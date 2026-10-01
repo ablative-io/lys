@@ -2,9 +2,10 @@ import { useState } from 'react';
 import type { Choices } from './choices';
 import type { ProvisioningProfile } from './Provisioning';
 import { StartAgent } from '../runtime/StartAgent';
+import type { PeopleView } from '../../generated';
 
-export function ProfileEditor({ id, profile, choices, readOnly = false }: {
-  id: string; profile: ProvisioningProfile | null; choices: Choices; readOnly?: boolean;
+export function ProfileEditor({ id, profile, choices, people, readOnly = false }: {
+  id: string; profile: ProvisioningProfile | null; choices: Choices; people: PeopleView; readOnly?: boolean;
 }) {
   const available = choices.programs ?? [];
   const [programName, setProgram] = useState(profile?.harness?.name ?? (available.length === 1 ? available[0].name : choices.programs?.length === 1 ? choices.programs[0].name : ''));
@@ -57,6 +58,6 @@ export function ProfileEditor({ id, profile, choices, readOnly = false }: {
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
     {prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
     <p>Lys makes this agent’s own folder when it starts.</p>
-    <StartAgent agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} />
+    <StartAgent agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} known={{ people, machines: choices.machines }} />
   </section>;
 }

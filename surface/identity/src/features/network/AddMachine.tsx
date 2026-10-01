@@ -1,82 +1,58 @@
-/** Add a computer: this one or another, who may start there, and the rarely needed rest under More; its runner is recorded in the same step. */
+/** Naming a local computer keeps its request until both the computer and runner are confirmed. */
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { operationId, Refused, request, useLoad } from '../../api';
-import type { AgentSummary } from '../../generated';
-import { readRoles } from '../roles/AssignedRoles';
-import { Gate } from '../signin/Gate';
-import { Picker } from '../../shell/Picker';
-import { matchesMachine, savedMachine } from './contract';
-import type { Machine, NameMachine } from './contract';
+import { operationId, Refused, request } from '../../api';
+import { confirmRunner, matchesMachine, savedMachine } from './contract';
+import type { Machine, PendingMachine } from './contract';
 
-type Starts = 'own' | 'dialled';
-const RUNNER = 'lys-runner';
-
-export function AddMachine({ agents, person, changed, cancel }: { agents: AgentSummary[]; person: string; changed: (message: string) => void; cancel: () => void }) {
-  const roles = useLoad(readRoles, 'machine-roles');
+export function AddMachine({ person, agent, changed, cancel }: {
+  person: string; agent?: string; changed: (message: string, machine: Machine) => void; cancel: () => void;
+}) {
   const key = 'lys.pending.machine.' + person;
   const [restored] = useState(() => {
-    try { return { body: savedMachine(key), error: '' }; }
-    catch (error) { return { body: null, error: String(error) }; }
+    try { return { pending: savedMachine(key), error: '' }; }
+    catch (error) { return { pending: null, error: error instanceof Refused ? error.refusal.refusal + ': ' + error.message : 'PendingMachineUnreadable: ' + String(error) }; }
   });
-  const [pending, setPending] = useState(restored.body);
+  const [pending, setPending] = useState(restored.pending);
   const [failure, setFailure] = useState(restored.error);
   const [busy, setBusy] = useState(false);
-  const [starts, setStarts] = useState<Starts>('own');
   const working = useRef(false);
-  const send = async (body: NameMachine, runner: Record<string, string> | null, retry: boolean) => {
+  const keep = (next: PendingMachine) => { sessionStorage.setItem(key, JSON.stringify({ version: 1, ...next })); setPending(next); };
+  const send = async (initial: PendingMachine) => {
     if (working.current || restored.error) return;
     working.current = true; setBusy(true); setFailure('');
+    let current = initial;
     try {
-      sessionStorage.setItem(key, JSON.stringify(body)); setPending(body);
-      const result = await request<Machine>('/network/machines', body);
-      if (!matchesMachine(result, body, person)) throw new Error('The answer did not confirm this computer was added. What you entered is kept.');
-      sessionStorage.removeItem(key); setPending(null);
-      if (runner) {
-        try { await request('/network/machines/' + encodeURIComponent(result.id) + '/runner', { runner }); }
-        catch (error) { changed(body.name + ' was added, but its Lys runner was not recorded: ' + (error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)) + '. Lys cannot start agents on it until it is.'); return; }
+      keep(current);
+      if (current.phase === 'machine') {
+        const result = await request<unknown>('/network/machines', current.body);
+        if (!matchesMachine(result, current.body, person)) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The answer did not confirm this computer was added. What you entered is kept.' });
+        current = { ...current, machine: result, phase: current.legacy ? 'read-runner' : 'runner' }; keep(current);
       }
-      changed(body.name + ' was added.' + (runner ? ' Lys will start agents on it through its Lys runner.' : ' Lys will not start agents on it.'));
-    } catch (error) {
-      if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) { sessionStorage.removeItem(key); setPending(null); }
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
-    } finally { working.current = false; setBusy(false); }
+      const path = '/network/machines/' + encodeURIComponent(current.body.operation) + '/runner';
+      const runner = await request<unknown>(path, current.phase === 'runner' ? { runner: { kind: 'lys' } } : undefined);
+      confirmRunner(runner, current.body.operation, !current.legacy);
+      if (!current.machine) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The recorded computer is missing from this pending addition.' });
+      sessionStorage.removeItem(key); setPending(null);
+      changed(current.body.name + ' was added. Its runner is recorded.', current.machine);
+    } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
+    finally { working.current = false; setBusy(false); }
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (pending || working.current || restored.error) return;
-    const data = new FormData(event.currentTarget);
-    const text = (name: string) => String(data.get(name) ?? '').trim();
-    const name = text('name'); const kind = 'Computer';
-    if (!name) { setFailure('Give the computer a name.'); return; }
-    const runs = true;
-    const runnerKey = text('runner-key').toLowerCase();
-    if (starts === 'dialled' && !/^[0-9a-f]{64}$/.test(runnerKey)) { setFailure('The runner key is 64 letters and digits (0 to 9, a to f), as the runner printed it when it was set up.'); return; }
-    const runner: Record<string, string> = starts === 'own' ? { kind: 'lys' } : { kind: 'dialled', key: runnerKey };
-    const mayReach = [...new Set(text('hosts').split(/\s+/).filter(Boolean).map((host) => host.toLowerCase()))];
-    void send({ operation: operationId(), name, kind, runtime: runs ? RUNNER : null, slots: 0,
-      may_run: runs ? data.getAll('agent').map(String) : [], ...(runs ? { may_run_roles: data.getAll('role').map(String) } : {}), may_reach: mayReach }, runner, false);
+    const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
+    if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) { setFailure('Give this computer a name of 1 to 100 characters without control characters.'); return; }
+    if (agent !== undefined && !/^agent-[0-9a-f]{32}$/.test(agent)) { setFailure('AgentIdentifierMalformed: the agent for this addition could not be read.'); return; }
+    void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null });
   };
-  return <form className="card recorded-form" aria-label="Add a computer" onSubmit={submit}>
-    <h2>Add a computer</h2>
+  return <form className="recorded-form" aria-label="Add a computer" onSubmit={submit}>
+    <h2>Add this computer</h2>
     <fieldset disabled={busy || pending !== null || Boolean(restored.error)} style={{ border: 0, padding: 0, margin: 0 }}>
-      <div className="field">Which computer
-        <div className="seg" role="group" aria-label="Which computer">
-          <button type="button" className={starts === 'own' ? 'on' : ''} aria-pressed={starts === 'own'} onClick={() => setStarts('own')}>The one Lys runs on</button>
-          <button type="button" className={starts === 'dialled' ? 'on' : ''} aria-pressed={starts === 'dialled'} onClick={() => setStarts('dialled')}>Another computer</button>
-        </div>
-      </div>
-      <label className="field">Name<input name="name" required maxLength={100} placeholder={starts === 'own' ? 'For example Office Mac' : 'For example Build server 3'} /></label>
-      {starts === 'dialled' ? <label className="field">Its runner's key<span className="hint">Set up the Lys runner on that computer and paste the key it prints.</span><input name="runner-key" required autoComplete="off" /></label> : null}
-      <div className="field">Who may start agents here
-        <Gate load={roles} title="Roles" ok={(view) => view.roles.length ? <>{view.roles.map((role) => <label key={role.id} className="sec"><input type="checkbox" name="role" value={role.id} /> Anyone holding {role.name}</label>)}</> : null} />
-        <Picker name="agent" label="Add an agent" multiple options={agents.map((agent) => ({ id: agent.id, name: agent.display_name }))} />
-      </div>
-      <details><summary className="sec">Websites its agents' services may connect to</summary>
-        <label className="field"><span className="hint">One per line, for example mcp.example.com.</span><textarea name="hosts" rows={3} /></label>
-      </details>
-      <div className="chain" style={{ marginTop: 12 }}><button className="btn primary" type="submit">Add this computer</button><button className="btn" type="button" onClick={cancel}>Cancel</button></div>
+      <label className="field">Name<input name="name" required maxLength={100} /></label>
+      <p className="hint">Type a name for this computer.</p>
+      <div className="chain"><button className="btn primary" type="submit">Add this computer</button><button className="btn" type="button" onClick={cancel}>Cancel</button></div>
     </fieldset>
-    {pending ? <div role="status"><p>Adding {pending.name} is not confirmed. What you entered is kept.</p><button className="btn" type="button" disabled={busy} onClick={() => void send(pending, null, true)}>Check whether it was added</button></div> : null}
-    {failure ? <p className="why-not" role="alert">{failure}</p> : null}
+    {pending ? <div role="status"><p>Adding {pending.body.name} is not confirmed. Its original request is kept.</p><button className="btn" type="button" disabled={busy} onClick={() => void send(pending)}>Check whether it was added</button></div> : null}
+    {failure ? <><p className="why-not" role="alert">Lys could not confirm this computer addition.</p><details><summary>Details</summary><p>{failure}</p></details></> : null}
   </form>;
 }

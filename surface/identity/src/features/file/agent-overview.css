@@ -21,6 +21,10 @@
 .agent-details .identity-id { overflow-wrap: anywhere; color: var(--text-secondary); }
 .agent-detail-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
 .agent-settings { margin-bottom: 24px; }
+.computer-admission { border-top: 1px solid var(--border-default); padding-top: 16px; margin: 20px 0; }
+.computer-permission { margin: 10px 0; }
+.computer-permission label { cursor: pointer; }
+.computer-admission details { margin: 8px 0; }
 @media (max-width: 620px) {
   .agent-facts { grid-template-columns: 1fr; gap: 4px; }
   .agent-facts dd { margin-bottom: 14px; }
