@@ -325,14 +325,20 @@ pub(crate) async fn register_agent(
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    crate::grants::with_directory_grants(&state, |directory, mut judged| {
-        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-        crate::service_account_grants::admit(&mut judged, caller, "agents")?;
-        let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
-        let target = registration_target(responsible, body.answers_to.as_deref(), false)?;
-        let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
-        crate::reporting_api::registered(&answer).map(Json)
-    })
+    crate::grants::with_directory_grants(
+        &state,
+        |mut judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+            crate::service_account_grants::admit(&mut judged, caller, "agents")?;
+            let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
+            let target = registration_target(responsible, body.answers_to.as_deref(), false)?;
+            Ok((actor, target))
+        },
+        |directory, (actor, target)| {
+            let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
+            crate::reporting_api::registered(&answer).map(Json)
+        },
+    )
 }
 
 pub(crate) async fn list(

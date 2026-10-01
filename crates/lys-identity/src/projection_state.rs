@@ -5,6 +5,8 @@
 //! bindings its records hold, and is rebuilt from them on reading exactly as
 //! [`Projection::apply`] builds it.
 
+use std::sync::Arc;
+
 use ciborium::Value;
 
 use super::{Projection, Record};
@@ -104,11 +106,10 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
         let (id, record) = read_record(held)?;
         for bound in &record.bindings {
             let taken = match id {
-                IdentityId::Person(person) => {
-                    projection.bindings.insert(bound.clone(), person).is_some()
-                }
-                IdentityId::Agent(agent) => projection
-                    .agent_bindings
+                IdentityId::Person(person) => Arc::make_mut(&mut projection.bindings)
+                    .insert(bound.clone(), person)
+                    .is_some(),
+                IdentityId::Agent(agent) => Arc::make_mut(&mut projection.agent_bindings)
                     .insert(bound.clone(), agent)
                     .is_some(),
                 IdentityId::ServiceAccount(_) => {
@@ -122,18 +123,25 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
         if let IdentityId::Person(person) = id {
             std::sync::Arc::make_mut(&mut projection.people).insert(id.to_string(), person);
         }
-        if projection.records.insert(id, record).is_some() {
+        if Arc::make_mut(&mut projection.records)
+            .insert(id, record)
+            .is_some()
+        {
             return Err(format!("{id} is recorded twice"));
         }
     }
-    projection.operations = read_indexed(operations, "an operation", read_operation)?
+    projection.operations = Arc::new(
+        read_indexed(operations, "an operation", read_operation)?
+            .into_iter()
+            .collect(),
+    );
+    projection.link_sources = Arc::new(
+        read_indexed(link_sources, "a link-audit source", |source| {
+            read_text(source, "a link-audit source")
+        })?
         .into_iter()
-        .collect();
-    projection.link_sources = read_indexed(link_sources, "a link-audit source", |source| {
-        read_text(source, "a link-audit source")
-    })?
-    .into_iter()
-    .collect();
+        .collect(),
+    );
     projection
         .rebuild_reporting_indexes()
         .map_err(|error| error.to_string())?;
