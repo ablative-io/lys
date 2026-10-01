@@ -42,12 +42,12 @@ use crate::peer::Leader;
 use crate::protocol::{Ended, EndedHow, Key, Launch, SessionView, StatusView};
 use crate::refusals::Desk;
 use crate::rotation::RotationState;
-use crate::scrollback::Scrollback;
 use crate::state::{Kept, KeptSession, StateFile};
 use crate::tracking::Tracking;
 use crate::tracking_store::Feed;
 
 mod lifecycle;
+pub(crate) mod output;
 mod restart;
 
 #[cfg(test)]
@@ -130,7 +130,7 @@ pub(crate) struct Session {
     pub(crate) leader_start: Option<Leader>,
     columns: u16,
     rows: u16,
-    scrollback: Scrollback,
+    pub(crate) output: Arc<output::OutputHandle>,
     pub(crate) ended: Option<Ended>,
     pub(crate) live: Option<Live>,
     generation: u64,
@@ -142,25 +142,16 @@ pub(crate) struct Session {
 }
 
 impl Session {
-    /// The session's scrollback.
-    pub(crate) fn scrollback(&self) -> &Scrollback {
-        &self.scrollback
-    }
-
-    /// The session's end, once it has ended.
-    pub(crate) fn ended(&self) -> Option<Ended> {
-        self.ended.clone()
-    }
-
-    fn view(&self, id: &str) -> SessionView {
-        SessionView {
+    fn view(&self, id: &str) -> Result<SessionView, RunnerError> {
+        let output = self.output.lock()?;
+        Ok(SessionView {
             session: id.to_owned(),
             pid: self.pid,
             started_at: self.started_at,
             columns: self.columns,
             rows: self.rows,
-            oldest: self.scrollback.oldest(),
-            cursor: self.scrollback.end(),
+            oldest: output.scrollback().oldest(),
+            cursor: output.scrollback().end(),
             account: self
                 .rotation
                 .as_ref()
@@ -176,7 +167,7 @@ impl Session {
                 .as_ref()
                 .and_then(|launch| launch.policy.as_deref())
                 .map(Admitted::judged_under),
-        }
+        })
     }
 
     pub(crate) fn live(&mut self, id: &str) -> Result<&mut Live, RunnerError> {
@@ -314,7 +305,7 @@ impl Sessions {
                     leader_start: kept.leader_start,
                     columns: kept.columns,
                     rows: kept.rows,
-                    scrollback: Scrollback::new(scrollback),
+                    output: Arc::new(output::OutputHandle::new(scrollback, Some(ended.clone()))),
                     ended: Some(ended),
                     live: None,
                     generation: 0,
@@ -376,6 +367,26 @@ impl Sessions {
     pub fn wake(&self) {
         #[cfg(test)]
         lifecycle::output_tests::table_woken();
+        self.changed.notify_all();
+    }
+
+    /// Wake a cancelled output request and the shared control waiters.
+    pub fn wake_session(&self, id: &str) -> Result<(), RunnerError> {
+        let table = self.lock();
+        let output = Arc::clone(&table.sessions.get(id).ok_or_else(|| unknown(id))?.output);
+        self.changed.notify_all();
+        drop(table);
+        output.wake()
+    }
+
+    /// Wake caller-close requests whose session was not decoded.
+    pub(crate) fn cancel_waiters(&self) {
+        let table = self.lock();
+        for (id, session) in &table.sessions {
+            if let Err(error) = session.output.wake() {
+                crate::error::said(&format!("session {id}: cancellation_wake_failed: {error}"));
+            }
+        }
         self.changed.notify_all();
     }
 
@@ -467,7 +478,7 @@ impl Sessions {
             leader_start: None,
             columns: launch.columns,
             rows: launch.rows,
-            scrollback: Scrollback::new(self.scrollback),
+            output: Arc::new(output::OutputHandle::new(self.scrollback, None)),
             ended: None,
             live: None,
             generation: 0,
@@ -582,35 +593,23 @@ impl Sessions {
         Ok(())
     }
 
-    /// Run `check` on session `id` each time the table changes, until it
+    /// Run `check` on session `id` each time its output changes, until it
     /// answers, the caller leaves, or the runner stops.
     pub(crate) fn until<T>(
         &self,
         id: &str,
         left: &AtomicBool,
-        mut check: impl FnMut(&mut Session, &str) -> Option<Result<T, RunnerError>>,
+        check: impl FnMut(&mut output::OutputState, &str) -> Option<Result<T, RunnerError>>,
     ) -> Result<T, RunnerError> {
-        let mut table = self.lock();
-        loop {
-            let stopping = table.stopping;
-            let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-            if let Some(answer) = check(session, id) {
-                return answer;
-            }
-            if left.load(Ordering::SeqCst) {
-                return Err(RunnerError::refused(
-                    "caller_left",
-                    "the caller closed the request",
-                ));
-            }
-            if stopping {
-                return Err(RunnerError::refused(
-                    "runner_stopping",
-                    "the runner is stopping",
-                ));
-            }
-            table = self.wait(table);
-        }
+        let output = Arc::clone(
+            &self
+                .lock()
+                .sessions
+                .get(id)
+                .ok_or_else(|| unknown(id))?
+                .output,
+        );
+        output.until(id, left, check)
     }
 
     /// End session `id`'s process and answer once its exit is seen.
@@ -625,7 +624,7 @@ impl Sessions {
                 }
             }
         }
-        let ended = self.until(id, left, |session, _| session.ended.clone().map(Ok))?;
+        let ended = self.until(id, left, |session, _| session.ended().map(Ok))?;
         self.writer.barrier()?;
         Ok(ended)
     }
@@ -634,12 +633,18 @@ impl Sessions {
     pub fn status(&self, only: Option<&str>) -> Result<StatusView, RunnerError> {
         let table = self.lock();
         let sessions = match only {
-            Some(id) => vec![table.sessions.get(id).ok_or_else(|| unknown(id))?.view(id)],
+            Some(id) => vec![
+                table
+                    .sessions
+                    .get(id)
+                    .ok_or_else(|| unknown(id))?
+                    .view(id)?,
+            ],
             None => table
                 .sessions
                 .iter()
                 .map(|(id, session)| session.view(id))
-                .collect(),
+                .collect::<Result<Vec<_>, _>>()?,
         };
         Ok(StatusView {
             runner: RUNNER.to_owned(),
@@ -654,6 +659,9 @@ impl Sessions {
         let mut table = self.lock();
         table.stopping = true;
         for (id, session) in &mut table.sessions {
+            if let Err(error) = session.output.stop() {
+                crate::error::said(&format!("session {id}: shutdown_wake_failed: {error}"));
+            }
             if session.ended.is_none() {
                 session.ending = true;
                 if let Some(live) = &session.live {

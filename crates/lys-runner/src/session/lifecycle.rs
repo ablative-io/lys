@@ -122,6 +122,7 @@ pub(super) struct Pending {
     generation: u64,
     reader: Box<dyn Read + Send>,
     child: Box<dyn Child + Send + Sync>,
+    output: Arc<super::output::OutputHandle>,
 }
 
 impl Pending {
@@ -179,13 +180,23 @@ impl Sessions {
         session: &mut Session,
         mut prepared: Prepared,
     ) -> Result<Pending, RunnerError> {
+        let generation = session.generation + 1;
+        session.output.begin(
+            generation,
+            session.rotation.as_ref(),
+            session
+                .guard
+                .tracking
+                .as_ref()
+                .is_some_and(|tracking| tracking.harness == Harness::ClaudeCode),
+        )?;
         let spawned = prepared.spawned.take().ok_or_else(|| {
             RunnerError::refused(
                 "spawn_install_failed",
                 "the prepared child was already installed",
             )
         })?;
-        session.generation += 1;
+        session.generation = generation;
         session.pid = Some(spawned.pid);
         session.guard.leader = Some(prepared.leader.clone());
         session.leader_start = Some(prepared.leader.clone());
@@ -200,6 +211,7 @@ impl Sessions {
             generation: session.generation,
             reader: spawned.reader,
             child: spawned.child,
+            output: Arc::clone(&session.output),
         })
     }
 
@@ -209,14 +221,17 @@ impl Sessions {
             generation,
             reader,
             child,
+            output,
             ..
         } = pending;
         let pumped = Arc::clone(self);
         let owned = id.to_owned();
-        let pump = std::thread::spawn(move || pumped.pump(&owned, generation, reader));
+        let pumped_output = Arc::clone(&output);
+        let pump =
+            std::thread::spawn(move || pumped.pump(&owned, generation, &pumped_output, reader));
         let watched = Arc::clone(self);
         let owned = id.to_owned();
-        std::thread::spawn(move || watched.watch(&owned, generation, child, pump));
+        std::thread::spawn(move || watched.watch(&owned, generation, &output, child, pump));
     }
 
     pub(super) fn replace_generation(
@@ -274,7 +289,13 @@ impl Sessions {
 
     /// Keep the output of generation `generation` of session `id` until its
     /// terminal closes.
-    fn pump(&self, id: &str, generation: u64, mut reader: Box<dyn Read + Send>) {
+    fn pump(
+        &self,
+        id: &str,
+        generation: u64,
+        output: &super::output::OutputHandle,
+        mut reader: Box<dyn Read + Send>,
+    ) {
         let mut buffer = [0_u8; 8192];
         loop {
             let read = match reader.read(&mut buffer) {
@@ -286,17 +307,37 @@ impl Sessions {
                     break;
                 }
             };
-            let mut table = self.lock();
-            if let Some(session) = table
-                .sessions
-                .get_mut(id)
-                .filter(|s| s.generation == generation)
-            {
-                session.scrollback.push(&buffer[..read]);
-                trip_on_words(session, read);
+            match output.push(generation, &buffer[..read]) {
+                Ok(true) => {
+                    let leader = {
+                        let mut table = self.lock();
+                        table
+                            .sessions
+                            .get_mut(id)
+                            .filter(|session| session.generation == generation && !session.ending)
+                            .and_then(|session| {
+                                let rotation = session.rotation.as_mut()?;
+                                if rotation.tripped() {
+                                    return None;
+                                }
+                                rotation.trip();
+                                session.guard.leader.clone()
+                            })
+                    };
+                    if let Some(leader) = leader {
+                        if let Err(error) = crate::pty::end(&leader) {
+                            crate::error::said(&format!(
+                                "session {id}: rotation_signal_failed: {error}"
+                            ));
+                        }
+                    }
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    crate::error::said(&format!("session {id}: output_record_failed: {error}"));
+                    break;
+                }
             }
-            drop(table);
-            self.wake();
         }
     }
 
@@ -308,6 +349,7 @@ impl Sessions {
         self: &Arc<Self>,
         id: &str,
         generation: u64,
+        output: &super::output::OutputHandle,
         mut child: Box<dyn Child + Send + Sync>,
         pump: std::thread::JoinHandle<()>,
     ) {
@@ -436,6 +478,9 @@ impl Sessions {
         drop(table);
         if let Err(error) = self.writer.barrier() {
             crate::error::said(&format!("session {id}: exit_record_failed: {error}"));
+        }
+        if let Err(error) = output.finish(generation, ended) {
+            crate::error::said(&format!("session {id}: output_exit_failed: {error}"));
         }
         self.wake();
     }
@@ -831,42 +876,6 @@ pub(crate) fn tracking_started(
         adapter,
     };
     append(table, id, vec![Body::Coverage(coverage)], None)
-}
-
-/// Mark the session's usage-limit words seen in the last `read` bytes, and
-/// end its process so its exit moves it to the next account.
-fn trip_on_words(session: &mut Session, read: usize) {
-    if session
-        .guard
-        .tracking
-        .as_ref()
-        .is_some_and(|tracking| tracking.harness == Harness::ClaudeCode)
-    {
-        return;
-    }
-    let Some(rotation) = session.rotation.as_mut() else {
-        return;
-    };
-    if session.ending || rotation.tripped() {
-        return;
-    }
-    let reach = read + rotation.longest_word().saturating_sub(1);
-    let from = session
-        .scrollback
-        .end()
-        .saturating_sub(reach as u64)
-        .max(session.scrollback.oldest());
-    let Ok(bytes) = session.scrollback.from(from) else {
-        return;
-    };
-    if rotation.words_in(&String::from_utf8_lossy(&bytes)) {
-        rotation.trip();
-        if let Some(live) = &session.live {
-            if let Err(error) = live.end() {
-                crate::error::said(&format!("rotation_signal_failed: {error}"));
-            }
-        }
-    }
 }
 
 pub(crate) fn window_limit(table: &mut Table, id: &str, bodies: &[Body]) -> Option<Leader> {
