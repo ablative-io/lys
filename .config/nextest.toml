@@ -1,0 +1,9 @@
+nextest-version = "0.9.133"
+experimental = ["setup-scripts"]
+
+[scripts.setup.go-fixture]
+command = { command-line = "cargo run --offline --locked -p lys-core --example go_conformance_fixture", env = { LYS_GO_PROFILE = "1" } }
+
+[[profile.default.scripts]]
+filter = '((package(lys-core) & binary(/^(bundle_conformance|receipt_conformance|cose_conformance|consistency_conformance|consistency_receipt_conformance|delegation_conformance|go_conformance)$/)) | (package(lys-anchor) & binary(/^(anchor_receipt_conformance|checkpoint_note_conformance)$/))) & (test(/(^|::)go_/) | binary(/^consistency_conformance$/))'
+setup = "go-fixture"

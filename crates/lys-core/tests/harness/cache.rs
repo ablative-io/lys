@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::path::Path;
 use std::process::Command;
+use std::time::Instant;
 
 use sha2::{Digest, Sha256};
 
@@ -102,8 +103,15 @@ fn environment(go: &Path, scaffold: &Path, gocache: &Path) -> Vec<u8> {
 ///
 /// Fails on a broken toolchain, changed build inputs, corrupt cache or any I/O
 /// error. The lock covers publication and copying, so readers see a full build.
-pub fn build(go: &Path, scaffold: &Path, out: &Path, compile: impl FnOnce(&Path, &Path)) {
-    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("lys-go-conformance-v1");
+pub fn build(
+    go: &Path,
+    scaffold: &Path,
+    out: &Path,
+    target_tmp: &Path,
+    compile: impl FnOnce(&Path, &Path),
+) {
+    let started = Instant::now();
+    let root = target_tmp.join("lys-go-conformance-v1");
     let gocache = root.join("gocache");
     fs::create_dir_all(&gocache).expect("cannot create shared Go compiler cache");
     let environment = environment(go, scaffold, &gocache);
@@ -120,7 +128,9 @@ pub fn build(go: &Path, scaffold: &Path, out: &Path, compile: impl FnOnce(&Path,
         .write(true)
         .open(root.join(format!("{key}.lock")))
         .expect("cannot open Go executable cache lock");
+    let waiting = Instant::now();
     lock.lock().expect("cannot lock Go executable cache");
+    profile("lock", waiting);
     let entry = root.join(key);
     if !entry
         .try_exists()
@@ -128,7 +138,9 @@ pub fn build(go: &Path, scaffold: &Path, out: &Path, compile: impl FnOnce(&Path,
     {
         let staging = tempfile::tempdir_in(&root).expect("cannot stage Go executable cache");
         let executable = staging.path().join("tool");
+        let compiling = Instant::now();
         compile(&executable, &gocache);
+        profile("build", compiling);
         assert_eq!(
             source_hash(scaffold),
             source,
@@ -150,4 +162,15 @@ pub fn build(go: &Path, scaffold: &Path, out: &Path, compile: impl FnOnce(&Path,
         "Go scaffold source changed before using its cached executable"
     );
     fs::copy(executable, out).expect("cannot copy cached Go executable into the test");
+    profile("cache", started);
+}
+
+/// Prints phase costs only when the diagnostic explicitly requests them.
+pub fn profile(phase: &str, started: Instant) {
+    if std::env::var_os("LYS_GO_PROFILE").is_some() {
+        eprintln!(
+            "go_fixture phase={phase} elapsed_us={}",
+            started.elapsed().as_micros()
+        );
+    }
 }

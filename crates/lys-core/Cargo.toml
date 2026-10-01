@@ -28,6 +28,7 @@ exclude = [
     "tests/consistency_receipt_conformance.rs",
     "tests/delegation_conformance/",
     "tests/harness/",
+    "examples/go_conformance_fixture.rs",
     # The openssl interop gate is repo-only for the same reason: it requires an
     # Ed25519-capable openssl on the machine and FAILS rather than skips when
     # there is none (a skipped gate reports green while testing nothing). That

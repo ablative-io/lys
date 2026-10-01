@@ -111,29 +111,36 @@ fn find_go() -> Option<PathBuf> {
 /// Builds the vendored reference once and copies it into the test directory.
 fn build_go_tool(go: &Path, out: &Path) {
     let scaffold_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/go-conformance");
-    cache::build(go, &scaffold_dir, out, |executable, gocache| {
-        let status = Command::new(go)
-            .arg("build")
-            .arg("-o")
-            .arg(executable)
-            .arg(".")
-            .current_dir(&scaffold_dir)
-            .env("GOFLAGS", "-mod=vendor")
-            .env("GOPROXY", "off")
-            .env("GOTOOLCHAIN", "local")
-            .env("GOWORK", "off")
-            .env("GOCACHE", gocache)
-            .status()
-            .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-        assert!(
-            status.success(),
-            "go build of the note conformance tool failed"
-        );
-    });
+    cache::build(
+        go,
+        &scaffold_dir,
+        out,
+        Path::new(env!("CARGO_TARGET_TMPDIR")),
+        |executable, gocache| {
+            let status = Command::new(go)
+                .arg("build")
+                .arg("-o")
+                .arg(executable)
+                .arg(".")
+                .current_dir(&scaffold_dir)
+                .env("GOFLAGS", "-mod=vendor")
+                .env("GOPROXY", "off")
+                .env("GOTOOLCHAIN", "local")
+                .env("GOWORK", "off")
+                .env("GOCACHE", gocache)
+                .status()
+                .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
+            assert!(
+                status.success(),
+                "go build of the note conformance tool failed"
+            );
+        },
+    );
 }
 
 /// Runs the built reference with the case's original arguments and input.
 fn run_go_tool(bin: &Path, args: &[&str], input: &[u8]) -> (bool, Vec<u8>) {
+    let started = std::time::Instant::now();
     let mut child = Command::new(bin)
         .args(args)
         .stdin(Stdio::piped())
@@ -150,6 +157,7 @@ fn run_go_tool(bin: &Path, args: &[&str], input: &[u8]) -> (bool, Vec<u8>) {
     let output = child
         .wait_with_output()
         .expect("failed to wait for the Go tool");
+    cache::profile("exec", started);
     (output.status.success(), output.stdout)
 }
 

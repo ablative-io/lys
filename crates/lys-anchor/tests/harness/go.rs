@@ -146,20 +146,26 @@ pub fn go_or_skip(gate: &str) -> Option<PathBuf> {
 /// an unvendored dependency cannot resolve at all rather than being fetched.
 pub fn build_go_tool(go: &Path, scaffold: GoScaffold, out: &Path) {
     let scaffold_dir = scaffold.dir();
-    cache::build(go, &scaffold_dir, out, |executable, gocache| {
-        let status = Command::new(go)
-            .arg("build")
-            .arg("-o")
-            .arg(executable)
-            .arg(".")
-            .current_dir(&scaffold_dir)
-            .envs(GO_ENV)
-            .env("GOWORK", "off")
-            .env("GOCACHE", gocache)
-            .status()
-            .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-        assert!(status.success(), "go build of the {scaffold:?} tool failed");
-    });
+    cache::build(
+        go,
+        &scaffold_dir,
+        out,
+        Path::new(env!("CARGO_TARGET_TMPDIR")),
+        |executable, gocache| {
+            let status = Command::new(go)
+                .arg("build")
+                .arg("-o")
+                .arg(executable)
+                .arg(".")
+                .current_dir(&scaffold_dir)
+                .envs(GO_ENV)
+                .env("GOWORK", "off")
+                .env("GOCACHE", gocache)
+                .status()
+                .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
+            assert!(status.success(), "go build of the {scaffold:?} tool failed");
+        },
+    );
 }
 
 /// Runs the pre-built tool with `input` on stdin; returns `(exit_success,
@@ -173,6 +179,7 @@ pub fn build_go_tool(go: &Path, scaffold: GoScaffold, out: &Path) {
 ///
 /// Panics if the built tool cannot be spawned or its stdin cannot be written.
 pub fn run_built_tool<S: AsRef<OsStr>>(bin: &Path, args: &[S], input: &[u8]) -> (bool, Vec<u8>) {
+    let started = std::time::Instant::now();
     let mut child = Command::new(bin)
         .args(args)
         .stdin(Stdio::piped())
@@ -189,6 +196,7 @@ pub fn run_built_tool<S: AsRef<OsStr>>(bin: &Path, args: &[S], input: &[u8]) -> 
     let output = child
         .wait_with_output()
         .expect("failed to wait for the tool");
+    cache::profile("exec", started);
     (output.status.success(), output.stdout)
 }
 
