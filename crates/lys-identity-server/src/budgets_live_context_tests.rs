@@ -12,8 +12,8 @@ use lys_core::Ed25519Identity;
 
 fn closed_context(figure: Option<u64>) -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
-    let key = Arc::new(Ed25519Identity::generate()?);
-    let mut runtime = RuntimeStore::open(dir.path(), Arc::clone(&key))?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let mut runtime = RuntimeStore::open(&dir.path().join("runtime"), Arc::clone(&key))?;
     let first = Report {
         operation: "start-old".to_owned(),
         session: "old".to_owned(),
@@ -40,7 +40,7 @@ fn closed_context(figure: Option<u64>) -> Result<(), Box<dyn Error>> {
         ..first
     })?;
     drop(runtime);
-    let mut runtime = RuntimeStore::open(dir.path(), key)?;
+    let mut runtime = RuntimeStore::open(&dir.path().join("runtime"), key)?;
     let agents = BTreeSet::from(["agent".to_owned()]);
     let sessions = runtime.agents_with_sessions(&agents)?;
     let mut held = Held::default();
