@@ -87,6 +87,7 @@ pub mod launch_template;
 pub mod link_audit_api;
 pub mod list_page;
 mod mcp_approval_sight;
+mod mcp_endpoint;
 mod mcp_record;
 pub mod mcp_requests_api;
 mod mcp_requests_state;
