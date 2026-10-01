@@ -5,6 +5,9 @@
 //! operation id that names it, and retired once, under an operation id of
 //! its own. Every operation id names one line only.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::read_views::Login;
@@ -96,10 +99,56 @@ impl Account {
 
 /// The service accounts as their log folds them, in the order created.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The service accounts.
     pub accounts: Vec<Account>,
+    #[serde(skip)]
+    index: Arc<Index>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Index {
+    accounts: HashMap<String, usize>,
+    operations: HashMap<String, (usize, bool)>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    accounts: Vec<Account>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let mut index = Index::default();
+        for (position, account) in records.accounts.iter().enumerate() {
+            index
+                .accounts
+                .entry(account.created.id.clone())
+                .or_insert(position);
+            index
+                .operations
+                .entry(account.created.id.clone())
+                .or_insert((position, false));
+            if let Some(retired) = &account.retired {
+                index
+                    .operations
+                    .entry(retired.operation.clone())
+                    .or_insert((position, true));
+            }
+        }
+        Self {
+            accounts: records.accounts,
+            index: Arc::new(index),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -112,34 +161,36 @@ struct Sealed {
 impl Held {
     /// The service account named `id`.
     pub fn account(&self, id: &str) -> Option<&Account> {
-        self.accounts
-            .iter()
-            .find(|account| account.created.id == id)
+        self.index.accounts.get(id).and_then(|position| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Account);
+            self.accounts.get(*position)
+        })
     }
 
-    /// The line kept under `operation`, whichever kind it is.
+    /// The creation or retirement kept under `operation`.
     pub fn operation(&self, operation: &str) -> Option<Line> {
-        self.accounts.iter().find_map(|account| {
-            if account.created.id == operation {
-                return Some(Line::Created(account.created.clone()));
-            }
-            account
-                .retired
-                .as_ref()
-                .filter(|retired| retired.operation == operation)
-                .map(|retired| Line::Retired(retired.clone()))
-        })
+        let (position, retired) = self.index.operations.get(operation)?;
+        #[cfg(test)]
+        crate::folded_work::visit(crate::folded_work::Work::Account);
+        let account = self.accounts.get(*position)?;
+        if *retired {
+            account.retired.clone().map(Line::Retired)
+        } else {
+            Some(Line::Created(account.created.clone()))
+        }
     }
 
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
         if let Line::ImportRefused(refused) = line {
-            let account = self
+            let position = self
+                .index
                 .accounts
-                .iter_mut()
-                .find(|account| account.created.id == refused.account)
+                .get(&refused.account)
                 .ok_or_else(|| "import refusal names no existing account".to_owned())?;
+            let account = &mut self.accounts[*position];
             if account
                 .import_refusals
                 .iter()
@@ -155,12 +206,19 @@ impl Held {
             Line::Retired(retired) => &retired.operation,
             Line::ImportRefused(_) => return Err("unexpected import refusal".to_owned()),
         };
-        if self.operation(operation).is_some() {
+        if self.index.operations.contains_key(operation) {
             return Err(format!("operation `{operation}` already names a line"));
         }
         match line {
             Line::ImportRefused(_) => Err("unexpected import refusal".to_owned()),
             Line::Created(created) => {
+                let index = Arc::make_mut(&mut self.index);
+                index
+                    .accounts
+                    .insert(created.id.clone(), self.accounts.len());
+                index
+                    .operations
+                    .insert(created.id.clone(), (self.accounts.len(), false));
                 self.accounts.push(Account {
                     created,
                     retired: None,
@@ -169,22 +227,22 @@ impl Held {
                 Ok(())
             }
             Line::Retired(retired) => {
-                let account = self
-                    .accounts
-                    .iter_mut()
-                    .find(|account| account.created.id == retired.account)
-                    .ok_or_else(|| {
-                        format!(
-                            "retirement `{}` names service account `{}`, which was never created",
-                            retired.operation, retired.account
-                        )
-                    })?;
+                let position = *self.index.accounts.get(&retired.account).ok_or_else(|| {
+                    format!(
+                        "retirement `{}` names service account `{}`, which was never created",
+                        retired.operation, retired.account
+                    )
+                })?;
+                let account = &mut self.accounts[position];
                 if account.retired.is_some() {
                     return Err(format!(
                         "retirement `{}` names service account `{}`, which was already retired",
                         retired.operation, retired.account
                     ));
                 }
+                Arc::make_mut(&mut self.index)
+                    .operations
+                    .insert(retired.operation.clone(), (position, true));
                 account.retired = Some(retired);
                 Ok(())
             }
@@ -204,9 +262,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("service accounts state: {error}"))
     }

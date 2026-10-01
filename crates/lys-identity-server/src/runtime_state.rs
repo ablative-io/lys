@@ -5,6 +5,10 @@
 //! seen by a runtime and carrying no identity. A found session is never
 //! given an identity here; it stays found.
 
+use std::collections::BTreeMap;
+use std::ops::Bound;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 /// The snapshot domain the reports' folded state is sealed under.
@@ -123,10 +127,51 @@ impl Tracked {
 
 /// The sessions as their log folds them, in the order first reported.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The sessions.
     pub sessions: Vec<Tracked>,
+    #[serde(skip)]
+    index: Arc<Index>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Index {
+    positions: BTreeMap<String, usize>,
+    live: BTreeMap<(String, usize), usize>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    sessions: Vec<Tracked>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let mut index = Index::default();
+        for (position, tracked) in records.sessions.iter().enumerate() {
+            index
+                .positions
+                .entry(tracked.session.clone())
+                .or_insert(position);
+            if tracked.agent.is_some() && !tracked.stopped() && tracked.first().is_some() {
+                index
+                    .live
+                    .insert((tracked.session.clone(), position), position);
+            }
+        }
+        Self {
+            sessions: records.sessions,
+            index: Arc::new(index),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -139,9 +184,28 @@ struct Sealed {
 impl Held {
     /// The session named `session`.
     pub fn session(&self, session: &str) -> Option<&Tracked> {
-        self.sessions
-            .iter()
-            .find(|tracked| tracked.session == session)
+        self.index
+            .positions
+            .get(session)
+            .and_then(|position| self.sessions.get(*position))
+    }
+
+    /// Live agent sessions in identifier order, starting after the supplied identifier.
+    pub fn live_ordered(&self, after: Bound<&str>) -> impl Iterator<Item = &Tracked> {
+        let after = match after {
+            Bound::Unbounded => Bound::Unbounded,
+            Bound::Excluded(id) => Bound::Excluded((id.to_owned(), usize::MAX)),
+            Bound::Included(id) => Bound::Included((id.to_owned(), 0)),
+        };
+        self.index
+            .live
+            .range((after, Bound::Unbounded))
+            .map(|(_, position)| &self.sessions[*position])
+    }
+
+    /// The maintained number of live agent sessions.
+    pub fn live_count(&self) -> usize {
+        self.index.live.len()
     }
 
     /// The report kept under `operation`, with its session.
@@ -155,12 +219,16 @@ impl Held {
     /// Fold one report. A report on a session never begun is refused by
     /// reason, since every kept report was checked against what came before.
     pub fn hold(&mut self, report: Report) -> Result<(), String> {
-        if let Some(tracked) = self
-            .sessions
-            .iter_mut()
-            .find(|tracked| tracked.session == report.session)
-        {
+        if let Some(position) = self.index.positions.get(&report.session).copied() {
+            let tracked = &mut self.sessions[position];
             tracked.reports.push(report);
+            let index = Arc::make_mut(&mut self.index);
+            let key = (tracked.session.clone(), position);
+            if tracked.agent.is_some() && !tracked.stopped() {
+                index.live.insert(key, position);
+            } else {
+                index.live.remove(&key);
+            }
             return Ok(());
         }
         let begins = match report.agent {
@@ -172,6 +240,16 @@ impl Held {
                 "report `{}` is the first on session `{}` and does not begin it",
                 report.operation, report.session
             ));
+        }
+        let index = Arc::make_mut(&mut self.index);
+        index
+            .positions
+            .insert(report.session.clone(), self.sessions.len());
+        if report.agent.is_some() {
+            index.live.insert(
+                (report.session.clone(), self.sessions.len()),
+                self.sessions.len(),
+            );
         }
         self.sessions.push(Tracked {
             session: report.session.clone(),
@@ -195,9 +273,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("runtime state: {error}"))
     }

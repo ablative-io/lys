@@ -27,6 +27,7 @@
 //! or a state that does not read back, sends the start to every leaf, by
 //! name, never silently.
 
+use std::ops::Bound;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -301,9 +302,25 @@ impl<S: LeafStore> RequestStore<S> {
             .map(|asked| (asked, self.held.decided.get(&asked.id)))
     }
 
+    /// Requests in identifier order, starting after the supplied identifier.
+    pub fn requests_ordered(&self, after: Bound<&str>) -> impl Iterator<Item = &Asked> {
+        self.held
+            .ordered
+            .range::<str, _>((after, Bound::Unbounded))
+            .flat_map(|(_, positions)| positions)
+            .map(|position| &self.held.asked[*position])
+    }
+
+    /// The maintained number of requests.
+    pub fn request_count(&self) -> usize {
+        self.held.asked.len()
+    }
+
     /// The request named `id`.
     pub fn request(&self, id: &str) -> Option<Kept<'_>> {
-        self.requests().find(|(asked, _)| asked.id == id)
+        let position = *self.held.ordered.get(id)?.first()?;
+        let asked = self.held.asked.get(position)?;
+        Some((asked, self.held.decided.get(id)))
     }
 
     /// Keep `asked`. Asked again in the same words it is kept once; the same

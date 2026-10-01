@@ -8,6 +8,7 @@
 //! before it is signed and never after it is in the log.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
 
 use crate::binding::LoginBinding;
 use crate::error::IdentityError;
@@ -88,6 +89,7 @@ impl Record {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Projection {
     records: BTreeMap<IdentityId, Record>,
+    people: Arc<BTreeMap<String, PersonId>>,
     agents_by_person: BTreeMap<PersonId, BTreeSet<IdentityId>>,
     reporting_children: BTreeMap<IdentityId, BTreeSet<IdentityId>>,
     agent_count: usize,
@@ -160,6 +162,28 @@ impl Projection {
     /// Every identity, in identifier order.
     pub fn records(&self) -> impl Iterator<Item = (&IdentityId, &Record)> {
         self.records.iter()
+    }
+
+    /// People in wire identifier order, starting after the supplied identifier.
+    pub fn people(&self, after: std::ops::Bound<&str>) -> impl Iterator<Item = (&str, PersonId)> {
+        self.people
+            .range::<str, _>((after, std::ops::Bound::Unbounded))
+            .map(|(id, person)| (id.as_str(), *person))
+    }
+
+    /// The maintained number of people.
+    pub fn people_count(&self) -> usize {
+        self.people.len()
+    }
+
+    /// The maintained number of agents answering to people.
+    pub fn people_agents_count(&self) -> usize {
+        self.agent_count
+    }
+
+    /// The maintained number of one person's agents.
+    pub fn person_agents_count(&self, person: PersonId) -> usize {
+        self.agents_by_person.get(&person).map_or(0, BTreeSet::len)
     }
 
     /// The named person's agents, without visiting unrelated directory records.
@@ -380,6 +404,9 @@ impl Projection {
                 self.link_sources
                     .insert(seen.source_operation_id().to_owned(), index);
             }
+        }
+        if let IdentityId::Person(person) = identity {
+            Arc::make_mut(&mut self.people).insert(identity.to_string(), person);
         }
         Ok(())
     }
