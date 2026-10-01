@@ -29,13 +29,17 @@ pub mod budgets_context;
 pub mod budgets_crossing;
 pub mod budgets_enforce;
 pub mod budgets_feed;
+pub mod budgets_index;
 pub mod budgets_legacy;
 pub mod budgets_limits;
 pub mod budgets_members;
 pub mod budgets_migration;
 pub mod budgets_state;
 pub mod budgets_store;
+mod budgets_totals;
 pub mod budgets_usage;
+#[cfg(test)]
+mod budgets_work;
 pub mod caller_admission;
 pub mod certificates_api;
 mod certificates_issue;
