@@ -84,6 +84,26 @@ impl Agent {
         Ok(())
     }
 
+    fn remove(&mut self, session: &str) -> Result<(), String> {
+        if let Some(reading) = self.sessions.remove(session) {
+            if let Some(figure) = reading.figure {
+                let count = self
+                    .figures
+                    .get_mut(&figure)
+                    .ok_or("context figure count is absent")?;
+                *count = count
+                    .checked_sub(1)
+                    .ok_or("context figure count underflows")?;
+                if *count == 0 {
+                    self.figures.remove(&figure);
+                }
+            }
+            self.missing.remove(session);
+            self.named_at = self.sessions.values().map(|reading| reading.at_ms).max();
+        }
+        Ok(())
+    }
+
     fn gap(&self, at_ms: i64) -> Option<&'static str> {
         if self.named_at.is_some_and(|at| at > at_ms)
             || self.unnamed_at.is_some_and(|at| at > at_ms)
@@ -118,6 +138,101 @@ impl Availability {
             .keep(usage)
     }
 
+    pub(crate) fn agents(&self) -> BTreeSet<String> {
+        self.agents.keys().cloned().collect()
+    }
+
+    pub(crate) fn remove(&mut self, agent: &str, session: &str) -> Result<(), String> {
+        if let Some(agent) = self.agents.get_mut(agent) {
+            agent.remove(session)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn reconcile(
+        &mut self,
+        sessions: &BTreeMap<String, crate::runtime_store::SessionActivity>,
+    ) -> Result<Vec<String>, String> {
+        let mut removed = Vec::new();
+        for (name, activity) in sessions {
+            let Some(agent) = self.agents.get_mut(name) else {
+                continue;
+            };
+            let closed: Vec<_> = agent
+                .sessions
+                .keys()
+                .filter(|session| !activity.live_sessions().contains(*session))
+                .cloned()
+                .collect();
+            for session in closed {
+                agent.remove(&session)?;
+                removed.push(session);
+            }
+        }
+        Ok(removed)
+    }
+
+    pub(crate) fn used_live(
+        &self,
+        limit: &Limit,
+        agents: &BTreeSet<String>,
+        at_ms: i64,
+        sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
+    ) -> Used {
+        let Some(sessions) = sessions else {
+            return self.used(limit, agents, at_ms);
+        };
+        let mut figure = None;
+        let mut gap = None;
+        for name in agents {
+            let Some(activity) = sessions.get(name) else {
+                gap = Some(NO_CONTEXT);
+                break;
+            };
+            let agent = self.agents.get(name);
+            let mut named_at = None;
+            for session in activity.live_sessions() {
+                let Some(reading) = agent.and_then(|agent| agent.sessions.get(session)) else {
+                    gap = Some(NO_CONTEXT);
+                    break;
+                };
+                named_at = Some(named_at.map_or(reading.at_ms, |at: i64| at.max(reading.at_ms)));
+                if reading.at_ms > at_ms {
+                    gap = Some(FUTURE);
+                    break;
+                }
+                let Some(current) = reading.figure else {
+                    gap = Some(NO_CONTEXT);
+                    break;
+                };
+                figure = Some(figure.map_or(current, |held: u64| held.max(current)));
+            }
+            if gap.is_some() {
+                break;
+            }
+            if let Some(unnamed) = agent.and_then(|agent| agent.unnamed_at) {
+                if unnamed > at_ms {
+                    gap = Some(FUTURE);
+                    break;
+                }
+                if named_at.is_none_or(|named| unnamed >= named) {
+                    gap = Some(NO_SESSION);
+                    break;
+                }
+            }
+        }
+        Used {
+            unit: limit.unit,
+            period: limit.period,
+            figure: gap.is_none().then_some(figure).flatten().map(Into::into),
+            since_ms: None,
+            unavailable: gap
+                .or_else(|| figure.is_none().then_some(NO_CONTEXT))
+                .map(str::to_owned),
+            account: None,
+        }
+    }
+
     /// Read covered agents' current maximum, refusing to invent a figure for a gap.
     pub(crate) fn used(&self, limit: &Limit, agents: &BTreeSet<String>, at_ms: i64) -> Used {
         let mut figure = None;
@@ -150,3 +265,15 @@ impl Availability {
 #[cfg(test)]
 #[path = "budgets_context_tests.rs"]
 mod tests;
+
+/// A confirmed runtime end removes only that session's derived context state.
+pub(crate) fn finish(
+    state: &crate::routes::AppState,
+    agent: &str,
+    session: &str,
+) -> Result<(), crate::error::ServerError> {
+    if state.budgets.is_none() {
+        return Ok(());
+    }
+    crate::budgets_api::with_budgets(state, |store| store.end_context(agent, session))
+}

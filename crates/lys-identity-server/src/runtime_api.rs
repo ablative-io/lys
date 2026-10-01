@@ -153,21 +153,11 @@ pub(crate) fn session_agents(
 
 /// When a runtime last reported a session on each machine, by machine id;
 /// none when the configuration names no runtime reports.
-pub(crate) fn last_reports(state: &AppState) -> Result<BTreeMap<String, u64>, ServerError> {
-    let mut last = BTreeMap::new();
+pub(crate) fn last_reports(state: &AppState) -> Result<Arc<BTreeMap<String, u64>>, ServerError> {
     if state.runtime.is_none() {
-        return Ok(last);
+        return Ok(Arc::new(BTreeMap::new()));
     }
-    with_runtime(state, |store| {
-        for tracked in store.sessions() {
-            if let Some(report) = tracked.latest() {
-                let at = last.entry(tracked.machine.clone()).or_insert(report.at);
-                *at = (*at).max(report.at);
-            }
-        }
-        Ok(())
-    })?;
-    Ok(last)
+    with_runtime(state, |store| Ok(store.last_reports()))
 }
 
 fn words(name: &str, text: &str) -> Result<String, ServerError> {
@@ -312,6 +302,9 @@ async fn report_agent(
             })?;
         }
         let tracked = with_runtime(&state, |store| store.report(report))?;
+        if tracked.stopped() && let Some(agent) = &tracked.agent {
+            crate::budgets_context::finish(&state, agent, &tracked.session)?;
+        }
         view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
     })
     .map(Json)
@@ -340,6 +333,11 @@ async fn report_found(
                 .ok_or(ServerError::MachineUnknown)
         })?;
         let tracked = with_runtime(&state, |store| store.report(report))?;
+        if tracked.stopped()
+            && let Some(agent) = &tracked.agent
+        {
+            crate::budgets_context::finish(&state, agent, &tracked.session)?;
+        }
         view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
     })
     .map(Json)

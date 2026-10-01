@@ -36,6 +36,9 @@ use crate::protocol::{Answer, PROTOCOL_VERSION};
 use crate::refusals::JudgeAsk;
 use crate::session::Sessions;
 
+#[cfg(any(target_os = "linux", test))]
+mod group;
+
 /// A process's start identity: what tells one process from a later one
 /// given the same id.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -236,43 +239,42 @@ pub(crate) fn group_members(group: u32) -> Result<Vec<u32>, RunnerError> {
 /// List this group's members from the kernel's process records.
 #[cfg(target_os = "linux")]
 pub(crate) fn group_members(group: u32) -> Result<Vec<u32>, RunnerError> {
-    let group_id = process_id(group)?;
+    process_id(group)?;
     let entries = std::fs::read_dir("/proc").map_err(|error| {
         RunnerError::refused(
             "process_group_unreadable",
             format!("process group {group}: {error}"),
         )
     })?;
-    let mut members = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|error| {
-            RunnerError::refused(
-                "process_group_unreadable",
-                format!("process group {group}: {error}"),
-            )
-        })?;
-        let Some(pid) = entry
-            .file_name()
-            .to_str()
-            .and_then(|name| name.parse::<u32>().ok())
-        else {
-            continue;
-        };
-        if pid <= 1 {
-            continue;
-        }
-        match rustix::process::getpgid(Some(process_id(pid)?)) {
-            Ok(found) if found == group_id => members.push(pid),
-            Ok(_) | Err(rustix::io::Errno::SRCH) => {}
-            Err(error) => {
-                return Err(RunnerError::refused(
+    let entries = entries.map(|entry| {
+        entry
+            .map(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .and_then(|name| name.parse::<u32>().ok())
+            })
+            .map_err(|error| {
+                RunnerError::refused(
                     "process_group_unreadable",
-                    format!("process {pid}: {error}"),
-                ));
-            }
+                    format!("process group {group}: {error}"),
+                )
+            })
+    });
+    group::members(entries, group, |pid| {
+        match rustix::process::getpgid(Some(process_id(pid)?)) {
+            Ok(found) => u32::try_from(found.as_raw_nonzero().get())
+                .map(Some)
+                .map_err(|error| {
+                    RunnerError::refused("process_group_unreadable", error.to_string())
+                }),
+            Err(rustix::io::Errno::SRCH) => Ok(None),
+            Err(error) => Err(RunnerError::refused(
+                "process_group_unreadable",
+                format!("process {pid}: {error}"),
+            )),
         }
-    }
-    Ok(members)
+    })
 }
 
 /// The session whose leader the peer `pid`, of user `uid`, descends from,
@@ -376,32 +378,80 @@ pub struct PeerRequest {
     pub peer: PeerAct,
 }
 
-/// Whether request `line` is a peer's rather than the server's.
-pub fn is_peer(line: &str) -> bool {
-    serde_json::from_str::<Value>(line).is_ok_and(|value| value.get("peer").is_some())
+/// A decoded outer request retains its shape through classification and dispatch.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ParsedRequest {
+    /// A harness request authenticated by its socket peer.
+    Peer(PeerRequest),
+    /// A server request authenticated by its signature.
+    Server(crate::protocol::Request),
+    /// An unsupported shape still identifies a protocol version.
+    Versioned {
+        /// The outer protocol version.
+        version: u32,
+    },
 }
 
-/// The answer to the peer request `line`, from the peer on `stream`.
+/// Decode the outer JSON once; typed variants retain duplicate-field validation.
+pub fn parse(line: &str) -> Result<ParsedRequest, RunnerError> {
+    let request: ParsedRequest =
+        serde_json::from_str(line).map_err(|error| RunnerError::Malformed {
+            reason: format!("the request does not read: {error}"),
+        })?;
+    let version = match &request {
+        ParsedRequest::Peer(request) => request.version,
+        ParsedRequest::Server(request) => request.version,
+        ParsedRequest::Versioned { version } => *version,
+    };
+    if version != PROTOCOL_VERSION {
+        return Err(RunnerError::ProtocolMismatch {
+            theirs: version,
+            ours: PROTOCOL_VERSION,
+        });
+    }
+    if matches!(request, ParsedRequest::Versioned { .. }) {
+        return Err(RunnerError::Malformed {
+            reason: "the request is neither a peer nor a server request".to_owned(),
+        });
+    }
+    Ok(request)
+}
+
+/// Whether a decoded request is a peer's rather than the server's.
+pub fn is_peer(request: &ParsedRequest) -> bool {
+    matches!(request, ParsedRequest::Peer(_))
+}
+
+/// Decode a one-shot peer request and answer it without another JSON parse.
 pub fn answer(
     sessions: &Arc<Sessions>,
     stream: &UnixStream,
     line: &str,
     left: &AtomicBool,
 ) -> Answer {
-    let request = match serde_json::from_str::<PeerRequest>(line) {
-        Ok(request) if request.version == PROTOCOL_VERSION => request,
-        Ok(request) => {
-            return Answer::refusal(&RunnerError::ProtocolMismatch {
-                theirs: request.version,
-                ours: PROTOCOL_VERSION,
-            });
-        }
-        Err(error) => {
-            return Answer::refusal(&RunnerError::Malformed {
-                reason: format!("the peer's request does not read: {error}"),
-            });
-        }
-    };
+    match parse(line) {
+        Ok(ParsedRequest::Peer(request)) => answer_parsed(sessions, stream, request, left),
+        Ok(_) => Answer::refusal(&RunnerError::Malformed {
+            reason: "the request is not a peer request".to_owned(),
+        }),
+        Err(error) => Answer::refusal(&error),
+    }
+}
+
+/// Answer the typed peer request supplied by socket dispatch.
+pub fn answer_parsed(
+    sessions: &Arc<Sessions>,
+    stream: &UnixStream,
+    request: PeerRequest,
+    left: &AtomicBool,
+) -> Answer {
+    if request.version != PROTOCOL_VERSION {
+        return Answer::refusal(&RunnerError::ProtocolMismatch {
+            theirs: request.version,
+            ours: PROTOCOL_VERSION,
+        });
+    }
     match request.peer {
         PeerAct::Restart { operation, .. } => peer_of(stream)
             .map_err(|error| RunnerError::refused("not_a_session", error.to_string()))
@@ -442,3 +492,36 @@ pub(crate) fn restart_with(
 #[cfg(test)]
 #[path = "../tests/peer_restart/cases.rs"]
 mod restart_tests;
+
+#[cfg(test)]
+mod parse_tests {
+    use super::{ParsedRequest, is_peer, parse};
+
+    #[test]
+    fn one_typed_request_is_shared_by_classification_and_dispatch()
+    -> Result<(), crate::error::RunnerError> {
+        let parsed = parse(r#"{"version":1,"peer":{"act":"restart","operation":"stable"}}"#)?;
+        assert!(is_peer(&parsed));
+        let ParsedRequest::Peer(request) = parsed else {
+            panic!("peer request shape changed");
+        };
+        assert!(
+            matches!(request.peer, super::PeerAct::Restart { operation, .. } if operation == "stable")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_fields_unknown_fields_and_unknown_versions_are_refused() {
+        for line in [
+            r#"{"version":1,"version":1,"peer":{"act":"restart","operation":"stable"}}"#,
+            r#"{"version":1,"peer":{"act":"restart","operation":"stable","unknown":true}}"#,
+        ] {
+            assert!(parse(line).is_err(), "{line}");
+        }
+        assert!(parse(r#"{"version":999}"#).is_err_and(|error| matches!(
+            error,
+            crate::error::RunnerError::ProtocolMismatch { .. }
+        )));
+    }
+}

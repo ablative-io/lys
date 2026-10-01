@@ -22,7 +22,7 @@ use std::thread::JoinHandle;
 
 use crate::admitted::Admitted;
 use crate::error::RunnerError;
-use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_request};
+use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_parsed, verify_request};
 use crate::scrollback::whole_text;
 use crate::session::Sessions;
 
@@ -53,7 +53,7 @@ pub struct Runner {
     socket: PathBuf,
     server: [u8; 32],
     #[cfg(test)]
-    accept_error: Option<io::Error>,
+    accept_error: Option<(usize, io::Error)>,
 }
 
 /// A runner serving on its own thread.
@@ -204,7 +204,12 @@ impl Runner {
                 }
                 incoming = listener.accept() => {
                     #[cfg(test)]
-                    let incoming = if let Some(error) = accept_error.take() {
+                    let incoming = if let Some((remaining, _)) = accept_error.as_mut()
+                        && *remaining > 0
+                    {
+                        *remaining -= 1;
+                        incoming
+                    } else if let Some((_, error)) = accept_error.take() {
                         drop(incoming);
                         Err(error)
                     } else {
@@ -214,6 +219,14 @@ impl Runner {
                         Ok(accepted) => accepted,
                         Err(error) => {
                             crate::error::said(&format!("runner_socket_accept_failed: {error}"));
+                            if matches!(error.raw_os_error(), Some(nix::libc::EMFILE | nix::libc::ENFILE)) {
+                                tokio::select! {
+                                    changed = stop.changed() => { changed.map_err(socket_failed)?; }
+                                    completed = connections.join_next(), if !connections.is_empty() => {
+                                        connection_result(completed);
+                                    }
+                                }
+                            }
                             continue;
                         }
                     };
@@ -375,7 +388,7 @@ async fn departed(stream: &tokio::net::UnixStream) -> Result<(), RunnerError> {
 }
 
 enum Command {
-    Peer(String),
+    Peer(crate::peer::PeerRequest),
     Server(Act),
 }
 
@@ -434,11 +447,15 @@ impl DispatchPermit {
     }
 }
 
-fn command(line: String, server: &[u8; 32], greeting: &Greeting) -> Result<Command, RunnerError> {
-    if crate::peer::is_peer(&line) {
-        Ok(Command::Peer(line))
-    } else {
-        verify_request(line.trim_end(), server, greeting).map(Command::Server)
+fn command(line: &str, server: &[u8; 32], greeting: &Greeting) -> Result<Command, RunnerError> {
+    match crate::peer::parse(line.trim_end())? {
+        crate::peer::ParsedRequest::Peer(request) => Ok(Command::Peer(request)),
+        crate::peer::ParsedRequest::Server(request) => {
+            verify_parsed(&request, server, greeting).map(Command::Server)
+        }
+        crate::peer::ParsedRequest::Versioned { .. } => Err(RunnerError::Malformed {
+            reason: "the request shape was not decoded".to_owned(),
+        }),
     }
 }
 
@@ -500,7 +517,7 @@ async fn execute(
     let proved = Arc::clone(proof);
     let mut task = tokio::task::spawn_blocking(move || {
         let answer = match command {
-            Command::Peer(line) => crate::peer::answer(&held, &proved, line.trim_end(), &flag),
+            Command::Peer(request) => crate::peer::answer_parsed(&held, &proved, request, &flag),
             Command::Server(act) => {
                 perform(&held, act, &flag).unwrap_or_else(|error| Answer::refusal(&error))
             }
@@ -602,7 +619,7 @@ async fn connection(
             },
             changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
         };
-        let command = match command(line, &server, &greeting) {
+        let command = match command(&line, &server, &greeting) {
             Ok(command) if pending.is_empty() => command,
             Ok(_) => {
                 response(

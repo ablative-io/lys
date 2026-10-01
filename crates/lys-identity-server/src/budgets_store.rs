@@ -211,9 +211,41 @@ impl<S: LeafStore> BudgetStore<S> {
         }
     }
 
+    pub(crate) fn revision(&self) -> u64 {
+        self.log.len()
+    }
+
     /// The budgets as held.
     pub fn held(&self) -> &Held {
         &self.held
+    }
+
+    pub(crate) fn end_context(&mut self, agent: &str, session: &str) -> Result<(), ServerError> {
+        self.held
+            .context_availability
+            .remove(agent, session)
+            .map_err(unavailable)?;
+        self.held.crossings.context.remove(session);
+        Ok(())
+    }
+
+    pub(crate) fn reconcile_context(
+        &mut self,
+        sessions: Option<
+            &std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>,
+        >,
+    ) -> Result<(), ServerError> {
+        if let Some(sessions) = sessions {
+            for session in self
+                .held
+                .context_availability
+                .reconcile(sessions)
+                .map_err(unavailable)?
+            {
+                self.held.crossings.context.remove(&session);
+            }
+        }
+        Ok(())
     }
 
     /// Set `budget` as the version after `expected`, the version the caller

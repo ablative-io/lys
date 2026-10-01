@@ -5,6 +5,8 @@ use serde::ser::{Serialize, SerializeSeq, Serializer};
 use super::{Kept, Profile, Review, Settings, SkillText, Version, unavailable};
 use crate::error::ServerError;
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) enum Edit {
     Set {
         profile: usize,

@@ -5,7 +5,7 @@
 //! seen by a runtime and carrying no identity. A found session is never
 //! given an identity here; it stays found.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Bound;
 use std::sync::Arc;
 
@@ -14,6 +14,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(test)]
 #[path = "runtime_operation_tests.rs"]
 mod operation_tests;
+
+#[cfg(test)]
+#[path = "runtime_report_index_tests.rs"]
+mod report_index_tests;
 
 /// The snapshot domain the reports' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/runtime-reports-state/v1";
@@ -144,6 +148,21 @@ struct Index {
     positions: BTreeMap<String, usize>,
     live: BTreeMap<(String, usize), usize>,
     operations: HashMap<String, (usize, usize)>,
+    machine_reports: BTreeMap<String, BTreeSet<(u64, usize)>>,
+    last_reports: Arc<BTreeMap<String, u64>>,
+}
+
+impl Index {
+    fn report(&mut self, machine: &str, position: usize, previous: Option<u64>, at: u64) {
+        let reports = self.machine_reports.entry(machine.to_owned()).or_default();
+        if let Some(previous) = previous {
+            reports.remove(&(previous, position));
+        }
+        reports.insert((at, position));
+        if let Some((latest, _)) = reports.last() {
+            Arc::make_mut(&mut self.last_reports).insert(machine.to_owned(), *latest);
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -160,6 +179,9 @@ impl From<Records> for Held {
                 .positions
                 .entry(tracked.session.clone())
                 .or_insert(position);
+            if let Some(report) = tracked.latest() {
+                index.report(&tracked.machine, position, None, report.at);
+            }
             if tracked.agent.is_some() && !tracked.stopped() && tracked.first().is_some() {
                 index
                     .live
@@ -219,6 +241,11 @@ impl Held {
         self.index.live.len()
     }
 
+    /// Latest report times by machine, shared without copying session history.
+    pub fn last_reports(&self) -> Arc<BTreeMap<String, u64>> {
+        Arc::clone(&self.index.last_reports)
+    }
+
     /// The report kept under `operation`, with its session.
     pub fn operation(&self, operation: &str) -> Option<&Report> {
         let (session, report) = self.index.operations.get(operation)?;
@@ -231,9 +258,12 @@ impl Held {
         if let Some(position) = self.index.positions.get(&report.session).copied() {
             let tracked = &mut self.sessions[position];
             let report_position = tracked.reports.len();
+            let previous = tracked.latest().map(|latest| latest.at);
+            let at = report.at;
             let operation = report.operation.clone();
             tracked.reports.push(report);
             let index = Arc::make_mut(&mut self.index);
+            index.report(&tracked.machine, position, previous, at);
             let location = (position, report_position);
             index
                 .operations
@@ -263,6 +293,7 @@ impl Held {
             ));
         }
         let index = Arc::make_mut(&mut self.index);
+        index.report(&report.machine, self.sessions.len(), None, report.at);
         index
             .operations
             .entry(report.operation.clone())

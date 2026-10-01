@@ -249,7 +249,8 @@ pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<()
             confirmation(ended),
         );
         store.report(report).map(drop)
-    })
+    })?;
+    crate::budgets_context::finish(state, &driven.agent, &driven.session)
 }
 
 /// The end an answer carries, when it carries one.

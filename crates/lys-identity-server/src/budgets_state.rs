@@ -486,7 +486,7 @@ impl Held {
                 }
             }
             Leaf::Acted(acted) => {
-                self.crossings.acted.insert(acted.operation.clone(), acted);
+                self.crossings.acted(acted);
             }
             Leaf::Refused(record) => self.refusals.hold(*record),
             Leaf::FeedRead(read) => self.refusals.read_to(read),

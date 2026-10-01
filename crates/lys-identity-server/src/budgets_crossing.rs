@@ -10,7 +10,7 @@
 //! context budget crosses when a session's figure rises from under the
 //! limit to at or over it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lys_runner::Ended;
 use lys_runner::operations::{OperationOutcome, OperationState};
@@ -155,7 +155,7 @@ impl Acted {
 
 /// The crossings as the log folds them.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "StoredCrossings")]
 pub struct Crossings {
     /// Every crossing, in the order kept.
     pub crossed: Vec<Crossing>,
@@ -163,44 +163,145 @@ pub struct Crossings {
     pub acted: BTreeMap<String, Acted>,
     /// Each session's last context figure.
     pub context: BTreeMap<String, u64>,
+    #[serde(skip)]
+    index: CrossingIndex,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredCrossings {
+    crossed: Vec<Crossing>,
+    acted: BTreeMap<String, Acted>,
+    context: BTreeMap<String, u64>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct CrossingIndex {
+    operations: BTreeMap<String, usize>,
+    agents: BTreeMap<String, BTreeSet<usize>>,
+    pending: BTreeSet<usize>,
+    pending_agents: BTreeMap<String, BTreeSet<usize>>,
+}
+
+fn pending(crossing: &Crossing, acted: Option<&Acted>) -> bool {
+    acted.is_none_or(|acted| {
+        matches!(acted.stands, Stands::Accepted | Stands::Uncertain)
+            || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
+    })
+}
+
+impl CrossingIndex {
+    fn insert(&mut self, position: usize, crossing: &Crossing, acted: Option<&Acted>) {
+        self.operations.insert(crossing.operation.clone(), position);
+        self.agents
+            .entry(crossing.agent.clone())
+            .or_default()
+            .insert(position);
+        self.update(position, crossing, acted);
+    }
+
+    fn update(&mut self, position: usize, crossing: &Crossing, acted: Option<&Acted>) {
+        if pending(crossing, acted) {
+            self.pending.insert(position);
+            self.pending_agents
+                .entry(crossing.agent.clone())
+                .or_default()
+                .insert(position);
+        } else {
+            self.pending.remove(&position);
+            if let Some(agent) = self.pending_agents.get_mut(&crossing.agent) {
+                agent.remove(&position);
+                if agent.is_empty() {
+                    self.pending_agents.remove(&crossing.agent);
+                }
+            }
+        }
+    }
+}
+
+impl From<StoredCrossings> for Crossings {
+    fn from(stored: StoredCrossings) -> Self {
+        let mut index = CrossingIndex::default();
+        for (position, crossing) in stored.crossed.iter().enumerate() {
+            index.insert(position, crossing, stored.acted.get(&crossing.operation));
+        }
+        Self {
+            crossed: stored.crossed,
+            acted: stored.acted,
+            context: stored.context,
+            index,
+        }
+    }
 }
 
 impl Crossings {
+    /// Check an operation's identity without walking previous crossings.
+    pub fn holds(&self, operation: &str) -> bool {
+        self.index.operations.contains_key(operation)
+    }
+
     /// Keep `crossing` unless its operation is kept already.
     pub fn hold(&mut self, crossing: Crossing) {
-        if !self
-            .crossed
-            .iter()
-            .any(|held| held.operation == crossing.operation)
-        {
+        if !self.holds(&crossing.operation) {
+            self.index.insert(
+                self.crossed.len(),
+                &crossing,
+                self.acted.get(&crossing.operation),
+            );
             self.crossed.push(crossing);
         }
     }
 
-    /// The crossings whose act is not settled: never answered, accepted and
-    /// waiting, or a stop sent whose exit is not yet seen.
-    pub fn unsettled(&self) -> Vec<Crossing> {
-        self.crossed
-            .iter()
-            .filter(|crossing| match self.acted.get(&crossing.operation) {
-                None => true,
-                Some(acted) => {
-                    matches!(acted.stands, Stands::Accepted | Stands::Uncertain)
-                        || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
-                }
+    /// Update the selected operation and its pending indexes together.
+    pub fn acted(&mut self, acted: Acted) {
+        if let Some(position) = self.index.operations.get(&acted.operation).copied() {
+            self.index
+                .update(position, &self.crossed[position], Some(&acted));
+        }
+        self.acted.insert(acted.operation.clone(), acted);
+    }
+
+    fn selected(&self, positions: impl Iterator<Item = usize>) -> Vec<Crossing> {
+        positions
+            .map(|position| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::Crossing);
+                self.crossed[position].clone()
             })
-            .cloned()
             .collect()
+    }
+
+    /// Pending acts, in retained order, independent of settled history.
+    pub fn unsettled(&self) -> Vec<Crossing> {
+        self.selected(self.index.pending.iter().copied())
+    }
+
+    /// An agent read retries only that agent's pending acts.
+    pub fn unsettled_for(&self, agent: &str) -> Vec<Crossing> {
+        self.selected(
+            self.index
+                .pending_agents
+                .get(agent)
+                .into_iter()
+                .flat_map(|positions| positions.iter().copied()),
+        )
     }
 
     /// Each crossing of `agent`, with what came of it: its receipt.
     pub fn of_agent(&self, agent: &str) -> Vec<Receipt> {
-        self.crossed
-            .iter()
-            .filter(|crossing| crossing.agent == agent)
-            .map(|crossing| Receipt {
-                crossing: crossing.clone(),
-                acted: self.acted.get(&crossing.operation).cloned(),
+        self.index
+            .agents
+            .get(agent)
+            .into_iter()
+            .flat_map(|positions| positions.iter())
+            .map(|position| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::Crossing);
+                let crossing = &self.crossed[*position];
+                Receipt {
+                    crossing: crossing.clone(),
+                    acted: self.acted.get(&crossing.operation).cloned(),
+                }
             })
             .collect()
     }

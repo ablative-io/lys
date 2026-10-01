@@ -10,10 +10,11 @@ pub(crate) enum Work {
     Running,
     StateCopy,
     IndexCopy,
+    Crossing,
 }
 
 thread_local! {
-    static COUNTS: Cell<[usize; 4]> = const { Cell::new([0; 4]) };
+    static COUNTS: Cell<[usize; 5]> = const { Cell::new([0; 5]) };
 }
 
 pub(crate) fn visit(work: Work) {
@@ -25,7 +26,7 @@ pub(crate) fn visit(work: Work) {
 }
 
 fn reset() {
-    COUNTS.set([0; 4]);
+    COUNTS.set([0; 5]);
 }
 
 fn count(work: Work) -> usize {

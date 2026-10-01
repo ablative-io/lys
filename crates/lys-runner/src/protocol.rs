@@ -662,6 +662,21 @@ pub fn verify_request(
     let request: Request = serde_json::from_str(line).map_err(|error| RunnerError::Malformed {
         reason: format!("the request does not read: {error}"),
     })?;
+    verify_parsed(&request, server, greeting)
+}
+
+/// Verify a decoded server request without reparsing its outer JSON.
+pub fn verify_parsed(
+    request: &Request,
+    server: &[u8; 32],
+    greeting: &Greeting,
+) -> Result<Act, RunnerError> {
+    if request.version != PROTOCOL_VERSION {
+        return Err(RunnerError::ProtocolMismatch {
+            theirs: request.version,
+            ours: PROTOCOL_VERSION,
+        });
+    }
     if request.signature.is_empty() {
         return Err(RunnerError::Unsigned {
             reason: "the request carries no signature".to_owned(),

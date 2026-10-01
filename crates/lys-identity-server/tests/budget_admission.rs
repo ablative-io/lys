@@ -11,12 +11,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_core::Ed25519Identity;
-use lys_identity::OperationId;
+use lys_identity::{
+    Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
+};
 use lys_identity_server::budgets_state::{
     Act, Budget, Holder, HolderKind, Length, Measure, Period, Usage,
 };
 use lys_identity_server::budgets_store::BudgetStore;
-use lys_identity_server::dev_seed::seed_configured;
+use lys_identity_server::routes::open_directory;
 use lys_runner::protocol::{Greeting, Reply, verify_request};
 use lys_runner::{Act as RunnerAct, Answer};
 use serde_json::{Value, json};
@@ -150,6 +152,52 @@ fn prepare_cap(config: &lys_identity_server::Config, agent: &str, person: &str) 
     Ok(())
 }
 
+fn prepare_agent(config: &lys_identity_server::Config) -> TestResult<(String, String)> {
+    let mut directory = open_directory(config)?;
+    let at = jiff::Timestamp::now().as_second().try_into()?;
+    let actor = Actor::new(
+        config.administrator_binding()?,
+        Provenance::new(AuthMethod::Oidc, at),
+    );
+    let (person, _) = directory.register_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Operator")?,
+        at,
+    )?;
+    directory.bind_login(
+        actor.clone(),
+        OperationId::generate()?,
+        person,
+        LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+        at,
+    )?;
+    directory.transition(
+        actor.clone(),
+        OperationId::generate()?,
+        IdentityId::Person(person),
+        Transition::Activate,
+        "",
+        at,
+    )?;
+    let (agent, _) = directory.register_agent(
+        actor.clone(),
+        OperationId::generate()?,
+        person,
+        Profile::new("Runner")?,
+        at,
+    )?;
+    directory.transition(
+        actor,
+        OperationId::generate()?,
+        IdentityId::Agent(agent),
+        Transition::Activate,
+        "",
+        at,
+    )?;
+    Ok((agent.to_string(), person.to_string()))
+}
+
 async fn control(path: &Path, key: Arc<Ed25519Identity>) -> TestResult {
     let client = lys_runner::client::Client::new(path.to_owned(), key);
     let answer = tokio::task::spawn_blocking(move || {
@@ -165,9 +213,8 @@ async fn control(path: &Path, key: Arc<Ed25519Identity>) -> TestResult {
 #[tokio::test]
 async fn an_exhausted_cap_refuses_both_routes_without_a_runner_request() -> TestResult {
     let (service, (agent, key)) = Service::start_with(|config| {
-        let seed = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
-        let agent = seed.people[0].agents[0].id.to_string();
-        prepare_cap(config, &agent, &seed.people[0].id.to_string())?;
+        let (agent, person) = prepare_agent(config)?;
+        prepare_cap(config, &agent, &person)?;
         Ok((
             agent,
             Arc::new(Ed25519Identity::load(&config.event_key_file)?),

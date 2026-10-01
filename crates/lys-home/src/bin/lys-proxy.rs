@@ -61,6 +61,8 @@ fn run(args: Args) -> Result<(), ProxyError> {
         capture_slots: args.capture_slots,
     };
     let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .max_blocking_threads(8)
         .enable_all()
         .build()
         .map_err(|source| ProxyError::io("starting the runtime", &config.state, source))?;
@@ -70,16 +72,22 @@ fn run(args: Args) -> Result<(), ProxyError> {
             .map_err(|source| {
                 ProxyError::io("binding the listen address", &config.state, source)
             })?;
+        let report_state = config.state.clone();
         let started = Proxy::start(config)?;
         for report in &started.lost {
             print_report(report);
         }
         let reports = started.reports;
-        std::thread::spawn(move || {
-            for report in reports {
-                print_report(&report);
-            }
-        });
+        std::thread::Builder::new()
+            .name(String::from("lys-proxy-reports"))
+            .spawn(move || {
+                for report in reports {
+                    print_report(&report);
+                }
+            })
+            .map_err(|source| {
+                ProxyError::io("starting the report worker", &report_state, source)
+            })?;
         started.proxy.serve(listener).await
     })
 }
