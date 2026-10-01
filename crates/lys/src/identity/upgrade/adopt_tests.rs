@@ -208,6 +208,7 @@ fn install_run_again_restarts_a_process_whose_binary_it_placed() -> TestResult {
         &scratch.units,
         &source,
         false,
+        false,
         &mut |line| {
             said.push(line.to_string());
         },
@@ -256,7 +257,14 @@ fn a_screen_swap_restarts_only_the_service_when_configuration_is_unchanged() -> 
     super::super::scratch::package(&screens, B)?;
     crate::identity::install::surface::place(&screens, &scratch.layout.surface_dir())?;
     let source = |name: &str| -> IdentityResult<PathBuf> { Ok(scratch.layout.binary(name)) };
-    let record = settle(&scratch.layout, &scratch.units, &source, false, &mut |_| {})?;
+    let record = settle(
+        &scratch.layout,
+        &scratch.units,
+        &source,
+        false,
+        true,
+        &mut |_| {},
+    )?;
     assert_eq!(
         std::fs::read_to_string(&scratch.units[0].pid)?,
         broker,
