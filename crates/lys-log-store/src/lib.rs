@@ -78,6 +78,10 @@ pub use snapshot::{SNAPSHOT_FORMAT, Snapshot, SnapshotRefusal, seal, unseal};
 pub use start::{Start, Started, open_with_snapshot};
 pub use store::{LeafStore, PinnedRoot};
 
+#[cfg(all(test, unix))]
+mod batch_crash_tests;
+#[cfg(test)]
+mod batch_tests;
 #[cfg(test)]
 mod leaf_count;
 #[cfg(test)]

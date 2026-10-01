@@ -401,6 +401,23 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         })
     }
 
+    /// Record a durable batch while retaining each intermediate receipt root.
+    pub(crate) fn append_batch(&mut self, bytes: &[&[u8]]) -> Result<Vec<Coordinate>, StoreError> {
+        let appended = self.log.append_batch(bytes)?;
+        let mut coordinates = Vec::with_capacity(appended.len());
+        for (index, leaf_hash) in appended {
+            self.frontier.push_hash(leaf_hash);
+            self.checkpoints.record(&self.frontier);
+            coordinates.push(Coordinate {
+                index,
+                tree_size: self.frontier.size(),
+                root: self.frontier.root(),
+                leaf_hash,
+            });
+        }
+        Ok(coordinates)
+    }
+
     /// Reopens the store, reads every leaf after the recorded ones, and
     /// records them, answering each as an event. Nothing is recorded unless
     /// every step succeeds.

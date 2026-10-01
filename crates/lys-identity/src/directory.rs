@@ -36,6 +36,9 @@ use crate::signer::{SignedEvent, sign_event};
 #[path = "directory_reporting.rs"]
 pub mod reporting;
 
+#[path = "directory_batch.rs"]
+mod batch;
+
 /// Why the directory stopped answering, if it has.
 type Broken = Option<String>;
 

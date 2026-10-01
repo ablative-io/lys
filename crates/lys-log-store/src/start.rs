@@ -100,7 +100,10 @@ pub fn open_with_snapshot<S: LeafStore>(
                 } else {
                     let (frontier, state) = snapshot.into_parts();
                     let reading = Reading::from(&store, frontier)?;
-                    if reading.reconcile(store.pinned()).is_ok() {
+                    if reading
+                        .reconcile(store.pinned(), store.batch_intent())
+                        .is_ok()
+                    {
                         let replayed = reading.replayed();
                         let (log, tail) = FrontierLog::from_reading(store, reading)?;
                         return Ok(Started {

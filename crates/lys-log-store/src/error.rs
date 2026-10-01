@@ -38,6 +38,51 @@ use std::path::PathBuf;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum StoreError {
+    /// This backend cannot durably record an interrupted batch's bound.
+    #[error("store cannot record durable batch intent ending at {end}")]
+    BatchIntentUnsupported {
+        /// The requested end of the batch.
+        end: u64,
+    },
+    /// An earlier batch's intent must be resolved before another starts.
+    #[error("batch intent ending at {end} requires reopen before another batch")]
+    BatchIntentPending {
+        /// The recorded end.
+        end: u64,
+    },
+    /// A batch must extend the current pinned tree.
+    #[error("batch end {end} must exceed the pinned tree size {pinned}")]
+    BatchIntentInvalid {
+        /// The held pinned tree size.
+        pinned: u64,
+        /// The requested end.
+        end: u64,
+    },
+    /// An intent cannot retroactively authorize an already unpinned tail.
+    #[error("cannot begin a batch with {extent} leaves and a pin covering {pinned}")]
+    BatchStartUnpinned {
+        /// The stored leaf count.
+        extent: u64,
+        /// The pinned tree size.
+        pinned: u64,
+    },
+    /// A stored tree size cannot be represented by this process's leaf buffer.
+    #[error("tree size {count} cannot fit in a leaf buffer: {source}")]
+    LeafCountUnrepresentable {
+        /// The stored tree size.
+        count: u64,
+        /// The failed integer conversion.
+        #[source]
+        source: std::num::TryFromIntError,
+    },
+    /// The requested batch would exceed the range of leaf indices.
+    #[error("batch of {count} leaves at {index} exceeds the leaf index range")]
+    BatchSizeOverflow {
+        /// The first requested index.
+        index: u64,
+        /// The number of requested leaves.
+        count: usize,
+    },
     /// A filesystem or backend operation failed. Carries the operation and
     /// path in `context` so the failure is actionable without a backtrace.
     #[error("{context}: {source}")]

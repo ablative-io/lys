@@ -18,6 +18,7 @@ pub(crate) struct Disk {
     pub(crate) leaves: Vec<Vec<u8>>,
     pub(crate) pinned: Option<PinnedRoot>,
     pub(crate) snapshot: Option<Vec<u8>>,
+    pub(crate) batch_intent: Option<u64>,
 }
 
 pub(crate) struct CountingStore {
@@ -93,6 +94,16 @@ impl LeafStore for CountingStore {
             });
         }
         self.disk.pinned = Some(pin);
+        self.disk.batch_intent = None;
+        Ok(())
+    }
+
+    fn batch_intent(&self) -> Option<u64> {
+        self.disk.batch_intent
+    }
+
+    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
+        self.disk.batch_intent = Some(end);
         Ok(())
     }
 
