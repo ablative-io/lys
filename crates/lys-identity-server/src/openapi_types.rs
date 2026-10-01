@@ -91,6 +91,18 @@ pub(crate) type Entry = (Method, &'static str, Schema, Schema);
 /// What each entry of the table takes and answers, by method and path.
 pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, Schema)> {
     let mut entries = sign_in_and_identities(api);
+    entries.push((
+        POST,
+        "/grants/{id}/tokens",
+        Some(api.schema::<crate::grant_tokens::IssueBody>()),
+        Some(api.schema::<crate::grant_tokens::Issued>()),
+    ));
+    entries.push((
+        POST,
+        "/grants/{id}/tokens/{token_id}/revoke",
+        None,
+        Some(api.schema::<crate::grant_tokens::Revoked>()),
+    ));
     entries.push(restart_types(api));
     entries.extend(grants_and_reviews(api));
     entries.extend(roles_and_requests(api));

@@ -72,6 +72,10 @@ pub mod goals_types;
 pub mod goals_views;
 pub mod grant_contract;
 mod grant_sight;
+mod grant_token_store;
+#[cfg(test)]
+mod grant_token_tests;
+pub mod grant_tokens;
 pub mod grants;
 pub mod grants_batch;
 pub mod grants_reach;
