@@ -122,11 +122,11 @@ async function submit(twice = false) {
 }
 function plain(stage: Stage, code = 'StepUnavailable') {
   const details = [...document.querySelectorAll('details')].find((entry) => entry.textContent?.includes(code));
-  expect(details).toBeUndefined();
-  expect(document.body.textContent).toContain(code);
+  expect(details?.open).toBe(false);
+  expect(details?.textContent).toContain(code);
   const face = document.body.cloneNode(true) as HTMLElement;
   for (const detail of face.querySelectorAll('details')) detail.remove();
-  expect(face.textContent).toContain(code);
+  expect(face.textContent).not.toContain(code);
   expect(face.textContent).toContain(words[stage]);
 }
 
