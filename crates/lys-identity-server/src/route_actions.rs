@@ -23,7 +23,7 @@ pub(crate) fn admit(
     if path == "/mcp" && matches!(method, "GET" | "POST" | "DELETE") {
         return Ok(());
     }
-    if crate::kept_responsibilities::KEPT.contains(&(method, path)) {
+    if state.kept_responsibilities.keeps(method, path) {
         return Err(Box::new(
             (
                 StatusCode::FORBIDDEN,
