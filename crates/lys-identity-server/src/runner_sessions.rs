@@ -312,18 +312,16 @@ pub async fn run_on_runner(
         machine: machine.to_owned(),
         runner: runner.clone(),
     };
-    let session = launch.session.clone();
-    let act = {
-        let mut passes = crate::agent_pass::store(state)?;
-        crate::runner_start_pass::act(
-            &mut passes,
-            AgentId::from_str(agent)?,
-            state.oidc.public_origin(),
-            launch,
-        )?
-    };
-    let missing_config = matches!(&act, Act::Start { lys_mcp: None, .. });
-    let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
+    let asked = crate::runner_client::ask(
+        state,
+        machine,
+        runner.clone(),
+        Act::Start {
+            lys_mcp: None,
+            launch: Box::new(launch),
+        },
+    )
+    .await;
     let answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
             let act = Act::Status {
