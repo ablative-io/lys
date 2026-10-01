@@ -58,24 +58,10 @@ async fn check(
     next: Next,
 ) -> Response {
     if request.headers().contains_key(crate::agent_pass::HEADER) {
-        if [
-            header::COOKIE,
-            header::AUTHORIZATION,
-            axum::http::HeaderName::from_static(crate::agent_signature::HEADER),
-        ]
-        .iter()
-        .any(|name| request.headers().contains_key(name))
-        {
-            return ServerError::AgentPassRefused {
-                reason: "a run pass cannot be combined with another credential".to_owned(),
-            }
-            .into_response();
+        if let Err(error) = pass_credentials(request.headers()) {
+            return error.into_response();
         }
-        let method = if request.method() == HttpMethod::HEAD {
-            "GET"
-        } else {
-            request.method().as_str()
-        };
+        let method = pass_method(request.method());
         let path = request
             .uri()
             .path()
@@ -136,3 +122,31 @@ fn admitted(state: &AppState, auth: &[Auth], headers: &HeaderMap) -> Result<(), 
     }
     signed_in(state, headers).map(drop)
 }
+
+fn pass_credentials(headers: &HeaderMap) -> Result<(), ServerError> {
+    if [
+        header::COOKIE,
+        header::AUTHORIZATION,
+        axum::http::HeaderName::from_static(crate::agent_signature::HEADER),
+    ]
+    .iter()
+    .any(|name| headers.contains_key(name))
+    {
+        return Err(ServerError::AgentPassRefused {
+            reason: "a run pass cannot be combined with another credential".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn pass_method(method: &HttpMethod) -> &str {
+    if method == HttpMethod::HEAD {
+        "GET"
+    } else {
+        method.as_str()
+    }
+}
+
+#[cfg(test)]
+#[path = "signed_first_tests.rs"]
+mod tests;

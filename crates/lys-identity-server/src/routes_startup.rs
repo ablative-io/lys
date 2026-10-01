@@ -16,6 +16,9 @@ use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::Sessions;
 
 pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+    let kept_responsibilities = crate::kept_responsibilities::Kept::load(
+        &config.log_dir.with_file_name("kept-responsibilities.json"),
+    )?;
     crate::openapi::prepare()?;
     crate::openapi::surface::prepare()?;
     let catalogue = Arc::new(crate::harness_catalogue::Catalogue::embedded()?);
@@ -82,6 +85,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         .map(crate::spicedb::SpiceDbEngine::new);
     let state = Arc::new(AppState {
         changes: crate::changes::Changes::new()?,
+        kept_responsibilities,
         import_credential_file: config.import_credential_file.clone(),
         estate_plan_file: config.log_dir.with_file_name("estate-approval.json"),
         identity_upstream: format!(
