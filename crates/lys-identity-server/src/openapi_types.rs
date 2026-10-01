@@ -123,6 +123,18 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
     let agent = api.schema::<AgentView>();
     api.schema::<SignedInView>();
     vec![
+        (
+            GET,
+            "/changes",
+            None,
+            Some(api.schema::<crate::changes::Changed>()),
+        ),
+        (
+            GET,
+            "/surface-contract",
+            None,
+            Some(api.schema::<crate::openapi::surface::SurfaceContract>()),
+        ),
         (GET, "/authority", None, None),
         (GET, "/login", None, None),
         (GET, "/callback", None, None),

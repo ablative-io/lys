@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 /** Service-account records are created and retired explicitly; they are not grants or stored credentials. */
 import { useState } from 'react';
 import { api, operationId, request, useLoad } from '../../api';
@@ -11,7 +12,7 @@ import type { Column } from '../../shell/Listing';
 import { Picker } from '../../shell/Picker';
 interface AccountsView { scope: 'personal' | 'directory'; service_accounts: ServiceAccount[] }
 export function ServiceAccounts() {
-  const load = useLoad(async () => ({ me: await api.me(), accounts: await request<AccountsView>('/service-accounts') }), 'service-accounts');
+  const load = useLoad(() => readTogether({ me: api.me(), accounts: request<AccountsView>('/service-accounts') }), 'service-accounts');
   return <main className="page fill"><div className="head"><div><div className="eyebrow">Directory</div><h1>Service accounts</h1><p className="sub">Keep a list of accounts used for work. Retiring an account here marks its Lys record retired; it does not close the provider account or revoke credentials.</p></div></div>
     <Gate load={load} title="Service accounts" ok={({ me, accounts }) => <AccountList initial={accounts} me={me} />} />
   </main>;

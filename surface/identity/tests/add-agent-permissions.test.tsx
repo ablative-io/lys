@@ -18,7 +18,7 @@ function routes() {
   let given: Record<string, unknown> | null = null;
   const receipt = (body: unknown, change_kind = 2) => ({ ...RECEIPTS[4].receipt, operation: (body as { operation: string }).operation, identity: COURIER, change_kind });
   return { ...SERVICE,
-    '/openapi.json': ok({ paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { answers_to: {} } } } } } } } } }),
+    '/surface-contract': ok({ paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { answers_to: {} } } } } } } } } }),
     '/grants': ok({ grants: GRANTS, revision: 7 }), '/grants/model': ok(MODEL),
     'POST /agents': (body: unknown) => ok({ agent: COURIER, responsible: ADA, reports_to: { id: (body as { answers_to?: string }).answers_to ?? ADA, kind: (body as { answers_to?: string }).answers_to?.startsWith('agent-') ? 'agent' : 'person' }, receipt: receipt(body) }),
     ['POST /identities/' + COURIER + '/transitions']: (body: unknown) => ok({ receipt: receipt(body, 5) }),

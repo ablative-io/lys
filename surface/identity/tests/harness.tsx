@@ -33,6 +33,15 @@ export function serve(routes: Record<string, Route>, posted: { path: string; bod
     const key = post ? method + ' ' + path : path;
     requests.push(key);
     if (post) posted.push({ path: method === 'POST' ? path : key, body });
+    if (method === 'GET' && path.startsWith('/changes') && !routes[key]) {
+      if (path === '/changes') return new Response(JSON.stringify({ generation: 'op-' + '0'.repeat(32) }), { headers: { 'content-type': 'application/json' } });
+      return new Promise<Response>((...callbacks) => {
+        const reject = callbacks[1];
+        const abort = () => reject(new DOMException('Aborted', 'AbortError'));
+        if (init?.signal?.aborted) abort();
+        else init?.signal?.addEventListener('abort', abort, { once: true });
+      });
+    }
     const route = routes[key];
     const answer = typeof route === 'function' ? route(body) : route;
     if (!answer) return new Response('', { status: 404 });

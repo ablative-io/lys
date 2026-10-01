@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 /** Metadata-only secrets listing; authentication and visibility belong to the broker adapter. */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -29,7 +30,7 @@ type Secret = SecretListing['secrets'][number];
 
 export function Secrets({ read }: { read: () => Promise<SecretListing> }) {
   const load = useLoad(read, 'secrets');
-  const people = useLoad(async () => ({ view: await api.people(), me: await api.me(), teams: await readTeams().catch(() => []) }), 'secret-people');
+  const people = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().catch(() => []) }), 'secret-people');
   const admin = people.status === 'ok' && people.data.view.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   return <>

@@ -35,6 +35,7 @@ use crate::session::{Sessions, now};
 
 /// Everything a request is served from.
 pub struct AppState {
+    pub(crate) changes: crate::changes::Changes,
     /// The directory, one caller at a time.
     pub directory: Mutex<Directory<FileLeafStore>>,
     /// Sign-in.

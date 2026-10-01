@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
@@ -166,9 +167,9 @@ type Teams = { list: OrgTeam[]; refused: string };
 
 export function Access() {
   const { mode = 'can', arg } = useParams();
-  const load = useLoad(async () => ({
-    w: await readGrantWorld(),
-    teams: await readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
+  const load = useLoad(() => readTogether({
+    w: readGrantWorld(),
+    teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'access');
   return <Gate load={load} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} />} />;
 }

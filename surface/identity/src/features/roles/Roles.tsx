@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 /** Read versioned roles, publish deliberate changes and manage explicitly identified holdings. */
 import { useState } from 'react';
 import { useParams } from 'react-router';
@@ -24,7 +25,7 @@ export function Roles() {
     setAnswers((values) => new Map([...values, [next.id, next]]));
     setEditing(false); setNotice('Lys saved the role change. The details below came with its answer.');
   };
-  const authority = useLoad(async () => ({ people: await api.people(), me: await api.me(), model: await api.model() }), 'role-authority');
+  const authority = useLoad(() => readTogether({ people: api.people(), me: api.me(), model: api.model() }), 'role-authority');
   const admin = authority.status === 'ok' && authority.data.people.scope === 'directory';
   const identities = authority.status === 'ok' ? authority.data.people.people.flatMap((person) => [{ id: person.id, name: person.display_name }, ...person.agents.map((agent) => ({ id: agent.id, name: agent.display_name, detail: 'agent of ' + person.display_name }))]) : [];
   return <div className="page fill"><div className="head"><div><div className="eyebrow">Directory</div><h1>Roles</h1><p className="sub">Describe a job, assign it to people or agents, and review changes before updating their assigned version.</p></div></div>
