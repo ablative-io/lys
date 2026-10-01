@@ -22,6 +22,7 @@ pub(super) fn levels(
     limit: &Limit,
     agents: &std::collections::BTreeSet<String>,
     zone: &str,
+    sessions: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<Option<Levels>, ServerError> {
     if limit.unit == Measure::ContextPercent {
         let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
@@ -50,9 +51,9 @@ pub(super) fn levels(
             missing: None,
         }));
     }
-    let before = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, None)
+    let before = crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, usage.at_ms, None, sessions)
         .map_err(unavailable)?;
-    let after = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, Some(usage))
+    let after = crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, usage.at_ms, Some(usage), sessions)
         .map_err(unavailable)?;
     let Some(figure) = after.figure else {
         return Ok(None);

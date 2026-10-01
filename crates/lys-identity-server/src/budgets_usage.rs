@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use lys_runner::tracking_budget::PlanWindow;
 use serde::Serialize;
 use serde_json::Number;
 
@@ -18,7 +19,7 @@ pub struct Used {
     /// The current figure in the named unit.
     #[schema(value_type = Option<f64>)]
     pub figure: Option<Number>,
-    /// The start of the current period or reported window.
+    /// The current period's start, reported window's start, or recorded expired reset.
     pub since_ms: Option<i64>,
     /// Why the figure is unavailable; absent exactly when a figure is present.
     pub unavailable: Option<String>,
@@ -122,6 +123,19 @@ pub fn figure(
     at_ms: i64,
     incoming: Option<&Usage>,
 ) -> Result<Used, String> {
+    figure_with_sessions(held, limit, agents, zone, at_ms, incoming, None)
+}
+
+/// Distinguish a never-run agent from one awaiting its first usage report.
+pub(crate) fn figure_with_sessions(
+    held: &Held,
+    limit: &Limit,
+    agents: &BTreeSet<String>,
+    zone: &str,
+    at_ms: i64,
+    incoming: Option<&Usage>,
+    sessions: Option<&BTreeSet<String>>,
+) -> Result<Used, String> {
     Reading {
         held,
         limit,
@@ -129,6 +143,7 @@ pub fn figure(
         zone,
         at_ms,
         incoming,
+        sessions,
     }
     .figure(Purpose::Spend)
 }
@@ -148,6 +163,7 @@ pub(crate) fn source_figure(
         zone,
         at_ms,
         incoming: None,
+        sessions: None,
     }
     .figure(Purpose::Source)
 }
@@ -165,6 +181,7 @@ struct Reading<'a> {
     zone: &'a str,
     at_ms: i64,
     incoming: Option<&'a Usage>,
+    sessions: Option<&'a BTreeSet<String>>,
 }
 
 impl Reading<'_> {
@@ -176,16 +193,31 @@ impl Reading<'_> {
             zone,
             at_ms,
             incoming,
+            sessions,
         } = self;
         let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
+        let mut usage_agents = BTreeSet::new();
         let mut uses: Vec<_> = held
             .uses
             .iter()
             .chain(incoming)
-            .filter(|usage| agents.contains(&usage.agent) && usage.at_ms <= at_ms)
+            .filter(|usage| {
+                if !agents.contains(&usage.agent) {
+                    return false;
+                }
+                if purpose == Purpose::Spend
+                    && matches!(limit.unit, Measure::Dollars | Measure::PlanPercent)
+                {
+                    usage_agents.insert(usage.agent.as_str());
+                }
+                usage.at_ms <= at_ms
+            })
             .collect();
+        let never_run = |agent: &str| {
+            sessions.is_some_and(|known| !known.contains(agent)) && !usage_agents.contains(agent)
+        };
         if limit.unit == Measure::PlanPercent {
-            return plan(limit, agents, &uses, at_ms);
+            return plan(limit, agents, &uses, at_ms, purpose, &never_run);
         }
         if limit.unit == Measure::ContextPercent {
             return context(limit, &uses);
@@ -193,12 +225,13 @@ impl Reading<'_> {
         let since = start(limit, zone, at_ms)?;
         if purpose == Purpose::Spend {
             uses.retain(|usage| since.is_none_or(|start| usage.at_ms >= start));
-            // No charged observation in this period means no spend, not a missing native source.
-            if uses.is_empty() {
+            if uses.is_empty()
+                && (limit.unit != Measure::Dollars || agents.iter().all(|agent| never_run(agent)))
+            {
                 return present(limit, since, 0);
             }
         }
-        if let Some(reason) = spend_gap(limit, agents, &uses, since, purpose) {
+        if let Some(reason) = spend_gap(limit, agents, &uses, since, purpose, &never_run) {
             return Ok(unavailable(limit, since, reason));
         }
         if limit.unit == Measure::Tokens
@@ -241,6 +274,8 @@ fn plan(
     agents: &BTreeSet<String>,
     uses: &[&Usage],
     at_ms: i64,
+    purpose: Purpose,
+    never_run: &impl Fn(&str) -> bool,
 ) -> Result<Used, String> {
     let duration = match limit.period {
         Some(Length::FiveHour) => 300,
@@ -253,27 +288,19 @@ fn plan(
             ));
         }
     };
-    let reports = match plan_reports(agents, uses) {
+    let now = u64::try_from(at_ms)
+        .map_err(|error| format!("plan observation is before the Unix epoch: {error}"))?;
+    let reports = match plan_reports(agents, uses, duration, now, purpose, never_run) {
         Ok(reports) => reports,
         Err(reason) => return Ok(unavailable(limit, None, reason)),
     };
-    let now = u64::try_from(at_ms)
-        .map_err(|error| format!("plan observation is before the Unix epoch: {error}"))?;
+    if reports.is_empty() && purpose == Purpose::Spend {
+        return present(limit, None, 0);
+    }
     let mut largest: Option<(Number, i64, String)> = None;
-    let mut expired = false;
-    for (account, report) in reports {
-        let Some(window) = report.plan_windows.as_ref().and_then(|windows| {
-            windows
-                .iter()
-                .find(|window| window.duration_minutes == duration)
-        }) else {
-            if report.unavailable.iter().any(|gap| {
-                gap.figure == "plan_windows"
-                    && gap.reason == format!("{duration}_minute_window_expired")
-            }) {
-                expired = true;
-                continue;
-            }
+    let mut expired: Option<i64> = None;
+    for (account, window) in reports {
+        let Some(window) = window else {
             return Ok(unavailable(
                 limit,
                 None,
@@ -281,7 +308,9 @@ fn plan(
             ));
         };
         if window.resets_at_ms <= now {
-            expired = true;
+            let boundary = i64::try_from(window.resets_at_ms)
+                .map_err(|error| format!("reported plan reset is not representable: {error}"))?;
+            expired = Some(expired.map_or(boundary, |earlier| earlier.max(boundary)));
             continue;
         }
         lys_runner::tracking_budget::percent(&serde_json::Value::Number(
@@ -319,12 +348,11 @@ fn plan(
         }),
         None => Ok(unavailable(
             limit,
-            None,
-            if expired {
-                "the reported account plan window has expired"
-            } else {
-                "no accounts report the requested plan window"
-            },
+            expired,
+            expired.map_or_else(
+                || "no accounts report the requested plan window".to_owned(),
+                |boundary| format!("the plan window reset at {boundary}; no report since"),
+            ),
         )),
     }
 }
@@ -363,6 +391,7 @@ fn spend_gap(
     uses: &[&Usage],
     since: Option<i64>,
     purpose: Purpose,
+    never_run: &impl Fn(&str) -> bool,
 ) -> Option<String> {
     if matches!(limit.unit, Measure::Dollars | Measure::RunningMs) {
         let field = if limit.unit == Measure::Dollars {
@@ -380,11 +409,7 @@ fn spend_gap(
             return Some(gap.reason.clone());
         }
         let mut reports = BTreeMap::new();
-        let mut observed = BTreeSet::new();
         for usage in uses {
-            if limit.unit == Measure::Dollars && purpose == Purpose::Spend {
-                observed.insert(usage.agent.as_str());
-            }
             let reported = if limit.unit == Measure::Dollars {
                 usage.dollars_micros.is_some()
             } else {
@@ -392,20 +417,17 @@ fn spend_gap(
             };
             if usage.native_snapshot || reported {
                 let key = (&usage.agent, &usage.session);
-                if reports
-                    .get(&key)
-                    .is_none_or(|earlier: &&Usage| earlier.at_ms <= usage.at_ms)
-                {
-                    reports.insert(key, *usage);
+                let latest = reports.entry(key).or_insert(*usage);
+                if latest.at_ms <= usage.at_ms {
+                    *latest = *usage;
                 }
             }
         }
         if limit.unit == Measure::Dollars {
             for agent in agents {
-                if purpose == Purpose::Spend && !observed.contains(agent.as_str()) {
-                    continue;
-                }
-                if !reports.keys().any(|(reported, _)| *reported == agent) {
+                if (purpose != Purpose::Spend || !never_run(agent))
+                    && !reports.keys().any(|(reported, _)| *reported == agent)
+                {
                     return Some(format!("dollars have not been reported for agent {agent}"));
                 }
             }
@@ -437,23 +459,37 @@ fn spend_gap(
 fn plan_reports<'a>(
     agents: &BTreeSet<String>,
     uses: &[&'a Usage],
-) -> Result<BTreeMap<&'a str, &'a Usage>, String> {
+    duration: u64,
+    now: u64,
+    purpose: Purpose,
+    never_run: &impl Fn(&str) -> bool,
+) -> Result<BTreeMap<&'a str, Option<&'a PlanWindow>>, String> {
     let mut sessions = BTreeMap::new();
+    let mut resets = BTreeMap::new();
     for (index, usage) in uses.iter().copied().enumerate() {
+        if let Some(window) = usage.plan_windows.as_ref().and_then(|windows| {
+            windows
+                .iter()
+                .find(|window| window.duration_minutes == duration)
+        }) {
+            let key = (&usage.agent, &usage.session, usage.account.as_deref());
+            let latest = resets.entry(key).or_insert((index, usage, window));
+            if (usage.at_ms, index) > (latest.1.at_ms, latest.0) {
+                *latest = (index, usage, window);
+            }
+        }
         if usage.plan_windows.is_some() {
             let key = (&usage.agent, &usage.session);
-            if sessions
-                .get(&key)
-                .is_none_or(|(earlier_index, earlier): &(usize, &Usage)| {
-                    (usage.at_ms, index) > (earlier.at_ms, *earlier_index)
-                })
-            {
-                sessions.insert(key, (index, usage));
+            let latest = sessions.entry(key).or_insert((index, usage));
+            if (usage.at_ms, index) > (latest.1.at_ms, latest.0) {
+                *latest = (index, usage);
             }
         }
     }
     for agent in agents {
-        if !sessions.keys().any(|(reported, _)| *reported == agent) {
+        if (purpose != Purpose::Spend || !never_run(agent))
+            && !sessions.keys().any(|(reported, _)| *reported == agent)
+        {
             return Err(format!("plan window unreported for agent {agent}"));
         }
     }
@@ -464,17 +500,32 @@ fn plan_reports<'a>(
             .as_deref()
             .filter(|account| !account.is_empty())
             .ok_or("the reported plan window names no account")?;
-        if accounts
-            .get(account)
-            .is_none_or(|(earlier_index, earlier): &(usize, &Usage)| {
-                (report.at_ms, index) > (earlier.at_ms, *earlier_index)
-            })
-        {
-            accounts.insert(account, (index, report));
+        let latest = accounts.entry(account).or_insert((index, report));
+        if (report.at_ms, index) > (latest.1.at_ms, latest.0) {
+            *latest = (index, report);
         }
     }
     Ok(accounts
         .into_iter()
-        .map(|(account, (_, report))| (account, report))
+        .map(|(account, (_, report))| {
+            let window = report.plan_windows.as_ref().and_then(|windows| {
+                windows
+                    .iter()
+                    .find(|window| window.duration_minutes == duration)
+            });
+            let window = window.or_else(|| {
+                if !report.unavailable.iter().any(|gap| {
+                    gap.figure == "plan_windows"
+                        && gap.reason == format!("{duration}_minute_window_expired")
+                }) {
+                    return None;
+                }
+                resets
+                    .get(&(&report.agent, &report.session, Some(account)))
+                    .map(|(_, _, window)| *window)
+                    .filter(|window| window.resets_at_ms <= now)
+            });
+            (account, window)
+        })
         .collect())
 }
