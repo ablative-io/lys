@@ -1,6 +1,7 @@
 //! The roles as they are kept: an initial snapshot and durable changes in
-//! one file. Ordinary changes append only their own records. An existing
-//! snapshot is migrated atomically with the first change.
+//! one file. Changes append only their own records; periodic snapshots
+//! bound restart replay. An existing snapshot is migrated atomically with
+//! the first change.
 //!
 //! A change is written before it is answered. When a write fails, what the
 //! file holds is read again before anything else is answered, so memory
@@ -33,6 +34,8 @@ use persistence::Persistence;
 #[cfg(test)]
 std::thread_local! {
     static WRITTEN_BYTES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static REPLAYED_CHANGES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static RECOVERED_TAILS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -113,6 +116,11 @@ impl RolesStore {
             return Err(failure);
         }
         if let Err(failure) = change.apply(&mut self.kept) {
+            self.uncertain = true;
+            self.settle()?;
+            return Err(failure);
+        }
+        if let Err(failure) = self.persistence.checkpoint_if_due(&self.kept) {
             self.uncertain = true;
             self.settle()?;
             return Err(failure);

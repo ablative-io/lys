@@ -4,7 +4,11 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-use super::{Kept, RolesStore, WRITTEN_BYTES};
+use lys_identity::SNAPSHOT_EVERY;
+
+use super::changes::Change;
+use super::persistence::HEADER;
+use super::{Kept, RECOVERED_TAILS, REPLAYED_CHANGES, RolesStore, WRITTEN_BYTES};
 use crate::error::ServerError;
 use crate::roles_records::{Ending, Holding, Move, Role, Version, Words};
 
@@ -170,18 +174,166 @@ fn an_old_install_preserves_roles_and_idempotency_through_changes_and_restart() 
 }
 
 #[test]
-fn a_truncated_change_is_refused_without_discarding_the_record() -> TestResult {
+fn a_torn_final_change_is_durably_removed_before_later_changes() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("roles.json");
+    let mut store = RolesStore::open(&path)?;
+    store.make("Builder".to_owned(), version(1, "role-1"))?;
+    let expected = store.roles().to_vec();
+    drop(store);
+    let complete = fs::read(&path)?;
+    let mut bytes = complete.clone();
+    bytes.extend_from_slice(b"{\"change\":\"Revise\",\"role\":0");
+    fs::write(&path, &bytes)?;
+    RECOVERED_TAILS.with(|recovered| recovered.set(0));
+    let mut store = RolesStore::open(&path)?;
+    assert_eq!(store.roles(), expected);
+    assert_eq!(fs::read(&path)?, complete);
+    assert_eq!(RECOVERED_TAILS.with(std::cell::Cell::get), 1);
+    bounded_write(&path, || {
+        store
+            .revise("role-1", "version-2", words(), "person-a", 400)
+            .map(|number| assert_eq!(number, 2))
+    })?;
+    let expected = store.roles().to_vec();
+    drop(store);
+    assert_eq!(RolesStore::open(&path)?.roles(), expected);
+    Ok(())
+}
+
+#[test]
+fn complete_corruption_and_an_incomplete_snapshot_are_refused_without_truncation() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("roles.json");
     let mut store = RolesStore::open(&path)?;
     store.make("Builder".to_owned(), version(1, "role-1"))?;
     drop(store);
     let mut bytes = fs::read(&path)?;
-    bytes.extend_from_slice(b"{\"change\":\"Revise\",\"role\":0");
+    bytes.extend_from_slice(b"{broken}\n");
     fs::write(&path, &bytes)?;
-    let opened = RolesStore::open(&path);
-    assert!(matches!(opened, Err(ServerError::RolesUnavailable { .. })));
+    assert!(matches!(
+        RolesStore::open(&path),
+        Err(ServerError::RolesUnavailable { .. })
+    ));
     assert_eq!(fs::read(&path)?, bytes);
+    let mut incomplete = HEADER.to_vec();
+    incomplete.extend_from_slice(b"{\"roles\":[]");
+    fs::write(&path, &incomplete)?;
+    assert!(matches!(
+        RolesStore::open(&path),
+        Err(ServerError::RolesUnavailable { .. })
+    ));
+    assert_eq!(fs::read(&path)?, incomplete);
+    Ok(())
+}
+
+fn seed_journal(path: &Path, count: u64) -> Result<Kept, Box<dyn Error>> {
+    let mut kept = Kept {
+        roles: vec![Role {
+            id: "role-1".to_owned(),
+            name: "Builder".to_owned(),
+            versions: vec![version(1, "role-1")],
+            holdings: Vec::new(),
+        }],
+    };
+    let mut bytes = HEADER.to_vec();
+    serde_json::to_writer(&mut bytes, &kept)?;
+    bytes.push(b'\n');
+    for offset in 0..count {
+        let number = u32::try_from(offset + 2)?;
+        let change = Change::Revise {
+            role: 0,
+            version: version(number, &format!("version-{number}")),
+        };
+        serde_json::to_writer(&mut bytes, &change)?;
+        bytes.push(b'\n');
+        change.apply(&mut kept)?;
+    }
+    fs::write(path, bytes)?;
+    Ok(kept)
+}
+
+#[test]
+fn checkpoint_boundaries_borrow_state_and_bound_actual_replay() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("roles.json");
+    let count = SNAPSHOT_EVERY.get();
+    let expected = seed_journal(&path, count - 1)?;
+    REPLAYED_CHANGES.with(|replayed| replayed.set(0));
+    let mut store = RolesStore::open(&path)?;
+    assert_eq!(store.roles(), expected.roles);
+    assert_eq!(REPLAYED_CHANGES.with(std::cell::Cell::get), count - 1);
+    let boundary = u32::try_from(count + 1)?;
+    assert_eq!(
+        store.revise(
+            "role-1",
+            &format!("version-{boundary}"),
+            words(),
+            "person-a",
+            400,
+        )?,
+        boundary
+    );
+    drop(store);
+    REPLAYED_CHANGES.with(|replayed| replayed.set(0));
+    let mut store = RolesStore::open(&path)?;
+    assert_eq!(REPLAYED_CHANGES.with(std::cell::Cell::get), 0);
+    let next = boundary + 1;
+    bounded_write(&path, || {
+        store
+            .revise(
+                "role-1",
+                &format!("version-{next}"),
+                words(),
+                "person-a",
+                410,
+            )
+            .map(|number| assert_eq!(number, next))
+    })?;
+    let expected = store.roles().to_vec();
+    drop(store);
+    REPLAYED_CHANGES.with(|replayed| replayed.set(0));
+    assert_eq!(RolesStore::open(&path)?.roles(), expected);
+    assert_eq!(REPLAYED_CHANGES.with(std::cell::Cell::get), 1);
+    Ok(())
+}
+
+#[test]
+fn a_crashed_checkpoint_refuses_the_next_append_until_the_snapshot_is_written() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("roles.json");
+    let count = SNAPSHOT_EVERY.get();
+    let expected = seed_journal(&path, count)?;
+    let mut store = RolesStore::open(&path)?;
+    let before = fs::read(&path)?;
+    fs::create_dir(path.with_extension("writing"))?;
+    let next = u32::try_from(count + 2)?;
+    let failed = store.revise(
+        "role-1",
+        &format!("version-{next}"),
+        words(),
+        "person-a",
+        420,
+    );
+    assert!(matches!(failed, Err(ServerError::RolesUnavailable { .. })));
+    assert_eq!(fs::read(&path)?, before);
+    assert_eq!(store.roles(), expected.roles);
+    fs::remove_dir(path.with_extension("writing"))?;
+    assert_eq!(
+        store.revise(
+            "role-1",
+            &format!("version-{next}"),
+            words(),
+            "person-a",
+            420,
+        )?,
+        next
+    );
+    let expected = store.roles().to_vec();
+    drop(store);
+    REPLAYED_CHANGES.with(|replayed| replayed.set(0));
+    assert_eq!(RolesStore::open(&path)?.roles(), expected);
+    assert_eq!(REPLAYED_CHANGES.with(std::cell::Cell::get), 1);
     Ok(())
 }
 
