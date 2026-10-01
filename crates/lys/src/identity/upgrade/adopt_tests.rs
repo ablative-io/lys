@@ -247,6 +247,39 @@ fn install_run_again_restarts_a_process_whose_binary_it_placed() -> TestResult {
 }
 
 #[test]
+fn a_screen_swap_restarts_only_the_service_when_configuration_is_unchanged() -> TestResult {
+    let scratch = Scratch::new()?;
+    let broker = std::fs::read_to_string(&scratch.units[0].pid)?;
+    let service = std::fs::read_to_string(&scratch.units[1].pid)?;
+    let configuration = scratch.configuration()?;
+    let screens = scratch.work().join("screens");
+    super::super::scratch::package(&screens, B)?;
+    crate::identity::install::surface::place(&screens, &scratch.layout.surface_dir())?;
+    let source = |name: &str| -> IdentityResult<PathBuf> { Ok(scratch.layout.binary(name)) };
+    let record = settle(&scratch.layout, &scratch.units, &source, false, &mut |_| {})?;
+    assert_eq!(
+        std::fs::read_to_string(&scratch.units[0].pid)?,
+        broker,
+        "a screen swap leaves the broker running"
+    );
+    assert_ne!(
+        std::fs::read_to_string(&scratch.units[1].pid)?,
+        service,
+        "a screen swap restarts the service that holds the old cache"
+    );
+    assert_eq!(scratch.configuration()?, configuration);
+    assert_eq!(
+        record
+            .surface
+            .ok_or("the placed screens were not recorded")?
+            .commit,
+        B
+    );
+    assert_eq!(scratch.running()?, ready_lines(A));
+    Ok(())
+}
+
+#[test]
 fn install_from_another_build_is_refused_and_stops_nothing() -> TestResult {
     let scratch = Scratch::new()?;
     let pids: Vec<String> = scratch
