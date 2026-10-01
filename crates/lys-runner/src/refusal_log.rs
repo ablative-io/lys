@@ -214,7 +214,7 @@ pub(crate) fn keep(
     drop(table);
     let appended = appended.and_then(|_| sessions.writer.barrier());
     match appended {
-        Ok(_) => {
+        Ok(()) => {
             sessions.wake();
             Verdict::of(record, "recorded")
         }

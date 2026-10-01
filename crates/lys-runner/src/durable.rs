@@ -40,7 +40,7 @@ impl Writer {
         let faults = Arc::clone(&fault);
         let worker = std::thread::Builder::new()
             .name("runner-writer".to_owned())
-            .spawn(move || run(receiver, &faults))
+            .spawn(move || run(&receiver, &faults))
             .map_err(refused)?;
         Ok(Self(Arc::new(Inner {
             sender: Some(sender),
@@ -107,7 +107,7 @@ impl Drop for Inner {
     }
 }
 
-fn run(receiver: mpsc::Receiver<Command>, fault: &Mutex<Option<String>>) {
+fn run(receiver: &mpsc::Receiver<Command>, fault: &Mutex<Option<String>>) {
     while let Ok(first) = receiver.recv() {
         let mut commands = std::iter::once(first)
             .chain(receiver.try_iter().take(31))
