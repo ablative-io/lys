@@ -33,6 +33,7 @@ use crate::tracking_store::{Body, Commit};
 
 mod delivery;
 use delivery::*;
+pub(crate) use delivery::{accept, compacting, deliver, ended};
 
 #[cfg(test)]
 #[path = "../tests/operations_index/cases.rs"]
