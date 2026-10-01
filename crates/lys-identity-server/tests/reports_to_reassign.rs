@@ -128,7 +128,7 @@ fn leaf_bytes(service: &Service) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn Er
         let name = entry
             .file_name()
             .into_string()
-            .map_err(|_| "leaf name is not text")?;
+            .map_err(|error| format!("leaf name is not text: {error:?}"))?;
         leaves.insert(name, std::fs::read(entry.path())?);
     }
     Ok(leaves)
@@ -240,24 +240,21 @@ async fn invalid_edges(table: &Table, agent: &str, target: &str) -> Result<(), B
         (agent, agent, vec![agent, agent]),
         (target, agent, vec![target, agent, target]),
     ] {
+        let body = edge(destination)?;
         let answer = table
             .refuse(
                 &format!("/agents/{source}/reports-to"),
                 &table.administrator,
-                &edge(destination)?,
+                &body,
                 "AnswersToCycle",
             )
             .await?;
         assert_eq!(answer["chain"], json!(chain));
     }
     let route = format!("/agents/{agent}/reports-to");
+    let body = edge(&AgentId::generate()?.to_string())?;
     table
-        .refuse(
-            &route,
-            &table.administrator,
-            &edge(&AgentId::generate()?.to_string())?,
-            "AnswersToUnknown",
-        )
+        .refuse(&route, &table.administrator, &body, "AnswersToUnknown")
         .await?;
     for (destination, state) in [
         (&table.seeded.people[0].agents[1], "registered"),
@@ -265,13 +262,9 @@ async fn invalid_edges(table: &Table, agent: &str, target: &str) -> Result<(), B
         (&table.seeded.people[1].agents[1], "retired"),
     ] {
         let destination = destination.id.to_string();
+        let body = edge(&destination)?;
         let answer = table
-            .refuse(
-                &route,
-                &table.administrator,
-                &edge(&destination)?,
-                "AnswersToInactive",
-            )
+            .refuse(&route, &table.administrator, &body, "AnswersToInactive")
             .await?;
         assert_eq!(answer["identity"], destination);
         assert_eq!(answer["state"], state);
@@ -286,9 +279,10 @@ async fn same_accountability(
     responsible: &str,
 ) -> Result<(), Box<dyn Error>> {
     for (destination, kind) in [(responsible, "person"), (target, "agent")] {
+        let body = edge(destination)?;
         let (status, answer) = table
             .service
-            .post(route, Some(&table.administrator), &edge(destination)?)
+            .post(route, Some(&table.administrator), &body)
             .await?;
         assert_eq!(status, 200, "{answer}");
         assert_eq!(
@@ -321,7 +315,7 @@ async fn an_old_directory_requires_migration_and_preserves_every_registration()
             let name = entry
                 .file_name()
                 .into_string()
-                .map_err(|_| "leaf name is not text")?;
+                .map_err(|error| format!("leaf name is not text: {error:?}"))?;
             old_leaves.insert(name, std::fs::read(entry.path())?);
         }
         let path = config.log_dir.clone();
@@ -525,10 +519,11 @@ async fn an_inactive_reporting_link_blocks_and_reinstatement_restores_agent_call
             email: "administrator@example.test".to_owned(),
         })
         .await?;
+    let body = edge(&parent)?;
     let response = reqwest::Client::new()
         .post(format!("{}/agents/{child}/reports-to", service.base))
         .header(reqwest::header::COOKIE, &administrator)
-        .json(&edge(&parent)?)
+        .json(&body)
         .send()
         .await?;
     let status = response.status().as_u16();
