@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
 use lys_identity::{
     Actor, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, Profile, Provenance,
@@ -26,59 +26,81 @@ struct Fixture {
 
 impl Fixture {
     async fn fresh() -> TestResult<Self> {
-        let (service, (agent, other, person, key)) = Service::start_with(|config| {
-            lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
-            let path = config.log_dir.clone();
-            let key = Ed25519Identity::load(&config.event_key_file)?;
-            lys_identity::directory_migration::migrate(
-                lys_log_store::FileLeafStore::open(&path)?,
-                &key,
-            )?;
-            let mut directory = Directory::open(
-                Box::new(move || lys_log_store::FileLeafStore::open(&path)),
-                key,
-            )?;
-            let actor = Actor::new(
-                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                Provenance::new(AuthMethod::Oidc, 1),
-            );
-            let (person, _) = directory.setup_person(
-                actor.clone(),
-                OperationId::generate()?,
-                Profile::new("Owner")?,
-                1,
-            )?;
-            let (agent, _) = directory.register_agent(
-                actor.clone(),
-                OperationId::generate()?,
-                person,
-                Profile::new("Caller")?,
-                2,
-            )?;
-            let (other, _) = directory.register_agent(
-                actor.clone(),
-                OperationId::generate()?,
-                person,
-                Profile::new("Other")?,
-                2,
-            )?;
-            for id in [agent, other] {
-                directory.transition(
+        // Only the stores a grant read touches are opened; the rest of the
+        // service is left out so the fixture costs what the test needs.
+        let (service, (agent, other, person, key)) = Service::start_adjusted(
+            GRANT_MODEL,
+            None,
+            None,
+            None,
+            |config| {
+                config.requests_dir = None;
+                config.roles_file = None;
+                config.provisioning_file = None;
+                config.network_file = None;
+                config.runtime_dir = None;
+                config.service_accounts_dir = None;
+                config.teams_dir = None;
+                config.stops_dir = None;
+                config.budgets_dir = None;
+                config.policies_dir = None;
+                config.goals_dir = None;
+                config.reviews_dir = None;
+            },
+            |config| {
+                lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+                let path = config.log_dir.clone();
+                let key = Ed25519Identity::load(&config.event_key_file)?;
+                lys_identity::directory_migration::migrate(
+                    lys_log_store::FileLeafStore::open(&path)?,
+                    &key,
+                )?;
+                let mut directory = Directory::open(
+                    Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+                    key,
+                )?;
+                let actor = Actor::new(
+                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                    Provenance::new(AuthMethod::Oidc, 1),
+                );
+                let (person, _) = directory.setup_person(
                     actor.clone(),
                     OperationId::generate()?,
-                    IdentityId::Agent(id),
-                    Transition::Activate,
-                    "",
-                    3,
+                    Profile::new("Owner")?,
+                    1,
                 )?;
-            }
-            Ok((
-                agent.to_string(),
-                other.to_string(),
-                person.to_string(),
-                Arc::new(Ed25519Identity::load(&config.event_key_file)?),
-            ))
-        })
+                let (agent, _) = directory.register_agent(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    person,
+                    Profile::new("Caller")?,
+                    2,
+                )?;
+                let (other, _) = directory.register_agent(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    person,
+                    Profile::new("Other")?,
+                    2,
+                )?;
+                for id in [agent, other] {
+                    directory.transition(
+                        actor.clone(),
+                        OperationId::generate()?,
+                        IdentityId::Agent(id),
+                        Transition::Activate,
+                        "",
+                        3,
+                    )?;
+                }
+                Ok((
+                    agent.to_string(),
+                    other.to_string(),
+                    person.to_string(),
+                    Arc::new(Ed25519Identity::load(&config.event_key_file)?),
+                ))
+            },
+        )
         .await?;
         let cookie = service
             .sign_in(identity_contract::apps::login(ADMINISTRATOR))
