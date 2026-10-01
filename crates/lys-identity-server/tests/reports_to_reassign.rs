@@ -15,6 +15,7 @@ mod before;
 
 struct Table {
     service: Service,
+    client: reqwest::Client,
     seeded: Seeded,
     administrator: String,
     other: String,
@@ -38,11 +39,33 @@ impl Table {
             })
             .await?;
         Ok(Self {
+            client: reqwest::Client::new(),
             service,
             seeded,
             administrator,
             other,
         })
+    }
+
+    async fn post(
+        &self,
+        route: &str,
+        cookie: Option<&str>,
+        body: &Value,
+    ) -> Result<(u16, Value), Box<dyn Error>> {
+        let mut request = self
+            .client
+            .post(format!("{}{route}", self.service.base))
+            .json(body);
+        if let Some(cookie) = cookie {
+            request = request.header(reqwest::header::COOKIE, cookie);
+        }
+        let response = request.send().await?;
+        let status = response.status().as_u16();
+        let raw = response.text().await?;
+        let answer = serde_json::from_str(&raw)
+            .map_err(|error| format!("POST {route}: status={status}, body={raw:?}: {error}"))?;
+        Ok((status, answer))
     }
 
     async fn read(&self, agent: &str) -> Result<Value, Box<dyn Error>> {
@@ -66,7 +89,7 @@ impl Table {
     ) -> Result<Value, Box<dyn Error>> {
         let leaves = leaf_bytes(&self.service)?;
         let state = std::fs::read(self.service.dir.path().join("log/state.json"))?;
-        let (status, answer) = self.service.post(route, Some(cookie), body).await?;
+        let (status, answer) = self.post(route, Some(cookie), body).await?;
         assert!((400..500).contains(&status), "{status}: {answer}");
         assert_eq!(answer["refusal"], code);
         assert_eq!(leaf_bytes(&self.service)?, leaves);
@@ -83,7 +106,6 @@ impl Table {
             "transition": "retire", "reason": "Reporting authority withdrawn",
         });
         let (status, answer) = self
-            .service
             .post(
                 &format!("/identities/{identity}/transitions"),
                 Some(&self.administrator),
@@ -127,7 +149,6 @@ async fn reassignment_resolves_accountability_without_rewriting_history()
         .await?;
     let started = Instant::now();
     let (status, answer) = table
-        .service
         .post(&route, Some(&table.administrator), &request)
         .await?;
     eprintln!(
@@ -149,7 +170,6 @@ async fn reassignment_resolves_accountability_without_rewriting_history()
         assert_eq!(after.get(&name), Some(&bytes), "historical leaf {name}");
     }
     let (status, replay) = table
-        .service
         .post(&route, Some(&table.administrator), &request)
         .await?;
     assert_eq!(status, 200, "{replay}");
@@ -185,7 +205,6 @@ async fn reassignment_resolves_accountability_without_rewriting_history()
     assert_eq!(refusal["chain"], json!([agent, target, responsible]));
     let after_retirement = leaf_bytes(&table.service)?;
     let (status, replay) = table
-        .service
         .post(&route, Some(&table.administrator), &request)
         .await?;
     assert_eq!(status, 200, "{replay}");
@@ -379,7 +398,6 @@ async fn one_leaf_moves_accountability_for_an_agent_and_two_descendant_levels()
     let before = leaf_bytes(&table.service)?;
     let request = edge(&responsible)?;
     let (status, answer) = table
-        .service
         .post(
             &format!("/agents/{root}/reports-to"),
             Some(&table.administrator),
@@ -436,7 +454,6 @@ async fn active_reporting_agent(
         "display_name": name, "answers_to": target,
     });
     let (status, answer) = table
-        .service
         .post("/agents", Some(&table.administrator), &body)
         .await?;
     assert_eq!(status, 200, "{answer}");
@@ -446,7 +463,6 @@ async fn active_reporting_agent(
         .to_owned();
     let body = json!({"operation": OperationId::generate()?.to_string(), "transition": "activate"});
     let (status, activated) = table
-        .service
         .post(
             &format!("/identities/{agent}/transitions"),
             Some(&table.administrator),
@@ -455,4 +471,85 @@ async fn active_reporting_agent(
         .await?;
     assert_eq!(status, 200, "{activated}");
     Ok(agent)
+}
+
+#[tokio::test]
+async fn an_inactive_reporting_link_blocks_and_reinstatement_restores_agent_calls()
+-> Result<(), Box<dyn Error>> {
+    use lys_identity::{
+        Actor, AuthMethod, IdentityId, LoginBinding, Profile, Provenance, Transition,
+    };
+    use lys_identity_server::session::{Sessions, now};
+
+    let (service, (parent, child, cookie)) = Service::start_with(|config| {
+        let mut directory = lys_identity_server::routes::open_directory(config)?;
+        let binding = LoginBinding::new(&config.issuer, ADMINISTRATOR)?;
+        let actor = Actor::new(binding.clone(), Provenance::new(AuthMethod::Oidc, now()));
+        let (person, _) = directory.setup_person(
+            actor.clone(),
+            OperationId::generate()?,
+            Profile::new("Accountable person")?,
+            now(),
+        )?;
+        let mut agents = Vec::new();
+        for name in ["Reporting parent", "Reporting child"] {
+            let (agent, _) = directory.register_agent(
+                actor.clone(),
+                OperationId::generate()?,
+                person,
+                Profile::new(name)?,
+                now(),
+            )?;
+            directory.transition(
+                actor.clone(),
+                OperationId::generate()?,
+                IdentityId::Agent(agent),
+                Transition::Activate,
+                "",
+                now(),
+            )?;
+            agents.push(agent);
+        }
+        let sessions = Sessions::open(
+            config.sessions_file.clone().ok_or("no sessions file")?,
+            config.session_seconds,
+            config.secure_cookie,
+        )?;
+        let cookie = sessions.begin(Actor::new(binding, Provenance::by_agent(agents[1], now())))?;
+        Ok((agents[0].to_string(), agents[1].to_string(), cookie))
+    })
+    .await?;
+    let administrator = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "administrator@example.test".to_owned(),
+        })
+        .await?;
+    let response = reqwest::Client::new()
+        .post(format!("{}/agents/{child}/reports-to", service.base))
+        .header(reqwest::header::COOKIE, &administrator)
+        .json(&edge(&parent)?)
+        .send()
+        .await?;
+    let status = response.status().as_u16();
+    let raw = response.text().await?;
+    assert_eq!(status, 200, "reporting setup: {raw}");
+    assert_eq!(service.get("/grants/model", Some(&cookie)).await?.0, 200);
+    let route = format!("/identities/{parent}/transitions");
+    for transition in ["suspend", "reinstate"] {
+        let body = json!({"operation": OperationId::generate()?.to_string(),
+            "transition": transition, "reason": "Reporting authority changed"});
+        let (status, answer) = service.post(&route, Some(&administrator), &body).await?;
+        assert_eq!(status, 200, "{answer}");
+        let (status, answer) = service.get("/grants/model", Some(&cookie)).await?;
+        if transition == "suspend" {
+            assert_eq!(status, 403, "{answer}");
+            assert_eq!(answer["refusal"], "AnswersToInactive");
+            assert_eq!(answer["identity"], parent);
+            assert_eq!(answer["state"], "suspended");
+        } else {
+            assert_eq!(status, 200, "{answer}");
+        }
+    }
+    Ok(())
 }
