@@ -23,6 +23,10 @@ mod binding_tests;
 mod rollout_tests;
 
 #[cfg(test)]
+#[path = "../tests/follower_parent/cases.rs"]
+mod parent_tests;
+
+#[cfg(test)]
 thread_local! {
     static ROLLOUT_DIRECTORIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }

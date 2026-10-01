@@ -34,6 +34,10 @@ pub use crate::peer::Collected;
 #[path = "../../tests/lifecycle/cases.rs"]
 mod io_tests;
 
+pub(crate) fn transcript_parent(path: &Path) -> Result<PathBuf, RunnerError> {
+    Ok(path.parent().unwrap_or_else(|| Path::new("/")).to_owned())
+}
+
 /// What wakes a session's stream follower.
 #[derive(Debug)]
 pub(crate) enum Wake {
@@ -299,7 +303,13 @@ impl Sessions {
                 crate::error::said(&format!("a stream follower had ended: {gone}"));
             }
         });
-        let dir = path.parent().unwrap_or_else(|| Path::new("/")).to_owned();
+        let dir = match transcript_parent(&path) {
+            Ok(dir) => dir,
+            Err(error) => {
+                crate::error::said(&format!("session {id}: {error}"));
+                return;
+            }
+        };
         let watching = notifier.and_then(|mut each| {
             notify::Watcher::watch(&mut each, &dir, notify::RecursiveMode::NonRecursive)
                 .map(|()| each)
