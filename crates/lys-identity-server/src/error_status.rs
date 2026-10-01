@@ -148,7 +148,8 @@ impl ServerError {
             | Self::MachineNotForAgent
             | Self::SecondFactorUnsupported
             | Self::NotPermitted { .. }
-            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
+            | Self::ReviewerOnly
+            | Self::McpBeyondRemit { .. } => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::McpServerUnknown { .. }
             | Self::GrantNotVisible
