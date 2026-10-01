@@ -14,7 +14,6 @@ use std::num::NonZeroU64;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::sync::OnceLock;
 
 use lys_core::Ed25519Identity;
 use lys_secrets::{
@@ -22,6 +21,9 @@ use lys_secrets::{
     StoreKey,
 };
 use tempfile::TempDir;
+
+#[path = "support/log_window_fixture.rs"]
+mod fixture;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -120,24 +122,6 @@ fn build(folders: &Folders) -> TestResult {
     Ok(())
 }
 
-/// The 10,000-line broker, written once per run under the target's
-/// temporary folder.
-fn built() -> Result<&'static Folders, Box<dyn Error>> {
-    static BUILT: OnceLock<Result<Folders, String>> = OnceLock::new();
-    BUILT
-        .get_or_init(|| {
-            let dir = tempfile::Builder::new()
-                .prefix("log-window-")
-                .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
-                .map_err(|error| format!("making the fixture folder: {error}"))?;
-            let folders = Folders { dir };
-            build(&folders).map_err(|error| format!("building the 10,000-line log: {error}"))?;
-            Ok(folders)
-        })
-        .as_ref()
-        .map_err(|error| error.as_str().into())
-}
-
 fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
     fs::create_dir_all(to)?;
     for entry in fs::read_dir(from)? {
@@ -154,13 +138,7 @@ fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
 
 /// A copy of the 10,000-line broker for one test.
 fn ten_thousand() -> Result<Folders, Box<dyn Error>> {
-    let built = built()?;
-    let copy = Folders {
-        dir: tempfile::tempdir()?,
-    };
-    copy_tree(&built.root(), &copy.root())?;
-    copy_tree(&built.keys(), &copy.keys())?;
-    Ok(copy)
+    fixture::copy()
 }
 
 /// One printed page: each row's index and the index its outcome names,
