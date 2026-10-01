@@ -185,16 +185,17 @@ impl Availability {
         let mut figure = None;
         let mut gap = None;
         for name in agents {
+            // An agent with no live session, and a live session that has not
+            // reported yet, add no figure and no gap, as the fold over reports
+            // does; only a report that names no context is a gap.
             let Some(activity) = sessions.get(name) else {
-                gap = Some(NO_CONTEXT);
-                break;
+                continue;
             };
             let agent = self.agents.get(name);
             let mut named_at = None;
             for session in activity.live_sessions() {
                 let Some(reading) = agent.and_then(|agent| agent.sessions.get(session)) else {
-                    gap = Some(NO_CONTEXT);
-                    break;
+                    continue;
                 };
                 named_at = Some(named_at.map_or(reading.at_ms, |at: i64| at.max(reading.at_ms)));
                 if reading.at_ms > at_ms {

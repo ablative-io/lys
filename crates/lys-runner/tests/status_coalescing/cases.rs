@@ -203,12 +203,19 @@ fn a_full_window_stops_its_leader_even_when_flushing_fails() -> Result<(), Box<d
     } else {
         None
     };
-    sessions.stop_all()?;
+    let stopped = sessions.stop_all();
     super::status::BEFORE_END.with(|probe| *probe.borrow_mut() = None);
     assert_eq!(
         result
             .err()
             .ok_or("failed flush was answered successful")?
+            .name(),
+        fault.name()
+    );
+    assert_eq!(
+        stopped
+            .err()
+            .ok_or("a stop whose record failed was answered successful")?
             .name(),
         fault.name()
     );

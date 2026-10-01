@@ -758,10 +758,10 @@ impl Sessions {
         {
             table = self.wait(table)?;
         }
-        self.persist(&table)?;
+        let persisted = self.persist(&table);
         drop(table);
-        self.writer.barrier()?;
+        let flushed = self.writer.barrier();
         self.wake();
-        Ok(())
+        persisted.and(flushed)
     }
 }
