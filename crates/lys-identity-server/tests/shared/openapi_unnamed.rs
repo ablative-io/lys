@@ -79,7 +79,7 @@ pub(crate) const OPEN_ANSWERS: &[(&str, &str)] = &[
         "answers the account as the issuer reports it after the change",
     ),
     ("get /authority", "answers text/plain, not JSON"),
-    ("get /login", "answers a 303 to the issuer, with no body"),
+    ("get /login", "answers a 303 to /#/sign-in, with no body"),
     (
         "get /callback",
         "answers through Response, since it must set the session cookie",

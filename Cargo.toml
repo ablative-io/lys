@@ -21,7 +21,7 @@ edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/ablative-io/lys"
 authors = ["Tom Whiting <tom@ablative.com.au>"]
-rust-version = "1.85"
+rust-version = "1.97.1"
 
 [workspace.dependencies]
 # Internal
