@@ -92,11 +92,11 @@ Behavioural. The protocol is a short list of acts (start, input, keys, read, wai
 
 ### R3: Start runs the agent
 
-Behavioural. POST /agents/{id}/start on a machine with a runner renders the command as today and has the runner run it, with the working directory, environment and handles the launch record names; the session reports starting, then running when the runner confirms the process is up. A machine without a runner answers the command as today. Every refusal of the existing start is unchanged. The identity server and the lys-identity start files still spawn nothing: they ask the runner over its socket, and only lys-runner spawns a process, so DIRECTORY-029 R12 and crates/lys-identity/tests/start_no_spawn.rs stay green unchanged. This supersedes DIRECTORY-029's boundary against a lys launcher subcommand by Tom's word of 28 September 2026 19:4x (Lys runs the agents it starts); the no-spawn guarantee of the start path stands.
+Behavioural. POST /agents/{id}/start on a machine with a runner renders the command as today and has the runner run it, with the working directory, environment and handles the launch record names; the session reports starting, then running when the runner confirms the process is up. A placed machine with no recorded runner is refused with 409 MachineWithoutRunner before Starting, and a kept start replayed after its runner record is gone is refused the same way, leaving every stored byte unchanged (Archie, 1 October 2026, card AaUzlnIW: a command nobody can run is not a start). Every refusal of the existing start is unchanged. The identity server and the lys-identity start files still spawn nothing: they ask the runner over its socket, and only lys-runner spawns a process, so DIRECTORY-029 R12 and crates/lys-identity/tests/start_no_spawn.rs stay green unchanged. This supersedes DIRECTORY-029's boundary against a lys launcher subcommand by Tom's word of 28 September 2026 19:4x (Lys runs the agents it starts); the no-spawn guarantee of the start path stands.
 
 **Acceptance:**
 - Starting an agent on a machine with the runner leaves it running and listed on the Sessions screen.
-- A machine without a runner answers the command as before; the existing start tests pass unchanged.
+- A machine with no recorded runner is refused by name with MachineWithoutRunner before Starting, on a new start and on replay, and nothing it stored changes.
 - crates/lys-identity/tests/start_no_spawn.rs passes unchanged, and no file it scans names a process-spawning API.
 
 **Files:**
