@@ -55,6 +55,7 @@ mod peer_view;
 
 mod lifecycle;
 pub(crate) mod output;
+mod owned;
 mod restart;
 
 #[cfg(test)]
@@ -446,42 +447,6 @@ impl Sessions {
     /// and when it started.
     pub fn start(self: &Arc<Self>, launch: Launch) -> Result<(u32, u64), RunnerError> {
         self.begin(launch, None, None)
-    }
-
-    /// Start with a verified responsible person supplied by the admitting caller.
-    ///
-    /// # Errors
-    /// Returns invalid responsibility, launch or persistence errors by name.
-    pub fn start_for(
-        self: &Arc<Self>,
-        launch: Launch,
-        responsible: &str,
-    ) -> Result<(u32, u64), RunnerError> {
-        self.begin_for(launch, None, None, responsible)
-    }
-
-    /// Begin an owned session without deriving a person from a server key.
-    ///
-    /// # Errors
-    /// Returns invalid responsibility, tracking, launch or persistence errors by name.
-    pub fn begin_for(
-        self: &Arc<Self>,
-        launch: Launch,
-        policy: Option<Policy>,
-        tracking: Option<Tracking>,
-        responsible: &str,
-    ) -> Result<(u32, u64), RunnerError> {
-        if responsible.is_empty()
-            || responsible.trim() != responsible
-            || responsible.chars().any(char::is_control)
-            || responsible == "lys"
-        {
-            return Err(RunnerError::refused(
-                "SessionResponsibleInvalid",
-                "a verified responsible person is required",
-            ));
-        }
-        self.begin_owned(launch, policy, tracking, Some(responsible.to_owned()))
     }
 
     /// Start `launch` as [`Sessions::start`] does, holding `policy` for its
