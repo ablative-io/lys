@@ -203,3 +203,6 @@ mod sign_in_flights;
 mod sign_in_attempts;
 
 mod sign_in_address;
+
+/// Eligible authorities named by an agent grant refusal.
+pub mod who_can_grant;
