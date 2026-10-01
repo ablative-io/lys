@@ -85,9 +85,9 @@ impl<S: LeafStore> Log<S> {
     /// Opens a log over `store`: loads every leaf, rebuilds the tree, and
     /// reconciles it with the pinned root.
     ///
-    /// One divergence is tolerated and repaired: a contiguous tail of leaves
-    /// whose pinned-size prefix rebuilds to the pinned root. An append or batch
-    /// can be interrupted between storing leaves and advancing the pin. The
+    /// An interrupted append permits exactly one extra leaf. A durably recorded
+    /// batch intent permits a contiguous tail up to its exclusive end. Both
+    /// require the pinned-size prefix to rebuild to the pinned root. The
     /// repair advances the pin, is reported by
     /// [`recovered_to`](Self::recovered_to), and is never silent.
     ///
@@ -129,12 +129,14 @@ impl<S: LeafStore> Log<S> {
     ///
     /// For a reader, whose open must not change the store. When the rebuilt
     /// tree equals the pin, the log is the one [`Log::open`] returns. When the
-    /// store holds more leaves than the pin and the pinned-size prefix rebuilds
-    /// to the pinned root, the interrupted append or batch [`Log::open`] repairs,
-    /// log holds the pinned prefix only, reports the tree size a writable open
+    /// store has a recoverable tail under the one-leaf rule or its recorded
+    /// batch intent, and the pinned prefix matches, the log holds the pinned
+    /// prefix only, reports the tree size a writable open
     /// repairs to through [`pending_repair`](Self::pending_repair), and refuses
     /// every append with [`StoreError::AppendAwaitsRepair`]. The store's
     /// [`pin`](LeafStore::pin) is never called.
+    /// An intent left before any leaf was written also needs a writable open
+    /// to clear it; its pending repair size is the unchanged pinned size.
     ///
     /// # Errors
     ///
@@ -162,9 +164,13 @@ impl<S: LeafStore> Log<S> {
             pending_repair: None,
         };
         if rebuilt_size == pinned.tree_size && rebuilt_root == pinned.root {
+            if log.store.batch_intent().is_some() {
+                log.pending_repair = Some(rebuilt_size);
+            }
             return Ok(log);
         }
-        if rebuilt_size > pinned.tree_size {
+        if crate::store::recoverable_tail(pinned.tree_size, rebuilt_size, log.store.batch_intent())
+        {
             let prefix = log.prefix_tree(pinned.tree_size)?;
             if prefix.root().to_parts().0 == pinned.root {
                 let count = usize::try_from(pinned.tree_size).map_err(|source| {
@@ -193,9 +199,14 @@ impl<S: LeafStore> Log<S> {
         let (rebuilt_root, rebuilt_size) = self.tree.root().to_parts();
         let pinned = self.store.pinned();
         if rebuilt_size == pinned.tree_size && rebuilt_root == pinned.root {
+            if self.store.batch_intent().is_some() {
+                self.store.pin(pinned)?;
+                self.recovered_to = Some(rebuilt_size);
+            }
             return Ok(());
         }
-        if rebuilt_size > pinned.tree_size {
+        if crate::store::recoverable_tail(pinned.tree_size, rebuilt_size, self.store.batch_intent())
+        {
             let prefix = self.prefix_tree(pinned.tree_size)?;
             let (prefix_root, _prefix_size) = prefix.root().to_parts();
             if prefix_root == pinned.root {
@@ -270,11 +281,14 @@ impl<S: LeafStore> Log<S> {
     }
 
     /// Append consecutive leaves and acknowledge them only after one final pin.
+    /// A durable intent records the exclusive end before any leaf is written.
     /// An empty batch performs no writes. A failed batch requires a fresh open;
-    /// its durable prefix is recovered when it extends the verified pinned root.
+    /// its prefix is recovered only within that intent and the verified pin.
     ///
     /// # Errors
-    /// As [`Self::append`], or [`StoreError::BatchSizeOverflow`] before writing.
+    /// As [`Self::append`], [`StoreError::BatchSizeOverflow`] before writing,
+    /// or a named failure recording durable intent, including
+    /// [`StoreError::BatchIntentUnsupported`] for a backend without that support.
     pub fn append_batch(&mut self, leaves: &[&[u8]]) -> StoreResult<Vec<(u64, [u8; 32])>> {
         if let Some(leaves) = self.pending_repair {
             return Err(StoreError::AppendAwaitsRepair {
@@ -291,6 +305,7 @@ impl<S: LeafStore> Log<S> {
             return Ok(Vec::new());
         }
         self.poisoned = true;
+        self.store.begin_batch(end)?;
         self.store.put_leaves(first, leaves)?;
         let mut appended = Vec::with_capacity(leaves.len());
         for (index, bytes) in (first..end).zip(leaves) {

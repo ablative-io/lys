@@ -499,7 +499,7 @@ fn a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte() {
 }
 
 #[test]
-fn a_read_only_store_two_leaves_past_its_pin_reports_pending_repair_without_a_write() {
+fn a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
@@ -511,17 +511,19 @@ fn a_read_only_store_two_leaves_past_its_pin_reports_pending_repair_without_a_wr
     let before = tree_bytes(&dir);
     let store = FileLeafStore::open_read_only(&dir).unwrap();
     assert_eq!(store.extent(), 2);
-    let mut log = Log::open_at_pin(store).unwrap();
-    assert_eq!(log.tree().len(), 0);
-    assert_eq!(log.pending_repair(), Some(2));
-    assert!(matches!(
-        log.append(b"later"),
-        Err(StoreError::AppendAwaitsRepair {
-            pinned_tree_size: 0,
-            leaves: 2,
-        })
-    ));
-    assert_eq!(tree_bytes(&dir), before, "the read changed no file");
+    let err = Log::open(store).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            StoreError::PinMismatch {
+                pinned_size: 0,
+                rebuilt_size: 2,
+                ..
+            }
+        ),
+        "{err}"
+    );
+    assert_eq!(tree_bytes(&dir), before, "the refusal changed no file");
 }
 
 #[test]
@@ -661,4 +663,15 @@ fn a_log_opened_at_its_pin_leaves_the_pin_and_refuses_to_append_while_a_repair_i
     assert_eq!(repaired.append(b"leaf-2").unwrap().0, 2);
     assert_eq!(repaired.tree().len(), 3);
     assert_eq!(repaired.store().pinned().tree_size, 3);
+}
+
+#[test]
+fn a_store_without_batch_intent_support_refuses_before_writing() {
+    let mut log = Log::open(MemStore::new(ORIGIN)).unwrap();
+    assert!(matches!(
+        log.append_batch(&[b"first", b"second"]),
+        Err(StoreError::BatchIntentUnsupported { end: 2 })
+    ));
+    assert_eq!(log.store().extent(), 0);
+    assert_eq!(log.store().pinned().tree_size, 0);
 }

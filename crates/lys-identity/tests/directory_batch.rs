@@ -198,6 +198,12 @@ impl LeafStore for Partial {
     fn pinned(&self) -> PinnedRoot {
         self.store.pinned()
     }
+    fn batch_intent(&self) -> Option<u64> {
+        self.store.batch_intent()
+    }
+    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
+        self.store.begin_batch(end)
+    }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         self.store.pin(pin)
     }

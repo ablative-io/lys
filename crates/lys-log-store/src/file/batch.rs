@@ -5,6 +5,35 @@ use super::{link_leaf, next_process_sequence, write_leaf_temp};
 use crate::store::batch_end;
 
 impl FileLeafStore {
+    pub(super) fn start_batch(&mut self, end: u64) -> StoreResult<()> {
+        self.refuse_if_read_only("begin a batch")?;
+        if let Some(index) = self.durability_uncertain {
+            return Err(StoreError::ReopenRequired { index });
+        }
+        if let Some(end) = self.batch_intent {
+            return Err(StoreError::BatchIntentPending { end });
+        }
+        if self.extent != self.pinned.tree_size {
+            return Err(StoreError::BatchStartUnpinned {
+                extent: self.extent,
+                pinned: self.pinned.tree_size,
+            });
+        }
+        if end <= self.pinned.tree_size {
+            return Err(StoreError::BatchIntentInvalid {
+                pinned: self.pinned.tree_size,
+                end,
+            });
+        }
+        self.pin_uncertain = true;
+        if let Err(error) = super::write_state(&self.dir, self.pinned, Some(end)) {
+            self.durability_uncertain = Some(self.extent);
+            return Err(error);
+        }
+        self.batch_intent = Some(end);
+        Ok(())
+    }
+
     pub(super) fn put_batch(&mut self, index: u64, leaves: &[&[u8]]) -> StoreResult<()> {
         self.put_batch_with(index, leaves, &AFTER_LINK)
     }

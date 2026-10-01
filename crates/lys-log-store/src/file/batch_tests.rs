@@ -4,8 +4,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{AfterLink, FileLeafStore, StoreError};
-use crate::LeafStore;
 use crate::file::{remove_file, sync_dir};
+use crate::{LeafStore, Log};
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 static FLUSHES: AtomicUsize = AtomicUsize::new(0);
@@ -103,5 +103,130 @@ fn partial_batch_conflict_preserves_the_other_leaf_and_requires_reopen() -> Outc
         std::fs::read_dir(temporary.path().join("leaves"))?.count(),
         2
     );
+    Ok(())
+}
+
+#[test]
+fn old_state_opens_without_rewrite_and_the_next_batch_clears_its_optional_intent() -> Outcome {
+    use base64::Engine;
+    let temporary = tempfile::tempdir()?;
+    let store = FileLeafStore::create(temporary.path(), "example.com/lys/old-state")?;
+    let pin = store.pinned();
+    drop(store);
+    let legacy = format!(
+        "{{\"tree_size\":0,\"root_hash\":\"{}\"}}\n",
+        base64::engine::general_purpose::STANDARD.encode(pin.root)
+    );
+    let state = temporary.path().join("state.json");
+    std::fs::write(&state, &legacy)?;
+    let reader = FileLeafStore::open_read_only(temporary.path())?;
+    assert_eq!(reader.pinned(), pin);
+    assert_eq!(reader.batch_intent(), None);
+    assert_eq!(std::fs::read(&state)?, legacy.as_bytes());
+    let mut log = Log::open(FileLeafStore::open(temporary.path())?)?;
+    assert_eq!(std::fs::read(&state)?, legacy.as_bytes());
+    log.append_batch(&[b"first", b"second"])?;
+    assert_eq!(log.store().batch_intent(), None);
+    let saved: serde_json::Value = serde_json::from_slice(&std::fs::read(&state)?)?;
+    assert!(saved.get("batch_end").is_none());
+    assert_eq!(saved["tree_size"], 2);
+    let reopened = Log::open(FileLeafStore::open(temporary.path())?)?;
+    assert_eq!(reopened.tree().root(), log.tree().root());
+    assert_eq!(reopened.recovered_to(), None);
+    Ok(())
+}
+
+#[test]
+fn intent_is_durable_before_leaves_and_an_empty_interruption_clears_it_on_recovery() -> Outcome {
+    let temporary = tempfile::tempdir()?;
+    let mut store = FileLeafStore::create(temporary.path(), "example.com/lys/intent")?;
+    let pin = store.pinned();
+    store.begin_batch(3)?;
+    let state = temporary.path().join("state.json");
+    let intent_bytes = std::fs::read(&state)?;
+    let saved: serde_json::Value = serde_json::from_slice(&intent_bytes)?;
+    assert_eq!(saved["batch_end"], 3);
+    assert_eq!(saved["tree_size"], 0);
+    assert_eq!(store.extent(), 0);
+    assert_eq!(store.pinned(), pin);
+    assert!(matches!(
+        store.begin_batch(4),
+        Err(StoreError::BatchIntentPending { end: 3 })
+    ));
+    drop(store);
+    let reader = Log::open_at_pin(FileLeafStore::open_read_only(temporary.path())?)?;
+    assert_eq!(reader.pending_repair(), Some(0));
+    assert_eq!(std::fs::read(&state)?, intent_bytes);
+    let log = Log::open(FileLeafStore::open(temporary.path())?)?;
+    assert_eq!(log.recovered_to(), Some(0));
+    assert_eq!(log.store().pinned(), pin);
+    assert_eq!(log.store().batch_intent(), None);
+    let saved: serde_json::Value = serde_json::from_slice(&std::fs::read(&state)?)?;
+    assert!(saved.get("batch_end").is_none());
+    Ok(())
+}
+
+#[test]
+fn intent_refuses_a_read_only_store_and_cannot_authorize_an_existing_tail() -> Outcome {
+    let temporary = tempfile::tempdir()?;
+    let mut store = FileLeafStore::create(temporary.path(), "example.com/lys/intent")?;
+    let mut reader = FileLeafStore::open_read_only(temporary.path())?;
+    assert!(matches!(
+        reader.begin_batch(2),
+        Err(StoreError::ReadOnly { .. })
+    ));
+    store.put_leaves(0, &[b"first", b"second"])?;
+    assert!(matches!(
+        store.begin_batch(3),
+        Err(StoreError::BatchStartUnpinned {
+            extent: 2,
+            pinned: 0
+        })
+    ));
+    assert_eq!(store.batch_intent(), None);
+    assert!(matches!(
+        Log::open(store),
+        Err(StoreError::PinMismatch { .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn a_failed_intent_write_holds_the_store_before_any_leaf_is_written() -> Outcome {
+    let temporary = tempfile::tempdir()?;
+    let mut store = FileLeafStore::create(temporary.path(), "example.com/lys/intent")?;
+    std::fs::create_dir(temporary.path().join("state.json.tmp"))?;
+    assert!(matches!(store.begin_batch(2), Err(StoreError::Io { .. })));
+    assert_eq!(store.extent(), 0);
+    assert!(matches!(
+        store.put_leaf(0, b"first"),
+        Err(StoreError::ReopenRequired { index: 0 })
+    ));
+    assert!(matches!(
+        store.pin(store.pinned()),
+        Err(StoreError::ReopenRequired { index: 0 })
+    ));
+    assert_eq!(FileLeafStore::open(temporary.path())?.batch_intent(), None);
+    Ok(())
+}
+
+#[test]
+fn an_intent_that_does_not_extend_the_pin_is_corrupt_on_both_opens() -> Outcome {
+    let temporary = tempfile::tempdir()?;
+    FileLeafStore::create(temporary.path(), "example.com/lys/intent")?;
+    let state = temporary.path().join("state.json");
+    let mut saved: serde_json::Value = serde_json::from_slice(&std::fs::read(&state)?)?;
+    saved["batch_end"] = 0.into();
+    let bytes = serde_json::to_vec(&saved)?;
+    std::fs::write(&state, &bytes)?;
+    assert!(matches!(
+        FileLeafStore::open_read_only(temporary.path()),
+        Err(StoreError::Corrupt { .. })
+    ));
+    assert!(matches!(
+        FileLeafStore::open(temporary.path()),
+        Err(StoreError::Corrupt { .. })
+    ));
+    assert_eq!(std::fs::read(state)?, bytes);
     Ok(())
 }

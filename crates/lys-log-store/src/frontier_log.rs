@@ -25,8 +25,8 @@
 //! # The same integrity routine as `Log`
 //!
 //! Opening reconciles the tree with the store's pin exactly as
-//! [`Log::open`](crate::Log::open) does: equal is clean, a contiguous tail
-//! whose prefix reaches the pinned root is an interrupted append or batch and is
+//! [`Log::open`](crate::Log::open) does: equal is clean, and a verified tail
+//! is recoverable only as one leaf or within a durably recorded batch intent. It is
 //! repaired and reported, and anything else is
 //! [`StoreError::PinMismatch`]. Appends store the leaf before the pin, and a
 //! handle whose pin write failed is poisoned.
@@ -115,12 +115,18 @@ impl Reading {
     ///
     /// [`StoreError::PinMismatch`] for any divergence but one interrupted
     /// append.
-    pub(crate) fn reconcile(&self, pinned: PinnedRoot) -> StoreResult<Option<PinnedRoot>> {
+    pub(crate) fn reconcile(
+        &self,
+        pinned: PinnedRoot,
+        intent: Option<u64>,
+    ) -> StoreResult<Option<PinnedRoot>> {
         let (size, root) = (self.frontier.size(), self.frontier.root());
         if size == pinned.tree_size && root == pinned.root {
-            return Ok(None);
+            return Ok(intent.map(|_| pinned));
         }
-        if size > pinned.tree_size && self.root_at_pin == Some(pinned.root) {
+        if crate::store::recoverable_tail(pinned.tree_size, size, intent)
+            && self.root_at_pin == Some(pinned.root)
+        {
             return Ok(Some(PinnedRoot {
                 tree_size: size,
                 root,
@@ -185,7 +191,7 @@ impl<S: LeafStore> FrontierLog<S> {
     /// Builds the log from a reading, repairing the pin when the reading
     /// found one interrupted append.
     pub(crate) fn from_reading(mut store: S, reading: Reading) -> StoreResult<(Self, Tail)> {
-        let repair = reading.reconcile(store.pinned())?;
+        let repair = reading.reconcile(store.pinned(), store.batch_intent())?;
         let recovered_to = match repair {
             Some(pin) => {
                 store.pin(pin)?;
@@ -267,11 +273,13 @@ impl<S: LeafStore> FrontierLog<S> {
         Ok((index, leaf_hash))
     }
 
-    /// Append consecutive leaves durably, then advance the pin once.
+    /// Record durable intent, append consecutive leaves, then advance the pin once.
     /// An empty batch writes nothing; a failed batch holds this handle until reopen.
+    /// Recovery adopts only a verified tail within the recorded end.
     ///
     /// # Errors
-    /// As [`Self::append`], or [`StoreError::BatchSizeOverflow`] before writing.
+    /// As [`Self::append`], [`StoreError::BatchSizeOverflow`] before writing,
+    /// or a named intent-recording failure, including [`StoreError::BatchIntentUnsupported`].
     pub fn append_batch(&mut self, leaves: &[&[u8]]) -> StoreResult<Vec<(u64, [u8; 32])>> {
         if self.poisoned {
             return Err(StoreError::Poisoned);
@@ -282,6 +290,7 @@ impl<S: LeafStore> FrontierLog<S> {
             return Ok(Vec::new());
         }
         self.poisoned = true;
+        self.store.begin_batch(end)?;
         self.store.put_leaves(first, leaves)?;
         let mut appended = Vec::with_capacity(leaves.len());
         for (index, bytes) in (first..end).zip(leaves) {

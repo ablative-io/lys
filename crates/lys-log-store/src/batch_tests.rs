@@ -53,6 +53,12 @@ impl LeafStore for Store {
     fn pinned(&self) -> PinnedRoot {
         self.inner.pinned()
     }
+    fn batch_intent(&self) -> Option<u64> {
+        self.inner.batch_intent()
+    }
+    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
+        self.inner.begin_batch(end)
+    }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         self.pins += 1;
         self.inner.pin(pin)
@@ -128,9 +134,11 @@ fn failed_partial_batches_hold_both_logs_and_recover_only_the_written_prefix() -
         assert_eq!(reopened.tree().len(), size);
         assert_eq!(resumed.len(), size);
         assert_eq!(reopened.tree().root(), resumed.root());
-        let repaired = (count > 0).then_some(size);
+        let repaired = Some(size);
         assert_eq!(reopened.recovered_to(), repaired);
         assert_eq!(resumed.recovered_to(), repaired);
+        assert_eq!(reopened.store().batch_intent(), None);
+        assert_eq!(resumed.store().batch_intent(), None);
     }
     Ok(())
 }
@@ -150,6 +158,60 @@ fn failed_final_pin_holds_a_complete_batch_until_reopen() -> Outcome {
     let (reopened, _) = FrontierLog::open(CountingStore::over(log.store().inner.disk.clone()))?;
     assert_eq!(reopened.recovered_to(), Some(4));
     assert_eq!(reopened.store().pinned().tree_size, 4);
+    assert_eq!(reopened.store().batch_intent(), None);
+    Ok(())
+}
+
+#[test]
+fn a_tail_beyond_recorded_intent_is_refused_by_both_logs_and_the_pinned_reader() -> Outcome {
+    let mut store = CountingStore::new();
+    store.begin_batch(2)?;
+    store.put_leaves(0, &LEAVES)?;
+    let disk = store.disk;
+    assert!(matches!(
+        Log::open(CountingStore::over(disk.clone())),
+        Err(StoreError::PinMismatch { .. })
+    ));
+    assert!(matches!(
+        Log::open_at_pin(CountingStore::over(disk.clone())),
+        Err(StoreError::PinMismatch { .. })
+    ));
+    assert!(matches!(
+        FrontierLog::open(CountingStore::over(disk)),
+        Err(StoreError::PinMismatch { .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn no_intent_retains_one_leaf_recovery_and_refuses_multiple_unplanned_leaves() -> Outcome {
+    let mut store = CountingStore::new();
+    store.put_leaf(0, LEAVES[0])?;
+    let one = store.disk.clone();
+    assert_eq!(
+        Log::open(CountingStore::over(one.clone()))?.recovered_to(),
+        Some(1)
+    );
+    assert_eq!(
+        FrontierLog::open(CountingStore::over(one))?
+            .0
+            .recovered_to(),
+        Some(1)
+    );
+    store.put_leaf(1, LEAVES[1])?;
+    let two = store.disk;
+    assert!(matches!(
+        Log::open(CountingStore::over(two.clone())),
+        Err(StoreError::PinMismatch { .. })
+    ));
+    assert!(matches!(
+        Log::open_at_pin(CountingStore::over(two.clone())),
+        Err(StoreError::PinMismatch { .. })
+    ));
+    assert!(matches!(
+        FrontierLog::open(CountingStore::over(two)),
+        Err(StoreError::PinMismatch { .. })
+    ));
     Ok(())
 }
 

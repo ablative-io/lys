@@ -31,6 +31,12 @@ impl LeafStore for BeforePin {
     fn pinned(&self) -> PinnedRoot {
         self.0.pinned()
     }
+    fn batch_intent(&self) -> Option<u64> {
+        self.0.batch_intent()
+    }
+    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
+        self.0.begin_batch(end)
+    }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         println!("BATCH_READY");
         std::io::stdout()
@@ -131,6 +137,7 @@ fn killed_between_leaves_and_pin_reopens_at_old_pin_and_repairs_three_leaves() -
     let stored = FileLeafStore::open_read_only(&directory)?;
     assert_eq!(stored.pinned(), pin);
     assert_eq!(stored.extent(), 4);
+    assert_eq!(stored.batch_intent(), Some(4));
     let reader = Log::open_at_pin(stored)?;
     assert_eq!(reader.tree().len(), 1);
     assert_eq!(reader.pending_repair(), Some(4));
@@ -139,6 +146,7 @@ fn killed_between_leaves_and_pin_reopens_at_old_pin_and_repairs_three_leaves() -
     assert_eq!(tail.leaves.len(), 4);
     assert_eq!(repaired.recovered_to(), Some(4));
     assert_eq!(repaired.store().pinned().tree_size, 4);
+    assert_eq!(repaired.store().batch_intent(), None);
     for (index, bytes) in (1..4).zip([b"first".as_slice(), b"second", b"third"]) {
         assert_eq!(repaired.leaf_bytes(index)?.as_deref(), Some(bytes));
     }
