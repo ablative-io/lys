@@ -90,6 +90,8 @@ pub fn api() -> Api {
 
 /// The document, generated from the table.
 pub fn document() -> Result<Value, ServerError> {
+    #[cfg(test)]
+    cache_tests::built();
     let mut document = api()
         .document()
         .map_err(|faults| ServerError::ConfigInvalid {
@@ -122,3 +124,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 async fn served() -> Result<Json<Value>, ServerError> {
     document().map(Json)
 }
+
+#[cfg(test)]
+#[path = "openapi_cache_tests.rs"]
+mod cache_tests;

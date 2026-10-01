@@ -157,6 +157,56 @@ async fn exchange_at(
 }
 
 #[tokio::test]
+async fn replaying_a_code_revokes_the_access_it_issued() -> TestResult {
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let given = code(&service, &cookie, &challenge_of("verifier")).await?;
+    let (status, answer) = exchange(&service, &given, "verifier").await?;
+    assert_eq!(status, 200);
+    let access = answer["access_token"].as_str().ok_or("no access token")?;
+    let client = reqwest::Client::new();
+    assert_eq!(
+        client
+            .get(format!("{}/oauth/userinfo", service.base))
+            .bearer_auth(access)
+            .send()
+            .await?
+            .status(),
+        200
+    );
+    let (status, refused) = exchange(&service, &given, "verifier").await?;
+    assert_eq!(status, 400);
+    assert_eq!(refused["refusal"], "CodeUsed");
+    let refused = client
+        .get(format!("{}/oauth/userinfo", service.base))
+        .bearer_auth(access)
+        .send()
+        .await?;
+    assert_eq!(refused.status(), 401);
+    let body: Value = refused.json().await?;
+    assert_eq!(body["refusal"], "TokenUnknown");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_issued_access_token_survives_a_service_restart() -> TestResult {
+    let (mut service, cookie, person) = table(CODE_SECONDS).await?;
+    let given = code(&service, &cookie, &challenge_of("verifier")).await?;
+    let (status, answer) = exchange(&service, &given, "verifier").await?;
+    assert_eq!(status, 200);
+    let access = answer["access_token"].as_str().ok_or("no access token")?;
+    service.restart().await?;
+    let answer = reqwest::Client::new()
+        .get(format!("{}/oauth/userinfo", service.base))
+        .bearer_auth(access)
+        .send()
+        .await?;
+    assert_eq!(answer.status(), 200);
+    let body: Value = answer.json().await?;
+    assert_eq!(body["sub"], person);
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys() -> TestResult {
     let (service, cookie, person) = table(CODE_SECONDS).await?;
     let http = openidconnect::reqwest::ClientBuilder::new()

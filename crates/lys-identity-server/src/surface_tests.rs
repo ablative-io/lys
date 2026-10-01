@@ -56,6 +56,50 @@ async fn the_page_the_assets_and_the_api_share_one_origin() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+async fn installed_bytes_remain_served_without_reading_the_files_again()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    std::fs::write(dir.path().join("index.html"), "installed page")?;
+    std::fs::create_dir(dir.path().join("assets"))?;
+    std::fs::write(dir.path().join("assets/app.js"), "installed asset")?;
+    let base = started(dir.path()).await?;
+    std::fs::remove_file(dir.path().join("index.html"))?;
+    std::fs::remove_file(dir.path().join("assets/app.js"))?;
+    let client = reqwest::Client::new();
+    for (path, expected) in [
+        ("/", "installed page"),
+        ("/assets/app.js", "installed asset"),
+    ] {
+        let answer = client.get(format!("{base}{path}")).send().await?;
+        assert_eq!(answer.status(), 200, "{path}");
+        assert_eq!(answer.text().await?, expected);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_matching_installed_etag_needs_no_body() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    std::fs::write(dir.path().join("index.html"), "installed page")?;
+    let base = started(dir.path()).await?;
+    let client = reqwest::Client::new();
+    let page = client.get(format!("{base}/")).send().await?;
+    let tag = page
+        .headers()
+        .get(reqwest::header::ETAG)
+        .ok_or("no installed ETag")?
+        .clone();
+    let answer = client
+        .get(format!("{base}/"))
+        .header(reqwest::header::IF_NONE_MATCH, tag)
+        .send()
+        .await?;
+    assert_eq!(answer.status(), 304);
+    assert!(answer.bytes().await?.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_path_outside_the_directory_is_never_read() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::TempDir::new()?;
     let inside = dir.path().join("served");
