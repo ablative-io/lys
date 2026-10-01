@@ -7,6 +7,7 @@ import { $, serve, type } from './harness';
 import { ADA, RECEIPTS, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 import type { Answer, Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
+import { addAndRunCapability } from '../src/features/people/registration-capability';
 
 const agent = 'agent-' + 'f'.repeat(32);
 const prefix = '/agents/' + agent;
@@ -276,6 +277,16 @@ describe('Add and run on the first computer', () => {
 });
 
 describe('Add and run on an existing computer', () => {
+  it('keeps both capabilities unknown when their single schema read fails', async () => {
+    const requests = serve({ '/openapi.json': refused(503, 'SchemaUnavailable', 'The served schema could not be read') });
+    const capability = await addAndRunCapability();
+    expect(capability.answersTo).toBeNull();
+    expect(capability.machineAdmission).toBeNull();
+    expect(capability.problem).toMatchObject({ refusal: { refusal: 'SchemaUnavailable' } });
+    expect(capability.admissionProblem).toBe(capability.problem);
+    expect(requests).toEqual(['/openapi.json']);
+  });
+
   it('migrates the earlier saved envelope without replacing its registration or planned computer', async () => {
     const old = { version: 1, person: ADA, step: 'registration', pending: null,
       registration: { name: 'Clover', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null, answersTo: ADA, team: null, membership: null, activated: false },
@@ -292,6 +303,25 @@ describe('Add and run on an existing computer', () => {
     expect(posted[1].body).toMatchObject({ operation: old.registration.activate });
     expect(posted[4].body).toEqual({ ...old.machine.body, may_run: [agent] });
     expect(server.applied.size).toBe(7);
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(location.hash).toBe('#/file/' + agent);
+  });
+
+  it('migrates an earlier pending start and resends its exact body on the recorded computer', async () => {
+    const computer = { ...existingComputer(), name: 'Ward computer', may_run: [{ id: agent, display_name: 'Clover', state: 'active' as const }] };
+    const body = { operation: 'op-' + '4'.repeat(32), machine: computer.id };
+    const old = { version: 1, person: ADA, step: 'start',
+      registration: { name: 'Clover', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent, answersTo: ADA, team: null, membership: null, activated: true },
+      settings: { harness: { name: program.name, program: '/opt/bin/care', package: 'care', description }, model_access: ['care'], permissions: { default_mode: 'default' }, tools: [], skills: [], mcp_servers: [], instructions: '', instructions_mode: 'keep', note: '' },
+      machine: { body: { operation: computer.id, name: computer.name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [agent], may_run_roles: [], may_reach: [] }, phase: 'runner', legacy: false, machine: computer },
+      pending: { stage: 'start', path: prefix + '/start-command', body, machine: computer.id, version: 1 },
+    };
+    sessionStorage.setItem(key, JSON.stringify(old));
+    const { posted } = await open(service(undefined, 'running', [computer]).routes);
+    expect(JSON.parse(sessionStorage.getItem(key) ?? 'null')).toMatchObject({ version: 2, placement: { kind: 'new' }, pending: old.pending });
+    expect(posted).toEqual([]);
+    await submit();
+    expect(posted).toEqual([{ path: prefix + '/start-command', body }]);
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(location.hash).toBe('#/file/' + agent);
   });
@@ -323,6 +353,7 @@ describe('Add and run on an existing computer', () => {
     await type($('[name="display_name"]'), 'Clover');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
     expect($('form button[type="submit"]')?.textContent).toBe('Add Clover and run it on this computer');
+    expect(requests.filter((path) => path === '/openapi.json')).toHaveLength(1);
     await submit(true);
     expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + agent + '/transitions', prefix + '/provisioning', prefix + '/provisioning/1/review', '/network/machines/' + computer.id + '/agents', prefix + '/start-command']);
     expect(posted[4].body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), agent, allow: true });
