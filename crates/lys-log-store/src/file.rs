@@ -656,7 +656,7 @@ fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
         context: format!("failed to write {}", path.display()),
         source,
     })?;
-    file.sync_all().map_err(|source| StoreError::Io {
+    crate::durability::sync_all(&file).map_err(|source| StoreError::Io {
         context: format!("failed to flush {} to disk", path.display()),
         source,
     })

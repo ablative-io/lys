@@ -216,3 +216,38 @@ fn debug_summarizes_without_leaf_content() {
     );
     assert!(rendered.contains("extent: 1"), "{rendered}");
 }
+
+#[test]
+fn identical_pin_performs_no_flush() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut store = store_pinned_at_one(&tmp.path().join("log"));
+    let before = crate::durability::flush_count();
+    store.pin(store.pinned()).unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 0);
+    store
+        .pin(PinnedRoot {
+            tree_size: 2,
+            root: [8; 32],
+        })
+        .unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 2);
+}
+
+#[test]
+fn identical_snapshot_skips_only_a_write_this_handle_completed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    let before = crate::durability::flush_count();
+    store.put_snapshot(b"first").unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 2);
+    store.put_snapshot(b"first").unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 2);
+    store.put_snapshot(b"second").unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 4);
+    let mut reopened = FileLeafStore::open(&dir).unwrap();
+    let before = crate::durability::flush_count();
+    reopened.put_snapshot(b"second").unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 2);
+    assert_eq!(reopened.snapshot().unwrap().unwrap(), b"second");
+}

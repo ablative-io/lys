@@ -10,6 +10,10 @@ rust-version.workspace = true
 keywords = ["transparency", "merkle", "append-only", "storage", "log"]
 categories = ["cryptography", "database-implementations"]
 
+[features]
+# Observe real flush calls in contract tests without changing their behaviour.
+flush-counts = []
+
 [dependencies]
 base64.workspace = true
 lys-core.workspace = true

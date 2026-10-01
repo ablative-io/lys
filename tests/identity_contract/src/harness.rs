@@ -196,6 +196,8 @@ pub const LINK_AUDIT_SOURCE: &str = "link-audit-source-subject";
 pub struct Service {
     /// The service's base URL.
     pub base: String,
+    /// Real log-store flush attempts during synchronous startup, before serving requests.
+    pub startup_flushes: u64,
     /// The issuer people sign in through.
     pub issuer: FakeIssuer,
     client: reqwest::Client,
@@ -437,10 +439,13 @@ impl Service {
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
+        let before = lys_log_store::flush_count();
         let (server, client) = serve(listener, &config, say).await?;
+        let startup_flushes = lys_log_store::flush_count() - before;
         Ok((
             Self {
                 base,
+                startup_flushes,
                 issuer,
                 client,
                 dir,

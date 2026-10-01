@@ -58,7 +58,7 @@ pub(super) fn write_leaf_temp(
             source,
         })
         .and_then(|()| {
-            file.sync_all().map_err(|source| StoreError::Io {
+            crate::durability::sync_all(&file).map_err(|source| StoreError::Io {
                 context: format!(
                     "failed to flush temporary leaf file {} to disk",
                     tmp_path.display()
@@ -168,7 +168,7 @@ pub(super) fn fsync_dir(dir: &Path) -> StoreResult<()> {
 /// Opens a directory and flushes it; see [`fsync_dir`] for the platform scope.
 #[cfg(unix)]
 pub(super) fn sync_dir(dir: &Path) -> std::io::Result<()> {
-    std::fs::File::open(dir).and_then(|handle| handle.sync_all())
+    std::fs::File::open(dir).and_then(|handle| crate::durability::sync_all(&handle))
 }
 
 #[cfg(not(unix))]
