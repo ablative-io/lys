@@ -244,7 +244,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     )? {
         emitter.note("deployment.toml written");
     }
-    let config = DeploymentConfig::load(&config_path)?;
+    let config = DeploymentConfig::load_install(&config_path)?;
     let materialised = prepare::materialise_all(&config)?;
     emitter.note(&format!(
         "{} private files ready (only you can read them)",

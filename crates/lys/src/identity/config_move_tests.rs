@@ -22,7 +22,7 @@ fn brought_forward() -> Result<(tempfile::TempDir, DeploymentConfig), Box<dyn Er
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("deployment.toml");
     std::fs::write(&path, WRITTEN_29_SEPTEMBER)?;
-    let config = DeploymentConfig::load(&path)?;
+    let config = DeploymentConfig::load_install(&path)?;
     Ok((folder, config))
 }
 
@@ -55,7 +55,7 @@ fn the_original_is_kept_beside_it_and_the_move_happens_once() -> Result<(), Box<
     assert_eq!(kept_beside(&folder)?, [WRITTEN_29_SEPTEMBER]);
     let path = folder.path().join("deployment.toml");
     let written = std::fs::read_to_string(&path)?;
-    DeploymentConfig::load(&path)?;
+    DeploymentConfig::load_install(&path)?;
     assert_eq!(
         std::fs::read_to_string(&path)?,
         written,
@@ -103,5 +103,22 @@ fn an_install_whose_issuer_did_not_move_is_handed_no_move() -> Result<(), Box<dy
     let rendered = server_config::render(&layout, &config, &carried, false);
     assert!(rendered.get("issuer_moved_from").is_none(), "{rendered}");
     assert_eq!(rendered["administrator"]["issuer"], LYS_ISSUER);
+    Ok(())
+}
+
+#[test]
+fn a_fresh_install_and_a_deployment_prepared_on_its_own_are_left_as_written()
+-> Result<(), Box<dyn Error>> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("deployment.toml");
+    let fresh = crate::identity::install::layout::render_deployment(None);
+    std::fs::write(&path, &fresh)?;
+    DeploymentConfig::load_install(&path)?;
+    assert_eq!(std::fs::read_to_string(&path)?, fresh);
+    std::fs::write(&path, WRITTEN_29_SEPTEMBER)?;
+    let prepared = DeploymentConfig::load(&path)?;
+    assert_eq!(prepared.issuer.public_origin, "http://localhost:18080");
+    assert_eq!(std::fs::read_to_string(&path)?, WRITTEN_29_SEPTEMBER);
+    assert!(kept_beside(&folder)?.is_empty());
     Ok(())
 }

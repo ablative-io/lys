@@ -112,7 +112,7 @@ impl Render for Templates {
                 ),
             ));
         }
-        let config = DeploymentConfig::load(&layout.deployment_config())?;
+        let config = DeploymentConfig::load_install(&layout.deployment_config())?;
         let state = config.state_dir();
         let mut credentials = Vec::with_capacity(SECRETS.len());
         for spec in SECRETS {

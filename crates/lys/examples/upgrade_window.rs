@@ -71,7 +71,7 @@ fn reversible(layout: &Layout) -> ProbeResult {
 }
 
 fn window(layout: &Layout, from: &Path, surface: &Path, verifier: &Path) -> ProbeResult {
-    let config = DeploymentConfig::load(&layout.deployment_config())?;
+    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
     install::server_state(layout, &config)?;
     let units = upgrade::units(layout);
     let runner = from.join("lys");

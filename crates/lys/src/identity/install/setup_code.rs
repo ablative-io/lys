@@ -185,7 +185,7 @@ fn issue(root: Option<std::path::PathBuf>, json: bool) -> IdentityResult<()> {
         Some(root) => Layout::at(root),
         None => Layout::discover()?,
     };
-    let config = DeploymentConfig::load(&layout.deployment_config())?;
+    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
     let purpose = if has_administrator(&layout)? {
         Purpose::Password
     } else {

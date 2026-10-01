@@ -49,8 +49,10 @@ fn key_of(line: &str) -> Option<&str> {
 }
 
 /// The text brought forward, or `None` when it is already in this build's
-/// shape.
-pub fn bring_forward(text: &str) -> IdentityResult<Option<String>> {
+/// shape. Only an install's own file, `install`, sits behind Lys, so only
+/// its sign-in address is moved to Lys's origin; a deployment prepared on
+/// its own keeps the public origin it names.
+pub fn bring_forward(text: &str, install: bool) -> IdentityResult<Option<String>> {
     let table: Table = toml::from_str(text)
         .map_err(|error| refuse(ErrorKind::ConfigInvalid, "configuration", error.message()))?;
     // An earlier build named the one app client beside the platform's after
@@ -70,7 +72,7 @@ pub fn bring_forward(text: &str) -> IdentityResult<Option<String>> {
         .get("deployment")
         .and_then(toml::Value::as_table)
         .is_none_or(|deployment| deployment.contains_key("network"));
-    let earlier_origin = earlier_origin(&table);
+    let earlier_origin = install && earlier_origin(&table);
     if earlier_app_client.is_none() && names_network && !earlier_origin {
         return Ok(None);
     }

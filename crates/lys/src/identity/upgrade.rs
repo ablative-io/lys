@@ -146,7 +146,7 @@ pub struct Compose;
 
 impl Engine for Compose {
     fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
-        let config = DeploymentConfig::load(&layout.deployment_config())?;
+        let config = DeploymentConfig::load_install(&layout.deployment_config())?;
         services::compose_recreate(layout, &config)?;
         services::wait_ready(layout, &config, say)?;
         say("compose services on their rendered definition and ready");
@@ -475,7 +475,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     emitter.field("root", "root", layout.root.display().to_string());
     let units = units(&layout);
     require_install(&layout)?;
-    let config = DeploymentConfig::load(&layout.deployment_config())?;
+    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
     install::server_state(&layout, &config)?;
     let templates = render::Templates {
         messages: options

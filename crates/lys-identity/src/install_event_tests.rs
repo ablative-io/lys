@@ -42,7 +42,7 @@ fn a_changed_actor_subject_kind_or_padding_never_decodes() -> Result<(), Identit
         changed_codes, 3,
         "the actor, the subject and the change kind"
     );
-    let mut padded = body.clone();
+    let mut padded = body;
     padded.push(0);
     assert!(decode(&padded).is_err());
     Ok(())

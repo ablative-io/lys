@@ -177,6 +177,20 @@ impl DeploymentConfig {
     /// file an earlier build wrote forward to this build's shape and writing
     /// it back, so an install is never refused for the build it began on.
     pub fn load(path: &Path) -> IdentityResult<Self> {
+        Self::load_brought_forward(path, false)
+    }
+
+    /// Reads and validates an install's own `deployment.toml` as [`load`]
+    /// does, also moving a sign-in address an earlier install wrote on the
+    /// sign-in service's own port to Lys's origin, which every install
+    /// since serves it at.
+    ///
+    /// [`load`]: Self::load
+    pub fn load_install(path: &Path) -> IdentityResult<Self> {
+        Self::load_brought_forward(path, true)
+    }
+
+    fn load_brought_forward(path: &Path, install: bool) -> IdentityResult<Self> {
         let read = std::fs::read_to_string(path).map_err(|error| {
             IdentityError::new(
                 ErrorKind::ConfigUnreadable,
@@ -186,14 +200,15 @@ impl DeploymentConfig {
             )
             .at(path)
         })?;
-        let text = match bring_forward::bring_forward(&read).map_err(|error| error.at(path))? {
-            Some(brought) => {
-                Self::parse(&brought, PathBuf::new()).map_err(|error| error.at(path))?;
-                bring_forward::write_back(path, &brought)?;
-                brought
-            }
-            None => read,
-        };
+        let text =
+            match bring_forward::bring_forward(&read, install).map_err(|error| error.at(path))? {
+                Some(brought) => {
+                    Self::parse(&brought, PathBuf::new()).map_err(|error| error.at(path))?;
+                    bring_forward::write_back(path, &brought)?;
+                    brought
+                }
+                None => read,
+            };
         let base = path
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
