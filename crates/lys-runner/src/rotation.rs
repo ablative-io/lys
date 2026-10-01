@@ -8,10 +8,9 @@
 //! session's directory, and so where its harness keeps its session store and
 //! transcripts, never changes, and a moved session resumes.
 //!
-//! A usage limit is the harness's own signal where it has one, an exit
-//! status, so an agent quoting the words rotates nothing. A harness with no
-//! such signal declares the words that mean a limit, and then quoted text can
-//! trip it; that is said where the words are declared. At the list's end the
+//! A usage limit is a reported account window or the harness's own exit
+//! status, so an agent quoting words rotates nothing. Words are declared
+//! only for a harness without a structured signal. At the list's end the
 //! session is ended `accounts_exhausted`; the list never wraps round.
 
 use serde::{Deserialize, Serialize};
@@ -22,6 +21,8 @@ use crate::error::RunnerError;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "signal", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Limit {
+    /// A reported account window at 100 percent whose reset is still ahead.
+    PlanWindow,
     /// The harness exits with this status at its usage limit: its own signal.
     ExitStatus {
         /// The exit status.
@@ -39,6 +40,7 @@ impl Limit {
     /// The signal's name, as a move records it.
     pub fn name(&self) -> &'static str {
         match self {
+            Self::PlanWindow => "plan_window",
             Self::ExitStatus { .. } => "exit_status",
             Self::Words { .. } => "words",
         }
@@ -71,7 +73,7 @@ pub struct Move {
     pub to: String,
     /// When, in milliseconds since the Unix epoch.
     pub at: u64,
-    /// The signal that said a usage limit: `exit_status` or `words`.
+    /// The declared signal that said a usage limit.
     pub by: String,
 }
 
@@ -111,7 +113,7 @@ impl RotationState {
         }
         let words_empty = match &rotation.limit {
             Limit::Words { words } => words.is_empty() || words.iter().any(String::is_empty),
-            Limit::ExitStatus { .. } => false,
+            Limit::ExitStatus { .. } | Limit::PlanWindow => false,
         };
         if words_empty {
             return Err(refused(
@@ -156,7 +158,7 @@ impl RotationState {
     pub fn limit_at_exit(&self, status: Option<u32>) -> bool {
         match &self.rotation.limit {
             Limit::ExitStatus { status: limit } => status == Some(*limit),
-            Limit::Words { .. } => self.tripped,
+            Limit::Words { .. } | Limit::PlanWindow => self.tripped,
         }
     }
 
@@ -164,7 +166,7 @@ impl RotationState {
     /// signal of its own; the harness's own signal is never read from text.
     pub fn words_in(&self, text: &str) -> bool {
         match &self.rotation.limit {
-            Limit::ExitStatus { .. } => false,
+            Limit::ExitStatus { .. } | Limit::PlanWindow => false,
             Limit::Words { words } => words.iter().any(|word| text.contains(word.as_str())),
         }
     }
@@ -173,17 +175,28 @@ impl RotationState {
     /// across the edge of what was read before.
     pub fn longest_word(&self) -> usize {
         match &self.rotation.limit {
-            Limit::ExitStatus { .. } => 0,
+            Limit::ExitStatus { .. } | Limit::PlanWindow => 0,
             Limit::Words { words } => words.iter().map(String::len).max().unwrap_or(0),
         }
     }
 
-    /// Mark the words seen, so the process's exit moves the session.
+    /// Whether a live reported window carries the declared structured limit.
+    /// Fractional percentages are never rounded into a full window.
+    pub fn windows_in(&self, windows: &[crate::tracking_budget::PlanWindow], now_ms: u64) -> bool {
+        matches!(self.rotation.limit, Limit::PlanWindow)
+            && windows.iter().any(|window| {
+                window.duration_minutes > 0
+                    && window.resets_at_ms > now_ms
+                    && crate::tracking_budget::scaled_exact(&window.used_percent, 0) == Some(100)
+            })
+    }
+
+    /// Mark the declared signal seen, so the process's exit moves the session.
     pub fn trip(&mut self) {
         self.tripped = true;
     }
 
-    /// Whether the words were seen and the process is being ended for them.
+    /// Whether the limit was seen and the process is being ended for it.
     pub fn tripped(&self) -> bool {
         self.tripped
     }
