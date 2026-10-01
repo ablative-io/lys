@@ -14,15 +14,29 @@ use support::Table;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+fn machine_body(table: &Table) -> Result<serde_json::Value, Box<dyn Error>> {
+    Ok(json!({
+        "operation": support::operation()?, "name": "Box", "kind": "laptop", "runtime": "sh",
+        "slots": 1, "may_run": [table.agent()], "may_reach": [],
+    }))
+}
+
+fn start_body(machine: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+    Ok(json!({ "machine": machine, "operation": support::operation()? }))
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_malformed_start_keeps_the_runners_refusal_name() -> TestResult {
     let table = Table::set().await?;
     let socket = table.dir.path().join("refusing.sock");
     let listener = UnixListener::bind(&socket)?;
     let machine = table
-        .machine(Some(json!({
-            "kind": "socket", "path": socket,
-        })))
+        .machine(
+            &machine_body(&table)?,
+            Some(json!({
+                "kind": "socket", "path": socket,
+            })),
+        )
         .await?;
     let server_key = table.server_key.public_key_bytes();
     let answering = std::thread::spawn(move || -> Result<(), String> {
@@ -45,7 +59,7 @@ async fn a_malformed_start_keeps_the_runners_refusal_name() -> TestResult {
         writeln!(writer, "{}", reply_line(Answer::refusal(&refused)))
             .map_err(|error| error.to_string())
     });
-    let sent = table.start(&machine).await;
+    let sent = table.start(&table.agent(), &start_body(&machine)?).await;
     answering
         .join()
         .map_err(|panic| format!("the refusing runner panicked: {panic:?}"))??;

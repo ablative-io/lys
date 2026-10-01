@@ -136,15 +136,16 @@ impl Table {
         Ok(())
     }
 
-    /// Name a machine that runs the agent's shell, with `runner` as its
-    /// runner when one is given.
-    pub async fn machine(&self, runner: Option<Value>) -> Result<String, Box<dyn Error>> {
-        let id = operation()?;
-        let body = json!({
-            "operation": id, "name": "Box", "kind": "laptop", "runtime": "sh",
-            "slots": 1, "may_run": [self.agent()], "may_reach": [],
-        });
-        self.ok("/network/machines", &body).await?;
+    /// Name the requested machine, recording its runner when one is given.
+    pub async fn machine(
+        &self,
+        body: &Value,
+        runner: Option<Value>,
+    ) -> Result<String, Box<dyn Error>> {
+        let id = body["operation"]
+            .as_str()
+            .ok_or("machine body has no operation")?;
+        self.ok("/network/machines", body).await?;
         if let Some(runner) = runner {
             self.ok(
                 &format!("/network/machines/{id}/runner"),
@@ -152,13 +153,12 @@ impl Table {
             )
             .await?;
         }
-        Ok(id)
+        Ok(id.to_owned())
     }
 
-    pub async fn start(&self, machine: &str) -> Result<(u16, Value), Box<dyn Error>> {
-        let path = format!("/agents/{}/start-command", self.agent());
-        let body = json!({ "machine": machine, "operation": operation()? });
-        self.service.post(&path, Some(&self.ada), &body).await
+    pub async fn start(&self, agent: &str, body: &Value) -> Result<(u16, Value), Box<dyn Error>> {
+        let path = format!("/agents/{agent}/start-command");
+        self.service.post(&path, Some(&self.ada), body).await
     }
 
     pub fn close(mut self) -> TestResult {

@@ -29,11 +29,24 @@ use serde_json::json;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+fn machine_body(table: &Table) -> Result<serde_json::Value, Box<dyn Error>> {
+    Ok(json!({
+        "operation": support::operation()?, "name": "Box", "kind": "laptop", "runtime": "sh",
+        "slots": 1, "may_run": [table.agent()], "may_reach": [],
+    }))
+}
+
+fn start_body(machine: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+    Ok(json!({ "machine": machine, "operation": support::operation()? }))
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_start_on_a_machine_with_the_runner_runs_and_is_listed_running() -> TestResult {
     let table = Table::set().await?;
-    let machine = table.machine(Some(json!({ "kind": "lys" }))).await?;
-    let (status, started) = table.start(&machine).await?;
+    let machine = table
+        .machine(&machine_body(&table)?, Some(json!({ "kind": "lys" })))
+        .await?;
+    let (status, started) = table.start(&table.agent(), &start_body(&machine)?).await?;
     assert_eq!(status, 200, "{started}");
     assert_eq!(started["executed"], false, "the service itself ran nothing");
     assert_eq!(started["runner"]["state"], "running", "{started}");
@@ -122,8 +135,10 @@ async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -
             &json!({ "version": 0, "rules": [rule] }),
         )
         .await?;
-    let machine = table.machine(Some(json!({ "kind": "lys" }))).await?;
-    let (status, started) = table.start(&machine).await?;
+    let machine = table
+        .machine(&machine_body(&table)?, Some(json!({ "kind": "lys" })))
+        .await?;
+    let (status, started) = table.start(&table.agent(), &start_body(&machine)?).await?;
     assert_eq!(status, 200, "{started}");
     let session = started["session"].as_str().ok_or("no session")?;
     let client = Client::new(
@@ -152,8 +167,10 @@ async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -
 #[tokio::test(flavor = "multi_thread")]
 async fn a_runner_that_does_not_answer_is_named_beside_the_live_list() -> TestResult {
     let mut table = Table::set().await?;
-    let machine = table.machine(Some(json!({ "kind": "lys" }))).await?;
-    let (status, started) = table.start(&machine).await?;
+    let machine = table
+        .machine(&machine_body(&table)?, Some(json!({ "kind": "lys" })))
+        .await?;
+    let (status, started) = table.start(&table.agent(), &start_body(&machine)?).await?;
     assert_eq!(status, 200, "{started}");
     let session = started["session"].as_str().ok_or("no session")?.to_owned();
     if let Some(serving) = table.serving.take() {
@@ -174,7 +191,7 @@ async fn a_runner_that_does_not_answer_is_named_beside_the_live_list() -> TestRe
 #[tokio::test(flavor = "multi_thread")]
 async fn a_machine_without_a_runner_is_refused_by_name() -> TestResult {
     let table = Table::set().await?;
-    let machine = table.machine(None).await?;
+    let machine = table.machine(&machine_body(&table)?, None).await?;
     let path = format!("/agents/{}/start-command", table.agent());
     let body = json!({ "machine": machine, "operation": operation()? });
     let before = runtime_bytes(&table.service.dir.path().join("runtime"))?;
@@ -207,9 +224,12 @@ async fn a_machine_without_a_runner_is_refused_by_name() -> TestResult {
 async fn a_kept_start_without_its_runner_is_refused_without_rewriting_it() -> TestResult {
     let table = Table::set().await?;
     let machine = table
-        .machine(Some(json!({
-            "kind": "socket", "path": table.dir.path().join("absent.sock"),
-        })))
+        .machine(
+            &machine_body(&table)?,
+            Some(json!({
+                "kind": "socket", "path": table.dir.path().join("absent.sock"),
+            })),
+        )
         .await?;
     let path = format!("/agents/{}/start-command", table.agent());
     let body = json!({ "machine": machine, "operation": operation()? });
@@ -286,9 +306,12 @@ async fn a_runner_on_another_protocol_version_is_refused_by_name() -> TestResult
     });
     let path = socket.display().to_string();
     let machine = table
-        .machine(Some(json!({ "kind": "socket", "path": path })))
+        .machine(
+            &machine_body(&table)?,
+            Some(json!({ "kind": "socket", "path": path })),
+        )
         .await?;
-    let (status, refused) = table.start(&machine).await?;
+    let (status, refused) = table.start(&table.agent(), &start_body(&machine)?).await?;
     assert_eq!(status, 502, "{refused}");
     assert_eq!(refused["refusal"], "runner_protocol_mismatch", "{refused}");
     answering
@@ -313,9 +336,10 @@ async fn a_runner_on_a_second_machine_dials_in_and_starts_the_agent() -> TestRes
     })?
     .spawn();
     let machine = table
-        .machine(Some(
-            json!({ "kind": "dialled", "key": hex(&machine_key.public_key_bytes()) }),
-        ))
+        .machine(
+            &machine_body(&table)?,
+            Some(json!({ "kind": "dialled", "key": hex(&machine_key.public_key_bytes()) })),
+        )
         .await?;
     let dial = Dial {
         server: table.service.base.clone(),
@@ -326,7 +350,7 @@ async fn a_runner_on_a_second_machine_dials_in_and_starts_the_agent() -> TestRes
     };
     std::thread::spawn(move || dial.bridge());
 
-    let (status, started) = table.start(&machine).await?;
+    let (status, started) = table.start(&table.agent(), &start_body(&machine)?).await?;
     assert_eq!(status, 200, "{started}");
     assert_eq!(started["runner"]["state"], "running", "{started}");
     let session = started["session"].as_str().ok_or("no session")?;
@@ -413,9 +437,10 @@ async fn a_captured_dial_is_admitted_once_and_never_under_another_epoch() -> Tes
     let table = Table::set().await?;
     let key = Ed25519Identity::load_or_generate(&table.dir.path().join("machine.key"))?;
     let machine = table
-        .machine(Some(
-            json!({ "kind": "dialled", "key": hex(&key.public_key_bytes()) }),
-        ))
+        .machine(
+            &machine_body(&table)?,
+            Some(json!({ "kind": "dialled", "key": hex(&key.public_key_bytes()) })),
+        )
         .await?;
     let base = table.service.base.clone();
     let asked = tokio::task::spawn_blocking(move || {
@@ -470,9 +495,12 @@ async fn a_bridge_carrying_another_runners_greeting_is_refused_by_name() -> Test
     // greeting the bridge carries is that of another runner it can reach.
     let own = hex(&[0x11; 16]);
     let machine = table
-        .machine(Some(json!({
-            "kind": "dialled", "key": hex(&key.public_key_bytes()), "runner": own,
-        })))
+        .machine(
+            &machine_body(&table)?,
+            Some(json!({
+                "kind": "dialled", "key": hex(&key.public_key_bytes()), "runner": own,
+            })),
+        )
         .await?;
     let other_greeting =
         lys_runner::connect(&table.dir.path().join("runner.sock"))?.greeting_line()?;
