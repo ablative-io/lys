@@ -287,10 +287,40 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         request: &DelegateRequest,
         at: u64,
     ) -> Result<Recorded, GrantError> {
+        self.delegate_as(directory, request, at, false)
+    }
+
+    /// Pass on part of a grant as [`Grants::delegate`] does, as a one-time
+    /// grant: use-only, and spent by its first exercise.
+    pub fn delegate_once(
+        &mut self,
+        directory: &Projection,
+        request: &DelegateRequest,
+        at: u64,
+    ) -> Result<Recorded, GrantError> {
+        self.delegate_as(directory, request, at, true)
+    }
+
+    fn one_time_issuer(&self, grant: GrantId) -> Option<IdentityId> {
+        self.book
+            .grant(grant)
+            .filter(|grant| grant.is_once())
+            .map(|grant| grant.parts().issuer)
+    }
+
+    fn delegate_as(
+        &mut self,
+        directory: &Projection,
+        request: &DelegateRequest,
+        at: u64,
+        once: bool,
+    ) -> Result<Recorded, GrantError> {
         self.settle_for_change()?;
         if let Some((event, receipt)) = self.answered(request.operation)? {
             return match event.change() {
-                GrantChange::Issue(grant) if delegation_matches(request, grant) => {
+                GrantChange::Issue(grant)
+                    if delegation_matches(request, grant) && grant.is_once() == once =>
+                {
                     self.answer(event, receipt)
                 }
                 _ => Err(Self::reused(request.operation)),
@@ -304,6 +334,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             at,
             GrantId::generate()?,
         )?;
+        let grant = if once {
+            Grant::once(grant.parts().clone())?
+        } else {
+            grant
+        };
         self.commit(GrantEvent::new(
             request.operation,
             request.caller,
@@ -379,46 +414,21 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         if let Err(error) = &used {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);
         }
+        if let Some(issuer) = self.one_time_issuer(permit.grant) {
+            // A one-time grant admits only an exercise whose use is recorded,
+            // and is revoked by its issuer before this answers.
+            used.clone()?;
+            self.commit(GrantEvent::new(
+                OperationId::generate()?,
+                issuer,
+                at,
+                GrantChange::Revoke {
+                    grant: permit.grant,
+                    reason: ONE_TIME_SPENT.to_owned(),
+                },
+            )?)?;
+        }
         permit.use_event = Some(used);
-        Ok(permit)
-    }
-
-    /// [`Grants::check`] for a grant that may be one-time: when `once` names
-    /// the permitted grant, its use must be recorded and the grant is then
-    /// revoked by its issuer before this answers, so it admits exactly one
-    /// exercise. A one-time use that cannot be recorded is refused.
-    pub fn check_once(
-        &mut self,
-        directory: &Projection,
-        request: &ExerciseRequest,
-        at: u64,
-        at_least: Option<u64>,
-        once: &dyn Fn(GrantId) -> bool,
-    ) -> Result<Permit, GrantError> {
-        let permit = self.check(directory, request, at, at_least)?;
-        if !once(permit.grant) {
-            return Ok(permit);
-        }
-        if let Some(Err(error)) = &permit.use_event {
-            return Err(error.clone());
-        }
-        let issuer = self
-            .book
-            .grant(permit.grant)
-            .ok_or_else(|| GrantError::GrantUnknown {
-                grant: permit.grant.to_string(),
-            })?
-            .parts()
-            .issuer;
-        self.commit(GrantEvent::new(
-            OperationId::generate()?,
-            issuer,
-            at,
-            GrantChange::Revoke {
-                grant: permit.grant,
-                reason: ONE_TIME_SPENT.to_owned(),
-            },
-        )?)?;
         Ok(permit)
     }
 
