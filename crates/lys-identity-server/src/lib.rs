@@ -117,6 +117,8 @@ mod openapi_accounts_types;
 mod openapi_refusals;
 mod openapi_runner_types;
 mod openapi_table;
+#[cfg(test)]
+mod route_group_scope_tests;
 mod openapi_typed;
 mod openapi_types;
 pub mod operator;
