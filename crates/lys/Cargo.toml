@@ -45,6 +45,7 @@ rustix.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+tokio.workspace = true
 
 # The container-backed identity targets run only on the identity leg of
 # .land/gates.sh, never under `cargo test --workspace --all-features`.
