@@ -340,7 +340,8 @@ pub(crate) async fn register_agent(
         },
         |directory, (actor, target)| {
             crate::agent_policy_api::with_policies(&state, |policies| {
-                let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
+                let answer =
+                    directory.register_reporting_agent(actor, op, target, profile, now())?;
                 policies.ensure_default(&answer.agent.to_string())?;
                 crate::reporting_api::registered(&answer).map(Json)
             })
