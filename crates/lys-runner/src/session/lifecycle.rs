@@ -34,6 +34,10 @@ pub use crate::peer::Collected;
 #[path = "../../tests/lifecycle/cases.rs"]
 mod io_tests;
 
+#[cfg(test)]
+#[path = "../../tests/output/cases.rs"]
+pub(super) mod output_tests;
+
 pub(crate) fn transcript_parent(path: &Path) -> Result<PathBuf, RunnerError> {
     path.parent()
         .filter(|parent| !parent.as_os_str().is_empty())

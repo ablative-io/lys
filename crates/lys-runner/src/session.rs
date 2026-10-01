@@ -359,6 +359,8 @@ impl Sessions {
     }
 
     pub(crate) fn lock(&self) -> MutexGuard<'_, Table> {
+        #[cfg(test)]
+        lifecycle::output_tests::table_locked();
         let mut table = self.table.lock().unwrap_or_else(PoisonError::into_inner);
         table.operations.prune(now_ms());
         table
@@ -372,6 +374,8 @@ impl Sessions {
 
     /// Wake everything waiting on the table: a caller left, or a thing changed.
     pub fn wake(&self) {
+        #[cfg(test)]
+        lifecycle::output_tests::table_woken();
         self.changed.notify_all();
     }
 
