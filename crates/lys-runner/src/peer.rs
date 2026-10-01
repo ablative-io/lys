@@ -154,6 +154,127 @@ pub fn start_identity(pid: u32) -> Result<StartIdentity, RunnerError> {
     System.start(pid)
 }
 
+fn process_id(pid: u32) -> Result<rustix::process::Pid, RunnerError> {
+    i32::try_from(pid)
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+        .filter(|id| id.as_raw_nonzero().get() > 1)
+        .ok_or_else(|| unproved(format!("{pid} is not a process id to inspect")))
+}
+
+/// Read an identity while distinguishing an exited process from an unreadable one.
+pub(crate) fn present_start(pid: u32) -> Result<Option<StartIdentity>, RunnerError> {
+    let id = process_id(pid)?;
+    match rustix::process::test_kill_process(id) {
+        Err(rustix::io::Errno::SRCH) => return Ok(None),
+        Err(error) => {
+            return Err(RunnerError::refused(
+                "process_start_unreadable",
+                format!("process {pid}: {error}"),
+            ));
+        }
+        Ok(()) => {}
+    }
+    match start_identity(pid) {
+        Ok(start) => Ok(Some(start)),
+        Err(error) => match rustix::process::test_kill_process(id) {
+            Err(rustix::io::Errno::SRCH) => Ok(None),
+            Ok(()) => Err(RunnerError::refused(
+                "process_start_unreadable",
+                error.to_string(),
+            )),
+            Err(probe) => Err(RunnerError::refused(
+                "process_start_unreadable",
+                format!("{error}; process {pid} existence check: {probe}"),
+            )),
+        },
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn start_order(start: &StartIdentity) -> Option<(u64, u64)> {
+    let (seconds, micros) = start.0.strip_prefix("macos:")?.split_once('.')?;
+    let micros: u64 = micros.parse().ok()?;
+    (micros < 1_000_000).then_some((seconds.parse().ok()?, micros))
+}
+
+#[cfg(target_os = "linux")]
+fn start_order(start: &StartIdentity) -> Option<(u64, u64)> {
+    Some((start.0.strip_prefix("linux:")?.parse().ok()?, 0))
+}
+
+/// Compare numeric kernel start times, never their textual ordering.
+pub(crate) fn started_not_before(
+    start: &StartIdentity,
+    leader: &StartIdentity,
+) -> Result<bool, RunnerError> {
+    let read = |value: &StartIdentity| {
+        start_order(value).ok_or_else(|| {
+            RunnerError::refused(
+                "process_start_unreadable",
+                "start identity does not read as a kernel start time",
+            )
+        })
+    };
+    Ok(read(start)? >= read(leader)?)
+}
+
+/// List this group's members through the kernel's group filter.
+#[cfg(target_os = "macos")]
+pub(crate) fn group_members(group: u32) -> Result<Vec<u32>, RunnerError> {
+    libproc::processes::pids_by_type(libproc::processes::ProcFilter::ByProgramGroup {
+        pgrpid: group,
+    })
+    .map_err(|error| {
+        RunnerError::refused(
+            "process_group_unreadable",
+            format!("process group {group}: {error}"),
+        )
+    })
+}
+
+/// List this group's members from the kernel's process records.
+#[cfg(target_os = "linux")]
+pub(crate) fn group_members(group: u32) -> Result<Vec<u32>, RunnerError> {
+    let group_id = process_id(group)?;
+    let entries = std::fs::read_dir("/proc").map_err(|error| {
+        RunnerError::refused(
+            "process_group_unreadable",
+            format!("process group {group}: {error}"),
+        )
+    })?;
+    let mut members = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|error| {
+            RunnerError::refused(
+                "process_group_unreadable",
+                format!("process group {group}: {error}"),
+            )
+        })?;
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if pid <= 1 {
+            continue;
+        }
+        match rustix::process::getpgid(Some(process_id(pid)?)) {
+            Ok(found) if found == group_id => members.push(pid),
+            Ok(_) | Err(rustix::io::Errno::SRCH) => {}
+            Err(error) => {
+                return Err(RunnerError::refused(
+                    "process_group_unreadable",
+                    format!("process {pid}: {error}"),
+                ));
+            }
+        }
+    }
+    Ok(members)
+}
+
 /// The session whose leader the peer `pid`, of user `uid`, descends from,
 /// among `leaders`, as `processes` reads them. Refused `peer_unproved`,
 /// with the reason, when the user is not `own`, when the ancestry breaks or

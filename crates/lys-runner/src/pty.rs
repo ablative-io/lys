@@ -12,7 +12,9 @@ use std::fmt::Display;
 use std::io::{Read, Write};
 
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
-use rustix::process::{Pid, Signal, kill_process_group, test_kill_process_group};
+use rustix::process::{
+    Pid, Signal, getpgid, getsid, kill_process, kill_process_group, test_kill_process_group,
+};
 
 use crate::error::RunnerError;
 
@@ -181,40 +183,108 @@ pub fn resize(master: &dyn MasterPty, columns: u16, rows: u16) -> Result<(), Run
 
 /// What a restart found of a process group its last run recorded and never
 /// saw end.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Left {
     /// No process is in the group: it is gone.
     Gone,
-    /// Processes were still in it, and were ended with it.
-    Ended,
+    /// Proved members were signalled; the reason names any unproved members left.
+    Ended {
+        /// A leaderless group or a member that could not be ended.
+        reason: Option<String>,
+    },
     /// The live leader has another start identity, so the group was not signalled.
     Reused,
+    /// Live members could not be proved or signalled and were left running.
+    Unended {
+        /// Every member left, with the named reason.
+        reason: String,
+    },
 }
 
-/// End a recorded leader's group only while its start identity still matches.
-/// A reused group is reported without a signal; an unreadable identity or
-/// a refused signal is returned by name so a restart cannot claim it ended.
+/// Signal each member only when its session is the recorded leader and its
+/// start is not earlier than the leader's. A live, reused leader prevents
+/// cleanup; an absent leader does not prevent proving the remaining members.
+/// Identity verification and signalling are separate kernel operations: a
+/// process can exit and its id can be reassigned between them.
 pub fn end_left_group(leader: &crate::peer::Leader) -> Result<Left, RunnerError> {
     let pid = leader.pid;
     let group = group(pid)?;
     match test_kill_process_group(group) {
-        Err(rustix::io::Errno::SRCH) => Ok(Left::Gone),
-        Err(error) => Err(RunnerError::refused(
-            "end_failed",
-            format!("process group {pid} answers but is not this runner's to end: {error}"),
-        )),
-        Ok(()) => {
-            let current = crate::peer::start_identity(pid).map_err(|error| {
-                RunnerError::refused(
-                    "process_start_unreadable",
-                    format!("process group {pid} was not ended: {error}"),
-                )
-            })?;
-            if current != leader.start {
-                return Ok(Left::Reused);
-            }
-            end_group(pid).map(|()| Left::Ended)
+        Err(rustix::io::Errno::SRCH) => return Ok(Left::Gone),
+        Err(error) => {
+            return Err(RunnerError::refused(
+                "end_failed",
+                format!("process group {pid} cannot be inspected: {error}"),
+            ));
         }
+        Ok(()) => {}
+    }
+    let current = crate::peer::present_start(pid)?;
+    if current.as_ref().is_some_and(|start| *start != leader.start) {
+        return Ok(Left::Reused);
+    }
+    let members: std::collections::BTreeSet<_> =
+        crate::peer::group_members(pid)?.into_iter().collect();
+    let mut signalled = false;
+    let mut reasons = Vec::new();
+    for member in members {
+        match end_member(member, leader) {
+            Ok(ended) => signalled |= ended,
+            Err(error) => reasons.push(format!("process {member} not ended: {error}")),
+        }
+    }
+    if !signalled && reasons.is_empty() {
+        return Ok(Left::Gone);
+    }
+    if current.is_none() {
+        reasons.insert(0, format!("leaderless process group {pid}"));
+    }
+    let reason = (!reasons.is_empty()).then(|| reasons.join("; "));
+    if signalled {
+        Ok(Left::Ended { reason })
+    } else {
+        Ok(Left::Unended {
+            reason: reasons.join("; "),
+        })
+    }
+}
+
+fn end_member(pid: u32, leader: &crate::peer::Leader) -> Result<bool, RunnerError> {
+    let Some(start) = crate::peer::present_start(pid)? else {
+        return Ok(false);
+    };
+    let member = group(pid)?;
+    let recorded = group(leader.pid)?;
+    let session = getsid(Some(member))
+        .map_err(|error| RunnerError::refused("process_session_unreadable", error.to_string()))?;
+    let member_group = getpgid(Some(member))
+        .map_err(|error| RunnerError::refused("process_group_unreadable", error.to_string()))?;
+    if session != recorded || member_group != recorded {
+        return Err(RunnerError::refused(
+            "process_session_mismatch",
+            "member no longer belongs to the recorded session and group",
+        ));
+    }
+    if !crate::peer::started_not_before(&start, &leader.start)? {
+        return Err(RunnerError::refused(
+            "process_start_mismatch",
+            "member started before the recorded leader",
+        ));
+    }
+    match crate::peer::present_start(pid)? {
+        None => return Ok(false),
+        Some(current) if current == start => {}
+        Some(_) => {
+            return Err(RunnerError::refused(
+                "process_start_mismatch",
+                "member identity changed during ownership verification",
+            ));
+        }
+    }
+    match kill_process(member, Signal::KILL) {
+        Ok(()) => Ok(true),
+        Err(rustix::io::Errno::SRCH) => Ok(false),
+        Err(error) => Err(RunnerError::refused("end_failed", error.to_string())),
     }
 }
 
@@ -222,6 +292,7 @@ fn group(pid: u32) -> Result<Pid, RunnerError> {
     i32::try_from(pid)
         .ok()
         .and_then(Pid::from_raw)
+        .filter(|id| id.as_raw_nonzero().get() > 1)
         .ok_or_else(|| RunnerError::refused("end_failed", format!("{pid} is not a process id")))
 }
 
