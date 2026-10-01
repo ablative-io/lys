@@ -195,7 +195,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    let starts = start::routes(start_service(config, &state)?);
+    let start_service = start_service(config, &state)?;
+    crate::agent_pass_recovery::at_start(&state, &start_service)?;
+    let starts = start::routes(start_service);
     let starts = crate::start_budget::guarded(
         starts.merge(crate::launch_api::routes().with_state(Arc::clone(&state))),
         Arc::clone(&state),

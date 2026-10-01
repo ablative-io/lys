@@ -409,13 +409,7 @@ async fn withdrawn(
             (service.clock)(),
         )
         .and_then(|state| {
-            if let Some(app) = &service.pass_state {
-                crate::agent_pass::end_launch(app, &launch_record).map_err(|error| {
-                    StartError::Unavailable {
-                        reason: error.to_string(),
-                    }
-                })?;
-            }
+            crate::agent_pass_recovery::withdraw(service.pass_state.as_deref(), &launch_record)?;
             Ok(state.to_json())
         })
     })

@@ -240,6 +240,11 @@ impl<S: LeafStore> LaunchRecords<S> {
         self.held.withdrawals.len()
     }
 
+    /// Every withdrawal, borrowed in the order kept.
+    pub fn withdrawals(&self) -> &[Withdrawal] {
+        &self.held.withdrawals
+    }
+
     /// Every signed event, exactly the bytes appended, in log order.
     pub fn signed_events(&self) -> &[Vec<u8>] {
         &self.held.leaves
