@@ -23,15 +23,25 @@ struct State {
 #[derive(Clone)]
 pub(crate) struct Input {
     state: Arc<Mutex<State>>,
+    workers: Arc<tokio::sync::Semaphore>,
 }
 
 impl Input {
+    #[cfg(test)]
     pub(crate) fn new(writer: Box<dyn Write + Send>) -> Self {
+        Self::bounded(writer, Arc::new(tokio::sync::Semaphore::new(1)))
+    }
+
+    pub(crate) fn bounded(
+        writer: Box<dyn Write + Send>,
+        workers: Arc<tokio::sync::Semaphore>,
+    ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State {
                 writer: Some(writer),
                 sender: None,
             })),
+            workers,
         }
     }
 
@@ -62,12 +72,20 @@ impl Input {
     ) -> Result<(), RunnerError> {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if state.sender.is_none() {
+            let permit = Arc::clone(&self.workers)
+                .try_acquire_owned()
+                .map_err(|error| {
+                    RunnerError::refused("runner_input_workers_full", error.to_string())
+                })?;
             let writer = state.writer.take().ok_or_else(|| {
                 RunnerError::refused("input_worker_failed", "the input worker could not start")
             })?;
             let (sender, receiver) = mpsc::channel();
             let worker = std::thread::Builder::new()
-                .spawn(move || run(writer, receiver))
+                .spawn(move || {
+                    run(writer, receiver);
+                    drop(permit);
+                })
                 .map_err(|error| RunnerError::refused("input_worker_failed", error.to_string()))?;
             drop(worker);
             state.sender = Some(sender);

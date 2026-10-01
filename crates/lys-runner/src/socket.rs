@@ -22,7 +22,7 @@ use std::thread::JoinHandle;
 
 use crate::admitted::Admitted;
 use crate::error::RunnerError;
-use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_parsed};
+use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_parsed, verify_request};
 use crate::scrollback::whole_text;
 use crate::session::Sessions;
 

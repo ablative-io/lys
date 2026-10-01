@@ -98,6 +98,7 @@ pub(super) fn plan(session: &Session, resumed: bool) -> Result<SpawnPlan, Runner
 pub(super) struct Prepared {
     spawned: Option<crate::pty::Spawned>,
     leader: Leader,
+    permit: Arc<tokio::sync::OwnedSemaphorePermit>,
 }
 
 impl Drop for Prepared {
@@ -123,6 +124,14 @@ pub(super) struct Pending {
     reader: Box<dyn Read + Send>,
     child: Box<dyn Child + Send + Sync>,
     output: Arc<super::output::OutputHandle>,
+    permit: Arc<tokio::sync::OwnedSemaphorePermit>,
+}
+
+struct FailedActivation {
+    pid: u32,
+    child: Box<dyn Child + Send + Sync>,
+    pump: Option<std::thread::JoinHandle<()>>,
+    failure: RunnerError,
 }
 
 impl Pending {
@@ -138,6 +147,9 @@ impl Pending {
 impl Sessions {
     /// Prepare a verified child without owning the session table.
     pub(super) fn run(&self, plan: &SpawnPlan) -> Result<Prepared, RunnerError> {
+        let permit = Arc::new(Arc::clone(&self.generations).try_acquire_owned().map_err(
+            |error| RunnerError::refused("runner_lifecycle_workers_full", error.to_string()),
+        )?);
         self.writer.barrier()?;
         #[cfg(test)]
         if let Some(probe) = self
@@ -173,10 +185,12 @@ impl Sessions {
         Ok(Prepared {
             spawned: Some(spawned),
             leader,
+            permit,
         })
     }
 
     pub(super) fn install(
+        &self,
         session: &mut Session,
         mut prepared: Prepared,
     ) -> Result<Pending, RunnerError> {
@@ -201,7 +215,7 @@ impl Sessions {
         session.guard.leader = Some(prepared.leader.clone());
         session.leader_start = Some(prepared.leader.clone());
         session.live = Some(Live {
-            writer: crate::input::Input::new(spawned.writer),
+            writer: crate::input::Input::bounded(spawned.writer, Arc::clone(&self.inputs)),
             master: spawned.master,
             pid: spawned.pid,
             leader: Some(prepared.leader.clone()),
@@ -212,26 +226,184 @@ impl Sessions {
             reader: spawned.reader,
             child: spawned.child,
             output: Arc::clone(&session.output),
+            permit: Arc::clone(&prepared.permit),
         })
     }
 
     /// Activate only after the generation is visible in the table.
-    pub(super) fn activate(self: &Arc<Self>, id: &str, pending: Pending) {
+    pub(super) fn activate(
+        self: &Arc<Self>,
+        id: &str,
+        pending: Pending,
+    ) -> Result<(), RunnerError> {
         let Pending {
+            pid,
             generation,
             reader,
             child,
             output,
-            ..
+            permit,
         } = pending;
         let pumped = Arc::clone(self);
         let owned = id.to_owned();
         let pumped_output = Arc::clone(&output);
-        let pump =
-            std::thread::spawn(move || pumped.pump(&owned, generation, &pumped_output, reader));
+        let pump = match std::thread::Builder::new()
+            .name("runner-output".to_owned())
+            .spawn(move || pumped.pump(&owned, generation, &pumped_output, reader))
+        {
+            Ok(pump) => pump,
+            Err(error) => {
+                let failure =
+                    RunnerError::refused("session_output_worker_failed", error.to_string());
+                return self.activation_failed(
+                    id,
+                    generation,
+                    &output,
+                    FailedActivation {
+                        pid,
+                        child,
+                        pump: None,
+                        failure,
+                    },
+                );
+            }
+        };
         let watched = Arc::clone(self);
         let owned = id.to_owned();
-        std::thread::spawn(move || watched.watch(&owned, generation, &output, child, pump));
+        let watched_output = Arc::clone(&output);
+        let held_permit = Arc::clone(&permit);
+        let (deliver, delivered) = mpsc::channel();
+        let watcher = match std::thread::Builder::new()
+            .name("runner-process-exit".to_owned())
+            .spawn(move || {
+                match delivered.recv() {
+                    Ok((child, pump)) => {
+                        watched.watch(&owned, generation, &watched_output, child, pump)
+                    }
+                    Err(error) => {
+                        crate::error::said(&format!("session_exit_worker_failed: {error}"))
+                    }
+                }
+                drop(held_permit);
+            }) {
+            Ok(watcher) => watcher,
+            Err(error) => {
+                let failure = RunnerError::refused("session_exit_worker_failed", error.to_string());
+                return self.activation_failed(
+                    id,
+                    generation,
+                    &output,
+                    FailedActivation {
+                        pid,
+                        child,
+                        pump: Some(pump),
+                        failure,
+                    },
+                );
+            }
+        };
+        if let Err(error) = deliver.send((child, pump)) {
+            let (child, pump) = error.0;
+            if watcher.join().is_err() {
+                crate::error::said("session_exit_worker_failed: the exit worker panicked");
+            }
+            let failure = RunnerError::refused(
+                "session_exit_worker_failed",
+                "the exit worker ended before it took its child",
+            );
+            return self.activation_failed(
+                id,
+                generation,
+                &output,
+                FailedActivation {
+                    pid,
+                    child,
+                    pump: Some(pump),
+                    failure,
+                },
+            );
+        }
+        drop(watcher);
+        Ok(())
+    }
+
+    fn activation_failed(
+        &self,
+        id: &str,
+        generation: u64,
+        output: &super::output::OutputHandle,
+        failed: FailedActivation,
+    ) -> Result<(), RunnerError> {
+        let FailedActivation {
+            pid,
+            mut child,
+            pump,
+            failure,
+        } = failed;
+        let signalled = crate::pty::end_group(pid);
+        if let Err(error) = &signalled {
+            crate::error::said(&format!(
+                "session {id}: cancelled_spawn_cleanup_failed: {error}"
+            ));
+        }
+        let waited = child.wait();
+        if let Err(error) = &waited {
+            crate::error::said(&format!(
+                "session {id}: cancelled_spawn_exit_unconfirmed: {error}"
+            ));
+        }
+        if pump.is_some_and(|pump| pump.join().is_err()) {
+            crate::error::said("session_output_worker_failed: the output worker panicked");
+        }
+        let ended = Ended {
+            how: EndedHow::Exited,
+            at: now_ms(),
+            status: waited
+                .as_ref()
+                .ok()
+                .filter(|exit| exit.signal().is_none())
+                .map(|exit| exit.exit_code()),
+            signal: waited
+                .as_ref()
+                .ok()
+                .and_then(|exit| exit.signal().map(str::to_owned)),
+            reason: Some(match (&signalled, &waited) {
+                (Ok(()), Ok(_)) => failure.to_string(),
+                (Err(error), Ok(_)) => {
+                    format!("{failure}; cancelled_spawn_cleanup_failed: {error}")
+                }
+                (Ok(()), Err(error)) => {
+                    format!("{failure}; cancelled_spawn_exit_unconfirmed: {error}")
+                }
+                (Err(signal), Err(wait)) => format!(
+                    "{failure}; cancelled_spawn_cleanup_failed: {signal}; cancelled_spawn_exit_unconfirmed: {wait}"
+                ),
+            }),
+        };
+        let mut table = self.lock();
+        let mut recorded = Ok(());
+        if let Some(session) = table
+            .sessions
+            .get_mut(id)
+            .filter(|session| session.generation == generation)
+        {
+            session.live = None;
+            session.ended = Some(ended.clone());
+            if let Some(follower) = session.follower.take() {
+                stop_follower(id, &follower);
+            }
+            table.running.remove(id);
+            crate::operations::ended(&mut table, id, &ended);
+            recorded = self.persist(&table);
+        }
+        drop(table);
+        let fenced = recorded.and_then(|()| self.writer.barrier());
+        let finished = output.finish(generation, ended);
+        self.wake();
+        fenced?;
+        finished?;
+        signalled?;
+        Err(failure)
     }
 
     pub(super) fn replace_generation(
@@ -247,6 +419,7 @@ impl Sessions {
         if table.stopping || session.generation != generation {
             return Ok(false);
         }
+        table.reserve_capacity(id)?;
         if !table.starting.insert(id.to_owned()) {
             return Err(RunnerError::refused(
                 "session_starting",
@@ -268,22 +441,29 @@ impl Sessions {
         }
         crate::collector::status::flush_status(&mut table, id)?;
         let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-        let pending = Self::install(session, prepared)?;
+        let pending = self.install(session, prepared)?;
         session.ended = None;
         session.ending = false;
         session.guard.idle = true;
         if let Some(started_at) = started_at {
             session.started_at = started_at;
         }
-        if follow {
-            self.follow(&mut table, id);
-        }
+        let followed = if follow {
+            self.follow(&mut table, id)
+        } else {
+            Ok(())
+        };
+        table.running.insert(id.to_owned());
         let recorded = self.persist(&table);
         drop(table);
-        self.activate(id, pending);
+        self.activate(id, pending)?;
         drop(reservation);
         recorded?;
         self.writer.barrier()?;
+        if let Err(error) = followed {
+            self.end(id, &std::sync::atomic::AtomicBool::new(false))?;
+            return Err(error);
+        }
         self.wake();
         Ok(true)
     }
@@ -470,6 +650,7 @@ impl Sessions {
         if let Some(follower) = session.follower.take() {
             stop_follower(id, &follower);
         }
+        table.running.remove(id);
         if table
             .sessions
             .get(id)
@@ -495,22 +676,30 @@ impl Sessions {
 
     /// Follow session `id`'s bound stream on a thread of its own, stopping
     /// any follower it had.
-    pub(crate) fn follow(self: &Arc<Self>, table: &mut Table, id: &str) {
+    pub(crate) fn follow(self: &Arc<Self>, table: &mut Table, id: &str) -> Result<(), RunnerError> {
         let Some(path) = table
             .feed
             .source(id)
             .map(|source| PathBuf::from(&source.path))
         else {
-            return;
+            return Ok(());
         };
         let Some(session) = table.sessions.get_mut(id) else {
-            return;
+            return Ok(());
         };
         if let Some(old) = session.follower.take() {
             stop_follower(id, &old);
         }
+        let permit = Arc::new(
+            Arc::clone(&self.followers)
+                .try_acquire_owned()
+                .map_err(|error| {
+                    RunnerError::refused("runner_followers_full", error.to_string())
+                })?,
+        );
         let (wake, woken) = mpsc::channel();
-        let notices = wake.clone();
+        // The callback owns the same permit until the notifier's event loop exits.
+        let notices = Arc::new((wake.clone(), Arc::clone(&permit)));
         let notifier = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
             let next = match event {
                 Ok(event) if event.need_rescan() => {
@@ -519,7 +708,7 @@ impl Sessions {
                 Ok(_) => Wake::Changed,
                 Err(error) => Wake::Lost(error.to_string()),
             };
-            if let Err(gone) = notices.send(next) {
+            if let Err(gone) = notices.0.send(next) {
                 crate::error::said(&format!("a stream follower had ended: {gone}"));
             }
         });
@@ -532,7 +721,7 @@ impl Sessions {
                 if let Err(error) = append(table, id, vec![Body::Coverage(coverage)], None) {
                     crate::error::said(&format!("session {id}: coverage_record_failed: {error}"));
                 }
-                return;
+                return Err(error);
             }
         };
         let watching = notifier.and_then(|mut each| {
@@ -545,26 +734,32 @@ impl Sessions {
                 let words = format!("{} cannot be watched: {error}", dir.display());
                 crate::error::said(&format!("session {id}: coverage_incomplete: {words}"));
                 let source = table.feed.source(id).cloned().unwrap_or_default();
-                let coverage = Coverage::of("coverage_incomplete", &source, None, words);
+                let coverage = Coverage::of("coverage_incomplete", &source, None, words.clone());
                 if let Err(error) = append(table, id, vec![Body::Coverage(coverage)], None) {
                     crate::error::said(&format!("session {id}: coverage_record_failed: {error}"));
                 }
-                return;
+                return Err(RunnerError::refused("transcript_watch_failed", words));
             }
         };
-        session.follower = Some(wake);
         let (sessions, owned) = (Arc::clone(self), id.to_owned());
-        std::thread::spawn(move || {
-            sessions.read_source(&owned, None);
-            for next in woken {
-                match next {
-                    Wake::Changed => sessions.read_source(&owned, None),
-                    Wake::Lost(reason) => sessions.read_source(&owned, Some(&reason)),
-                    Wake::Stop => break,
+        let follower = std::thread::Builder::new()
+            .name("runner-transcript".to_owned())
+            .spawn(move || {
+                sessions.read_source(&owned, None);
+                for next in woken {
+                    match next {
+                        Wake::Changed => sessions.read_source(&owned, None),
+                        Wake::Lost(reason) => sessions.read_source(&owned, Some(&reason)),
+                        Wake::Stop => break,
+                    }
                 }
-            }
-            drop(watcher);
-        });
+                drop(watcher);
+                drop(permit);
+            })
+            .map_err(|error| RunnerError::refused("transcript_worker_failed", error.to_string()))?;
+        session.follower = Some(wake);
+        drop(follower);
+        Ok(())
     }
 
     /// Read session `id`'s stream from its saved cursor to its last whole

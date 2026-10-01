@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use super::{Sessions, lifecycle, now_ms, unknown, valid_id};
+use super::{Restarting, Sessions, lifecycle, now_ms, unknown, valid_id};
 use crate::error::RunnerError;
 use crate::operations::{OperationOutcome, begin_restart, finish_restart};
 use crate::peer::Leader;
@@ -43,11 +43,19 @@ impl Sessions {
                     format!("session {id} has no held launch to restart"),
                 ));
             }
-            begin_restart(&mut table, id, operation)?
+            let outcome = begin_restart(&mut table, id, operation)?;
+            if outcome.1 {
+                table.restarting.insert(id.to_owned());
+            }
+            outcome
         };
         if !fresh {
             return Ok(outcome);
         }
+        let reservation = Restarting {
+            sessions: Arc::clone(self),
+            id: id.to_owned(),
+        };
         // Acceptance survives the caller's exit, which ending its own
         // session causes; only the old process's exit releases the restart.
         let result = self.end(id, &AtomicBool::new(false)).and_then(|ended| {
@@ -64,6 +72,7 @@ impl Sessions {
         let outcome = finish_restart(&mut table, operation, result);
         drop(table);
         self.writer.barrier()?;
+        drop(reservation);
         self.wake();
         outcome
     }

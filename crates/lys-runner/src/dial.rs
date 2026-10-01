@@ -26,6 +26,7 @@
 //! The bridge is a process of its own, so a server that cannot be reached
 //! ends the bridge, by name, and never the runner or a session it holds.
 
+mod dispatch;
 mod transport;
 
 use std::path::PathBuf;
@@ -119,6 +120,7 @@ impl Dial {
     pub fn bridge(&self) -> Result<(), RunnerError> {
         let signer = Arc::new(self.signer()?);
         let mut epoch = signer.epoch()?;
+        let mut dispatch = dispatch::Dispatch::new();
         loop {
             let mut connection = crate::client::connect(&self.socket)?;
             let greeting = connection.greeting_line()?;
@@ -130,15 +132,20 @@ impl Dial {
                 }
                 taken => taken?,
             };
-            let (posted, epoch) = (Arc::clone(&signer), epoch.clone());
-            std::thread::spawn(move || {
+            let control = control_request(&line);
+            let posted = Arc::clone(&signer);
+            let posting_epoch = epoch.clone();
+            let posting_ticket = ticket.clone();
+            if let Err(error) = dispatch.submit(control, move || {
                 let reply = connection
                     .exchange(&line)
                     .unwrap_or_else(|error| reply_line(Answer::refusal(&error)));
-                if let Err(error) = posted.reply(&epoch, &ticket, &reply) {
+                if let Err(error) = posted.reply(&posting_epoch, &posting_ticket, &reply) {
                     crate::error::said(&format!("a reply was not delivered: {error}"));
                 }
-            });
+            }) {
+                signer.reply(&epoch, &ticket, &reply_line(Answer::refusal(&error)))?;
+            }
         }
     }
 
@@ -156,6 +163,19 @@ impl Dial {
             machine: self.machine.clone(),
             key: Arc::clone(&self.key),
         })
+    }
+}
+
+fn control_request(line: &str) -> bool {
+    let Ok(request) = serde_json::from_str::<crate::protocol::Request>(line) else {
+        return false;
+    };
+    match serde_json::from_str::<crate::protocol::Act>(&request.act) {
+        Ok(crate::protocol::Act::Status { .. } | crate::protocol::Act::End { .. }) => true,
+        Ok(crate::protocol::Act::Operate { operation }) => {
+            matches!(operation.request, crate::operations::OperationRequest::Stop)
+        }
+        Ok(_) | Err(_) => false,
     }
 }
 
