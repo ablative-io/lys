@@ -16,17 +16,25 @@ use lys_identity_server::teams_nesting::CreatedV1;
 use lys_identity_server::teams_state::{Changed, Created, Line};
 use lys_identity_server::teams_store::TeamStore;
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Person {
     pub id: String,
     pub agents: Vec<String>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Fixture {
     pub people: Vec<Person>,
     pub teams: Vec<String>,
 }
 
 pub fn seed(config: &Config) -> Result<Fixture, Box<dyn Error>> {
+    super::fixture::scale(config)
+}
+
+pub(super) fn build(config: &Config) -> Result<Fixture, Box<dyn Error>> {
     let actor = Actor::new(
         config.administrator_binding()?,
         Provenance::new(AuthMethod::Oidc, 1),

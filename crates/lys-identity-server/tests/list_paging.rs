@@ -7,8 +7,12 @@ use std::error::Error;
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
-use lys_identity_server::dev_seed::{Seeded, seed_configured};
+use lys_identity_server::dev_seed::Seeded;
 use serde_json::{Value, json};
+
+#[path = "support/list_paging_fixture.rs"]
+mod fixture;
+use fixture::seed_configured;
 
 #[path = "support/list_paging_scale.rs"]
 mod scale;
