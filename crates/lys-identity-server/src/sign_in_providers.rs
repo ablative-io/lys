@@ -33,6 +33,9 @@ use serde_json::{Value, json};
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in};
 
+#[path = "accounts_changes.rs"]
+mod account_changes;
+
 /// Where the issuer's administration API is and what this service calls it with.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -74,6 +77,7 @@ pub struct SignInProviders {
     client: reqwest::Client,
     origins: ProviderOrigins,
     probe: reqwest::Client,
+    changes: account_changes::Changes,
 }
 
 /// The most characters a client secret carries, the issuer's own limit.
@@ -215,6 +219,7 @@ impl SignInProviders {
             client: reqwest::Client::new(),
             origins: origins.unwrap_or_default(),
             probe,
+            changes: account_changes::Changes::default(),
         })
     }
 
@@ -226,9 +231,40 @@ impl SignInProviders {
         path: &str,
         body: Option<&Value>,
     ) -> Result<Value, ServerError> {
+        self.send(method, format!("{}{path}", self.api), body).await
+    }
+
+    pub(crate) async fn lock_account(
+        &self,
+        id: &str,
+    ) -> Result<account_changes::Guard<'_>, ServerError> {
+        self.changes.lock(id).await
+    }
+
+    pub(crate) async fn account_by_email(&self, email: &str) -> Result<Value, ServerError> {
+        let mut url =
+            reqwest::Url::parse(&format!("{}/users/email/", self.api)).map_err(|error| {
+                ServerError::SignInProvidersUnavailable {
+                    reason: format!("the issuer's account lookup URL is invalid: {error}"),
+                }
+            })?;
+        url.path_segments_mut()
+            .map_err(|()| ServerError::SignInProvidersUnavailable {
+                reason: "the issuer's account lookup URL cannot hold path segments".to_owned(),
+            })?
+            .push(email);
+        self.send(reqwest::Method::GET, url, None).await
+    }
+
+    async fn send(
+        &self,
+        method: reqwest::Method,
+        url: impl reqwest::IntoUrl,
+        body: Option<&Value>,
+    ) -> Result<Value, ServerError> {
         let mut request = self
             .client
-            .request(method, format!("{}{path}", self.api))
+            .request(method, url)
             .header(reqwest::header::AUTHORIZATION, &self.authorization)
             .header(reqwest::header::ACCEPT, "application/json");
         if let Some(body) = body {
