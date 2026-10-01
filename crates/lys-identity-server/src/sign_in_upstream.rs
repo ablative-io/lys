@@ -229,6 +229,9 @@ impl IssuerSignIn {
 
 /// Send the browser to Lys's sign-in screen naming the refusal.
 fn to_sign_in(error: &ServerError) -> Response {
+    // The browser is told only the refusal's name; the reason is written to
+    // the service's log, so whoever reads it can see why.
+    eprintln!("lys-identity-server provider sign-in refused: {error}");
     let location = format!("{SIGN_IN_SCREEN}?refused={}", error.name());
     (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response()
 }
