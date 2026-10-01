@@ -347,6 +347,12 @@ describe('Add and run on an existing computer', () => {
     const computer = existingComputer();
     const server = service(undefined, 'running', [computer]);
     const { posted, requests } = await open(server.routes);
+    const start = server.routes['POST ' + prefix + '/start-command'];
+    if (typeof start !== 'function') throw new Error('The start fixture is missing');
+    let readsAtStart: string[] = [];
+    server.routes['POST ' + prefix + '/start-command'] = (body) => {
+      const answer = start(body); readsAtStart = [...requests]; return answer;
+    };
     expect($('[name="computer_name"]')).toBeNull();
     expect(document.body.textContent).toContain(computer.name);
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
@@ -363,7 +369,8 @@ describe('Add and run on an existing computer', () => {
     expect(location.hash).toBe('#/file/' + agent);
     expect(document.body.textContent).toContain('Running, as its runner last reported');
     expect($('a[href="#/runtime/' + (posted[5].body as { operation: string }).operation + '"]')).not.toBeNull();
-    expect(requests.filter((path) => path === '/network')).toHaveLength(1);
+    expect(readsAtStart.filter((path) => path === '/network')).toHaveLength(1);
+    expect(requests.filter((path) => path === '/network')).toHaveLength(2);
   });
 
   it.each(['admission', 'start'] as const)('replays the exact saved %s on the original computer after remount', async (stage) => {
