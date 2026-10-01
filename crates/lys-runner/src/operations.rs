@@ -183,11 +183,11 @@ fn unavailable(what: impl std::fmt::Display) -> RunnerError {
 }
 
 fn terminal(outcome: &OperationOutcome) -> bool {
-    !matches!(
-        outcome.state,
-        OperationState::Accepted | OperationState::Delivering
-    ) && !(outcome.state == OperationState::Delivered
-        && matches!(outcome.request.as_str(), "stop" | "compact"))
+    match outcome.state {
+        OperationState::Accepted | OperationState::Delivering => false,
+        OperationState::Delivered => !matches!(outcome.request.as_str(), "stop" | "compact"),
+        OperationState::Confirmed | OperationState::Uncertain | OperationState::Refused => true,
+    }
 }
 
 impl Operations {
