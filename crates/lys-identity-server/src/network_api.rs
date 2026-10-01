@@ -19,7 +19,7 @@ use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::projection::Projection;
-use lys_identity::{AgentId, IdentityId, OperationId};
+use lys_identity::{AgentId, IdentityId, LifecycleState, OperationId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -463,29 +463,44 @@ async fn change_agent(
         .map_err(|error| malformed(format!("operation does not read: {error}")))?
         .to_string();
     let agent = AgentId::from_str(&body.agent)?;
-    with_directory(&state, |directory| {
+    // The directory and the network are never locked together: the network write
+    // syncs to disk, and no directory reader may wait on that flush.
+    let by = with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
-        if directory.record(IdentityId::Agent(agent)).is_none() {
-            return Err(ServerError::AgentNotVisible);
+        let record = directory
+            .record(IdentityId::Agent(agent))
+            .ok_or(ServerError::AgentNotVisible)?;
+        if body.allow && record.state() != LifecycleState::Active {
+            return Err(ServerError::Inactive {
+                identity: agent.to_string(),
+                state: record.state(),
+            });
         }
-        let last = last_reports(&state)?;
-        with_network(&state, |store| {
-            let recorded = store.change_agent(AgentsRecorded {
-                operation,
-                machine: id.clone(),
-                agent: agent.to_string(),
-                allow: body.allow,
-                by,
-                at: now(),
-                original_may_run: None,
-            })?;
-            let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(MachineAgentsChanged {
-                machine: view(directory, machine, last.get(&id).copied()),
-                recorded,
-            }))
-        })
+        Ok(by)
+    })?;
+    let last = last_reports(&state)?;
+    let (recorded, machine) = with_network(&state, |store| {
+        let recorded = store.change_agent(AgentsRecorded {
+            operation,
+            machine: id.clone(),
+            agent: agent.to_string(),
+            allow: body.allow,
+            by,
+            at: now(),
+            original_may_run: None,
+        })?;
+        let machine = store
+            .machine(&id)
+            .cloned()
+            .ok_or(ServerError::MachineUnknown)?;
+        Ok((recorded, machine))
+    })?;
+    with_directory(&state, |directory| {
+        Ok(Json(MachineAgentsChanged {
+            machine: view(directory.projection()?, &machine, last.get(&id).copied()),
+            recorded,
+        }))
     })
 }
 
