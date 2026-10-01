@@ -15,11 +15,10 @@ impl Harness {
     fn start() -> Result<Self, Box<dyn Error>> {
         let arguments = vec![
             "-c".to_owned(),
-            "trap 'printf \"final-usage:7\\n\"; exit 0' TERM; printf 'ready\\n'; IFS= read -r line"
-                .to_owned(),
+            "import signal, sys\ndef ended(signum, frame):\n print('final-usage:7', flush=True)\n sys.exit(0)\nsignal.signal(signal.SIGTERM, ended)\nprint('ready', flush=True)\nsignal.pause()".to_owned(),
         ];
         let mut harness = Self(pty::spawn(&Spawn {
-            program: "/bin/sh",
+            program: "/usr/bin/python3",
             arguments: &arguments,
             directory: "/",
             environment: &BTreeMap::new(),
