@@ -1995,6 +1995,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-135",
+      "title": "An agent Lys starts carries a pass for that run and may be granted any action a person can take, except the responsibilities a person keeps",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-10-02",
+      "decided_by": "Tom, relayed by Waffles in the Lys room at 07:32 Melbourne; recorded by Archie.",
+      "context": "On a18cdfc5 an agent reaches 18 of 173 routes, only by a signed request; a grant token needs a person to sign in and paste a 24-hour token; refused calls have no path to the person who could grant them.",
+      "decision": "Every non-public action is a grantable permission. Lys issues a pass per run at spin-up, written with the Lys MCP address into the seat's config, ended when the run ends; every route takes it as the agent and judges each call against live grants. A refusal names who can grant, walking up the chain, and the agent asks them; the answer is once, for a while, ongoing or no. Grants gain one-time and transfer-and-return. A small named set of responsibilities is never passed to an agent.",
+      "quote": "not because I don't want AI to have the power... because I don't want a human to get rid of their responsibility",
+      "consequences": [
+        "No helper command, no assertion exchange and no second MCP server.",
+        "Refused calls are not drafts.",
+        "Agents started outside Lys are out of scope.",
+        "The kept set is data Tom confirms."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

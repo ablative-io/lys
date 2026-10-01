@@ -68,6 +68,14 @@
         {
           "id": "S133",
           "text": "As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at."
+        },
+        {
+          "id": "S258",
+          "text": "As the responsible person, I want an agent refused outside its grants to tell me it needs me and ask, and to answer once, for a while, ongoing or no, so that I give only what I mean to."
+        },
+        {
+          "id": "S259",
+          "text": "As the responsible person, I want the few responsibilities that are mine to stay mine whatever I grant, so that no one can hand away being responsible."
         }
       ]
     },
@@ -620,6 +628,10 @@
         {
           "id": "S190",
           "text": "As the person running a team of agents, I want to pick an agent's program, model and mode from named choices, so that I can set an agent up without typing paths, ids or JSON."
+        },
+        {
+          "id": "S257",
+          "text": "As the person running a team of agents, I want to start an agent from Lys and never sign it in or paste anything, so that it can act at once and only within its grants."
         }
       ]
     },

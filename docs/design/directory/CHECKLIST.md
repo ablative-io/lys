@@ -480,3 +480,13 @@
 
 - [ ] **C474** — Lys answers the programs it can start, with their models and modes as named choices. (DIRECTORY-076 R1).
 - [ ] **C475** — Each computer's runner reports where each described program is installed. (DIRECTORY-076 R2).
+
+## An agent Lys starts acts through MCP with a pass for that run, can be granted any action a person can take, and asks the person who can grant what it is refused (DIRECTORY-077)
+
+- [ ] **C476** — Every action a person can take in Lys is a permission an agent can be granted. (DIRECTORY-077 R1).
+- [ ] **C477** — Lys issues an agent a pass for one run when it starts it, written into the seat's own config, and ends it when the run ends. (DIRECTORY-077 R2).
+- [ ] **C478** — Every route takes the pass as the agent and judges each call against the agent's live grants, except the few responsibilities a person keeps. (DIRECTORY-077 R3).
+- [ ] **C479** — A refusal names who can grant the action, walking up the chain. (DIRECTORY-077 R4).
+- [ ] **C480** — An agent asks that person, and they answer once, for a while, ongoing or no. (DIRECTORY-077 R5).
+- [ ] **C481** — Grants can be one-time, and can be transferred and returned. (DIRECTORY-077 R6).
+- [ ] **C482** — Proven on Tom's live install with an agent Lys starts. (DIRECTORY-077 R7).

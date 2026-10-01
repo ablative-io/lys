@@ -34,6 +34,10 @@
 
 **S133.** As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at.
 
+**S258.** As the responsible person, I want an agent refused outside its grants to tell me it needs me and ask, and to answer once, for a while, ongoing or no, so that I give only what I mean to.
+
+**S259.** As the responsible person, I want the few responsibilities that are mine to stay mine whatever I grant, so that no one can hand away being responsible.
+
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -277,6 +281,8 @@
 **S189.** As the person running a team of agents, I want every setting an agent can have listed and checked, and a list of approved MCP servers, so that I can see an agent's whole configuration and a mistyped setting is refused before it starts.
 
 **S190.** As the person running a team of agents, I want to pick an agent's program, model and mode from named choices, so that I can set an agent up without typing paths, ids or JSON.
+
+**S257.** As the person running a team of agents, I want to start an agent from Lys and never sign it in or paste anything, so that it can act at once and only within its grants.
 
 ## Installer and operator — Provision and upgrade the internal audit connection
 

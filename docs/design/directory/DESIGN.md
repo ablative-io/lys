@@ -79,6 +79,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-128 — The runner applies OS containment from the same Lys policy and reports native denials — Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch. gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.
 - ADR-129 — Paths under /api belong to the API and are refused when unknown, and paths outside it stay the page's — The API nested under /api has its own fallback answering 404 with a named JSON refusal. Paths outside /api stay the page's, so /health and /healthz at the root keep answering the page, and the page shows what it shows for a route it does not know. The one health answer is GET /api/health, which names the service and its build and asks no other service. Serving 404 for chosen root names was weighed and not taken, because the server would then guess at the page's routes.
 - ADR-131 — Codex policy comes from Lys and refusal provenance follows the real harness contract — Render the same Lys policy into isolated native Codex settings. Use064's one transport owner and051's one refusal store. Distinguish Codex-reported rejection, Lys judge denial and062 OS denial. Required unrepresentable policy refuses launch. Coverage is capability-derived, never a blanket claim.
+- ADR-135 — An agent Lys starts carries a pass for that run and may be granted any action a person can take, except the responsibilities a person keeps — Every non-public action is a grantable permission. Lys issues a pass per run at spin-up, written with the Lys MCP address into the seat's config, ended when the run ends; every route takes it as the agent and judges each call against live grants. A refusal names who can grant, walking up the chain, and the agent asks them; the answer is once, for a while, ongoing or no. Grants gain one-time and transfer-and-return. A small named set of responsibilities is never passed to an agent.
 
 ## Goals
 
@@ -1151,6 +1152,30 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/lib.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
 | `crates/lys-identity-server/src/teams_nesting.rs` | Versioned nesting events and their admitted mutations (DIRECTORY-071). | DIRECTORY-071 |
 | `crates/lys-identity-server/src/tree_views.rs` | Typed summaries computed from held state for the tree read (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/route_actions.rs` | created by DIRECTORY-077 R1 | DIRECTORY-077 |
+| `crates/lys-identity-server/tests/route_actions.rs` | created by DIRECTORY-077 R1 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/agent_pass.rs` | created by DIRECTORY-077 R2 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/agent_pass_store.rs` | created by DIRECTORY-077 R2 | DIRECTORY-077 |
+| `crates/lys-identity-server/tests/agent_pass.rs` | created by DIRECTORY-077 R2 | DIRECTORY-077 |
+| `crates/lys-home/src/harness/launch_fields.rs` | changed by DIRECTORY-077 R2 | DIRECTORY-077 |
+| `crates/lys-home/src/harness/codex/launch.rs` | changed by DIRECTORY-077 R2 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/kept_responsibilities.rs` | created by DIRECTORY-077 R3 | DIRECTORY-077 |
+| `crates/lys-identity-server/tests/agent_pass_routes.rs` | created by DIRECTORY-077 R3 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/signed_first.rs` | changed by DIRECTORY-077 R3 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/agent_signature.rs` | changed by DIRECTORY-077 R3 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/mcp_endpoint.rs` | changed by DIRECTORY-077 R3 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/who_can_grant.rs` | created by DIRECTORY-077 R4 | DIRECTORY-077 |
+| `crates/lys-identity-server/tests/who_can_grant.rs` | created by DIRECTORY-077 R4 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/grants_reach.rs` | changed by DIRECTORY-077 R4 | DIRECTORY-077 |
+| `crates/lys-identity-server/tests/requests_from_agents.rs` | created by DIRECTORY-077 R5 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/requests_api.rs` | changed by DIRECTORY-077 R5 | DIRECTORY-077 |
+| `crates/lys-identity-server/src/requests_decide.rs` | changed by DIRECTORY-077 R5 | DIRECTORY-077 |
+| `crates/lys-identity/tests/grant_kinds.rs` | created by DIRECTORY-077 R6 | DIRECTORY-077 |
+| `crates/lys-identity/src/grants/usage.rs` | changed by DIRECTORY-077 R6 | DIRECTORY-077 |
+| `crates/lys-identity/src/grants/codec.rs` | changed by DIRECTORY-077 R6 | DIRECTORY-077 |
+| `docs/design/directory/DIRECTORY-077-PROOF.md` | created by DIRECTORY-077 R7 | DIRECTORY-077 |
+| `docs/design/directory/briefs/DIRECTORY-077.json` | the brief | DIRECTORY-077 |
+| `docs/design/directory/briefs/DIRECTORY-077.md` | rendered markdown | DIRECTORY-077 |
 
 ## Inventory
 

@@ -1,0 +1,256 @@
+{
+  "id": "DIRECTORY-077",
+  "cluster": "directory",
+  "title": "An agent Lys starts acts through MCP with a pass for that run, can be granted any action a person can take, and asks the person who can grant what it is refused",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C476",
+    "C477",
+    "C478",
+    "C479",
+    "C480",
+    "C481",
+    "C482"
+  ],
+  "stories": [
+    "S257",
+    "S258",
+    "S259"
+  ],
+  "design_anchor": [
+    "ADR-135",
+    "ADR-133"
+  ],
+  "purpose": "Tom, 2 October (relayed by Waffles at 07:32): you start an AI with Lys and never worry about it again; it never signs in, it can't act outside its grants, and it is secure. On a18cdfc5 an agent reaches 18 of Lys's 173 routes, only by a signed request it has no way to make when Lys starts it, and the grant-token path needs a person to sign in and paste a 24-hour token. Tom: every action a person can take becomes a permission an agent can be granted, \"not because I don't want AI to have the power... because I don't want a human to get rid of their responsibility\"; only a handful of real responsibilities stay with a person. Agents started outside Lys are out of scope.",
+  "task": "Make every non-public route declare the action it exercises and make the grant model name it. Issue a pass for each run Lys starts and render it with the Lys MCP address into the Claude Code and Codex configs, ending it when the run ends. Take the pass as the agent on every route, judged per call against live grants, and keep the named responsibilities with people. Answer a refusal with who can grant, let the agent ask them, and let them answer once, for a while, ongoing or no. Add one-time and transfer-and-return grants. Prove it on Tom's live install. The responsibilities a person keeps, proposed by Archie for Tom to confirm, held as data so his answer changes data, not code: First-run setup: POST /setup, /setup/open, /setup/administrator, /setup/password. Issuing a root grant: POST /grants/roots, the point where a person takes responsibility. A person's sign-in credentials: POST /directory/people/{id}/account/email and /password, POST /me/account/email and /password. Setting how people sign in: POST /sign-in-providers. The responsible person's answer to a draft: POST /drafts/{id}/approve, /refuse, /correct. Out: agents started outside Lys, a helper command, an assertion exchange, a second MCP server, and the person-issued credential button (parked).",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Every action a person can take in Lys is a permission an agent can be granted",
+      "spec": "Behavioural. WHEN the service starts, THE SYSTEM SHALL hold, for every route in the table that is not public, the resource kind, the action and the path parameter naming the resource that the route exercises, and the grant model SHALL name each of those actions so a grant can carry it; a route with no declared action SHALL fail the service's start naming the route. Public routes (sign-in, first-run code entry, the issuer's documents, receipts, the runner's dial) are protocol, not actions, and stay as they are.",
+      "acceptance": [
+        "Every one of the 155 routes an agent cannot reach on a18cdfc5 declares its resource kind and action, and the grant model answers each action.",
+        "A table row added without a declared action fails start, naming its method and path.",
+        "A signed-in person's session is judged as it is today on every route."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/route_actions.rs",
+          "crates/lys-identity-server/tests/route_actions.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/routes_table.rs",
+          "crates/lys-identity/src/grants/model.rs",
+          "crates/lys-identity/src/grants/schema.rs",
+          "crates/lys-identity-server/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C476"
+      ],
+      "stories": [
+        "S257"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Lys issues an agent a pass for one run when it starts it, written into the seat's own config, and ends it when the run ends",
+      "spec": "Behavioural. WHEN Lys starts, restarts or starts again an agent's launch, THE SYSTEM SHALL issue a pass bound to that agent and that launch record, keep only its digest, and render the Lys MCP address and the pass into the seat's own config: for Claude Code an HTTP MCP server named lys at <service>/api/mcp with the header lys-agent-pass, and for Codex the same address and header in mcp_servers. WHEN the agent is stopped, its session ends or crashes as the runner reports it, or its launch is withdrawn, THE SYSTEM SHALL end that pass, so the next call with it is refused; a restart issues a fresh pass. The pass is never written to a log, an error, an environment variable, a kept template or a profile.",
+      "acceptance": [
+        "An agent Lys starts has a config naming the Lys MCP address and a pass, with nothing typed or pasted by a person.",
+        "After a stop, a crash reported by the runner, or a withdrawal, the old pass is refused by name on its next call.",
+        "A restart's config carries a different pass from the run before it, and the earlier pass is refused.",
+        "No log line, error body, environment or template written by the start contains the pass."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/agent_pass.rs",
+          "crates/lys-identity-server/src/agent_pass_store.rs",
+          "crates/lys-identity-server/tests/agent_pass.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/start.rs",
+          "crates/lys-identity-server/src/restart_api.rs",
+          "crates/lys-identity-server/src/stop_api.rs",
+          "crates/lys-identity-server/src/runtime_api.rs",
+          "crates/lys-identity-server/src/launch_template.rs",
+          "crates/lys-home/src/harness/launch_fields.rs",
+          "crates/lys-home/src/harness/rendering.rs",
+          "crates/lys-home/src/harness/codex/launch.rs",
+          "crates/lys-home/src/harness/claude_code/launch.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C477"
+      ],
+      "stories": [
+        "S257"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Every route takes the pass as the agent and judges each call against the agent's live grants, except the few responsibilities a person keeps",
+      "spec": "Behavioural. WHEN a request carries a live agent pass, THE SYSTEM SHALL take it as that agent on every non-public route, refuse it with a session cookie, an agent signature or an Authorization header beside it, and judge the call against the agent's grants as they stand at that call for the route's declared resource and action; an agent that is suspended or stopped, or whose grant has ended, SHALL be refused on its next call. The responsibilities a person keeps (proposed below for Tom to confirm, held as data) SHALL be refused to every agent whatever it holds, naming the person whose responsibility it is.",
+      "acceptance": [
+        "An agent holding the grant for an action makes that change through MCP with its pass and it is recorded as the agent's act.",
+        "The same call without the grant is refused, and nothing is recorded.",
+        "Ending the grant makes the next call refused; suspending the agent does the same.",
+        "Each kept responsibility is refused to an agent that holds every grant, naming the person who keeps it."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/kept_responsibilities.rs",
+          "crates/lys-identity-server/tests/agent_pass_routes.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/signed_first.rs",
+          "crates/lys-identity-server/src/agent_signature.rs",
+          "crates/lys-identity-server/src/mcp_endpoint.rs",
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/error.rs",
+          "crates/lys-identity-server/src/error_status.rs",
+          "crates/lys-identity-server/src/openapi.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C478"
+      ],
+      "stories": [
+        "S257",
+        "S259"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "A refusal names who can grant the action, walking up the chain",
+      "spec": "Behavioural. WHEN an agent's call is refused because it holds no grant for the action, THE SYSTEM SHALL answer, beside the refusal, the nearest identity who holds that action on that resource and may pass it on to an agent, walking up the agent's reports-to chain first and then the grant's lineage to its root person, and say in plain words who to ask (for example, ask your lead, or this needs Tom). A refused call is not turned into a draft; drafts stay for an agent asked to propose a change on someone's behalf.",
+      "acceptance": [
+        "An agent refused for an action its lead can pass on is told to ask its lead, by name.",
+        "An agent refused for an action only the root person can give is told it needs that person, by name.",
+        "No draft is created by a refusal."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/who_can_grant.rs",
+          "crates/lys-identity-server/tests/who_can_grant.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/grants_refusals.rs",
+          "crates/lys-identity-server/src/grants_reach.rs",
+          "crates/lys-identity-server/src/mcp_endpoint.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C479"
+      ],
+      "stories": [
+        "S258"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "An agent asks that person, and they answer once, for a while, ongoing or no",
+      "spec": "Behavioural. WHEN an agent with a live pass asks who may act on a resource or sends an access request naming an action and a resource, THE SYSTEM SHALL accept it as the agent, address the request to the identity the refusal named, and let that identity answer once (a one-time grant), for a while (a grant with an end time it chooses), ongoing (a grant until revoked) or no; the answer is recorded and the agent's next call is judged against it.",
+      "acceptance": [
+        "An agent sends a request after a refusal, and the named person sees it addressed to them.",
+        "Each of the four answers produces the grant it names, or none, and the agent's next call is judged against it.",
+        "A request for a kept responsibility is refused, naming the person who keeps it."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/requests_from_agents.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/requests_api.rs",
+          "crates/lys-identity-server/src/requests_decide.rs",
+          "crates/lys-identity-server/src/requests_state.rs",
+          "crates/lys-identity-server/src/requests_store.rs",
+          "crates/lys-identity-server/src/grants_reach.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C480"
+      ],
+      "stories": [
+        "S258"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Grants can be one-time, and can be transferred and returned",
+      "spec": "Behavioural. THE SYSTEM SHALL let a grant be one-time, spent by the first exercise the check admits so a second exercise is refused, and SHALL let a holder transfer a grant to another identity, losing its use themselves until it is returned or the transfer's window ends, when it comes back to them; both keep the existing pass-on, sharing, window and cascading revoke rules, and a stored grant from before this change reads unchanged.",
+      "acceptance": [
+        "A one-time grant admits exactly one exercise; two calls at once admit one and refuse the other.",
+        "A transferred grant is usable by the recipient and refused to the holder until it is returned or its window ends, then the reverse.",
+        "Revoking the source of a one-time or transferred grant ends it.",
+        "A grant log from a18cdfc5 opens and answers every grant as it did."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/tests/grant_kinds.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/grants/types.rs",
+          "crates/lys-identity/src/grants/usage.rs",
+          "crates/lys-identity/src/grants/revocation.rs",
+          "crates/lys-identity/src/grants/commit.rs",
+          "crates/lys-identity/src/grants/events.rs",
+          "crates/lys-identity/src/grants/codec.rs",
+          "crates/lys-identity/src/grants/admission.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C481"
+      ],
+      "stories": [
+        "S258"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Proven on Tom's live install with an agent Lys starts",
+      "spec": "Behavioural. WHEN an agent is started by Lys on Tom's live install with nothing pasted, THE SYSTEM SHALL let it make one real change inside its grants, refuse it outside them with the name of who can grant, carry its request to that person, and let a one-time approval through exactly once, and the proof SHALL record each step's call and answer.",
+      "acceptance": [
+        "The proof records the four steps on the live install, each with its call and answer and no secret.",
+        "The second attempt after the one-time approval is refused."
+      ],
+      "files": {
+        "create": [
+          "docs/design/directory/DIRECTORY-077-PROOF.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C482"
+      ],
+      "stories": [
+        "S257",
+        "S258"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT poll, sleep, add a timer, timeout, deadline, watchdog or background loop; a pass ends on the event that ends its run.",
+    "SHALL NOT add unsafe, an ignored test, an allow attribute, an underscore rename or a discarded result.",
+    "SHALL NOT change a stored shape without a migration tested from an a18cdfc5 install, and SHALL NOT edit an installed configuration by hand.",
+    "SHALL NOT write a pass, a token or a key into a log, an error, an environment variable, a template, a profile, a post or a test's output.",
+    "SHALL NOT add a second MCP server, a helper command or an assertion exchange.",
+    "SHALL NOT turn a refused call into a draft.",
+    "SHALL NOT make Lys depend on Cambium or name a harness detail in code; harness details are data."
+  ],
+  "verification": [
+    "Handwritten main brief passes the design gate on its exit code.",
+    "Built by the assigned GPT seats in 30-minute bounded pieces on their own branches: red first, then green, with fmt, Clippy pedantic in both configurations, nextest on the touched crates, ast-grep and the 500-line file limit.",
+    "One gate after all the code is written; a red is fixed and the fixed head gates again at once. Archie stacks, gates, lands and installs.",
+    "R7 is shown on Tom's live install after the install, and its record is committed."
+  ]
+}

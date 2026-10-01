@@ -1825,6 +1825,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "An agent Lys starts acts through MCP with a pass for that run, can be granted any action a person can take, and asks the person who can grant what it is refused (DIRECTORY-077)",
+      "items": [
+        {
+          "id": "C476",
+          "text": "Every action a person can take in Lys is a permission an agent can be granted. (DIRECTORY-077 R1).",
+          "done": false
+        },
+        {
+          "id": "C477",
+          "text": "Lys issues an agent a pass for one run when it starts it, written into the seat's own config, and ends it when the run ends. (DIRECTORY-077 R2).",
+          "done": false
+        },
+        {
+          "id": "C478",
+          "text": "Every route takes the pass as the agent and judges each call against the agent's live grants, except the few responsibilities a person keeps. (DIRECTORY-077 R3).",
+          "done": false
+        },
+        {
+          "id": "C479",
+          "text": "A refusal names who can grant the action, walking up the chain. (DIRECTORY-077 R4).",
+          "done": false
+        },
+        {
+          "id": "C480",
+          "text": "An agent asks that person, and they answer once, for a while, ongoing or no. (DIRECTORY-077 R5).",
+          "done": false
+        },
+        {
+          "id": "C481",
+          "text": "Grants can be one-time, and can be transferred and returned. (DIRECTORY-077 R6).",
+          "done": false
+        },
+        {
+          "id": "C482",
+          "text": "Proven on Tom's live install with an agent Lys starts. (DIRECTORY-077 R7).",
+          "done": false
+        }
+      ]
     }
   ]
 }
