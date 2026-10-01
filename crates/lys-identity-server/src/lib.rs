@@ -213,3 +213,6 @@ mod sign_in_address;
 
 #[cfg(test)]
 mod agent_pass_tests;
+
+/// Eligible authorities named by an agent grant refusal.
+pub mod who_can_grant;
