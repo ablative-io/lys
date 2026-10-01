@@ -214,6 +214,14 @@ async fn a_pass_exercises_get_and_head_and_refuses_a_revoked_grant_and_an_ungran
     let refused = get(&service, "/configuration", &pass).await?;
     assert_eq!(refused.0, 403, "{}", refused.1);
     assert_eq!(refused.1["refusal"], "NotHeld");
+    assert_eq!(
+        refused.1["can_grant"],
+        json!([{
+            "id":person, "kind":"person", "display_name":"Owner"
+        }]),
+        "{}",
+        refused.1
+    );
     let path = format!("{}/configuration", service.base);
     assert_eq!(
         client()
@@ -309,6 +317,7 @@ async fn a_pass_cannot_borrow_credentials_or_reach_undeclared_or_kept_routes() -
         assert_eq!(response.status().as_u16(), 403);
         let body: Value = response.json().await?;
         assert_eq!(body["refusal"], "ResponsibilityKept");
+        assert_eq!(body["can_grant"], json!([]), "{body}");
         assert_eq!(body["fields"]["route"], path);
     }
     Ok(())
