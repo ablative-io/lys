@@ -27,11 +27,9 @@ use crate::identity::install::services;
 pub type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn create_pipe(path: &Path) -> TestResult {
-    let made = Command::new("mkfifo").arg(path).status()?;
-    if !made.success() {
-        return Err(format!("upgrade_fixture_pipe_create_failed: mkfifo exited {made}").into());
-    }
-    Ok(())
+    let mode = nix::sys::stat::Mode::from_bits_truncate(0o666);
+    nix::unistd::mkfifo(path, mode)
+        .map_err(|error| format!("upgrade_fixture_pipe_create_failed: {error}").into())
 }
 
 /// Build A's commit.
