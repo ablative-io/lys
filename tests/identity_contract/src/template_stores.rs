@@ -73,7 +73,7 @@ pub(crate) fn build(name: &str, path: &Path, config: &Config) -> Result<(), Box<
     match name {
         "log" => {
             let mut configured = config.clone();
-            configured.log_dir = path.to_owned();
+            path.clone_into(&mut configured.log_dir);
             snapshot_result(open_directory(&configured)?.log()?.snapshot_failure())?;
         }
         "organisation" => {
