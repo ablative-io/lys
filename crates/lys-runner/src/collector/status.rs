@@ -191,15 +191,11 @@ impl Sessions {
             };
             let pending =
                 PendingStatus::new(record.clone(), &source, session.pending_status.as_ref());
-            let leader = if pending.is_ok() {
-                crate::session::window_limit(
-                    &mut table,
-                    id,
-                    std::slice::from_ref(&Body::Usage(record)),
-                )
-            } else {
-                None
-            };
+            let leader = crate::session::window_limit(
+                &mut table,
+                id,
+                std::slice::from_ref(&Body::Usage(record)),
+            );
             let message = pending.and_then(|pending| {
                 table
                     .sessions
@@ -213,23 +209,43 @@ impl Sessions {
             (Ok("the snapshot repeats the last one held"), None)
         };
         let stopping = result.1.is_some();
-        if stopping {
-            flush_status(&mut table, id)?;
-        }
+        let appended = if stopping {
+            flush_status(&mut table, id).map(|_| ())
+        } else {
+            Ok(())
+        };
         drop(table);
-        if stopping || flushed {
-            self.writer.barrier()?;
+        let durable = if stopping || flushed {
+            let durable = self.writer.barrier();
             self.wake();
-        }
-        if let Some(leader) = result.1 {
+            durable
+        } else {
+            Ok(())
+        };
+        let ended = if let Some(leader) = result.1 {
             #[cfg(test)]
             BEFORE_END.with(|probe| {
                 if let Some(probe) = probe.borrow_mut().take() {
                     probe();
                 }
             });
-            crate::pty::end(&leader)?;
+            crate::pty::end(&leader)
+        } else {
+            Ok(())
+        };
+        for error in [
+            result.0.as_ref().err(),
+            appended.as_ref().err(),
+            durable.as_ref().err(),
+            ended.as_ref().err(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            crate::error::said(&format!("session {id}: status_boundary_failed: {error}"));
         }
-        result.0.map(str::to_owned)
+        let words = result.0?;
+        appended.and(durable).and(ended)?;
+        Ok(words.to_owned())
     }
 }
