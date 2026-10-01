@@ -218,10 +218,18 @@ impl Channel {
         let path = self.path(route);
         validate_request(method, &path, headers)?;
         let mut head = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: keep-alive\r\n",
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Length: {}\r\nConnection: keep-alive\r\n",
             self.authority,
             body.len()
         );
+        // The dial routes take text; a caller that names its own body type
+        // (a signed agent request sends JSON) is never sent a second one.
+        if !headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+        {
+            head.push_str("Content-Type: text/plain\r\n");
+        }
         for (name, value) in headers {
             head.push_str(name);
             head.push_str(": ");

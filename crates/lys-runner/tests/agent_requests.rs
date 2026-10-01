@@ -315,12 +315,18 @@ mod tests {
         let lease = lease()?;
         let (broker, task) = broker_server(Arc::clone(&lease)).await?;
         let agent = table.agent.clone();
-        let path = format!("/agents/{agent}/runtime/sessions/one/reports?scope=exact");
+        let path = format!("/agents/{agent}/runtime/sessions/op-00112233445566778899aabbccddeeff/reports?scope=exact");
         let body=json!({"operation":operation()?,"state":"starting","machine":table.machine,"what":"request"}).to_string().into_bytes();
         let client = AgentClient::new(&table.service.base, &broker, None)?;
         let (answer, header) = tokio::task::spawn_blocking(move || {
             let header = client.sign(&agent, "agent-key", lease.as_ref(), "POST", &path, &body)?;
-            let answer = client.send_signed("POST", &path, &[], &body, &header)?;
+            let answer = client.send_signed(
+                "POST",
+                &path,
+                &[("Content-Type", "application/json")],
+                &body,
+                &header,
+            )?;
             Ok::<_, lys_runner::error::RunnerError>((answer, (path, body, header)))
         })
         .await??;
