@@ -427,6 +427,9 @@ impl Held {
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
+        if line.app() == Some("") {
+            return Err("this line names no app".to_owned());
+        }
         if self.operation(line.operation()).is_some() {
             return Err(format!(
                 "operation `{}` already names a line",
@@ -449,7 +452,10 @@ impl Held {
             Line::Placed(placed) => self.placements.push(placed),
             Line::Registrar(registrar) => self.registrars.push(registrar),
             other => {
-                let id = other.app().unwrap_or_default().to_owned();
+                let id = other
+                    .app()
+                    .ok_or_else(|| "this line names no app".to_owned())?
+                    .to_owned();
                 let app = self
                     .apps
                     .iter_mut()

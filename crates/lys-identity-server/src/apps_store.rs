@@ -51,6 +51,7 @@ pub struct AppStore<S: LeafStore = FileLeafStore> {
     since_snapshot: u64,
     snapshot_failure: Option<String>,
     uncertain: bool,
+    model_revision: u64,
 }
 
 /// A log opened and folded: the log, what it folds to, and how it started.
@@ -80,6 +81,7 @@ impl<S: LeafStore> AppStore<S> {
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let schemas = schemas_of(&held)?;
+        let model_revision = schema_revision(&held)?;
         let mut store = Self {
             reopen,
             key,
@@ -90,6 +92,7 @@ impl<S: LeafStore> AppStore<S> {
             since_snapshot: 0,
             snapshot_failure: None,
             uncertain: false,
+            model_revision,
         };
         store.after_start(&start);
         Ok(store)
@@ -99,6 +102,10 @@ impl<S: LeafStore> AppStore<S> {
     /// the refusal that sent it there.
     pub fn start(&self) -> &Start {
         &self.start
+    }
+
+    pub(crate) fn model_revision(&self) -> u64 {
+        self.model_revision
     }
 
     /// The number of leaves the log holds.
@@ -148,6 +155,7 @@ impl<S: LeafStore> AppStore<S> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
             self.schemas = schemas_of(&held)?;
+            self.model_revision = schema_revision(&held)?;
             self.log = log;
             self.held = held;
             self.start = start.clone();
@@ -160,6 +168,16 @@ impl<S: LeafStore> AppStore<S> {
     /// Append one line as one leaf. A failed append is settled by reading
     /// back: the line is kept only if the leaf store holds exactly it.
     fn append(&mut self, line: Line) -> Result<(), ServerError> {
+        let advance = match &line {
+            Line::Lys(lys) => lys.version,
+            Line::Approved(_) | Line::Applied(_) | Line::Retired(_) => 1,
+            _ => 0,
+        };
+        let model_revision = self
+            .model_revision
+            .checked_add(advance)
+            .ok_or_else(|| unavailable("app model revision exceeds its range"))?;
+
         let bytes = serde_json::to_vec(&line).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
@@ -168,6 +186,7 @@ impl<S: LeafStore> AppStore<S> {
                 return Err(unavailable(reason).into());
             }
             self.schemas = schemas_of(&self.held)?;
+            self.model_revision = model_revision;
             self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
                 self.write_snapshot();
@@ -421,4 +440,13 @@ fn rebuilt<S: LeafStore>(reopen: &Reopen<S>, reason: String) -> Result<Opened<S>
         replayed,
     };
     Ok((log, held, start))
+}
+
+fn schema_revision(held: &Held) -> Result<u64, ServerError> {
+    held.apps.iter().try_fold(0_u64, |revision, app| {
+        revision
+            .checked_add(app.current().map_or(0, |version| version.version))
+            .and_then(|revision| revision.checked_add(u64::from(app.retired.is_some())))
+            .ok_or_else(|| unavailable("app model revision exceeds its range").into())
+    })
 }

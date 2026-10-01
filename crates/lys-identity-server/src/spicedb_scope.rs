@@ -277,6 +277,9 @@ impl SpiceDb {
             app_kinds: Mutex::new(BTreeMap::new()),
             scope: Some(scope.to_owned()),
         };
+        let schema_guard = super::SCHEMA_WRITE
+            .lock()
+            .map_err(|error| unavailable(format!("schema writer unavailable: {error}")))?;
         let own = seen(Some(scope), &engine.held_text()?);
         let definitions = blocks(&own)
             .into_iter()
@@ -293,6 +296,7 @@ impl SpiceDb {
         }
         let (status, body) = engine.call("/v1/schema/write", &json!({"schema": ""}))?;
         if status == 200 {
+            drop(schema_guard);
             return Ok(());
         }
         Err(unavailable(format!(
