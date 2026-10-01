@@ -7,13 +7,18 @@ import { ADA, BEA, COURIER, DIRECTORY, ME, RECEIPTS, SERVICE, ok, refused } from
 import type { Route } from './fixtures';
 import { serve, type } from './harness';
 
+const schema = (supports: boolean) => ok({
+  paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/RegistrationBody' } } } } } } },
+  components: { schemas: { RegistrationBody: { type: 'object', properties: { operation: { type: 'string' }, display_name: { type: 'string' }, ...(supports ? { answers_to: { type: 'string' } } : {}) } } } },
+});
+
 let root: Root | null = null;
 beforeEach(() => sessionStorage.clear());
 afterEach(() => { const mounted = root; if (mounted) act(() => mounted.unmount()); root = null; });
 
 async function form(routes: Record<string, Route>, query = '') {
   const posted: { path: string; body: unknown }[] = [];
-  serve({ ...SERVICE, ...routes }, posted);
+  serve({ ...SERVICE, '/openapi.json': schema(true), ...routes }, posted);
   history.replaceState(null, '', '/#/agents/new' + query);
   const container = document.createElement('div'); document.body.appendChild(container);
   const mounted = createRoot(container); root = mounted;
@@ -114,6 +119,39 @@ describe('Add-agent retry safety', () => {
     expect(posted).toHaveLength(2);
     expect(location.hash).toBe('#/file/' + COURIER);
     expect(sessionStorage.getItem('lys.add-agent.' + ADA)).toBeNull();
+  });
+
+  it.each([
+    { label: 'has no answers_to field', answer: schema(false), words: 'coming' },
+    { label: 'cannot be read', answer: ok({ broken: true }), words: 'could not be read' },
+    { label: 'is unavailable', answer: refused(503, 'StorageUnavailable', 'Not available'), words: 'could not be read' },
+  ])('still adds under You when the served schema $label', async ({ answer, words }) => {
+    const { entry, posted } = await form({
+      '/openapi.json': answer,
+      '/directory/people': ok({ ...DIRECTORY, people: DIRECTORY.people.map((person) => ({ ...person, state: 'active' })) }),
+      'POST /agents': (body) => ok({ agent: COURIER, responsible: ADA, receipt: receipt(body) }),
+      ['POST /identities/' + COURIER + '/transitions']: (body) => ok({ receipt: { ...receipt(body), change_kind: 5 } }),
+    });
+    const other = entry.querySelector<HTMLOptionElement>('select[name="answers_to"] option[value="' + BEA + '"]');
+    expect(other?.disabled).toBe(true);
+    expect(other?.textContent).toContain('(coming)');
+    expect(entry.textContent).toContain(words);
+    await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
+    await submit(entry);
+    expect(posted).toHaveLength(2);
+    expect(posted[0].body).not.toHaveProperty('answers_to');
+    expect(location.hash).toBe('#/file/' + COURIER);
+  });
+
+  it('keeps a saved other-person request unsent when that field is not served', async () => {
+    const saved = { name: 'Held helper', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null, answersTo: BEA, team: null, membership: null, activated: false };
+    sessionStorage.setItem('lys.add-agent.' + ADA, JSON.stringify(saved));
+    const { entry, posted } = await form({ '/openapi.json': schema(false) });
+    expect(entry.textContent).toContain('saved request');
+    expect(entry.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    await submit(entry);
+    expect(posted).toEqual([]);
+    expect(JSON.parse(sessionStorage.getItem('lys.add-agent.' + ADA) ?? 'null')).toEqual(saved);
   });
 
 });
