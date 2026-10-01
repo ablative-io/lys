@@ -26,10 +26,10 @@ async function optional<T>(path: string): Promise<{ value: T | null; missing: st
   }
 }
 
-export async function readChoices(): Promise<Choices> {
+export async function readChoices(servedNetwork?: NetworkView): Promise<Choices> {
   const [programs, network, skills, secrets] = await Promise.all([
     optional<{ programs: Program[] }>('/harnesses'),
-    optional<NetworkView>('/network'),
+    servedNetwork ? Promise.resolve({ value: servedNetwork, missing: '' }) : optional<NetworkView>('/network'),
     optional<{ skills: { name: string }[] }>('/skills'),
     optional<{ secrets: { name: string }[] }>('/secrets'),
   ]);

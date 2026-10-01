@@ -1,0 +1,194 @@
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { App } from '../src/App';
+import { $, serve, type } from './harness';
+import { ADA, RECEIPTS, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
+import type { Answer, Route } from './fixtures';
+import type { NameMachine } from '../src/features/network/contract';
+
+const agent = 'agent-' + 'f'.repeat(32);
+const prefix = '/agents/' + agent;
+const key = 'lys.add-and-run.' + ADA;
+const stages = ['register', 'activate', 'profile', 'review', 'machine', 'runner', 'start'] as const;
+type Stage = typeof stages[number];
+const words: Record<Stage, string> = { register: 'registering the agent', activate: 'activating the agent', profile: 'saving the settings', review: 'approving the settings', machine: 'adding this computer', runner: 'recording this computer’s runner', start: 'starting the agent' };
+const description = { models: { minimum: 1, maximum: 1, further_encoding: { kind: 'array' } }, permissions: { modes: ['default'], rule_forms: [] }, mcp: { transports: ['stdio'], working_directory: false, handle_variables: false, channel_policies: ['off'] }, rendering_contract: 'test' };
+const program = { name: 'Care program', line: 'Agent program', description, models: [{ id: 'care', label: 'Care model' }], modes: [{ id: 'default', meaning: 'Ask before changes' }], instructions_modes: ['keep'], builds: [{ name: 'Installed', program: '/opt/bin/care', package: 'care', from: 'runner' }] };
+let root: Root | null = null;
+beforeEach(() => sessionStorage.clear());
+afterEach(() => { if (root) act(() => root?.unmount()); root = null; });
+
+function service(failure?: Stage, runnerState: 'running' | 'ended' | 'absent' = 'running') {
+  let profile: Record<string, unknown> | null = null;
+  let computer: Record<string, unknown> | null = null;
+  let session = '';
+  let failed = false;
+  const applied = new Map<string, Answer>();
+  const routes: Record<string, Route> = { ...SERVICE,
+    '/openapi.json': ok({ paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { operation: {}, display_name: {} } } } } } } } } }),
+    '/network': () => ok({ machines: computer ? [computer] : [], reports_served: true }),
+    '/harnesses': ok({ programs: [program] }), '/skills': ok({ skills: [] }), '/secrets': ok({ secrets: [] }),
+    ['/directory/agents/' + agent]: ok({ ...SCRIBE_VIEW, id: agent, display_name: 'Clover' }),
+    [prefix + '/provisioning']: () => ok({ agent, profile, versions: [], enforced: false }),
+    [prefix + '/runtime/sessions']: () => ok({ sessions: session && runnerState === 'running' ? [{ agent, session, machine: computer?.id, machine_name: 'Ward computer', runtime: 'lys-runner', shown: 'running', last_report_at: 1, stopped: null, stop_asked_at: null }] : [] }),
+  };
+  const answer = (stage: Stage, body: unknown, build: () => Answer): Answer => {
+    const stamp = stage + JSON.stringify(body);
+    let result = applied.get(stamp);
+    if (!result) { result = build(); applied.set(stamp, result); }
+    if (failure === stage && !failed) { failed = true; return refused(503, 'StepUnavailable', 'The step outcome is unknown'); }
+    return result;
+  };
+  routes['POST /agents'] = (body) => answer('register', body, () => ok({ agent, responsible: ADA, receipt: { ...RECEIPTS[4].receipt, operation: (body as { operation: string }).operation, identity: agent } }));
+  routes['POST /identities/' + agent + '/transitions'] = (body) => answer('activate', body, () => ok({ receipt: { ...RECEIPTS[5].receipt, operation: (body as { operation: string }).operation, identity: agent } }));
+  routes['POST ' + prefix + '/provisioning'] = (body) => answer('profile', body, () => {
+    profile = { ...(body as object), version: 1, set_by: ADA, set_at: 1, reviewed_by: null, session: null };
+    return ok({ agent, profile, recorded: { operation: profile.operation, version: 1 } });
+  });
+  routes['POST ' + prefix + '/provisioning/1/review'] = (body) => answer('review', body, () => {
+    profile = { ...profile, reviewed_by: ADA };
+    return ok({ agent, profile, recorded: { operation: (body as { operation: string }).operation, version: 1 } });
+  });
+  routes['POST /network/machines'] = (body) => answer('machine', body, () => {
+    const given = body as NameMachine;
+    computer = { ...given, id: given.operation, may_run: [{ id: agent, display_name: 'Clover', state: 'active' }], named_by: ADA, named_at: 1, state: 'in_use', retired_at: null, last_report_at: null };
+    routes['POST /network/machines/' + given.operation + '/runner'] = (runner) => answer('runner', runner, () => ok({ machine: given.operation, ...(runner as object) }));
+    return ok(computer);
+  });
+  routes['POST ' + prefix + '/start-command'] = (body) => answer('start', body, () => {
+    const given = body as { operation: string; machine: string }; session = given.operation;
+    return ok({ agent, machine: given.machine, runtime: 'lys-runner', session, provisioning_version: 1, harness: program.name, handles: [], template: '{}', template_sha256: 'digest', command: 'care', left_out: [], executed: false,
+      ...(runnerState === 'absent' ? {} : { runner: { session, state: runnerState, pid: 1, started_at: 1 } }) });
+  });
+  return { routes, applied };
+}
+
+async function open(routes: Record<string, Route>) {
+  const posted: { path: string; body: unknown }[] = [];
+  const requests = serve(routes, posted);
+  history.replaceState(null, '', '/#/agents/new');
+  const container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
+  await act(async () => { root?.render(<App />); });
+  return { posted, requests };
+}
+async function remount(routes: Record<string, Route>) {
+  if (root) act(() => root?.unmount()); root = null; document.body.innerHTML = '';
+  return open(routes);
+}
+async function names() {
+  await type($('[name="display_name"]'), 'Clover');
+  await type($('[name="computer_name"]'), 'Ward computer');
+}
+async function submit(twice = false) {
+  const form = $('form[aria-label="Add an agent"]');
+  if (!form) throw new Error('The one-press form is missing');
+  await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); if (twice) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+}
+function plain(stage: Stage, code = 'StepUnavailable') {
+  const details = [...document.querySelectorAll('details')].find((entry) => entry.textContent?.includes(code));
+  expect(details?.open).toBe(false);
+  expect(details?.textContent).toContain(code);
+  const face = document.body.cloneNode(true) as HTMLElement;
+  for (const detail of face.querySelectorAll('details')) detail.remove();
+  expect(face.textContent).not.toContain(code);
+  expect(face.textContent).toContain(words[stage]);
+}
+
+describe('Add and run on the first computer', () => {
+  it('requires the empty computer name and offered choices before enabling its one button', async () => {
+    const { posted, requests } = await open(service().routes);
+    const button = $('form button[type="submit"]') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(($('[name="computer_name"]') as HTMLInputElement).value).toBe('');
+    expect(($('[name="program"]') as HTMLSelectElement).value).toBe(program.name);
+    expect(($('[name="model"]') as HTMLSelectElement).value).toBe('care');
+    await names();
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).toBe('Add Clover and run it on this computer');
+    expect(document.querySelectorAll('form button[type="submit"]')).toHaveLength(1);
+    expect(posted).toEqual([]);
+    expect(requests.filter((path) => path === '/network')).toHaveLength(1);
+  });
+
+  it('offers its one button when a computer is already in use', async () => {
+    const server = service();
+    const existing = { id: 'machine-existing', name: 'Front desk', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [], named_by: ADA, named_at: 1, state: 'in_use', retired_at: null, last_report_at: 1 };
+    server.routes['/network'] = ok({ machines: [existing], reports_served: true });
+    const { posted } = await open(server.routes);
+    await names();
+    const button = $('form button[type="submit"]') as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).toBe('Add Clover and run it on this computer');
+    expect(posted).toEqual([]);
+  });
+
+  it('records all seven stages in order and lands on the real running session', async () => {
+    const server = service(); const { posted } = await open(server.routes); await names(); await submit(true);
+    expect(posted).toHaveLength(7);
+    const computer = (posted[4].body as NameMachine).operation;
+    expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + agent + '/transitions', prefix + '/provisioning', prefix + '/provisioning/1/review', '/network/machines', '/network/machines/' + computer + '/runner', prefix + '/start-command']);
+    expect(posted[2].body).toMatchObject({ from_version: 0, model_access: ['care'], permissions: { default_mode: 'default' }, harness: { name: program.name, program: '/opt/bin/care' } });
+    expect(posted[4].body).toMatchObject({ name: 'Ward computer', runtime: 'lys-runner', slots: 0, may_run: [agent], may_run_roles: [], may_reach: [] });
+    expect(posted[5].body).toEqual({ runner: { kind: 'lys' } });
+    expect(posted[6].body).toMatchObject({ machine: computer });
+    expect(server.applied.size).toBe(7);
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(location.hash).toBe('#/file/' + agent);
+    expect(document.body.textContent).toContain('Running, as its runner last reported');
+    expect($('a[href="#/runtime/' + (posted[6].body as { operation: string }).operation + '"]')).not.toBeNull();
+  });
+
+  it.each(stages)('replays only the saved %s request after an unknown outcome and remount', async (stage) => {
+    const server = service(stage); const first = await open(server.routes); await names(); await submit();
+    const index = stages.indexOf(stage);
+    expect(first.posted).toHaveLength(index + 1);
+    expect(sessionStorage.getItem(key)).not.toBeNull();
+    plain(stage);
+    const original = first.posted[index];
+    const next = await remount(server.routes); await submit();
+    expect(next.posted[0]).toEqual(original);
+    expect(next.posted).toHaveLength(7 - index);
+    expect(server.applied.size).toBe(7);
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(location.hash).toBe('#/file/' + agent);
+    expect(document.body.textContent).toContain('Running, as its runner last reported');
+  });
+
+  it('does not navigate or claim running without a confirmed runner start', async () => {
+    const { posted } = await open(service(undefined, 'absent').routes); await names(); await submit();
+    expect(posted).toHaveLength(7);
+    expect(location.hash).toBe('#/agents/new');
+    expect(sessionStorage.getItem(key)).not.toBeNull();
+    plain('start', 'RunnerStartUnconfirmed');
+    expect(document.body.textContent).toContain('Lys admitted the start, but no runner ran it');
+    expect(document.body.textContent).not.toContain('Running, as its runner last reported');
+  });
+
+  it('names an ended runner session without claiming it is still running', async () => {
+    const { posted } = await open(service(undefined, 'ended').routes); await names(); await submit();
+    expect(posted).toHaveLength(7);
+    expect(location.hash).toBe('#/agents/new');
+    expect(sessionStorage.getItem(key)).not.toBeNull();
+    plain('start', 'RunnerStartEnded');
+    expect(document.body.textContent).toContain('The runner confirmed this session already ended');
+    expect(document.body.textContent).not.toContain('Running, as its runner last reported');
+  });
+
+  it('blocks corrupt retained state without sending a replacement operation', async () => {
+    sessionStorage.setItem(key, '{');
+    const { posted } = await open(service().routes);
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.body.textContent).toContain('PendingAddAndRunUnreadable');
+    await submit(); expect(posted).toEqual([]);
+  });
+
+  it('does not invent choices when the service offers more than one', async () => {
+    const server = service(); server.routes['/harnesses'] = ok({ programs: [program, { ...program, name: 'Other program' }] });
+    const { posted } = await open(server.routes); await names();
+    expect(($('[name="program"]') as HTMLSelectElement).value).toBe('');
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(posted).toEqual([]);
+  });
+});

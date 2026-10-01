@@ -14,7 +14,7 @@ export interface StartAnswer {
   handles: { env: string; id: string; secret: string }[]; template: string; template_sha256: string; command: string; left_out: string[]; executed: false;
   runner?: { session: string; state: 'running' | 'ended'; pid: number | null; started_at: number };
 }
-interface Pending {
+export interface Pending {
   stage: 'profile' | 'review' | 'start'; path: string; body: Record<string, unknown>;
   machine: string; version: number; legacyKey?: string;
 }
@@ -41,7 +41,10 @@ function permitted(machine: Machine, agent: string, held: string[]): boolean {
 function retained(key: string, prefix: string): Pending | null {
   const raw = sessionStorage.getItem(key);
   if (raw === null) return null;
-  const value: unknown = JSON.parse(raw);
+  return pendingStartOf(JSON.parse(raw), key, prefix);
+}
+
+export function pendingStartOf(value: unknown, key: string, prefix: string): Pending {
   if (!record(value) || !record(value.body)) return fail('PendingStartUnreadable', 'The retained start is not a request.');
   if (value.stage !== 'profile' && value.stage !== 'review' && value.stage !== 'start') return fail('PendingStartUnreadable', 'The retained request has no recognized stage.');
   if (typeof value.version !== 'number' || !Number.isInteger(value.version) || value.version < 0) return fail('PendingStartUnreadable', 'The retained request has no valid version.');
@@ -54,6 +57,31 @@ function retained(key: string, prefix: string): Pending | null {
   if (legacyKey !== undefined && !['provisioning', 'profile-review', 'start'].some((kind) => legacyKey === key.replace('agent-start', kind))) return fail('PendingStartUnreadable', 'The retained request names an unrelated record.');
   return { stage: value.stage, path, body: value.body, machine: value.machine, version: value.version, legacyKey };
 
+}
+
+export async function startRequest(agent: string, current: Pending): Promise<StartAnswer> {
+  const receipt: StartAnswer = await request<StartAnswer>(current.path, current.body);
+  if (receipt.agent !== agent || receipt.machine !== current.machine || receipt.session !== current.body.operation || receipt.executed !== false || typeof receipt.command !== 'string' || !receipt.command || !Array.isArray(receipt.left_out)) fail('StartReceiptMismatch', 'The start answer did not confirm the retained request.');
+  if (receipt.provisioning_version !== current.version) fail('StartVersionChanged', 'The runner start names a different profile version; check that session before another start.');
+  const runner = receipt.runner;
+  if (!runner) fail('RunnerStartUnconfirmed', 'Lys admitted the start, but no runner ran it. The same request is retained.');
+  if (runner.session !== receipt.session || !['running', 'ended'].includes(runner.state)) fail('StartReceiptMismatch', 'The runner answer did not name this session and its state.');
+  return receipt;
+}
+
+export async function profileRequest(agent: string, current: Pending): Promise<{ profile: ProvisioningProfile; version: number; notice: string }> {
+  const receipt: ProvisioningAnswer = await request<ProvisioningAnswer>(current.path, current.body);
+  const savedProfile = receipt.profile;
+  const recorded = receipt.recorded;
+  if (receipt.agent !== agent || !savedProfile || !recorded) fail('ProfileReceiptMismatch', 'The answer did not confirm the retained profile request.');
+  if (current.stage === 'profile') {
+    const version = current.version + 1;
+    if (recorded.operation !== current.body.operation || recorded.version !== version || savedProfile.version !== version || savedProfile.operation !== current.body.operation) fail('ProfileReceiptMismatch', 'The saved version does not match this request, or a newer version replaced it.');
+    if (Object.entries(current.body).some(([name, value]) => !['operation', 'from_version', 'note'].includes(name) && !same(setting(name, value), setting(name, member(savedProfile, name))))) fail('ProfileReceiptMismatch', 'The saved settings differ from this retained request.');
+    return { profile: savedProfile, version, notice: '' };
+  }
+  if (recorded.version !== current.version || savedProfile.version !== current.version || !savedProfile.reviewed_by || !/^op-[0-9a-f]{32}$/.test(recorded.operation)) fail('ProfileReceiptMismatch', 'The review did not confirm the current profile version.');
+  return { profile: savedProfile, version: current.version, notice: recorded.operation === current.body.operation ? 'Version ' + current.version + ' of these settings is approved.' : 'Version ' + current.version + ' was already approved by someone else. This did not replace that approval.' };
 }
 
 export function StartAgent({ agent, profile, settings, refusal = '', canSave, known }: {
@@ -155,30 +183,14 @@ function StartForm({ agent, person, machines, profile, settings, refusal, canSav
         if (current.stage === 'review' && !mayReview) fail('NotAdmitted', 'The responsible person or an administrator must approve this profile.');
         persist(current);
         if (current.stage === 'start') {
-          const receipt: StartAnswer = await request<StartAnswer>(current.path, current.body);
-          if (receipt.agent !== agent || receipt.machine !== current.machine || receipt.session !== current.body.operation || receipt.executed !== false || typeof receipt.command !== 'string' || !receipt.command || !Array.isArray(receipt.left_out)) fail('StartReceiptMismatch', 'The start answer did not confirm the retained request.');
-          if (receipt.provisioning_version !== current.version) fail('StartVersionChanged', 'The runner start names a different profile version; check that session before another start.');
-          const runner = receipt.runner;
-          if (!runner) fail('RunnerStartUnconfirmed', 'Lys admitted the start, but no runner ran it. The same request is retained.');
-          if (runner.session !== receipt.session || !['running', 'ended'].includes(runner.state)) fail('StartReceiptMismatch', 'The runner answer did not name this session and its state.');
+          const receipt = await startRequest(agent, current);
           if (current.legacyKey) sessionStorage.removeItem(current.legacyKey);
           sessionStorage.removeItem(key); setPending(null); setAnswer(receipt); return;
         }
-        const receipt: ProvisioningAnswer = await request<ProvisioningAnswer>(current.path, current.body);
-        const savedProfile = receipt.profile;
-        const recorded = receipt.recorded;
-        if (receipt.agent !== agent || !savedProfile || !recorded) fail('ProfileReceiptMismatch', 'The answer did not confirm the retained profile request.');
+        const confirmed = await profileRequest(agent, current);
         const legacyKey = current.legacyKey;
-        if (current.stage === 'profile') {
-          const version: number = current.version + 1;
-          if (recorded.operation !== current.body.operation || recorded.version !== version || savedProfile.version !== version || savedProfile.operation !== current.body.operation) fail('ProfileReceiptMismatch', 'The saved version does not match this request, or a newer version replaced it.');
-          if (Object.entries(current.body).some(([name, value]) => !['operation', 'from_version', 'note'].includes(name) && !same(setting(name, value), setting(name, member(savedProfile, name))))) fail('ProfileReceiptMismatch', 'The saved settings differ from this retained request.');
-          current = savedProfile.reviewed_by ? nextStart(version, current.machine) : nextReview(version, current.machine);
-        } else {
-          if (recorded.version !== current.version || savedProfile.version !== current.version || !savedProfile.reviewed_by || !/^op-[0-9a-f]{32}$/.test(recorded.operation)) fail('ProfileReceiptMismatch', 'The review did not confirm the current profile version.');
-          setReviewNotice(recorded.operation === current.body.operation ? 'Version ' + current.version + ' of these settings is approved.' : 'Version ' + current.version + ' was already approved by someone else. This did not replace that approval.');
-          current = nextStart(current.version, current.machine);
-        }
+        if (current.stage === 'profile') current = confirmed.profile.reviewed_by ? nextStart(confirmed.version, current.machine) : nextReview(confirmed.version, current.machine);
+        else { setReviewNotice(confirmed.notice); current = nextStart(confirmed.version, current.machine); }
         persist(current);
         if (legacyKey) sessionStorage.removeItem(legacyKey);
       }
