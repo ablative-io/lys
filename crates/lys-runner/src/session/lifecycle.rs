@@ -76,11 +76,6 @@ impl Sessions {
         })?;
         session.generation += 1;
         session.pid = Some(spawned.pid);
-        session.live = Some(Live {
-            writer: crate::input::Input::new(spawned.writer),
-            master: spawned.master,
-            pid: spawned.pid,
-        });
         session.guard.leader = match crate::peer::start_identity(spawned.pid) {
             Ok(start) => Some(Leader {
                 pid: spawned.pid,
@@ -94,6 +89,12 @@ impl Sessions {
             }
         };
         session.leader_start = session.guard.leader.clone();
+        session.live = Some(Live {
+            writer: crate::input::Input::new(spawned.writer),
+            master: spawned.master,
+            pid: spawned.pid,
+            leader: session.guard.leader.clone(),
+        });
         let generation = session.generation;
         let (reader, child) = (spawned.reader, spawned.child);
         let pumped = Arc::clone(self);
@@ -253,7 +254,11 @@ impl Sessions {
             .get(id)
             .is_some_and(|session| session.guard.tracking.is_some())
         {
-            crate::collector::flushed(&mut table, self.runner(), id, "session_end");
+            if let Err(error) =
+                crate::collector::flushed(&mut table, self.runner(), id, "session_end")
+            {
+                crate::error::said(&format!("session {id}: final_usage_record_failed: {error}"));
+            }
         }
         crate::operations::ended(&mut table, id, &ended);
         self.persist_logged(&table);
@@ -306,7 +311,9 @@ impl Sessions {
                 crate::error::said(&format!("session {id}: coverage_incomplete: {words}"));
                 let source = table.feed.source(id).cloned().unwrap_or_default();
                 let coverage = Coverage::of("coverage_incomplete", &source, None, words);
-                append(table, id, vec![Body::Coverage(coverage)], None);
+                if let Err(error) = append(table, id, vec![Body::Coverage(coverage)], None) {
+                    crate::error::said(&format!("session {id}: coverage_record_failed: {error}"));
+                }
                 return;
             }
         };
@@ -377,6 +384,7 @@ impl Sessions {
                 source: Some(source),
                 attempt: None,
             };
+            let leader = window_limit(&mut table, id, &bodies);
             let appended = table.feed.append(id, now_ms(), bodies, commit);
             drop(table);
             if let Err(error) = appended.and_then(|_| self.writer.barrier()) {
@@ -384,6 +392,11 @@ impl Sessions {
                     "session {id}: coverage_incomplete: what its stream yielded was not kept, and is read again from the saved cursor: {error}"
                 ));
                 return;
+            }
+            if let Some(leader) = leader {
+                if let Err(error) = crate::pty::end(&leader) {
+                    crate::error::said(&format!("session {id}: rotation_signal_failed: {error}"));
+                }
             }
             self.wake();
             if !more {
@@ -403,14 +416,25 @@ fn stop_follower(id: &str, follower: &mpsc::Sender<Wake>) {
 }
 
 /// Keep `bodies` for session `id` as one unit, with `source` when given.
-pub(crate) fn append(table: &mut Table, id: &str, bodies: Vec<Body>, source: Option<SourceState>) {
+pub(crate) fn append(
+    table: &mut Table,
+    id: &str,
+    bodies: Vec<Body>,
+    source: Option<SourceState>,
+) -> Result<(), RunnerError> {
     let commit = Commit {
         source,
         attempt: None,
     };
     if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
+        let gap = table.gaps.entry(id.to_owned()).or_default();
+        gap.lost += 1;
+        gap.since.get_or_insert(now_ms());
+        gap.words = format!("coverage_incomplete: {error}");
         crate::error::said(&format!("session {id}: coverage_incomplete: {error}"));
+        return Err(error);
     }
+    Ok(())
 }
 
 /// The rotation evidence of `session`.
@@ -474,7 +498,11 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
         )));
     }
     source.identity = Some(identity);
-    if let Err(error) = file.seek(SeekFrom::Start(source.offset)) {
+    if let Err(error) = if source.offset == 0 {
+        Ok(0)
+    } else {
+        file.seek(SeekFrom::Start(source.offset))
+    } {
         bodies.push(Body::Coverage(Coverage::of(
             "source_refused",
             source,
@@ -599,7 +627,12 @@ pub(crate) fn launched(
 }
 
 /// Say, in the feed, the executable and version launched for session `id`.
-pub(crate) fn tracking_started(table: &mut Table, id: &str, executable: &str, version: &str) {
+pub(crate) fn tracking_started(
+    table: &mut Table,
+    id: &str,
+    executable: &str,
+    version: &str,
+) -> Result<(), RunnerError> {
     let tracking = table
         .sessions
         .get(id)
@@ -615,7 +648,7 @@ pub(crate) fn tracking_started(table: &mut Table, id: &str, executable: &str, ve
         harness_version: Some(version.to_owned()),
         adapter,
     };
-    append(table, id, vec![Body::Coverage(coverage)], None);
+    append(table, id, vec![Body::Coverage(coverage)], None)
 }
 
 /// Mark the session's usage-limit words seen in the last `read` bytes, and
@@ -647,7 +680,35 @@ fn trip_on_words(session: &mut Session, read: usize) {
     if rotation.words_in(&String::from_utf8_lossy(&bytes)) {
         rotation.trip();
         if let Some(live) = &session.live {
-            live.end("at its usage limit");
+            if let Err(error) = live.end() {
+                crate::error::said(&format!("rotation_signal_failed: {error}"));
+            }
         }
     }
+}
+
+pub(crate) fn window_limit(table: &mut Table, id: &str, bodies: &[Body]) -> Option<Leader> {
+    let session = table.sessions.get_mut(id)?;
+    if session.ending {
+        return None;
+    }
+    let rotation = session.rotation.as_mut()?;
+    if rotation.tripped() {
+        return None;
+    }
+    let reached = bodies.iter().any(|body| match body {
+        Body::Usage(record) => {
+            record.account.as_deref() == Some(rotation.account())
+                && rotation.windows_in(&record.figures.plan_windows, now_ms())
+        }
+        _ => false,
+    });
+    if reached {
+        rotation.trip();
+        if session.guard.leader.is_none() {
+            crate::error::said("rotation_signal_failed: the process's leader is unproved");
+        }
+        return session.guard.leader.clone();
+    }
+    None
 }
