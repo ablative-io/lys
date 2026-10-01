@@ -284,6 +284,7 @@ pub struct ProvisioningStore {
     kept: Kept,
     indexes: Arc<index::Indexes>,
     journal: bool,
+    since_snapshot: u64,
     uncertain: bool,
 }
 
@@ -295,7 +296,7 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 
 #[cfg(test)]
 fn read(path: &Path) -> Result<Kept, ServerError> {
-    journal::read(path).map(|(kept, _)| kept)
+    journal::read(path).map(|(kept, _, _)| kept)
 }
 
 fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -314,13 +315,14 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 impl ProvisioningStore {
     /// The profiles kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
-        let (kept, journal) = journal::read(path)?;
+        let (kept, journal, since_snapshot) = journal::read(path)?;
         let indexes = Arc::new(index::Indexes::rebuild(&kept));
         Ok(Self {
             path: path.to_owned(),
             kept,
             indexes,
             journal,
+            since_snapshot,
             uncertain: false,
         })
     }
@@ -328,11 +330,12 @@ impl ProvisioningStore {
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            let (kept, journal) = journal::settle(&self.path)?;
+            let (kept, journal, since_snapshot) = journal::settle(&self.path)?;
             let indexes = Arc::new(index::Indexes::rebuild(&kept));
             self.kept = kept;
             self.indexes = indexes;
             self.journal = journal;
+            self.since_snapshot = since_snapshot;
             self.uncertain = false;
         }
         Ok(())
@@ -352,6 +355,10 @@ impl ProvisioningStore {
     }
 
     fn commit(&mut self, edit: edits::Edit) -> Result<(), ServerError> {
+        if self.since_snapshot >= lys_identity::SNAPSHOT_EVERY.get() {
+            self.checkpoint()?;
+        }
+        let appended = self.journal;
         let written = if self.journal {
             journal::append(&self.path, &edit)
         } else {
@@ -364,12 +371,16 @@ impl ProvisioningStore {
             return Err(error);
         }
         self.journal = true;
+        self.since_snapshot = if appended { self.since_snapshot + 1 } else { 0 };
         let changed = edits::apply(&mut self.kept, edit)
             .and_then(|change| Arc::make_mut(&mut self.indexes).update(&self.kept, change));
         if let Err(error) = changed {
             self.uncertain = true;
             self.settle()?;
             return Err(error);
+        }
+        if self.since_snapshot >= lys_identity::SNAPSHOT_EVERY.get() {
+            self.checkpoint()?;
         }
         Ok(())
     }
@@ -381,19 +392,24 @@ impl ProvisioningStore {
         self.indexes = Arc::new(index::Indexes::rebuild(&next));
         self.kept = next;
         self.journal = false;
+        self.since_snapshot = 0;
         Ok(())
     }
 
     /// Replace the change log with a durable snapshot during maintenance.
     pub fn checkpoint(&mut self) -> Result<(), ServerError> {
         self.settle()?;
-        let bytes = serde_json::to_vec(&self.kept).map_err(unavailable)?;
+        let bytes = serde_json::to_vec(&self.kept)
+            .map_err(|error| unavailable(format!("encoding provisioning checkpoint: {error}")))?;
         if let Err(error) = journal::snapshot(&self.path, &bytes) {
             self.uncertain = true;
             self.settle()?;
-            return Err(error);
+            return Err(unavailable(format!(
+                "writing provisioning checkpoint: {error}"
+            )));
         }
         self.journal = true;
+        self.since_snapshot = 0;
         Ok(())
     }
 

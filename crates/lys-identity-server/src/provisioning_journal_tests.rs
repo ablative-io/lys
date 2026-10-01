@@ -4,7 +4,7 @@ use std::error::Error;
 
 use serde_json::json;
 
-use super::{ProvisioningStore, Review, SkillText, Version, journal};
+use super::{ProvisioningStore, Review, SkillText, Version, edits, journal};
 use crate::error::ServerError;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -146,7 +146,7 @@ fn an_old_install_migrates_with_reviews_skills_retries_and_checkpoint() -> TestR
 }
 
 #[test]
-fn incomplete_and_corrupt_changes_are_named_and_never_silently_discarded() -> TestResult {
+fn torn_final_changes_are_durably_truncated_and_complete_corruption_is_refused() -> TestResult {
     let (directory, mut store) = fixture(1)?;
     store.keep_skill(skill("migration"))?;
     let path = directory.path().join("profiles.json");
@@ -155,6 +155,20 @@ fn incomplete_and_corrupt_changes_are_named_and_never_silently_discarded() -> Te
     let complete = std::fs::read(&path)?;
     let boundary = usize::try_from(boundary)?;
     for length in [boundary + 1, boundary + 39, complete.len() - 1] {
+        std::fs::write(&path, &complete[..length])?;
+        let before = journal::RECOVERED_TAILS.with(std::cell::Cell::get);
+        let mut reopened = ProvisioningStore::open(&path)?;
+        assert!(reopened.named("next-version").is_none());
+        assert_eq!(std::fs::read(&path)?, complete[..boundary]);
+        assert_eq!(
+            journal::RECOVERED_TAILS.with(std::cell::Cell::get) - before,
+            1
+        );
+        reopened.set("agent-0", 1, version("next-version")?)?;
+        let reopened = ProvisioningStore::open(&path)?;
+        assert!(reopened.named("next-version").is_some());
+    }
+    for length in [9, boundary - 1] {
         std::fs::write(&path, &complete[..length])?;
         assert!(matches!(
             ProvisioningStore::open(&path),
@@ -171,6 +185,111 @@ fn incomplete_and_corrupt_changes_are_named_and_never_silently_discarded() -> Te
         Err(ServerError::ProvisioningUnavailable { reason }) if reason.contains("checksum mismatch")
     ));
     assert_eq!(std::fs::read(&path)?, corrupt);
+    Ok(())
+}
+
+fn seeded_changes(changes: u64) -> Result<(tempfile::TempDir, ProvisioningStore), Box<dyn Error>> {
+    let (directory, store) = fixture(1)?;
+    let path = directory.path().join("profiles.json");
+    journal::snapshot(&path, &serde_json::to_vec(&store.kept)?)?;
+    let mut bytes = std::fs::read(&path)?;
+    for number in 0..changes {
+        bytes.extend_from_slice(&journal::encode_change(&edits::Edit::Skill(skill(
+            &format!("seed-{number}"),
+        )))?);
+    }
+    std::fs::write(&path, &bytes)?;
+    Ok((directory, ProvisioningStore::open(&path)?))
+}
+
+#[test]
+fn periodic_checkpoints_bound_actual_restart_change_replay() -> TestResult {
+    let every = lys_identity::SNAPSHOT_EVERY.get();
+    let (directory, mut store) = seeded_changes(every - 1)?;
+    assert_eq!(store.since_snapshot, every - 1);
+    store.keep_skill(skill("boundary"))?;
+    assert_eq!(store.since_snapshot, 0);
+    store.keep_skill(skill("tail"))?;
+    let before = journal::REPLAYED_CHANGES.with(std::cell::Cell::get);
+    let reopened = ProvisioningStore::open(&directory.path().join("profiles.json"))?;
+    let replayed = journal::REPLAYED_CHANGES.with(std::cell::Cell::get) - before;
+    assert_eq!(
+        replayed, 1,
+        "restart replayed changes before the checkpoint"
+    );
+    assert!(replayed <= every);
+    assert!(u64::try_from(reopened.skills().len())? > every);
+    assert_eq!(reopened.profiles(), store.profiles());
+    assert_eq!(reopened.skills(), store.skills());
+    Ok(())
+}
+
+#[test]
+fn recovering_a_torn_tail_near_the_checkpoint_boundary_folds_each_change_once() -> TestResult {
+    let every = lys_identity::SNAPSHOT_EVERY.get();
+    let (directory, store) = seeded_changes(every - 1)?;
+    let path = directory.path().join("profiles.json");
+    let complete = std::fs::read(&path)?;
+    let torn = journal::encode_change(&edits::Edit::Skill(skill("torn")))?;
+    let mut bytes = complete.clone();
+    bytes.extend_from_slice(&torn[..torn.len() - 1]);
+    std::fs::write(&path, &bytes)?;
+    let before = journal::REPLAYED_CHANGES.with(std::cell::Cell::get);
+    let mut reopened = ProvisioningStore::open(&path)?;
+    let replayed = journal::REPLAYED_CHANGES.with(std::cell::Cell::get) - before;
+    assert_eq!(
+        replayed,
+        every - 1,
+        "recovery folded the valid prefix twice"
+    );
+    assert!(replayed <= every);
+    assert_eq!(std::fs::read(&path)?, complete);
+    assert_eq!(reopened.skills(), store.skills());
+    assert!(reopened.skill("torn", "digest-torn").is_none());
+    reopened.keep_skill(skill("after-recovery"))?;
+    assert_eq!(reopened.since_snapshot, 0);
+    let checkpointed = ProvisioningStore::open(&path)?;
+    assert!(
+        checkpointed
+            .skill("after-recovery", "digest-after-recovery")
+            .is_some()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_crash_at_the_checkpoint_boundary_cannot_append_past_the_replay_bound() -> TestResult {
+    let every = lys_identity::SNAPSHOT_EVERY.get();
+    let (directory, mut store) = seeded_changes(every)?;
+    assert_eq!(store.since_snapshot, every);
+    let path = directory.path().join("profiles.json");
+    let recorded = std::fs::read(&path)?;
+    let blocked = path.with_extension("writing");
+    std::fs::create_dir(&blocked)?;
+    assert!(matches!(
+        store.keep_skill(skill("after-boundary")),
+        Err(ServerError::ProvisioningUnavailable { reason }) if reason.contains("provisioning checkpoint")
+    ));
+    assert_eq!(
+        std::fs::read(&path)?,
+        recorded,
+        "failed checkpoint appended another change"
+    );
+    assert!(
+        store
+            .skill("after-boundary", "digest-after-boundary")
+            .is_none()
+    );
+    std::fs::remove_dir(&blocked)?;
+    store.keep_skill(skill("after-boundary"))?;
+    assert_eq!(store.since_snapshot, 1);
+    let before = journal::REPLAYED_CHANGES.with(std::cell::Cell::get);
+    let reopened = ProvisioningStore::open(&path)?;
+    assert_eq!(
+        journal::REPLAYED_CHANGES.with(std::cell::Cell::get) - before,
+        1
+    );
+    assert_eq!(reopened.skills(), store.skills());
     Ok(())
 }
 
