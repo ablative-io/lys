@@ -5,7 +5,7 @@
 //! seen by a runtime and carrying no identity. A found session is never
 //! given an identity here; it stays found.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound;
 use std::sync::Arc;
 
@@ -143,6 +143,7 @@ pub struct Held {
 struct Index {
     positions: BTreeMap<String, usize>,
     live: BTreeMap<(String, usize), usize>,
+    operations: HashMap<String, (usize, usize)>,
 }
 
 #[derive(Deserialize)]
@@ -163,6 +164,12 @@ impl From<Records> for Held {
                 index
                     .live
                     .insert((tracked.session.clone(), position), position);
+            }
+            for (report_position, report) in tracked.reports.iter().enumerate() {
+                index
+                    .operations
+                    .entry(report.operation.clone())
+                    .or_insert((position, report_position));
             }
         }
         Self {
@@ -214,14 +221,8 @@ impl Held {
 
     /// The report kept under `operation`, with its session.
     pub fn operation(&self, operation: &str) -> Option<&Report> {
-        self.sessions
-            .iter()
-            .flat_map(|tracked| tracked.reports.iter())
-            .inspect(|_| {
-                #[cfg(test)]
-                crate::folded_work::visit(crate::folded_work::Work::RuntimeOperation);
-            })
-            .find(|report| report.operation == operation)
+        let (session, report) = self.index.operations.get(operation)?;
+        self.sessions.get(*session)?.reports.get(*report)
     }
 
     /// Fold one report. A report on a session never begun is refused by
@@ -229,8 +230,20 @@ impl Held {
     pub fn hold(&mut self, report: Report) -> Result<(), String> {
         if let Some(position) = self.index.positions.get(&report.session).copied() {
             let tracked = &mut self.sessions[position];
+            let report_position = tracked.reports.len();
+            let operation = report.operation.clone();
             tracked.reports.push(report);
             let index = Arc::make_mut(&mut self.index);
+            let location = (position, report_position);
+            index
+                .operations
+                .entry(operation)
+                .and_modify(|previous| {
+                    if location < *previous {
+                        *previous = location;
+                    }
+                })
+                .or_insert(location);
             let key = (tracked.session.clone(), position);
             if tracked.agent.is_some() && !tracked.stopped() {
                 index.live.insert(key, position);
@@ -250,6 +263,10 @@ impl Held {
             ));
         }
         let index = Arc::make_mut(&mut self.index);
+        index
+            .operations
+            .entry(report.operation.clone())
+            .or_insert((self.sessions.len(), 0));
         index
             .positions
             .insert(report.session.clone(), self.sessions.len());
