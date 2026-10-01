@@ -129,6 +129,7 @@ impl ServerError {
             | Self::McpServerHeld { .. }
             | Self::MachineReused { .. }
             | Self::MachineTeamReused { .. }
+            | Self::MachineAgentsReused { .. }
             | Self::RoleReused { .. }
             | Self::RoleHeld { .. }
             | Self::HoldingOver { .. }

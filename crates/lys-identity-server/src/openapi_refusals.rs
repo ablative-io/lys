@@ -13,6 +13,8 @@ pub(crate) const SIGNED_BODY: &[&str] = &["NotSignedIn", "RequestMalformed"];
 pub(crate) const ADMIN: &[&str] = &["NotSignedIn", "NotAdmitted"];
 /// The administrator, with a body.
 pub(crate) const ADMIN_BODY: &[&str] = &["NotSignedIn", "NotAdmitted", "RequestMalformed"];
+/// An allowance operation reused for different words.
+pub(crate) const MACHINE_AGENTS: &[&str] = &["MachineAgentsReused"];
 /// A signed-in person bound to a person.
 pub(crate) const PERSON: &[&str] = &["NotSignedIn", "NoPerson"];
 /// A grant the caller may see.
