@@ -2,7 +2,7 @@ import { operationId, Refused, request } from '../../api';
 import type { Login } from '../../generated';
 import { agentRequestOf, addAgent } from './add-agent-request';
 import type { PendingAgent } from './add-agent-request';
-import { isRecord, pendingMachineOf, strings } from '../network/contract';
+import { isRecord, pendingMachineOf, readableMachine, strings } from '../network/contract';
 import type { NetworkView, PendingMachine } from '../network/contract';
 import { recordComputer, validComputerName } from '../network/AddMachine';
 import { pendingStartOf, profileRequest, startRequest } from '../runtime/StartAgent';
@@ -115,10 +115,14 @@ export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: A
     return agent;
   } catch (problem) { throw new AddAndRunFailure(addAndRunStep(current), problem); }
 }
-export async function firstRunChoices(): Promise<{ choices: Choices | null; problem: unknown }> {
+export interface FirstRunOptions { choices: Choices | null; network: NetworkView | null; problem: unknown }
+export async function firstRunChoices(): Promise<FirstRunOptions> {
+  let network: NetworkView | null = null;
   try {
-    const network = await request<NetworkView>('/network');
-    if (!Array.isArray(network.machines) || network.machines.some((machine) => !machine || machine.state !== 'in_use' && machine.state !== 'retired')) throw new Refused(200, { refusal: 'NetworkUnreadable', reason: 'The service did not name computer states.' });
-    return { choices: await readChoices(network), problem: null };
-  } catch (problem) { return { choices: null, problem }; }
+    const answer = await request<unknown>('/network');
+    if (!isRecord(answer) || !Array.isArray(answer.machines) || !answer.machines.every(readableMachine) || typeof answer.reports_served !== 'boolean') throw new Refused(200, { refusal: 'NetworkUnreadable', reason: 'The service did not name readable computers and their admission rules.' });
+    network = { machines: answer.machines, reports_served: answer.reports_served };
+    if (network.machines.some((machine) => machine.state === 'in_use')) return { choices: null, network, problem: null };
+    return { choices: await readChoices(network), network, problem: null };
+  } catch (problem) { return { choices: null, network, problem }; }
 }
