@@ -9,8 +9,9 @@ use std::error::Error;
 use identity_contract::fake_rauthy::{API_KEY, FakeRauthy};
 use identity_contract::harness::{GRANT_MODEL, Service, session_cookie};
 use lys_identity::OperationId;
+use lys_identity_server::accounts;
 use lys_identity_server::setup::SetupSettings;
-use lys_identity_server::sign_in_providers::SignInProvidersSettings;
+use lys_identity_server::sign_in_providers::{SignInProviders, SignInProvidersSettings};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -19,6 +20,143 @@ type TestResult = Result<(), Box<dyn Error>>;
 const CODE: &str = "accounts-first-run-code";
 const EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
+
+fn held_account() -> Value {
+    json!({
+        "email": EMAIL,
+        "given_name": "Ada",
+        "family_name": "Lovelace",
+        "language": "en",
+        "roles": ["staff"],
+        "groups": ["accounts"],
+        "enabled": true,
+        "email_verified": true,
+        "user_expires": 2_000_000_000,
+        "user_values": {"city": "Melbourne", "phone": "+61000000000"},
+    })
+}
+
+fn account_api(issuer: &FakeRauthy) -> Result<SignInProviders, Box<dyn Error>> {
+    Ok(SignInProviders::open(
+        &SignInProvidersSettings {
+            api: issuer.api().to_owned(),
+            api_key_file: issuer.api_key_file(),
+        },
+        None,
+    )?)
+}
+
+#[tokio::test]
+async fn account_update_refuses_each_missing_mandatory_member_before_put() -> TestResult {
+    let issuer = FakeRauthy::start().await?;
+    let api = account_api(&issuer)?;
+    for field in [
+        "email",
+        "language",
+        "roles",
+        "enabled",
+        "email_verified",
+        "user_values",
+    ] {
+        let mut user =
+            issuer_api(&issuer, reqwest::Method::POST, "/users", &held_account()).await?;
+        let id = user["id"]
+            .as_str()
+            .ok_or("the issuer names the account")?
+            .to_owned();
+        user.as_object_mut()
+            .ok_or("an account object")?
+            .remove(field);
+        issuer_api(
+            &issuer,
+            reqwest::Method::PUT,
+            &format!("/users/{id}"),
+            &user,
+        )
+        .await?;
+        let before = issuer.users();
+        let requests = issuer.request_count();
+        let mut changed = false;
+        let answer = accounts::change(&api, &id, |update| {
+            changed = true;
+            update["enabled"] = json!(false);
+        })
+        .await;
+        let refusal = answer
+            .err()
+            .ok_or("an incomplete account must be refused")?;
+        assert_eq!(
+            refusal.name(),
+            "SignInProvidersUnavailable",
+            "{field}: {refusal}"
+        );
+        assert!(refusal.to_string().contains(field), "{field}: {refusal}");
+        assert!(!changed, "{field}: refuse before applying the change");
+        assert_eq!(
+            issuer.request_count(),
+            requests + 1,
+            "{field}: only GET reaches the issuer"
+        );
+        assert_eq!(
+            issuer.users(),
+            before,
+            "{field}: held records survive without a PUT"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn account_update_preserves_other_values_and_never_copies_a_held_password() -> TestResult {
+    let issuer = FakeRauthy::start().await?;
+    let api = account_api(&issuer)?;
+    let mut request = held_account();
+    request["password"] = json!("held-password-must-not-be-sent");
+    request["created_at"] = json!(123);
+    let mut expected = issuer_api(&issuer, reqwest::Method::POST, "/users", &request).await?;
+    let id = expected["id"]
+        .as_str()
+        .ok_or("the issuer names the account")?
+        .to_owned();
+    let fields = expected.as_object_mut().ok_or("an account object")?;
+    fields.remove("password");
+    fields.remove("created_at");
+    fields.insert("enabled".to_owned(), json!(false));
+    accounts::change(&api, &id, |update| update["enabled"] = json!(false)).await?;
+    assert_eq!(issuer.users(), vec![expected]);
+    Ok(())
+}
+
+#[tokio::test]
+async fn account_update_keeps_absent_optionals_distinct_from_explicit_null() -> TestResult {
+    let issuer = FakeRauthy::start().await?;
+    let api = account_api(&issuer)?;
+    for present in [false, true] {
+        let mut request = held_account();
+        let fields = request.as_object_mut().ok_or("an account object")?;
+        for field in ["given_name", "family_name", "groups", "user_expires"] {
+            if present {
+                fields.insert(field.to_owned(), Value::Null);
+            } else {
+                fields.remove(field);
+            }
+        }
+        let mut expected = issuer_api(&issuer, reqwest::Method::POST, "/users", &request).await?;
+        let id = expected["id"]
+            .as_str()
+            .ok_or("the issuer names the account")?
+            .to_owned();
+        expected["enabled"] = json!(false);
+        accounts::change(&api, &id, |update| update["enabled"] = json!(false)).await?;
+        let held = issuer.users();
+        let actual = held
+            .iter()
+            .find(|user| user["id"] == id)
+            .ok_or("the account is still held")?;
+        assert_eq!(actual, &expected, "explicit null present: {present}");
+    }
+    Ok(())
+}
 
 /// A service whose administrator Ada was made on the setup page, signed in.
 async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
