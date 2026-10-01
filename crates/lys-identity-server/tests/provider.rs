@@ -6,13 +6,18 @@
 //! refusals has its own test.
 
 use std::error::Error;
+use std::sync::Arc;
 
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::OperationId;
+use lys_identity::signer::load_service_key;
+use lys_identity_server::configuration_store::ConfigurationStore;
 use lys_identity_server::provider::{CODE_SECONDS, ProductClient, ProviderSettings};
+use lys_identity_server::routes::open_directory;
+use lys_identity_server::runner_acts::ActStore;
 use openidconnect::core::{
     CoreAuthenticationFlow, CoreClient, CoreJwsSigningAlgorithm, CoreProviderMetadata,
 };
@@ -43,6 +48,19 @@ async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn E
         None,
         None,
         |config| {
+            config.requests_dir = None;
+            config.certificates_dir = None;
+            config.network_file = None;
+            config.roles_file = None;
+            config.provisioning_file = None;
+            config.runtime_dir = None;
+            config.service_accounts_dir = None;
+            config.teams_dir = None;
+            config.stops_dir = None;
+            config.budgets_dir = None;
+            config.policies_dir = None;
+            config.goals_dir = None;
+            config.reviews_dir = None;
             config.provider = Some(ProviderSettings {
                 key_file: config.log_dir.with_file_name("provider.key"),
                 clients: vec![ProductClient {
@@ -56,6 +74,25 @@ async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn E
         |config| {
             let key = config.log_dir.with_file_name("provider.key");
             std::fs::write(key, [5u8; 32])?;
+            let signing = Arc::new(load_service_key(&config.event_key_file)?);
+            drop(open_directory(config)?);
+            drop(ConfigurationStore::open(
+                &config.log_dir.with_file_name("organisation"),
+                Arc::clone(&signing),
+            )?);
+            drop(ActStore::open(
+                &config.log_dir.with_file_name("runner-acts"),
+                Arc::clone(&signing),
+            )?);
+            drop(lys_identity::start::LaunchRecords::open(
+                &config.log_dir.with_file_name("launch-records"),
+                load_service_key(&config.event_key_file)?,
+            )?);
+            drop(lys_identity_server::apps_api::opened(
+                config,
+                signing,
+                &|_| {},
+            )?);
             Ok(())
         },
     )
@@ -200,8 +237,9 @@ async fn an_issued_access_token_survives_a_service_restart() -> TestResult {
         .bearer_auth(access)
         .send()
         .await?;
-    assert_eq!(answer.status(), 200);
+    let status = answer.status();
     let body: Value = answer.json().await?;
+    assert_eq!(status, 200, "refusal: {}", body["refusal"]);
     assert_eq!(body["sub"], person);
     Ok(())
 }
