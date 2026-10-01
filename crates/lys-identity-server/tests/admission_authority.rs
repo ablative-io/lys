@@ -61,7 +61,7 @@ fn a_suspended_administrator_has_no_administrator_authority() -> TestResult {
 #[test]
 fn an_unbound_configured_link_audit_login_keeps_its_authority() -> TestResult {
     let harness = Harness::new(30)?;
-    let directory = harness.open()?;
+    let mut directory = harness.open()?;
     let actor = actor()?;
     let admission = Admission::new(None, actor.binding().clone());
     admission.link_audit_source(&actor)?;
@@ -72,7 +72,7 @@ fn an_unbound_configured_link_audit_login_keeps_its_authority() -> TestResult {
 #[test]
 fn a_person_less_human_login_is_not_the_link_audit_source() -> TestResult {
     let harness = Harness::new(33)?;
-    let directory = harness.open()?;
+    let mut directory = harness.open()?;
     let admission = Admission::new(None, actor()?.binding().clone());
     let human = Actor::new(
         LoginBinding::new("https://issuer.example.test", "someone-without-a-person")?,
