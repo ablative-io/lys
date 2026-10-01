@@ -20,6 +20,11 @@
 //! (the index is rebuilt by scanning, the head re-read), so what the process
 //! believes about the file never runs ahead of or behind the disk.
 
+mod batch;
+#[cfg(test)]
+mod batch_recovery_tests;
+#[cfg(test)]
+mod batch_tests;
 pub mod beside;
 #[cfg(test)]
 mod beside_tests;

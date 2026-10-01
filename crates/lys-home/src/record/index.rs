@@ -416,6 +416,40 @@ impl Index {
         Ok(())
     }
 
+    /// Append the rows of a durable batch and sync once before publishing
+    /// any of them in memory. A failed write leaves reconciliation to the
+    /// session owner, whose entry lines are already durable.
+    pub(crate) fn append_rows(
+        &mut self,
+        rows: Vec<IndexRow>,
+        counts: &IoCounter,
+    ) -> Result<(), HomeError> {
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.file)
+            .map_err(|e| HomeError::io("opening the index", &self.file, e))?;
+        for row in &rows {
+            let line = serde_json::to_string(row).map_err(|e| HomeError::Malformed {
+                path: self.file.clone(),
+                line: 0,
+                what: "index row",
+                reason: e.to_string(),
+            })?;
+            file.write_all(line.as_bytes())
+                .map_err(|e| HomeError::io("writing the index", &self.file, e))?;
+            file.write_all(b"\n")
+                .map_err(|e| HomeError::io("writing the index", &self.file, e))?;
+        }
+        file.sync_all()
+            .map_err(|e| HomeError::io("syncing the index", &self.file, e))?;
+        counts.synced();
+        for row in rows {
+            self.push_row(row);
+        }
+        Ok(())
+    }
+
     /// Where the session file ends, as the index knows it.
     #[must_use]
     pub fn end(&self) -> u64 {

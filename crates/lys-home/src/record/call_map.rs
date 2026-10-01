@@ -44,7 +44,7 @@ impl Session {
         self.io.read(entries.len());
         let mut calls = HashMap::with_capacity(entries.len());
         for entry in &entries {
-            if let Some(call_id) = call_id_of(entry) {
+            if let Some(call_id) = call_id_of(&entry.body) {
                 calls
                     .entry(call_id.to_owned())
                     .or_insert_with(|| entry.id().to_owned());
@@ -56,14 +56,20 @@ impl Session {
     /// Add an appended `lys.call` entry's call id to a built map, unless the
     /// map holds that id already; a map not yet built is left unbuilt.
     pub(super) fn note_call(&mut self, entry: &Entry) {
-        let Some(call_id) = call_id_of(entry) else {
+        self.note_call_body(&entry.body, entry.id());
+    }
+
+    /// Note a batch member without copying its body or invalidating a map
+    /// that already holds all earlier calls.
+    pub(super) fn note_call_body(&mut self, body: &EntryBody, id: &str) {
+        let Some(call_id) = call_id_of(body) else {
             return;
         };
         let held = self.calls.get_mut();
         if let Some(calls) = held.unwrap_or_else(PoisonError::into_inner) {
             calls
                 .entry(call_id.to_owned())
-                .or_insert_with(|| entry.id().to_owned());
+                .or_insert_with(|| id.to_owned());
         }
     }
 
@@ -76,8 +82,8 @@ impl Session {
 }
 
 /// The call id a `lys.call` entry's data carries.
-fn call_id_of(entry: &Entry) -> Option<&str> {
-    match &entry.body {
+fn call_id_of(body: &EntryBody) -> Option<&str> {
+    match body {
         EntryBody::Custom {
             custom_type,
             data: Some(data),
