@@ -75,12 +75,11 @@ fn every_stamped_crate_carries_the_same_build_script() -> TestResult {
     Ok(())
 }
 
-/// Exercises the stamp without the workspace's dependencies.
-fn probe(
-    tree: &std::path::Path,
-    name: &str,
-    commit: Option<&std::ffi::OsStr>,
-) -> Result<std::process::Output, Box<dyn Error>> {
+#[path = "version/stamp.rs"]
+mod stamp;
+
+/// Creates the same tracked input for direct and Cargo-driven stamp probes.
+fn prepare(tree: &std::path::Path, name: &str) -> Result<(), Box<dyn Error>> {
     if !tree.join("Cargo.toml").exists() {
         std::fs::create_dir_all(tree.join("src"))?;
         std::fs::write(
@@ -99,6 +98,25 @@ fn probe(
             "fn main() {\n    println!(\"{}\", env!(\"LYS_BUILD\"));\n}\n",
         )?;
     }
+    Ok(())
+}
+
+fn probe(
+    tree: &std::path::Path,
+    name: &str,
+    commit: Option<&std::ffi::OsStr>,
+) -> Result<std::process::Output, Box<dyn Error>> {
+    prepare(tree, name)?;
+    stamp::run(tree, commit)
+}
+
+/// Cargo itself still proves rebuilds after environment and repository changes.
+fn cargo_probe(
+    tree: &std::path::Path,
+    name: &str,
+    commit: Option<&std::ffi::OsStr>,
+) -> Result<std::process::Output, Box<dyn Error>> {
+    prepare(tree, name)?;
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let mut command = Command::new(cargo);
     command
@@ -148,11 +166,17 @@ fn git(tree: &std::path::Path, args: &[&str]) -> Result<String, Box<dyn Error>> 
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
-fn committed(tree: &std::path::Path, name: &str) -> Result<String, Box<dyn Error>> {
+type Probe = fn(
+    &std::path::Path,
+    &str,
+    Option<&std::ffi::OsStr>,
+) -> Result<std::process::Output, Box<dyn Error>>;
+
+fn committed(tree: &std::path::Path, name: &str, run: Probe) -> Result<String, Box<dyn Error>> {
     std::fs::create_dir_all(tree)?;
     git(tree, &["init", "--quiet"])?;
     std::fs::write(tree.join(".gitignore"), "/target\n")?;
-    built(probe(tree, name, None)?)?;
+    built(run(tree, name, None)?)?;
     git(tree, &["add", "."])?;
     git(tree, &["commit", "--quiet", "-m", "probe"])?;
     let commit = git(tree, &["rev-parse", "HEAD"])?;
@@ -181,12 +205,12 @@ fn an_export_names_a_stated_commit_and_rebuilds_when_it_changes() -> TestResult 
         let tree = scratch.path().join("exported");
         for commit in [STATED, OTHER] {
             assert_eq!(
-                built(probe(&tree, name, Some(commit.as_ref()))?)?,
+                built(cargo_probe(&tree, name, Some(commit.as_ref()))?)?,
                 format!("{commit}; stated"),
                 "{name}"
             );
         }
-        assert_eq!(built(probe(&tree, name, None)?)?, NO_COMMIT, "{name}");
+        assert_eq!(built(cargo_probe(&tree, name, None)?)?, NO_COMMIT, "{name}");
     }
     Ok(())
 }
@@ -214,12 +238,12 @@ fn an_invalid_stated_commit_is_refused_for_every_binary() -> TestResult {
 fn a_build_from_a_commit_names_it_and_its_dirty_state() -> TestResult {
     let scratch = tempfile::tempdir()?;
     let tree = scratch.path().join("committed");
-    let commit = committed(&tree, "lys")?;
-    assert_eq!(built(probe(&tree, "lys", None)?)?, commit);
+    let commit = committed(&tree, "lys", cargo_probe)?;
+    assert_eq!(built(cargo_probe(&tree, "lys", None)?)?, commit);
     std::fs::write(tree.join("src").join("extra.txt"), "a change\n")?;
     git(&tree, &["add", "src/extra.txt"])?;
     assert_eq!(
-        built(probe(&tree, "lys", None)?)?,
+        built(cargo_probe(&tree, "lys", None)?)?,
         format!("{commit}; dirty")
     );
     Ok(())
@@ -230,7 +254,7 @@ fn a_stated_commit_must_agree_with_git_for_every_binary() -> TestResult {
     for name in STAMPED {
         let scratch = tempfile::tempdir()?;
         let tree = scratch.path().join("committed");
-        let commit = committed(&tree, name)?;
+        let commit = committed(&tree, name, probe)?;
         assert_eq!(
             built(probe(&tree, name, Some(commit.as_ref()))?)?,
             format!("{commit}; stated"),
