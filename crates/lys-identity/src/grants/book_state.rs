@@ -114,6 +114,7 @@ pub(crate) fn decode(value: Value) -> Result<GrantBook, Unreadable> {
     for held in list(records, "the grant records")? {
         let held = read_record(held)?;
         let id = held.grant.id();
+        book.index_kind(&held.grant);
         if let Source::Grant(source) = held.grant.source() {
             book.children.entry(source).or_default().insert(id);
         }

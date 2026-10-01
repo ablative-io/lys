@@ -33,6 +33,8 @@ tracing.workspace = true
 utoipa.workspace = true
 
 [dev-dependencies]
+lys-identity = { workspace = true, features = ["test-support"] }
+lys-log-store = { workspace = true, features = ["flush-counts"] }
 ciborium.workspace = true
 identity-contract = { path = "../../tests/identity_contract" }
 rustix.workspace = true

@@ -400,6 +400,12 @@ impl ProvisioningStore {
         self.kept.profiles.get(*self.indexes.profiles.get(agent)?)
     }
 
+    /// The numbered version of the named agent's profile.
+    pub fn version(&self, agent: &str, number: u32) -> Option<&Version> {
+        let (profile, version) = self.indexes.location(agent, number)?;
+        self.kept.profiles.get(profile)?.versions.get(version)
+    }
+
     /// The agent and the version `operation` names, if it names one.
     pub(crate) fn named(&self, operation: &str) -> Option<(&str, &Version)> {
         let &(profile, version) = self.indexes.operations.get(operation)?;

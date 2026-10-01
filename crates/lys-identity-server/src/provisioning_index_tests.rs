@@ -163,6 +163,33 @@ fn provisioning_named_operation_does_not_visit_retained_history() -> TestResult 
 }
 
 #[test]
+fn a_numbered_profile_version_uses_the_index_after_open_and_write() -> TestResult {
+    let (directory, mut store) = fixture()?;
+    let before = index_work().2;
+    assert_eq!(
+        store.version("agent-15", 8).map(|version| version.number),
+        Some(8)
+    );
+    assert!(store.version("agent-15", 99).is_none());
+    assert!(store.version("missing", 1).is_none());
+    assert_eq!(
+        index_work().2 - before,
+        0,
+        "numbered version lookup scanned history"
+    );
+    store.set("agent-0", 8, version(0, 9, true)?)?;
+    let reopened = ProvisioningStore::open(&directory.path().join("profiles.json"))?;
+    let before = index_work().2;
+    assert_eq!(store.version("agent-0", 9), reopened.version("agent-0", 9));
+    assert_eq!(
+        store.version("agent-0", 9).map(|version| version.number),
+        Some(9)
+    );
+    assert_eq!(index_work().2 - before, 0);
+    Ok(())
+}
+
+#[test]
 fn provisioning_administrator_declaration_does_not_visit_retained_history() -> TestResult {
     let (directory, store) = fixture()?;
     let before = index_work().2;

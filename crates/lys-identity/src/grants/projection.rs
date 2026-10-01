@@ -13,6 +13,7 @@ use super::admission::Route;
 use super::error::GrantError;
 use super::events::{GrantChange, GrantEvent};
 use super::lineage::{self, Lineage, check_hop};
+use super::schema::owner_of;
 use super::types::{Grant, GrantId, Resource, Source};
 use crate::id::IdentityId;
 use crate::operation::OperationId;
@@ -106,9 +107,13 @@ pub struct GrantBook {
     records: BTreeMap<GrantId, GrantRecord>,
     children: BTreeMap<GrantId, BTreeSet<GrantId>>,
     by_resource: BTreeMap<Resource, BTreeSet<GrantId>>,
+    by_kind: BTreeMap<(String, String), BTreeSet<GrantId>>,
     operations: HashMap<OperationId, u64>,
     refused: BTreeMap<u64, (OperationId, GrantError)>,
 }
+
+#[cfg(any(test, feature = "test-support"))]
+thread_local! { static RECORD_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
 
 impl GrantBook {
     /// An empty book.
@@ -128,7 +133,35 @@ impl GrantBook {
 
     /// Every grant, in id order.
     pub fn records(&self) -> impl Iterator<Item = &GrantRecord> {
-        self.records.values()
+        let records = self.records.values();
+        #[cfg(any(test, feature = "test-support"))]
+        let records =
+            records.inspect(|_| RECORD_VISITS.with(|visits| visits.set(visits.get() + 1)));
+        records
+    }
+
+    /// The whole-book records visited by this thread, for cost regressions.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn record_visits() -> usize {
+        RECORD_VISITS.with(std::cell::Cell::get)
+    }
+
+    /// Grants belonging to `app`, selected by kind then by grant id.
+    pub fn in_app<'a>(&'a self, app: &'a str) -> impl Iterator<Item = &'a GrantRecord> {
+        self.by_kind
+            .range((app.to_owned(), String::new())..)
+            .take_while(move |((owner, _), _)| owner == app)
+            .flat_map(|(_, ids)| ids)
+            .filter_map(|id| self.records.get(id))
+    }
+
+    /// Index one issued grant without walking earlier grants.
+    pub(crate) fn index_kind(&mut self, grant: &Grant) {
+        let kind = grant.resource().kind();
+        self.by_kind
+            .entry((owner_of(kind).to_owned(), kind.to_owned()))
+            .or_default()
+            .insert(grant.id());
     }
 
     /// Every grant `holder` holds, in id order.
@@ -239,6 +272,7 @@ impl GrantBook {
         self.operations.insert(event.operation(), index);
         match event.change() {
             GrantChange::Issue(grant) => {
+                self.index_kind(grant);
                 if let Source::Grant(source) = grant.source() {
                     self.children.entry(source).or_default().insert(grant.id());
                 }
@@ -309,3 +343,7 @@ impl GrantBook {
 
 #[path = "book_state.rs"]
 pub(crate) mod state;
+
+#[cfg(test)]
+#[path = "projection_index_tests.rs"]
+mod index_tests;

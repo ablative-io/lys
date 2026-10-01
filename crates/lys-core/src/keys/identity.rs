@@ -72,6 +72,15 @@ impl fmt::Debug for Ed25519Identity {
 }
 
 impl Ed25519Identity {
+    /// Make a fresh signing identity held only in memory for ephemeral work.
+    #[must_use]
+    pub fn ephemeral() -> Self {
+        use rand::RngCore;
+        let mut seed = Zeroizing::new([0u8; 32]);
+        rand::rng().fill_bytes(&mut *seed);
+        Self::from_seed(&seed)
+    }
+
     /// Returns the 32-byte Ed25519 verifying (public) key.
     pub fn public_key_bytes(&self) -> [u8; 32] {
         self.verifying_key.to_bytes()
