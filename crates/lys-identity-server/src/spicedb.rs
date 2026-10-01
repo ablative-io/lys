@@ -280,6 +280,34 @@ impl SpiceDb {
         .collect()
     }
 
+    pub(crate) fn schema_writer(&self) -> Result<Self, GrantError> {
+        Ok(Self {
+            endpoint: self.endpoint.clone(),
+            key: self.key.clone(),
+            mirror: self.mirror.clone(),
+            relations: self.relations.clone(),
+            scope: self.scope.clone(),
+            app_kinds: Mutex::new(
+                self.app_kinds
+                    .lock()
+                    .map_err(|error| unavailable(format!("app kinds unavailable: {error}")))?
+                    .clone(),
+            ),
+        })
+    }
+
+    pub(crate) fn hold_app_kinds(
+        &self,
+        kinds: &BTreeMap<String, KindModel>,
+    ) -> Result<(), GrantError> {
+        *self
+            .app_kinds
+            .lock()
+            .map_err(|error| unavailable(format!("app kinds unavailable: {error}")))? =
+            kinds.clone();
+        Ok(())
+    }
+
     /// Hold `kinds` as the approved apps' kinds from now on and write the
     /// schema they give, keeping every kind of Lys's own the engine holds.
     pub fn set_app_kinds(&self, kinds: &BTreeMap<String, KindModel>) -> Result<(), GrantError> {

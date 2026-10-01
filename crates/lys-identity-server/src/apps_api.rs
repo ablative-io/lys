@@ -44,10 +44,8 @@ use crate::apps_store::AppStore;
 use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued};
 use crate::config::Config;
 use crate::error::ServerError;
-use crate::grants::GrantState;
 use crate::routes::{AppState, with_directory};
 use crate::session::now;
-use crate::spicedb::Relationships;
 
 /// The operation the app `lys` is recorded under.
 const LYS_OPERATION: &str = "lys-model";
@@ -162,46 +160,20 @@ pub(crate) fn with_apps<T>(
     })
 }
 
-/// Give the grants, when they are open, the model the apps now make: the
-/// app `lys`'s relations and every approved, unretired app's kinds, in the
-/// permission engine too when one is named. Called with the apps held and
-/// the grants not held; inside `with_grants`, [`refresh_held`] is called.
-pub(crate) fn refresh(state: &AppState, apps: &AppStore) -> Result<(), ServerError> {
-    let model = apps.model()?;
-    state.grant_setup.hold_model(model.clone());
-    let mut slot = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
-    let Some(grants) = &mut *slot else {
-        return Ok(());
-    };
-    refresh_open(grants, model)
-}
-
-/// Give the grants already held, `grants`, the model the apps now make, and
-/// hold Lys's own model as the one the screens read. For a caller inside
-/// `with_grants`, which holds the grants and must not lock them again.
-pub(crate) fn refresh_held(
-    state: &AppState,
-    apps: &AppStore,
-    grants: &mut GrantState,
-) -> Result<(), ServerError> {
-    let model = apps.model()?;
-    state.grant_setup.hold_model(model.clone());
-    refresh_open(grants, model)
-}
-
-fn refresh_open(
-    grants: &mut GrantState,
-    model: lys_identity::grants::Model,
-) -> Result<(), ServerError> {
-    if let Relationships::SpiceDb(engine) = grants.relationships() {
-        engine.set_app_kinds(model.kinds())?;
-    }
-    if model.version() > grants.model().version() {
-        grants.set_model(model)?;
-    } else {
-        grants.set_kinds(model.kinds().clone());
-    }
-    Ok(())
+/// Publish the current app model after the calling mutation releases its locks.
+pub(crate) fn refresh(state: &AppState) -> Result<(), ServerError> {
+    crate::apps_refresh::refresh(
+        &state.directory,
+        &state.apps,
+        &state.grants,
+        &state.grant_setup,
+        |engine, model| {
+            if let Some(engine) = engine {
+                engine.set_app_kinds(model.kinds())?;
+            }
+            Ok(())
+        },
+    )
 }
 
 fn words(name: &str, text: &str) -> Result<String, ServerError> {
@@ -414,7 +386,7 @@ async fn approve(
     } else {
         None
     };
-    with_apps(&state, |apps, projection| {
+    let answer = with_apps(&state, |apps, projection| {
         let by = administrator(&state, apps, &headers, projection)?;
         if let Some(Line::Approved(approved)) = apps.held().operation(&operation) {
             if approved.app != id {
@@ -458,14 +430,14 @@ async fn approve(
             by,
             at,
         }))?;
-        refresh(&state, apps)?;
         Ok(Approval {
             app: view(apps, &id)?,
             client: None,
             credentials: Some(credentials),
         })
-    })
-    .map(Json)
+    })?;
+    refresh(&state)?;
+    Ok(Json(answer))
 }
 
 /// Keep the decision `made` makes on app `id`, as the administrator.
@@ -478,7 +450,7 @@ fn decided(
 ) -> Result<AppView, ServerError> {
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let reason = words("reason", &body.reason)?;
-    with_apps(state, |apps, projection| {
+    let (answer, retiring) = with_apps(state, |apps, projection| {
         let by = administrator(state, apps, headers, projection)?;
         let line = made(Decided {
             operation,
@@ -489,11 +461,12 @@ fn decided(
         });
         let retiring = matches!(line, Line::Retired(_));
         apps.keep(line)?;
-        if retiring {
-            refresh(state, apps)?;
-        }
-        view(apps, id)
-    })
+        Ok((view(apps, id)?, retiring))
+    })?;
+    if retiring {
+        refresh(state)?;
+    }
+    Ok(answer)
 }
 
 async fn decline(
