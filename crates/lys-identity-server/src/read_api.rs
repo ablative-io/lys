@@ -30,7 +30,7 @@ use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Json, Router};
 use lys_identity::projection::{Projection, Record};
-use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding, PersonId};
+use lys_identity::{Actor, AgentId, IdentityId, LoginBinding, PersonId};
 
 use crate::admission::AUTHORITY;
 use crate::directory_views::receipt_json;

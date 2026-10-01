@@ -503,7 +503,7 @@ async fn change_agent(
     })?;
     with_directory(&state, |directory| {
         Ok(Json(MachineAgentsChanged {
-            machine: view(directory.projection()?, &machine, last.get(&id).copied()),
+            machine: view(directory.projection()?, &machine, last.get(&id).copied())?,
             recorded,
         }))
     })
