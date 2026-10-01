@@ -78,8 +78,7 @@ struct Table {
 impl Table {
     async fn start() -> Result<Self, Box<dyn Error>> {
         let (service, seeded) =
-            Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, OTHER])?))
-                .await?;
+            Service::start_with(|config| seed_configured(config, [ADMINISTRATOR, OTHER])).await?;
         let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
         let other = service.sign_in(login(OTHER)).await?;
         Ok(Self {
