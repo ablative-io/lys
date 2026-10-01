@@ -96,6 +96,39 @@ async fn limits_keep_distinct_actions_for_the_same_unit_and_period() -> TestResu
 }
 
 #[tokio::test]
+async fn editing_one_amount_preserves_the_other_limit_and_survives_restart() -> TestResult {
+    let mut table = Table::fresh().await?;
+    let path = format!("/budgets/agent/{}", table.agent);
+    let (status, set) = table
+        .put(
+            &path,
+            &json!({"limits": token_limits(), "warn_at": 80, "version": 0}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{set}");
+    let mut limits = set["limits"].clone();
+    limits[0]["amount"] = json!(450);
+    let (status, edited) = table
+        .put(
+            &path,
+            &json!({"limits": limits, "warn_at": set["warn_at"], "version": 1}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{edited}");
+    assert_eq!(edited["limits"], limits);
+    assert_eq!(edited["limits"][1], set["limits"][1]);
+    assert_eq!(edited["limits"][0]["act"], set["limits"][0]["act"]);
+    assert_eq!(edited["warn_at"], set["warn_at"]);
+    assert_eq!(edited["holder"], set["holder"]);
+    assert_eq!(edited["version"], 2);
+    let read = table.get(&path).await?;
+    assert_eq!(read["limits"], limits);
+    table.service.restart().await?;
+    assert_eq!(metadata(&table.get(&path).await?), metadata(&read));
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_stale_holder_version_cannot_replace_any_limit() -> TestResult {
     let table = Table::fresh().await?;
     let path = format!("/budgets/agent/{}", table.agent);

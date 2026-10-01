@@ -48,6 +48,14 @@ async function click(selector: string): Promise<void> {
   await act(async () => { element(selector).click(); });
 }
 
+async function choose(selector: string, value: string): Promise<void> {
+  await act(async () => {
+    const found = element<HTMLSelectElement>(selector);
+    found.value = value;
+    found.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 const edit = 'form[aria-label="Edit budget limits"]';
 const words = 'form[aria-label="Reword goal ' + goal.goal.id + '"]';
 const active = 'input[aria-label="Goal active ' + goal.goal.id + '"]';
@@ -83,6 +91,20 @@ describe('Usage port', () => {
     expect(changed).not.toHaveBeenCalled();
   });
 
+  it('changes one action and the warning while preserving every amount and the other action', async () => {
+    const limits: Limit[] = [{ unit: 'tokens', amount: 400, period: 'week', act: 'tell' }, { unit: 'tokens', amount: 500, period: 'week', act: 'stop' }];
+    const view = budgetsView(holder, [], { limits, warn_at: 80, version: 7 });
+    const posted: { path: string; body: unknown }[] = [];
+    const changed = vi.fn();
+    serve({ ['PUT ' + path]: (body) => ok({ ...view, ...body as BudgetBody, version: 8 }) }, posted);
+    await render(<UsageBudgets agent={SCRIBE} budgets={view} receipts={[]} changed={changed} />);
+    await choose(edit + ' select[name="act-0"]', 'notice');
+    await input(edit + ' input[name="warn_at"]', '70');
+    await click(edit + ' button[type="submit"]');
+    expect(posted).toEqual([{ path: 'PUT ' + path, body: { limits: [{ ...limits[0], act: 'notice' }, limits[1]], warn_at: 70, version: 7 } }]);
+    expect(changed).toHaveBeenCalledWith('Budget kept as version 8.');
+  });
+
   it('does not confirm an answer that changes an unrelated budget action', async () => {
     const changed = vi.fn();
     const view = budgetsView(holder, [], { limits: [{ unit: 'tokens', amount: 500, period: 'week', act: 'stop' }], version: 7 });
@@ -92,17 +114,36 @@ describe('Usage port', () => {
     await click(edit + ' button[type="submit"]');
     expect(changed).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('BudgetAnswerUnconfirmed');
+    expect(element<HTMLButtonElement>(edit + ' button[type="submit"]').disabled).toBe(true);
+    expect(element<HTMLButtonElement>('form[aria-label="Set a budget"] button[type="submit"]').disabled).toBe(true);
   });
 
   it('refuses an empty or negative edited amount before sending a request', async () => {
     const posted: { path: string; body: unknown }[] = [];
     serve({}, posted);
     await render(<UsageBudgets agent={SCRIBE} budgets={budgetsView(holder, [], { limits: [{ unit: 'tokens', amount: 500, period: 'week', act: 'tell' }] })} receipts={[]} changed={vi.fn()} />);
-    for (const value of ['', '-1']) {
+    for (const value of ['', '-1', '0.5', '9007199254740992']) {
       await input(edit + ' input[name="amount-0"]', value);
       expect(element<HTMLButtonElement>(edit + ' button[type="submit"]').disabled).toBe(true);
     }
     expect(posted).toEqual([]);
+  });
+
+  it('sets shared-plan percentages only in a reported plan window', async () => {
+    const view = budgetsView(holder);
+    const posted: { path: string; body: unknown }[] = [];
+    const changed = vi.fn();
+    serve({ ['PUT ' + path]: (body) => ok({ ...view, ...body as BudgetBody, version: 1 }) }, posted);
+    await render(<UsageBudgets agent={SCRIBE} budgets={view} receipts={[]} changed={changed} />);
+    const form = 'form[aria-label="Set a budget"]';
+    await choose(form + ' select', 'plan_percent');
+    expect(Array.from(document.querySelectorAll<HTMLSelectElement>(form + ' select'))[1].value).toBe('five_hour');
+    await input(form + ' input[name="limit"]', '101');
+    expect(element<HTMLButtonElement>(form + ' button[type="submit"]').disabled).toBe(true);
+    await input(form + ' input[name="limit"]', '50');
+    await click(form + ' button[type="submit"]');
+    expect(posted).toEqual([{ path: 'PUT ' + path, body: { limits: [{ unit: 'plan_percent', amount: 50, period: 'five_hour', act: 'tell' }], warn_at: null, version: 0 } }]);
+    expect(changed).toHaveBeenCalledWith('Budget kept as version 1.');
   });
 
   it('rewords one current-shape goal without rewriting its other fields or another goal', async () => {
