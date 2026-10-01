@@ -25,6 +25,9 @@ pub use service::ServiceRefusal;
 /// A named refusal or failure of the secrets broker.
 #[derive(Debug, thiserror::Error)]
 pub enum SecretsError {
+    /// The leased entry cannot sign.
+    #[error(transparent)]
+    Signing(#[from] crate::broker::SigningRefusal),
     /// No store key was supplied, or the supplied key file does not exist.
     #[error("StoreKeyMissing: no store key at {path:?} (act: supply the store key file at start)")]
     StoreKeyMissing {

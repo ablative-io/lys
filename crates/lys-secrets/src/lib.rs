@@ -37,7 +37,8 @@ pub use broker::{
     Admitted, Ask, Broker, BrokerPaths, Checked, Clock, Discovery, EndAct, EndWay, Ended,
     HandleEnded, HandleRecord as Lease, HeldHandle, LeaseEnd, LeaseView, ListScope, OwnerChanged,
     PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome, SNAPSHOT_EVERY, SecretSettings, Settled,
-    SnapshotReport, SystemBehind, Ticket, UpstreamRevocation, UseError, Used,
+    Signature, SigningRefusal, SnapshotReport, SystemBehind, Ticket, UpstreamRevocation, UseError,
+    Used,
 };
 pub use error::{
     AccountsRefusal, BoundsRefusal, LeaseRefusal, ListRefusal, OAuthRefusal, OwnerChangeRefusal,
