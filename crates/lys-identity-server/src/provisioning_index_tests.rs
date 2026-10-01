@@ -131,3 +131,135 @@ fn provisioning_administrator_declaration_does_not_visit_retained_history() -> T
     assert!(directory.path().join("profiles.json").exists());
     Ok(())
 }
+
+#[test]
+fn reviewing_an_earlier_declaration_keeps_profile_and_version_precedence() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("profiles.json");
+    let mut early = version(0, 1, false)?;
+    early.settings.mcp_servers[0].name = "shared".to_owned();
+    early.settings.mcp_servers[0].url = "https://early.example.test/mcp".to_owned();
+    let mut late = version(1, 1, true)?;
+    late.settings.mcp_servers[0].name = "shared".to_owned();
+    late.settings.mcp_servers[0].url = "https://late.example.test/mcp".to_owned();
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&json!({"profiles": [
+            {"agent": "agent-0", "versions": [early]},
+            {"agent": "agent-1", "versions": [late]}
+        ]}))?,
+    )?;
+    let mut store = ProvisioningStore::open(&path)?;
+    assert_eq!(
+        store
+            .declared_server("shared")
+            .ok_or("late declaration missing")?
+            .url,
+        "https://late.example.test/mcp"
+    );
+    store.review(
+        "agent-0",
+        1,
+        Review {
+            operation: "review-0-1".to_owned(),
+            by: "reviewer".to_owned(),
+            at: 2,
+        },
+    )?;
+    assert_eq!(
+        store
+            .declared_server("shared")
+            .ok_or("early declaration missing")?
+            .url,
+        "https://early.example.test/mcp"
+    );
+    let bytes = std::fs::read(&path)?;
+    store.review(
+        "agent-0",
+        1,
+        Review {
+            operation: "review-0-1".to_owned(),
+            by: "reviewer".to_owned(),
+            at: 3,
+        },
+    )?;
+    assert_eq!(std::fs::read(&path)?, bytes);
+    assert!(matches!(
+        store.review(
+            "agent-1",
+            1,
+            Review {
+                operation: "review-0-1".to_owned(),
+                by: "reviewer".to_owned(),
+                at: 3,
+            }
+        ),
+        Err(crate::error::ServerError::ProvisioningReused { .. })
+    ));
+    let reopened = ProvisioningStore::open(&path)?;
+    assert_eq!(
+        reopened.declared_server("shared"),
+        store.declared_server("shared")
+    );
+    Ok(())
+}
+
+#[test]
+fn failed_writes_rebuild_only_durable_records_and_retry_updates_reads() -> TestResult {
+    let (directory, mut store) = fixture()?;
+    let path = directory.path().join("profiles.json");
+    let blocked = path.with_extension("writing");
+    std::fs::create_dir(&blocked)?;
+    assert!(matches!(
+        store.set("agent-0", 8, version(0, 9, true)?),
+        Err(crate::error::ServerError::ProvisioningUnavailable { .. })
+    ));
+    assert!(store.named("record-0-9").is_none());
+    assert!(store.declared_server("server-0-9").is_none());
+    assert_eq!(
+        store.profile("agent-0").ok_or("profile missing")?.latest(),
+        8
+    );
+    std::fs::remove_dir(&blocked)?;
+    store.set("agent-0", 8, version(0, 9, true)?)?;
+    assert!(store.named("record-0-9").is_some());
+    assert!(store.declared_server("server-0-9").is_some());
+    assert_eq!(
+        std::fs::read(&path)?,
+        serde_json::to_vec_pretty(&store.kept)?
+    );
+    Ok(())
+}
+
+#[test]
+fn uncertain_reload_replaces_every_derived_lookup_from_durable_records() -> TestResult {
+    let (directory, mut store) = fixture()?;
+    let path = directory.path().join("profiles.json");
+    let replacement = version(20, 1, true)?;
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&json!({
+            "profiles": [{"agent": "replacement", "versions": [replacement]}],
+            "skills": [{"name": "replacement", "text": "new", "len": 3, "sha256": "new-digest"}]
+        }))?,
+    )?;
+    let bytes = std::fs::read(&path)?;
+    store.uncertain = true;
+    store.settle()?;
+    assert!(store.named("record-15-8").is_none());
+    assert!(store.declared_server("server-15-8").is_none());
+    assert!(store.profile("agent-0").is_none());
+    assert!(store.skill("skill-0", "digest-0").is_none());
+    assert_eq!(
+        store.named("record-20-1").ok_or("replacement missing")?.0,
+        "replacement"
+    );
+    assert!(store.declared_server("server-20-1").is_some());
+    assert!(store.skill("replacement", "new-digest").is_some());
+    assert_eq!(
+        store.pins(&["replacement".to_owned()])?[0].sha256,
+        "new-digest"
+    );
+    assert_eq!(std::fs::read(&path)?, bytes);
+    Ok(())
+}
