@@ -22,28 +22,12 @@ const BODY_LIMIT: usize = 2 * 1024 * 1024;
 #[schema(value_type = Object)]
 pub(crate) struct Envelope(Value);
 const VERSIONS: [&str; 3] = ["2025-03-26", "2025-06-18", "2025-11-25"];
-const TOOLS: [(&str, &str); 4] = [
-    (
-        "what-can-I-do",
-        "Ask the existing HTTP routes what the caller may do. Admission is decided by those routes.",
-    ),
-    (
-        "read",
-        "Read through an existing HTTP route with the caller's credentials and admission.",
-    ),
-    (
-        "change",
-        "Change through an existing HTTP route. Its validation, authority checks and refusals apply unchanged.",
-    ),
-    (
-        "drafts",
-        "Ask an existing draft route with the caller's credentials. This transport grants no draft authority.",
-    ),
-];
+const LEGACY_TOOLS: [&str; 4] = ["what-can-I-do", "read", "change", "drafts"];
 
 struct Endpoint {
     router: Router,
     origin: String,
+    tools: &'static crate::mcp_tools::Catalogue,
 }
 
 pub(crate) fn routes(router: Router, origin: &str) -> Result<Router, ServerError> {
@@ -53,6 +37,7 @@ pub(crate) fn routes(router: Router, origin: &str) -> Result<Router, ServerError
     let endpoint = Arc::new(Endpoint {
         router,
         origin: origin.origin().ascii_serialization(),
+        tools: crate::mcp_tools::prepare()?,
     });
     Ok(Router::new()
         .route("/mcp", post(message).get(no_stream))
@@ -200,11 +185,13 @@ async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Res
             )
         };
     }
+    if method == "tools/list" {
+        return tools(endpoint.tools, &id, &value["params"]);
+    }
     let result = match method {
         "initialize" => initialize(&value["params"]),
         "ping" => Ok(json!({})),
-        "tools/list" => tools(&value["params"]),
-        "tools/call" => call(&endpoint.router, parts, &value["params"]).await,
+        "tools/call" => call(&endpoint, parts, &value["params"]).await,
         _ => Err((-32601, "the MCP method is not supported".to_owned())),
     };
     match result {
@@ -240,17 +227,34 @@ fn initialize(params: &Value) -> ResultValue {
     )
 }
 
-fn tools(params: &Value) -> ResultValue {
+fn tools(catalogue: &crate::mcp_tools::Catalogue, id: &Value, params: &Value) -> Response {
     if !params.is_null() && (!params.is_object() || params.get("cursor").is_some()) {
-        return Err((
+        return fault(
+            id,
+            StatusCode::OK,
             -32602,
-            "this tool list has no continuation cursor".to_owned(),
-        ));
+            "this tool list has no continuation cursor",
+        );
     }
-    let schema = json!({"type":"object","properties":{"method":{"type":"string","enum":["GET","POST","PUT","PATCH","DELETE"]},"path":{"type":"string","description":"An absolute local HTTP path, including its query."},"body":{}},"required":["method","path"],"additionalProperties":false});
-    Ok(
-        json!({"tools":TOOLS.map(|(name, description)| json!({"name":name,"description":description,"inputSchema":schema}))}),
-    )
+    let id = match serde_json::to_vec(id) {
+        Ok(id) => id,
+        Err(error) => {
+            return fault(
+                id,
+                StatusCode::OK,
+                -32603,
+                format!("the MCP id could not be encoded: {error}"),
+            );
+        }
+    };
+    let encoded = catalogue.encoded();
+    let mut body = Vec::with_capacity(encoded.len() + id.len() + 40);
+    body.extend_from_slice(b"{\"jsonrpc\":\"2.0\",\"id\":");
+    body.extend_from_slice(&id);
+    body.extend_from_slice(b",\"result\":");
+    body.extend_from_slice(encoded);
+    body.push(b'}');
+    ([(header::CONTENT_TYPE, "application/json")], body).into_response()
 }
 
 #[derive(Deserialize)]
@@ -269,15 +273,12 @@ struct Arguments {
 }
 
 async fn call(
-    router: &Router,
+    endpoint: &Endpoint,
     mut parts: axum::http::request::Parts,
     params: &Value,
 ) -> ResultValue {
     let call: Call = serde_json::from_value(params.clone())
         .map_err(|error| (-32602, format!("invalid tool call: {error}")))?;
-    if !TOOLS.iter().any(|(name, _)| *name == call.name) {
-        return Err((-32602, format!("unknown tool {}", call.name)));
-    }
     if !["GET", "POST", "PUT", "PATCH", "DELETE"].contains(&call.arguments.method.as_str()) {
         return Err((
             -32602,
@@ -298,6 +299,12 @@ async fn call(
             -32602,
             "the tool path must be local to the HTTP router".to_owned(),
         ));
+    }
+    if !LEGACY_TOOLS.contains(&call.name.as_str()) {
+        endpoint
+            .tools
+            .resolve(&call.name, &call.arguments.method, uri.path())
+            .map_err(|reason| (-32602, reason))?;
     }
     parts.method = Method::from_bytes(call.arguments.method.as_bytes())
         .map_err(|error| (-32602, error.to_string()))?;
@@ -320,7 +327,8 @@ async fn call(
     } else {
         Body::empty()
     };
-    let response = match router
+    let response = match endpoint
+        .router
         .clone()
         .oneshot(Request::from_parts(parts, body))
         .await

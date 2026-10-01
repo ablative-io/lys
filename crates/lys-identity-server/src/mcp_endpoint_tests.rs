@@ -50,18 +50,7 @@ async fn mcp_initialize_and_tools_list_answer() -> Result<(), Box<dyn Error>> {
     )
     .await?;
     let tools = listed["result"]["tools"].as_array().ok_or("no tools")?;
-    assert_eq!(
-        tools
-            .iter()
-            .map(|tool| tool["name"].as_str())
-            .collect::<Vec<_>>(),
-        vec![
-            Some("what-can-I-do"),
-            Some("read"),
-            Some("change"),
-            Some("drafts")
-        ]
-    );
+    assert_eq!(tools.len(), crate::openapi_table::TABLE.len());
     for tool in tools {
         assert!(
             !tool["description"]
