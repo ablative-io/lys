@@ -100,6 +100,10 @@ async fn set_zone(
         })
     })?;
     let by = crate::routes::with_directory(&state, |directory| {
+        if crate::routes::admitted_agent(directory.projection()?, &actor)? {
+            return crate::caller_admission::active_caller(directory.projection()?, &actor)
+                .map(|identity| identity.to_string());
+        }
         crate::read_api::own_person(directory.projection()?, &actor)
             .map(|person| person.to_string())
     })?;

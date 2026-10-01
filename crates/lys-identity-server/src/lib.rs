@@ -92,6 +92,7 @@ pub mod grants_refusals;
 pub mod harness_catalogue;
 mod import_api;
 mod import_bootstrap;
+mod kept_responsibilities;
 pub mod launch_api;
 pub mod launch_fields;
 pub mod launch_harness;
@@ -145,6 +146,9 @@ pub mod roles_api;
 pub mod roles_records;
 pub mod roles_store;
 pub mod roles_views;
+mod route_actions;
+#[cfg(test)]
+mod route_actions_tests;
 pub mod routes;
 mod routes_startup;
 pub mod routes_table;

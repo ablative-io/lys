@@ -91,6 +91,10 @@ pub(crate) fn person(state: &AppState, headers: &HeaderMap) -> Result<String, Se
     let actor = signed_in(state, headers)?;
     with_directory(state, |directory| {
         let projection = directory.projection()?;
+        if crate::routes::admitted_agent(projection, &actor)? {
+            return crate::caller_admission::active_caller(projection, &actor)
+                .map(|identity| identity.to_string());
+        }
         Ok(own_person(projection, &actor)?.to_string())
     })
 }

@@ -363,11 +363,14 @@ pub(crate) mod wire {
     /// Closed historical code: no actor key 5 is the operator; a 16-byte
     /// key 5 is a service-account bearer. Future methods need a fresh code.
     pub(crate) const OPERATOR_OR_SERVICE_ACCOUNT: u64 = 3;
+    /// A live pass authenticated the agent whose id is carried under key 5.
+    pub(crate) const AGENT_PASS: u64 = 4;
 
     pub(crate) fn method(value: AuthMethod) -> u64 {
         match value {
             AuthMethod::Oidc => OIDC,
             AuthMethod::AgentSignature(_) => AGENT_SIGNATURE,
+            AuthMethod::AgentPass(_) => AGENT_PASS,
             AuthMethod::Operator | AuthMethod::ServiceAccountBearer(_) => {
                 OPERATOR_OR_SERVICE_ACCOUNT
             }
@@ -384,6 +387,7 @@ pub(crate) mod wire {
         match (code, agent) {
             (OIDC, None) => Ok(AuthMethod::Oidc),
             (AGENT_SIGNATURE, Some(agent)) => Ok(AuthMethod::AgentSignature(agent)),
+            (AGENT_PASS, Some(agent)) => Ok(AuthMethod::AgentPass(agent)),
             (OPERATOR_OR_SERVICE_ACCOUNT, None) => Ok(AuthMethod::Operator),
             (OPERATOR_OR_SERVICE_ACCOUNT, Some(account)) => Ok(AuthMethod::ServiceAccountBearer(
                 crate::ServiceAccountId::from_bytes(*account.as_bytes()),
@@ -392,7 +396,8 @@ pub(crate) mod wire {
             (AGENT_SIGNATURE, None) => {
                 Err("an agent-signature actor carries the agent's id under key 5")
             }
-            _ => Err("an authentication method code is 1, 2 or 3"),
+            (AGENT_PASS, None) => Err("an agent-pass actor carries the agent's id under key 5"),
+            _ => Err("an authentication method code is 1, 2, 3 or 4"),
         }
     }
 

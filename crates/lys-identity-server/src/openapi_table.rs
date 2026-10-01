@@ -50,12 +50,12 @@ pub(crate) struct Scope {
 }
 
 macro_rules! entries {
-    ($($method:ident $path:literal $words:literal $auth:ident [$($set:expr),*] $(scope($kind:literal, $action:literal, [$($parameter:literal),+]))?;)*) => {
-        &[$(E($method, $path, $words, $auth, &[$($set),*], entries!(@scope $($kind, $action, [$($parameter),+])?)),)*]
+    ($($method:ident $path:literal $words:literal $auth:ident [$($set:expr),*] $(scope($kind:literal, $action:literal, [$($parameter:literal),*]))?;)*) => {
+        &[$(E($method, $path, $words, $auth, &[$($set),*], entries!(@scope $($kind, $action, [$($parameter),*])?)),)*]
     };
     (@scope) => { None };
-    (@scope $kind:literal, $action:literal, [$($parameter:literal),+]) => {
-        Some(Scope { kind: $kind, action: $action, parameters: &[$($parameter),+] })
+    (@scope $kind:literal, $action:literal, [$($parameter:literal),*]) => {
+        Some(Scope { kind: $kind, action: $action, parameters: &[$($parameter),*] })
     };
 }
 
@@ -101,16 +101,32 @@ pub(crate) fn token_scope(
         let id = scope
             .parameters
             .iter()
-            .map(|name| values.get(name).copied().ok_or(TokenError::Undeclared))
+            .map(|name| {
+                name.strip_prefix('=')
+                    .or_else(|| values.get(name).copied())
+                    .ok_or(TokenError::Undeclared)
+            })
             .collect::<Result<Vec<_>, _>>()?
             .join(".");
         return Ok((
-            Resource::new(scope.kind, &id).map_err(crate::error::ServerError::from)?,
+            Resource::new(
+                scope.kind,
+                if scope.parameters.is_empty() {
+                    "all"
+                } else {
+                    &id
+                },
+            )
+            .map_err(crate::error::ServerError::from)?,
             Action::new(scope.action).map_err(crate::error::ServerError::from)?,
         ));
     }
     Err(TokenError::Undeclared)
 }
+
+#[cfg(test)]
+#[path = "route_scope_tests.rs"]
+mod tests;
 
 /// Every route of the table; `openapi_types.rs` names the types each takes and answers.
 pub(crate) const TABLE: &[E] = entries! {
@@ -137,22 +153,22 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/directory/agents/{id}" "Any agent, for the administrator" S [ADMIN, &["AgentNotVisible"]];
     POST "/grants/{id}/tokens" "Issue a credential for one grant" C [SIGNED_BODY, &["GrantTokenResponsibleRequired", "GrantTokenExpiryInvalid", "GrantTokenStoreFull", "GrantTokenUnavailable", "GrantTokenUnknown"]];
     POST "/grants/{id}/tokens/{token_id}/revoke" "Revoke one grant credential" C [SIGNED, &["GrantTokenResponsibleRequired", "GrantTokenUnavailable", "GrantTokenUnknown"]];
-    GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]];
+    GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]] scope("grant", "read", []);
     GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];
-    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused"]];
-    GET "/grants/model" "Lys's own permission model" S [SIGNED];
+    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused"]] scope("grant", "grant.delegate", []);
+    GET "/grants/model" "Lys's own permission model" S [SIGNED] scope("grant", "read", []);
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused"]];
-    POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]];
-    POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, UNANSWERED, &["NotHeld"]];
-    POST "/grants/who" "Who may act on a resource" S [GRANT_ASKED, UNANSWERED];
-    POST "/grants/reach" "Who may act on each of many resources" S [GRANT_ASKED, UNANSWERED];
-    GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown", "NotHolder", "IdentityNotActive"]];
-    GET "/grants/{id}" "One grant the caller may see" S [GRANT_READ, &["GrantIdMalformed"]];
-    POST "/grants/{id}/revoke" "Revoke a grant and all it derives" S [GRANT_READ, RECORDED, &["GrantUnknown", "RevokeRefused"]];
+    POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]] scope("grant", "grant.check", []);
+    POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, UNANSWERED, &["NotHeld"]] scope("grant", "grant.why", []);
+    POST "/grants/who" "Who may act on a resource" S [GRANT_ASKED, UNANSWERED] scope("grant", "grant.who", []);
+    POST "/grants/reach" "Who may act on each of many resources" S [GRANT_ASKED, UNANSWERED] scope("grant", "grant.reach", []);
+    GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown", "NotHolder", "IdentityNotActive"]] scope("grant", "read", []);
+    GET "/grants/{id}" "One grant the caller may see" S [GRANT_READ, &["GrantIdMalformed"]] scope("grant", "read", ["id"]);
+    POST "/grants/{id}/revoke" "Revoke a grant and all it derives" S [GRANT_READ, RECORDED, &["GrantUnknown", "RevokeRefused"]] scope("grant", "grant.revoke", ["id"]);
     GET "/receipts/{index}" "A directory receipt, publicly" P [&["RequestMalformed", "InstallEntry"]];
     GET "/service-key" "The service's public key" P [];
-    GET "/reviews" "The grants due for review" S [SIGNED, &["NoPerson"]];
-    POST "/reviews/{grant}/keep" "Keep a grant under review" S [SIGNED_BODY, &["GrantNotDue", "GrantNotVisible", "ReviewReused"], &["NoPerson", "ReviewerOnly"]];
+    GET "/reviews" "The grants due for review" S [SIGNED, &["NoPerson"]] scope("review", "read", []);
+    POST "/reviews/{grant}/keep" "Keep a grant under review" S [SIGNED_BODY, &["GrantNotDue", "GrantNotVisible", "ReviewReused"], &["NoPerson", "ReviewerOnly"]] scope("review", "review.keep", ["grant"]);
     GET "/roles" "Every role" S [SIGNED];
     POST "/roles" "Make a role" S [ADMIN_BODY, &["RelationUnknown", "RoleReused"]];
     GET "/roles/{id}" "One role" S [SIGNED];
@@ -160,18 +176,18 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/roles/{id}/holders" "Assign a role" S [ADMIN_BODY, &["HolderUnknown"], &["RoleHeld", "RoleUnknown"]];
     POST "/roles/{id}/holders/{holder}/move" "Move a holding" S [ADMIN_BODY, &["HoldingOver", "RoleVersionUnknown"], &["HolderUnknown", "HoldingChanged"]];
     POST "/roles/{id}/holders/{holder}/end" "End a holding" S [ADMIN_BODY];
-    GET "/requests" "The access requests" S [SIGNED, &["NoPerson", "NotAdmitted", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
-    POST "/requests" "Ask for access" S [SIGNED_BODY, &["RelationUnknown"], &["NoPerson", "NotAdmitted", "RequestReused"]];
-    POST "/requests/{id}/approve" "Approve an access request" S [SIGNED_BODY, &["NotAdmitted", "RequestDecided"], &["SourceUnknown"]];
-    POST "/requests/{id}/decline" "Decline an access request" S [SIGNED_BODY, &["RequestDecided", "RequestUnknown"], &["NotAdmitted"]];
-    POST "/requests/{id}/reconcile" "Settle an approval" S [SIGNED_BODY, &["NoPerson", "NotAdmitted"]];
-    GET "/connections" "What the service is connected to" S [ADMIN];
+    GET "/requests" "The access requests" S [SIGNED, &["NoPerson", "NotAdmitted", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("request", "read", []);
+    POST "/requests" "Ask for access" S [SIGNED_BODY, &["RelationUnknown"], &["NoPerson", "NotAdmitted", "RequestReused"]] scope("request", "request.create", []);
+    POST "/requests/{id}/approve" "Approve an access request" S [SIGNED_BODY, &["NotAdmitted", "RequestDecided"], &["SourceUnknown"]] scope("request", "request.approve", ["id"]);
+    POST "/requests/{id}/decline" "Decline an access request" S [SIGNED_BODY, &["RequestDecided", "RequestUnknown"], &["NotAdmitted"]] scope("request", "request.decline", ["id"]);
+    POST "/requests/{id}/reconcile" "Settle an approval" S [SIGNED_BODY, &["NoPerson", "NotAdmitted"]] scope("request", "request.reconcile", ["id"]);
+    GET "/connections" "What the service is connected to" S [ADMIN] scope("connection", "read", []);
     GET "/sign-in-providers" "The sign-in providers" S [ADMIN, &["SignInProvidersUnavailable"]];
     POST "/sign-in-providers" "Set a sign-in provider" S [ADMIN_BODY, &["ProviderRefused"]];
     POST "/link-audit" "Deliver a link-audit record" G [AGENT, &["NotAdmitted", "NotSignedIn", "RequestMalformed"]];
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
     GET "/network" "The machines" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
-    GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]];
+    GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]] scope("harness", "read", []);
     POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]];
     POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
@@ -181,8 +197,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProvisioningReused", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]];
     POST "/agents/{id}/mcp-requests/{request}/approve" "Approve an MCP request within remit" G [SIGNED_BODY, AGENT, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "TeamsUnavailable", "ProfileNotReviewed", "ProvisioningReused", "RequestUnknown", "RequestDecided", "RequestReused", "mcp_beyond_remit", "mcp_server_held", "McpSettingUnrepresentable"]];
     POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]];
-    GET "/skills" "The skills Lys keeps" S [SIGNED];
-    POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY];
+    GET "/skills" "The skills Lys keeps" S [SIGNED] scope("skill", "read", []);
+    POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY] scope("skill", "skill.keep", []);
     POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, PROFILE_REVIEW];
     POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], &["SecretsUnavailable"], START_RUNNER, START_BUDGET];
     POST "/agents/{id}/restart" "Restart an agent on its latest reviewed profile" S [SIGNED_BODY, RESTART];
@@ -258,22 +274,22 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/teams/{id}/members/{member}/confirm" "Confirm a held membership" S [ADMIN_BODY, &["TeamsUnavailable"]];
     POST "/teams/{id}/nesting" "Replace a team parent and lead" S [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
     POST "/teams/{id}/retire" "Retire a team" S [SIGNED_BODY];
-    GET "/resources" "The resources grants are on" S [SIGNED, &["NotAdmitted"]];
-    GET "/secrets" "The secrets" S [SIGNED, &["NoPerson", "SecretsUnavailable"]];
-    GET "/secrets/grants" "The secrets' grants" S [SIGNED];
-    GET "/secrets/audit" "The secrets' audit" S [SIGNED];
-    GET "/secrets/revocation" "The secrets' revocations" S [SIGNED, &["RequestMalformed"]];
-    GET "/secrets/settings" "The secrets' settings" S [SIGNED, &["RequestMalformed"]];
-    GET "/secrets/handles" "The secret handles" S [SIGNED, &["RequestMalformed"]];
-    POST "/secrets/scope" "Scope a secret" S [SIGNED_BODY, &["LendingNotPermitted"]];
-    POST "/secrets/recipients" "A secret's recipients" S [SIGNED_BODY];
-    POST "/secrets/drop" "Drop a secret handle" S [SIGNED_BODY];
+    GET "/resources" "The resources grants are on" S [SIGNED, &["NotAdmitted"]] scope("resource", "read", []);
+    GET "/secrets" "The secrets" S [SIGNED, &["NoPerson", "SecretsUnavailable"]] scope("secret", "read", []);
+    GET "/secrets/grants" "The secrets' grants" S [SIGNED] scope("secret", "read", []);
+    GET "/secrets/audit" "The secrets' audit" S [SIGNED] scope("secret", "read", []);
+    GET "/secrets/revocation" "The secrets' revocations" S [SIGNED, &["RequestMalformed"]] scope("secret", "read", []);
+    GET "/secrets/settings" "The secrets' settings" S [SIGNED, &["RequestMalformed"]] scope("secret", "read", []);
+    GET "/secrets/handles" "The secret handles" S [SIGNED, &["RequestMalformed"]] scope("secret", "read", []);
+    POST "/secrets/scope" "Scope a secret" S [SIGNED_BODY, &["LendingNotPermitted"]] scope("secret", "secret.scope", []);
+    POST "/secrets/recipients" "A secret's recipients" S [SIGNED_BODY] scope("secret", "secret.recipients", []);
+    POST "/secrets/drop" "Drop a secret handle" S [SIGNED_BODY] scope("secret", "secret.drop", []);
     GET "/sessions" "The caller's sessions" S [SIGNED, &["NoPerson"]];
     POST "/sessions/{id}/end" "End one's own session" S [SIGNED, &["SessionUnknown"], &["NoPerson"]];
-    GET "/directory/people/{id}/sessions" "A person's sessions" S [ADMIN, &["IdentityUnknown"]];
-    POST "/directory/people/{id}/sessions/{session}/end" "End a session" S [ADMIN, &["SessionUnknown"], &["IdentityUnknown"]];
-    GET "/configuration" "The service's configuration" S [ADMIN, &["ConfigurationUnavailable"]];
-    PUT "/configuration" "Set the organisation zone at its current version" S [ADMIN_BODY, &["ConfigurationMalformed", "ConfigurationVersionConflict", "ConfigurationZoneRefused", "ConfigurationUnavailable", "NoPerson"]];
+    GET "/directory/people/{id}/sessions" "A person's sessions" S [ADMIN, &["IdentityUnknown"]] scope("session", "read", ["id"]);
+    POST "/directory/people/{id}/sessions/{session}/end" "End a session" S [ADMIN, &["SessionUnknown"], &["IdentityUnknown"]] scope("session", "session.end", ["session"]);
+    GET "/configuration" "The service's configuration" S [ADMIN, &["ConfigurationUnavailable"]] scope("configuration", "read", []);
+    PUT "/configuration" "Set the organisation zone at its current version" S [ADMIN_BODY, &["ConfigurationMalformed", "ConfigurationVersionConflict", "ConfigurationZoneRefused", "ConfigurationUnavailable", "NoPerson"]] scope("configuration", "configuration.zone.set", []);
     GET "/agents/{id}/memory" "An agent's memory" S [SIGNED, &["AgentNotVisible"]];
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]];
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]];
@@ -282,7 +298,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable"]];
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY];
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED];
-    GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]];
+    GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]] scope("change", "read", []);
     GET "/mcp" "MCP server stream availability" G [SIGNED];
     POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent"]];
     GET "/surface-contract" "The surface registration and computer admission contract" P [];
