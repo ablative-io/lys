@@ -317,8 +317,12 @@ pub(crate) async fn register_agent(
                 }
             };
             let target = registration_target(own, body.answers_to.as_deref(), true)?;
-            let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
-            crate::reporting_api::registered(&answer).map(Json)
+            crate::agent_policy_api::with_policies(&state, |policies| {
+                let answer =
+                    directory.register_reporting_agent(actor, op, target, profile, now())?;
+                policies.ensure_default(&answer.agent.to_string())?;
+                crate::reporting_api::registered(&answer).map(Json)
+            })
         });
     }
     let (op, profile) = (
@@ -335,8 +339,11 @@ pub(crate) async fn register_agent(
             Ok((actor, target))
         },
         |directory, (actor, target)| {
-            let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
-            crate::reporting_api::registered(&answer).map(Json)
+            crate::agent_policy_api::with_policies(&state, |policies| {
+                let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
+                policies.ensure_default(&answer.agent.to_string())?;
+                crate::reporting_api::registered(&answer).map(Json)
+            })
         },
     )
 }

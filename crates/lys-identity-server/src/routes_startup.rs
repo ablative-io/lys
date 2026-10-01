@@ -48,8 +48,15 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
     let budgets = crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), &say)?;
-    let policies =
+    let mut policies =
         crate::agent_policy_store::PolicyStore::configured(config, Arc::clone(&key), &say)?;
+    if let Some(store) = policies.as_mut() {
+        for (id, _) in directory.projection()?.records() {
+            if let lys_identity::IdentityId::Agent(agent) = id {
+                store.ensure_default(&agent.to_string())?;
+            }
+        }
+    }
     let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
     let acts = crate::runner_acts::ActStore::open(
         &config.log_dir.with_file_name("runner-acts"),

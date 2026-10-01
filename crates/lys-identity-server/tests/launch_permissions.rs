@@ -38,7 +38,7 @@ impl Table {
     /// Keep `rules` as the agent's Tool policy.
     async fn policy(&self, rules: &Value) -> TestResult {
         let path = format!("/agents/{}/policy", self.agent());
-        let body = json!({ "version": 0, "rules": rules });
+        let body = json!({ "version": 1, "rules": rules });
         let (status, kept) = self.service.post(&path, Some(&self.ada), &body).await?;
         assert_eq!(status, 200, "{kept}");
         Ok(())
@@ -195,6 +195,7 @@ async fn a_hard_policy_rule_the_settings_file_cannot_express_refuses_the_start_b
 #[tokio::test]
 async fn a_profile_with_no_permissions_writes_environment_only() -> TestResult {
     let table = Table::unprofiled().await?;
+    table.policy(&json!([])).await?;
     let (status, set) = table.record(0, &json!([]), &Value::Null).await?;
     assert_eq!(status, 200, "{set}");
     table.review(1).await?;
