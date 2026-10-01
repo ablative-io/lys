@@ -1,10 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Refused, api, operationId, request, useLoad } from '../../api';
 import { readRoles } from '../roles/AssignedRoles';
 import type { Machine, NetworkView } from '../network/contract';
 import { entries } from '../people/directory';
 import type { ProvisioningAnswer, ProvisioningProfile } from '../provisioning/Provisioning';
 import { Gate } from '../signin/Gate';
+import { ComputerAdmission } from '../network/ComputerAdmission';
+import type { PeopleView } from '../../generated';
+import type { Role } from '../roles/contract';
 
 export interface StartAnswer {
   agent: string; machine: string; runtime: string; session: string; provisioning_version: number; harness: string;
@@ -53,21 +56,35 @@ function retained(key: string, prefix: string): Pending | null {
 
 }
 
-export function StartAgent({ agent, profile, settings, refusal = '', canSave }: {
+export function StartAgent({ agent, profile, settings, refusal = '', canSave, known }: {
   agent: string; profile: ProvisioningProfile | null; settings?: Record<string, unknown>; refusal?: string; canSave?: boolean;
+  known?: { people: PeopleView; machines: Machine[] };
 }) {
   const load = useLoad(async () => {
-    const [me, people, network, roles] = await Promise.all([api.me(), api.people(), request<NetworkView>('/network'), readRoles()]);
+    const [me, people, network, roles] = await Promise.all([api.me(), known ? Promise.resolve(known.people) : api.people(), known ? Promise.resolve({ machines: known.machines }) : request<NetworkView>('/network'), readRoles()]);
     return { me, people, network, roles };
   }, 'launch-options:' + agent);
   return <Gate load={load} title="Start" ok={({ me, people, network, roles }) => {
     const identity = entries(people).find((entry) => entry.id === agent);
-    const held = roles.roles.filter((role) => role.holders.some((holder) => holder.holder === agent && holder.state === 'holding')).map((role) => role.id);
-    const machines = network.machines.filter((machine) => permitted(machine, agent, held));
     const mayReview = people.scope === 'directory' || identity?.person?.id === me.person.id;
-    const problem = identity?.state !== 'active' ? 'AgentNotActive: turn this agent on before starting it.' : !machines.length ? 'MachineUnavailable: no computer with a Lys runner admits this agent.' : refusal;
-    return <StartForm agent={agent} person={me.person.id} machines={machines} profile={profile} settings={settings} refusal={problem} canSave={canSave ?? people.scope === 'directory'} mayReview={mayReview} />;
+    return <StartChoices key={agent} agent={agent} name={identity?.display_name ?? agent} active={identity?.state === 'active'} person={me.person.id} admin={people.scope === 'directory'} machines={network.machines} roles={roles.roles} profile={profile} settings={settings} refusal={refusal} canSave={canSave ?? people.scope === 'directory'} mayReview={mayReview} />;
   }} />;
+}
+
+function StartChoices({ agent, name, active, person, admin, machines: initialMachines, roles, profile, settings, refusal, canSave, mayReview }: {
+  agent: string; name: string; active: boolean; person: string; admin: boolean; machines: Machine[]; roles: Role[];
+  profile: ProvisioningProfile | null; settings?: Record<string, unknown>; refusal: string; canSave: boolean; mayReview: boolean;
+}) {
+  const [machines, setMachines] = useState(initialMachines);
+  const held = roles.filter((role) => role.holders.some((holder) => holder.holder === agent && holder.state === 'holding')).map((role) => role.id);
+  const admitted = machines.filter((machine) => permitted(machine, agent, held));
+  const problem = !active ? 'AgentNotActive: turn this agent on before starting it.' : !admitted.length ? 'MachineUnavailable: no computer with a Lys runner admits this agent.' : refusal;
+  return <>
+    <ComputerAdmission agent={agent} name={name} person={person} admin={admin} machines={machines} roles={roles} changed={(machine) => {
+      setMachines((current) => current.some((entry) => entry.id === machine.id) ? current.map((entry) => entry.id === machine.id ? machine : entry) : [...current, machine]);
+    }} />
+    <StartForm agent={agent} person={person} machines={admitted} profile={profile} settings={settings} refusal={problem} canSave={canSave} mayReview={mayReview} />
+  </>;
 }
 
 function StartForm({ agent, person, machines, profile, settings, refusal, canSave, mayReview }: {
@@ -105,6 +122,9 @@ function StartForm({ agent, person, machines, profile, settings, refusal, canSav
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<StartAnswer | null>(null);
   const working = useRef(false);
+  useEffect(() => {
+    if (!pending && !answer && !busy && machine !== preferred && !machines.some((entry) => entry.id === machine)) setMachine(preferred);
+  }, [machines, machine, preferred, pending, answer, busy]);
   const block = initial.error || refusal;
   const persist = (next: Pending) => { sessionStorage.setItem(key, JSON.stringify(next)); setPending(next); };
   const nextReview = (version: number, computer: string): Pending => ({ stage: 'review', path: prefix + '/provisioning/' + version + '/review', body: { operation: operationId() }, machine: computer, version });
@@ -139,7 +159,7 @@ function StartForm({ agent, person, machines, profile, settings, refusal, canSav
           if (receipt.agent !== agent || receipt.machine !== current.machine || receipt.session !== current.body.operation || receipt.executed !== false || typeof receipt.command !== 'string' || !receipt.command || !Array.isArray(receipt.left_out)) fail('StartReceiptMismatch', 'The start answer did not confirm the retained request.');
           if (receipt.provisioning_version !== current.version) fail('StartVersionChanged', 'The runner start names a different profile version; check that session before another start.');
           const runner = receipt.runner;
-          if (!runner) fail('RunnerStartUnconfirmed', 'Lys returned a command but no runner confirmed this agent started. The same request is retained.');
+          if (!runner) fail('RunnerStartUnconfirmed', 'Lys admitted the start, but no runner ran it. The same request is retained.');
           if (runner.session !== receipt.session || !['running', 'ended'].includes(runner.state)) fail('StartReceiptMismatch', 'The runner answer did not name this session and its state.');
           if (current.legacyKey) sessionStorage.removeItem(current.legacyKey);
           sessionStorage.removeItem(key); setPending(null); setAnswer(receipt); return;
@@ -173,10 +193,10 @@ function StartForm({ agent, person, machines, profile, settings, refusal, canSav
   </div>;
   return <form onSubmit={(event) => { event.preventDefault(); void run(); }}>
     <label className="field">Computer this agent runs on<select name="machine" value={machine} disabled={busy || Boolean(pending?.machine)} onChange={(event) => setMachine(event.target.value)}>{machines.length !== 1 ? <option value="">Choose a computer</option> : null}{machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>
-    {block ? <p role="alert" className="why-not">{block}</p> : null}
+    {block ? <><p role="alert" className="why-not">This agent cannot start yet.</p><details><summary>Details</summary><p>{block}</p></details></> : null}
     {pending ? <p role="status">This start has no confirmed answer. Its original request is retained. Press Start this agent to check that same request.</p> : null}
     {reviewNotice ? <p role="status">{reviewNotice}</p> : null}
-    {failure ? <p role="alert" className="why-not">{failure}</p> : null}
+    {failure ? <><p role="alert" className="why-not">{failure.includes('RunnerStartUnconfirmed:') ? 'Lys admitted the start, but no runner ran it.' : 'Lys could not confirm this agent’s start.'}</p><details><summary>Details</summary><p>{failure}</p></details></> : null}
     <button type="submit" className="btn primary" disabled={busy || Boolean(initial.error) || (!pending && (Boolean(block) || !machine))}>Start this agent</button>
   </form>;
 }

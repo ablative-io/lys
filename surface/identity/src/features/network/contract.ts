@@ -1,5 +1,6 @@
 /** Machine declarations as network_api.rs serves them; declarations are not runtime reports. */
 import type { AgentSummary } from '../../generated';
+import { Refused } from '../../api';
 export interface Machine {
   id: string; name: string; kind: string; runtime: string | null; slots: number;
   may_run: AgentSummary[]; may_run_roles?: string[]; may_reach: string[]; named_by: string; named_at: number;
@@ -10,25 +11,54 @@ export interface NameMachine {
   operation: string; name: string; kind: string; runtime: string | null;
   slots: number; may_run: string[]; may_run_roles?: string[]; may_reach: string[];
 }
-export function matchesMachine(machine: Machine, body: NameMachine, person: string): boolean {
+export function isRecord(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+export const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((part) => typeof part === 'string');
+export function readableMachine(value: unknown): value is Machine {
+  return isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string' && (value.state === 'in_use' || value.state === 'retired')
+    && (value.runtime === null || typeof value.runtime === 'string') && Array.isArray(value.may_run)
+    && value.may_run.every((agent) => isRecord(agent) && typeof agent.id === 'string')
+    && (value.may_run_roles === undefined || strings(value.may_run_roles));
+}
+export function matchesMachine(machine: unknown, body: NameMachine, person: string): machine is Machine {
+  if (!readableMachine(machine)) return false;
   return machine.id === body.operation && machine.named_by === person && machine.name === body.name
     && machine.kind === body.kind && machine.runtime === body.runtime && machine.slots === body.slots
     && JSON.stringify(machine.may_run.map((agent) => agent.id)) === JSON.stringify(body.may_run)
     && JSON.stringify(machine.may_run_roles ?? []) === JSON.stringify(body.may_run_roles ?? [])
     && JSON.stringify(machine.may_reach) === JSON.stringify(body.may_reach);
 }
-export function savedMachine(key: string): NameMachine | null {
+export interface PendingMachine { body: NameMachine; phase: 'machine' | 'runner' | 'read-runner'; legacy: boolean; machine: Machine | null }
+function unreadable(): never { throw new Refused(0, { refusal: 'PendingMachineUnreadable', reason: 'The retained computer addition cannot be read. Resolve its original request before adding another computer.' }); }
+function machineBody(value: unknown): NameMachine {
+  if (!isRecord(value) || typeof value.operation !== 'string' || !/^op-[0-9a-f]{32}$/.test(value.operation)
+    || typeof value.name !== 'string' || !value.name.trim() || typeof value.kind !== 'string'
+    || !(value.runtime === null || typeof value.runtime === 'string') || typeof value.slots !== 'number' || !Number.isInteger(value.slots) || value.slots < 0
+    || !strings(value.may_run) || !strings(value.may_reach) || (value.may_run_roles !== undefined && !strings(value.may_run_roles))) return unreadable();
+  return { operation: value.operation, name: value.name, kind: value.kind, runtime: value.runtime, slots: value.slots,
+    may_run: value.may_run, may_reach: value.may_reach, ...(value.may_run_roles !== undefined ? { may_run_roles: value.may_run_roles } : {}) };
+}
+export function savedMachine(key: string): PendingMachine | null {
   const raw = sessionStorage.getItem(key);
   if (raw === null) return null;
-  const value: unknown = JSON.parse(raw);
-  const strings = (data: unknown): data is string[] => Array.isArray(data) && data.every((part) => typeof part === 'string');
-  if (!value || typeof value !== 'object' || !('operation' in value) || typeof value.operation !== 'string'
-    || !/^op-[0-9a-f]{32}$/.test(value.operation) || !('name' in value) || typeof value.name !== 'string'
-    || !('kind' in value) || typeof value.kind !== 'string' || !('runtime' in value) || !(value.runtime === null || typeof value.runtime === 'string')
-    || !('slots' in value) || typeof value.slots !== 'number' || !Number.isInteger(value.slots) || value.slots < 0
-    || ('may_run_roles' in value && !strings(value.may_run_roles))
-    || !('may_run' in value) || !strings(value.may_run) || !('may_reach' in value) || !strings(value.may_reach)) {
-    throw new Error('The retained machine registration could not be read. It must be resolved before another is sent.');
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return unreadable(); }
+  if (isRecord(value) && 'body' in value) {
+    if (value.version !== 1 || !['machine', 'runner', 'read-runner'].includes(String(value.phase)) || typeof value.legacy !== 'boolean'
+      || (value.phase === 'runner' && value.legacy) || (value.phase === 'read-runner' && !value.legacy)) return unreadable();
+    const body = machineBody(value.body);
+    const machine = value.machine;
+    if (machine !== null && (!readableMachine(machine) || machine.id !== body.operation)) return unreadable();
+    if (value.phase !== 'machine' && machine === null) return unreadable();
+    return { body, phase: value.phase as PendingMachine['phase'], legacy: value.legacy, machine };
   }
-  return { operation: value.operation, name: value.name, kind: value.kind, runtime: value.runtime, slots: value.slots, may_run: value.may_run, may_reach: value.may_reach, ...('may_run_roles' in value ? { may_run_roles: value.may_run_roles as string[] } : {}) };
+  return { body: machineBody(value), phase: 'machine', legacy: true, machine: null };
+}
+
+export function confirmRunner(value: unknown, machine: string, local: boolean): void {
+  const runner = isRecord(value) ? value.runner : undefined;
+  if (!isRecord(value) || value.machine !== machine || !isRecord(runner)
+    || !(runner.kind === 'lys' || (!local && runner.kind === 'socket' && typeof runner.path === 'string' && runner.path.startsWith('/'))
+      || (!local && runner.kind === 'dialled' && typeof runner.key === 'string' && /^[0-9a-f]{64}$/.test(runner.key)))) {
+    throw new Refused(200, { refusal: 'RunnerReceiptMismatch', reason: 'The computer’s runner is missing or could not be confirmed. Its addition remains unresolved; no runner is invented.' });
+  }
 }

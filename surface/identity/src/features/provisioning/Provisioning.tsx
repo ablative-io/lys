@@ -26,6 +26,6 @@ export function Provisioning({ id }: { id: string }) {
     return { answer, people, choices };
   }, 'provisioning:' + id);
   return <Gate load={load} title="Start" ok={({ answer, people, choices }) =>
-    <ProfileEditor key={id} readOnly={people.scope !== 'directory'} id={id} profile={answer.profile} choices={choices} />
+    <ProfileEditor key={id} readOnly={people.scope !== 'directory'} id={id} profile={answer.profile} choices={choices} people={people} />
   } />;
 }
