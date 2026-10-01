@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
@@ -207,18 +208,8 @@ impl Scratch {
             std::fs::write(&rendered.target, rendered.bytes.as_slice())?;
         }
         let hold = work.join("hold");
-        let made = rustix::fs::mkfifoat(
-            rustix::fs::CWD,
-            &hold,
-            rustix::fs::Mode::RUSR
-                | rustix::fs::Mode::WUSR
-                | rustix::fs::Mode::RGRP
-                | rustix::fs::Mode::WGRP
-                | rustix::fs::Mode::ROTH
-                | rustix::fs::Mode::WOTH,
-        );
-        assert!(made.is_ok(), "mkfifo failed: {made:?}");
-        made?;
+        let made = Command::new("mkfifo").arg(&hold).status()?;
+        assert!(made.success(), "mkfifo failed");
         let units = BINARIES
             .into_iter()
             .zip(["secrets", "identity"])
