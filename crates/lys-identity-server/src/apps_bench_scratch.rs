@@ -53,7 +53,7 @@ use crate::spicedb::{Relationships, SpiceDb, SpiceDbConnection};
 const EXAMPLE_ISSUER: &str = "https://bench.lys.invalid";
 
 #[path = "apps_bench_memory.rs"]
-mod memory;
+pub(crate) mod memory;
 use memory::MemoryStore;
 type ScratchGrants = Grants<MemoryStore, Relationships>;
 

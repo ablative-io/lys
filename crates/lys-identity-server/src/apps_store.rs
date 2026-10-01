@@ -178,6 +178,12 @@ impl<S: LeafStore> AppStore<S> {
             .checked_add(advance)
             .ok_or_else(|| unavailable("app model revision exceeds its range"))?;
 
+        let schema_app = match &line {
+            Line::Lys(_) | Line::Approved(_) | Line::Applied(_) | Line::Retired(_) => {
+                line.app().map(str::to_owned)
+            }
+            _ => None,
+        };
         let bytes = serde_json::to_vec(&line).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
@@ -185,7 +191,21 @@ impl<S: LeafStore> AppStore<S> {
                 self.uncertain = true;
                 return Err(unavailable(reason).into());
             }
-            self.schemas = schemas_of(&self.held)?;
+            if let Some(id) = schema_app {
+                let refreshed = self.held.app(&id).map(schema_of).transpose();
+                match refreshed {
+                    Ok(Some(Some(schema))) => {
+                        self.schemas.insert(id, schema);
+                    }
+                    Ok(_) => {
+                        self.schemas.remove(&id);
+                    }
+                    Err(error) => {
+                        self.uncertain = true;
+                        return Err(error);
+                    }
+                }
+            }
             self.model_revision = model_revision;
             self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
@@ -388,24 +408,37 @@ fn refusal(line: &Line, refused: Refused) -> ServerError {
     error.into()
 }
 
-/// Each approved, unretired app's current schema, read and checked.
-fn schemas_of(held: &Held) -> Result<BTreeMap<String, AppSchema>, ServerError> {
-    let mut schemas = BTreeMap::new();
-    for app in &held.apps {
-        if app.standing() != Standing::Approved {
-            continue;
-        }
-        let Some(current) = app.current() else {
-            continue;
-        };
-        let id = &app.registered.app;
-        let schema = AppSchema::parse(id, &current.schema).map_err(|error| {
+#[cfg(test)]
+thread_local! { static SCHEMA_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
+fn schema_of(app: &App) -> Result<Option<AppSchema>, ServerError> {
+    if app.standing() != Standing::Approved {
+        return Ok(None);
+    }
+    let Some(current) = app.current() else {
+        return Ok(None);
+    };
+    #[cfg(test)]
+    SCHEMA_READS.with(|reads| reads.set(reads.get() + 1));
+    let id = &app.registered.app;
+    AppSchema::parse(id, &current.schema)
+        .map(Some)
+        .map_err(|error| {
             unavailable(format!(
                 "the app {id}'s schema version {} does not read back: {error}",
                 current.version
             ))
-        })?;
-        schemas.insert(id.clone(), schema);
+            .into()
+        })
+}
+
+/// Each approved, unretired app's current schema, read once on opening.
+fn schemas_of(held: &Held) -> Result<BTreeMap<String, AppSchema>, ServerError> {
+    let mut schemas = BTreeMap::new();
+    for app in &held.apps {
+        if let Some(schema) = schema_of(app)? {
+            schemas.insert(app.registered.app.clone(), schema);
+        }
     }
     Ok(schemas)
 }
@@ -450,3 +483,7 @@ fn schema_revision(held: &Held) -> Result<u64, ServerError> {
             .ok_or_else(|| unavailable("app model revision exceeds its range").into())
     })
 }
+
+#[cfg(test)]
+#[path = "apps_store_schema_tests.rs"]
+mod schema_tests;
