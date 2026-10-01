@@ -1,12 +1,16 @@
 //! Nested team totals count each member once and retain unavailable sources.
 
 use std::error::Error;
+use std::sync::Arc;
 
 use identity_contract::apps::{Auth, send};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
+use lys_core::Ed25519Identity;
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::seed_configured;
+use lys_identity_server::runtime_state::{Report, Reported};
+use lys_identity_server::runtime_store::RuntimeStore;
 use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -19,8 +23,35 @@ struct Table {
 
 impl Table {
     async fn fresh() -> TestResult<Self> {
-        let (service, seeded) = Service::start_with(|config| {
-            Ok(seed_configured(config, [ADMINISTRATOR, "other-subject"])?)
+        Self::with_session(false).await
+    }
+
+    async fn with_session(has_session: bool) -> TestResult<Self> {
+        let (service, seeded) = Service::start_with(move |config| {
+            let seeded = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
+            if has_session {
+                let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+                let mut runtime = RuntimeStore::open(
+                    config
+                        .runtime_dir
+                        .as_deref()
+                        .ok_or("no runtime directory")?,
+                    key,
+                )?;
+                runtime.report(Report {
+                    operation: OperationId::generate()?.to_string(),
+                    session: OperationId::generate()?.to_string(),
+                    agent: Some(seeded.people[0].agents[2].id.to_string()),
+                    machine: OperationId::generate()?.to_string(),
+                    state: Reported::Starting,
+                    what: "tracked session".to_owned(),
+                    confirmation: String::new(),
+                    reported_by: seeded.people[0].id.to_string(),
+                    at: 1,
+                    launch: None,
+                })?;
+            }
+            Ok(seeded)
         })
         .await?;
         let cookie = service
@@ -66,30 +97,51 @@ impl Table {
         assert_eq!(status, 200, "{answer}");
         Ok(answer)
     }
+
+    async fn charged_team(&self) -> TestResult<(String, String, Value)> {
+        let parent = self.team(None).await?;
+        let child = self.team(Some(&parent)).await?;
+        self.member(&parent, &self.agents[0]).await?;
+        for agent in &self.agents[..2] {
+            self.member(&child, agent).await?;
+        }
+        let at = jiff::Timestamp::now().as_millisecond();
+        for (agent, tokens, running, dollars, percent) in [
+            (&self.agents[0], 200, 100, 400_000_000, 49),
+            (&self.agents[1], 300, 150, 100_000_000, 50),
+        ] {
+            self.post(&format!("/agents/{agent}/usage"), &json!({"event": agent, "at_ms": at, "tokens": tokens, "running_ms": running, "dollars_micros": dollars, "account": "shared-account", "plan_windows": [{"duration_minutes": 10_080, "used_percent": percent, "resets_at_ms": at + 604_800_000}]})).await?;
+        }
+        let limits = json!([
+            {"unit": "tokens", "amount": 600, "period": "week", "act": "stop"},
+            {"unit": "running_ms", "amount": 300, "period": "week", "act": "tell"},
+            {"unit": "dollars", "amount": 600, "period": "week", "act": "stop"},
+            {"unit": "plan_percent", "amount": 60, "period": "week", "act": "stop"}
+        ]);
+        Ok((parent, child, limits))
+    }
+
+    async fn start(&self, agent: &str, route: &str) -> TestResult<(u16, Value)> {
+        let machine = OperationId::generate()?.to_string();
+        let body = if route == "start-command" {
+            json!({"machine": machine, "operation": OperationId::generate()?.to_string()})
+        } else {
+            json!({"machine": machine, "profile_version": "1"})
+        };
+        self.service
+            .post(
+                &format!("/agents/{agent}/{route}"),
+                Some(&self.cookie),
+                &body,
+            )
+            .await
+    }
 }
 
 #[tokio::test]
 async fn nested_team_usage_is_deduplicated_and_appears_in_each_agents_within_rows() -> TestResult {
     let table = Table::fresh().await?;
-    let parent = table.team(None).await?;
-    let child = table.team(Some(&parent)).await?;
-    table.member(&parent, &table.agents[0]).await?;
-    for agent in &table.agents[..2] {
-        table.member(&child, agent).await?;
-    }
-    let at = jiff::Timestamp::now().as_millisecond();
-    for (agent, tokens, running, dollars, percent) in [
-        (&table.agents[0], 200, 100, 400_000_000, 49),
-        (&table.agents[1], 300, 150, 100_000_000, 50),
-    ] {
-        table.post(&format!("/agents/{agent}/usage"), &json!({"event": agent, "at_ms": at, "tokens": tokens, "running_ms": running, "dollars_micros": dollars, "account": "shared-account", "plan_windows": [{"duration_minutes": 10_080, "used_percent": percent, "resets_at_ms": at + 604_800_000}]})).await?;
-    }
-    let limits = json!([
-        {"unit": "tokens", "amount": 600, "period": "week", "act": "stop"},
-        {"unit": "running_ms", "amount": 300, "period": "week", "act": "tell"},
-        {"unit": "dollars", "amount": 600, "period": "week", "act": "stop"},
-        {"unit": "plan_percent", "amount": 60, "period": "week", "act": "stop"}
-    ]);
+    let (parent, child, limits) = table.charged_team().await?;
     let path = format!("/teams/{parent}/budget");
     let (status, answer) = send(
         &table.service,
@@ -126,13 +178,9 @@ async fn nested_team_usage_is_deduplicated_and_appears_in_each_agents_within_row
     }
     table.member(&child, &table.agents[2]).await?;
     let unknown = table.get(&path).await?;
-    assert_eq!(unknown["used"][2]["figure"], Value::Null);
-    assert!(
-        unknown["used"][2]["unavailable"]
-            .as_str()
-            .is_some_and(|reason| reason.contains(&table.agents[2]))
-    );
-    assert_eq!(unknown["used"][3]["figure"], Value::Null);
+    assert_eq!(unknown["used"][2]["figure"], 500);
+    assert_eq!(unknown["used"][2]["unavailable"], Value::Null);
+    assert_eq!(unknown["used"][3]["figure"], 50);
     let (status, refused) = send(
         &table.service,
         reqwest::Method::PUT,
@@ -144,5 +192,49 @@ async fn nested_team_usage_is_deduplicated_and_appears_in_each_agents_within_row
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "BudgetUnitUnavailable");
     assert_eq!(table.get(&path).await?["version"], 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_member_with_a_session_and_no_dollar_report_refuses_both_starts() -> TestResult {
+    let table = Table::with_session(true).await?;
+    let (parent, child, limits) = table.charged_team().await?;
+    let path = format!("/teams/{parent}/budget");
+    let (status, answer) = send(
+        &table.service,
+        reqwest::Method::PUT,
+        &path,
+        Auth::Cookie(&table.cookie),
+        Some(&json!({"limits": limits, "warn_at": null, "version": 0})),
+    )
+    .await?;
+    assert_eq!(status, 200, "{answer}");
+    let member = &table.agents[2];
+    table.member(&child, member).await?;
+    let unknown = table.get(&path).await?;
+    let starts = [
+        ("start-command", table.start(member, "start-command").await?),
+        ("start", table.start(member, "start").await?),
+    ];
+    assert_eq!(unknown["used"][2]["figure"], Value::Null, "{unknown}");
+    assert!(
+        unknown["used"][2]["unavailable"]
+            .as_str()
+            .is_some_and(|reason| reason.contains(member)),
+        "{unknown}"
+    );
+    assert_eq!(unknown["used"][3]["figure"], Value::Null, "{unknown}");
+    for (route, (status, refused)) in starts {
+        assert_eq!(status, 503, "{route}: {refused}");
+        assert_eq!(
+            refused["refusal"], "BudgetsUnavailable",
+            "{route}: {refused}"
+        );
+        let reason = refused["reason"].as_str().ok_or("no refusal reason")?;
+        assert!(
+            reason.contains("dollars") && reason.contains(member),
+            "{route}: {refused}"
+        );
+    }
     Ok(())
 }
