@@ -371,15 +371,16 @@ async fn stop(
         }
         (Err(other), _) => return Err(other.into()),
     }
-    crate::agent_pass::end_agent(&state, agent)?;
     // Asked only once the directory holds this operation's suspension, so a
     // refused stop leaves no asked line in other words behind it.
     if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {
+        crate::agent_pass::end_agent(&state, agent)?;
         return through_runners(&state, kept.into(), &by).await.map(Json);
     }
+    let sessions_asked = ask_sessions(&state, &agent.to_string(), &asked.operation, &by, &reason)?;
+    crate::agent_pass::end_agent(&state, agent)?;
     let agent = agent.to_string();
     let certificates_withdrawn = withdraw_certificates(&state, &agent, &by, &reason)?;
-    let sessions_asked = ask_sessions(&state, &agent, &asked.operation, &by, &reason)?;
     let (credentials_ended, credentials_refused) =
         match end_handles(&state, &headers, &agent, &asked.operation).await {
             Ok(ended) => (Some(ended), None),

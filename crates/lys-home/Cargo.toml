@@ -30,6 +30,7 @@ sha2.workspace = true
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }
 tokio = { workspace = true, features = ["io-util"] }
+toml = { workspace = true, features = ["display"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix.workspace = true
@@ -44,7 +45,6 @@ path = "src/bin/lys-proxy.rs"
 
 [dev-dependencies]
 tempfile.workspace = true
-toml.workspace = true
 
 [lints]
 workspace = true

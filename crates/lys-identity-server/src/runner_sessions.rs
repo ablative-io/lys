@@ -233,7 +233,7 @@ pub fn confirmation(ended: &Ended) -> String {
 /// Keep `driven`'s end as its runner saw it, once.
 pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<(), ServerError> {
     if state.runtime.is_none() {
-        return Ok(());
+        return crate::agent_pass::end_session(state, &driven.session);
     }
     with_runtime(state, |store| {
         if store
@@ -250,6 +250,7 @@ pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<()
         );
         store.report(report).map(drop)
     })?;
+    crate::agent_pass::end_session(state, &driven.session)?;
     crate::budgets_context::finish(state, &driven.agent, &driven.session)
 }
 
@@ -312,15 +313,28 @@ pub async fn run_on_runner(
         machine: machine.to_owned(),
         runner: runner.clone(),
     };
-    let asked = crate::runner_client::ask(
-        state,
-        machine,
-        runner.clone(),
+    let session = launch.session.clone();
+    let already_issued = crate::agent_pass::store(state)?.has_session(&session)?;
+    let act = if already_issued {
+        Act::Status {
+            session: Some(session.clone()),
+        }
+    } else {
+        let agent_id = AgentId::from_str(agent)?;
+        let record = launch
+            .environment
+            .get("LYS_LAUNCH_RECORD")
+            .map_or(session.as_str(), String::as_str);
+        let pass = crate::agent_pass::store(state)?.issue(agent_id, record, &session)?;
         Act::Start {
             launch: Box::new(launch),
-        },
-    )
-    .await;
+            lys_mcp: Some(lys_runner::protocol::LysMcp {
+                url: format!("{}/api/mcp", state.oidc.public_origin()),
+                pass: pass.to_string(),
+            }),
+        }
+    };
+    let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
     let answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
             let act = Act::Status {
@@ -330,6 +344,9 @@ pub async fn run_on_runner(
         }
         other => other,
     };
+    if answer.is_err() {
+        crate::agent_pass::end_session(state, &session)?;
+    }
     let outcome = answer
         .as_ref()
         .map_or_else(ServerError::name, |answer| kind(answer).to_owned());

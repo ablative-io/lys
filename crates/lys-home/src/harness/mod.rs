@@ -17,6 +17,7 @@ pub mod description;
 /// handles and channel policy, and the kept skills (HOME-037).
 pub mod launch_fields;
 mod launch_fields_tests;
+pub mod lys_mcp;
 /// The native rendering registry, addressed by description contract identifier.
 pub mod rendering;
 pub mod rendering_launch;

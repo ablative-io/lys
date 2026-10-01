@@ -12,17 +12,7 @@ use sha2::{Digest, Sha256};
 use crate::error::RunnerError;
 use crate::protocol::{Launch, hex};
 
-/// One signed config file.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct File {
-    /// Its relative location.
-    pub path: String,
-    /// Its exact contents.
-    pub text: String,
-    /// Its lowercase content digest.
-    pub sha256: String,
-}
+pub use lys_home::harness::rendering_launch::File;
 
 /// Config files and the process inputs bound to their locations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,6 +111,19 @@ fn checked(config: &Config, arguments: usize) -> Result<(), RunnerError> {
         }
     }
     Ok(())
+}
+
+/// Verify the supplied config before adding the run-only MCP entry.
+pub(crate) fn add_lys_mcp(
+    launch: &mut Launch,
+    entry: &crate::protocol::LysMcp,
+) -> Result<(), RunnerError> {
+    let config = launch.config.as_mut().ok_or_else(|| {
+        RunnerError::refused("LysMcpConfigMissing", "the launch carries no native config")
+    })?;
+    checked(config, launch.arguments.len())?;
+    lys_home::harness::lys_mcp::render(&mut config.files, &config.environment_paths, entry)
+        .map_err(|error| RunnerError::refused(error.name(), error.to_string()))
 }
 
 fn directory(path: &Path) -> Result<(), RunnerError> {

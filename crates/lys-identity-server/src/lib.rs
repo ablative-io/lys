@@ -11,6 +11,7 @@ pub mod accounts;
 pub mod admission;
 mod agent_grants_api;
 pub mod agent_pass;
+mod agent_pass_recovery;
 pub mod agent_pass_store;
 pub mod agent_policy_api;
 pub mod agent_policy_store;

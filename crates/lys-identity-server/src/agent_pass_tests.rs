@@ -14,7 +14,9 @@ fn agent_pass_survives_service_restart_as_a_digest_only() -> Result<(), Box<dyn 
     let pass = passes.issue(agent, "launch-one", "session-one")?;
     assert_eq!(passes.lookup(&pass)?, agent);
     assert!(!std::fs::read_to_string(&file)?.contains(pass.as_str()));
-    let reopened = Passes::open(file)?;
+    let mut reopened = Passes::open(file)?;
+    assert!(reopened.lookup(&pass).is_err());
+    reopened.reconcile(|_, _, _| true)?;
     assert_eq!(reopened.lookup(&pass)?, agent);
     Ok(())
 }
@@ -44,9 +46,13 @@ fn agent_pass_stop_end_and_withdraw_each_refuse_the_old_pass() -> Result<(), Box
         Err(ServerError::AgentPassRefused { .. })
     ));
     assert!(matches!(
-        Passes::open(file)?.lookup(&pass),
+        Passes::open(file.clone())?.lookup(&pass),
         Err(ServerError::AgentPassRefused { .. })
     ));
+    let mut reopened = Passes::open(file.clone())?;
+    reopened.reconcile(|_, _, _| false)?;
+    assert!(reopened.lookup(&pass).is_err());
+    assert!(Passes::open(file)?.lookup(&pass).is_err());
     Ok(())
 }
 
@@ -87,5 +93,28 @@ fn agent_pass_failed_end_refuses_cached_admission() -> Result<(), Box<dyn Error>
         passes.lookup(&pass),
         Err(ServerError::AgentPassRefused { .. })
     ));
+    Ok(())
+}
+
+#[test]
+fn agent_pass_failed_end_does_not_revive_on_reopen() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let file = dir.path().join("passes.json");
+    let mut passes = Passes::open(file.clone())?;
+    let pass = passes.issue(AgentId::from_bytes([1; 16]), "launch-one", "session-one")?;
+    let earlier = std::fs::read(&file)?;
+    std::fs::remove_file(&file)?;
+    std::fs::create_dir(&file)?;
+    assert!(passes.end_session("session-one").is_err());
+    std::fs::remove_dir(&file)?;
+    std::fs::write(&file, earlier)?;
+    assert!(matches!(
+        Passes::open(file.clone())?.lookup(&pass),
+        Err(ServerError::AgentPassRefused { .. })
+    ));
+    let mut reopened = Passes::open(file.clone())?;
+    reopened.reconcile(|_, _, _| false)?;
+    assert!(reopened.lookup(&pass).is_err());
+    assert!(Passes::open(file)?.lookup(&pass).is_err());
     Ok(())
 }
