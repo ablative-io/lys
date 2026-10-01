@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use super::{Sessions, now_ms, unknown, valid_id};
+use super::{Sessions, lifecycle, now_ms, unknown, valid_id};
 use crate::error::RunnerError;
 use crate::operations::{OperationOutcome, begin_restart, finish_restart};
 use crate::peer::Leader;
@@ -58,7 +58,7 @@ impl Sessions {
                     "the old process's exit has no status or signal; its launch was not restarted",
                 ));
             }
-            self.relaunch(id, &ended)?;
+            self.relaunch(id)?;
             Ok(ended)
         });
         let mut table = self.lock();
@@ -69,7 +69,7 @@ impl Sessions {
         outcome
     }
 
-    fn relaunch(self: &Arc<Self>, id: &str, ended: &Ended) -> Result<(), RunnerError> {
+    fn relaunch(self: &Arc<Self>, id: &str) -> Result<(), RunnerError> {
         let mut table = self.lock();
         if table.stopping {
             return Err(RunnerError::refused(
@@ -91,19 +91,15 @@ impl Sessions {
             .transpose()?;
         session.columns = launch.columns;
         session.rows = launch.rows;
-        session.ending = false;
-        session.guard.idle = true;
-        session.ended = None;
-        if let Err(error) = self.run(id, session, false) {
-            session.ended = Some(ended.clone());
-            return Err(error);
-        }
-        session.started_at = now_ms();
-        self.follow(&mut table, id);
-        self.persist(&table)?;
+        let plan = lifecycle::plan(session, false)?;
+        let generation = session.generation;
         drop(table);
-        self.writer.barrier()?;
-        self.wake();
+        if !self.replace_generation(id, generation, &plan, Some(now_ms()), true)? {
+            return Err(RunnerError::refused(
+                "runner_stopping",
+                "the runner stopped before the prepared restart was installed",
+            ));
+        }
         Ok(())
     }
 }
