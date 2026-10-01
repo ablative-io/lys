@@ -450,7 +450,7 @@ impl Sessions {
         table.sessions.insert(id.clone(), session);
         self.persist(&table)?;
         if let Some((executable, version)) = launched {
-            lifecycle::tracking_started(&mut table, &id, &executable, &version);
+            lifecycle::tracking_started(&mut table, &id, &executable, &version)?;
         }
         drop(table);
         self.writer.barrier()?;

@@ -61,7 +61,7 @@ impl Sessions {
                 if let Some(session) = table.sessions.get_mut(id) {
                     session.guard.idle = false;
                 }
-                append(&mut table, id, vec![boundary("turn_start", None)], None);
+                append(&mut table, id, vec![boundary("turn_start", None)], None)?;
                 Ok("a turn began".to_owned())
             }
             "Stop" if input.get("stop_hook_active").and_then(Value::as_bool) == Some(true) => Ok(
@@ -71,7 +71,7 @@ impl Sessions {
                 self.read_source(id, None);
                 let name = if event == "Stop" { "turn_end" } else { "session_end" };
                 let mut table = self.lock();
-                flushed(&mut table, self.runner(), id, name);
+                flushed(&mut table, self.runner(), id, name)?;
                 if event == "Stop" {
                     if let Some(session) = table.sessions.get_mut(id) {
                         session.guard.idle = true;
@@ -84,7 +84,7 @@ impl Sessions {
             }
             "PreCompact" => {
                 let mut table = self.lock();
-                append(&mut table, id, vec![boundary("compacting", None)], None);
+                append(&mut table, id, vec![boundary("compacting", None)], None)?;
                 crate::operations::compacting(&mut table, id);
                 drop(table);
                 self.wake();
@@ -145,7 +145,7 @@ impl Sessions {
                 ..SourceState::default()
             };
             let coverage = Coverage::of("source_refused", &refused, None, words.clone());
-            append(&mut table, id, vec![Body::Coverage(coverage)], None);
+            append(&mut table, id, vec![Body::Coverage(coverage)], None)?;
             return Err(unbound(words));
         }
         self.bind(&mut table, id, (given, claude), false)
@@ -185,7 +185,7 @@ impl Sessions {
                             words.clone(),
                         ))],
                         None,
-                    );
+                    )?;
                     return Err(RunnerError::refused("transcript_unreadable", words));
                 }
             }
@@ -209,7 +209,7 @@ impl Sessions {
             )),
             boundary("session_start", None),
         ];
-        append(table, id, bodies, Some(source));
+        append(table, id, bodies, Some(source))?;
         self.follow(table, id);
         Ok(words)
     }
@@ -246,7 +246,7 @@ impl Sessions {
         };
         let bodies = vec![body];
         let leader = crate::session::window_limit(table, id, &bodies);
-        append(table, id, bodies, Some(source));
+        append(table, id, bodies, Some(source))?;
         drop(guard);
         self.writer.barrier()?;
         if let Some(leader) = leader {
@@ -292,7 +292,7 @@ impl Sessions {
         drop(table);
         self.read_source(id, None);
         let mut table = self.lock();
-        append(&mut table, id, vec![boundary("turn_end", turn)], None);
+        append(&mut table, id, vec![boundary("turn_end", turn)], None)?;
         if let Some(session) = table.sessions.get_mut(id) {
             session.guard.idle = true;
         }
@@ -305,7 +305,12 @@ impl Sessions {
 
 /// Keep boundary `name` for session `id`, with the response its stream
 /// held pending, now shown whole.
-pub(crate) fn flushed(table: &mut Table, runner: &str, id: &str, name: &str) {
+pub(crate) fn flushed(
+    table: &mut Table,
+    runner: &str,
+    id: &str,
+    name: &str,
+) -> Result<(), RunnerError> {
     let source = table.feed.source(id).cloned();
     let pending = table.sessions.get(id).and_then(|session| {
         let tracking = session.guard.tracking.as_ref()?;

@@ -254,7 +254,11 @@ impl Sessions {
             .get(id)
             .is_some_and(|session| session.guard.tracking.is_some())
         {
-            crate::collector::flushed(&mut table, self.runner(), id, "session_end");
+            if let Err(error) =
+                crate::collector::flushed(&mut table, self.runner(), id, "session_end")
+            {
+                crate::error::said(&format!("session {id}: final_usage_record_failed: {error}"));
+            }
         }
         crate::operations::ended(&mut table, id, &ended);
         self.persist_logged(&table);
@@ -307,7 +311,9 @@ impl Sessions {
                 crate::error::said(&format!("session {id}: coverage_incomplete: {words}"));
                 let source = table.feed.source(id).cloned().unwrap_or_default();
                 let coverage = Coverage::of("coverage_incomplete", &source, None, words);
-                append(table, id, vec![Body::Coverage(coverage)], None);
+                if let Err(error) = append(table, id, vec![Body::Coverage(coverage)], None) {
+                    crate::error::said(&format!("session {id}: coverage_record_failed: {error}"));
+                }
                 return;
             }
         };
@@ -410,14 +416,25 @@ fn stop_follower(id: &str, follower: &mpsc::Sender<Wake>) {
 }
 
 /// Keep `bodies` for session `id` as one unit, with `source` when given.
-pub(crate) fn append(table: &mut Table, id: &str, bodies: Vec<Body>, source: Option<SourceState>) {
+pub(crate) fn append(
+    table: &mut Table,
+    id: &str,
+    bodies: Vec<Body>,
+    source: Option<SourceState>,
+) -> Result<(), RunnerError> {
     let commit = Commit {
         source,
         attempt: None,
     };
     if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
+        let gap = table.gaps.entry(id.to_owned()).or_default();
+        gap.lost += 1;
+        gap.since.get_or_insert(now_ms());
+        gap.words = format!("coverage_incomplete: {error}");
         crate::error::said(&format!("session {id}: coverage_incomplete: {error}"));
+        return Err(error);
     }
+    Ok(())
 }
 
 /// The rotation evidence of `session`.
@@ -606,7 +623,12 @@ pub(crate) fn launched(
 }
 
 /// Say, in the feed, the executable and version launched for session `id`.
-pub(crate) fn tracking_started(table: &mut Table, id: &str, executable: &str, version: &str) {
+pub(crate) fn tracking_started(
+    table: &mut Table,
+    id: &str,
+    executable: &str,
+    version: &str,
+) -> Result<(), RunnerError> {
     let tracking = table
         .sessions
         .get(id)
@@ -622,7 +644,7 @@ pub(crate) fn tracking_started(table: &mut Table, id: &str, executable: &str, ve
         harness_version: Some(version.to_owned()),
         adapter,
     };
-    append(table, id, vec![Body::Coverage(coverage)], None);
+    append(table, id, vec![Body::Coverage(coverage)], None)
 }
 
 /// Mark the session's usage-limit words seen in the last `read` bytes, and

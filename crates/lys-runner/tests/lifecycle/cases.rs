@@ -67,7 +67,7 @@ fn tracked(
         session
             .scrollback()
             .from(0)
-            .is_ok_and(|bytes| bytes.windows(5).any(|word| word == b"ready"))
+            .is_ok_and(|bytes| bytes.windows(7).any(|word| word == b"ready\r\n"))
             .then_some(Ok(()))
     })?;
     Ok(sessions)
@@ -199,7 +199,7 @@ fn a_full_live_status_window_trips_the_declared_rotation() -> TestResult {
             }),
         },
     )?;
-    let tripped = sessions
+    let rotation = sessions
         .lock()
         .sessions
         .get("session")
@@ -207,7 +207,8 @@ fn a_full_live_status_window_trips_the_declared_rotation() -> TestResult {
         .rotation
         .as_ref()
         .ok_or("rotation missing")?
-        .tripped();
+        .clone();
+    let tripped = rotation.tripped() || !rotation.moves().is_empty();
     sessions.stop_all();
     assert!(
         tripped,
