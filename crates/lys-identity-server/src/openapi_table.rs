@@ -104,8 +104,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
     POST "/network/machines/{id}/agents" "Allow or remove one agent on a computer" S [ADMIN_BODY, MACHINE_AGENTS, &["NoPerson", "IdentifierMalformed", "AgentNotVisible", "MachineUnknown", "MachineRetired", "MachineWithoutRuntime", "NetworkUnavailable", "RuntimeUnavailable"]];
     GET "/agents/{id}/provisioning" "An agent's profile" S [SIGNED, &["AgentNotVisible"]];
-    GET "/agents/{id}/mcp-requests" "An agent's pending MCP requests" S [SIGNED, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable"]];
-    POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]];
+    GET "/agents/{id}/mcp-requests" "An agent's MCP requests" S [SIGNED, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProvisioningReused"]];
+    POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProvisioningReused", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]];
+    POST "/agents/{id}/mcp-requests/{request}/approve" "Approve an MCP request within remit" G [SIGNED_BODY, AGENT, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "TeamsUnavailable", "ProfileNotReviewed", "ProvisioningReused", "RequestUnknown", "RequestDecided", "RequestReused", "mcp_beyond_remit", "mcp_server_held", "McpSettingUnrepresentable"]];
     POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]];
     GET "/skills" "The skills Lys keeps" S [SIGNED];
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY];

@@ -168,6 +168,18 @@ pub enum ServerError {
         /// The server requested.
         server: String,
     },
+    /// The caller cannot pass this server to the requesting agent.
+    #[error(
+        "mcp_beyond_remit: approver `{approver}` cannot approve MCP server `{server}` for agent `{agent}`"
+    )]
+    McpBeyondRemit {
+        /// The approver's identity.
+        approver: String,
+        /// The requesting agent.
+        agent: String,
+        /// The server requested.
+        server: String,
+    },
     /// The request is not one the caller may see: none is kept by that id, or it is another's.
     #[error("RequestUnknown: no access request by that id is visible to the signed-in caller")]
     RequestUnknown,
@@ -400,6 +412,9 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
+    /// The machine cannot execute a start without a recorded runner.
+    #[error("MachineWithoutRunner: the machine has no recorded runner to start the agent with")]
+    MachineWithoutRunner,
     /// A skill Lys keeps no text for.
     #[error("SkillUnknown: Lys keeps no skill named `{name}`; keep its text under /skills first")]
     SkillUnknown {

@@ -156,6 +156,39 @@ async fn a_goal_switches_inactive_then_active_without_a_judgement() -> TestResul
 }
 
 #[tokio::test]
+async fn field_edits_preserve_every_other_goal_field_and_survive_restart() -> TestResult {
+    let mut table = Table::start().await?;
+    let item = table.set().await?;
+    let other = table.set().await?;
+    let mut expected = table.listed().await?;
+    assert_eq!(expected["goals"], json!([item, other]));
+    let route = format!("/goals/{}", goal_id(&item)?);
+    expected["goals"][0]["goal"]["words"] = json!("keep every record available");
+    let reworded = table
+        .post(
+            &format!("{route}/words"),
+            &json!({"operation": OperationId::generate()?.to_string(), "words": "keep every record available"}),
+        )
+        .await?;
+    assert_eq!(reworded, expected["goals"][0]);
+    assert_eq!(table.listed().await?, expected);
+    for active in [false, true] {
+        expected["goals"][0]["goal"]["active"] = json!(active);
+        let switched = table
+            .post(
+                &format!("{route}/active"),
+                &json!({"operation": OperationId::generate()?.to_string(), "active": active}),
+            )
+            .await?;
+        assert_eq!(switched, expected["goals"][0]);
+        assert_eq!(table.listed().await?, expected);
+    }
+    table.service.restart().await?;
+    assert_eq!(table.listed().await?, expected);
+    Ok(())
+}
+
+#[tokio::test]
 async fn rewording_round_trips_and_replaying_the_set_keeps_the_current_words() -> TestResult {
     let table = Table::start().await?;
     let mut set = set_body()?;
