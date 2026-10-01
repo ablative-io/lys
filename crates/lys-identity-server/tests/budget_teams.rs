@@ -202,6 +202,7 @@ impl Table {
                 .map(|session| KeptSession {
                     session: session.clone(),
                     pid: None,
+                    leader_start: None,
                     started_at: 1,
                     columns: 120,
                     rows: 40,
