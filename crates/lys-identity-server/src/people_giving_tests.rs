@@ -59,7 +59,9 @@ fn joined<T>(worker: std::thread::ScopedJoinHandle<'_, T>) -> T {
     }
 }
 
-fn prepare_stores(
+/// Opens the six independent stores a signed-agent fixture seeds before its
+/// directory, each on its own scoped worker.
+pub(crate) fn prepare_stores(
     log: &std::path::Path,
     key_file: &std::path::Path,
     apps_dir: &std::path::Path,

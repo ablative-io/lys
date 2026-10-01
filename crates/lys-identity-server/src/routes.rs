@@ -40,7 +40,7 @@ pub(crate) mod people_giving;
 
 #[cfg(test)]
 #[path = "people_giving_tests.rs"]
-mod people_giving_tests;
+pub(crate) mod people_giving_tests;
 
 /// Everything a request is served from.
 pub struct AppState {

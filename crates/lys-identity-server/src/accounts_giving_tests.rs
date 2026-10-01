@@ -138,32 +138,13 @@ impl Table {
             },
             |config| {
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-                crate::configuration_store::ConfigurationStore::open(
-                    &config.log_dir.with_file_name("organisation"),
-                    Arc::clone(&key),
-                )?;
-                crate::runner_acts::ActStore::open(
-                    &config.log_dir.with_file_name("runner-acts"),
-                    Arc::clone(&key),
-                )?;
-                lys_identity::start::LaunchRecords::open(
-                    &config.log_dir.with_file_name("launch-records"),
-                    Ed25519Identity::load(&config.event_key_file)?,
-                )?;
-                crate::apps_store::AppStore::open(&config.apps_dir(), Arc::clone(&key))?;
-                crate::certificates_store::CertificateStore::open(
-                    config
-                        .certificates_dir
-                        .as_deref()
-                        .ok_or("certificate fixture is disabled")?,
-                    Arc::clone(&key),
-                )?;
-                crate::teams_store::TeamStore::open(
-                    config
-                        .teams_dir
-                        .as_deref()
-                        .ok_or("team fixture is disabled")?,
-                    Arc::clone(&key),
+                crate::routes::people_giving_tests::prepare_stores(
+                    &config.log_dir,
+                    &config.event_key_file,
+                    &config.apps_dir(),
+                    config.certificates_dir.as_deref(),
+                    config.teams_dir.as_deref(),
+                    &key,
                 )?;
                 FileLeafStore::create(&config.log_dir, &config.log_origin)?;
                 let path = config.log_dir.clone();
