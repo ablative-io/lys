@@ -110,6 +110,8 @@ pub(super) fn generate_and_persist(path: &Path) -> TrustResult<Ed25519Identity> 
     match std::fs::hard_link(&tmp_path, path) {
         Ok(()) => {
             remove_tmp_file(&tmp_path);
+            #[cfg(unix)]
+            sync_parent(parent)?;
             tracing::info!(
                 path = %path.display(),
                 "generated and persisted identity key"
@@ -135,6 +137,21 @@ pub(super) fn generate_and_persist(path: &Path) -> TrustResult<Ed25519Identity> 
             })
         }
     }
+}
+
+/// Flushes the key's folder so the published name survives a crash.
+#[cfg(unix)]
+fn sync_parent(parent: &Path) -> TrustResult<()> {
+    let folder = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+    std::fs::File::open(folder)
+        .and_then(|handle| handle.sync_all())
+        .map_err(|e| TrustError::KeyManagement {
+            reason: format!("failed to flush identity key folder to disk: {e}"),
+        })
 }
 
 /// Best-effort removal of an in-flight tmp key file after a failed write or
@@ -171,6 +188,9 @@ fn write_identity_file(path: &Path, seed: &[u8; 32]) -> TrustResult<()> {
         .map_err(|e| TrustError::KeyManagement {
             reason: format!("failed to write identity key: {e}"),
         })?;
+    file.sync_all().map_err(|e| TrustError::KeyManagement {
+        reason: format!("failed to flush identity key to disk: {e}"),
+    })?;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(|e| {
         TrustError::KeyManagement {
             reason: format!("failed to write identity key: {e}"),
@@ -195,5 +215,8 @@ fn write_identity_file(path: &Path, seed: &[u8; 32]) -> TrustResult<()> {
         .map_err(|e| TrustError::KeyManagement {
             reason: format!("failed to write identity key: {e}"),
         })?;
+    file.sync_all().map_err(|e| TrustError::KeyManagement {
+        reason: format!("failed to flush identity key to disk: {e}"),
+    })?;
     Ok(())
 }
