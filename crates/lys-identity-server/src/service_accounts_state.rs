@@ -191,11 +191,11 @@ impl Held {
                 .get(&refused.account)
                 .ok_or_else(|| "import refusal names no existing account".to_owned())?;
             let account = &mut self.accounts[*position];
-            if account
-                .import_refusals
-                .iter()
-                .any(|kept| kept.operation == refused.operation && kept.refusal == refused.refusal)
-            {
+            if account.import_refusals.iter().any(|kept| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::Refusal);
+                kept.operation == refused.operation && kept.refusal == refused.refusal
+            }) {
                 return Err("import refusal already recorded".to_owned());
             }
             account.import_refusals.push(refused);

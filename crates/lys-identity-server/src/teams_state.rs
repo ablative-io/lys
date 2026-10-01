@@ -331,6 +331,8 @@ impl Held {
         self.teams
             .iter()
             .find_map(|team| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::TeamOperation);
                 if team.created.id == operation {
                     return Some(
                         team.changes
@@ -342,7 +344,11 @@ impl Held {
                 }
                 team.changes
                     .iter()
-                    .find(|line| line.operation() == operation)
+                    .find(|line| {
+                        #[cfg(test)]
+                        crate::folded_work::visit(crate::folded_work::Work::TeamOperation);
+                        line.operation() == operation
+                    })
                     .cloned()
             })
             .or_else(|| {
