@@ -497,6 +497,7 @@ fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::ServiceAccountRetired { .. }
         | ServerError::ServiceAccountOwnerRetired { .. }
         | ServerError::PolicyUnavailable { .. }
+        | ServerError::AgentHasNoPolicy { .. }
         | ServerError::PolicyVersionConflict { .. }
         | ServerError::PolicyRefused { .. }
         | ServerError::StopsUnavailable { .. }

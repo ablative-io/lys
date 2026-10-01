@@ -415,7 +415,7 @@ pub(crate) fn live_page(
     with_directory(state, |directory| {
         let projection = directory.projection()?;
         let asker = caller(state, headers, projection)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(projection, &actor)?;
         let filtered = page.filtered() || !administrator;
         let after = if filtered {
             std::ops::Bound::Unbounded
