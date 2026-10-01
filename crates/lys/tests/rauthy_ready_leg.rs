@@ -27,6 +27,7 @@ use std::thread;
 use serde_json::{Value, json};
 
 const SCRIPT: &str = "scripts/identity-gates/rauthy_ready.py";
+const LOGICAL_CLOCK: &str = "crates/lys/tests/rauthy_ready_leg/clock.py";
 const REVISION_LABEL: &str = "org.opencontainers.image.revision";
 const NAME_PREFIX: &str = "lys-rauthy-ready-";
 const BUILD_PREFIX: &str = "docker buildx build --label org.opencontainers.image.revision=";
@@ -336,9 +337,13 @@ impl Case {
     }
 
     fn run(&self, path: &OsStr) -> Run {
+        self.run_script(path, &[SCRIPT])
+    }
+
+    fn run_script(&self, path: &OsStr, script: &[&str]) -> Run {
         let before = self.deploy_identity_status();
         let output = Command::new(&self.python)
-            .arg(SCRIPT)
+            .args(script)
             .arg("--versions-file")
             .arg(&self.versions)
             .current_dir(&self.root)
@@ -584,12 +589,13 @@ fn never_ready() {
     let mut stub = Stub::ready();
     stub.health_status = 500;
     let case = Case::new(&stub);
-    let run = case.run(&case.stub_path());
+    let run = case.run_script(&case.stub_path(), &["-B", LOGICAL_CLOCK, SCRIPT]);
     assert_eq!(run.code, Some(1), "stderr: {}", run.stderr);
     assert_eq!(run.ready_lines(), 0);
     let line = run.refusal("readiness_timeout");
     assert!(line.contains("rauthy"), "{line}");
     assert!(run.requests >= 1, "the listener counted no request");
+    assert_eq!(run.requests, 61, "the full retry budget must be exercised");
     assert_every_creation_removed(&run.argvs);
     run.assert_leaks_none();
 }
