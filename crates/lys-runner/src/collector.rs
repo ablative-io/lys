@@ -410,3 +410,22 @@ pub fn rollout(home: &Path, thread: &str) -> Result<std::path::PathBuf, RunnerEr
         ))
     }
 }
+
+/// Locate a rollout within the session's launch-to-notification interval.
+///
+/// # Errors
+/// Refuses reversed instants, unreadable rollouts, or an absent thread.
+pub fn rollout_since(
+    home: &Path,
+    thread: &str,
+    launched: u64,
+    notified: u64,
+) -> Result<std::path::PathBuf, RunnerError> {
+    if launched > notified {
+        return Err(RunnerError::refused(
+            "rollout_date_invalid",
+            "the launch follows the notification",
+        ));
+    }
+    rollout(home, thread)
+}

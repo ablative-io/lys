@@ -26,7 +26,7 @@ fn a_current_rollout_touches_only_its_date_directory() -> Result<(), Box<dyn Err
         b"{\"type\":\"session_meta\",\"payload\":{\"id\":\"thread\"}}\n",
     )?;
     super::ROLLOUT_DIRECTORIES.with(|count| count.set(0));
-    assert_eq!(super::rollout(home.path(), "thread")?, path);
+    assert_eq!(super::rollout_since(home.path(), "thread", now, now)?, path);
     assert_eq!(super::ROLLOUT_DIRECTORIES.with(std::cell::Cell::get), 1);
     Ok(())
 }
