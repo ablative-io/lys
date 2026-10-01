@@ -61,9 +61,6 @@ pub(crate) fn end_agent(state: &AppState, agent: AgentId) -> Result<(), ServerEr
 pub(crate) fn end_session(state: &AppState, session: &str) -> Result<(), ServerError> {
     store(state)?.end_session(session)
 }
-pub(crate) fn end_launch(state: &AppState, launch: &str) -> Result<(), ServerError> {
-    store(state)?.end_launch(launch)
-}
 
 #[cfg(test)]
 mod tests {
