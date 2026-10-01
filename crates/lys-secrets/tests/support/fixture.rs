@@ -11,6 +11,9 @@ use std::path::Path;
 use lys_secrets::{Asker, AskerKind, Broker, BrokerPaths, Clock, LocalGrants, Scope, Secret};
 use serde_json::{Value, json};
 
+#[path = "world_fixture.rs"]
+mod world_fixture;
+
 pub type Failure = Box<dyn Error>;
 pub type TestResult = Result<(), Failure>;
 
@@ -38,17 +41,29 @@ pub const HIDDEN_FROM_A: [&str; 2] = [B_PERSONAL, B_TEAM];
 
 /// A broker in `dir` on `clock`, holding the six secrets with their scopes.
 pub fn world(dir: &Path, clock: Clock) -> Result<Broker<LocalGrants>, Failure> {
+    world_fixture::copy(dir)?;
+    let paths = paths_in(dir);
+    world_fixture::validate(&paths)?;
+    let broker = Broker::open(&paths, LocalGrants::new(), clock)?;
+    if broker.audit().len() != 12 {
+        return Err("secrets_fixture_invalid: expected six seals and six scope records".into());
+    }
+    Ok(broker)
+}
+
+fn paths_in(dir: &Path) -> BrokerPaths {
     let keys = dir.join("keys");
-    std::fs::create_dir_all(&keys)?;
-    let paths = BrokerPaths {
+    BrokerPaths {
         store_dir: dir.join("store"),
         log_dir: dir.join("log"),
         store_key: keys.join("store.key"),
         audit_key: keys.join("audit.key"),
         anchor: keys.join("audit.anchor"),
-    };
-    let mut broker = Broker::create(&paths, LocalGrants::new(), clock)?;
-    let sealed = [
+    }
+}
+
+fn seals() -> [(&'static str, &'static str, Scope); 6] {
+    [
         (A_PERSONAL, PERSON_A, Scope::Personal(PERSON_A.to_owned())),
         (A_TEAM, PERSON_A, Scope::Team(TEAM_A.to_owned())),
         (
@@ -63,13 +78,18 @@ pub fn world(dir: &Path, clock: Clock) -> Result<Broker<LocalGrants>, Failure> {
             PERSON_B,
             Scope::Organisation(ORGANISATION.to_owned()),
         ),
-    ];
-    for (name, owner, scope) in sealed {
+    ]
+}
+
+fn build(dir: &Path) -> Result<(), Failure> {
+    std::fs::create_dir_all(dir.join("keys"))?;
+    let mut broker = Broker::create(&paths_in(dir), LocalGrants::new(), Box::new(|| START_MS))?;
+    for (name, owner, scope) in seals() {
         let generated = format!("generated test value of {name}");
         broker.seal(name, owner, &Secret::from_slice(generated.as_bytes()))?;
         broker.set_scope(owner, name, scope)?;
     }
-    Ok(broker)
+    Ok(())
 }
 
 /// The asker `identity` of `kind`, with `groups` injected as the group
