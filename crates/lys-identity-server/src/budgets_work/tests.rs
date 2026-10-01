@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 use std::error::Error;
+use std::sync::Arc;
 
 use lys_runner::tracking::{
     CLAUDE_ADAPTER, Figures, Measure as NativeMeasure, RECORD_VERSION, UsageRecord,
@@ -108,7 +109,7 @@ fn unrelated_history_does_not_add_running_baseline_visits() -> TestResult {
     for size in [0, 512] {
         let held = history(size)?;
         reset();
-        let usage = crate::budgets_feed::convert("machine", "covered", &record, &held.uses)?;
+        let usage = crate::budgets_feed::convert("machine", "covered", &record, &held)?;
         assert_eq!(usage.running_ms, 4);
         assert!(
             count(Work::Running) <= 1,
@@ -143,5 +144,86 @@ fn snapshots_keep_their_exact_bytes_without_copying_held_history() -> TestResult
             "snapshot copied {size} unrelated records"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn held_copies_share_the_index_without_copying_its_records() -> TestResult {
+    let held = history(512)?;
+    reset();
+    let copied = held.clone();
+    assert_eq!(copied, held);
+    assert!(Arc::ptr_eq(&held.index, &copied.index));
+    assert_eq!(count(Work::StateCopy), 1);
+    assert_eq!(count(Work::IndexCopy), 0);
+    Ok(())
+}
+
+fn tokens(held: &Held, at_ms: i64, incoming: Option<&Usage>) -> TestResult<u64> {
+    let used = crate::budgets_usage::figure(
+        held,
+        &Limit {
+            unit: Measure::Tokens,
+            amount: 100.into(),
+            period: Some(Length::Week),
+            act: Act::Tell,
+            zone: None,
+        },
+        &BTreeSet::from(["covered".to_owned()]),
+        "UTC",
+        at_ms,
+        incoming,
+    )?;
+    used.figure
+        .and_then(|figure| figure.as_u64())
+        .ok_or_else(|| "tokens unavailable".into())
+}
+
+#[test]
+fn cached_totals_handle_late_records_future_records_and_clock_reversal() -> TestResult {
+    let mut held = history(512)?;
+    assert_eq!(tokens(&held, NOW, None)?, 7);
+    reset();
+    assert_eq!(tokens(&held, NOW, None)?, 7);
+    assert_eq!(count(Work::Usage), 0);
+    assert_eq!(count(Work::StateCopy), 0);
+    for (event, at_ms, added, expected) in [("late", NOW - 1, 3, 10), ("future", NOW + 1, 2, 10)] {
+        held.hold(Leaf::Used(Usage {
+            event: event.to_owned(),
+            agent: "covered".to_owned(),
+            at_ms,
+            tokens: added,
+            ..Usage::default()
+        }))?;
+        reset();
+        assert_eq!(tokens(&held, NOW, None)?, expected);
+        assert_eq!(count(Work::Usage), 0);
+        assert_eq!(count(Work::IndexCopy), 0);
+    }
+    assert_eq!(tokens(&held, NOW + 1, None)?, 12);
+    assert_eq!(tokens(&held, NOW - 1, None)?, 3);
+    assert_eq!(tokens(&held, NOW, None)?, 10);
+    Ok(())
+}
+
+#[test]
+fn incoming_totals_do_not_mutate_the_cache_or_charge_twice() -> TestResult {
+    let mut held = history(512)?;
+    let incoming = Usage {
+        event: "incoming".to_owned(),
+        agent: "covered".to_owned(),
+        at_ms: NOW,
+        tokens: 3,
+        ..Usage::default()
+    };
+    assert_eq!(tokens(&held, NOW, Some(&incoming))?, 10);
+    assert_eq!(tokens(&held, NOW, None)?, 7);
+    held.hold(Leaf::Used(incoming.clone()))?;
+    assert_eq!(tokens(&held, NOW, Some(&incoming))?, 10);
+    assert_eq!(tokens(&held, NOW, None)?, 10);
+    assert_eq!(held.uses.len(), 514);
+    held.hold(Leaf::Used(incoming))?;
+    assert_eq!(held.uses.len(), 514);
+    assert_eq!(tokens(&held, NOW, None)?, 10);
     Ok(())
 }
