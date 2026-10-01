@@ -65,17 +65,14 @@ impl Changes {
             id: id.to_owned(),
             held: None,
         };
-        guard.held = Some(match Arc::clone(&lock).try_lock_owned() {
-            Ok(held) => {
-                #[cfg(test)]
-                crate::accounts::changes_tests::started(false);
-                held
-            }
-            Err(_) => {
-                #[cfg(test)]
-                crate::accounts::changes_tests::started(true);
-                lock.lock_owned().await
-            }
+        guard.held = Some(if let Ok(held) = Arc::clone(&lock).try_lock_owned() {
+            #[cfg(test)]
+            crate::accounts::changes_tests::started(false);
+            held
+        } else {
+            #[cfg(test)]
+            crate::accounts::changes_tests::started(true);
+            lock.lock_owned().await
         });
         Ok(guard)
     }
@@ -106,7 +103,7 @@ impl Drop for Guard<'_> {
                 }
             }
             Err(error) => {
-                tracing::error!(refusal = "SignInProvidersUnavailable", reason = %error, "the account-change index lock is poisoned")
+                tracing::error!(refusal = "SignInProvidersUnavailable", reason = %error, "the account-change index lock is poisoned");
             }
         }
     }

@@ -53,10 +53,11 @@ async fn active_account_changes_are_bounded_and_completed_ids_leave_no_history()
         Err(crate::error::ServerError::SignInProvidersUnavailable { .. })
     ));
     drop(held);
-    let table = changes.table.lock().map_err(|error| error.to_string())?;
-    assert_eq!(table.active, 0);
-    assert!(table.accounts.is_empty());
-    drop(table);
+    {
+        let table = changes.table.lock().map_err(|error| error.to_string())?;
+        assert_eq!(table.active, 0);
+        assert!(table.accounts.is_empty());
+    }
     drop(changes.lock("new-account").await?);
     Ok(())
 }
