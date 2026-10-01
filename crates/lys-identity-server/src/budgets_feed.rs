@@ -55,7 +55,7 @@ pub async fn keep_page(
                 crate::budgets_enforce::keep(state, usage).await?;
             }
             Body::Refusal(record) => refusals.push(record),
-            Body::Coverage(_) | Body::Boundary(_) | Body::Operation(_) => {}
+            Body::Coverage(_) | Body::Boundary(_) | Body::Operation(_) | Body::Injection(_) => {}
             Body::Commit(_) => {
                 return Err(refused("a runner feed page unexpectedly contains a commit"));
             }

@@ -86,6 +86,7 @@ impl IntoResponse for TokenError {
 /// Required, explicitly bounded expiry; no default lifetime.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = GrantTokenIssueBody)]
 pub struct IssueBody {
     /// Seconds since the Unix epoch.
     pub expires_at: u64,
@@ -93,6 +94,7 @@ pub struct IssueBody {
 
 /// The secret is returned once; only its digest is stored.
 #[derive(Serialize, utoipa::ToSchema)]
+#[schema(as = GrantTokenIssued)]
 pub struct Issued {
     /// Public id used to revoke this one credential.
     pub id: String,
@@ -104,6 +106,7 @@ pub struct Issued {
 
 /// An explicit durable revocation answer.
 #[derive(Serialize, utoipa::ToSchema)]
+#[schema(as = GrantTokenRevoked)]
 pub struct Revoked {
     /// The credential id.
     pub id: String,

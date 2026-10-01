@@ -362,10 +362,22 @@ async fn an_agent_needs_a_live_person_write_grant_and_a_shared_admitted_team() -
         event.actor().provenance().method(),
         AuthMethod::AgentSignature(_)
     ));
-    for (suffix, body) in [
-        ("email", json!({"email": "changed@example.test"})),
-        ("password", json!({"password": "Fixture-password"})),
-        ("enabled", json!({"enabled": true})),
+    // Email and password take no agent at all; enabled takes an agent only
+    // under an account grant, which a person profile grant is not.
+    for (suffix, body, refused, refusal) in [
+        (
+            "email",
+            json!({"email": "changed@example.test"}),
+            401,
+            "NotSignedIn",
+        ),
+        (
+            "password",
+            json!({"password": "Fixture-password"}),
+            401,
+            "NotSignedIn",
+        ),
+        ("enabled", json!({"enabled": true}), 403, "NotHeld"),
     ] {
         let (status, answer) = table
             .signed(
@@ -375,10 +387,10 @@ async fn an_agent_needs_a_live_person_write_grant_and_a_shared_admitted_team() -
             )
             .await?;
         assert_eq!(
-            status, 401,
+            status, refused,
             "a person profile grant does not admit an account write: {answer}"
         );
-        assert_eq!(answer["refusal"], "NotSignedIn", "{answer}");
+        assert_eq!(answer["refusal"], refusal, "{answer}");
     }
     assert_eq!(
         table.record(&table.person).await?["display_name"],
