@@ -11,7 +11,7 @@ use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::atomic::AtomicBool;
 
 use lys_runner::peer::{Leader, start_identity};
-use lys_runner::state::{Kept, KeptSession};
+use lys_runner::state::{FORMAT, Kept, KeptSession};
 use lys_runner::{EndedHow, Launch, Sessions};
 use serde_json::json;
 
@@ -234,7 +234,7 @@ fn a_legacy_restart_never_signals_an_unproved_live_process_group() -> TestResult
     );
     drop(restarted);
     let migrated: Kept = serde_json::from_slice(&std::fs::read(dir.path().join("sessions.json"))?)?;
-    assert_eq!(migrated.format, "lys-runner-sessions/v2");
+    assert_eq!(migrated.format, FORMAT);
     assert_eq!(migrated.sessions[0].leader_start, None);
     let reopened = Sessions::open(dir.path(), 4096)?;
     assert_eq!(
@@ -469,7 +469,7 @@ fn a_legacy_completed_session_migrates_without_changing_its_observed_end() -> Te
     assert_eq!(ended.signal, None);
     assert_eq!(ended.reason, None);
     let kept: Kept = serde_json::from_slice(&std::fs::read(dir.path().join("sessions.json"))?)?;
-    assert_eq!(kept.format, "lys-runner-sessions/v2");
+    assert_eq!(kept.format, FORMAT);
     assert_eq!(kept.sessions[0].leader_start, None);
     Ok(())
 }
