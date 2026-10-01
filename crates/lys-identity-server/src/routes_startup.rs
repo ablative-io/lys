@@ -150,6 +150,14 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         configuration: Mutex::new(configuration),
         policies: policies.map(Mutex::new),
         goals: goals.map(crate::goals_store::Goals::new),
+        grant_tokens: Mutex::new(
+            crate::grant_token_store::Tokens::open(
+                config.log_dir.with_file_name("grant-tokens.json"),
+            )
+            .map_err(|error| ServerError::ConfigInvalid {
+                reason: error.to_string(),
+            })?,
+        ),
         apps: Mutex::new(apps),
         benches: crate::apps_bench::Benches::new(
             config.apps_dir().with_file_name("benches"),

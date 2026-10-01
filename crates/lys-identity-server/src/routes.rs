@@ -98,6 +98,8 @@ pub struct AppState {
     /// The apps, kept beside the grant log: always open, holding at least
     /// the app `lys`.
     pub apps: Mutex<crate::apps_store::AppStore>,
+    /// Cached durable grant-bound credentials.
+    pub grant_tokens: Mutex<crate::grant_token_store::Tokens>,
     /// The schema builder's test benches, each a throwaway draft.
     pub benches: crate::apps_bench::Benches,
     /// The issuer's administration API the sign-in providers are set
