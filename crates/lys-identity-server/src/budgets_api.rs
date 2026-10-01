@@ -29,6 +29,7 @@ use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
 
 mod confirm;
+pub(crate) use confirm::ConfirmBody;
 use confirm::*;
 
 /// A budget to set on a holder.
