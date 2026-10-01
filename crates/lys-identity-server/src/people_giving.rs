@@ -16,7 +16,7 @@ use crate::routes::{AppState, Named, malformed, signed_in, with_directory};
 use crate::session::now;
 use crate::teams_state::Team;
 
-pub(super) fn actor(
+pub(crate) fn actor(
     state: &AppState,
     headers: &HeaderMap,
     request: (&str, &str, &[u8]),
@@ -61,7 +61,7 @@ fn admitted(team: &Team, member: &str) -> bool {
         && !team.held.iter().any(|held| held.member == member)
 }
 
-pub(super) fn holds(teams: &[Team], agent: AgentId, person: PersonId) -> Result<(), ServerError> {
+pub(crate) fn holds(teams: &[Team], agent: AgentId, person: PersonId) -> Result<(), ServerError> {
     let agent = agent.to_string();
     let person = person.to_string();
     if teams

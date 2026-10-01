@@ -24,9 +24,11 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::rejection::JsonRejection;
-use axum::extract::{Path, State};
-use axum::http::{Extensions, HeaderMap};
+use axum::body::{Body, Bytes};
+use axum::extract::FromRequest;
+use axum::extract::rejection::{BytesRejection, JsonRejection};
+use axum::extract::{OriginalUri, Path, State};
+use axum::http::{Extensions, HeaderMap, Request};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{Actor, IdentityId, PersonId};
@@ -492,21 +494,41 @@ pub(crate) struct Enabled {
     enabled: bool,
 }
 
+#[path = "accounts_giving.rs"]
+mod giving;
+
 async fn set_enabled(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
     Path(person): Path<String>,
-    body: Result<Json<Enabled>, JsonRejection>,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<Value>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    let bytes = body.map_err(|error| ServerError::RequestMalformed {
+        reason: error.body_text(),
+    })?;
+    let actor =
+        crate::routes::people_giving::actor(&state, &headers, ("POST", uri.path(), &bytes))?;
+    if actor.provenance().agent().is_none() {
+        crate::routes::administrator(&state, &actor)?;
+    }
+    let mut request = Request::new(Body::from(bytes));
+    *request.headers_mut() = headers;
+    let Json(body) = Json::<Enabled>::from_request(request, &())
+        .await
+        .map_err(|error| ServerError::RequestMalformed {
+            reason: error.body_text(),
+        })?;
+    if actor.provenance().agent().is_some() {
+        return giving::enabled(&state, &actor, PersonId::from_str(&person)?, body.enabled).await;
+    }
     let id = account_id(&state, &person)?;
     if actor.binding().subject() == id {
         return Err(refused(
             "the administrator does not disable their own sign-in",
         ));
     }
-    let enabled = body_of(body)?.enabled;
+    let enabled = body.enabled;
     let api = api(&state)?;
     let guard = api.lock_account(&id).await?;
     let mut update = update_of(&read(api, &id).await?)?;
@@ -537,3 +559,7 @@ mod tests;
 #[cfg(test)]
 #[path = "accounts_changes_tests.rs"]
 pub(crate) mod changes_tests;
+
+#[cfg(test)]
+#[path = "accounts_giving_tests.rs"]
+mod giving_tests;

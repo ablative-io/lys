@@ -36,7 +36,7 @@ use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::{Sessions, now};
 
 #[path = "people_giving.rs"]
-mod people_giving;
+pub(crate) mod people_giving;
 
 #[cfg(test)]
 #[path = "people_giving_tests.rs"]
