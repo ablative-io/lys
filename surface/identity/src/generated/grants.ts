@@ -153,6 +153,8 @@ export interface Permit {
 export interface GrantModel {
   version: number;
   relations: Record<string, string[]>;
+  /** The acts no agent may be given; a screen never offers them. */
+  withheld_from_agents: string[];
 }
 
 /** POST /grants/who answers one page of holders, each with its permit. */
