@@ -1,15 +1,29 @@
-/** An agent's goals, expectations and deliverables, and the form that sets one. */
+/** An agent's goals: the sentences it is reminded of. A line is added with Enter, reworded in place, and switched off without being lost. */
 import { useState } from 'react';
-import { operationId } from '../../api';
-import { useRoleChange } from '../roles/useRoleChange';
-import { ChangeStatus } from '../roles/ChangeStatus';
-import type { GoalItem, GoalKind } from './contract';
+import { Refused, operationId, request } from '../../api';
+import type { Goal } from './limits';
 
-type Props = { agent: string; goals: GoalItem[]; changed: (words: string) => void };
+type Props = { agent: string; goals: Goal[]; changed: (words: string) => void };
 
-const STANDING = { open: 'Open', met: 'Met', missed: 'Missed', dropped: 'Dropped' };
+/** Sends one change, answering the refusal in words or an empty string. */
+async function send(path: string, body: object): Promise<string> {
+  try {
+    await request<unknown>(path, { operation: operationId(), ...body }, 'POST');
+    return '';
+  } catch (error) {
+    return error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error);
+  }
+}
 
 export function UsageGoals({ agent, goals, changed }: Props) {
+  const [failure, setFailure] = useState('');
+  const act = async (path: string, body: object, done: string) => {
+    const refused = await send(path, body);
+    setFailure(refused);
+    if (!refused) changed(done);
+  };
+  const active = goals.filter((goal) => goal.active);
+  const inactive = goals.filter((goal) => !goal.active);
   return <section className="card usage-goals" aria-label="Goals"><h3>Goals</h3>
     {goals.length ? <table className="usage-list"><thead><tr><th>Kind</th><th>What</th><th>Deadline</th><th>Where it stands</th><th>Change</th></tr></thead>
       <tbody>{goals.map((item) => <tr key={item.goal.id}><td>{item.goal.kind}</td><td>{item.goal.words}</td>
@@ -59,11 +73,32 @@ function SetGoal({ agent, changed }: { agent: string; changed: (words: string) =
     if (!words.trim() || !Number.isFinite(seconds)) return;
     change.submit({ operation: operationId(), kind, words: words.trim(), deadline: seconds, ...(kind === 'deliverable' ? { evidence } : {}) });
   };
-  return <form aria-label="Set a goal" onSubmit={(event) => { event.preventDefault(); submit(); }}><h4>Set a goal</h4>
-    <label className="field">Kind<select value={kind} disabled={change.blocked} onChange={(event) => setKind(event.target.value as GoalKind)}><option value="goal">Goal</option><option value="expectation">Expectation</option><option value="deliverable">Deliverable</option></select></label>
-    <label className="field usage-what">What<textarea name="words" rows={4} value={words} required maxLength={500} disabled={change.blocked} onChange={(event) => setWords(event.target.value)} /></label>
-    <label className="field">Deadline<input name="deadline" type="datetime-local" required value={deadline} disabled={change.blocked} onChange={(event) => setDeadline(event.target.value)} /></label>
-    {kind === 'deliverable' ? <label className="field">Proved by<select value={evidence} disabled={change.blocked} onChange={(event) => setEvidence(event.target.value as 'commit' | 'document' | 'check')}><option value="commit">A landed commit</option><option value="document">A document</option><option value="check">A passing check</option></select></label> : null}
-    <button className="btn primary" type="submit" disabled={change.blocked || !words.trim() || !deadline}>Set goal</button><ChangeStatus change={change} />
+  return <li className="usage-goal" data-active={goal.active}>
+    <label className="usage-switch"><input type="checkbox" aria-label={goal.active ? 'Switch this goal off' : 'Switch this goal on'} checked={goal.active} disabled={busy}
+      onChange={() => void run(() => act(path + '/active', { active: !goal.active }, goal.active ? 'Goal switched off.' : 'Goal switched on.'))} /></label>
+    <input className="usage-words" name="words" aria-label="Goal" value={words} maxLength={500} disabled={busy}
+      onChange={(event) => setWords(event.target.value)} onBlur={reword} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); reword(); } }} />
+    {goal.deadline === null ? null : <span className="usage-deadline">by {new Date(goal.deadline * 1000).toLocaleDateString()}</span>}
+  </li>;
+}
+
+function AddGoal({ agent, act }: { agent: string; act: Act }) {
+  const [words, setWords] = useState('');
+  const [deadline, setDeadline] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const add = async () => {
+    const next = words.trim();
+    if (!next) return;
+    const seconds = deadline ? Math.floor(Date.parse(deadline) / 1000) : null;
+    setBusy(true);
+    await act('/agents/' + encodeURIComponent(agent) + '/goals', { words: next, ...(seconds !== null && Number.isFinite(seconds) ? { deadline: seconds } : {}) }, 'Goal added.');
+    setBusy(false);
+    setWords(''); setDeadline(null);
+  };
+  return <form className="usage-add" aria-label="Add a goal" onSubmit={(event) => { event.preventDefault(); void add(); }}>
+    <input className="usage-words" name="new-goal" aria-label="New goal" placeholder="Add a goal, then press Enter" value={words} maxLength={500} disabled={busy} onChange={(event) => setWords(event.target.value)} />
+    {deadline === null
+      ? <button className="btn" type="button" disabled={busy} onClick={() => setDeadline('')}>Add a deadline</button>
+      : <input name="deadline" aria-label="Deadline" type="date" value={deadline} disabled={busy} onChange={(event) => setDeadline(event.target.value)} />}
   </form>;
 }

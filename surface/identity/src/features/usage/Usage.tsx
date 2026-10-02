@@ -6,7 +6,9 @@ import { Gate } from '../signin/Gate';
 import { UsageBudgets } from './UsageBudgets';
 import { UsageGoals } from './UsageGoals';
 import { tracking } from './contract';
-import type { BudgetsView, GoalsView, UsageView } from './contract';
+import type { UsageView } from './contract';
+import { eventWords } from './limits';
+import type { GoalList, LimitsView, Used } from './limits';
 import './usage.css';
 
 export function AgentUsage({ agent }: { agent: string }) {
@@ -19,12 +21,17 @@ export function AgentUsage({ agent }: { agent: string }) {
     goals: request<GoalsView>('/agents/' + path + '/goals'),
   }), 'usage:' + agent + ':' + revision);
   const changed = (words: string) => { setNotice(words); setRevision((value) => value + 1); };
-  return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals }) => {
+  return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Budget and goals" ok={({ budget, usage, goals }) => {
     const tracked = tracking(usage);
+    const latest = usage.receipts[usage.receipts.length - 1];
     return <>
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets agent={agent} budgets={budgets} receipts={usage.receipts} changed={changed} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
+      <div>
+        <UsageBudgets key={budget.version} agent={agent} budget={budget} used={usage.used} changed={changed} />
+        {latest ? <p className="usage-event">{eventWords(latest.crossing.measure, latest.crossing.figure, latest.crossing.at_ms, latest.crossing.act, latest.acted?.stands ?? null)}</p> : null}
+      </div>
     </>;
   }} /></>;
 }
