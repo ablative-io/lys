@@ -6,7 +6,8 @@
 //! from agents can ever be passed through them.
 
 use lys_identity::grants::{
-    Action, GrantError, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window, agent_may_hold,
+    Action, GrantError, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window,
+    agent_may_hold,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use sha2::{Digest, Sha256};

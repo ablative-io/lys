@@ -84,7 +84,10 @@ async fn role_changes_are_withheld_from_agents() -> TestResult {
     for (resource, relation, action, path, body) in cases {
         let (status, answer) = table.give(resource, relation, action).await?;
         assert_eq!(status, 403, "{action}: {answer}");
-        assert_eq!(answer["refusal"], "WithheldFromAgents", "{action}: {answer}");
+        assert_eq!(
+            answer["refusal"], "WithheldFromAgents",
+            "{action}: {answer}"
+        );
         refused(&table, Method::POST, &path, Some(&body)).await?;
     }
     assert!(table.role_view(&table.role).await?["holders"][0]["ended_by"].is_null());

@@ -188,8 +188,7 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
 /// is; a Lys act is an agent's only when [`AGENT_MAY_HOLD`] names it.
 #[must_use]
 pub fn agent_may_hold(kind: &str, action: &str) -> bool {
-    !kind.contains('.')
-        && AGENT_MAY_HOLD.contains(&action)
+    !kind.contains('.') && AGENT_MAY_HOLD.contains(&action)
 }
 
 /// Plain sentences for shipped actions, served separately from the stored model.
@@ -338,9 +337,8 @@ pub fn shipped_model() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        AGENT_MAY_HOLD, ACTIONS, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS,
-        agent_may_hold,
-        shipped_model,
+        ACTIONS, AGENT_MAY_HOLD, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS,
+        agent_may_hold, shipped_model,
     };
     use crate::grants::{Action, Relation};
     use serde_json::Value;
