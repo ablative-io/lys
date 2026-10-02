@@ -73,7 +73,7 @@ async fn claude_first_run_defaults_start_with_native_workspace_settings() -> Tes
 #[tokio::test]
 async fn claude_without_a_confinement_choice_refuses_before_rendering() -> TestResult {
     let table = Table::unprofiled().await?;
-    table.launch_profile().await?;
+    table.launch_profile_mode(None).await?;
     let agent = table.agent();
     let machine = table
         .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
@@ -124,6 +124,10 @@ impl Table {
     }
 
     async fn launch_profile(&self) -> TestResult {
+        self.launch_profile_mode(Some("default")).await
+    }
+
+    async fn launch_profile_mode(&self, mode: Option<&str>) -> TestResult {
         let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
         let (status, kept) = self
             .service
@@ -136,6 +140,7 @@ impl Table {
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
             "harness": self.harness(),
             "instructions": "Build what the brief says.", "note": "First setup.",
+            "permissions": mode.map(|mode| json!({"default_mode": mode})),
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         let (status, set) = self.service.post(&path, Some(&self.ada), &body).await?;

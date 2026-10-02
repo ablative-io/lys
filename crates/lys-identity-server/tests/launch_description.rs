@@ -20,6 +20,7 @@ fn version(name: &str) -> Result<Version, serde_json::Error> {
         "settings": {
             "model_access": ["model-a", "model-b"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "same instructions", "note": "",
+            "permissions": {"default_mode": "plan"},
             "harness": {"name": name, "program": "/opt/seat/bin/harness",
                 "package": "verified-package", "description": description}
         }

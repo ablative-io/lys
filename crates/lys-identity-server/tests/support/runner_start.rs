@@ -161,6 +161,7 @@ impl Table {
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "",
             "harness": harness,
+            "permissions": {"default_mode": "default"},
         });
         self.ok(&path, &body).await?;
         self.ok(
