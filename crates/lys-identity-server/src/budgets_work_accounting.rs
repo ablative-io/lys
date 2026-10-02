@@ -108,7 +108,7 @@ fn unrelated_history_does_not_add_running_baseline_visits() -> TestResult {
     for size in [0, 512] {
         let held = history(size)?;
         reset();
-        let usage = crate::budgets_feed::convert("machine", "covered", &record, &held)?;
+        let usage = crate::budgets_feed::convert("machine", "covered", &record, &held.uses)?;
         assert_eq!(usage.running_ms, 4);
         assert!(
             count(Work::Running) <= 1,

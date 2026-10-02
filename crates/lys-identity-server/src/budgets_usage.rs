@@ -123,22 +123,9 @@ pub fn figure(
     incoming: Option<&Usage>,
 ) -> Result<Used, String> {
     let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
-    let since = if matches!(limit.unit, Measure::PlanPercent | Measure::ContextPercent) {
-        None
-    } else {
-        start(limit, zone, at_ms)?
-    };
-    let selected = held.index.positions(agents, limit.unit, at_ms);
-    let uses = selected
-        .into_iter()
-        .map(|position| {
-            held.uses
-                .get(position)
-                .ok_or_else(|| format!("usage index names missing record {position}"))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let uses: Vec<_> = uses
-        .into_iter()
+    let uses: Vec<_> = held
+        .uses
+        .iter()
         .chain(incoming)
         .filter(|usage| {
             #[cfg(test)]
@@ -169,50 +156,100 @@ pub(crate) fn source_figure(
         incoming: None,
         sessions: None,
     }
-    let mut spend = held
-        .index
-        .spend(&held.uses, agents, limit, zone, since, at_ms)?;
-    if let Some(incoming) = incoming.filter(|usage| {
-        agents.contains(&usage.agent)
-            && usage.at_ms <= at_ms
-            && since.is_none_or(|since| usage.at_ms >= since)
-    }) {
-        spend.add(limit.unit, incoming, held.uses.len())?;
-    }
-    if let Some(position) = spend.gap {
-        let usage = if position == held.uses.len() {
-            incoming.ok_or("period gap names no incoming record")?
-        } else {
-            held.uses
-                .get(position)
-                .ok_or("period gap names a missing record")?
-        };
-        let field = match limit.unit {
-            Measure::Tokens => "tokens",
-            Measure::RunningMs => "running_ms",
-            Measure::Dollars => "dollars_micros",
-            Measure::PlanPercent | Measure::ContextPercent => {
-                return Err("a level reached spend summation".to_owned());
-            }
-        };
-        let gap = usage
-            .unavailable
+    .figure(Purpose::Source)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Purpose {
+    Spend,
+    Source,
+}
+
+struct Reading<'a> {
+    held: &'a Held,
+    limit: &'a Limit,
+    agents: &'a BTreeSet<String>,
+    zone: &'a str,
+    at_ms: i64,
+    incoming: Option<&'a Usage>,
+    sessions: Option<&'a BTreeMap<String, crate::runtime_store::SessionActivity>>,
+}
+
+impl Reading<'_> {
+    fn figure(self, purpose: Purpose) -> Result<Used, String> {
+        let Self {
+            held,
+            limit,
+            agents,
+            zone,
+            at_ms,
+            incoming,
+            sessions,
+        } = self;
+        let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
+        let mut usage_agents = BTreeSet::new();
+        let mut uses: Vec<_> = held
+            .uses
             .iter()
-            .find(|gap| {
-                gap.figure == field
-                    && (limit.unit == Measure::Tokens || gap.reason.contains("reset"))
+            .chain(incoming)
+            .filter(|usage| {
+                if !agents.contains(&usage.agent) {
+                    return false;
+                }
+                if purpose == Purpose::Spend && limit.unit == Measure::PlanPercent {
+                    usage_agents.insert(usage.agent.as_str());
+                }
+                usage.at_ms <= at_ms
             })
-            .ok_or("period gap names a record without its source refusal")?;
-        return Ok(unavailable(limit, since, &gap.reason));
+            .collect();
+        let never_run = |agent: &str| {
+            sessions.is_some_and(|known| !known.contains_key(agent))
+                && !usage_agents.contains(agent)
+        };
+        if limit.unit == Measure::PlanPercent {
+            return plan(limit, agents, &uses, at_ms, purpose, &never_run);
+        }
+        if limit.unit == Measure::ContextPercent {
+            return context(limit, &uses);
+        }
+        let since = start(limit, zone, at_ms)?;
+        if purpose == Purpose::Spend {
+            uses.retain(|usage| since.is_none_or(|start| usage.at_ms >= start));
+        }
+        let inactive = |agent: &str| match sessions {
+            Some(known) => known
+                .get(agent)
+                .is_none_or(|activity| !activity.active_since(since)),
+            None => false,
+        };
+        if let Some(reason) = spend_gap(limit, agents, &uses, since, purpose, &inactive) {
+            return Ok(unavailable(limit, since, reason));
+        }
+        let total = spend
+            .total
+            .and_then(|total| u64::try_from(total).ok())
+            .ok_or("budget spend overflows its reported unit")?;
+        present(limit, since, total)
     }
-    if let Some(reason) = spend_gap(limit, agents, &uses, since) {
-        return Ok(unavailable(limit, since, reason));
-    }
-    let total = spend
-        .total
-        .and_then(|total| u64::try_from(total).ok())
-        .ok_or("budget spend overflows its reported unit")?;
-    present(limit, since, total)
+}
+
+fn period_gap(unit: Measure, usage: &Usage) -> Result<&str, String> {
+    let field = match unit {
+        Measure::Tokens => "tokens",
+        Measure::RunningMs => "running_ms",
+        Measure::Dollars => "dollars_micros",
+        Measure::PlanPercent | Measure::ContextPercent => {
+            return Err("a level reached spend summation".to_owned());
+        }
+    };
+    usage
+        .unavailable
+        .iter()
+        .find(|gap| {
+            gap.figure == field && (unit == Measure::Tokens || gap.reason.contains("reset"))
+        })
+        .map(|gap| gap.reason.as_str())
+        .ok_or_else(|| "period gap names a record without its source refusal".to_owned())
 }
 
 fn plan(

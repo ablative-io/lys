@@ -32,7 +32,11 @@ impl Spend {
         let gap = usage.unavailable.iter().any(|gap| match unit {
             Measure::Tokens => gap.figure == "tokens",
             Measure::RunningMs => gap.figure == "running_ms" && gap.reason.contains("reset"),
-            Measure::Dollars => gap.figure == "dollars_micros" && gap.reason.contains("reset"),
+            Measure::Dollars => {
+                usage.dollars_micros.is_none()
+                    && gap.figure == "dollars_micros"
+                    && gap.reason.contains("reset")
+            }
             Measure::PlanPercent | Measure::ContextPercent => false,
         });
         if gap && self.gap.is_none_or(|earlier| position < earlier) {
