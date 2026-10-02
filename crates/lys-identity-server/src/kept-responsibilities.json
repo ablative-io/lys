@@ -1,0 +1,26 @@
+[
+  {
+    "method": "POST",
+    "path": "/setup"
+  },
+  {
+    "method": "POST",
+    "path": "/setup/open"
+  },
+  {
+    "method": "POST",
+    "path": "/setup/administrator"
+  },
+  {
+    "method": "POST",
+    "path": "/setup/password"
+  },
+  {
+    "method": "POST",
+    "path": "/grants/roots"
+  },
+  {
+    "method": "POST",
+    "path": "/sign-in-providers"
+  }
+]

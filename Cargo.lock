@@ -1792,6 +1792,7 @@ dependencies = [
  "jiff",
  "libproc",
  "lys-core",
+ "lys-home",
  "lys-identity",
  "lys-identity-server",
  "lys-secrets",

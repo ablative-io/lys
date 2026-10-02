@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use crate::error::ServerError;
 use crate::error_holding::HoldingError;
 use crate::error_team::TeamError;
-use crate::grants::{Decision, Judged, decide, with_grants};
+use crate::grants::{Decision, Judged, decide, decide_as, with_grants};
 use crate::read_api::login;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -124,6 +124,16 @@ fn member_request(
     })
 }
 
+pub(super) fn decide_member<S: lys_log_store::LeafStore>(
+    judged: &mut Judged<'_, S>,
+    request: &ExerciseRequest,
+    at: u64,
+    decision: Decision,
+) -> Result<(), lys_identity::grants::GrantError> {
+    // Ingress judged the team action; member authority is a separate requirement.
+    decide(judged, request, at, None, decision).map(drop)
+}
+
 pub(crate) fn add(
     state: &AppState,
     actor: &Actor,
@@ -134,7 +144,8 @@ pub(crate) fn add(
     with_grants(state, |mut judged| {
         crate::caller_admission::active_caller(judged.directory, actor)?;
         let team_request = team_request(&mut judged, agent, &changed.team)?;
-        decide(
+        decide_as(
+            actor,
             &mut judged,
             &team_request,
             changed.at,
@@ -145,27 +156,16 @@ pub(crate) fn add(
             let team = store.team(&changed.team).ok_or(TeamError::Unknown)?;
             holds(team, agent)?;
             let member_request = member_request(&mut judged, agent, &changed.member)?;
-            decide(
-                &mut judged,
-                &member_request,
-                changed.at,
-                None,
-                Decision::Explain,
-            )?;
-            decide(
+            decide_member(&mut judged, &member_request, changed.at, Decision::Explain)?;
+            decide_as(
+                actor,
                 &mut judged,
                 &team_request,
                 changed.at,
                 None,
                 Decision::Exercise,
             )?;
-            decide(
-                &mut judged,
-                &member_request,
-                changed.at,
-                None,
-                Decision::Exercise,
-            )?;
+            decide_member(&mut judged, &member_request, changed.at, Decision::Exercise)?;
             kept(store, Line::Added(changed))
         })
     })
@@ -195,7 +195,7 @@ pub(crate) fn create(
             .and_then(lys_identity::projection::Record::responsible)
             .ok_or(ServerError::NoPerson)?;
         let request = team_request(&mut judged, agent, &parent)?;
-        decide(&mut judged, &request, at, None, Decision::Explain)?;
+        decide_as(actor, &mut judged, &request, at, None, Decision::Explain)?;
         with_teams(state, |store| {
             let team = store.team(&parent).ok_or(TeamError::Unknown)?;
             holds(team, agent)?;
@@ -214,7 +214,7 @@ pub(crate) fn create(
                 parent: Some(parent),
                 lead: None,
             });
-            decide(&mut judged, &request, at, None, Decision::Exercise)?;
+            decide_as(actor, &mut judged, &request, at, None, Decision::Exercise)?;
             kept(store, line)
         })
     })

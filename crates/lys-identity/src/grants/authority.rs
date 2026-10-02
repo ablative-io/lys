@@ -47,6 +47,9 @@ pub struct ExerciseRequest {
     pub action: Action,
 }
 
+/// The reason a one-time grant's revocation names.
+pub const ONE_TIME_SPENT: &str = "a one-time grant is spent by its first use";
+
 /// A request to revoke a grant, and with it everything derived from it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevokeRequest {
@@ -284,10 +287,39 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         request: &DelegateRequest,
         at: u64,
     ) -> Result<Recorded, GrantError> {
+        self.delegate_as(directory, request, at, false)
+    }
+
+    /// Pass on part of a grant as [`Grants::delegate`] does, as a one-time
+    /// grant: use-only, and spent by its first exercise.
+    pub fn delegate_once(
+        &mut self,
+        directory: &Projection,
+        request: &DelegateRequest,
+        at: u64,
+    ) -> Result<Recorded, GrantError> {
+        self.delegate_as(directory, request, at, true)
+    }
+
+    fn is_one_time(&self, grant: GrantId) -> bool {
+        self.book
+            .grant(grant)
+            .is_some_and(super::types::Grant::is_once)
+    }
+
+    fn delegate_as(
+        &mut self,
+        directory: &Projection,
+        request: &DelegateRequest,
+        at: u64,
+        once: bool,
+    ) -> Result<Recorded, GrantError> {
         self.settle_for_change()?;
         if let Some((event, receipt)) = self.answered(request.operation)? {
             return match event.change() {
-                GrantChange::Issue(grant) if delegation_matches(request, grant) => {
+                GrantChange::Issue(grant)
+                    if delegation_matches(request, grant) && grant.is_once() == once =>
+                {
                     self.answer(event, receipt)
                 }
                 _ => Err(Self::reused(request.operation)),
@@ -301,6 +333,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             at,
             GrantId::generate()?,
         )?;
+        let grant = if once {
+            Grant::once(grant.parts().clone())?
+        } else {
+            grant
+        };
         self.commit(GrantEvent::new(
             request.operation,
             request.caller,
@@ -375,6 +412,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         let used = self.record_use(request.caller, permit.grant, request.route, at);
         if let Err(error) = &used {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);
+        }
+        if self.is_one_time(permit.grant) {
+            // A one-time grant admits only an exercise whose use is recorded;
+            // that one leaf spends it.
+            used.clone()?;
         }
         permit.use_event = Some(used);
         Ok(permit)

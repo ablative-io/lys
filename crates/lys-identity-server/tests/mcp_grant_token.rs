@@ -1,11 +1,15 @@
 #![cfg(test)]
 //! Grant header admission preserves the ordinary route holding checks.
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
 use serde_json::{Value, json};
 use std::error::Error;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+
+/// The profile route names `person.profile.set`, so the writing relation carries it.
+const MODEL: &str =
+    r#"{"version":1,"relations":{"alpha":["read","write","person.profile.set"],"beta":["read"]}}"#;
 
 struct Fixture {
     service: Service,
@@ -13,20 +17,27 @@ struct Fixture {
     person: String,
     other: String,
     agent: String,
+    lead: String,
     client: reqwest::Client,
 }
 fn operation() -> TestResult<String> {
     Ok(OperationId::generate()?.to_string())
 }
 impl Fixture {
-    async fn new() -> TestResult<Self> {
+    async fn new(chain: bool, teams: bool) -> TestResult<Self> {
         // Only the stores token admission and the profile route touch are opened.
-        let (service, (person, agent)) = Service::start_adjusted(
-            GRANT_MODEL,
+        let (service, (person, agent, lead)) = Service::start_adjusted(
+            MODEL,
             None,
             None,
             None,
             |config| {
+                config.certificates_dir = None;
+                config.homes_dir = None;
+                config.sessions_file = None;
+                if !teams {
+                    config.teams_dir = None;
+                }
                 config.requests_dir = None;
                 config.roles_file = None;
                 config.provisioning_file = None;
@@ -60,22 +71,45 @@ impl Fixture {
                     Profile::new("Owner")?,
                     1,
                 )?;
-                let (agent, _) = directory.register_agent(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    person,
-                    Profile::new("Agent")?,
-                    2,
-                )?;
+                let parent = if chain {
+                    let (lead, _) = directory.register_agent(
+                        actor.clone(),
+                        OperationId::generate()?,
+                        person,
+                        Profile::new("Lead")?,
+                        2,
+                    )?;
+                    directory.transition(
+                        actor.clone(),
+                        OperationId::generate()?,
+                        IdentityId::Agent(lead),
+                        Transition::Activate,
+                        "",
+                        3,
+                    )?;
+                    IdentityId::Agent(lead)
+                } else {
+                    IdentityId::Person(person)
+                };
+                let agent = directory
+                    .register_reporting_agent(
+                        actor.clone(),
+                        OperationId::generate()?,
+                        parent,
+                        Profile::new("Agent")?,
+                        4,
+                    )?
+                    .agent;
                 directory.transition(
                     actor,
                     OperationId::generate()?,
                     IdentityId::Agent(agent),
                     Transition::Activate,
                     "",
-                    3,
+                    5,
                 )?;
-                Ok((person.to_string(), agent.to_string()))
+                let lead = parent.to_string();
+                Ok((person.to_string(), agent.to_string(), lead))
             },
         )
         .await?;
@@ -92,6 +126,7 @@ impl Fixture {
             person,
             other,
             agent,
+            lead,
             client: reqwest::Client::new(),
         })
     }
@@ -121,10 +156,24 @@ impl Fixture {
     }
 
     async fn token(&self, resource: &str, relation: &str) -> TestResult<String> {
+        self.token_from(resource, relation, false).await
+    }
+    async fn token_from(
+        &self,
+        resource: &str,
+        relation: &str,
+        through_lead: bool,
+    ) -> TestResult<String> {
         let wire = json!({"kind":"person","id":resource});
-        let (status, root) = self.service.post("/grants/roots",Some(&self.cookie),&json!({"operation":operation()?,"route":"api","holder":self.person,"resource":wire,"relation":"alpha","pass_on":{"kind":"to","actions":["read","write"],"recipients":["agent"]},"window":{"starts_at":0,"ends_at":null}})).await?;
+        let (status, root) = self.service.post("/grants/roots",Some(&self.cookie),&json!({"operation":operation()?,"route":"api","holder":self.person,"resource":wire,"relation":"alpha","pass_on":{"kind":"to","actions":["read","write","person.profile.set"],"recipients":["agent"]},"window":{"starts_at":0,"ends_at":null}})).await?;
         assert_eq!(status, 200);
-        let (status, held) = self.service.post("/grants",Some(&self.cookie),&json!({"operation":operation()?,"route":"api","source":root["grant"],"recipient":self.agent,"responsible":self.person,"resource":wire,"relation":relation,"pass_on":{"kind":"use_only"},"window":{"starts_at":0,"ends_at":null}})).await?;
+        let mut source = root["grant"].clone();
+        if through_lead {
+            let (status, held) = self.service.post("/grants", Some(&self.cookie), &json!({"operation":operation()?, "route":"api", "source":source, "recipient":self.lead, "responsible":self.person, "resource":wire, "relation":"alpha", "pass_on":{"kind":"to","actions":["read","write","person.profile.set"],"recipients":["agent"]}, "window":{"starts_at":0,"ends_at":null}})).await?;
+            assert_eq!(status, 200);
+            source = held["grant"].clone();
+        }
+        let (status, held) = self.service.post("/grants",Some(&self.cookie),&json!({"operation":operation()?,"route":"api","source":source,"recipient":self.agent,"responsible":self.person,"resource":wire,"relation":relation,"pass_on":{"kind":"use_only"},"window":{"starts_at":0,"ends_at":null}})).await?;
         assert_eq!(status, 200);
         let grant = held["grant"].as_str().ok_or("missing grant")?;
         let (status, issued) = self
@@ -158,7 +207,7 @@ impl Fixture {
 
 #[tokio::test]
 async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
-    let fixture = Fixture::new().await?;
+    let fixture = Fixture::new(false, true).await?;
     fixture.holding().await?;
     let writer = fixture.token(&fixture.person, "alpha").await?;
     let path = format!("/identities/{}/profile", fixture.person);
@@ -195,10 +244,10 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
 
 #[tokio::test]
 async fn mcp_grant_token_refuses_an_undeclared_route() -> TestResult {
-    let fixture = Fixture::new().await?;
+    let fixture = Fixture::new(false, false).await?;
     let token = fixture.token(&fixture.person, "alpha").await?;
     let (status, answer) = fixture
-        .call(&token, "GET", "/directory/people", Value::Null, false)
+        .call(&token, "GET", "/sessions", Value::Null, false)
         .await?;
     assert_eq!(status, 200);
     assert_eq!(
@@ -210,7 +259,7 @@ async fn mcp_grant_token_refuses_an_undeclared_route() -> TestResult {
 
 #[tokio::test]
 async fn mcp_grant_token_refuses_a_personal_cookie() -> TestResult {
-    let fixture = Fixture::new().await?;
+    let fixture = Fixture::new(false, false).await?;
     let token = fixture.token(&fixture.person, "alpha").await?;
     let (status, answer) = fixture
         .call(
@@ -228,7 +277,7 @@ async fn mcp_grant_token_refuses_a_personal_cookie() -> TestResult {
 
 #[tokio::test]
 async fn mcp_grant_token_refuses_a_person_holder() -> TestResult {
-    let fixture = Fixture::new().await?;
+    let fixture = Fixture::new(false, false).await?;
     let (status,root) = fixture.service.post("/grants/roots",Some(&fixture.cookie),&json!({"operation":operation()?,"route":"api","holder":fixture.person,"resource":{"kind":"person","id":fixture.person},"relation":"alpha","pass_on":{"kind":"use_only"},"window":{"starts_at":0,"ends_at":null}})).await?;
     assert_eq!(status, 200);
     let grant = root["grant"].as_str().ok_or("missing grant")?;
@@ -255,6 +304,59 @@ async fn mcp_grant_token_refuses_a_person_holder() -> TestResult {
     assert_eq!(
         answer["result"]["structuredContent"]["body"]["refusal"],
         "TokenHolderNotAgent"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn refusal_names_nearest_grant_holder_then_root() -> TestResult {
+    let fixture = Fixture::new(true, false).await?;
+    let reader = fixture.token_from(&fixture.person, "beta", true).await?;
+    let (status, answer) = fixture
+        .call(
+            &reader,
+            "POST",
+            &format!("/identities/{}/profile", fixture.person),
+            json!({"operation":operation()?,"display_name":"Refused"}),
+            false,
+        )
+        .await?;
+    assert_eq!(status, 200);
+    let refusal = &answer["result"]["structuredContent"]["body"];
+    assert_eq!(refusal["refusal"], "GrantTokenScopeMismatch");
+    assert_eq!(
+        refusal["can_grant"],
+        json!([
+            {"id":fixture.lead,"kind":"agent","display_name":"Lead"},
+            {"id":fixture.person,"kind":"person","display_name":"Owner"}
+        ])
+    );
+    let (_, current) = fixture.service.get("/me", Some(&fixture.cookie)).await?;
+    assert_eq!(current["person"]["display_name"], "Owner");
+    Ok(())
+}
+
+#[tokio::test]
+async fn refusal_names_root_when_chain_holds_no_requested_grant() -> TestResult {
+    let fixture = Fixture::new(true, false).await?;
+    let reader = fixture.token_from(&fixture.person, "beta", true).await?;
+    let (status, answer) = fixture
+        .call(
+            &reader,
+            "POST",
+            &format!("/identities/{}/profile", fixture.other),
+            json!({"operation":operation()?,"display_name":"Refused"}),
+            false,
+        )
+        .await?;
+    assert_eq!(status, 200);
+    let refusal = &answer["result"]["structuredContent"]["body"];
+    assert_eq!(refusal["refusal"], "GrantTokenScopeMismatch");
+    assert_eq!(
+        refusal["can_grant"],
+        json!([
+            {"id":fixture.person,"kind":"person","display_name":"Owner"}
+        ])
     );
     Ok(())
 }

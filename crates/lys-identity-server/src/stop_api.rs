@@ -374,11 +374,18 @@ async fn stop(
     // Asked only once the directory holds this operation's suspension, so a
     // refused stop leaves no asked line in other words behind it.
     if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {
-        return through_runners(&state, kept.into(), &by).await.map(Json);
+        // Kept whole by an earlier stop: its certificates and handles are
+        // already withdrawn, so the pass is ended, the runners are told, and
+        // a failed end is reported after them.
+        let ended = crate::agent_pass::end_agent(&state, agent);
+        let view = through_runners(&state, kept.into(), &by).await;
+        ended?;
+        return view.map(Json);
     }
+    let agent_id = agent;
+    let sessions_asked = ask_sessions(&state, &agent.to_string(), &asked.operation, &by, &reason)?;
     let agent = agent.to_string();
     let certificates_withdrawn = withdraw_certificates(&state, &agent, &by, &reason)?;
-    let sessions_asked = ask_sessions(&state, &agent, &asked.operation, &by, &reason)?;
     let (credentials_ended, credentials_refused) =
         match end_handles(&state, &headers, &agent, &asked.operation).await {
             Ok(ended) => (Some(ended), None),
@@ -395,7 +402,13 @@ async fn stop(
     // leaves the stop recorded whole, and the same stop sent again asks it
     // again.
     let kept = with_stops(&state, |store| store.keep(done))?;
-    through_runners(&state, kept.into(), &by).await.map(Json)
+    // Ended only once certificates and handles are withdrawn and the stop is
+    // kept, so a failed end leaves nothing half done: the runners are still
+    // told, and the failure is reported after them.
+    let ended = crate::agent_pass::end_agent(&state, agent_id);
+    let view = through_runners(&state, kept.into(), &by).await;
+    ended?;
+    view.map(Json)
 }
 
 /// `view` once each asked session not yet confirmed ended has been asked of

@@ -290,6 +290,27 @@ pub(crate) enum Decision {
     Explain,
 }
 
+/// [`decide`] for a caller the giving paths judge, except that a caller
+/// holding an agent pass was already judged, and its use recorded, by the
+/// guarded router on the route's own declared action: judging it again here
+/// would record a second use and spend a one-time grant before the act.
+pub(crate) fn decide_as<S: LeafStore>(
+    actor: &lys_identity::Actor,
+    judged: &mut Judged<'_, S>,
+    request: &ExerciseRequest,
+    at: u64,
+    at_least: Option<u64>,
+    decision: Decision,
+) -> Result<(), GrantError> {
+    if matches!(
+        actor.provenance().method(),
+        lys_identity::AuthMethod::AgentPass(_)
+    ) {
+        return Ok(());
+    }
+    decide(judged, request, at, at_least, decision).map(drop)
+}
+
 /// The grants' decision on `request`, reaching from its resource to each
 /// parent it is placed in that its schema lists, nearest first, answered
 /// with the permit and the resource whose grant permits it. The first

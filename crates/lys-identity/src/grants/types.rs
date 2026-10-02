@@ -316,6 +316,7 @@ pub struct GrantParts {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grant {
     parts: GrantParts,
+    once: bool,
 }
 
 impl Grant {
@@ -348,8 +349,26 @@ impl Grant {
             Source::Grant(source) if source == parts.id => Err(GrantError::LineageMalformed {
                 reason: "a grant does not derive from itself",
             }),
-            Source::Root | Source::Grant(_) => Ok(Self { parts }),
+            Source::Root | Source::Grant(_) => Ok(Self { parts, once: false }),
         }
+    }
+
+    /// The one-time grant `parts` describe: spent by its first exercise,
+    /// and use-only, since what may be used once is never passed on.
+    pub fn once(parts: GrantParts) -> Result<Self, GrantError> {
+        if parts.pass_on != PassOn::UseOnly {
+            return Err(GrantError::UseOnly {
+                grant: parts.id.to_string(),
+            });
+        }
+        let mut grant = Self::new(parts)?;
+        grant.once = true;
+        Ok(grant)
+    }
+
+    /// Whether the grant is spent by its first exercise.
+    pub fn is_once(&self) -> bool {
+        self.once
     }
 
     /// Every member of the grant.

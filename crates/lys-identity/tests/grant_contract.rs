@@ -153,11 +153,19 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
         cases += 1;
         assert_eq!(decode_grant(bytes).as_ref(), Err(expected), "case {cases}");
     };
-    for key in [0, 13, 40] {
+    for key in [0, 14, 40] {
         let mut pairs = fixture();
         pairs.push((int(key), int(1)));
         refused(&bytes_of(pairs)?, &GrantError::MemberUnknown { key });
     }
+    let mut pairs = fixture();
+    pairs.push((int(13), int(1)));
+    refused(
+        &bytes_of(pairs)?,
+        &GrantError::GrantMalformed {
+            reason: "a one-time grant names key 13 once, as true",
+        },
+    );
     for (key, member) in (1..).zip(MEMBERS) {
         let pairs = fixture()
             .into_iter()
@@ -238,7 +246,7 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
     refused(&bytes_of(reordered)?, &GrantError::GrantNotCanonical);
     assert_eq!(
         cases,
-        3 + 12 + 4 + 3 + 5 + 1,
+        3 + 1 + 12 + 4 + 3 + 5 + 1,
         "every refusal case was counted"
     );
     Ok(())

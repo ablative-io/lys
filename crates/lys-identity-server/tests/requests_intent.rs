@@ -91,6 +91,7 @@ async fn interrupted() -> Result<(Table, String, String), Box<dyn Error>> {
             source: None,
             note: "for the quarter".to_owned(),
             intended_at: 6,
+            answer: lys_identity_server::requests_store::Answer::AsAsked,
         })?;
         Ok(seeded)
     })

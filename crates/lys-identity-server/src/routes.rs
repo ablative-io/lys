@@ -109,6 +109,10 @@ pub struct AppState {
     pub apps: Mutex<crate::apps_store::AppStore>,
     /// Cached durable grant-bound credentials.
     pub grant_tokens: Mutex<crate::grant_token_store::Tokens>,
+    /// Cached digests for the agent runs this install starts.
+    pub agent_passes: Arc<Mutex<crate::agent_pass_store::Passes>>,
+    /// Responsibilities loaded from the deployment data before serving.
+    pub(crate) kept_responsibilities: crate::kept_responsibilities::Kept,
     /// The schema builder's test benches, each a throwaway draft.
     pub benches: crate::apps_bench::Benches,
     /// The issuer's administration API the sign-in providers are set
@@ -200,6 +204,12 @@ pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
 /// The signed-in actor, or a refusal: the administrator for a request
 /// carrying the install's operator token, else the session's actor.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
+    if let Some((agent, provenance)) = crate::agent_pass::verified(state, headers)? {
+        return Ok(Actor::new(
+            lys_identity::LoginBinding::new(state.oidc.issuer(), &agent.to_string())?,
+            provenance,
+        ));
+    }
     if let Some(actor) = crate::operator::actor(state, headers)? {
         return Ok(actor);
     }
@@ -209,10 +219,29 @@ pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, 
 /// Require an active administrator using the current directory projection.
 pub(crate) fn administrator(state: &AppState, actor: &Actor) -> Result<(), ServerError> {
     with_directory(state, |directory| {
+        if admitted_agent(directory.projection()?, actor)? {
+            return Ok(());
+        }
         state
             .admission
             .administrator(directory.projection()?, actor)
     })
+}
+
+/// Admit a pass actor whose route grant was exercised by the guarded router.
+/// A signed agent cannot borrow this exception to personal admission.
+pub(crate) fn admitted_agent(
+    directory: &lys_identity::projection::Projection,
+    actor: &Actor,
+) -> Result<bool, ServerError> {
+    if matches!(
+        actor.provenance().method(),
+        lys_identity::AuthMethod::AgentPass(_)
+    ) {
+        crate::caller_admission::active_caller(directory, actor)?;
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 /// Whether the caller is an administrator, retaining operational refusals.

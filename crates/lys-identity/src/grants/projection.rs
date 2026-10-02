@@ -10,6 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use super::admission::Route;
+use super::authority::ONE_TIME_SPENT;
 use super::error::GrantError;
 use super::events::{GrantChange, GrantEvent};
 use super::lineage::{self, Lineage, check_hop};
@@ -255,13 +256,17 @@ impl GrantBook {
                     .ok_or_else(|| GrantError::GrantUnknown {
                         grant: grant.to_string(),
                     })?;
-                if record.grant.holder() == event.caller() {
-                    Ok(())
-                } else {
-                    Err(GrantError::EventMismatch {
+                if record.grant.holder() != event.caller() {
+                    return Err(GrantError::EventMismatch {
                         reason: USE_BY_HOLDER,
-                    })
+                    });
                 }
+                if record.grant.is_once() && record.revoked.is_some() {
+                    return Err(GrantError::AlreadyRevoked {
+                        grant: grant.to_string(),
+                    });
+                }
+                Ok(())
             }
         }
     }
@@ -309,6 +314,16 @@ impl GrantBook {
                         index,
                     };
                     record.uses = record.uses.saturating_add(1);
+                    // A one-time grant is spent by the leaf that records its
+                    // use, so no second append is needed to end it.
+                    if record.grant.is_once() && record.revoked.is_none() {
+                        record.revoked = Some(Revocation {
+                            operation: event.operation(),
+                            index,
+                            at: event.recorded_at(),
+                            reason: ONE_TIME_SPENT.to_owned(),
+                        });
+                    }
                 }
             }
         }

@@ -22,17 +22,6 @@ pub const POSTGRES_INIT_SQL: &str =
 /// The deployment configuration the install writes when none exists.
 pub const DEPLOYMENT_TEMPLATE: &str = include_str!("deployment.template.toml");
 
-/// The permission model the directory service starts with.
-pub const GRANT_MODEL: &str = r#"{
-  "version": 1,
-  "relations": {
-    "owner": ["view", "edit", "grant"],
-    "editor": ["view", "edit"],
-    "viewer": ["view"]
-  }
-}
-"#;
-
 /// The loopback port the identity service and its screens answer on.
 pub const SERVICE_PORT: u16 = 8490;
 

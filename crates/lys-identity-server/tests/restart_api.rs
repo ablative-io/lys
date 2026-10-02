@@ -236,6 +236,7 @@ async fn no_reviewed_profile_refuses_before_ending_the_running_session() -> Test
     )
     .await?;
     held.client().ask(&Act::Start {
+        lys_mcp: None,
         launch: Box::new(Launch {
             session: session.clone(),
             program: "/bin/cat".to_owned(),

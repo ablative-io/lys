@@ -30,7 +30,7 @@ use crate::grants::{Judged, with_grants};
 use crate::requests_api::{
     Weighed, decider, malformed, seen, settled, taken, with_requests, words,
 };
-use crate::requests_store::{Asked, Decided, Intended, RequestStore};
+use crate::requests_store::{Answer, Asked, Decided, Intended, RequestStore};
 use crate::requests_views::RequestView;
 use crate::routes::AppState;
 use crate::session::now;
@@ -44,6 +44,9 @@ pub(crate) struct ApproveBody {
     route: RouteWire,
     source: Option<String>,
     note: String,
+    /// Once, for a while, ongoing, or absent for the window asked for.
+    #[serde(default)]
+    answer: Answer,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -67,7 +70,7 @@ fn issued(
         Some(source) => Source::Grant(grant_id(source)?),
         None => Source::Root,
     };
-    let window = Window::new(asked.asked_at, asked.ends_at)?;
+    let window = Window::new(asked.asked_at, intent.answer.ends_at(asked.ends_at))?;
     let book = judged.grants.book();
     let Some(index) = book.operation(operation) else {
         return Ok(None);
@@ -75,7 +78,9 @@ fn issued(
     Ok(book
         .records()
         .find(|record| record.index() == index)
-        .map(|record| record.grant().parts())
+        .map(lys_identity::grants::GrantRecord::grant)
+        .filter(|grant| grant.is_once() == (intent.answer == Answer::Once))
+        .map(lys_identity::grants::Grant::parts)
         .filter(|parts| {
             parts.issuer == issuer
                 && parts.holder == weighed.seeker
@@ -151,7 +156,13 @@ pub(crate) async fn approve(
             let note = words("note", &body.note)?;
             let operation = OperationId::from_str(&body.operation)?;
             let source = body.source.as_deref().map(grant_id).transpose()?;
-            let window = Window::new(asked.asked_at, asked.ends_at)?;
+            let answer = body.answer;
+            let window = Window::new(asked.asked_at, answer.ends_at(asked.ends_at))?;
+            if source.is_none() && answer == Answer::Once {
+                return Err(malformed(
+                    "a one-time answer lends from a grant the approver holds: name the source",
+                ));
+            }
             if source.is_none() && matches!(weighed.seeker, IdentityId::Agent(_)) {
                 return Err(malformed(
                     "an agent's access is lent from a grant a person holds: name the source",
@@ -164,11 +175,11 @@ pub(crate) async fn approve(
                 source: source.map(|grant| grant.to_string()),
                 note: note.clone(),
                 intended_at: at,
+                answer,
             })?;
             let recorded = match (source, weighed.seeker) {
-                (Some(source), _) => judged.grants.delegate(
-                    judged.directory,
-                    &DelegateRequest {
+                (Some(source), _) => {
+                    let request = DelegateRequest {
                         operation,
                         caller,
                         route: body.route.into(),
@@ -179,9 +190,13 @@ pub(crate) async fn approve(
                         relation: weighed.relation.clone(),
                         pass_on: PassOn::UseOnly,
                         window,
-                    },
-                    at,
-                ),
+                    };
+                    if answer == Answer::Once {
+                        judged.grants.delegate_once(judged.directory, &request, at)
+                    } else {
+                        judged.grants.delegate(judged.directory, &request, at)
+                    }
+                }
                 (None, IdentityId::Person(holder)) => judged.grants.issue_root(
                     judged.directory,
                     &RootRequest {

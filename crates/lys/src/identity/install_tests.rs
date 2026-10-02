@@ -533,3 +533,29 @@ fn a_cambium_message_connection_is_written_and_carried_by_the_next_render()
     }
     Ok(())
 }
+
+#[test]
+fn an_earlier_shipped_model_is_replaced_by_this_builds_and_a_current_one_is_kept()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let root = dir.path().join("root");
+    let layout = Layout::at(root.clone());
+    let config = DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root)?;
+    crate::identity::prepare::materialise_all(&config)?;
+    std::fs::create_dir_all(layout.grant_model().parent().ok_or("no parent")?)?;
+    std::fs::write(
+        layout.grant_model(),
+        r#"{"version":1,"relations":{"owner":["view","edit","grant"]}}"#,
+    )?;
+    super::server_state(&layout, &config)?;
+    let shipped = lys_identity::grants::shipped_model();
+    assert_eq!(std::fs::read_to_string(layout.grant_model())?, shipped);
+    let later = format!(
+        r#"{{"version":{},"relations":{{"owner":["view"]}}}}"#,
+        lys_identity::grants::SHIPPED_VERSION + 1
+    );
+    std::fs::write(layout.grant_model(), &later)?;
+    super::server_state(&layout, &config)?;
+    assert_eq!(std::fs::read_to_string(layout.grant_model())?, later);
+    Ok(())
+}

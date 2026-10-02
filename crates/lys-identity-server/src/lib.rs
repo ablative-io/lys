@@ -10,6 +10,10 @@
 pub mod accounts;
 pub mod admission;
 mod agent_grants_api;
+pub mod agent_pass;
+mod agent_pass_recovery;
+pub mod agent_pass_store;
+
 pub mod agent_policy_api;
 pub mod agent_policy_store;
 mod agent_sight;
@@ -24,6 +28,7 @@ mod apps_refresh;
 pub mod apps_schema_api;
 pub mod apps_state;
 pub mod apps_store;
+mod apps_upgrade;
 pub mod apps_views;
 pub mod budgets_act;
 pub mod budgets_api;
@@ -92,10 +97,12 @@ pub mod grants_refusals;
 pub mod harness_catalogue;
 mod import_api;
 mod import_bootstrap;
+mod kept_responsibilities;
 pub mod launch_api;
 pub mod launch_fields;
 pub mod launch_harness;
 pub mod launch_permissions;
+mod launch_record_config;
 pub mod launch_template;
 pub mod link_audit_api;
 pub mod list_page;
@@ -119,6 +126,8 @@ mod openapi_table;
 mod openapi_typed;
 mod openapi_types;
 pub mod operator;
+#[cfg(test)]
+mod pass_provenance_tests;
 pub mod provider;
 pub mod provisioning_api;
 pub mod provisioning_store;
@@ -142,9 +151,18 @@ pub mod reviews_api;
 pub mod reviews_state;
 pub mod reviews_store;
 pub mod roles_api;
+#[cfg(test)]
+mod roles_pass_tests;
 pub mod roles_records;
 pub mod roles_store;
 pub mod roles_views;
+mod route_actions;
+#[cfg(test)]
+mod route_actions_tests;
+#[cfg(test)]
+mod route_group_scope_tests;
+#[cfg(test)]
+mod route_named_scope_tests;
 pub mod routes;
 mod routes_startup;
 pub mod routes_table;
@@ -155,6 +173,7 @@ pub mod runner_client;
 mod runner_dial;
 pub mod runner_operate;
 pub mod runner_sessions;
+mod runner_start_pass;
 pub mod runtime_api;
 pub mod runtime_state;
 pub mod runtime_store;
@@ -203,3 +222,9 @@ mod sign_in_flights;
 mod sign_in_attempts;
 
 mod sign_in_address;
+
+#[cfg(test)]
+mod agent_pass_tests;
+
+/// Eligible authorities named by an agent grant refusal.
+pub mod who_can_grant;

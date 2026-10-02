@@ -169,6 +169,12 @@ fn end_session(
 /// The signed-in caller and the public id of the session they called in.
 fn caller(state: &AppState, headers: &HeaderMap) -> Result<(Actor, String), ServerError> {
     let actor = signed_in(state, headers)?;
+    if matches!(
+        actor.provenance().method(),
+        lys_identity::AuthMethod::AgentPass(_)
+    ) {
+        return Ok((actor, String::new()));
+    }
     let current = state.sessions.current(cookie_header(headers))?;
     Ok((actor, current))
 }

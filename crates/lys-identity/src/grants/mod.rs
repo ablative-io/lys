@@ -23,6 +23,7 @@ pub mod schema;
 pub mod schema_diff;
 #[cfg(test)]
 mod schema_tests;
+pub mod shipped;
 mod state;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
@@ -30,7 +31,7 @@ pub mod types;
 pub mod usage;
 
 pub use admission::{DelegateRequest, RootRequest, Route};
-pub use authority::{ExerciseRequest, Grants, Permit, Recorded, RevokeRequest};
+pub use authority::{ExerciseRequest, Grants, ONE_TIME_SPENT, Permit, Recorded, RevokeRequest};
 pub use cannot_give::{
     CannotGiveItem, CannotGiveList, CannotGiveReason, CannotGiveRequest, CannotGiveSubject,
     SERVICE_ACCOUNT,
@@ -53,6 +54,7 @@ pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};
 pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, owner_of};
 pub use schema_diff::{Named, SchemaDiff, Standing, diff, stranded};
+pub use shipped::{SHIPPED_VERSION, shipped_model};
 pub use types::{
     Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };

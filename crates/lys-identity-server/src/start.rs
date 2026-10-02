@@ -54,6 +54,9 @@ use serde_json::Value;
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in, with_directory};
 
+#[path = "start_pass_state.rs"]
+mod pass_state;
+
 /// Who is asking, as the records a start keeps name them.
 pub trait Callers: Send + Sync {
     /// Refuse unavailable admission state before a start reads authority.
@@ -131,6 +134,7 @@ pub struct StartService {
     launches: Mutex<LaunchRecords>,
     clock: fn() -> u64,
     launcher: Option<Box<dyn Launcher>>,
+    pass_state: Option<Arc<Mutex<crate::agent_pass_store::Passes>>>,
 }
 
 impl StartService {
@@ -148,6 +152,7 @@ impl StartService {
             launches: Mutex::new(launches),
             clock,
             launcher: None,
+            pass_state: None,
         }
     }
 
@@ -324,14 +329,7 @@ async fn start(
         Ok(given) => given,
         Err(refused) => return refused,
     };
-    let body = given.to_json();
-    let Some(launcher) = service.launcher.as_ref() else {
-        return json(StatusCode::OK, body);
-    };
-    match launcher.launch(&given, &caller).await {
-        None => json(StatusCode::OK, body),
-        Some(ran) => ran_answer(&body, ran),
-    }
+    launch_given(&service, given, &caller).await
 }
 
 /// The given start's answer with the runner's word beside it: its
@@ -367,17 +365,37 @@ async fn start_again(
     headers: HeaderMap,
     UrlPath(source): UrlPath<String>,
 ) -> Response {
-    answer(service, &headers, move |service, launches, caller| {
-        give_again(
-            launches,
-            &service.owners(),
-            caller,
-            &source,
-            (service.clock)(),
-        )
-        .map(|given| given.to_json())
-    })
-    .await
+    let given = answer_with(
+        Arc::clone(&service),
+        &headers,
+        move |service, launches, caller| {
+            give_again(
+                launches,
+                &service.owners(),
+                caller,
+                &source,
+                (service.clock)(),
+            )
+            .map(|given| (given, caller.to_owned()))
+        },
+    )
+    .await;
+    let (given, caller) = match given {
+        Ok(given) => given,
+        Err(refused) => return refused,
+    };
+    launch_given(&service, given, &caller).await
+}
+
+async fn launch_given(service: &StartService, given: Given, caller: &str) -> Response {
+    let body = given.to_json();
+    match service.launcher.as_ref() {
+        Some(launcher) => match launcher.launch(&given, caller).await {
+            Some(ran) => ran_answer(&body, ran),
+            None => json(StatusCode::OK, body),
+        },
+        None => json(StatusCode::OK, body),
+    }
 }
 
 async fn withdrawn(
@@ -393,7 +411,10 @@ async fn withdrawn(
             &launch_record,
             (service.clock)(),
         )
-        .map(|state| state.to_json())
+        .and_then(|state| {
+            crate::agent_pass_recovery::withdraw(service.pass_state.as_deref(), &launch_record)?;
+            Ok(state.to_json())
+        })
     })
     .await
 }
@@ -590,11 +611,12 @@ pub fn directory_service(
             credential_id,
         },
     };
-    let service = StartService::new(
+    let service = StartService::new_with_passes(
         owners,
         Box::new(Directory(Arc::clone(state))),
         launches,
         crate::session::now,
+        Arc::clone(&state.agent_passes),
     );
     let runs = crate::runner_sessions::DirectoryLauncher(Arc::clone(state));
     Ok(Arc::new(service.with_launcher(Box::new(runs))))

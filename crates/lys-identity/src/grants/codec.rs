@@ -43,6 +43,7 @@ pub const MEMBERS: [&str; 12] = [
 ];
 
 const NULL: u8 = 0xf6;
+const TRUE: u8 = 0xf5;
 
 pub(crate) fn write_identity(out: &mut Vec<u8>, identity: IdentityId) {
     let (kind, id) = match identity {
@@ -76,7 +77,7 @@ pub(crate) fn recipient_code(kind: RecipientKind) -> u64 {
 /// Append the canonical encoding of `grant` to `out`.
 pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     let parts = grant.parts();
-    map(out, 12);
+    map(out, if grant.is_once() { 13 } else { 12 });
     uint(out, 1);
     bytes(out, parts.id.as_bytes());
     uint(out, 2);
@@ -130,6 +131,10 @@ pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     uint(out, parts.model_version);
     uint(out, 12);
     bytes(out, parts.operation.as_bytes());
+    if grant.is_once() {
+        uint(out, 13);
+        out.push(TRUE);
+    }
 }
 
 /// The canonical bytes of `grant`.
@@ -254,13 +259,20 @@ fn read_window(value: Value) -> Result<Window, GrantError> {
 }
 
 /// Take every member of a grant map, refusing an unknown or a missing one by name.
-fn members(value: Value) -> Result<[Value; 12], GrantError> {
+fn members(value: Value) -> Result<([Value; 12], bool), GrantError> {
     let Value::Map(pairs) = value else {
         return Err(malformed("a grant is a map of keys 1 to 12"));
     };
     let mut slots: [Option<Value>; 12] = Default::default();
+    let mut once = None;
     for (key, value) in pairs {
         let key = as_uint(&key, "a grant's keys are unsigned integers")?;
+        if key == 13 {
+            if value != Value::Bool(true) || once.replace(true).is_some() {
+                return Err(malformed("a one-time grant names key 13 once, as true"));
+            }
+            continue;
+        }
         let slot = usize::try_from(key)
             .ok()
             .and_then(|key| key.checked_sub(1))
@@ -274,13 +286,15 @@ fn members(value: Value) -> Result<[Value; 12], GrantError> {
     for (slot, member) in slots.into_iter().zip(MEMBERS) {
         taken.push(slot.ok_or(GrantError::MemberMissing { member })?);
     }
-    <[Value; 12]>::try_from(taken)
+    let taken = <[Value; 12]>::try_from(taken)
         .ok()
-        .ok_or_else(|| malformed("a grant is a map of keys 1 to 12"))
+        .ok_or_else(|| malformed("a grant is a map of keys 1 to 12"))?;
+    Ok((taken, once.is_some()))
 }
 
 /// The grant a decoded CBOR value names, checked against the contract.
 pub(crate) fn read_grant(value: Value) -> Result<Grant, GrantError> {
+    let (grant_members, once) = members(value)?;
     let [
         id,
         issuer,
@@ -294,9 +308,9 @@ pub(crate) fn read_grant(value: Value) -> Result<Grant, GrantError> {
         window,
         model_version,
         operation,
-    ] = members(value)?;
+    ] = grant_members;
     let [kind, resource_id] = fields::<2>(resource, "a resource is a map of keys 1 and 2")?;
-    Grant::new(GrantParts {
+    let parts = GrantParts {
         id: GrantId::from_bytes(as_id(id, "a grant id is 16 bytes")?),
         issuer: read_identity(issuer)?,
         holder: read_identity(holder)?,
@@ -312,7 +326,12 @@ pub(crate) fn read_grant(value: Value) -> Result<Grant, GrantError> {
         window: read_window(window)?,
         model_version: as_uint(&model_version, "a model version is an unsigned integer")?,
         operation: OperationId::from_bytes(as_id(operation, "an operation id is 16 bytes")?),
-    })
+    };
+    if once {
+        Grant::once(parts)
+    } else {
+        Grant::new(parts)
+    }
 }
 
 /// The grant `encoded` names, refused unless the bytes are its canonical encoding.

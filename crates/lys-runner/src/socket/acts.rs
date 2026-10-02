@@ -53,7 +53,13 @@ pub(super) fn perform(
             crate::legacy_input::write(sessions, server, &session, &data, context)
                 .map(|()| Answer::Delivered { session })
         }
-        Act::Start { launch } => {
+        Act::Start {
+            mut launch,
+            lys_mcp,
+        } => {
+            if let Some(entry) = lys_mcp {
+                crate::launch_config::add_lys_mcp(&mut launch, &entry)?;
+            }
             let session = launch.session.clone();
             let policy = launch
                 .policy

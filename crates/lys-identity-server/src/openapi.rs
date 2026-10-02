@@ -55,7 +55,28 @@ pub(crate) fn route(
         }
     }
     // The ingress guard judges credentials before the route.
-    for refusal in ["OperatorRefused", "AgentSignatureRefused"] {
+    for refusal in [
+        "OperatorRefused",
+        "AgentSignatureRefused",
+        "AgentPassRefused",
+        "TokenScopeUndeclared",
+        "ResponsibilityKept",
+        "NotHeld",
+        "PermissionAbsent",
+        "Revoked",
+        "Expired",
+        "NotStarted",
+        "IdentityNotActive",
+        "LogUnavailable",
+        "PermissionEngineUnavailable",
+        "ProjectionPending",
+        "OperationUnresolved",
+        "StaleDecision",
+        "kind_not_registered",
+        "app_not_approved",
+        "app_retired",
+        "action_not_declared",
+    ] {
         if !named.contains(&refusal) {
             named.push(refusal);
         }

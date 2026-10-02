@@ -37,6 +37,9 @@ pub enum TokenError {
     /// The requested resource/action lies outside its one bound grant.
     #[error("GrantTokenScopeMismatch")]
     Scope,
+    /// Scope refusal naming the authorities the holder can ask.
+    #[error("GrantTokenScopeMismatch")]
+    ScopeWithGrantors(Vec<crate::who_can_grant::CanGrant>),
     /// Only the grant's responsible person may administer it.
     #[error("GrantTokenResponsibleRequired")]
     Responsible,
@@ -68,7 +71,7 @@ impl IntoResponse for TokenError {
             Self::HolderNotAgent => "TokenHolderNotAgent",
             Self::Expired => "GrantTokenExpired",
             Self::Revoked => "GrantTokenRevoked",
-            Self::Scope => "GrantTokenScopeMismatch",
+            Self::Scope | Self::ScopeWithGrantors(_) => "GrantTokenScopeMismatch",
             Self::Responsible => "GrantTokenResponsibleRequired",
             Self::CookieConflict(_) => "GrantTokenCookieConflict",
             Self::Expiry => "GrantTokenExpiryInvalid",
@@ -80,16 +83,18 @@ impl IntoResponse for TokenError {
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Full => StatusCode::CONFLICT,
             Self::Expiry | Self::CookieConflict(_) => StatusCode::BAD_REQUEST,
-            Self::Responsible | Self::Scope | Self::Undeclared | Self::HolderNotAgent => {
-                StatusCode::FORBIDDEN
-            }
+            Self::Responsible
+            | Self::Scope
+            | Self::ScopeWithGrantors(_)
+            | Self::Undeclared
+            | Self::HolderNotAgent => StatusCode::FORBIDDEN,
             _ => StatusCode::UNAUTHORIZED,
         };
-        (
-            status,
-            Json(serde_json::json!({"refusal":name,"reason":self.to_string(),"fields":{}})),
-        )
-            .into_response()
+        let mut body = serde_json::json!({"refusal":name,"reason":self.to_string(),"fields":{}});
+        if let Self::ScopeWithGrantors(holders) = &self {
+            body["can_grant"] = serde_json::json!(holders);
+        }
+        (status, Json(body)).into_response()
     }
 }
 
@@ -202,30 +207,8 @@ pub fn validate(
     action: &Action,
 ) -> Result<GrantId, TokenError> {
     let at = crate::session::now();
-    crate::grants::with_grants(state, |judged| {
-        Ok((|| {
-            let tokens = state
-                .grant_tokens
-                .lock()
-                .map_err(|e| TokenError::Unavailable(format!("grant token lock poisoned: {e}")))?;
-            judged
-                .apps
-                .admit_kind(None, resource.kind())
-                .map_err(ServerError::from)?;
-            judged
-                .apps
-                .admit_action(resource.kind(), action.as_str())
-                .map_err(ServerError::from)?;
-            validate_with(
-                &tokens,
-                judged.grants.book(),
-                judged.directory,
-                token,
-                resource,
-                action,
-                at,
-            )
-        })())
+    crate::grants::with_grants(state, |mut judged| {
+        Ok(scoped(state, &mut judged, token, resource, action, at))
     })?
 }
 
@@ -307,28 +290,9 @@ pub(crate) fn principal(
     action: &Action,
 ) -> Result<crate::agent_signature::TokenPrincipal, TokenError> {
     let at = crate::session::now();
-    crate::grants::with_grants(state, |judged| {
+    crate::grants::with_grants(state, |mut judged| {
         Ok((|| {
-            let tokens = state.grant_tokens.lock().map_err(|error| {
-                TokenError::Unavailable(format!("grant token lock poisoned: {error}"))
-            })?;
-            judged
-                .apps
-                .admit_kind(None, resource.kind())
-                .map_err(ServerError::from)?;
-            judged
-                .apps
-                .admit_action(resource.kind(), action.as_str())
-                .map_err(ServerError::from)?;
-            let grant = validate_with(
-                &tokens,
-                judged.grants.book(),
-                judged.directory,
-                token,
-                resource,
-                action,
-                at,
-            )?;
+            let grant = scoped(state, &mut judged, token, resource, action, at)?;
             let holder = judged
                 .grants
                 .book()
@@ -341,4 +305,61 @@ pub(crate) fn principal(
             Ok(crate::agent_signature::TokenPrincipal { holder, grant })
         })())
     })?
+}
+
+fn scoped(
+    state: &AppState,
+    judged: &mut crate::grants::Judged<'_>,
+    token: &str,
+    resource: &Resource,
+    action: &Action,
+    at: u64,
+) -> Result<GrantId, TokenError> {
+    judged
+        .apps
+        .admit_kind(None, resource.kind())
+        .map_err(ServerError::from)?;
+    judged
+        .apps
+        .admit_action(resource.kind(), action.as_str())
+        .map_err(ServerError::from)?;
+    let (result, holder) = {
+        let tokens = state.grant_tokens.lock().map_err(|error| {
+            TokenError::Unavailable(format!("grant token lock poisoned: {error}"))
+        })?;
+        let result = validate_with(
+            &tokens,
+            judged.grants.book(),
+            judged.directory,
+            token,
+            resource,
+            action,
+            at,
+        );
+        let holder = if matches!(result, Err(TokenError::Scope)) {
+            let id = tokens
+                .lookup(token, at)?
+                .grant
+                .parse::<GrantId>()
+                .map_err(|error| {
+                    TokenError::Unavailable(format!("invalid cached grant id: {error}"))
+                })?;
+            Some(
+                judged
+                    .grants
+                    .book()
+                    .grant(id)
+                    .ok_or(TokenError::Unknown)?
+                    .holder(),
+            )
+        } else {
+            None
+        };
+        (result, holder)
+    };
+    if let Some(IdentityId::Agent(agent)) = holder {
+        let holders = crate::who_can_grant::for_judged(judged, agent, resource, action, at)?;
+        return Err(TokenError::ScopeWithGrantors(holders));
+    }
+    result
 }

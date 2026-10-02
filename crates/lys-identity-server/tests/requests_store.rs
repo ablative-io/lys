@@ -166,6 +166,7 @@ fn intended(id: &str, by: &str, operation: &str) -> Intended {
         source: None,
         note: "for the quarter".to_owned(),
         intended_at: 7,
+        answer: lys_identity_server::requests_store::Answer::AsAsked,
     }
 }
 

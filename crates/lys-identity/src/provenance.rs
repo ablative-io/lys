@@ -15,6 +15,7 @@
 //! answers for it, never in their place (P8).
 
 use crate::binding::LoginBinding;
+use crate::error::IdentityError;
 use crate::id::{AgentId, ServiceAccountId};
 
 /// How the service authenticated the actor.
@@ -31,19 +32,35 @@ pub enum AuthMethod {
     /// This person's service account presented its independently verified
     /// bearer credential. This never asserts the person signed in.
     ServiceAccountBearer(ServiceAccountId),
+    /// A live pass bound to this agent's run authenticated the request.
+    AgentPass(AgentId),
 }
 
-/// How and when the service authenticated the actor.
+/// The authentication evidence the service has for the actor.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Provenance {
-    method: AuthMethod,
-    authenticated_at: u64,
+pub enum Provenance {
+    /// An authentication whose time the service knows.
+    Authenticated {
+        /// How the actor authenticated.
+        method: AuthMethod,
+        /// The authentication time in seconds since the Unix epoch.
+        authenticated_at: u64,
+    },
+    /// A verified run pass, with no assertion of an authentication instant.
+    AgentPass {
+        /// The agent the run belongs to.
+        agent: AgentId,
+        /// The launch the pass belongs to.
+        launch: String,
+        /// The session the pass belongs to.
+        session: String,
+    },
 }
 
 impl Provenance {
     /// Authentication by `method` at `authenticated_at`, in seconds since the Unix epoch.
     pub fn new(method: AuthMethod, authenticated_at: u64) -> Self {
-        Self {
+        Self::Authenticated {
             method,
             authenticated_at,
         }
@@ -55,31 +72,69 @@ impl Provenance {
         Self::new(AuthMethod::AgentSignature(agent), authenticated_at)
     }
 
+    /// Authentication by a pass bound to this agent's launch and session.
+    ///
+    /// # Errors
+    /// Refuses an empty or oversized run identifier.
+    pub fn by_pass(agent: AgentId, launch: &str, session: &str) -> Result<Self, IdentityError> {
+        if launch.is_empty() || session.is_empty() || launch.len() > 128 || session.len() > 128 {
+            return Err(IdentityError::EventMalformed {
+                reason: "pass provenance requires bounded nonempty launch and session identifiers",
+            });
+        }
+        Ok(Self::AgentPass {
+            agent,
+            launch: launch.to_owned(),
+            session: session.to_owned(),
+        })
+    }
+
     /// How the actor was authenticated.
     pub fn method(&self) -> AuthMethod {
-        self.method
+        match self {
+            Self::Authenticated { method, .. } => *method,
+            Self::AgentPass { agent, .. } => AuthMethod::AgentPass(*agent),
+        }
     }
 
     /// The agent whose signed request authenticated the actor; none when the
     /// actor signed in themselves.
     pub fn agent(&self) -> Option<AgentId> {
-        match self.method {
+        match self.method() {
             AuthMethod::Oidc | AuthMethod::Operator | AuthMethod::ServiceAccountBearer(_) => None,
-            AuthMethod::AgentSignature(agent) => Some(agent),
+            AuthMethod::AgentSignature(agent) | AuthMethod::AgentPass(agent) => Some(agent),
         }
     }
 
     /// The independently authenticated service account, if any.
     pub fn service_account(&self) -> Option<ServiceAccountId> {
-        match self.method {
+        match self.method() {
             AuthMethod::ServiceAccountBearer(account) => Some(account),
-            AuthMethod::Oidc | AuthMethod::Operator | AuthMethod::AgentSignature(_) => None,
+            AuthMethod::Oidc
+            | AuthMethod::Operator
+            | AuthMethod::AgentSignature(_)
+            | AuthMethod::AgentPass(_) => None,
         }
     }
 
     /// When the actor was authenticated, in seconds since the Unix epoch.
-    pub fn authenticated_at(&self) -> u64 {
-        self.authenticated_at
+    pub fn authenticated_at(&self) -> Option<u64> {
+        match self {
+            Self::Authenticated {
+                authenticated_at, ..
+            } => Some(*authenticated_at),
+            Self::AgentPass { .. } => None,
+        }
+    }
+
+    /// The verified launch and session, when a run pass authenticated the actor.
+    pub fn run(&self) -> Option<(&str, &str)> {
+        match self {
+            Self::AgentPass {
+                launch, session, ..
+            } => Some((launch, session)),
+            Self::Authenticated { .. } => None,
+        }
     }
 }
 
@@ -111,3 +166,7 @@ impl Actor {
         &self.provenance
     }
 }
+
+#[cfg(test)]
+#[path = "provenance_tests.rs"]
+mod tests;

@@ -286,49 +286,84 @@ fn key(dir: &Path) -> Result<Arc<Ed25519Identity>, Box<dyn Error>> {
     )?))
 }
 
-#[test]
-fn a_second_start_with_a_changed_model_file_changes_nothing_and_says_so_by_name() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let first = config(
-        dir.path(),
-        r#"{"version":1,"relations":{"alpha":["read"]}}"#,
-    )?;
-    let said = std::sync::Mutex::new(Vec::<String>::new());
+/// Open the apps beside `model` in `dir`, keeping what the start said.
+fn start(
+    dir: &Path,
+    model: &str,
+    said: &std::sync::Mutex<Vec<String>>,
+) -> Result<lys_identity_server::apps_store::AppStore, Box<dyn Error>> {
+    let config = config(dir, model)?;
     let say = |line: &str| {
         if let Ok(mut lines) = said.lock() {
             lines.push(line.to_owned());
         }
     };
-    let store = lys_identity_server::apps_api::opened(&first, key(dir.path())?, &say)?;
-    let model = store.model()?;
-    drop(store);
-    let second = config(
+    Ok(lys_identity_server::apps_api::opened(
+        &config,
+        key(dir)?,
+        &say,
+    )?)
+}
+
+fn count(said: &std::sync::Mutex<Vec<String>>, prefix: &str) -> usize {
+    said.lock()
+        .map(|lines| lines.iter().filter(|line| line.starts_with(prefix)).count())
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_later_model_that_only_adds_is_applied_once_at_start() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let said = std::sync::Mutex::new(Vec::<String>::new());
+    let first = r#"{"version":1,"relations":{"alpha":["read"]}}"#;
+    let later = r#"{"version":2,"relations":{"alpha":["read","agent.stop"],"only.agent.stop":["agent.stop"]}}"#;
+    let model = start(dir.path(), first, &said)?.model()?;
+    assert_eq!(model.version(), 1);
+    let model = start(dir.path(), later, &said)?.model()?;
+    assert_eq!(model.version(), 2, "the later model is the next version");
+    assert_eq!(model.relations().count(), 2);
+    let again = start(dir.path(), later, &said)?.model()?;
+    assert_eq!(
+        again, model,
+        "a second start with the same file adds nothing"
+    );
+    let earlier = start(dir.path(), first, &said)?.model()?;
+    assert_eq!(earlier, model, "an earlier file is never applied");
+    assert_eq!(count(&said, "lys_model_recorded"), 1);
+    assert_eq!(count(&said, "lys_model_applied"), 1);
+    assert_eq!(count(&said, "grant_model_file_ignored"), 2);
+    Ok(())
+}
+
+#[test]
+fn a_later_model_that_takes_an_action_away_refuses_the_start_by_name() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let said = std::sync::Mutex::new(Vec::<String>::new());
+    let model = start(
+        dir.path(),
+        r#"{"version":1,"relations":{"alpha":["read"]}}"#,
+        &said,
+    )?
+    .model()?;
+    let refused = start(
         dir.path(),
         r#"{"version":5,"relations":{"omega":["write"]}}"#,
+        &said,
+    )
+    .err()
+    .ok_or("a model taking alpha away was applied")?;
+    assert!(
+        refused
+            .to_string()
+            .contains("takes read from the relation `alpha`"),
+        "{refused}"
+    );
+    let kept = start(
+        dir.path(),
+        r#"{"version":1,"relations":{"alpha":["read"]}}"#,
+        &said,
     )?;
-    let store = lys_identity_server::apps_api::opened(&second, key(dir.path())?, &say)?;
-    assert_eq!(
-        store.model()?,
-        model,
-        "the log is the only source once lys exists"
-    );
-    let lines = said.lock().map(|lines| lines.clone()).unwrap_or_default();
-    assert_eq!(
-        lines
-            .iter()
-            .filter(|line| line.starts_with("lys_model_recorded"))
-            .count(),
-        1,
-        "{lines:?}"
-    );
-    assert_eq!(
-        lines
-            .iter()
-            .filter(|line| line.starts_with("grant_model_file_ignored"))
-            .count(),
-        1,
-        "{lines:?}"
-    );
+    assert_eq!(kept.model()?, model, "the refused start changed nothing");
     Ok(())
 }
 

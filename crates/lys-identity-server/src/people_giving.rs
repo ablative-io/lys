@@ -11,7 +11,7 @@ use crate::directory_views::{ReceiptAnswer, receipt_view};
 use crate::error::ServerError;
 use crate::error_holding::HoldingError;
 use crate::error_team::TeamError;
-use crate::grants::{Decision, decide, with_directory_grants};
+use crate::grants::{Decision, decide_as, with_directory_grants};
 use crate::routes::{AppState, Named, malformed, signed_in, with_directory};
 use crate::session::now;
 use crate::teams_state::Team;
@@ -110,7 +110,7 @@ pub(super) fn profile(
                 resource: Resource::new("person", &person.to_string())?,
                 action: Action::new("write")?,
             };
-            decide(&mut judged, &request, at, None, Decision::Explain)?;
+            decide_as(actor, &mut judged, &request, at, None, Decision::Explain)?;
             if judged.directory.record(id).is_none() {
                 return Err(lys_identity::IdentityError::IdentityUnknown {
                     identity: id.to_string(),
@@ -125,7 +125,7 @@ pub(super) fn profile(
             })?;
             teams.settle()?;
             holds(teams.teams_iter(), agent, person)?;
-            decide(&mut judged, &request, at, None, Decision::Exercise)?;
+            decide_as(actor, &mut judged, &request, at, None, Decision::Exercise)?;
             Ok(teams)
         },
         |directory, teams| {

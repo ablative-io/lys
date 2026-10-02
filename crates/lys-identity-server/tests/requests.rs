@@ -436,3 +436,55 @@ async fn an_approval_the_grants_refuse_holds_nothing_and_gives_nothing() -> Test
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_once_answer_lends_a_grant_that_admits_exactly_one_exercise() -> TestResult {
+    let table = Table::set().await?;
+    let source = table.lendable("1").await?;
+    let asked = table.ask(&table.ada, "1", "beta").await?;
+    let mut once = approval(Some(&source))?;
+    once["answer"] = json!({ "kind": "once" });
+    let (status, approved) = table.decide(&table.bea, &asked, "approve", &once).await?;
+    assert_eq!(status, 200, "{approved}");
+    let grant = approved["decision"]["grant"].as_str().ok_or("no grant")?;
+    let exercise =
+        json!({"route": "api", "resource": {"kind": "doc", "id": "1"}, "action": "read"});
+    let first = table
+        .service
+        .post("/grants/check", Some(&table.ada), &exercise)
+        .await?;
+    assert_eq!(first.0, 200, "{}", first.1);
+    assert_eq!(first.1["grant"], grant);
+    let second = table
+        .service
+        .post("/grants/check", Some(&table.ada), &exercise)
+        .await?;
+    refused(&second, 403, "Revoked");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_for_a_while_answer_ends_when_the_approver_says_and_ongoing_has_no_end() -> TestResult {
+    let table = Table::set().await?;
+    let source = table.lendable("1").await?;
+    for (answer, ends) in [
+        (
+            json!({ "kind": "until", "ends_at": FAR - 60 }),
+            json!(FAR - 60),
+        ),
+        (json!({ "kind": "ongoing" }), Value::Null),
+    ] {
+        let asked = table.ask(&table.ada, "1", "beta").await?;
+        let mut body = approval(Some(&source))?;
+        body["answer"] = answer;
+        let (status, approved) = table.decide(&table.bea, &asked, "approve", &body).await?;
+        assert_eq!(status, 200, "{approved}");
+        let grant = approved["decision"]["grant"].as_str().ok_or("no grant")?;
+        let (_, held) = table
+            .service
+            .get(&format!("/grants/{grant}"), Some(&table.ada))
+            .await?;
+        assert_eq!(held["window"]["ends_at"], ends, "{held}");
+    }
+    Ok(())
+}
