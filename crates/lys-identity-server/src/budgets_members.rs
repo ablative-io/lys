@@ -1,6 +1,6 @@
 //! Team coverage includes admitted descendants and never grants membership authority.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lys_identity::projection::Projection;
 use lys_identity::{IdentityId, LifecycleState};
@@ -12,7 +12,11 @@ use crate::routes::{AppState, with_directory};
 use crate::teams_state::Team;
 
 /// Build coverage from the complete directory, including members with no usage yet.
+///
+/// Team membership is reversed in one pass over the teams, so each agent reads
+/// only the teams it belongs to and the parents above them.
 pub fn from_parts(directory: &Projection, teams: &[Team]) -> Result<Vec<Standing>, ServerError> {
+    let membership = Membership::of(teams);
     directory
         .records()
         .filter_map(|(identity, record)| {
@@ -23,7 +27,7 @@ pub fn from_parts(directory: &Projection, teams: &[Team]) -> Result<Vec<Standing
                 return None;
             }
             let agent = agent.to_string();
-            Some(ancestors(&agent, teams).map(|teams| Standing {
+            Some(membership.ancestors(&agent).map(|teams| Standing {
                 agent,
                 teams,
                 person: record.responsible().map(|person| person.to_string()),
@@ -32,42 +36,67 @@ pub fn from_parts(directory: &Projection, teams: &[Team]) -> Result<Vec<Standing
         .collect()
 }
 
-fn ancestors(agent: &str, teams: &[Team]) -> Result<BTreeSet<String>, ServerError> {
-    let mut covered = BTreeSet::new();
-    for team in teams.iter().filter(|team| {
-        team.retired.is_none()
-            && team.members.iter().any(|member| member == agent)
-            && !team.held.iter().any(|hold| hold.member == agent)
-    }) {
-        let mut visiting = BTreeSet::new();
-        let mut current = Some(team);
-        while let Some(team) = current {
+/// Teams by id and by admitted member, read from the team list once.
+struct Membership<'a> {
+    by_id: BTreeMap<&'a str, &'a Team>,
+    by_member: BTreeMap<&'a str, Vec<&'a Team>>,
+}
+
+impl<'a> Membership<'a> {
+    fn of(teams: &'a [Team]) -> Self {
+        let mut by_id = BTreeMap::new();
+        let mut by_member: BTreeMap<&str, Vec<&Team>> = BTreeMap::new();
+        for team in teams {
+            #[cfg(test)]
+            crate::budgets_work::visit(crate::budgets_work::Work::Team);
+            // The first team kept under an id answers a parent lookup, as a scan would.
+            by_id.entry(team.created.id.as_str()).or_insert(team);
             if team.retired.is_some() {
-                break;
+                continue;
             }
-            if !visiting.insert(team.created.id.clone()) {
-                return Err(ServerError::Budget(BudgetError::BudgetsUnavailable {
-                    reason: "team budget coverage contains a parent cycle".to_owned(),
-                }));
+            let admitted: BTreeSet<&str> = team
+                .members
+                .iter()
+                .map(String::as_str)
+                .filter(|member| !team.held.iter().any(|hold| hold.member == *member))
+                .collect();
+            for member in admitted {
+                by_member.entry(member).or_default().push(team);
             }
-            covered.insert(team.created.id.clone());
-            current = team
-                .parent
-                .as_ref()
-                .map(|parent| {
-                    teams
-                        .iter()
-                        .find(|candidate| candidate.created.id == *parent)
-                        .ok_or_else(|| {
+        }
+        Self { by_id, by_member }
+    }
+
+    fn ancestors(&self, agent: &str) -> Result<BTreeSet<String>, ServerError> {
+        let mut covered = BTreeSet::new();
+        for team in self.by_member.get(agent).into_iter().flatten() {
+            let mut visiting = BTreeSet::new();
+            let mut current = Some(*team);
+            while let Some(team) = current {
+                if team.retired.is_some() {
+                    break;
+                }
+                if !visiting.insert(team.created.id.clone()) {
+                    return Err(ServerError::Budget(BudgetError::BudgetsUnavailable {
+                        reason: "team budget coverage contains a parent cycle".to_owned(),
+                    }));
+                }
+                covered.insert(team.created.id.clone());
+                current = team
+                    .parent
+                    .as_ref()
+                    .map(|parent| {
+                        self.by_id.get(parent.as_str()).copied().ok_or_else(|| {
                             ServerError::Budget(BudgetError::BudgetsUnavailable {
                                 reason: format!("team budget parent {parent} is missing"),
                             })
                         })
-                })
-                .transpose()?;
+                    })
+                    .transpose()?;
+            }
         }
+        Ok(covered)
     }
-    Ok(covered)
 }
 
 /// Settled directory and team coverage, with no clock or runner request.

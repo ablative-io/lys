@@ -2,6 +2,8 @@
 
 use std::cell::Cell;
 
+mod crossings;
+mod members;
 mod tests;
 
 #[derive(Clone, Copy)]
@@ -11,10 +13,12 @@ pub(crate) enum Work {
     StateCopy,
     IndexCopy,
     Crossing,
+    CrossingLookup,
+    Team,
 }
 
 thread_local! {
-    static COUNTS: Cell<[usize; 5]> = const { Cell::new([0; 5]) };
+    static COUNTS: Cell<[usize; 7]> = const { Cell::new([0; 7]) };
 }
 
 pub(crate) fn visit(work: Work) {
@@ -26,7 +30,7 @@ pub(crate) fn visit(work: Work) {
 }
 
 fn reset() {
-    COUNTS.set([0; 5]);
+    COUNTS.set([0; 7]);
 }
 
 fn count(work: Work) -> usize {

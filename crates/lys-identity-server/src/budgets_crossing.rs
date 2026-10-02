@@ -237,6 +237,8 @@ impl From<StoredCrossings> for Crossings {
 impl Crossings {
     /// Check an operation's identity without walking previous crossings.
     pub fn holds(&self, operation: &str) -> bool {
+        #[cfg(test)]
+        crate::budgets_work::visit(crate::budgets_work::Work::CrossingLookup);
         self.index.operations.contains_key(operation)
     }
 
