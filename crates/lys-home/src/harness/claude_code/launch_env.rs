@@ -16,9 +16,6 @@ use crate::error::HomeError;
 use crate::harness::claude_code::template::Template;
 use crate::record::blocks::Hash;
 
-/// The settings file's bytes: `{"env": {...}}`, keys sorted, with the
-/// template's `permissions` beside `env` when it sets them; one trailing
-/// newline.
 /// Refuse a template that does not say how the agent is confined: a
 /// permissions slot that is absent, names no `defaultMode`, or names an empty
 /// one. Checked before anything is written, so nothing is ever rendered
@@ -42,6 +39,9 @@ pub fn confinement_named(template: &Template) -> Result<(), HomeError> {
     Ok(())
 }
 
+/// The settings file's bytes: `{"env": {...}}`, keys sorted, with the
+/// template's `permissions` beside `env` when it sets them; one trailing
+/// newline.
 pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     let mut env: BTreeMap<&str, &str> = template
         .env
