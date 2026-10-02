@@ -171,7 +171,8 @@ async fn an_unknown_api_path_is_refused_by_name_never_the_page() -> Result<(), B
 
     let (status, body) = text(&service, "/api/authority").await?;
     assert_eq!(status, 200);
-    assert_eq!(body, crate::admission::AUTHORITY);
+    let authority: Value = serde_json::from_str(&body)?;
+    assert_eq!(authority["authority"], crate::admission::AUTHORITY);
 
     let (status, body) = text(&service, "/people").await?;
     assert_eq!(status, 200);
