@@ -123,6 +123,7 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
     { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}</span> : null },
     { head: 'Add agent', cell: addUnder },
     { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
+    { head: 'Add agent', cell: addUnder },
   ];
   return (
     <>
