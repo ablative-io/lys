@@ -151,6 +151,7 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
         Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
     })
     .await?;
+    full_schema(&mirror).await?;
     let bea = seeded.people[1].id;
     let ada_cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea_cookie = service.sign_in(login(BEA)).await?;
@@ -251,6 +252,13 @@ async fn held_schema(settings: &SpiceDbSettings) -> Result<String, Box<dyn std::
     Ok(answer["schemaText"].as_str().unwrap_or_default().to_owned())
 }
 
+async fn full_schema(settings: &SpiceDbSettings) -> Outcome {
+    let schema = held_schema(settings).await?;
+    assert!(schema.contains("permission x0_person_dprofile_dset"));
+    assert!(schema.contains("relation x0_only_dperson_dprofile_dset"));
+    Ok(())
+}
+
 #[tokio::test]
 async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -> Outcome {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -272,6 +280,7 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
         |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
     .await?;
+    full_schema(&engine).await?;
     let left = "lys/bdeadbeefdeadbeef";
     let held = held_schema(&engine).await?;
     let planted = format!("{held}\n\ndefinition {left}/person {{}}\n");
