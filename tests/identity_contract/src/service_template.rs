@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::{self, File};
+use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Instant;
@@ -18,12 +19,33 @@ fn executable_hash() -> Result<&'static str, Failure> {
     static HASH: OnceLock<Result<String, String>> = OnceLock::new();
     HASH.get_or_init(|| {
         std::env::current_exe()
-            .and_then(|path| template_files::hash_file(&path))
+            .and_then(|path| program_hash(&path))
             .map_err(|error| format!("service template executable hash: {error}"))
     })
     .as_ref()
     .map(String::as_str)
     .map_err(|error| error.as_str().into())
+}
+
+fn program_hash(path: &Path) -> io::Result<String> {
+    let mut input = io::BufReader::with_capacity(256 * 1024, File::open(path)?);
+    let mut hash = ring::digest::Context::new(&ring::digest::SHA256);
+    loop {
+        let bytes = input.fill_buf()?;
+        if bytes.is_empty() {
+            break;
+        }
+        hash.update(bytes);
+        let count = bytes.len();
+        input.consume(count);
+    }
+    let digest = hash.finish();
+    let mut encoded = String::with_capacity(64);
+    for byte in digest.as_ref() {
+        std::fmt::Write::write_fmt(&mut encoded, format_args!("{byte:02x}"))
+            .map_err(io::Error::other)?;
+    }
+    Ok(encoded)
 }
 
 fn cache_dir() -> Result<PathBuf, Failure> {
@@ -198,6 +220,21 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn program_hash_reads_every_byte_across_its_buffer_boundary() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("program");
+        let mut bytes = vec![13; 256 * 1024 * 2 + 1];
+        for content in [&b""[..], &b"abc"[..], &bytes] {
+            fs::write(&path, content)?;
+            assert_eq!(program_hash(&path)?, template_files::hash_file(&path)?);
+        }
+        bytes[256 * 1024 * 2] = 17;
+        fs::write(&path, bytes)?;
+        assert_eq!(program_hash(&path)?, template_files::hash_file(&path)?);
+        Ok(())
+    }
 
     #[test]
     fn caller_prepared_stores_are_not_rebuilt() -> std::io::Result<()> {
