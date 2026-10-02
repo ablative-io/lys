@@ -259,6 +259,11 @@ impl Table {
         })).await
     }
 
+    /// The administrator's own call, answering its status and body.
+    pub(super) async fn as_administrator(&self, path: &str, body: &Value) -> TestResult<(u16, Value)> {
+        self.service.post(path, Some(&self.cookie), body).await
+    }
+
     pub(super) async fn role_view(&self, id: &str) -> TestResult<Value> {
         let (status, body) = self
             .service

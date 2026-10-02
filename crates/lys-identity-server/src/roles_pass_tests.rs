@@ -93,3 +93,32 @@ async fn role_changes_are_withheld_from_agents() -> TestResult {
     assert!(table.role_view(&table.role).await?["holders"][0]["ended_by"].is_null());
     Ok(())
 }
+
+/// Holding a role whose templates name authority gives an agent none of it:
+/// assignment issues no grant, so the agent holds nothing and stays refused.
+#[tokio::test]
+async fn a_held_role_with_authority_templates_gives_an_agent_nothing() -> TestResult {
+    let table = Table::fresh(false).await?;
+    let mut body = version_body()?;
+    body["name"] = json!("Administrator's deputy");
+    body["grant_templates"] = json!([
+        {"resource": {"kind": "role", "id": "all"}, "relation": "creator", "days": null}
+    ]);
+    let (status, role) = table.as_administrator("/roles", &body).await?;
+    assert_eq!(status, 200, "{role}");
+    let id = role["id"].as_str().ok_or("role id missing")?;
+    let (status, held) = table
+        .as_administrator(
+            &format!("/roles/{id}/holders"),
+            &json!({"operation": operation()?, "holder": table.agent, "ends_at": null}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{held}");
+    let (status, grants) = table.call(Method::GET, "/agent/grants", None).await?;
+    assert_eq!(status, 200, "{grants}");
+    assert_eq!(grants["grants"], json!([]), "{grants}");
+    let mut create = version_body()?;
+    create["name"] = json!("Made by the agent");
+    refused(&table, Method::POST, "/roles", Some(&create)).await?;
+    Ok(())
+}
