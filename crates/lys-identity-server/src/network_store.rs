@@ -184,6 +184,34 @@ fn original_agents(kept: &Kept) -> Result<BTreeMap<String, Vec<String>>, ServerE
     Ok(original)
 }
 
+fn original_agents(kept: &Kept) -> Result<BTreeMap<String, Vec<String>>, ServerError> {
+    let mut original = BTreeMap::new();
+    for (operation, recorded) in &kept.agent_changes {
+        if operation != &recorded.operation {
+            return Err(unavailable(
+                "an agent allowance receipt names a different operation",
+            ));
+        }
+        if let Some(agents) = &recorded.original_may_run
+            && original
+                .insert(recorded.machine.clone(), agents.clone())
+                .is_some()
+        {
+            return Err(unavailable(
+                "a computer's creation allowance is recorded more than once",
+            ));
+        }
+    }
+    for recorded in kept.agent_changes.values() {
+        if !original.contains_key(&recorded.machine) {
+            return Err(unavailable(
+                "a changed computer has no recorded creation allowance",
+            ));
+        }
+    }
+    Ok(original)
+}
+
 fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let beside = path.with_extension("writing");
     let mut file = fs::File::create(&beside)?;
@@ -408,6 +436,63 @@ impl NetworkStore {
         self.write(Change::Agent {
             recorded: recorded.clone(),
         })?;
+        Ok(recorded)
+    }
+
+    /// The original allowance receipt, if this operation has been recorded.
+    pub fn agent_recorded(&self, operation: &str) -> Option<&AgentsRecorded> {
+        self.kept.agent_changes.get(operation)
+    }
+
+    /// Keep allowance and receipt together. A repeat writes nothing and never reapplies the act.
+    pub fn change_agent(
+        &mut self,
+        mut recorded: AgentsRecorded,
+    ) -> Result<AgentsRecorded, ServerError> {
+        self.settle()?;
+        if let Some(first) = self.agent_recorded(&recorded.operation) {
+            if first.machine == recorded.machine
+                && first.agent == recorded.agent
+                && first.allow == recorded.allow
+                && first.by == recorded.by
+            {
+                return Ok(first.clone());
+            }
+            return Err(ServerError::MachineAgentsReused {
+                operation: recorded.operation,
+            });
+        }
+        let mut next = self.kept.clone();
+        let machine = next
+            .machines
+            .iter_mut()
+            .find(|machine| machine.id == recorded.machine)
+            .ok_or(ServerError::MachineUnknown)?;
+        if machine.retired.is_some() {
+            return Err(ServerError::MachineRetired);
+        }
+        if machine.runtime.is_none() {
+            return Err(ServerError::MachineWithoutRuntime);
+        }
+        recorded.original_may_run = if self.original_agents.contains_key(&recorded.machine) {
+            None
+        } else {
+            Some(machine.may_run.clone())
+        };
+        if recorded.allow {
+            if !machine.may_run.contains(&recorded.agent) {
+                machine.may_run.push(recorded.agent.clone());
+            }
+        } else {
+            machine.may_run.retain(|agent| agent != &recorded.agent);
+        }
+        next.agent_changes
+            .insert(recorded.operation.clone(), recorded.clone());
+        self.write(next)?;
+        if let Some(agents) = &recorded.original_may_run {
+            self.original_agents
+                .insert(recorded.machine.clone(), agents.clone());
+        }
         Ok(recorded)
     }
 

@@ -37,6 +37,18 @@ pub struct ReportingGap {
     pub state: LifecycleState,
 }
 
+#[path = "projection_reporting.rs"]
+mod reporting;
+
+/// The inactive identity that interrupts a reporting chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReportingGap {
+    /// The identity at the gap.
+    pub identity: IdentityId,
+    /// Its recorded lifecycle state.
+    pub state: LifecycleState,
+}
+
 /// One identity, as the directory holds it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
@@ -219,6 +231,34 @@ impl Projection {
     /// The maintained number of one person's agents.
     pub fn person_agents_count(&self, person: PersonId) -> usize {
         self.agents_by_person.get(&person).map_or(0, BTreeSet::len)
+    }
+
+    /// The named person's agents, without visiting unrelated directory records.
+    pub fn agents_of(
+        &self,
+        person: PersonId,
+    ) -> impl Iterator<Item = Result<(&IdentityId, &Record), IdentityError>> {
+        self.agents_by_person
+            .get(&person)
+            .into_iter()
+            .flat_map(|agents| agents.iter())
+            .map(move |identity| {
+                let held = self.records.get_key_value(identity).ok_or_else(|| {
+                    IdentityError::LogUnavailable {
+                        reason: format!(
+                            "person {person}'s agent index names missing identity {identity}"
+                        ),
+                    }
+                })?;
+                if !matches!(held.0, IdentityId::Agent(_)) || held.1.responsible != Some(person) {
+                    return Err(IdentityError::LogUnavailable {
+                        reason: format!(
+                            "person {person}'s agent index disagrees with identity {identity}"
+                        ),
+                    });
+                }
+                Ok(held)
+            })
     }
 
     /// The named person's agents, without visiting unrelated directory records.
