@@ -62,17 +62,17 @@ fn executable(source: &Path) -> Result<PathBuf, Box<dyn Error>> {
         let input = temporary.path().join("stamp.rs");
         fs::write(&input, source)?;
         let output = temporary.path().join("stamp");
-        let rustc_run = Command::new(&compiler.executable)
+        let compiled = Command::new(&compiler.executable)
             .args(["--edition=2024", "--crate-name", "stamp_probe"])
             .arg(&input)
             .arg("-o")
             .arg(&output)
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .output()?;
-        if !rustc_run.status.success() {
+        if !compiled.status.success() {
             return Err(format!(
                 "stamp_compile_failed: {}",
-                String::from_utf8_lossy(&rustc_run.stderr)
+                String::from_utf8_lossy(&compiled.stderr)
             )
             .into());
         }
