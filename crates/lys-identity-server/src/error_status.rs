@@ -85,6 +85,7 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
         GrantError::RelationUnknown { .. }
+        | GrantError::ResourceKindUnheld { .. }
         | GrantError::ActionsOutside { .. }
         | GrantError::LineageCycle { .. }
         | GrantError::IssuerNotHolder { .. }

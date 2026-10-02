@@ -69,6 +69,7 @@ pub(crate) fn route(
         "IdentityNotActive",
         "LogUnavailable",
         "PermissionEngineUnavailable",
+        "ResourceKindUnheld",
         "ProjectionPending",
         "OperationUnresolved",
         "StaleDecision",
