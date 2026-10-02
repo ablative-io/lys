@@ -1,10 +1,12 @@
 """Run an explicit live target against a disposable permission database."""
 
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
 import re
 import secrets
+import signal
 import subprocess
 import sys
 import tempfile
@@ -20,14 +22,43 @@ def docker(*arguments):
     return result.stdout.strip()
 
 
+class Cancelled(RuntimeError):
+    pass
+
+
+def cancel(signum, frame):
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    raise Cancelled(f"spicedb_cancelled: signal {signum}")
+
+
+@contextmanager
+def owned_process(arguments, **options):
+    previous = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
+    try:
+        # Restore the child mask after PID acquisition and before the command exec.
+        launch = "import json,os,signal,sys; signal.pthread_sigmask(signal.SIG_SETMASK, json.loads(sys.argv[1])); os.execvpe(sys.argv[2], sys.argv[2:], os.environ)"
+        process = subprocess.Popen([sys.executable, "-c", launch, json.dumps(sorted(previous)), *arguments], **options)
+        try:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+            yield process
+        finally:
+            if process.poll() is None:
+                process.terminate()
+            process.wait()
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if stream is not None:
+                    stream.close()
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+
+
 def ready(container):
-    logger = subprocess.Popen(
+    with owned_process(
         ["docker", "logs", "--follow", container],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-    )
-    try:
+    ) as logger:
         for line in logger.stdout:
             try:
                 event = json.loads(line)
@@ -36,11 +67,6 @@ def ready(container):
             if event.get("message") == "http server started serving" and event.get("service") == "http":
                 return
         raise RuntimeError("spicedb_not_ready: container ended before its HTTP ready line")
-    finally:
-        if logger.poll() is None:
-            logger.terminate()
-        logger.wait()
-        logger.stdout.close()
 
 
 def run(command):
@@ -57,30 +83,42 @@ def run(command):
         for path, text in [(key_file, key), (environment_file, f"SPICEDB_GRPC_PRESHARED_KEY={key}\n")]:
             with open(path, "x", opener=lambda name, flags: os.open(name, flags, 0o600)) as output:
                 output.write(text)
-        container = docker(
-            "run", "--detach", "--publish", "127.0.0.1::8443", "--env-file", str(environment_file),
-            image, "serve", "--datastore-engine=memory", "--http-enabled", "--log-format=json",
-        )
-        if not re.fullmatch("[0-9a-f]{64}", container):
-            raise RuntimeError("spicedb_container_invalid: docker did not return an owned container id")
+        previous = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
         try:
-            ready(container)
-            endpoint = docker("port", container, "8443/tcp")
-            if not re.fullmatch(r"127\.0\.0\.1:[0-9]{1,5}", endpoint):
-                raise RuntimeError("spicedb_endpoint_invalid: no single loopback HTTP endpoint")
-            environment = dict(os.environ, LYS_SPICEDB_ENDPOINT=endpoint, LYS_SPICEDB_KEY_FILE=str(key_file))
-            print(f"spicedb_fixture_ready: {container[:12]} {endpoint}", flush=True)
-            return subprocess.run(command, env=environment).returncode
+            container = docker(
+                "run", "--detach", "--publish", "127.0.0.1::8443", "--env-file", str(environment_file),
+                image, "serve", "--datastore-engine=memory", "--http-enabled", "--log-format=json",
+            )
+            if not re.fullmatch("[0-9a-f]{64}", container):
+                raise RuntimeError("spicedb_container_invalid: docker did not return an owned container id")
+            try:
+                signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+                ready(container)
+                endpoint = docker("port", container, "8443/tcp")
+                if not re.fullmatch(r"127\.0\.0\.1:[0-9]{1,5}", endpoint):
+                    raise RuntimeError("spicedb_endpoint_invalid: no single loopback HTTP endpoint")
+                environment = dict(os.environ, LYS_SPICEDB_ENDPOINT=endpoint, LYS_SPICEDB_KEY_FILE=str(key_file))
+                print(f"spicedb_fixture_ready: {container[:12]} {endpoint}", flush=True)
+                with owned_process(command, env=environment) as process:
+                    return process.wait()
+            finally:
+                docker("rm", "--force", container)
         finally:
-            docker("rm", "--force", container)
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous)
 
 
 def main(arguments):
+    previous = signal.signal(signal.SIGTERM, cancel)
     try:
         return run(arguments[1:] if arguments[:1] == ["--"] else arguments)
+    except Cancelled as error:
+        print(str(error), file=sys.stderr)
+        return 128 + signal.SIGTERM
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         print(f"spicedb_fixture_failed: {error}", file=sys.stderr)
         return 1
+    finally:
+        signal.signal(signal.SIGTERM, previous)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
 """The identity leg runs its explicit live target in an owned database."""
 
 import os
+import signal
+import sys
 import io
 import json
 from pathlib import Path
@@ -54,13 +56,58 @@ python3() { printf 'python3 %s\n' "$*" >> "$TRACE"; }
             self.assertTrue(key.read_text().strip())
             self.assertEqual(env["LYS_SPICEDB_ENDPOINT"], "127.0.0.1:18765")
             key_files.append(key)
-            return Mock(returncode=17)
+            child = Mock()
+            child.wait.return_value = 17
+            child.poll.return_value = 17
+            child.stdin = child.stdout = child.stderr = None
+            return child
 
-        with patch.object(spicedb_fixture, "docker", side_effect=["", owned, "127.0.0.1:18765", ""]) as docker, patch.object(spicedb_fixture, "ready"), patch.object(spicedb_fixture.subprocess, "run", side_effect=command), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(spicedb_fixture, "docker", side_effect=["", owned, "127.0.0.1:18765", ""]) as docker, patch.object(spicedb_fixture, "ready"), patch.object(spicedb_fixture.subprocess, "Popen", side_effect=command), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(spicedb_fixture.run(["cargo", "nextest"]), 17)
         docker.assert_any_call("rm", "--force", owned)
         self.assertTrue(key_files)
         self.assertFalse(key_files[0].exists())
+
+    def test_sigterm_reaps_its_processes_and_removes_private_files_and_container(self):
+        owned = "a" * 64
+        key_files = []
+        logger = Mock()
+        logger.stdout = io.StringIO(json.dumps({"message": "http server started serving", "service": "http"}) + "\n")
+        logger.poll.return_value = None
+        child = Mock()
+        child.stdout = child.stderr = child.stdin = None
+        child.poll.return_value = None
+        def wait():
+            os.kill(os.getpid(), signal.SIGTERM)
+        def spawn(arguments, **options):
+            if arguments[4] == "docker":
+                return logger
+            key_files.append(Path(options["env"]["LYS_SPICEDB_KEY_FILE"]))
+            child.wait.side_effect = lambda: wait() if child.wait.call_count == 1 else 0
+            return child
+        with patch.object(spicedb_fixture, "docker", side_effect=["", owned, "127.0.0.1:18765", ""]) as docker, patch.object(spicedb_fixture.subprocess, "Popen", side_effect=spawn), patch.object(spicedb_fixture.subprocess, "run", return_value=Mock(returncode=0)), patch("sys.stdout", new_callable=io.StringIO), patch("sys.stderr", new_callable=io.StringIO):
+            self.assertEqual(spicedb_fixture.main(["fixture-test"]), 143)
+        logger.terminate.assert_called_once_with()
+        logger.wait.assert_called_once_with()
+        child.terminate.assert_called_once_with()
+        self.assertEqual(child.wait.call_count, 2)
+        self.assertTrue(logger.stdout.closed)
+        docker.assert_any_call("rm", "--force", owned)
+        self.assertTrue(key_files)
+        self.assertFalse(key_files[0].exists())
+
+    def test_owned_child_restores_mask_before_exec_and_reaps_on_termination(self):
+        probe = "import signal,sys; print('BLOCKED' if signal.SIGTERM in signal.pthread_sigmask(signal.SIG_BLOCK, set()) else 'READY', flush=True); sys.stdin.readline()"
+        with spicedb_fixture.owned_process([sys.executable, "-c", probe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) as child:
+            state = child.stdout.readline().strip()
+            child.stdin.write("exit\n")
+            child.stdin.flush()
+            self.assertEqual(child.wait(), 0)
+        self.assertEqual(state, "READY")
+        ready = "import signal; print('READY', flush=True); signal.pause()"
+        with spicedb_fixture.owned_process([sys.executable, "-c", ready], stdout=subprocess.PIPE, text=True) as child:
+            self.assertEqual(child.stdout.readline().strip(), "READY")
+        self.assertEqual(child.returncode, -signal.SIGTERM)
 
     def test_early_database_exit_refuses_and_removes_its_container(self):
         owned = "a" * 64
