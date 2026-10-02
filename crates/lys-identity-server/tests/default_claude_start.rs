@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 
 use identity_contract::apps::{Auth, login, ok, op, post};
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service, StageTimer};
 use lys_core::Ed25519Identity;
 use lys_home::harness::rendering_launch::Launch;
 use lys_identity::{Actor, AuthMethod, LoginBinding, OperationId, Profile, Provenance};
@@ -230,9 +230,16 @@ async fn walk(table: &Table, mode: Option<&str>) -> Result<Evidence, Box<dyn Err
 }
 
 async fn evidence(mode: Option<&str>) -> Result<Evidence, Box<dyn Error>> {
+    let stage = StageTimer::new("scenario.table_open");
     let table = Table::open().await?;
+    drop(stage);
+    let stage = StageTimer::new("scenario.driver");
     let result = walk(&table, mode).await.map_err(|error| error.to_string());
-    match (result, table.close().await) {
+    drop(stage);
+    let stage = StageTimer::new("scenario.table_close");
+    let close = table.close().await;
+    drop(stage);
+    match (result, close) {
         (Ok(evidence), Ok(())) => Ok(evidence),
         (Err(error), Ok(())) => Err(error.into()),
         (Ok(_), Err(error)) => Err(error),
@@ -244,6 +251,7 @@ async fn evidence(mode: Option<&str>) -> Result<Evidence, Box<dyn Error>> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn claude_form_workspace_defaults_start_a_real_runner_with_native_settings() -> Outcome {
+    let timing = StageTimer::new("scenario.total");
     let evidence = evidence(Some("workspace-only")).await?;
     assert_eq!(evidence.status, 200, "{}", evidence.answer);
     assert_eq!(evidence.answer["runner"]["state"], "running");
@@ -282,11 +290,13 @@ async fn claude_form_workspace_defaults_start_a_real_runner_with_native_settings
     assert_eq!(native["sandbox"]["network"]["strictAllowlist"], true);
     assert_eq!(native["sandbox"]["network"]["allowLocalBinding"], false);
     assert_eq!(native["sandbox"]["network"]["allowAllUnixSockets"], false);
+    drop(timing);
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn claude_without_a_confinement_choice_refuses_before_render_or_start() -> Outcome {
+    let timing = StageTimer::new("scenario.total");
     let evidence = evidence(None).await?;
     assert_eq!(evidence.status, 400, "{}", evidence.answer);
     assert_eq!(evidence.answer["refusal"], "PolicyUnrepresentable");
@@ -298,5 +308,6 @@ async fn claude_without_a_confinement_choice_refuses_before_render_or_start() ->
     assert!(evidence.answer.get("template").is_none());
     assert!(evidence.answer.get("runner").is_none());
     assert_eq!(evidence.live["sessions"], json!([]));
+    drop(timing);
     Ok(())
 }
