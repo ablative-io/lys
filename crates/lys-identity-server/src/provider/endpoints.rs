@@ -194,6 +194,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::SignInStateUnknown
         | ServerError::SignInRefused
         | ServerError::SignInThrottled
+        | ServerError::RegistrationThrottled
         | ServerError::SecondFactorUnsupported
         | ServerError::SetupClosed
         | ServerError::SetupCodeRefused
