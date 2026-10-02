@@ -130,13 +130,7 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
     .await?)?;
 
     // The roots pass on nothing withheld, so editor is outside them.
-    let (status, refused) = post(
-        &service,
-        "/grants",
-        auth,
-        &give("editor", use_only)?,
-    )
-    .await?;
+    let (status, refused) = post(&service, "/grants", auth, &give("editor", use_only)?).await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "ActionsOutside", "{refused}");
 
@@ -153,7 +147,8 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
     assert_eq!(refused["refusal"], "WithheldFromAgents", "{refused}");
     // Nor may an agent's grant let it pass one on.
     let onward = json!({"kind": "to", "actions": ["agent.stop", "request.approve"], "recipients": ["agent"]});
-    let (status, refused) = post(&service, "/grants", auth, &give("only.agent.stop", onward)?).await?;
+    let (status, refused) =
+        post(&service, "/grants", auth, &give("only.agent.stop", onward)?).await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "WithheldFromAgents", "{refused}");
     assert_eq!(
@@ -191,8 +186,13 @@ async fn only_the_administrator_may_ask_for_agent_roots() -> TestResult {
     let (service, cookie, _) = set_up().await?;
     let stranger = service.sign_in(login("stranger")).await?;
     let before = revision(&service, &cookie).await?;
-    let (status, refused) =
-        post(&service, "/grants/agent-roots", Auth::Cookie(&stranger), &json!({})).await?;
+    let (status, refused) = post(
+        &service,
+        "/grants/agent-roots",
+        Auth::Cookie(&stranger),
+        &json!({}),
+    )
+    .await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "NotAdmitted", "{refused}");
     assert_eq!(

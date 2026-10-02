@@ -114,9 +114,15 @@ async fn a_held_role_with_authority_templates_gives_an_agent_nothing() -> TestRe
         )
         .await?;
     assert_eq!(status, 200, "{held}");
-    let (status, grants) = table.call(Method::GET, "/agent/grants", None).await?;
+    let (status, grants) = table.administrator_get("/grants").await?;
     assert_eq!(status, 200, "{grants}");
-    assert_eq!(grants["grants"], json!([]), "{grants}");
+    let held: Vec<&Value> = grants["grants"]
+        .as_array()
+        .ok_or("no grants")?
+        .iter()
+        .filter(|grant| grant["holder"] == table.agent.as_str())
+        .collect();
+    assert!(held.is_empty(), "{held:?}");
     let mut create = version_body()?;
     create["name"] = json!("Made by the agent");
     refused(&table, Method::POST, "/roles", Some(&create)).await?;

@@ -260,8 +260,17 @@ impl Table {
     }
 
     /// The administrator's own call, answering its status and body.
-    pub(super) async fn as_administrator(&self, path: &str, body: &Value) -> TestResult<(u16, Value)> {
+    pub(super) async fn as_administrator(
+        &self,
+        path: &str,
+        body: &Value,
+    ) -> TestResult<(u16, Value)> {
         self.service.post(path, Some(&self.cookie), body).await
+    }
+
+    /// The administrator's own read, answering its status and body.
+    pub(super) async fn administrator_get(&self, path: &str) -> TestResult<(u16, Value)> {
+        self.service.get(path, Some(&self.cookie)).await
     }
 
     pub(super) async fn role_view(&self, id: &str) -> TestResult<Value> {
