@@ -164,7 +164,6 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
     assert_eq!(plan["recorded_model_version"], 1);
     assert_eq!(plan["current_model_version"], 2);
     loader(&mut service, false).await?;
-    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     for collection in ["apps", "agents"] {
         if collection == "agents" {
             let error = loader(&mut service, true)
@@ -210,9 +209,8 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
         delegate["source"] = created["grant"].clone();
         ok(post(&service, "/grants", Auth::Cookie(&cookie), &delegate).await?)?;
     }
-    loader(&mut service, true).await?;
     let before = extent(&service)?;
-    service.restart().await?;
+    loader(&mut service, true).await?;
     assert_eq!(extent(&service)?, before);
     fs::write(service.dir.path().join("grant-model.json"), model(3))?;
     service.restart().await?;

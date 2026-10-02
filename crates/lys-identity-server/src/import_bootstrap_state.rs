@@ -85,6 +85,10 @@ impl Bootstrap<'_> {
 
     fn interrupted(&self, judged: &Judged<'_>, reason: &str) -> Result<ServerError, ServerError> {
         let version = judged.grants.model().version();
+        let recorded_model_version = self
+            .roots(judged)
+            .min_by_key(|record| record.index())
+            .map(|record| record.grant().parts().model_version);
         let carried: Vec<_> = judged
             .grants
             .model()
@@ -105,6 +109,8 @@ impl Bootstrap<'_> {
         Ok(ServerError::BootstrapInterrupted {
             reason: json!({
                 "reason":reason,
+                "recorded_model_version":recorded_model_version,
+                "current_model_version":version,
                 "act":"disable import_credential_file, restart, sign in as the configured administrator, record these requests, then restore import_credential_file",
                 "root_path":"/grants/roots",
                 "root":{"operation":root_operation.to_string(),"route":"api","holder":self.owner.to_string(),
