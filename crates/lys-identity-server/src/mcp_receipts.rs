@@ -10,8 +10,18 @@
 //! refused is held in memory, and the same ask from the same agent, made
 //! again, is relayed under the leaf already kept instead of writing another,
 //! so an agent that loops or probes cannot grow the directory log by one leaf
-//! per attempt. The hold ends when the ask is made, or when it is pushed out
-//! by newer refused asks once [`REFUSED_ASKS_HELD`] are held.
+//! per attempt. The same ask is told by the agent, the method, the path and
+//! the body without its `operation`, so a fresh operation id is still the
+//! same ask.
+//!
+//! A held ask stands only while the judgment it was refused under can
+//! stand: it remembers the directory log's and the grant log's sizes at the
+//! refusal, and either log having moved since is a miss, kept as a fresh
+//! leaf, so a change made after an approval never rests on a leaf kept
+//! before it. A grant window that opens with time alone moves no log, so
+//! the hold's life is also bounded to [`HELD_SECONDS`] from the refusal.
+//! The hold ends when the ask is made, when it lapses, or when it is pushed
+//! out by newer refused asks once [`REFUSED_ASKS_HELD`] are held.
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -40,6 +50,33 @@ const GRANT_TOKEN: &str = "grant-token";
 /// kept as a fresh leaf.
 pub(crate) const REFUSED_ASKS_HELD: usize = 4096;
 
+/// How long a refused ask is held, in seconds from its refusal: long enough
+/// to fold a loop or a probe into one leaf, short enough that a judgment
+/// changed by time alone is soon asked under a fresh leaf.
+pub(crate) const HELD_SECONDS: u64 = 60;
+
+/// The sizes of the two logs a judgment rests on, as they stood.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Logs {
+    directory: u64,
+    grants: u64,
+}
+
+/// The logs' sizes now, the directory's and the grants', read under the
+/// one lock order the grants are judged under.
+fn logs(state: &AppState) -> Result<Logs, ServerError> {
+    crate::grants::with_directory_grants(
+        state,
+        |judged| Ok(judged.grants.ledger().head()?.0),
+        |directory, grants| {
+            Ok(Logs {
+                directory: directory.log()?.head()?.0,
+                grants,
+            })
+        },
+    )
+}
+
 /// Who a relayed change is kept against, and the evidence kept with it.
 pub(crate) struct Witness {
     agent: AgentId,
@@ -48,7 +85,7 @@ pub(crate) struct Witness {
 }
 
 /// One ask as the hold tells it apart: the agent, the method, the path as
-/// the log keeps it and the body's digest.
+/// the log keeps it and the digest of the body without its `operation`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Ask {
     agent: AgentId,
@@ -57,10 +94,31 @@ pub(crate) struct Ask {
     body_sha256: String,
 }
 
-/// The refused asks held, oldest first, each with the view of the leaf it
-/// was kept under.
+/// The digest the hold tells a body by: a JSON object's `operation` is
+/// taken out first, so the same ask under a fresh operation id is the same
+/// ask; any other body is digested as it is.
+pub(crate) fn ask_digest(body: &[u8]) -> String {
+    match serde_json::from_slice::<Value>(body) {
+        Ok(Value::Object(mut fields)) => {
+            fields.remove("operation");
+            digest(Value::Object(fields).to_string().as_bytes())
+        }
+        Ok(_) | Err(_) => digest(body),
+    }
+}
+
+/// One refused ask held: the leaf it was kept under, the logs' sizes at the
+/// refusal and when it was refused.
+struct Held {
+    ask: Ask,
+    leaf: Value,
+    logs: Logs,
+    at: u64,
+}
+
+/// The refused asks held, oldest first.
 pub(crate) struct RefusedAsks {
-    held: Mutex<VecDeque<(Ask, Value)>>,
+    held: Mutex<VecDeque<Held>>,
 }
 
 fn unavailable(error: &dyn std::fmt::Display) -> ServerError {
@@ -77,24 +135,47 @@ impl RefusedAsks {
         }
     }
 
-    /// The leaf an identical refused ask was kept under, if one is held.
-    pub(crate) fn held(&self, ask: &Ask) -> Result<Option<Value>, ServerError> {
-        let held = self.held.lock().map_err(|error| unavailable(&error))?;
-        Ok(held
-            .iter()
-            .find(|(kept, _)| kept == ask)
-            .map(|(_, leaf)| leaf.clone()))
+    /// The leaf an identical refused ask was kept under, when one is held
+    /// whose logs still stand as `logs` and whose life has not lapsed at
+    /// `now`; one that has moved or lapsed is let go and is a miss.
+    pub(crate) fn held(
+        &self,
+        ask: &Ask,
+        logs: Logs,
+        now: u64,
+    ) -> Result<Option<Value>, ServerError> {
+        let mut held = self.held.lock().map_err(|error| unavailable(&error))?;
+        let Some(at) = held.iter().position(|kept| kept.ask == *ask) else {
+            return Ok(None);
+        };
+        let kept = &held[at];
+        if kept.logs == logs && now < kept.at.saturating_add(HELD_SECONDS) {
+            return Ok(Some(kept.leaf.clone()));
+        }
+        held.remove(at);
+        Ok(None)
     }
 
-    /// Hold `ask`, refused, under `leaf`; one already held is left as it is,
-    /// and the oldest is let go once more than [`REFUSED_ASKS_HELD`] would be
-    /// held.
-    pub(crate) fn refused(&self, ask: Ask, leaf: Value) -> Result<(), ServerError> {
+    /// Hold `ask`, refused at `now` under `leaf` with the logs at `logs`; one
+    /// already held is left as it is, and the oldest is let go once more
+    /// than [`REFUSED_ASKS_HELD`] would be held.
+    pub(crate) fn refused(
+        &self,
+        ask: Ask,
+        leaf: Value,
+        logs: Logs,
+        now: u64,
+    ) -> Result<(), ServerError> {
         let mut held = self.held.lock().map_err(|error| unavailable(&error))?;
-        if held.iter().any(|(kept, _)| *kept == ask) {
+        if held.iter().any(|kept| kept.ask == ask) {
             return Ok(());
         }
-        held.push_back((ask, leaf));
+        held.push_back(Held {
+            ask,
+            leaf,
+            logs,
+            at: now,
+        });
         while held.len() > REFUSED_ASKS_HELD {
             held.pop_front();
         }
@@ -104,22 +185,24 @@ impl RefusedAsks {
     /// `ask` was made: it is no longer held.
     pub(crate) fn made(&self, ask: &Ask) -> Result<(), ServerError> {
         let mut held = self.held.lock().map_err(|error| unavailable(&error))?;
-        held.retain(|(kept, _)| kept != ask);
+        held.retain(|kept| kept.ask != *ask);
         Ok(())
     }
 }
 
-/// A changing call's leaf: the ask it was kept under and whether this call
-/// wrote it or found it already kept from the same ask refused before.
+/// A changing call's leaf: the ask it was kept under, the logs as they
+/// stood and when, so a refusal can hold it.
 pub(crate) struct Kept {
     ask: Ask,
     leaf: Value,
+    logs: Logs,
+    at: u64,
 }
 
 impl Kept {
     /// Keep the ask `witness` makes through `method` and `uri` with `body`
     /// before it is relayed: under the leaf an identical refused ask is
-    /// already held under, else as a fresh leaf.
+    /// still held under, else as a fresh leaf.
     pub(crate) fn before(
         state: &AppState,
         hold: &RefusedAsks,
@@ -128,22 +211,34 @@ impl Kept {
         uri: &axum::http::Uri,
         body: &[u8],
     ) -> Result<Self, ServerError> {
+        let at = crate::session::now();
+        let logs = logs(state)?;
         let ask = Ask {
             agent: witness.agent,
             method: method.as_str().to_owned(),
             path: recorded_path(uri),
-            body_sha256: digest(body),
+            body_sha256: ask_digest(body),
         };
-        if let Some(leaf) = hold.held(&ask)? {
-            return Ok(Self { ask, leaf });
+        if let Some(leaf) = hold.held(&ask, logs, at)? {
+            return Ok(Self {
+                ask,
+                leaf,
+                logs,
+                at,
+            });
         }
-        let leaf = keep(state, witness, (method, &ask.path, &ask.body_sha256))?;
-        Ok(Self { ask, leaf })
+        let (leaf, directory) = keep(state, witness, (method, &ask.path, &digest(body)))?;
+        Ok(Self {
+            ask,
+            leaf,
+            logs: Logs { directory, ..logs },
+            at,
+        })
     }
 
     /// Name the leaf in `result` as the route judged: `receipt` when the
     /// change was made, `asked` when it was refused, which also holds the
-    /// ask so the same one is not kept again.
+    /// ask so the same one is not kept again while the judgment stands.
     pub(crate) fn answer(
         self,
         hold: &RefusedAsks,
@@ -154,7 +249,7 @@ impl Kept {
             hold.made(&self.ask)?;
             result["receipt"] = self.leaf;
         } else {
-            hold.refused(self.ask, self.leaf.clone())?;
+            hold.refused(self.ask, self.leaf.clone(), self.logs, self.at)?;
             result["asked"] = self.leaf;
         }
         Ok(())
@@ -244,12 +339,13 @@ pub(crate) fn digest(body: &[u8]) -> String {
 }
 
 /// Keep the asked change as a leaf before it is made and answer the view of
-/// the leaf it was kept under.
+/// the leaf it was kept under with the directory log's size once it holds
+/// that leaf: the size the route's judgment of the ask rests on.
 fn keep(
     state: &AppState,
     witness: Witness,
     (method, path, body_sha256): (&Method, &str, &str),
-) -> Result<Value, ServerError> {
+) -> Result<(Value, u64), ServerError> {
     let call = AgentCall::new(method.as_str(), path, body_sha256, &witness.signature)?;
     crate::routes::with_directory(state, |directory| {
         let projection = directory.projection()?;
@@ -263,10 +359,11 @@ fn keep(
         let actor = Actor::new(binding, witness.provenance);
         let receipt =
             directory.record_agent_call(actor, witness.agent, call, crate::session::now())?;
-        serde_json::to_value(crate::directory_views::receipt_view(&receipt)).map_err(|error| {
-            ServerError::ConfigInvalid {
+        let view = serde_json::to_value(crate::directory_views::receipt_view(&receipt)).map_err(
+            |error| ServerError::ConfigInvalid {
                 reason: format!("the receipt could not be rendered: {error}"),
-            }
-        })
+            },
+        )?;
+        Ok((view, receipt.coordinate().tree_size))
     })
 }

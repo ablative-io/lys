@@ -101,20 +101,25 @@ async fn leaves(
         .ok_or("the receipt checkpoint has no tree size")?)
 }
 
+fn nobody() -> Result<Value, Box<dyn Error>> {
+    Ok(json!({
+        "operation": lys_identity::OperationId::generate()?.to_string(),
+        "display_name": "Nobody"
+    }))
+}
+
 /// A change the route refuses is kept once as an ask, never answered as a
-/// receipt, and the same refused ask made again writes no second leaf.
+/// receipt; the same refused ask made again, under a fresh operation id,
+/// writes no second leaf; and once the directory has moved it is kept afresh,
+/// as a later leaf.
 #[tokio::test]
 async fn a_refused_ask_is_kept_once_and_answered_as_asked_not_as_a_receipt()
 -> Result<(), Box<dyn Error>> {
     let (service, cookie, agent, key) = certified_agent().await?;
-    let body = json!({
-        "operation": lys_identity::OperationId::generate()?.to_string(),
-        "display_name": "Nobody"
-    });
     let before = leaves(&service, &cookie).await?;
     let mut first = None;
     for id in [11_u64, 12] {
-        let bytes = change_call(id, "/people", &body)?;
+        let bytes = change_call(id, "/people", &nobody()?)?;
         let signature = signed(&agent, &key, &bytes)?;
         let response = post_signed(&service.base, bytes, &signature).await?;
         assert_eq!(response.status(), StatusCode::OK);
@@ -141,9 +146,10 @@ async fn a_refused_ask_is_kept_once_and_answered_as_asked_not_as_a_receipt()
         assert_eq!(
             leaves(&service, &cookie).await?,
             before + 1,
-            "one leaf for the ask, whatever the number of attempts"
+            "one leaf for the ask, whatever the number of attempts or operation ids"
         );
     }
+    let first = first.ok_or("the first ask")?;
     let other = json!({
         "operation": lys_identity::OperationId::generate()?.to_string(),
         "display_name": "Somebody"
@@ -156,11 +162,42 @@ async fn a_refused_ask_is_kept_once_and_answered_as_asked_not_as_a_receipt()
         .await?;
     assert_eq!(answer["result"]["isError"], true, "{answer}");
     assert_ne!(
-        answer["result"]["asked"],
-        first.ok_or("the first ask")?,
+        answer["result"]["asked"], first,
         "a different ask is its own leaf"
     );
     assert_eq!(leaves(&service, &cookie).await?, before + 2);
+
+    let (status, made) = service
+        .post(
+            "/people",
+            Some(&cookie),
+            &json!({
+                "operation": lys_identity::OperationId::generate()?.to_string(),
+                "display_name": "Somebody Real"
+            }),
+        )
+        .await?;
+    assert_eq!(status, 200, "the administrator moves the directory: {made}");
+    let moved = leaves(&service, &cookie).await?;
+    assert!(moved > before + 2, "the directory log moved");
+    let bytes = change_call(14, "/people", &nobody()?)?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let answer: Value = post_signed(&service.base, bytes, &signature)
+        .await?
+        .json()
+        .await?;
+    assert_eq!(answer["result"]["isError"], true, "{answer}");
+    let again = answer["result"]["asked"].clone();
+    assert_ne!(
+        again, first,
+        "the judgment it was refused under may have changed, so the ask is kept afresh"
+    );
+    let index = |asked: &Value| asked["log"]["index"].as_u64().ok_or("the leaf's index");
+    assert!(
+        index(&again)? > index(&first)?,
+        "the fresh leaf is later than the one asked before: {again} after {first}"
+    );
+    assert_eq!(leaves(&service, &cookie).await?, moved + 1);
     Ok(())
 }
 
