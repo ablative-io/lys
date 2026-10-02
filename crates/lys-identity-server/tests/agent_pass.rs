@@ -30,10 +30,13 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
                 let mut line = zeroize::Zeroizing::new(String::new());
                 BufReader::new(&stream).read_line(&mut line)?;
                 let act = verify_request(&line, &key, &greeting)?;
+                let Act::AsCaller { done, .. } = act else {
+                    return Err("start was not done for its caller".into());
+                };
                 let Act::Start {
                     launch,
                     lys_mcp: Some(entry),
-                } = act
+                } = *done
                 else {
                     return Err("start carried no run pass".into());
                 };

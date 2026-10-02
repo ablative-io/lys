@@ -51,7 +51,10 @@ impl Runner {
                     .map_err(|error| error.to_string())?
                     .ok_or("runner request ended before its line")?;
                 match verify_request(&line, &key, &greeting).map_err(|error| error.to_string())? {
-                    RunnerAct::Operate { operation } => operations.push(operation),
+                    RunnerAct::AsCaller { done, .. } => match *done {
+                        RunnerAct::Operate { operation } => operations.push(operation),
+                        other => return Err(format!("unexpected act for a caller: {other:?}")),
+                    },
                     other => return Err(format!("unexpected runner act: {other:?}")),
                 }
                 let reply = Reply {

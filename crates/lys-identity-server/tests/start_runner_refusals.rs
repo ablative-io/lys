@@ -50,7 +50,7 @@ async fn a_malformed_start_keeps_the_runners_refusal_name() -> TestResult {
             .map_err(|error| error.to_string())?;
         let act =
             verify_request(&line, &server_key, &greeting).map_err(|error| error.to_string())?;
-        if !matches!(act, Act::Start { .. }) {
+        if !matches!(act, Act::AsCaller { ref done, .. } if matches!(**done, Act::Start { .. })) {
             return Err("the service did not ask the runner to start".to_owned());
         }
         let refused = RunnerError::Malformed {

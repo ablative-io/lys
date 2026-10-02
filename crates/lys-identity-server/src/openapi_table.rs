@@ -310,7 +310,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED] scope("launch-record", "read", ["id"]);
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]] scope("change", "read", []);
     GET "/mcp" "MCP server stream availability" G [SIGNED];
-    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent"]];
+    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent", "TokenUnknown"]];
     GET "/surface-contract" "The surface registration and computer admission contract" P [];
     GET "/openapi.json" "This document" P [];
 };

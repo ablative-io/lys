@@ -153,9 +153,16 @@ pub(crate) async fn perform(
     carried: Carried,
     act: Act,
 ) -> Result<Json<Value>, ServerError> {
-    let act = lys_runner::Act::AsCaller {
-        caller: caller.clone(),
-        done: Box::new(act),
+    let act = if matches!(
+        act,
+        Act::Input { .. } | Act::InputBytes { .. } | Act::Keys { .. } | Act::Operate { .. }
+    ) {
+        Act::AsCaller {
+            caller: caller.clone(),
+            done: Box::new(act),
+        }
+    } else {
+        act
     };
     let answered =
         crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;

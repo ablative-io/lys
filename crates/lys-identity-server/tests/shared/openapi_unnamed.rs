@@ -27,6 +27,38 @@ pub(crate) const OPEN_ANSWERS: &[(&str, &str)] = &[
         "answers the OpenID Connect claims of the bearer's subject",
     ),
     (
+        "get /.well-known/oauth-protected-resource",
+        "answers the protected resource document, which follows RFC 9728, not a Lys type",
+    ),
+    (
+        "get /.well-known/oauth-protected-resource/mcp",
+        "answers the protected resource document, which follows RFC 9728, not a Lys type",
+    ),
+    (
+        "get /.well-known/oauth-protected-resource/api/mcp",
+        "answers the protected resource document, which follows RFC 9728, not a Lys type",
+    ),
+    (
+        "get /.well-known/oauth-authorization-server",
+        "answers the authorization server document, which follows RFC 8414, not a Lys type",
+    ),
+    (
+        "post /oauth/mcp/register",
+        "answers the client registration, which follows RFC 7591, not a Lys type",
+    ),
+    (
+        "get /oauth/mcp/authorize",
+        "answers the approval page as HTML, or a redirect back to the app",
+    ),
+    (
+        "post /oauth/mcp/consent",
+        "answers a redirect back to the app, with no body",
+    ),
+    (
+        "post /oauth/mcp/token",
+        "answers the OAuth token response, which follows RFC 6749, not a Lys type",
+    ),
+    (
         "post /sign-in",
         "answers through Response, since it must set the session cookie",
     ),
@@ -216,6 +248,18 @@ pub(crate) const NO_BODY: &[(&str, &str)] = &[
     (
         "post /oauth/token",
         "takes a form-encoded body, as RFC 6749 requires",
+    ),
+    (
+        "post /oauth/mcp/token",
+        "takes a form-encoded body, as RFC 6749 requires",
+    ),
+    (
+        "post /oauth/mcp/register",
+        "takes the client metadata RFC 7591 defines, not a Lys type",
+    ),
+    (
+        "post /oauth/mcp/consent",
+        "takes the approval page's form-encoded answer",
     ),
     ("post /requests/{id}/reconcile", "takes no body"),
     ("post /grants/agent-roots", "takes no body"),
