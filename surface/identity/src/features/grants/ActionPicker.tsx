@@ -27,7 +27,7 @@ export function singleActionCarriers(model: GrantModel): Map<string, string> {
 }
 
 /** Selecting everything selects the offered acts, never a broader agent relation. */
-export function ActionPicker({ model, groups, selected, change, disabled = false, agents = true }: {
+function GroupedActionPicker({ model, groups, selected, change, disabled = false, agents = true }: {
   model: GrantModel; groups: ActionGroup[]; selected: string[]; change: (selected: string[]) => void; disabled?: boolean; agents?: boolean;
 }) {
   const withheld = withheldFromAgents(model);
@@ -55,4 +55,21 @@ export function ActionPicker({ model, groups, selected, change, disabled = false
       </label>{choice.reason ? <p className="hint">{choice.reason}</p> : null}</div>)}
     </fieldset>;
   })}</>;
+}
+
+
+type GroupedProps = Parameters<typeof GroupedActionPicker>[0];
+type SingleProps = { model: GrantModel; resource: ResourceRef; actions: string[]; value: string[]; onChange: (value: string[]) => void; disabled?: boolean; agents?: boolean };
+
+/** A single resource uses action names as its value; grouped callers retain their source keys. */
+export function ActionPicker(props: SingleProps | GroupedProps) {
+  if ('groups' in props) return <GroupedActionPicker {...props} />;
+  const relations = singleActionCarriers(props.model);
+  const choices = props.actions.flatMap((action) => {
+    const relation = relations.get(action);
+    return relation ? [{ id: action, resource: props.resource, relation, actions: [action], reason: '' }] : [];
+  });
+  return <><GroupedActionPicker model={props.model} groups={[{ id: JSON.stringify(props.resource), title: 'Actions', choices }]}
+    selected={props.value} change={props.onChange} disabled={props.disabled} agents={props.agents} />
+    {choices.length < props.actions.length ? <p>Some actions cannot be selected because the model has no relation carrying that action alone.</p> : null}</>;
 }
