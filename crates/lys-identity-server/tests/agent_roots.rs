@@ -185,3 +185,20 @@ async fn asking_for_agent_roots_on_a_model_with_no_editor_is_refused_by_name() -
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn only_the_administrator_may_ask_for_agent_roots() -> TestResult {
+    let (service, cookie, _) = set_up().await?;
+    let stranger = service.sign_in(login("stranger")).await?;
+    let before = revision(&service, &cookie).await?;
+    let (status, refused) =
+        post(&service, "/grants/agent-roots", Auth::Cookie(&stranger), &json!({})).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotAdmitted", "{refused}");
+    assert_eq!(
+        revision(&service, &cookie).await?,
+        before,
+        "a refusal writes nothing to the grant log"
+    );
+    Ok(())
+}
