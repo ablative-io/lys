@@ -150,6 +150,16 @@ fn build_stores(paths: &[(&str, PathBuf)], stores: &Path, config: &Config) -> Re
     }
 }
 
+fn cache_lock(path: &Path) -> io::Result<File> {
+    let lock = File::options()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(path)?;
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
+    Ok(lock)
+}
+
 pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
     let mut paths = template_stores::paths(config);
     // Existing application logs deliberately ignore the model file, including
@@ -166,12 +176,7 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
     let key = fingerprint(config, &paths)?;
     let cache = cache_dir()?;
     fs::create_dir_all(&cache)?;
-    let lock = File::options()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(cache.join(format!("{key}.lock")))?;
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
+    let lock = cache_lock(&cache.join(format!("{key}.lock")))?;
     let ready = cache.join(&key);
     if !ready.try_exists()? {
         let started = Instant::now();
@@ -220,6 +225,21 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn warm_cache_verification_does_not_exclude_another_reader() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("cache.lock");
+        let first = cache_lock(&path)?;
+        let second = File::options().write(true).open(&path)?;
+        let shared = rustix::fs::flock(&second, rustix::fs::FlockOperation::NonBlockingLockShared);
+        assert!(
+            shared.is_ok(),
+            "parallel cache verification refused: {shared:?}"
+        );
+        drop(first);
+        Ok(())
+    }
 
     #[test]
     fn program_hash_reads_every_byte_across_its_buffer_boundary() -> io::Result<()> {
