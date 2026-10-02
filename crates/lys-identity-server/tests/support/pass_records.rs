@@ -251,6 +251,18 @@ impl Fixture {
                     at: 1,
                     launch: None,
                 })?;
+                runtime.report(Report {
+                    operation: operation()?,
+                    session: session.clone(),
+                    agent: Some(agent.to_string()),
+                    machine: machine.clone(),
+                    state: Reported::Running,
+                    what: "fixture process running".to_owned(),
+                    confirmation: String::new(),
+                    reported_by: person.to_string(),
+                    at: 2,
+                    launch: None,
+                })?;
                 let launch = given.record.id;
                 let mut passes = Passes::open(config.log_dir.with_file_name("agent-passes.json"))?;
                 let pass = passes.issue(agent, &launch, &session)?;
