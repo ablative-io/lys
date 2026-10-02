@@ -29,6 +29,17 @@ pub(crate) fn admit(
             &[],
         )));
     }
+    // An agent acts within its grants and otherwise asks, so asking never
+    // needs a grant: an active pass held by an active agent is enough, and
+    // the request records the asker.
+    if method == "POST" && path == "/requests" {
+        return crate::grants::with_grants(state, |judged| {
+            let actor = crate::routes::signed_in(state, headers)?;
+            crate::caller_admission::active_caller(judged.directory, &actor)?;
+            Ok(())
+        })
+        .map_err(|error| Box::new(error.into_response()));
+    }
     let (resource, action) = crate::openapi_table::token_scope(method, path)
         .map_err(|error| Box::new(error.into_response()))?;
     let refusal = crate::grants::with_grants(state, |mut judged| {

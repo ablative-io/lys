@@ -337,6 +337,37 @@ async fn a_pass_cannot_borrow_credentials_or_reach_undeclared_or_kept_routes() -
     Ok(())
 }
 
+#[tokio::test]
+async fn a_pass_asks_for_access_without_a_grant_and_an_unknown_pass_cannot() -> TestResult {
+    let (service, pass, _, person, _) = fixture().await?;
+    let ask = |pass: String| {
+        let body = json!({"operation": operation().unwrap_or_default(), "resource":
+            {"kind":"configuration", "id":"all"}, "relation":"beta", "responsible": person});
+        let url = format!("{}/requests", service.base);
+        async move {
+            let response = client()
+                .post(url)
+                .header("lys-agent-pass", pass)
+                .json(&body)
+                .send()
+                .await?;
+            let status = response.status().as_u16();
+            let body: Value = response.json().await.unwrap_or(Value::Null);
+            TestResult::Ok((status, body))
+        }
+    };
+    let (status, asked) = ask(pass.clone()).await?;
+    assert_ne!(asked["refusal"], "NotHeld", "{status} {asked}");
+    assert_ne!(asked["refusal"], "TokenScopeUndeclared", "{status} {asked}");
+    assert!(
+        asked.get("can_grant").is_none(),
+        "asking names no grantor: {asked}"
+    );
+    let (status, unknown) = ask(format!("{pass}x")).await?;
+    assert_eq!(status, 401, "{unknown}");
+    Ok(())
+}
+
 async fn refuses_an_unrecorded_use(service: &Service, pass: &str) -> TestResult {
     use std::os::unix::fs::PermissionsExt;
     let leaves = service.dir.path().join("grant-log/leaves");
