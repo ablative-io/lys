@@ -20,10 +20,10 @@ impl Table {
             "operation": operation()?, "from_version": from,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "",
-            "permissions": {"default_mode": "plan"},
         });
         if !harness.is_null() {
             body["harness"] = harness.clone();
+            body["permissions"] = json!({"default_mode": "plan"});
         }
         let path = format!("/agents/{}/provisioning", self.agent());
         self.service.post(&path, Some(&self.ada), &body).await

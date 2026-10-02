@@ -174,7 +174,9 @@ async fn a_hard_policy_rule_the_settings_file_cannot_express_refuses_the_start_b
             Some("/probe")
         )]))
         .await?;
-    let (status, set) = table.record(0, &json!([]), &json!({"default_mode": "plan"})).await?;
+    let (status, set) = table
+        .record(0, &json!([]), &json!({"default_mode": "plan"}))
+        .await?;
     assert_eq!(status, 200, "{set}");
     table.review(1).await?;
     let (status, refused) = table.start_profile("Box one").await?;
