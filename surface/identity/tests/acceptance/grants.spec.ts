@@ -137,8 +137,8 @@ const ROWS: ConformanceRow[] = [
       const { requests } = await mount('#/me?tab=account');
       expect(requests).toContain('/grants');
       expect(holdRows()).toEqual([
-        ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
-        ['You can view project ledger.', 'viewer', 'project:ledger', 'root', 'no', ''],
+        ['You can do everything here (project identity).', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+        ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root', 'no', ''],
       ]);
     },
   },
@@ -167,7 +167,7 @@ const ROWS: ConformanceRow[] = [
       const source = $$('#drawer .card')[0].textContent ?? '';
       expect(source).toContain('Source grant');
       expect(source).toContain('owner of project:identity');
-      expect(source).toContain('Actions it allowsedit, grant, view');
+      expect(source).toContain('Actions it allowseverything here');
       expect(source).toContain('You may pass it onagent');
       expect(source).toContain('Ends no later than27 Oct');
     },
@@ -264,17 +264,17 @@ describe('Keyboard operation (conformance 9.3)', () => {
     expect(document.activeElement?.id).toBe('dTo');
     expect(unreachable()).toEqual([]);
 
-    // Relations are picked by keyboard alone: the screen implements Enter and Space.
-    expect($('[data-pickrel].on')?.textContent).toBe('viewer');
-    await press('Enter', {}, $('[data-pickrel="editor"]'));
-    expect($('[data-pickrel].on')?.textContent).toBe('editor');
-    await press(' ', {}, $('[data-pickrel="viewer"]'));
-    expect($('[data-pickrel].on')?.textContent).toBe('viewer');
+    // An agent is offered one native checkbox per action, none ticked, so the keyboard reaches each and Space ticks it.
+    const boxes = () => $$('#drawer input[name="action"]') as HTMLInputElement[];
+    expect(boxes().map((box) => box.value)).toEqual(['edit', 'view']);
+    expect(boxes().filter((box) => box.checked)).toEqual([]);
+    await click($('#drawer input[name="action"][value="view"]'));
+    expect(boxes().filter((box) => box.checked).map((box) => box.value)).toEqual(['view']);
 
     // The whole form is in the tab order, in the order it reads.
-    const order = $$('#drawer select, #drawer [data-pickrel], #drawer button').map((el) => el.id || el.dataset.pickrel || el.dataset.act);
-    expect(order).toEqual(['dTo', 'editor', 'viewer', 'dLease', 'dPass', 'delegatedo', 'close']);
-    for (const el of $$('#drawer select, #drawer [data-pickrel], #drawer button')) expect(el.tabIndex).toBeGreaterThanOrEqual(0);
+    const order = $$('#drawer select, #drawer input[name="action"], #drawer button').map((el) => el.id || (el as HTMLInputElement).value || el.dataset.act);
+    expect(order).toEqual(['dTo', 'edit', 'view', 'dLease', 'dPass', 'delegatedo', 'close']);
+    for (const el of $$('#drawer select, #drawer input[name="action"], #drawer button')) expect(el.tabIndex).toBeGreaterThanOrEqual(0);
 
     const submit = $('[data-act="delegatedo"]');
     expect(submit?.tagName).toBe('BUTTON');
@@ -326,6 +326,7 @@ describe('API refusal parity', () => {
     const name = reason.split(':')[0];
     const { posted } = await mount('#/me?tab=account', { ...SERVICE, 'POST /grants': refused(403, name, reason) });
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    await click($('#drawer input[name="action"][value="view"]'));
     await click($('[data-act="delegatedo"]'));
     expect(posted).toHaveLength(1);
     expect($('#dAnswer b')?.textContent).toBe(name);
