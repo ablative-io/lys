@@ -31,7 +31,11 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
         let lock = std::fs::File::create(run.join(format!("{name}.exit")))?;
         flock(&lock, FlockOperation::LockExclusive)?;
         let child = Command::new("/bin/sh")
-            .args(["-c", "printf 'ready\n'; read line < \"$1\"", "lys-fixture"])
+            .args([
+                "-c",
+                r#"trap '' TERM; printf 'ready\n'; read line < "$1""#,
+                "lys-fixture",
+            ])
             .arg(&blocked)
             .stdin(lock)
             .stdout(Stdio::piped())
