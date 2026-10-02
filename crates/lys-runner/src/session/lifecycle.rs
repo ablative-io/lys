@@ -13,22 +13,47 @@
 //! line is left for the next read, and a truncated or replaced file is a new
 //! generation, said by name.
 
-use std::io::{Read, Seek, SeekFrom};
-use std::os::unix::fs::MetadataExt;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
 
 use portable_pty::Child;
-use serde_json::Value;
 
-use super::{Live, Session, Sessions, Table, now_ms, unknown};
+use super::{Live, Session, Sessions, Starting, now_ms, unknown};
 use crate::error::RunnerError;
 use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Launch};
-use crate::tracking::{Accounts, Harness, Reading, Tracking, version_in};
-use crate::tracking_store::{Body, Commit, Coverage, SourceState};
+use crate::protocol::{Ended, EndedHow};
+use crate::tracking::Harness;
 
 pub use crate::peer::Collected;
+
+mod launch;
+mod stream;
+mod terminal;
+
+pub(crate) use launch::{bound_directory, launched, tracking_started, window_limit};
+use stream::stop_follower;
+pub(crate) use stream::{accounts, append};
+
+#[cfg(test)]
+#[path = "../../tests/lifecycle/cases.rs"]
+mod io_tests;
+
+#[cfg(test)]
+#[path = "../../tests/output/cases.rs"]
+pub(super) mod output_tests;
+
+pub(crate) fn transcript_parent(path: &Path) -> Result<PathBuf, RunnerError> {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .ok_or_else(|| {
+            RunnerError::refused(
+                "transcript_parent_missing",
+                format!("{} has no containing directory", path.display()),
+            )
+        })
+}
 
 /// What wakes a session's stream follower.
 #[derive(Debug)]
@@ -41,519 +66,403 @@ pub(crate) enum Wake {
     Stop,
 }
 
-impl Sessions {
-    /// Run the session's process, on its rotation's account when it has one,
-    /// and start the threads that read its output and see its exit.
-    pub(super) fn run(
-        self: &Arc<Self>,
-        id: &str,
-        session: &mut Session,
-        resumed: bool,
-    ) -> Result<u32, RunnerError> {
-        let launch = session.launch.as_ref().ok_or_else(|| unknown(id))?;
-        let mut environment = launch.environment.clone();
-        let mut arguments = launch.arguments.clone();
-        if let Some(rotation) = &session.rotation {
-            environment.insert(
-                rotation.variable().to_owned(),
-                rotation.account().to_owned(),
-            );
-            if let (true, Some(resume)) = (resumed, rotation.resume_arguments()) {
-                arguments = resume.to_vec();
+pub(super) struct SpawnPlan {
+    program: String,
+    arguments: Vec<String>,
+    directory: String,
+    environment: std::collections::BTreeMap<String, String>,
+    columns: u16,
+    rows: u16,
+}
+
+pub(super) fn plan(session: &Session, resumed: bool) -> Result<SpawnPlan, RunnerError> {
+    let launch = session.launch.as_ref().ok_or_else(|| {
+        RunnerError::refused("session_launch_missing", "the session has no held launch")
+    })?;
+    let mut environment = launch.environment.clone();
+    let mut arguments = launch.arguments.clone();
+    if let Some(rotation) = &session.rotation {
+        environment.insert(
+            rotation.variable().to_owned(),
+            rotation.account().to_owned(),
+        );
+        if let (true, Some(resume)) = (resumed, rotation.resume_arguments()) {
+            arguments = resume.to_vec();
+        }
+    }
+    Ok(SpawnPlan {
+        program: launch.program.clone(),
+        arguments,
+        directory: launch.directory.clone(),
+        environment,
+        columns: session.columns,
+        rows: session.rows,
+    })
+}
+
+pub(super) struct Prepared {
+    spawned: Option<crate::pty::Spawned>,
+    leader: Leader,
+}
+
+impl Drop for Prepared {
+    fn drop(&mut self) {
+        if let Some(mut spawned) = self.spawned.take() {
+            match crate::pty::end_group(spawned.pid) {
+                Ok(()) => {
+                    if let Err(error) = spawned.child.wait() {
+                        crate::error::said(&format!("cancelled_spawn_exit_unconfirmed: {error}"));
+                    }
+                }
+                Err(error) => {
+                    crate::error::said(&format!("cancelled_spawn_cleanup_failed: {error}"));
+                }
             }
         }
-        let spawned = crate::pty::spawn(&crate::pty::Spawn {
-            program: &launch.program,
-            arguments: &arguments,
-            directory: &launch.directory,
-            environment: &environment,
-            columns: session.columns,
-            rows: session.rows,
+    }
+}
+
+pub(super) struct Pending {
+    pid: u32,
+    generation: u64,
+    reader: Box<dyn Read + Send>,
+    child: Box<dyn Child + Send + Sync>,
+    output: Arc<super::output::OutputHandle>,
+}
+
+struct FailedActivation {
+    pid: u32,
+    child: Box<dyn Child + Send + Sync>,
+    pump: Option<std::thread::JoinHandle<()>>,
+    failure: RunnerError,
+}
+
+impl Pending {
+    pub(super) fn cancel(mut self) -> Result<(), RunnerError> {
+        crate::pty::end_group(self.pid)?;
+        self.child.wait().map_err(|error| {
+            RunnerError::refused("cancelled_spawn_exit_unconfirmed", error.to_string())
         })?;
-        session.generation += 1;
+        Ok(())
+    }
+}
+
+impl Sessions {
+    /// Prepare a verified child without owning the session table.
+    pub(super) fn run(&self, plan: &SpawnPlan) -> Result<Prepared, RunnerError> {
+        self.writer.barrier()?;
+        #[cfg(test)]
+        if let Some(probe) = self
+            .spawn_probe
+            .lock()
+            .map_err(|error| RunnerError::refused("spawn_probe_failed", error.to_string()))?
+            .take()
+        {
+            probe();
+        }
+        let mut spawned = crate::pty::spawn(&crate::pty::Spawn {
+            program: &plan.program,
+            arguments: &plan.arguments,
+            directory: &plan.directory,
+            environment: &plan.environment,
+            columns: plan.columns,
+            rows: plan.rows,
+        })?;
+        let start = match crate::peer::start_identity(spawned.pid) {
+            Ok(start) => start,
+            Err(error) => {
+                crate::pty::end_group(spawned.pid)?;
+                spawned.child.wait().map_err(|waited| {
+                    RunnerError::refused("cancelled_spawn_exit_unconfirmed", waited.to_string())
+                })?;
+                return Err(error);
+            }
+        };
+        let leader = Leader {
+            pid: spawned.pid,
+            start,
+        };
+        Ok(Prepared {
+            spawned: Some(spawned),
+            leader,
+        })
+    }
+
+    pub(super) fn install(
+        session: &mut Session,
+        mut prepared: Prepared,
+    ) -> Result<Pending, RunnerError> {
+        let generation = session.generation + 1;
+        session.output.begin(
+            generation,
+            session.rotation.as_ref(),
+            session
+                .guard
+                .tracking
+                .as_ref()
+                .is_some_and(|tracking| tracking.harness == Harness::ClaudeCode),
+        )?;
+        let spawned = prepared.spawned.take().ok_or_else(|| {
+            RunnerError::refused(
+                "spawn_install_failed",
+                "the prepared child was already installed",
+            )
+        })?;
+        session.generation = generation;
         session.pid = Some(spawned.pid);
+        session.guard.leader = Some(prepared.leader.clone());
+        session.leader_start = Some(prepared.leader.clone());
         session.live = Some(Live {
             writer: crate::input::Input::new(spawned.writer),
             master: spawned.master,
             pid: spawned.pid,
+            leader: Some(prepared.leader.clone()),
         });
-        session.guard.leader = match crate::peer::start_identity(spawned.pid) {
-            Ok(start) => Some(Leader {
-                pid: spawned.pid,
-                start,
-            }),
-            Err(error) => {
-                crate::error::said(&format!(
-                    "session {id}: its leader's start identity was not read, so no peer of it is proved: {error}"
-                ));
-                None
-            }
-        };
-        session.leader_start = session.guard.leader.clone();
-        let generation = session.generation;
-        let (reader, child) = (spawned.reader, spawned.child);
+        Ok(Pending {
+            pid: spawned.pid,
+            generation: session.generation,
+            reader: spawned.reader,
+            child: spawned.child,
+            output: Arc::clone(&session.output),
+        })
+    }
+
+    /// Activate only after the generation is visible in the table.
+    pub(super) fn activate(
+        self: &Arc<Self>,
+        id: &str,
+        pending: Pending,
+    ) -> Result<(), RunnerError> {
+        let Pending {
+            pid,
+            generation,
+            reader,
+            child,
+            output,
+        } = pending;
         let pumped = Arc::clone(self);
         let owned = id.to_owned();
-        let pump = std::thread::spawn(move || pumped.pump(&owned, generation, reader));
-        let watched = Arc::clone(self);
-        let owned = id.to_owned();
-        std::thread::spawn(move || watched.watch(&owned, generation, child, pump));
-        Ok(spawned.pid)
-    }
-
-    /// Keep the output of generation `generation` of session `id` until its
-    /// terminal closes.
-    fn pump(&self, id: &str, generation: u64, mut reader: Box<dyn Read + Send>) {
-        let mut buffer = [0_u8; 8192];
-        loop {
-            let read = match reader.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(read) => read,
-                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-                Err(error) => {
-                    crate::error::said(&format!("session {id}: the terminal closed: {error}"));
-                    break;
-                }
-            };
-            let mut table = self.lock();
-            if let Some(session) = table
-                .sessions
-                .get_mut(id)
-                .filter(|s| s.generation == generation)
-            {
-                session.scrollback.push(&buffer[..read]);
-                trip_on_words(session, read);
+        let pumped_output = Arc::clone(&output);
+        let pump = match std::thread::Builder::new()
+            .name("runner-output".to_owned())
+            .spawn(move || pumped.pump(&owned, generation, &pumped_output, reader))
+        {
+            Ok(pump) => pump,
+            Err(error) => {
+                let failure =
+                    RunnerError::refused("session_output_worker_failed", error.to_string());
+                return self.activation_failed(
+                    id,
+                    generation,
+                    &output,
+                    FailedActivation {
+                        pid,
+                        child,
+                        pump: None,
+                        failure,
+                    },
+                );
             }
-            drop(table);
-            self.wake();
+        };
+        let observer = Arc::clone(self);
+        let owned = id.to_owned();
+        let watched_output = Arc::clone(&output);
+        let (deliver, delivered) = mpsc::channel();
+        let watcher = match std::thread::Builder::new()
+            .name("runner-process-exit".to_owned())
+            .spawn(move || match delivered.recv() {
+                Ok((child, pump)) => {
+                    observer.watch(&owned, generation, &watched_output, child, pump);
+                }
+                Err(error) => {
+                    crate::error::said(&format!("session_exit_worker_failed: {error}"));
+                }
+            }) {
+            Ok(watcher) => watcher,
+            Err(error) => {
+                let failure = RunnerError::refused("session_exit_worker_failed", error.to_string());
+                return self.activation_failed(
+                    id,
+                    generation,
+                    &output,
+                    FailedActivation {
+                        pid,
+                        child,
+                        pump: Some(pump),
+                        failure,
+                    },
+                );
+            }
+        };
+        if let Err(error) = deliver.send((child, pump)) {
+            let (child, pump) = error.0;
+            if watcher.join().is_err() {
+                crate::error::said("session_exit_worker_failed: the exit worker panicked");
+            }
+            let failure = RunnerError::refused(
+                "session_exit_worker_failed",
+                "the exit worker ended before it took its child",
+            );
+            return self.activation_failed(
+                id,
+                generation,
+                &output,
+                FailedActivation {
+                    pid,
+                    child,
+                    pump: Some(pump),
+                    failure,
+                },
+            );
         }
+        drop(watcher);
+        Ok(())
     }
 
-    /// See the exit of generation `generation` of session `id`: move it to
-    /// its next account at a usage limit, or record its end. The end is
-    /// recorded once the exit is seen and every byte its terminal gave is
-    /// kept, so a read that answers an end has read everything before it.
-    fn watch(
+    fn activation_failed(
+        &self,
+        id: &str,
+        generation: u64,
+        output: &super::output::OutputHandle,
+        failed: FailedActivation,
+    ) -> Result<(), RunnerError> {
+        let FailedActivation {
+            pid,
+            mut child,
+            pump,
+            failure,
+        } = failed;
+        let signalled = crate::pty::end_group(pid);
+        if let Err(error) = &signalled {
+            crate::error::said(&format!(
+                "session {id}: cancelled_spawn_cleanup_failed: {error}"
+            ));
+        }
+        let waited = child.wait();
+        if let Err(error) = &waited {
+            crate::error::said(&format!(
+                "session {id}: cancelled_spawn_exit_unconfirmed: {error}"
+            ));
+        }
+        if pump.is_some_and(|pump| pump.join().is_err()) {
+            crate::error::said("session_output_worker_failed: the output worker panicked");
+        }
+        let ended = Ended {
+            how: EndedHow::Exited,
+            at: now_ms(),
+            status: waited
+                .as_ref()
+                .ok()
+                .filter(|exit| exit.signal().is_none())
+                .map(portable_pty::ExitStatus::exit_code),
+            signal: waited
+                .as_ref()
+                .ok()
+                .and_then(|exit| exit.signal().map(str::to_owned)),
+            reason: Some(match (&signalled, &waited) {
+                (Ok(()), Ok(_)) => failure.to_string(),
+                (Err(error), Ok(_)) => {
+                    format!("{failure}; cancelled_spawn_cleanup_failed: {error}")
+                }
+                (Ok(()), Err(error)) => {
+                    format!("{failure}; cancelled_spawn_exit_unconfirmed: {error}")
+                }
+                (Err(signal), Err(wait)) => format!(
+                    "{failure}; cancelled_spawn_cleanup_failed: {signal}; cancelled_spawn_exit_unconfirmed: {wait}"
+                ),
+            }),
+        };
+        let mut table = match self.lock() {
+            Ok(table) => table,
+            Err(error) => {
+                if let Err(finish) = output.finish(generation, ended) {
+                    crate::error::said(&format!("session {id}: output_exit_failed: {finish}"));
+                }
+                self.wake();
+                return Err(error);
+            }
+        };
+        let mut recorded = Ok(());
+        if let Some(session) = table
+            .sessions
+            .get_mut(id)
+            .filter(|session| session.generation == generation)
+        {
+            session.live = None;
+            session.ended = Some(ended.clone());
+            if let Some(follower) = session.follower.take() {
+                stop_follower(id, &follower);
+            }
+            crate::operations::ended(&mut table, id, &ended);
+            recorded = self.persist(&table);
+        }
+        drop(table);
+        let fenced = recorded.and_then(|()| self.writer.barrier());
+        let finished = output.finish(generation, ended);
+        self.wake();
+        fenced?;
+        finished?;
+        signalled?;
+        Err(failure)
+    }
+
+    pub(super) fn replace_generation(
         self: &Arc<Self>,
         id: &str,
         generation: u64,
-        mut child: Box<dyn Child + Send + Sync>,
-        pump: std::thread::JoinHandle<()>,
-    ) {
-        let waited = child.wait();
-        let at = now_ms();
-        if pump.join().is_err() {
-            crate::error::said(&format!(
-                "session {id}: the thread keeping its output ended abnormally"
+        plan: &SpawnPlan,
+        started_at: Option<u64>,
+        follow: bool,
+    ) -> Result<bool, RunnerError> {
+        let mut table = self.lock()?;
+        let session = table.sessions.get(id).ok_or_else(|| unknown(id))?;
+        if table.stopping || session.generation != generation {
+            return Ok(false);
+        }
+        if !table.starting.insert(id.to_owned()) {
+            return Err(RunnerError::refused(
+                "session_starting",
+                "the session already has a launch in progress",
             ));
         }
-        let mut table = self.lock();
-        let Some(session) = table
-            .sessions
-            .get_mut(id)
-            .filter(|s| s.generation == generation)
-        else {
-            return;
-        };
-        session.live = None;
-        let (status, signal) = match &waited {
-            Ok(exit) => match exit.signal() {
-                Some(signal) => (None, Some(signal.to_owned())),
-                None => (Some(exit.exit_code()), None),
-            },
-            Err(error) => {
-                crate::error::said(&format!(
-                    "session {id}: the process's exit could not be read: {error}"
-                ));
-                (None, None)
-            }
-        };
-        let limit = !session.ending
-            && session
-                .rotation
-                .as_ref()
-                .is_some_and(|rotation| rotation.limit_at_exit(status));
-        let mut how = EndedHow::Exited;
-        if limit {
-            let next = session
-                .rotation
-                .as_mut()
-                .and_then(|rotation| rotation.advance(at));
-            if let Some(moved) = next {
-                crate::error::said(&format!(
-                    "session {id} reached its usage limit and moves to account {moved}"
-                ));
-                match self.run(id, session, true) {
-                    Ok(_) => {
-                        self.persist_logged(&table);
-                        drop(table);
-                        self.wake();
-                        return;
-                    }
-                    Err(error) => crate::error::said(&format!(
-                        "session {id} could not move to its next account: {error}"
-                    )),
-                }
-            } else {
-                crate::error::said(&format!(
-                    "session {id} reached its usage limit on the last of its accounts"
-                ));
-                how = EndedHow::AccountsExhausted;
-            }
-        }
-        let ended = Ended {
-            how,
-            at,
-            status,
-            signal,
-            reason: None,
-        };
-        session.ended = Some(ended.clone());
-        if let Some(follower) = session.follower.take() {
-            stop_follower(id, &follower);
-        }
-        crate::operations::ended(&mut table, id, &ended);
-        self.persist_logged(&table);
         drop(table);
-        self.wake();
-    }
-
-    /// Follow session `id`'s bound stream on a thread of its own, stopping
-    /// any follower it had.
-    pub(crate) fn follow(self: &Arc<Self>, table: &mut Table, id: &str) {
-        let Some(path) = table
-            .feed
-            .source(id)
-            .map(|source| PathBuf::from(&source.path))
-        else {
-            return;
+        let reservation = Starting {
+            sessions: Arc::clone(self),
+            id: id.to_owned(),
         };
-        let Some(session) = table.sessions.get_mut(id) else {
-            return;
-        };
-        if let Some(old) = session.follower.take() {
-            stop_follower(id, &old);
+        let prepared = self.run(plan)?;
+        let mut table = self.lock()?;
+        let session = table.sessions.get(id).ok_or_else(|| unknown(id))?;
+        if table.stopping || session.generation != generation {
+            drop(table);
+            drop(prepared);
+            return Ok(false);
         }
-        let (wake, woken) = mpsc::channel();
-        let notices = wake.clone();
-        let notifier = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            let next = match event {
-                Ok(event) if event.need_rescan() => {
-                    Wake::Lost("the notifier asked for a rescan".to_owned())
-                }
-                Ok(_) => Wake::Changed,
-                Err(error) => Wake::Lost(error.to_string()),
-            };
-            if let Err(gone) = notices.send(next) {
-                crate::error::said(&format!("a stream follower had ended: {gone}"));
-            }
-        });
-        let dir = path.parent().unwrap_or_else(|| Path::new("/")).to_owned();
-        let watching = notifier.and_then(|mut each| {
-            notify::Watcher::watch(&mut each, &dir, notify::RecursiveMode::NonRecursive)
-                .map(|()| each)
-        });
-        let watcher = match watching {
-            Ok(watcher) => watcher,
-            Err(error) => {
-                let words = format!("{} cannot be watched: {error}", dir.display());
-                crate::error::said(&format!("session {id}: coverage_incomplete: {words}"));
-                let source = table.feed.source(id).cloned().unwrap_or_default();
-                let coverage = Coverage::of("coverage_incomplete", &source, None, words);
-                append(table, id, vec![Body::Coverage(coverage)], None);
-                return;
-            }
-        };
-        session.follower = Some(wake);
-        let (sessions, owned) = (Arc::clone(self), id.to_owned());
-        std::thread::spawn(move || {
-            sessions.read_source(&owned, None);
-            for next in woken {
-                match next {
-                    Wake::Changed => sessions.read_source(&owned, None),
-                    Wake::Lost(reason) => sessions.read_source(&owned, Some(reason)),
-                    Wake::Stop => break,
-                }
-            }
-            drop(watcher);
-        });
-    }
-
-    /// Read session `id`'s stream from its saved cursor to its last whole
-    /// line, and keep what it yields with the new cursor as one unit.
-    pub(crate) fn read_source(&self, id: &str, lost: Option<String>) {
-        let mut guard = self.lock();
-        let table = &mut *guard;
-        let Some(session) = table.sessions.get(id) else {
-            return;
-        };
-        let Some(tracking) = session.guard.tracking.as_ref() else {
-            return;
-        };
-        let Some(mut source) = table.feed.source(id).cloned() else {
-            return;
-        };
-        let reading = Reading {
-            runner: self.state.runner(),
-            session: id,
-            tracking,
-            accounts: accounts(session, tracking),
-            now: now_ms(),
-        };
-        let mut bodies = Vec::new();
-        if let Some(reason) = lost {
-            bodies.push(Body::Coverage(Coverage::of(
-                "coverage_incomplete",
-                &source,
-                Some(source.offset),
-                format!("change notices were lost ({reason}): the stream is read again from its saved cursor"),
-            )));
+        crate::collector::status::flush_status(&mut table, id)?;
+        let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
+        let pending = Self::install(session, prepared)?;
+        session.ended = None;
+        session.ending = false;
+        session.guard.idle = true;
+        if let Some(started_at) = started_at {
+            session.started_at = started_at;
         }
-        let before = source.clone();
-        read_lines(&reading, &mut source, &mut bodies);
-        if bodies.is_empty() && source == before {
-            return;
-        }
-        let commit = Commit {
-            source: Some(source),
-            attempt: None,
-        };
-        if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
-            crate::error::said(&format!(
-                "session {id}: coverage_incomplete: what its stream yielded was not kept, and is read again from the saved cursor: {error}"
-            ));
-        }
-        drop(guard);
-        self.wake();
-    }
-}
-
-/// Stop the follower `follower` of session `id`.
-fn stop_follower(id: &str, follower: &mpsc::Sender<Wake>) {
-    if follower.send(Wake::Stop).is_err() {
-        crate::error::said(&format!(
-            "session {id}: its stream follower had already ended"
-        ));
-    }
-}
-
-/// Keep `bodies` for session `id` as one unit, with `source` when given.
-pub(crate) fn append(table: &mut Table, id: &str, bodies: Vec<Body>, source: Option<SourceState>) {
-    let commit = Commit {
-        source,
-        attempt: None,
-    };
-    if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
-        crate::error::said(&format!("session {id}: coverage_incomplete: {error}"));
-    }
-}
-
-/// The rotation evidence of `session`.
-pub(crate) fn accounts<'a>(session: &'a Session, tracking: &'a Tracking) -> Accounts<'a> {
-    Accounts {
-        current: session
-            .rotation
-            .as_ref()
-            .map(crate::rotation::RotationState::account),
-        moves: session
-            .rotation
-            .as_ref()
-            .map(crate::rotation::RotationState::moves)
-            .unwrap_or_default(),
-        declared: tracking.account.as_deref(),
-    }
-}
-
-/// Read `source` from its offset to its last whole line into `bodies`.
-fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<Body>) {
-    let opened = std::fs::File::open(&source.path).and_then(|file| {
-        let metadata = file.metadata()?;
-        Ok((file, metadata))
-    });
-    let (mut file, metadata) = match opened {
-        Ok(opened) => opened,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
-        Err(error) => {
-            bodies.push(Body::Coverage(Coverage::of(
-                "source_refused",
-                source,
-                Some(source.offset),
-                format!("the stream cannot be read: {error}"),
-            )));
-            return;
-        }
-    };
-    let identity = format!("{}:{}", metadata.dev(), metadata.ino());
-    let replaced = source
-        .identity
-        .as_ref()
-        .is_some_and(|held| *held != identity);
-    if replaced || metadata.len() < source.offset {
-        let words = if replaced {
-            "the stream's file was replaced"
+        let followed = if follow {
+            self.follow(&mut table, id)
         } else {
-            "the stream's file was truncated"
+            Ok(())
         };
-        source.generation += 1;
-        source.offset = 0;
-        source.pending = None;
-        source.totals = None;
-        bodies.push(Body::Coverage(Coverage::of(
-            "source_generation",
-            source,
-            Some(0),
-            format!(
-                "{words}: generation {} is read from its start",
-                source.generation
-            ),
-        )));
-    }
-    source.identity = Some(identity);
-    let mut bytes = Vec::new();
-    let read = file
-        .seek(SeekFrom::Start(source.offset))
-        .and_then(|_| file.read_to_end(&mut bytes));
-    if let Err(error) = read {
-        bodies.push(Body::Coverage(Coverage::of(
-            "source_refused",
-            source,
-            Some(source.offset),
-            format!("the stream cannot be read: {error}"),
-        )));
-        return;
-    }
-    let mut at = source.offset;
-    for line in bytes.split_inclusive(|byte| *byte == b'\n') {
-        if line.last() != Some(&b'\n') {
-            break;
+        let recorded = self.persist(&table);
+        drop(table);
+        self.activate(id, pending)?;
+        drop(reservation);
+        recorded?;
+        self.writer.barrier()?;
+        if let Err(error) = followed {
+            self.end(id, &std::sync::atomic::AtomicBool::new(false))?;
+            return Err(error);
         }
-        match serde_json::from_slice::<Value>(line) {
-            Ok(record) => bodies.extend(match reading.tracking.harness {
-                Harness::ClaudeCode => reading.claude(source, at, &record),
-                Harness::Codex => reading.codex(source, at, &record),
-            }),
-            Err(error) => bodies.push(Body::Coverage(Coverage::of(
-                "record_unreadable",
-                source,
-                Some(at),
-                format!("the record at byte {at} does not read: {error}"),
-            ))),
-        }
-        at += line.len() as u64;
-        source.offset = at;
-    }
-}
-
-/// The directory a session is bound to: `directory` resolved, or as given
-/// when it cannot be.
-pub(crate) fn bound_directory(directory: &str) -> String {
-    let given = if directory.is_empty() { "." } else { directory };
-    std::fs::canonicalize(given).map_or_else(
-        |error| {
-            crate::error::said(&format!(
-                "{given} does not resolve, and is kept as given: {error}"
-            ));
-            given.to_owned()
-        },
-        |path| path.display().to_string(),
-    )
-}
-
-/// The executable `launch` runs, found as its environment's `PATH` finds
-/// it, and the version it reports, refused `tracking_contract_unsupported`
-/// unless it is the version `tracking` declares.
-pub(crate) fn launched(
-    launch: &Launch,
-    tracking: &Tracking,
-) -> Result<(String, String), RunnerError> {
-    let unsupported = |words: String| RunnerError::refused("tracking_contract_unsupported", words);
-    let program = Path::new(&launch.program);
-    let found = if launch.program.contains('/') {
-        Some(program.to_owned())
-    } else {
-        let path = launch
-            .environment
-            .get("PATH")
-            .cloned()
-            .or_else(|| std::env::var("PATH").ok())
-            .unwrap_or_default();
-        std::env::split_paths(&path)
-            .map(|dir| dir.join(program))
-            .find(|candidate| candidate.is_file())
-    };
-    let executable = found
-        .and_then(|found| std::fs::canonicalize(found).ok())
-        .ok_or_else(|| {
-            unsupported(format!(
-                "{} is not found to ask its version",
-                launch.program
-            ))
-        })?;
-    let output = std::process::Command::new(&executable)
-        .arg("--version")
-        .output()
-        .map_err(|error| {
-            unsupported(format!(
-                "{} did not say its version: {error}",
-                executable.display()
-            ))
-        })?;
-    let said = String::from_utf8_lossy(&output.stdout);
-    let version = version_in(&said)
-        .ok_or_else(|| unsupported(format!("{} names no version", executable.display())))?;
-    crate::tracking::measured(&tracking.adapter, &version)?;
-    if version != tracking.version {
-        return Err(unsupported(format!(
-            "{} is version {version}, and the profile declares {}",
-            executable.display(),
-            tracking.version
-        )));
-    }
-    Ok((executable.display().to_string(), version))
-}
-
-/// Say, in the feed, the executable and version launched for session `id`.
-pub(crate) fn tracking_started(table: &mut Table, id: &str, executable: &str, version: &str) {
-    let tracking = table
-        .sessions
-        .get(id)
-        .and_then(|session| session.guard.tracking.as_ref());
-    let adapter = tracking.map(|tracking| tracking.adapter.clone());
-    let coverage = Coverage {
-        state: "tracking_started".to_owned(),
-        source: None,
-        generation: 0,
-        offset: None,
-        words: format!("launched {executable}, which says it is version {version}"),
-        executable: Some(executable.to_owned()),
-        harness_version: Some(version.to_owned()),
-        adapter,
-    };
-    append(table, id, vec![Body::Coverage(coverage)], None);
-}
-
-/// Mark the session's usage-limit words seen in the last `read` bytes, and
-/// end its process so its exit moves it to the next account.
-fn trip_on_words(session: &mut Session, read: usize) {
-    let Some(rotation) = session.rotation.as_mut() else {
-        return;
-    };
-    if session.ending || rotation.tripped() {
-        return;
-    }
-    let reach = read + rotation.longest_word().saturating_sub(1);
-    let from = session
-        .scrollback
-        .end()
-        .saturating_sub(reach as u64)
-        .max(session.scrollback.oldest());
-    let Ok(bytes) = session.scrollback.from(from) else {
-        return;
-    };
-    if rotation.words_in(&String::from_utf8_lossy(&bytes)) {
-        rotation.trip();
-        if let Some(live) = &session.live {
-            live.end("at its usage limit");
-        }
+        self.wake();
+        Ok(true)
     }
 }

@@ -31,7 +31,7 @@ pub fn migrate<S: LeafStore>(store: S, key: &Ed25519Identity) -> Result<bool, Id
     if version == directory_state::STATE_VERSION {
         return Ok(false);
     }
-    if version != 2 {
+    if version != 2 && version != 3 && version != 4 {
         return Err(IdentityError::DirectorySnapshotUnmigrated {
             found: version,
             expected: directory_state::STATE_VERSION,
@@ -62,12 +62,15 @@ pub fn migrate<S: LeafStore>(store: S, key: &Ed25519Identity) -> Result<bool, Id
             }
         })?;
     }
-    let mut projection =
-        directory_state::migrate_v2(&owner, frontier.size()).map_err(unavailable)?;
+    let mut projection = if version == 2 {
+        directory_state::migrate_v2(&owner, frontier.size()).map_err(unavailable)?
+    } else {
+        directory_state::decode(&owner, frontier.size()).map_err(unavailable)?
+    };
     let (mut log, tail) = FrontierLog::resume(store, frontier.clone()).map_err(unavailable)?;
     for leaf in tail.leaves {
         let signed = verify_event(&leaf, &key.public_key_bytes())?;
-        projection.apply(signed.event(), frontier.size())?;
+        projection.apply_entry(signed.entry(), frontier.size())?;
         frontier.push(&leaf);
         checkpoints.record(&frontier);
     }

@@ -10,8 +10,9 @@
 //! machine has one; the answer says so in `reports_served`, and never shows
 //! a machine as reporting.
 
+use std::ops::Bound;
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -19,7 +20,7 @@ use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::projection::Projection;
-use lys_identity::{AgentId, IdentityId, OperationId};
+use lys_identity::{AgentId, IdentityId, LifecycleState, OperationId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -197,26 +198,35 @@ pub(crate) fn with_network<T>(
         .ok_or_else(|| ServerError::NetworkUnavailable {
             reason: "the configuration names no network_file".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::NetworkUnavailable {
+            reason: format!("the network lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }
 
-fn view(directory: &Projection, machine: &Machine, last_report_at: Option<u64>) -> MachineView {
+fn view(
+    directory: &Projection,
+    machine: &Machine,
+    last_report_at: Option<u64>,
+) -> Result<MachineView, ServerError> {
     let may_run = machine
         .may_run
         .iter()
-        .filter_map(|id| {
-            let agent = AgentId::from_str(id).ok()?;
-            let record = directory.record(IdentityId::Agent(agent))?;
-            Some(AgentSummary {
-                id: id.clone(),
-                display_name: record.profile().display_name().to_owned(),
-                state: record.state().to_string(),
-            })
+        .map(|id| {
+            let agent = AgentId::from_str(id)?;
+            let identity = IdentityId::Agent(agent);
+            let record = directory.record(identity).ok_or_else(|| {
+                lys_identity::IdentityError::IdentityUnknown {
+                    identity: id.clone(),
+                }
+            })?;
+            crate::read_api::agent_summary(directory, identity, record)
         })
-        .collect();
-    MachineView {
+        .collect::<Result<_, ServerError>>()?;
+    Ok(MachineView {
         id: machine.id.clone(),
         name: machine.name.clone(),
         kind: machine.kind.clone(),
@@ -235,7 +245,7 @@ fn view(directory: &Projection, machine: &Machine, last_report_at: Option<u64>) 
         },
         retired_at: machine.retired.as_ref().map(|retired| retired.at),
         last_report_at,
-    }
+    })
 }
 
 async fn list(
@@ -254,24 +264,38 @@ async fn list(
             .flatten();
         let last = last_reports(&state)?;
         with_network(&state, |store| {
-            let mut machines: Vec<_> = store
-                .machines()
-                .iter()
-                .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
-                .collect();
-            let totals = if let Some(page) = &page {
-                machines.retain(|machine| {
-                    page.matches([machine.name.as_str()])
-                        && teams.as_ref().is_none_or(|teams| {
-                            machine
-                                .team
-                                .as_ref()
-                                .is_some_and(|team| teams.contains(team))
-                        })
-                });
-                Some(page.finish(&mut machines, |machine| &machine.id)?)
+            let (machines, totals) = if let Some(page) = &page {
+                let filtered = page.filtered();
+                let after = if filtered {
+                    Bound::Unbounded
+                } else {
+                    page.after()
+                };
+                let (machines, totals) = page.select(
+                    store.machines_ordered(after),
+                    (!filtered).then_some(store.machines().len()),
+                    |machine| {
+                        Ok(page.matches([machine.name.as_str()])
+                            && teams.as_ref().is_none_or(|teams| {
+                                machine
+                                    .team
+                                    .as_ref()
+                                    .is_some_and(|team| teams.contains(team))
+                            }))
+                    },
+                    |machine| &machine.id,
+                    |machine| view(directory, machine, last.get(&machine.id).copied()),
+                )?;
+                (machines, Some(totals))
             } else {
-                None
+                (
+                    store
+                        .machines()
+                        .iter()
+                        .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
+                        .collect::<Result<_, _>>()?,
+                    None,
+                )
             };
             Ok(Json(NetworkView {
                 machines,
@@ -351,7 +375,7 @@ async fn name(
     body: Result<Json<NameBody>, JsonRejection>,
 ) -> Result<Json<MachineView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(mut body) = body.map_err(|refused| malformed(refused.body_text()))?;
     body.team = body.team.as_deref().map(team_id).transpose()?;
     with_directory(&state, |directory| {
@@ -369,7 +393,7 @@ async fn name(
             let kept = store
                 .machine(&machine.id)
                 .ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(view(directory, kept, last.get(&kept.id).copied())))
+            Ok(Json(view(directory, kept, last.get(&kept.id).copied())?))
         })
     })
 }
@@ -402,7 +426,7 @@ async fn assign_team(
     body: Result<Json<TeamBody>, JsonRejection>,
 ) -> Result<Json<MachineTeamChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = OperationId::from_str(&id)
         .map_err(|error| malformed(format!("computer id does not read: {error}")))?
@@ -440,7 +464,7 @@ async fn assign_team(
             })?;
             let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
             Ok(Json(MachineTeamChanged {
-                machine: view(directory, machine, last.get(&id).copied()),
+                machine: view(directory, machine, last.get(&id).copied())?,
                 recorded,
             }))
         })
@@ -454,7 +478,7 @@ async fn change_agent(
     body: Result<Json<AgentBody>, JsonRejection>,
 ) -> Result<Json<MachineAgentsChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = OperationId::from_str(&id)
         .map_err(|error| malformed(format!("computer id does not read: {error}")))?
@@ -463,29 +487,44 @@ async fn change_agent(
         .map_err(|error| malformed(format!("operation does not read: {error}")))?
         .to_string();
     let agent = AgentId::from_str(&body.agent)?;
-    with_directory(&state, |directory| {
+    // The directory and the network are never locked together: the network write
+    // syncs to disk, and no directory reader may wait on that flush.
+    let by = with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
-        if directory.record(IdentityId::Agent(agent)).is_none() {
-            return Err(ServerError::AgentNotVisible);
+        let record = directory
+            .record(IdentityId::Agent(agent))
+            .ok_or(ServerError::AgentNotVisible)?;
+        if body.allow && record.state() != LifecycleState::Active {
+            return Err(ServerError::Inactive {
+                identity: agent.to_string(),
+                state: record.state(),
+            });
         }
-        let last = last_reports(&state)?;
-        with_network(&state, |store| {
-            let recorded = store.change_agent(AgentsRecorded {
-                operation,
-                machine: id.clone(),
-                agent: agent.to_string(),
-                allow: body.allow,
-                by,
-                at: now(),
-                original_may_run: None,
-            })?;
-            let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(MachineAgentsChanged {
-                machine: view(directory, machine, last.get(&id).copied()),
-                recorded,
-            }))
-        })
+        Ok(by)
+    })?;
+    let last = last_reports(&state)?;
+    let (recorded, machine) = with_network(&state, |store| {
+        let recorded = store.change_agent(AgentsRecorded {
+            operation,
+            machine: id.clone(),
+            agent: agent.to_string(),
+            allow: body.allow,
+            by,
+            at: now(),
+            original_may_run: None,
+        })?;
+        let machine = store
+            .machine(&id)
+            .cloned()
+            .ok_or(ServerError::MachineUnknown)?;
+        Ok((recorded, machine))
+    })?;
+    with_directory(&state, |directory| {
+        Ok(Json(MachineAgentsChanged {
+            machine: view(directory.projection()?, &machine, last.get(&id).copied())?,
+            recorded,
+        }))
     })
 }
 
@@ -495,7 +534,7 @@ async fn retire(
     Path(id): Path<String>,
 ) -> Result<Json<MachineView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
@@ -503,7 +542,7 @@ async fn retire(
         with_network(&state, |store| {
             store.retire(&id, Retirement { by, at: now() })?;
             let kept = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(view(directory, kept, last.get(&kept.id).copied())))
+            Ok(Json(view(directory, kept, last.get(&kept.id).copied())?))
         })
     })
 }

@@ -11,6 +11,7 @@
 //! nothing.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use jiff::civil::Weekday;
 use jiff::tz::TimeZone;
@@ -266,9 +267,12 @@ pub struct Held {
     /// The refusals read from the runners' feeds.
     #[serde(default)]
     pub refusals: crate::refusals_store::Refusals,
-    /// Derived record positions, rebuilt on open and excluded from signed state.
+    /// Current context availability, derived once on open and updated with each usage leaf.
     #[serde(skip)]
-    pub index: crate::budgets_index::Index,
+    pub context_availability: crate::budgets_context::Availability,
+    /// Derived record positions shared by copies and excluded from signed state.
+    #[serde(skip)]
+    pub index: Arc<crate::budgets_index::Index>,
 }
 
 impl Clone for Held {
@@ -283,7 +287,8 @@ impl Clone for Held {
             uses: self.uses.clone(),
             crossings: self.crossings.clone(),
             refusals: self.refusals.clone(),
-            index: self.index.clone(),
+            context_availability: self.context_availability.clone(),
+            index: Arc::clone(&self.index),
         }
     }
 }
@@ -297,22 +302,23 @@ impl PartialEq for Held {
             && self.uses == other.uses
             && self.crossings == other.crossings
             && self.refusals == other.refusals
+            && self.context_availability == other.context_availability
     }
 }
 
 impl Eq for Held {}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
-}
-
-#[derive(Serialize)]
-struct Sealing<'a> {
-    format: &'static str,
-    held: &'a Held,
 }
 
 impl Budget {
@@ -468,17 +474,19 @@ impl Held {
             Leaf::Used(mut usage) => {
                 if self.charged.insert(usage.event.clone()) {
                     for crossing in std::mem::take(&mut usage.crossed) {
+                        crossing.checked()?;
                         self.crossings.hold(crossing);
                     }
                     if let (Some(session), Some(figure)) = (&usage.session, usage.context_percent) {
                         self.crossings.context.insert(session.clone(), figure);
                     }
-                    self.index.insert(&usage, self.uses.len())?;
+                    self.context_availability.keep(&usage)?;
+                    Arc::make_mut(&mut self.index).insert(&usage, self.uses.len())?;
                     self.uses.push(usage);
                 }
             }
             Leaf::Acted(acted) => {
-                self.crossings.acted.insert(acted.operation.clone(), acted);
+                self.crossings.acted(acted);
             }
             Leaf::Refused(record) => self.refusals.hold(*record),
             Leaf::FeedRead(read) => self.refusals.read_to(read),
@@ -573,12 +581,18 @@ impl Held {
             ));
         }
         let mut held = sealed.held;
+        held.index = Arc::new(crate::budgets_index::Index::from_uses(&held.uses)?);
+        for crossing in &held.crossings.crossed {
+            crossing.checked()?;
+        }
+        for usage in &held.uses {
+            held.context_availability.keep(usage)?;
+        }
         if held.limit_sets.is_empty() {
             for budget in held.budgets.clone() {
                 held.merge_budget(&budget, budget.version)?;
             }
         }
-        held.index = crate::budgets_index::Index::from_uses(&held.uses)?;
         Ok(held)
     }
 }

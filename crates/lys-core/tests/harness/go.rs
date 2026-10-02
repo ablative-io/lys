@@ -101,8 +101,10 @@ pub fn build_go_tool(go: &Path, out: &Path) {
                 .status()
                 .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
             assert!(status.success(), "go build of the conformance tool failed");
+            Ok(())
         },
-    );
+    )
+    .expect("Go executable cache failed");
 }
 
 /// Runs the pre-built tool with `input` on stdin; returns `(exit_success,

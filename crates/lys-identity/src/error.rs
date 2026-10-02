@@ -10,6 +10,30 @@ use crate::lifecycle::{LifecycleState, Transition};
 /// Errors returned by the directory's records and its event encoding.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum IdentityError {
+    /// The approval does not bind the immutable creation payload.
+    #[error("DraftHashMismatch: approval names another draft payload")]
+    DraftHashMismatch,
+    /// The named draft has not been recorded.
+    #[error("DraftNotFound: no draft {draft} is recorded")]
+    DraftNotFound {
+        /// The requested draft identifier.
+        draft: String,
+    },
+    /// A terminal decision was already recorded for the draft.
+    #[error("DraftNotPending: draft {draft} already has a decision")]
+    DraftNotPending {
+        /// The draft identifier.
+        draft: String,
+    },
+    /// The prepared action or request evidence is invalid.
+    #[error("DraftChangeInvalid: {reason}")]
+    DraftChangeInvalid {
+        /// The failed boundary rule.
+        reason: &'static str,
+    },
+    /// A draft leaf was requested as an identity event.
+    #[error("DraftEntry: the leaf records a draft, not an identity change")]
+    DraftEntry,
     /// The directory snapshot must be upgraded before ordinary opening.
     #[error(
         "DirectorySnapshotUnmigrated: snapshot version {found} requires migration to {expected}"
@@ -111,6 +135,12 @@ pub enum IdentityError {
         "EventNotCanonical: the event's bytes are not the canonical encoding of what they decode to"
     )]
     EventNotCanonical,
+    /// A leaf records a change to the install as a whole where a change to
+    /// one identity was asked for.
+    #[error(
+        "InstallEntry: the leaf records a change to the install as a whole, not a change to an identity"
+    )]
+    InstallEntry,
     /// An event is larger than any event this directory writes.
     #[error("EventTooLarge: {len} bytes, over the limit of {limit}")]
     EventTooLarge {

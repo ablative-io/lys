@@ -63,6 +63,7 @@ impl Table {
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
             "harness": self.harness(),
             "instructions": "Build what the brief says.", "note": "First setup.",
+            "permissions": {"default_mode": "plan"},
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         let (status, set) = self.service.post(&path, Some(&self.ada), &body).await?;
@@ -91,7 +92,7 @@ impl Table {
 
 #[tokio::test]
 async fn each_refusal_is_by_name() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true, Some(BEA)).await?;
     let bea = table
         .service
         .sign_in(Login {
@@ -165,7 +166,7 @@ async fn each_refusal_is_by_name() -> TestResult {
 
 #[tokio::test]
 async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true, None).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -235,7 +236,7 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
 
 #[tokio::test]
 async fn a_start_is_kept_once_under_its_operation() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true, None).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -272,7 +273,7 @@ async fn a_start_is_kept_once_under_its_operation() -> TestResult {
 
 #[tokio::test]
 async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true, None).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = operation()?;

@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
@@ -108,11 +109,10 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
     return grouped;
   }, [teams]);
   const addUnder = (entry: Entry) => {
-    const person = entry.kind === 'person' ? entry.id : entry.person?.id;
-    if (!person) return null;
+    const person = entry.person?.id ?? entry.id;
     const memberships = memberTeams.get(entry.id) ?? memberTeams.get(person) ?? [];
     const team = whose.kind === 'team' && memberships.includes(whose.team) ? whose.team : memberships.length === 1 ? memberships[0] : '';
-    const query = new URLSearchParams({ answers_to: person });
+    const query = new URLSearchParams({ answers_to: entry.id });
     if (team) query.set('team', team);
     return <a href={'#/agents/new?' + query.toString()} onClick={(event) => event.stopPropagation()}>Add agent under them</a>;
   };
@@ -121,8 +121,8 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
     { head: 'State', cell: (x) => <><span className={'dot s-' + x.state} />{x.state}</> },
     { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}</span> : null },
-    { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
     { head: 'Add agent', cell: addUnder },
+    { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
   ];
   return (
     <>
@@ -149,7 +149,7 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
 
 export function People() {
   const shell = useShell();
-  const load = useLoad(async () => ({ view: await api.people(), me: await api.me(), teams: await readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
+  const load = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
   if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
     return (
       <div className="page fill">

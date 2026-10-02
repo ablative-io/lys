@@ -6,7 +6,6 @@
 //! and stopped only once its runner said the process ended: each is kept as
 //! the runtime report the runner's answer confirms, never inferred.
 
-use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -129,7 +128,7 @@ pub fn operator(
 ) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
     let id = AgentId::from_str(agent).map_err(|_unread| ServerError::AgentNotVisible)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(state, &actor)?;
     let (asker, answers) = with_directory(state, |directory| {
         let projection = directory.projection()?;
         let asker = caller(state, headers, projection)?;
@@ -233,7 +232,7 @@ pub fn confirmation(ended: &Ended) -> String {
 /// Keep `driven`'s end as its runner saw it, once.
 pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<(), ServerError> {
     if state.runtime.is_none() {
-        return Ok(());
+        return crate::agent_pass::end_session(state, &driven.session);
     }
     with_runtime(state, |store| {
         if store
@@ -249,7 +248,9 @@ pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<()
             confirmation(ended),
         );
         store.report(report).map(drop)
-    })
+    })?;
+    crate::agent_pass::end_session(state, &driven.session)?;
+    crate::budgets_context::finish(state, &driven.agent, &driven.session)
 }
 
 /// The end an answer carries, when it carries one.
@@ -290,7 +291,9 @@ pub fn keep_act(state: &AppState, act: RunnerAct) -> Result<ActReceipt, ServerEr
     let mut acts = state
         .acts
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+        .map_err(|error| ServerError::RuntimeUnavailable {
+            reason: format!("runner act store unavailable: {error}"),
+        })?;
     acts.keep(act)
 }
 
@@ -309,15 +312,18 @@ pub async fn run_on_runner(
         machine: machine.to_owned(),
         runner: runner.clone(),
     };
-    let asked = crate::runner_client::ask(
-        state,
-        machine,
-        runner.clone(),
-        Act::Start {
-            launch: Box::new(launch),
-        },
-    )
-    .await;
+    let session = launch.session.clone();
+    let act = {
+        let mut passes = crate::agent_pass::store(state)?;
+        crate::runner_start_pass::act(
+            &mut passes,
+            AgentId::from_str(agent)?,
+            state.oidc.public_origin(),
+            launch,
+        )?
+    };
+    let missing_config = matches!(&act, Act::Start { lys_mcp: None, .. });
+    let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
     let answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
             let act = Act::Status {
@@ -327,23 +333,35 @@ pub async fn run_on_runner(
         }
         other => other,
     };
+    let ending = if answer.is_err() {
+        crate::agent_pass::end_session(state, &session)
+    } else {
+        Ok(())
+    };
     let outcome = answer
         .as_ref()
         .map_or_else(ServerError::name, |answer| kind(answer).to_owned());
-    keep_act(
-        state,
-        RunnerAct {
-            act: "start".to_owned(),
-            caller: caller.to_owned(),
-            session: driven.session.clone(),
-            agent: agent.to_owned(),
-            machine: machine.to_owned(),
-            at: now(),
-            text: None,
-            keys: Vec::new(),
-            outcome,
-        },
-    )?;
+    let outcome = if missing_config {
+        format!("{outcome}; LysMcpConfigMissing")
+    } else {
+        outcome
+    };
+    crate::runner_start_pass::record_after_end(ending, || {
+        keep_act(
+            state,
+            RunnerAct {
+                act: "start".to_owned(),
+                caller: caller.to_owned(),
+                session: driven.session.clone(),
+                agent: agent.to_owned(),
+                machine: machine.to_owned(),
+                at: now(),
+                text: None,
+                keys: Vec::new(),
+                outcome,
+            },
+        )
+    })?;
     let (pid, started_at, ended) = match answer? {
         Answer::Started {
             pid, started_at, ..
@@ -446,35 +464,34 @@ impl Launcher for DirectoryLauncher {
                 machine: record.machine.clone(),
                 runner,
             };
-            let rotation = match crate::runner_api::session_settings(&self.0, &record.agent) {
-                Ok(settings) => settings.and_then(|settings| settings.accounts),
-                Err(refused) => return Some(Err(refused)),
-            };
             let policy = match crate::agent_policy_api::launch_policy(&self.0, &record.agent) {
                 Ok(policy) => policy,
+                Err(refused) => return Some(Err(refused)),
+            };
+            let runtime = match crate::network_api::with_network(&self.0, |store| {
+                store
+                    .machine(&record.machine)
+                    .and_then(|machine| machine.runtime.clone())
+                    .ok_or(ServerError::MachineWithoutRuntime)
+            }) {
+                Ok(runtime) => runtime,
+                Err(refused) => return Some(Err(refused)),
+            };
+            let launch = match crate::provisioning_api::with_provisioning(&self.0, |store| {
+                crate::launch_record_config::build(
+                    store,
+                    record,
+                    driven.session.clone(),
+                    &runtime,
+                    policy,
+                )
+            }) {
+                Ok(launch) => launch,
                 Err(refused) => return Some(Err(refused)),
             };
             if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
                 return Some(Err(refused));
             }
-            let environment = BTreeMap::from([
-                ("LYS_AGENT".to_owned(), record.agent.clone()),
-                ("LYS_SESSION".to_owned(), driven.session.clone()),
-                ("LYS_LAUNCH_RECORD".to_owned(), record.id.clone()),
-                ("LYS_HANDLES".to_owned(), record.credential_ids.join(",")),
-            ]);
-            let launch = Launch {
-                session: driven.session,
-                program: record.executable.clone(),
-                arguments: record.arguments.clone(),
-                directory: record.working_directory.clone(),
-                environment,
-                config: None,
-                columns: COLUMNS,
-                rows: ROWS,
-                rotation,
-                policy,
-            };
             Some(run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await)
         })
     }

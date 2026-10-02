@@ -30,19 +30,26 @@ identity_leg() {
     echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
     return 1
   fi
-  cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail
+  identity_status=0
+  cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail || identity_status=1
+  python3 -B scripts/identity-gates/spicedb_fixture.py -- cargo nextest run --locked -p lys-identity-server --all-features --test identity_spicedb --no-fail-fast --retries 0 --no-tests fail || identity_status=1
+  return "$identity_status"
 }
-# The surface leg installs dependencies, checks types and runs the identity tests:
-# npm ci, npm run typecheck and npm test,
-# with surface/identity as the package directory, so the shell's tests and the
-# mock-up's run on every lys landing. It is never scoped away by a changed-path
-# filter. Without npm it fails by name; it never skips.
+# The interpreter is named first, so a run here that differs from a run
+# elsewhere says which python3 each one used.
+identity_scripts_leg() {
+  echo "python3: $(command -v python3) $(python3 --version 2>&1)"
+  python3 -B -m unittest discover -s scripts/identity-gates -p "*test*.py"
+}
+# The compiled surface and dependencies are shared with the install fixtures.
+# Its type checks and every surface test still run on each gate.
 surface_leg() {
   if ! command -v npm >/dev/null 2>&1; then
     echo "surface_npm_missing: the surface leg needs npm on the PATH to run npm ci and npm test in surface/identity"
     return 1
   fi
-  (cd surface/identity && npm ci && npm run typecheck && npm test)
+  prepared_surface=$(python3 scripts/identity-gates/surface_fixture.py) || return 1
+  (cd "$prepared_surface" && npm run typecheck && npm test)
 }
 parallel() {
   job_index=$((job_index + 1))
@@ -83,6 +90,7 @@ parallel sh scripts/design/gate.sh
 parallel cargo doc --no-deps --all-features
 parallel ast-grep scan --config sgconfig.yml
 parallel sh scripts/file-length.sh
+parallel identity_scripts_leg
 parallel surface_leg
 leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
 leg cargo test --doc --workspace --all-features

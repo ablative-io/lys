@@ -22,37 +22,41 @@ const BODY_LIMIT: usize = 2 * 1024 * 1024;
 #[schema(value_type = Object)]
 pub(crate) struct Envelope(Value);
 const VERSIONS: [&str; 3] = ["2025-03-26", "2025-06-18", "2025-11-25"];
-const TOOLS: [(&str, &str); 4] = [
-    (
-        "what-can-I-do",
-        "Ask the existing HTTP routes what the caller may do. Admission is decided by those routes.",
-    ),
-    (
-        "read",
-        "Read through an existing HTTP route with the caller's credentials and admission.",
-    ),
-    (
-        "change",
-        "Change through an existing HTTP route. Its validation, authority checks and refusals apply unchanged.",
-    ),
-    (
-        "drafts",
-        "Ask an existing draft route with the caller's credentials. This transport grants no draft authority.",
-    ),
-];
+const LEGACY_TOOLS: [&str; 4] = ["what-can-I-do", "read", "change", "drafts"];
 
 struct Endpoint {
     router: Router,
+    state: Option<Arc<crate::routes::AppState>>,
     origin: String,
+    tools: &'static crate::mcp_tools::Catalogue,
 }
 
+#[cfg(test)]
 pub(crate) fn routes(router: Router, origin: &str) -> Result<Router, ServerError> {
+    registered(router, origin, None)
+}
+
+pub(crate) fn admitted_routes(
+    router: Router,
+    origin: &str,
+    state: Arc<crate::routes::AppState>,
+) -> Result<Router, ServerError> {
+    registered(router, origin, Some(state))
+}
+
+fn registered(
+    router: Router,
+    origin: &str,
+    state: Option<Arc<crate::routes::AppState>>,
+) -> Result<Router, ServerError> {
     let origin = reqwest::Url::parse(origin).map_err(|error| ServerError::ConfigInvalid {
         reason: format!("the MCP origin is invalid: {error}"),
     })?;
     let endpoint = Arc::new(Endpoint {
         router,
+        state,
         origin: origin.origin().ascii_serialization(),
+        tools: crate::mcp_tools::prepare()?,
     });
     Ok(Router::new()
         .route("/mcp", post(message).get(no_stream))
@@ -112,6 +116,44 @@ fn accepts(headers: &HeaderMap, media: &str) -> bool {
 }
 
 async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Response {
+    if request.headers().contains_key(crate::grant_tokens::HEADER) {
+        if let Err(error) = crate::grant_tokens::header(request.headers()) {
+            return error.into_response();
+        }
+        if request
+            .headers()
+            .contains_key(crate::agent_signature::HEADER)
+            || request.headers().contains_key(header::AUTHORIZATION)
+        {
+            return ServerError::AgentSignatureRefused {
+                reason: "a grant token cannot carry another credential",
+            }
+            .into_response();
+        }
+    }
+    if request
+        .headers()
+        .contains_key(crate::agent_signature::HEADER)
+        && request
+            .headers()
+            .get_all(header::COOKIE)
+            .iter()
+            .any(|value| {
+                value.to_str().is_ok_and(|cookies| {
+                    cookies.split(';').any(|cookie| {
+                        cookie
+                            .trim()
+                            .split_once('=')
+                            .is_some_and(|(name, _)| name == crate::session::COOKIE)
+                    })
+                })
+            })
+    {
+        return ServerError::AgentSignatureRefused {
+            reason: "an agent signature cannot carry a session cookie",
+        }
+        .into_response();
+    }
     if let Err((status, reason)) = transport(request.headers(), &endpoint) {
         return fault(&Value::Null, status, -32600, reason);
     }
@@ -200,11 +242,13 @@ async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Res
             )
         };
     }
+    if method == "tools/list" {
+        return tools(endpoint.tools, &id, &value["params"]);
+    }
     let result = match method {
         "initialize" => initialize(&value["params"]),
         "ping" => Ok(json!({})),
-        "tools/list" => tools(&value["params"]),
-        "tools/call" => call(&endpoint.router, parts, &value["params"]).await,
+        "tools/call" => call(&endpoint, parts, &value["params"]).await,
         _ => Err((-32601, "the MCP method is not supported".to_owned())),
     };
     match result {
@@ -240,17 +284,34 @@ fn initialize(params: &Value) -> ResultValue {
     )
 }
 
-fn tools(params: &Value) -> ResultValue {
+fn tools(catalogue: &crate::mcp_tools::Catalogue, id: &Value, params: &Value) -> Response {
     if !params.is_null() && (!params.is_object() || params.get("cursor").is_some()) {
-        return Err((
+        return fault(
+            id,
+            StatusCode::OK,
             -32602,
-            "this tool list has no continuation cursor".to_owned(),
-        ));
+            "this tool list has no continuation cursor",
+        );
     }
-    let schema = json!({"type":"object","properties":{"method":{"type":"string","enum":["GET","POST","PUT","PATCH","DELETE"]},"path":{"type":"string","description":"An absolute local HTTP path, including its query."},"body":{}},"required":["method","path"],"additionalProperties":false});
-    Ok(
-        json!({"tools":TOOLS.map(|(name, description)| json!({"name":name,"description":description,"inputSchema":schema}))}),
-    )
+    let id = match serde_json::to_vec(id) {
+        Ok(id) => id,
+        Err(error) => {
+            return fault(
+                id,
+                StatusCode::OK,
+                -32603,
+                format!("the MCP id could not be encoded: {error}"),
+            );
+        }
+    };
+    let encoded = catalogue.encoded();
+    let mut body = Vec::with_capacity(encoded.len() + id.len() + 40);
+    body.extend_from_slice(b"{\"jsonrpc\":\"2.0\",\"id\":");
+    body.extend_from_slice(&id);
+    body.extend_from_slice(b",\"result\":");
+    body.extend_from_slice(encoded);
+    body.push(b'}');
+    ([(header::CONTENT_TYPE, "application/json")], body).into_response()
 }
 
 #[derive(Deserialize)]
@@ -269,15 +330,12 @@ struct Arguments {
 }
 
 async fn call(
-    router: &Router,
+    endpoint: &Endpoint,
     mut parts: axum::http::request::Parts,
     params: &Value,
 ) -> ResultValue {
     let call: Call = serde_json::from_value(params.clone())
         .map_err(|error| (-32602, format!("invalid tool call: {error}")))?;
-    if !TOOLS.iter().any(|(name, _)| *name == call.name) {
-        return Err((-32602, format!("unknown tool {}", call.name)));
-    }
     if !["GET", "POST", "PUT", "PATCH", "DELETE"].contains(&call.arguments.method.as_str()) {
         return Err((
             -32602,
@@ -298,6 +356,31 @@ async fn call(
             -32602,
             "the tool path must be local to the HTTP router".to_owned(),
         ));
+    }
+    if !LEGACY_TOOLS.contains(&call.name.as_str()) {
+        endpoint
+            .tools
+            .resolve(&call.name, &call.arguments.method, uri.path())
+            .map_err(|reason| (-32602, reason))?;
+    }
+    if parts.headers.contains_key(crate::grant_tokens::HEADER) {
+        let admitted = (|| {
+            let token = crate::grant_tokens::header(&parts.headers)?;
+            let (resource, action) =
+                crate::openapi_table::token_scope(&call.arguments.method, uri.path())?;
+            let state = endpoint.state.as_ref().ok_or_else(|| {
+                crate::grant_tokens::TokenError::Unavailable(
+                    "MCP has no token authority state".to_owned(),
+                )
+            })?;
+            crate::grant_tokens::principal(state, token, &resource, &action)
+        })();
+        match admitted {
+            Ok(principal) => {
+                parts.extensions.insert(principal);
+            }
+            Err(error) => return rendered(error.into_response()).await,
+        }
     }
     parts.method = Method::from_bytes(call.arguments.method.as_bytes())
         .map_err(|error| (-32602, error.to_string()))?;
@@ -320,7 +403,8 @@ async fn call(
     } else {
         Body::empty()
     };
-    let response = match router
+    let response = match endpoint
+        .router
         .clone()
         .oneshot(Request::from_parts(parts, body))
         .await
@@ -328,6 +412,10 @@ async fn call(
         Ok(response) => response,
         Err(error) => match error {},
     };
+    rendered(response).await
+}
+
+async fn rendered(response: Response) -> ResultValue {
     let status = response.status();
     let bytes = to_bytes(response.into_body(), BODY_LIMIT)
         .await

@@ -10,13 +10,43 @@ use crate::error::ServerError;
 
 pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
     match error {
-        IdentityError::IdentityUnknown { .. } => StatusCode::NOT_FOUND,
+        IdentityError::IdentityUnknown { .. }
+        | IdentityError::AnswersToUnknown { .. }
+        | IdentityError::DraftNotFound { .. } => StatusCode::NOT_FOUND,
+        IdentityError::AnswersToInactive { .. } => StatusCode::FORBIDDEN,
         IdentityError::AppendUncertain { .. }
         | IdentityError::LogUnavailable { .. }
         | IdentityError::AppendRefused { .. }
         | IdentityError::RandomSourceUnavailable { .. }
         | IdentityError::KeyUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-        _ => StatusCode::CONFLICT,
+        IdentityError::IdentifierMalformed { .. } => StatusCode::BAD_REQUEST,
+        IdentityError::AnswersToCycle { .. }
+        | IdentityError::NoAccountablePerson { .. }
+        | IdentityError::DirectorySnapshotUnmigrated { .. }
+        | IdentityError::AlreadyBootstrapped { .. }
+        | IdentityError::BindingMalformed { .. }
+        | IdentityError::ProfileInvalid { .. }
+        | IdentityError::ReasonRequired { .. }
+        | IdentityError::TransitionRefused { .. }
+        | IdentityError::ChangeMismatch { .. }
+        | IdentityError::EventMalformed { .. }
+        | IdentityError::EventNotCanonical
+        | IdentityError::InstallEntry
+        | IdentityError::EventTooLarge { .. }
+        | IdentityError::VersionUnsupported { .. }
+        | IdentityError::SignerMismatch
+        | IdentityError::SignatureInvalid
+        | IdentityError::LeafNotAnEvent { .. }
+        | IdentityError::AlreadyRegistered { .. }
+        | IdentityError::BindingTaken { .. }
+        | IdentityError::StateMismatch { .. }
+        | IdentityError::OperationReused { .. }
+        | IdentityError::LinkSourceSeen { .. }
+        | IdentityError::ReceiptInvalid { .. }
+        | IdentityError::DraftHashMismatch
+        | IdentityError::DraftNotPending { .. }
+        | IdentityError::DraftChangeInvalid { .. }
+        | IdentityError::DraftEntry => StatusCode::CONFLICT,
     }
 }
 
@@ -36,7 +66,8 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::GrantNotCanonical
         | GrantError::EventMalformed { .. }
         | GrantError::EventNotCanonical
-        | GrantError::EventTooLarge { .. } => StatusCode::BAD_REQUEST,
+        | GrantError::EventTooLarge { .. }
+        | GrantError::ResourceKindUnheld { .. } => StatusCode::BAD_REQUEST,
         GrantError::SourceUnknown { .. } | GrantError::GrantUnknown { .. } => StatusCode::NOT_FOUND,
         GrantError::ModelInvalid { .. }
         | GrantError::EventMismatch { .. }
@@ -54,31 +85,58 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         GrantError::OperationReused { .. }
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
-        _ => StatusCode::FORBIDDEN,
+        GrantError::RelationUnknown { .. }
+        | GrantError::ActionsOutside { .. }
+        | GrantError::LineageCycle { .. }
+        | GrantError::IssuerNotHolder { .. }
+        | GrantError::NotHolder { .. }
+        | GrantError::ResourceOutside { .. }
+        | GrantError::UseOnly { .. }
+        | GrantError::RecipientRefused { .. }
+        | GrantError::WithheldFromAgents { .. }
+        | GrantError::PassOnBeyondSource { .. }
+        | GrantError::ExpiryBeyondSource { .. }
+        | GrantError::ResponsibleMismatch { .. }
+        | GrantError::IdentityNotActive { .. }
+        | GrantError::Revoked { .. }
+        | GrantError::Expired { .. }
+        | GrantError::NotStarted { .. }
+        | GrantError::RootAuthorityRefused { .. }
+        | GrantError::RevokeRefused { .. }
+        | GrantError::NotHeld { .. }
+        | GrantError::EnvelopeMismatch { .. }
+        | GrantError::PermissionAbsent { .. } => StatusCode::FORBIDDEN,
     }
 }
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "refusal": self.name(),
             "reason": self.to_string(),
             "fields": self.fields(),
         });
+        if let Self::Identity(error) = &self {
+            match error {
+                IdentityError::AnswersToCycle { chain }
+                | IdentityError::NoAccountablePerson { chain } => {
+                    body["chain"] = serde_json::json!(chain);
+                }
+                IdentityError::AnswersToInactive { identity, state } => {
+                    body["identity"] = serde_json::json!(identity);
+                    body["state"] = serde_json::json!(state.to_string());
+                }
+                IdentityError::AnswersToUnknown { identity } => {
+                    body["identity"] = serde_json::json!(identity);
+                }
+                _ => {}
+            }
+        }
         (self.status(), Json(body)).into_response()
     }
 }
 
 impl ServerError {
-    /// The stable refusal name, derived from the message unless its words stand alone.
-    pub fn name(&self) -> String {
-        if matches!(self, Self::ProfileVersionReplaced { .. }) {
-            return "ProfileVersionReplaced".to_owned();
-        }
-        let text = self.to_string();
-        text.split(':').next().unwrap_or_default().to_owned()
-    }
-
     /// The fields at fault, as JSON pointers into the request body; none
     /// when the refusal is not about a field.
     pub fn fields(&self) -> Vec<crate::apps_error::Field> {
@@ -91,6 +149,7 @@ impl ServerError {
     pub(crate) fn status(&self) -> StatusCode {
         match self {
             Self::NotSignedIn
+            | Self::AgentPassRefused { .. }
             | Self::AgentSignatureRefused { .. }
             | Self::OperatorRefused { .. }
             | Self::SignInRefused
@@ -100,6 +159,7 @@ impl ServerError {
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::Inactive { .. }
+            | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
@@ -107,7 +167,8 @@ impl ServerError {
             | Self::MachineNotForAgent
             | Self::SecondFactorUnsupported
             | Self::NotPermitted { .. }
-            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
+            | Self::ReviewerOnly
+            | Self::McpBeyondRemit { .. } => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::McpServerUnknown { .. }
             | Self::GrantNotVisible
@@ -127,9 +188,6 @@ impl ServerError {
             | Self::RequestHeld { .. }
             | Self::RequestReused { .. }
             | Self::McpServerHeld { .. }
-            | Self::MachineReused { .. }
-            | Self::MachineTeamReused { .. }
-            | Self::MachineAgentsReused { .. }
             | Self::RoleReused { .. }
             | Self::RoleHeld { .. }
             | Self::HoldingOver { .. }
@@ -144,6 +202,7 @@ impl ServerError {
             | Self::ProfileNotReviewed { .. }
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
+            | Self::MachineWithoutRunner
             | Self::LaunchUnrenderable { .. }
             | Self::HarnessUndeclared { .. }
             | Self::McpHandleUnsupported { .. }
@@ -160,7 +219,8 @@ impl ServerError {
             | Self::RunnerAbsent { .. }
             | Self::DialStale { .. }
             | Self::SetupClosed
-            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
+            | Self::ReviewReused { .. }
+            | Self::BootstrapInterrupted { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown
             | Self::RequestMalformed { .. }
             | Self::AccountRefused { .. }
@@ -206,6 +266,8 @@ impl ServerError {
             Self::Goal(error) => error.status(),
             Self::Team(error) => error.status(),
             Self::Budget(error) => error.status(),
+            Self::Holding(error) => error.status(),
+            Self::Machine(error) => error.status(),
         }
     }
 }

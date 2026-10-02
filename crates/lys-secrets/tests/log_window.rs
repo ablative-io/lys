@@ -3,7 +3,7 @@
 //! the lines it prints; the whole log is read only by the audit command, by
 //! name, and never by a start (SECRETS-007 R1, R2).
 //!
-//! The 10,000-line log is written once per run, each line signed by the
+//! The recorded 10,000-line log holds each line signed by the
 //! broker's audit key and carrying its own index in its outcome, so a
 //! printed row is checked against what the log holds rather than against
 //! the index the command printed beside it. Each test works on its own copy.
@@ -15,11 +15,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use lys_core::Ed25519Identity;
-use lys_secrets::{
-    AuditKind, AuditLine, AuditLog, Broker, BrokerPaths, EntryClass, LocalGrants, Secret, Start,
-    StoreKey,
-};
+use lys_secrets::{Broker, BrokerPaths, EntryClass, LocalGrants, Secret, Start};
 use tempfile::TempDir;
 
 #[path = "support/log_window_fixture.rs"]
@@ -76,64 +72,6 @@ impl Folders {
         args.extend_from_slice(more);
         Ok(Command::new(BINARY).args(&args).output()?)
     }
-}
-
-/// A refused use whose outcome names the line's own index.
-fn refusal(index: u64) -> AuditLine {
-    AuditLine {
-        kind: AuditKind::Use,
-        at_ms: AT_MS,
-        handle: None,
-        identity: Some("agent:noor".to_owned()),
-        secret: Some("github-token".to_owned()),
-        operation: None,
-        request: None,
-        uses: None,
-        spend: None,
-        outcome: format!("{OUTCOME} {index}"),
-    }
-}
-
-/// Makes a broker, fills its log to `LINES` signed lines, and opens it once
-/// so its snapshot is written at the full log.
-fn build(folders: &Folders) -> TestResult {
-    fs::create_dir_all(folders.root())?;
-    fs::create_dir_all(folders.keys())?;
-    let paths = folders.paths();
-    drop(Broker::create(
-        &paths,
-        LocalGrants::new(),
-        Box::new(|| AT_MS),
-    )?);
-    let guarded = [paths.store_dir.as_path(), paths.log_dir.as_path()];
-    let audit_key = StoreKey::load(&paths.audit_key, &guarded)?;
-    let signer = Ed25519Identity::load(&paths.audit_key)?;
-    let mut audit = AuditLog::open(&paths.log_dir, &paths.anchor, &guarded, &audit_key)?.0;
-    while audit.len() + 1 < LINES {
-        audit.append_unanchored(&refusal(audit.len()), &signer)?;
-    }
-    audit.append(&refusal(audit.len()), &signer)?;
-    drop(audit);
-    let broker = folders.open()?;
-    let len = broker.audit().len();
-    if len != LINES {
-        return Err(format!("the built log holds {len} lines, not {LINES}").into());
-    }
-    Ok(())
-}
-
-fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
-    fs::create_dir_all(to)?;
-    for entry in fs::read_dir(from)? {
-        let entry = entry?;
-        let target = to.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_tree(&entry.path(), &target)?;
-        } else {
-            fs::copy(entry.path(), &target)?;
-        }
-    }
-    Ok(())
 }
 
 /// A copy of the 10,000-line broker for one test.

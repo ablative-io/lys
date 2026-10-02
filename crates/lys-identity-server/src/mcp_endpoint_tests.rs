@@ -6,6 +6,126 @@ use serde_json::{Value, json};
 use std::error::Error;
 use tower::ServiceExt;
 
+async fn certified_agent() -> Result<
+    (
+        identity_contract::harness::Service,
+        String,
+        String,
+        std::sync::Arc<lys_core::Ed25519Identity>,
+    ),
+    Box<dyn Error>,
+> {
+    use base64::Engine;
+    use identity_contract::harness::{ADMINISTRATOR, Service};
+    use lys_identity::{
+        Actor, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, Profile, Provenance,
+        Transition,
+    };
+    let (service, (agent, key)) = Service::start_with(|config| {
+        lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+        let path = config.log_dir.clone();
+        let key = lys_core::Ed25519Identity::load(&config.event_key_file)?;
+        lys_identity::directory_migration::migrate(
+            lys_log_store::FileLeafStore::open(&path)?,
+            &key,
+        )?;
+        let mut directory = Directory::open(
+            Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+            key,
+        )?;
+        let actor = Actor::new(
+            LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+            Provenance::new(AuthMethod::Oidc, 1),
+        );
+        let (person, _) = directory.setup_person(
+            actor.clone(),
+            OperationId::generate()?,
+            Profile::new("Owner")?,
+            1,
+        )?;
+        let (agent, _) = directory.register_agent(
+            actor.clone(),
+            OperationId::generate()?,
+            person,
+            Profile::new("Caller")?,
+            2,
+        )?;
+        directory.transition(
+            actor,
+            OperationId::generate()?,
+            IdentityId::Agent(agent),
+            Transition::Activate,
+            "",
+            3,
+        )?;
+        Ok((
+            agent.to_string(),
+            std::sync::Arc::new(lys_core::Ed25519Identity::load(&config.event_key_file)?),
+        ))
+    })
+    .await?;
+    let cookie = service
+        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
+        .await?;
+    let request = lys_core::ca::create_certificate_request(&key, &agent)?;
+    let (status, answer) = service
+        .post(
+            &format!("/agents/{agent}/certificates"),
+            Some(&cookie),
+            &json!({
+                "operation":lys_identity::OperationId::generate()?.to_string(),
+                "request":base64::engine::general_purpose::STANDARD.encode(request)
+            }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    Ok((service, cookie, agent, key))
+}
+
+#[tokio::test]
+async fn a_signed_mcp_call_cannot_borrow_an_administrator_cookie() -> Result<(), Box<dyn Error>> {
+    use sha2::{Digest, Sha256};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let (service, cookie, agent, key) = certified_agent().await?;
+    let bytes = serde_json::to_vec(&json!({
+        "jsonrpc":"2.0", "id":9, "method":"tools/call", "params":{
+            "name":"get_directory_people", "arguments":{"method":"GET","path":"/directory/people"}
+        }
+    }))?;
+    let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
+    let nonce = crate::routes::hex(&Sha256::digest(
+        lys_identity::OperationId::generate()?
+            .to_string()
+            .as_bytes(),
+    ));
+    let payload = crate::agent_signature::payload("POST", "/mcp", &bytes, at, &nonce);
+    let signature = crate::routes::hex(
+        &lys_core::attestation::sign_attestation(&payload, &key).to_cose_bytes(),
+    );
+    let response = reqwest::Client::new()
+        .post(format!("{}/mcp", service.base))
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("cookie", cookie)
+        .header(
+            crate::agent_signature::HEADER,
+            format!("{agent} {at} {nonce} {signature}"),
+        )
+        .body(bytes)
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let refused: Value = response.json().await?;
+    assert_eq!(refused["refusal"], "AgentSignatureRefused", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("cookie")
+    );
+    Ok(())
+}
+
 fn register(router: Router, origin: &str) -> Result<Router, crate::error::ServerError> {
     Ok(router.clone().merge(super::routes(router, origin)?))
 }
@@ -50,18 +170,7 @@ async fn mcp_initialize_and_tools_list_answer() -> Result<(), Box<dyn Error>> {
     )
     .await?;
     let tools = listed["result"]["tools"].as_array().ok_or("no tools")?;
-    assert_eq!(
-        tools
-            .iter()
-            .map(|tool| tool["name"].as_str())
-            .collect::<Vec<_>>(),
-        vec![
-            Some("what-can-I-do"),
-            Some("read"),
-            Some("change"),
-            Some("drafts")
-        ]
-    );
+    assert_eq!(tools.len(), crate::openapi_table::TABLE.len());
     for tool in tools {
         assert!(
             !tool["description"]

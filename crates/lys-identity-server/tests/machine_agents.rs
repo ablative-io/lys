@@ -9,10 +9,10 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::{AgentId, OperationId};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
-use lys_identity_server::network_store::{Machine, NetworkStore, TeamRecorded};
+use lys_identity_server::network_store::{AgentsRecorded, Machine, NetworkStore, TeamRecorded};
 use lys_identity_server::runner_client::RunnerRecord;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -206,6 +206,38 @@ fn unchanged(path: &Path, bytes: &[u8], inode: u64) -> TestResult {
     Ok(())
 }
 
+fn kept_bytes(path: &Path) -> Result<Vec<u8>, Box<dyn Error>> {
+    #[derive(Serialize)]
+    struct Snapshot<'a> {
+        machines: &'a [Machine],
+        runners: BTreeMap<&'a str, &'a RunnerRecord>,
+        team_changes: BTreeMap<&'a str, &'a TeamRecorded>,
+        agent_changes: BTreeMap<&'a str, &'a AgentsRecorded>,
+    }
+    let store = NetworkStore::open(path)?;
+    let snapshot = Snapshot {
+        machines: store.machines(),
+        runners: store
+            .machines()
+            .iter()
+            .filter_map(|machine| {
+                store
+                    .runner(&machine.id)
+                    .map(|runner| (machine.id.as_str(), runner))
+            })
+            .collect(),
+        team_changes: store
+            .team_records()
+            .map(|recorded| (recorded.operation.as_str(), recorded))
+            .collect(),
+        agent_changes: store
+            .agent_records()
+            .map(|recorded| (recorded.operation.as_str(), recorded))
+            .collect(),
+    };
+    Ok(serde_json::to_vec_pretty(&snapshot)?)
+}
+
 #[tokio::test]
 async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_start() -> TestResult {
     let mut table = Table::set().await?;
@@ -273,7 +305,8 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
 
     let written = std::fs::read(&table.path)?;
     let inode = std::fs::metadata(&table.path)?.ino();
-    let held: Value = serde_json::from_slice(&written)?;
+    let snapshot = kept_bytes(&table.path)?;
+    let held: Value = serde_json::from_slice(&snapshot)?;
     assert_eq!(
         held["agent_changes"].as_object().map(serde_json::Map::len),
         Some(1)
@@ -281,10 +314,10 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
     let grant_id = grant["operation"].as_str().ok_or("no granting operation")?;
     assert_eq!(held["agent_changes"][grant_id], first["recorded"]);
     for field in ["runners", "team_changes"] {
-        assert_eq!(member(&written, field)?, member(&table.before, field)?);
+        assert_eq!(member(&snapshot, field)?, member(&table.before, field)?);
     }
     assert_eq!(
-        machine_bytes(&written, &table.other)?,
+        machine_bytes(&snapshot, &table.other)?,
         machine_bytes(&table.before, &table.other)?
     );
     let mut expected = table.machine.clone();
@@ -293,7 +326,7 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
         "    {}",
         serde_json::to_string_pretty(&expected)?.replace('\n', "\n    ")
     );
-    assert_eq!(machine_bytes(&written, &table.machine.id)?, expected);
+    assert_eq!(machine_bytes(&snapshot, &table.machine.id)?, expected);
 
     assert_eq!(table.sent(&path, &grant).await?, first);
     unchanged(&table.path, &written, inode)?;
@@ -332,7 +365,7 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
             &json!({"operation": operation()?, "machine": table.machine.id}),
         )
         .await?;
-    refused(&admitted, 503, "SecretsUnavailable");
+    refused(&admitted, 502, "SecretsUnavailable");
     assert_ne!(
         admitted.1["refusal"], "MachineNotForAgent",
         "grant did not admit past placement"
@@ -376,7 +409,7 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
     );
     unchanged(&table.path, &bytes, inode)?;
     table.creation_replays(false).await?;
-    let held: Value = serde_json::from_slice(&bytes)?;
+    let held: Value = serde_json::from_slice(&kept_bytes(&table.path)?)?;
     assert_eq!(
         held["agent_changes"].as_object().map(serde_json::Map::len),
         Some(2)
@@ -432,5 +465,62 @@ fn the_agents_route_describes_its_body_receipt_and_conflict() -> TestResult {
     assert!(route["responses"]["200"].is_object(), "{route}");
     assert!(route["responses"]["default"].is_object(), "{route}");
     assert!(route.to_string().contains("MachineAgentsReused"), "{route}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_retired_agent_is_not_allowed_onto_a_computer() -> TestResult {
+    let table = Table::set().await?;
+    let retire = json!({
+        "operation": operation()?,
+        "transition": "retire",
+        "reason": "Agent withdrawn",
+    });
+    table
+        .sent(
+            &format!("/identities/{}/transitions", table.agent()),
+            &retire,
+        )
+        .await?;
+    let inode = std::fs::metadata(&table.path)?.ino();
+    let path = format!("/network/machines/{}/agents", table.machine.id);
+    let grant = json!({"operation": operation()?, "agent": table.agent(), "allow": true});
+    refused(
+        &table.service.post(&path, Some(&table.ada), &grant).await?,
+        403,
+        "inactive",
+    );
+    unchanged(&table.path, &table.before, inode)?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_a_network_file_the_agents_route_says_so() -> TestResult {
+    let (service, seeded) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.network_file = None,
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
+    )
+    .await?;
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let grant = json!({
+        "operation": operation()?,
+        "agent": seeded.people[0].agents[0].id.to_string(),
+        "allow": true,
+    });
+    refused(
+        &service
+            .post(
+                &format!("/network/machines/{}/agents", operation()?),
+                Some(&ada),
+                &grant,
+            )
+            .await?,
+        503,
+        "NetworkUnavailable",
+    );
     Ok(())
 }

@@ -3,6 +3,7 @@ import type { Load } from '../../api';
 import type { ReactNode } from 'react';
 import type { AgentView } from '../../generated';
 import type { NetworkView } from '../network/contract';
+import type { Program } from '../provisioning/choices';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import type { Team } from '../teams/contract';
@@ -51,6 +52,21 @@ async function readNetwork() {
   return answer.machines;
 }
 
+async function readPrograms() {
+  const answer = await request<{ programs: Program[] }>('/harnesses');
+  if (!Array.isArray(answer.programs) || answer.programs.some((program) => !program || !Array.isArray(program.models)
+    || program.models.some((model) => !model || typeof model.id !== 'string' || typeof model.label !== 'string'))) {
+    mismatch('AgentModelsUnreadable', 'The service did not answer the models its programs list.');
+  }
+  return answer.programs;
+}
+
+/** A saved model by the name its program gives it; one no program lists is said to be unlisted, never shown as a bare id. */
+function modelName(programs: Program[], id: string): string {
+  const listed = programs.flatMap((program) => program.models).find((model) => model.id === id);
+  return listed ? listed.label : id + ' (no program lists this model now)';
+}
+
 async function readSessions(id: string) {
   const answer = await request<{ sessions: RuntimeSession[] }>('/agents/' + encodeURIComponent(id) + '/runtime/sessions');
   if (!Array.isArray(answer.sessions)) mismatch('RuntimeReportUnreadable', 'The runner did not answer a session list.');
@@ -92,29 +108,32 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
   const teams = useLoad(readTeams, 'agent-about-teams:' + agent.id);
   const network = useLoad(readNetwork, 'agent-about-computers:' + agent.id);
   const sessions = useLoad(() => readSessions(agent.id), 'agent-about-sessions:' + agent.id);
+  const programs = useLoad(readPrograms, 'agent-about-programs:' + agent.id);
   const held = teams.status === 'ok' ? teams.data.filter((team) => team.state === 'active' && team.members.includes(agent.id)) : [];
   const computer = profile.status === 'ok' ? profile.data?.runs_on : undefined;
   const machine = network.status === 'ok' ? network.data.find((entry) => entry.id === computer) : undefined;
   const noInUseComputer = network.status === 'ok' && !network.data.some((entry) => entry.state === 'in_use');
   const noComputer = network.status === 'ok' && !network.data.some((entry) => entry.state === 'in_use' && entry.runtime !== null
     && (entry.may_run.some((allowed) => allowed.id === agent.id) || Boolean(entry.may_run_roles?.length)));
-  const problems = [profile, teams, network, sessions].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
+  const saved = profile.status === 'ok' ? profile.data?.model_access ?? [] : [];
+  const models = programs.status === 'ok' ? saved.map((id) => modelName(programs.data, id)).join(', ') : '';
+  const problems = [profile, teams, network, sessions, programs].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
   return <><section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
       <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : held.length ? held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/teams">{team.name}</a></span>) : 'No team yet'}</dd>
       <dt>Computer</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !computer ? 'Choose a computer when you start' : network.status !== 'ok' ? reading(network, 'computers') : machine ? <a href="#/network">{machine.name}</a> : <span className="why-not">The saved computer is no longer visible. Choose an available computer in Start.</span>}<p className="note">Saved choice; the runner reports below say where a session was seen.</p></dd>
-      <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : profile.data?.model_access.length ? profile.data.model_access.join(', ') : 'Choose a model when you start'}<p className="note">Saved choice for the next start.</p></dd>
+      <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !saved.length ? 'Choose a model when you start' : programs.status !== 'ok' ? reading(programs, 'model names') : models}<p className="note">Saved choice for the next start.</p></dd>
       <dt>Running</dt><dd><Running load={sessions} /></dd>
     </dl>
-  </section><AgentNextSteps id={agent.id} name={agent.display_name} noComputer={noComputer} noInUseComputer={noInUseComputer} />{details(problems)}</>;
+  </section><AgentNextSteps id={agent.id} name={agent.display_name} noComputer={noComputer} noInUseComputer={noInUseComputer} chosen={machine && models ? { computer: machine.name, models } : null} />{details(problems)}</>;
 }
 
 /** Each next act opens the existing form and never makes a change just by visiting. */
-export function AgentNextSteps({ id, name, noComputer, noInUseComputer }: { id: string; name: string; noComputer: boolean; noInUseComputer: boolean }) {
+export function AgentNextSteps({ id, name, noComputer, noInUseComputer, chosen = null }: { id: string; name: string; noComputer: boolean; noInUseComputer: boolean; chosen?: { computer: string; models: string } | null }) {
   const base = '#/file/' + encodeURIComponent(id) + '/';
   return <nav className="agent-next" aria-label="Next steps">
-    <div className="agent-next-step"><a data-act="start" href={base + 'provisioning'}><strong>Start</strong><span>{noInUseComputer ? 'Lys has no computer to run ' + name + ' on yet.' : noComputer ? 'No computer lets ' + name + ' run yet. Ask for it to be allowed on a computer before starting.' : 'Choose its computer and model, then start this agent.'}</span></a>{noInUseComputer ? <a className="agent-add-computer" href="#/network?add=computer">Add this computer</a> : null}</div>
+    <div className="agent-next-step"><a data-act="start" href={base + 'provisioning'}><strong>Start</strong><span>{noInUseComputer ? 'Lys has no computer to run ' + name + ' on yet.' : noComputer ? 'No computer lets ' + name + ' run yet. Ask for it to be allowed on a computer before starting.' : chosen ? 'Start ' + name + ' on ' + chosen.computer + ' with ' + chosen.models + '.' : 'Choose its computer and model, then start this agent.'}</span></a>{noInUseComputer ? <a className="agent-add-computer" href="#/network?add=computer">Add this computer</a> : null}</div>
     <div className="agent-next-step"><a href={base + 'budgets'}><strong>Set limits</strong><span>Set how much this agent may use and when it must stop.</span></a></div>
     <div className="agent-next-step"><a href={base + 'access'}><strong>Give access</strong><span>Choose what this agent may reach from access you can give.</span></a></div>
   </nav>;

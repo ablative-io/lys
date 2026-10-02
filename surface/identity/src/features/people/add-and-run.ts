@@ -16,7 +16,7 @@ import type { HarnessDescription, ProvisioningProfile } from '../provisioning/Pr
 
 type Placement = { kind: 'new'; machine: PendingMachine } | { kind: 'existing'; computer: Machine; admission: MachineAdmission | null };
 export interface AddAndRun {
-  version: 2; person: string; registration: PendingAgent; settings: Record<string, unknown>;
+  version: 3; person: string; registration: PendingAgent; settings: Record<string, unknown>;
   step: 'registration' | 'profile' | 'review' | 'computer' | 'admission' | 'start'; placement: Placement; pending: Pending | null;
 }
 const operation = /^op-[0-9a-f]{32}$/;
@@ -69,24 +69,25 @@ function placementOf(value: unknown, registration: PendingAgent, step: AddAndRun
   return { kind: 'existing', computer: value.computer, admission: null };
 }
 function addAndRunOf(value: unknown, person: string): AddAndRun {
-  if (!isRecord(value) || (value.version !== 1 && value.version !== 2) || value.person !== person || !isRecord(value.settings)
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3) || value.person !== person || !isRecord(value.settings)
     || !['registration', 'profile', 'review', 'computer', 'admission', 'start'].includes(String(value.step))) return unreadable();
-  const registration = agentRequestOf(value.registration); profileFromSettings(value.settings);
+  if (value.version === 3 && (!isRecord(value.registration) || value.registration.version !== 1)) return unreadable();
+  const registration = agentRequestOf(value.registration, person); profileFromSettings(value.settings);
   const step = value.step as AddAndRun['step'];
   if (value.version === 1 && (step === 'admission' || 'placement' in value)) return unreadable();
-  if (value.version === 2 && 'machine' in value) return unreadable();
+  if (value.version !== 1 && 'machine' in value) return unreadable();
   const placement = placementOf(value.version === 1 ? { kind: 'new', machine: value.machine } : value.placement, registration, step);
   if (step === 'registration') {
     if (value.pending !== null) return unreadable();
-    return { version: 2, person, registration, settings: value.settings, step, placement, pending: null };
+    return { version: 3, person, registration, settings: value.settings, step, placement, pending: null };
   }
-  if (!registration.agent || !registration.activated) return unreadable();
+  if (!registration.agent || !registration.activated || registration.grants.some((entry) => entry.granted === null)) return unreadable();
   const prefix = '/agents/' + encodeURIComponent(registration.agent);
   const pending = pendingStartOf(value.pending, 'lys.pending.agent-start.' + person + '.' + registration.agent, prefix);
   const expected = step === 'computer' || step === 'admission' ? 'start' : step;
   if (pending.stage !== expected || pending.machine !== placementComputer(placement).id || pending.legacyKey !== undefined
     || placement.kind === 'existing' && placement.admission?.operation === pending.body.operation) return unreadable();
-  return { version: 2, person, registration, settings: value.settings, step, placement, pending };
+  return { version: 3, person, registration, settings: value.settings, step, placement, pending };
 }
 export function readAddAndRun(key: string, person: string): AddAndRun | null {
   const raw = sessionStorage.getItem(key);
@@ -94,7 +95,7 @@ export function readAddAndRun(key: string, person: string): AddAndRun | null {
   let value: unknown; let current: AddAndRun;
   try { value = JSON.parse(raw); current = addAndRunOf(value, person); }
   catch { return unreadable(); }
-  if (isRecord(value) && value.version === 1) {
+  if (isRecord(value) && value.version !== 3) {
     try { sessionStorage.setItem(key, JSON.stringify(current)); }
     catch { throw new Refused(0, { refusal: 'PendingAddAndRunMigrationFailed', reason: 'The earlier request could not be saved in the current format. No request has been sent; its original record is kept.' }); }
   }
@@ -105,10 +106,10 @@ export function newAddAndRun(registration: PendingAgent, settings: Record<string
   const placement: Placement = computer ? placementOf({ kind: 'existing', computer, admission: null }, registration, 'registration')
     : { kind: 'new', machine: { body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null } };
   if (placement.kind === 'new' && !validComputerName(name)) return unreadable();
-  return { version: 2, person, registration, settings, step: 'registration', pending: null, placement };
+  return { version: 3, person, registration, settings, step: 'registration', pending: null, placement };
 }
 export function addAndRunStep(current: AddAndRun): string {
-  if (current.step === 'registration') return current.registration.activated ? 'joining the team' : current.registration.agent ? 'activating the agent' : 'registering the agent';
+  if (current.step === 'registration') return current.registration.activated ? current.registration.grants.some((entry) => entry.granted === null) ? 'giving selected access' : 'joining the team' : current.registration.agent ? 'activating the agent' : 'registering the agent';
   if (current.step === 'profile') return 'saving the settings';
   if (current.step === 'review') return 'approving the settings';
   if (current.step === 'computer' && current.placement.kind === 'new') return current.placement.machine.phase === 'machine' ? 'adding this computer' : 'recording this computer’s runner';
@@ -118,7 +119,10 @@ export function addAndRunStep(current: AddAndRun): string {
 export class AddAndRunFailure extends Error {
   constructor(readonly step: string, readonly problem: unknown) {
     const code = problem instanceof Refused ? problem.refusal.refusal : problem instanceof Error ? problem.message.split(':', 1)[0] : '';
-    super('Lys could not confirm ' + step + '.' + (code === 'RunnerStartUnconfirmed' || code === 'RunnerDidNotRun' ? ' Lys admitted the start, but no runner ran it.' : code === 'RunnerStartEnded' ? ' The runner confirmed this session already ended.' : ''));
+    // A refusal is a definite answer, so its own sentence is shown; only an
+    // unknown outcome is "could not confirm".
+    const refusedWith = problem instanceof Refused && problem.status >= 400 && problem.status < 500 ? problem.refusal.reason : '';
+    super((refusedWith ? 'Lys refused ' + step + ': ' + refusedWith : 'Lys could not confirm ' + step + '.') + (code === 'RunnerStartUnconfirmed' || code === 'RunnerDidNotRun' ? ' Lys admitted the start, but no runner ran it.' : code === 'RunnerStartEnded' ? ' The runner confirmed this session already ended.' : ''));
   }
 }
 export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: AddAndRun) => void): Promise<string> {

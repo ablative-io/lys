@@ -16,6 +16,9 @@ use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::Sessions;
 
 pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+    let kept_responsibilities = crate::kept_responsibilities::Kept::load(
+        &config.log_dir.with_file_name("kept-responsibilities.json"),
+    )?;
     crate::openapi::prepare()?;
     crate::openapi::surface::prepare()?;
     let catalogue = Arc::new(crate::harness_catalogue::Catalogue::embedded()?);
@@ -82,6 +85,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         .map(crate::spicedb::SpiceDbEngine::new);
     let state = Arc::new(AppState {
         changes: crate::changes::Changes::new()?,
+        kept_responsibilities,
         import_credential_file: config.import_credential_file.clone(),
         estate_plan_file: config.log_dir.with_file_name("estate-approval.json"),
         identity_upstream: format!(
@@ -150,6 +154,17 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         configuration: Mutex::new(configuration),
         policies: policies.map(Mutex::new),
         goals: goals.map(crate::goals_store::Goals::new),
+        agent_passes: Arc::new(Mutex::new(crate::agent_pass_store::Passes::open(
+            config.log_dir.with_file_name("agent-passes.json"),
+        )?)),
+        grant_tokens: Mutex::new(
+            crate::grant_token_store::Tokens::open(
+                config.log_dir.with_file_name("grant-tokens.json"),
+            )
+            .map_err(|error| ServerError::ConfigInvalid {
+                reason: error.to_string(),
+            })?,
+        ),
         apps: Mutex::new(apps),
         benches: crate::apps_bench::Benches::new(
             config.apps_dir().with_file_name("benches"),
@@ -184,7 +199,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    let starts = start::routes(start_service(config, &state)?);
+    let start_service = start_service(config, &state)?;
+    crate::agent_pass_recovery::at_start(&state, &start_service)?;
+    let starts = start::routes(start_service);
     let starts = crate::start_budget::guarded(
         starts.merge(crate::launch_api::routes().with_state(Arc::clone(&state))),
         Arc::clone(&state),
@@ -210,9 +227,10 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         Arc::clone(&state),
         crate::operator::guard,
     ));
-    let api = api.merge(guarded(crate::mcp_endpoint::routes(
+    let api = api.merge(guarded(crate::mcp_endpoint::admitted_routes(
         dispatcher,
         &crate::sign_in::lys_origin(config)?,
+        Arc::clone(&state),
     )?));
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir, api)?,

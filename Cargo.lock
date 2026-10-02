@@ -1754,6 +1754,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.19",
  "tokio",
+ "toml",
  "tower",
  "tracing",
  "utoipa",
@@ -1786,9 +1787,16 @@ dependencies = [
 name = "lys-runner"
 version = "0.2.0"
 dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "identity-contract",
  "jiff",
  "libproc",
  "lys-core",
+ "lys-home",
+ "lys-identity",
+ "lys-identity-server",
+ "lys-secrets",
  "nix",
  "notify",
  "portable-pty",

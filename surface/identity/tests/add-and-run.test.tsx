@@ -31,7 +31,7 @@ function service(failure?: Stage, runnerState: 'running' | 'ended' | 'absent' = 
   let failed = false;
   const applied = new Map<string, Answer>();
   const routes: Record<string, Route> = { ...SERVICE,
-    '/openapi.json': ok({ paths: {
+    '/surface-contract': ok({ paths: {
       '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { operation: {}, display_name: {} } } } } } } },
       ...(computers.length ? { '/network/machines/{id}/agents': { post: {
         requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['operation', 'agent', 'allow'], properties: { operation: { type: 'string' }, agent: { type: 'string' }, allow: { type: 'boolean' } } } } } },
@@ -240,6 +240,17 @@ describe('Add and run on the first computer', () => {
     expect(document.body.textContent).toContain('Running, as its runner last reported');
   });
 
+  it('shows a start refusal in its own words, not as an unconfirmed step', async () => {
+    const server = service();
+    server.routes['POST /agents/' + agent + '/start-command'] = () => refused(400, 'PolicyUnrepresentable', 'The settings file cannot express these permissions for this program.');
+    await open(server.routes); await names(); await submit();
+    const face = document.body.cloneNode(true) as HTMLElement;
+    for (const detail of face.querySelectorAll('details')) detail.remove();
+    expect(face.textContent).toContain('The settings file cannot express these permissions for this program.');
+    expect(face.textContent).not.toContain('could not confirm');
+    expect(face.textContent).not.toContain('PolicyUnrepresentable');
+  });
+
   it('does not navigate or claim running without a confirmed runner start', async () => {
     const { posted } = await open(service(undefined, 'absent').routes); await names(); await submit();
     expect(posted).toHaveLength(7);
@@ -296,7 +307,8 @@ describe('Add and run on an existing computer', () => {
     server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }] }] });
     const { posted } = await open(server.routes);
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
-    expect(document.body.textContent).toContain('WorkspaceOnlyUnavailable');
+    expect(document.body.textContent).toContain('This program has no setting that keeps it to its own folder with internet off.');
+    expect(document.body.textContent).not.toContain('WorkspaceOnlyUnavailable');
     expect(document.body.textContent).not.toContain('Works in its own folder; no internet.');
     expect(document.querySelector('form details')).toBeNull();
     await submit();
@@ -304,13 +316,13 @@ describe('Add and run on an existing computer', () => {
   });
 
   it('keeps both capabilities unknown when their single schema read fails', async () => {
-    const requests = serve({ '/openapi.json': refused(503, 'SchemaUnavailable', 'The served schema could not be read') });
+    const requests = serve({ '/surface-contract': refused(503, 'SchemaUnavailable', 'The served schema could not be read') });
     const capability = await addAndRunCapability();
     expect(capability.answersTo).toBeNull();
     expect(capability.machineAdmission).toBeNull();
     expect(capability.problem).toMatchObject({ refusal: { refusal: 'SchemaUnavailable' } });
     expect(capability.admissionProblem).toBe(capability.problem);
-    expect(requests).toEqual(['/openapi.json']);
+    expect(requests).toEqual(['/surface-contract']);
   });
 
   it('migrates the earlier saved envelope without replacing its registration or planned computer', async () => {
@@ -418,7 +430,7 @@ describe('Add and run on an existing computer', () => {
     await type($('[name="display_name"]'), 'Clover');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
     expect($('form button[type="submit"]')?.textContent).toBe('Add Clover and run it on this computer');
-    expect(requests.filter((path) => path === '/openapi.json')).toHaveLength(1);
+    expect(requests.filter((path) => path === '/surface-contract')).toHaveLength(1);
     await submit(true);
     expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + agent + '/transitions', prefix + '/provisioning', prefix + '/provisioning/1/review', '/network/machines/' + computer.id + '/agents', prefix + '/start-command']);
     expect(posted[4].body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), agent, allow: true });

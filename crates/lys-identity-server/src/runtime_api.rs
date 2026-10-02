@@ -16,9 +16,9 @@
 //! nothing since `starting` is shown `unconfirmed`, however long ago that
 //! was: nothing is inferred from the clock.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
@@ -135,38 +135,33 @@ pub(crate) fn with_runtime<T>(
         .ok_or_else(|| ServerError::RuntimeUnavailable {
             reason: "the configuration names no runtime_dir".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::RuntimeUnavailable {
+            reason: format!("the runtime lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }
 
-/// Lifetime session knowledge; absent when no runtime history is configured.
+/// Selected agents' session activity; absent when no runtime history is configured.
 pub(crate) fn session_agents(
     state: &AppState,
-) -> Result<Option<Arc<BTreeMap<String, SessionActivity>>>, ServerError> {
+    selected: &BTreeSet<String>,
+) -> Result<Option<BTreeMap<String, SessionActivity>>, ServerError> {
     if state.runtime.is_none() {
         return Ok(None);
     }
-    with_runtime(state, RuntimeStore::agents_with_sessions).map(Some)
+    with_runtime(state, |store| store.agents_with_sessions(selected)).map(Some)
 }
 
 /// When a runtime last reported a session on each machine, by machine id;
 /// none when the configuration names no runtime reports.
-pub(crate) fn last_reports(state: &AppState) -> Result<BTreeMap<String, u64>, ServerError> {
-    let mut last = BTreeMap::new();
+pub(crate) fn last_reports(state: &AppState) -> Result<Arc<BTreeMap<String, u64>>, ServerError> {
     if state.runtime.is_none() {
-        return Ok(last);
+        return Ok(Arc::new(BTreeMap::new()));
     }
-    with_runtime(state, |store| {
-        for tracked in store.sessions() {
-            if let Some(report) = tracked.latest() {
-                let at = last.entry(tracked.machine.clone()).or_insert(report.at);
-                *at = (*at).max(report.at);
-            }
-        }
-        Ok(())
-    })?;
-    Ok(last)
+    with_runtime(state, |store| Ok(store.last_reports()))
 }
 
 fn words(name: &str, text: &str) -> Result<String, ServerError> {
@@ -219,13 +214,25 @@ fn report(
     })
 }
 
-pub(crate) fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
-    let (first, latest) = (tracked.first()?, tracked.latest()?);
-    let machine = state.network.as_ref().and_then(|store| {
-        let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-        store.machine(&tracked.machine).cloned()
-    });
-    Some(SessionView {
+pub(crate) fn view(
+    state: &AppState,
+    tracked: &Tracked,
+) -> Result<Option<SessionView>, ServerError> {
+    let (Some(first), Some(latest)) = (tracked.first(), tracked.latest()) else {
+        return Ok(None);
+    };
+    let machine = match &state.network {
+        Some(store) => {
+            let store = store
+                .lock()
+                .map_err(|error| ServerError::NetworkUnavailable {
+                    reason: format!("the network lock is poisoned: {error}"),
+                })?;
+            store.machine(&tracked.machine).cloned()
+        }
+        None => None,
+    };
+    Ok(Some(SessionView {
         session: tracked.session.clone(),
         agent: tracked.agent.clone(),
         machine: tracked.machine.clone(),
@@ -248,6 +255,18 @@ pub(crate) fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
         }),
         stop_asked_at: tracked.stop_asked_at(),
         reported_by: first.reported_by.clone(),
+    }))
+}
+
+pub(crate) fn views<'a>(
+    state: &AppState,
+    mut tracked: impl Iterator<Item = &'a Tracked>,
+) -> Result<Vec<SessionView>, ServerError> {
+    tracked.try_fold(Vec::new(), |mut answers, tracked| {
+        if let Some(answer) = view(state, tracked)? {
+            answers.push(answer);
+        }
+        Ok(answers)
     })
 }
 
@@ -280,7 +299,8 @@ async fn report_agent(
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let signed = signed_agent(&state, directory, &headers, ("POST", uri.path(), &bytes))?;
+        let target = uri.path_and_query().map_or(uri.path(), |target| target.as_str());
+        let signed = signed_agent(&state, directory, &headers, ("POST", target, &bytes))?;
         let asker = match signed {
             Some(own) => IdentityId::Agent(own),
             None => caller(&state, &headers, directory)?,
@@ -293,8 +313,7 @@ async fn report_agent(
                 IdentityId::ServiceAccount(_) => false,
             IdentityId::Person(person) => {
                 record.responsible() == Some(person)
-                    || signed_in(&state, &headers)
-                        .is_ok_and(|actor| state.admission.administrator(&actor).is_ok())
+                    || state.admission.is_administrator(directory, &signed_in(&state, &headers)?)?
             }
         };
         if !answers {
@@ -311,7 +330,11 @@ async fn report_agent(
             })?;
         }
         let tracked = with_runtime(&state, |store| store.report(report))?;
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        if tracked.stopped() { crate::agent_pass::end_session(&state, &tracked.session)?; }
+        if tracked.stopped() && let Some(agent) = &tracked.agent {
+            crate::budgets_context::finish(&state, agent, &tracked.session)?;
+        }
+        view(&state, &tracked)?.ok_or(ServerError::RuntimeSessionUnknown)
     })
     .map(Json)
 }
@@ -339,7 +362,12 @@ async fn report_found(
                 .ok_or(ServerError::MachineUnknown)
         })?;
         let tracked = with_runtime(&state, |store| store.report(report))?;
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        if tracked.stopped()
+            && let Some(agent) = &tracked.agent
+        {
+            crate::budgets_context::finish(&state, agent, &tracked.session)?;
+        }
+        view(&state, &tracked)?.ok_or(ServerError::RuntimeSessionUnknown)
     })
     .map(Json)
 }
@@ -354,7 +382,7 @@ async fn agent_sessions(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(&state, &headers, directory)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(directory, &actor)?;
         if directory.record(IdentityId::Agent(agent)).is_none() {
             return Err(ServerError::AgentNotVisible);
         }
@@ -364,12 +392,13 @@ async fn agent_sessions(
         }
         with_runtime(&state, |store| {
             Ok(SessionsView {
-                sessions: store
-                    .sessions()
-                    .iter()
-                    .filter(|tracked| tracked.agent.as_deref() == Some(agent.as_str()))
-                    .filter_map(|tracked| view(&state, tracked))
-                    .collect(),
+                sessions: views(
+                    &state,
+                    store
+                        .sessions()
+                        .iter()
+                        .filter(|tracked| tracked.agent.as_deref() == Some(agent.as_str())),
+                )?,
             })
         })
     })
@@ -386,7 +415,7 @@ pub(crate) fn visible_sessions(
     with_directory(state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(state, headers, directory)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(directory, &actor)?;
         with_runtime(state, |store| {
             Ok(store
                 .sessions()
@@ -403,14 +432,71 @@ pub(crate) fn visible_sessions(
     })
 }
 
+/// A queried live list builds only the selected views; visibility still narrows metadata.
+pub(crate) fn live_page(
+    state: &AppState,
+    headers: &HeaderMap,
+    page: &crate::list_page::Page,
+) -> Result<(Vec<SessionView>, crate::list_page::Totals), ServerError> {
+    let actor = signed_in(state, headers)?;
+    let members = page.members(state)?;
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let asker = caller(state, headers, projection)?;
+        let administrator = state.admission.is_administrator(projection, &actor)?;
+        let filtered = page.filtered() || !administrator;
+        let after = if filtered {
+            std::ops::Bound::Unbounded
+        } else {
+            page.after()
+        };
+        with_runtime(state, |store| {
+            page.select(
+                store.live_ordered(after),
+                (!filtered).then_some(store.live_count()),
+                |tracked| {
+                    if !filtered {
+                        return Ok(true);
+                    }
+                    let agent = tracked
+                        .agent
+                        .as_deref()
+                        .ok_or(ServerError::RuntimeSessionUnknown)?;
+                    if !sees(projection, administrator, asker, agent) {
+                        return Ok(false);
+                    }
+                    let id = agent.parse::<AgentId>()?;
+                    let record = projection
+                        .record(IdentityId::Agent(id))
+                        .ok_or(ServerError::AgentNotVisible)?;
+                    let person = record.responsible().map(|person| person.to_string());
+                    Ok(
+                        crate::list_page::member(members.as_ref(), agent, person.as_deref())
+                            && page.matches([record.profile().display_name()]),
+                    )
+                },
+                |tracked| &tracked.session,
+                |tracked| {
+                    let agent = tracked
+                        .agent
+                        .as_deref()
+                        .ok_or(ServerError::RuntimeSessionUnknown)?;
+                    let id = agent.parse::<AgentId>()?;
+                    if projection.record(IdentityId::Agent(id)).is_none() {
+                        return Err(ServerError::AgentNotVisible);
+                    }
+                    view(state, tracked)?.ok_or(ServerError::RuntimeSessionUnknown)
+                },
+            )
+        })
+    })
+}
+
 async fn sessions(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<SessionsView>, ServerError> {
-    let sessions = visible_sessions(&state, &headers)?
-        .iter()
-        .filter_map(|tracked| view(&state, tracked))
-        .collect();
+    let sessions = views(&state, visible_sessions(&state, &headers)?.iter())?;
     Ok(Json(SessionsView { sessions }))
 }
 
@@ -419,15 +505,16 @@ async fn found(
     headers: HeaderMap,
 ) -> Result<Json<SessionsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_runtime(&state, |store| {
         Ok(SessionsView {
-            sessions: store
-                .sessions()
-                .iter()
-                .filter(|tracked| tracked.agent.is_none())
-                .filter_map(|tracked| view(&state, tracked))
-                .collect(),
+            sessions: views(
+                &state,
+                store
+                    .sessions()
+                    .iter()
+                    .filter(|tracked| tracked.agent.is_none()),
+            )?,
         })
     })
     .map(Json)

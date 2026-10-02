@@ -134,8 +134,10 @@ fn build_go_tool(go: &Path, out: &Path) {
                 status.success(),
                 "go build of the note conformance tool failed"
             );
+            Ok(())
         },
-    );
+    )
+    .expect("Go executable cache failed");
 }
 
 /// Runs the built reference with the case's original arguments and input.

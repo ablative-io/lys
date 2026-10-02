@@ -29,6 +29,7 @@ struct Manifest {
     bytes: usize,
     leaf_bytes: usize,
     sha256: String,
+    frame_sha256: Vec<String>,
     audit_key_fingerprint: String,
     root: String,
     snapshot_format: &'static str,
@@ -122,10 +123,9 @@ fn record(key: &[u8], work: &Path, output: &Path) -> Result<()> {
         &guarded,
         &audit_key,
     )?;
-    for index in 0..LINES - 1 {
-        audit.append_unanchored(&refusal(index), &signer)?;
+    for index in 0..LINES {
+        audit.append(&refusal(index), &signer)?;
     }
-    audit.append(&refusal(LINES - 1), &signer)?;
     drop(audit);
 
     // The broker rebuilds its own fold, so the fixture cannot invent a snapshot.
@@ -170,13 +170,14 @@ fn record(key: &[u8], work: &Path, output: &Path) -> Result<()> {
     {
         return Err("FixtureRootInvalid: the complete history must match its pin".into());
     }
-    let (pack, leaf_bytes) = pack(&paths)?;
+    let (pack, leaf_bytes, frame_sha256) = pack(&paths)?;
     let manifest = Manifest {
         format: "lys-test/log-window-pack/v1",
         records: LINES,
         bytes: pack.len(),
         leaf_bytes,
         sha256: to_hex(&Sha256::digest(&pack)),
+        frame_sha256,
         audit_key_fingerprint: audit_key.id().as_str().to_owned(),
         root: to_hex(log.root().as_bytes()),
         snapshot_format: lys_log_store::SNAPSHOT_FORMAT,
@@ -194,14 +195,16 @@ fn record(key: &[u8], work: &Path, output: &Path) -> Result<()> {
     Ok(())
 }
 
-fn frame(pack: &mut Vec<u8>, path: &Path) -> Result<usize> {
+fn frame(pack: &mut Vec<u8>, hashes: &mut Vec<String>, path: &Path) -> Result<usize> {
     let bytes = fs::read(path).map_err(|e| format!("reading frame {}: {e}", path.display()))?;
+    hashes.push(to_hex(&Sha256::digest(&bytes)));
     pack.extend_from_slice(&u32::try_from(bytes.len())?.to_be_bytes());
     pack.extend_from_slice(&bytes);
     Ok(bytes.len())
 }
 
-fn pack(paths: &BrokerPaths) -> Result<(Vec<u8>, usize)> {
+fn pack(paths: &BrokerPaths) -> Result<(Vec<u8>, usize, Vec<String>)> {
+    let mut hashes = Vec::new();
     let mut pack = Vec::new();
     pack.extend_from_slice(MAGIC);
     pack.extend_from_slice(&LINES.to_be_bytes());
@@ -212,14 +215,15 @@ fn pack(paths: &BrokerPaths) -> Result<(Vec<u8>, usize)> {
         paths.anchor.clone(),
     ];
     for path in &metadata {
-        frame(&mut pack, path)?;
+        frame(&mut pack, &mut hashes, path)?;
     }
     let mut leaf_bytes = 0;
     for index in 0..LINES {
         leaf_bytes += frame(
             &mut pack,
+            &mut hashes,
             &paths.log_dir.join("leaves").join(format!("{index:020}")),
         )?;
     }
-    Ok((pack, leaf_bytes))
+    Ok((pack, leaf_bytes, hashes))
 }

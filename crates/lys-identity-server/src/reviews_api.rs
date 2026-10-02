@@ -23,7 +23,7 @@
 //! nothing more.
 
 use std::str::FromStr;
-use std::sync::{Arc, MutexGuard, PoisonError};
+use std::sync::{Arc, MutexGuard};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -185,7 +185,11 @@ fn decisions(state: &AppState) -> Result<Option<MutexGuard<'_, ReviewStore>>, Se
     let Some(store) = state.reviews.as_ref() else {
         return Ok(None);
     };
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::ReviewsUnavailable {
+            reason: format!("the reviews lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     Ok(Some(store))
 }
@@ -196,9 +200,14 @@ async fn reviews(
 ) -> Result<Json<ReviewView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     with_grants(&state, |judged| {
-        let person = own_person(judged.directory, &actor)?;
-        let whole = is_root(IdentityId::Person(person), judged.root);
-        let viewer = (!whole).then_some(person);
+        let caller = crate::caller_admission::active_caller(judged.directory, &actor)?;
+        let pass = crate::routes::admitted_agent(judged.directory, &actor)?;
+        let whole = pass || is_root(caller, judged.root);
+        let viewer = if whole {
+            None
+        } else {
+            Some(own_person(judged.directory, &actor)?)
+        };
         let judged_at = now();
         let kept = decisions(&state)?;
         let book = judged.grants.book();
@@ -208,7 +217,7 @@ async fn reviews(
             .filter_map(|record| {
                 answering(judged.directory, record.grant().holder(), viewer).map(|held| {
                     Ok(DueView {
-                        grant: grant_view(&judged, IdentityId::Person(person), record, judged_at),
+                        grant: grant_view(&judged, caller, record, judged_at),
                         agent: held.agent_summary()?,
                         reviewer: held.person_summary(),
                         last_kept: kept.as_ref().and_then(|store| {
@@ -271,13 +280,13 @@ async fn keep(
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let note = note(&body.note)?;
     with_grants(&state, |judged| {
-        let person = own_person(judged.directory, &actor)?;
-        let caller = IdentityId::Person(person);
-        let whole = is_root(caller, judged.root);
+        let caller = crate::caller_admission::active_caller(judged.directory, &actor)?;
+        let pass = crate::routes::admitted_agent(judged.directory, &actor)?;
+        let whole = pass || is_root(caller, judged.root);
         let book = judged.grants.book();
         let record = book
             .record(grant)
-            .filter(|record| sees(&judged, caller, record))
+            .filter(|record| pass || sees(&judged, caller, record))
             .ok_or(ServerError::GrantNotVisible)?;
         let held = answering(judged.directory, record.grant().holder(), None).ok_or_else(|| {
             ServerError::GrantNotDue {
@@ -285,13 +294,13 @@ async fn keep(
                 why: "it is not held by an agent that answers to a person and is not retired",
             }
         })?;
-        if !whole && held.person != person {
+        if !whole && IdentityId::Person(held.person) != caller {
             return Err(ServerError::ReviewerOnly);
         }
         let at = now();
         let kept = Kept {
             grant: grant.to_string(),
-            kept_by: person.to_string(),
+            kept_by: caller.to_string(),
             note,
             operation,
             at,

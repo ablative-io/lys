@@ -73,7 +73,7 @@ impl Session {
         }
         self.head = head.map(str::to_owned);
         for (body, id) in bodies.iter().zip(&batch.ids) {
-            self.note_call_body(body, id);
+            self.note_call_body(body, id)?;
         }
         observed(BatchStep::Head);
         Ok(batch.ids)

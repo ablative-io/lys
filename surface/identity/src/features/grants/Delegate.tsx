@@ -10,7 +10,7 @@ import { useShell } from '../../shell/ShellContext';
 import { day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotGiveList } from './CannotGiveList';
-import { grantNo, nameOf, onText, passText, relationsOf, withinPassOn } from './model';
+import { givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 
@@ -54,6 +54,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   const [pending, setPending] = useState(() => readPendingGrant(key, me, source.id));
   const [rest, setRest] = useState(() => readPendingRest(key, me, source.id));
   const working = useRef(false);
+  const unreleased = useRef(false);
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const locked = pending.kind !== 'empty' || outcome.at === 'sending';
   const toAgent = w.who.get(recipient)?.kind !== 'person';
@@ -104,18 +105,19 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         || typeof answer.grant !== 'string' || !/^grant-[0-9a-f]{32}$/.test(answer.grant)) {
         throw new Refused(200, { refusal: 'UnconfirmedAnswer', reason: 'The service did not confirm this grant operation. Its original details remain retained.' });
       }
-      sessionStorage.removeItem(key);
-      setPending({ kind: 'empty' });
+      try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { unreleased.current = true; }
       return true;
     } catch (error) {
-      const refused = error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
+      let refused = error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
       if (!submitted && !retry) {
         setPending({ kind: 'empty' });
         setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'RequestNotRetained', reason: 'Nothing was sent because this browser could not retain the grant request: ' + refused.message }) });
       } else if (retry || uncertain(refused)) {
         setOutcome({ at: 'pending', reason: refused.refusal.reason });
       } else {
-        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { /* still retained: a retry sends it once more and is refused by name again */ }
+        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (release) {
+          refused = new Refused(refused.status, { refusal: refused.refusal.refusal, reason: refused.refusal.reason + ' The browser could not release the retained request; Check original grant will answer this same refusal, never a second grant: ' + String(release) });
+        }
         setOutcome({ at: 'refused', refused });
       }
       return false;
@@ -169,14 +171,13 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         first = bodyFor(relation, actions); queue = [];
       }
       const given: DelegateBody[] = [];
+      unreleased.current = false;
       try {
-        if (!retry) retain(first);
+        // The whole run is kept before anything else, so a failure at any later write leaves every body somewhere it is offered again by name.
+        if (!retry) { keepRest([first, ...queue]); retain(first); }
         keepRest(queue);
       } catch (error) {
-        // Nothing has been sent. Release the retained body if the browser lets us; otherwise it stays retained and is retried, never duplicated.
-        if (!retry) {
-          try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { setPending({ kind: 'held', body: first }); }
-        }
+        // Nothing has been sent. What is stored is offered again on the next Give, exactly as ticked, never twice.
         notRetained(error);
         return;
       }
@@ -187,9 +188,10 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         if (!confirmed) {
           // An uncertain answer keeps the rest for the retry; a definite refusal ends the run and names what did and did not happen.
           if (outcome.at !== 'pending' && sessionStorage.getItem(key) === null) {
-            try { keepRest([]); } catch (error) { notRetained(error); }
-            if (given.length || queue.length) {
-              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${onText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}`);
+            let cleared = true;
+            try { keepRest([]); } catch { cleared = false; }
+            if (given.length || queue.length || !cleared) {
+              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${givenOnText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
             }
           }
           return;
@@ -203,14 +205,14 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
           } catch (error) {
             // Either the rest still holds next (retain failed) or the key holds it beside the rest (shortening failed): both resume exactly, so stop and say so.
             notRetained(error);
-            shell.toast(`Given before the browser stopped retaining: ${grantedWords(given)} ${onText(source)}. Not sent: ${grantedWords([next, ...queue])}.`);
+            shell.toast(`Given before the browser stopped retaining: ${grantedWords(given)} ${givenOnText(source)}. Not sent: ${grantedWords([next, ...queue])}.`);
             return;
           }
         }
         current = next;
       }
       shell.closeAll();
-      shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${onText(source)}, through you.`);
+      shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${givenOnText(source)}, through you.${unreleased.current ? ' The browser could not release the retained request; opening this again checks it, never gives it twice.' : ''}`);
       done();
     } finally { working.current = false; }
   };
@@ -218,7 +220,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   return (
     <>
       <div className="eyebrow">Your access</div>
-      <h2 style={{ marginTop: 6, fontSize: 16 }}>Give part of {source.relation} of {onText(source)} to an agent</h2>
+      <h2 style={{ marginTop: 6, fontSize: 16 }}>Give part of {source.relation} of {sourceText(source)} to an agent</h2>
       <p className="sub" style={{ marginTop: 6 }}>Only what you hold and may pass on. It traces back to you, and ends when yours does.</p>
       <fieldset disabled={locked} style={{ border: 0, padding: 0 }}>
       <div className="field">
@@ -237,7 +239,8 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         </select>
       </div>
       {toAgent ? <div className="field">
-        <label>Actions</label>
+        {/* The picker's own legend names the actions; a label is the heading only when no picker is shown. */}
+        {offer.known && carried.length ? null : <label>Actions</label>}
         {!offer.known ? <div className="note">The service has not said which actions an agent may hold, so none are offered yet.</div>
           : !carried.length ? <div className="note">{source.resource.kind.includes('.') ? "Lys can't give an agent this app's actions until the app allows it." : 'Nothing you may pass on here can be held by an agent.'}</div>
           : <ActionPicker model={w.model} resource={source.resource} actions={carried} value={picked} onChange={setPicked} disabled={locked} />}
@@ -277,7 +280,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       </fieldset>
       <div className="card" style={{ marginTop: 4 }}>
         <h2>Where it comes from</h2>
-        <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {onText(source)}</span></div>
+        <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {sourceText(source)}</span></div>
         <div className="row"><span className="sec">Actions it allows</span><span className="mono">{actionWords(w.model, source.resource, source.actions)}</span></div>
         <div className="row"><span className="sec">You may pass it on</span><span className="pass">{passText(source.pass_on)}</span></div>
         <div className="row"><span className="sec">Ends no later than</span><span>{source.effective_ends_at !== null ? day(source.effective_ends_at) : 'no end'}</span></div>
