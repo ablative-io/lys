@@ -175,6 +175,8 @@ impl From<Records> for Held {
     fn from(records: Records) -> Self {
         let mut index = Index::default();
         for (position, tracked) in records.sessions.iter().enumerate() {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Session);
             index
                 .positions
                 .entry(tracked.session.clone())

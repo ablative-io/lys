@@ -232,3 +232,40 @@ fn team_operations_do_not_visit_change_history() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn last_reports_do_not_visit_session_history_and_follow_latest_log_order() -> TestResult {
+    use crate::runtime_state::{Held, Report, Reported};
+    let report = |session: String, machine: &str, at| Report {
+        operation: format!("report-{session}-{at}"),
+        session,
+        agent: None,
+        machine: machine.to_owned(),
+        state: Reported::Running,
+        what: String::new(),
+        confirmation: String::new(),
+        reported_by: "person".to_owned(),
+        at,
+        launch: None,
+    };
+    let mut held = Held::default();
+    for n in 0..512 {
+        held.hold(report(format!("session-{n}"), "machine", n))?;
+    }
+    reset();
+    assert_eq!(held.last_reports().get("machine"), Some(&511));
+    assert_eq!(
+        count(Work::Session),
+        0,
+        "last reports scanned tracked sessions"
+    );
+    held.hold(report("session-511".to_owned(), "machine", 1))?;
+    assert_eq!(held.last_reports().get("machine"), Some(&510));
+    let bytes = held.encode()?;
+    let reopened = Held::decode(&bytes)?;
+    reset();
+    assert_eq!(reopened.last_reports(), held.last_reports());
+    assert_eq!(count(Work::Session), 0);
+    assert_eq!(reopened.encode()?, bytes);
+    Ok(())
+}
