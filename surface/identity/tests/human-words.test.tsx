@@ -109,13 +109,17 @@ it('keeps the recorded request on screen without replacing it with an older list
   const form = view.querySelector<HTMLFormElement>('form[aria-label="Ask for access"]');
   if (!form) throw new Error('The request form is missing');
   await act(async () => {
-    const selects = form.querySelectorAll('select');
-    if (selects.length !== 2) throw new Error('The request must offer a resource and access');
-    selects[0].value = '0';
-    selects[0].dispatchEvent(new Event('change', { bubbles: true }));
-    selects[1].value = 'viewer';
-    selects[1].dispatchEvent(new Event('change', { bubbles: true }));
-    form.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
+    const resource = form.querySelector('select');
+    if (!resource) throw new Error('The request must offer a resource');
+    resource.value = '0';
+    resource.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await act(async () => {
+    // Access is asked for one action at a time; view is carried by viewer alone.
+    const view = form.querySelector<HTMLInputElement>('input[name="action"][value="view"]');
+    if (!view) throw new Error('The request must offer the view action');
+    view.click();
+    form.querySelector<HTMLInputElement>('input[name="no-expiry"]')?.click();
   });
   await act(async () => {
     const why = form.querySelector('textarea');
