@@ -130,14 +130,65 @@ pub const WITHHELD_FROM_AGENTS: &[&str] = &[
     "team.budget.set",
 ];
 
+/// The acts an agent may hold, each decided: with [`WITHHELD_FROM_AGENTS`]
+/// it names every shipped act exactly once, so a new act cannot ship
+/// undecided.
+pub const AGENT_MAY_HOLD: &[&str] = &[
+    "agent.create",
+    "agent.mcp-request.approve",
+    "agent.mcp-request.create",
+    "agent.reports-to.set",
+    "agent.restart",
+    "agent.runtime.report",
+    "agent.start",
+    "agent.start-command",
+    "agent.stop",
+    "agent.usage.report",
+    "agent.wake",
+    "edit",
+    "grant.check",
+    "grant.reach",
+    "grant.who",
+    "grant.why",
+    "launch-record.start-again",
+    "launch-record.withdraw",
+    "machine.create",
+    "machine.retire",
+    "machine.runner.set",
+    "machine.team.set",
+    "person.create",
+    "person.profile.set",
+    "person.session.end",
+    "read",
+    "request.create",
+    "request.reconcile",
+    "review.keep",
+    "runtime-session.compact",
+    "runtime-session.end",
+    "runtime-session.found.report",
+    "runtime-session.input",
+    "runtime-session.input-bytes",
+    "runtime-session.keys",
+    "runtime-session.resize",
+    "session.end",
+    "skill.keep",
+    "team.create",
+    "team.member.add",
+    "team.member.confirm",
+    "team.member.remove",
+    "team.parent.set",
+    "team.retire",
+    "view",
+    "write",
+];
+
 /// Whether an agent may hold `action` on an object of `kind`. An approved
 /// app's kind, `{app}.{kind}`, marks none of its acts as an agent's, so none
-/// is; a Lys act is an agent's unless it is withheld or unshipped.
+/// is; a Lys act is an agent's only when [`AGENT_MAY_HOLD`] names it.
 #[must_use]
 pub fn agent_may_hold(kind: &str, action: &str) -> bool {
     !kind.contains('.')
-        && !WITHHELD_FROM_AGENTS.contains(&action)
-        && (ACTIONS.contains(&action) || FIRST_ACTIONS.contains(&action) || action == READ)
+        && AGENT_MAY_HOLD.contains(&action)
 }
 
 /// The prefix of the relation that carries one action alone.
@@ -174,7 +225,8 @@ pub fn shipped_model() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ACTIONS, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold,
+        AGENT_MAY_HOLD, ACTIONS, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS,
+        agent_may_hold,
         shipped_model,
     };
     use crate::grants::{Action, Relation};
@@ -225,8 +277,17 @@ mod tests {
             assert!(!agent_may_hold("person", withheld), "{withheld}");
         }
         for action in ACTIONS.iter().chain(&FIRST_ACTIONS).chain(&[READ]) {
-            let allowed = agent_may_hold("person", action);
-            assert_ne!(allowed, WITHHELD_FROM_AGENTS.contains(action), "{action}");
+            assert_ne!(
+                AGENT_MAY_HOLD.contains(action),
+                WITHHELD_FROM_AGENTS.contains(action),
+                "{action} is decided exactly once"
+            );
+        }
+        for allowed in AGENT_MAY_HOLD {
+            assert!(
+                ACTIONS.contains(allowed) || FIRST_ACTIONS.contains(allowed) || *allowed == READ,
+                "{allowed} is not shipped"
+            );
         }
         for authority in ["grant", "grant.delegate", "role.create", "secret.scope"] {
             assert!(!agent_may_hold("directory", authority));
