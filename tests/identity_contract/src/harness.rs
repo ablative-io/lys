@@ -218,7 +218,15 @@ pub struct Service {
     /// Holds the log, keys and secret file for the service's life.
     pub dir: tempfile::TempDir,
     config: Config,
-    server: tokio::task::JoinHandle<std::io::Result<()>>,
+    server: crate::harness_serve::Serving,
+}
+
+impl Drop for Service {
+    fn drop(&mut self) {
+        if let Err(error) = self.close() {
+            eprintln!("identity_service_shutdown_failed: {error}");
+        }
+    }
 }
 
 fn secret_file(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
@@ -266,6 +274,25 @@ async fn answer(response: reqwest::Response) -> Result<Answer, Box<dyn Error>> {
 }
 
 impl Service {
+    /// Stop and join every fixture task, reporting all shutdown failures.
+    ///
+    /// # Errors
+    /// Returns the named worker, task or state-lock failure during shutdown.
+    pub fn close(&mut self) -> std::io::Result<()> {
+        let mut failures = Vec::new();
+        if let Err(error) = self.server.stop() {
+            failures.push(format!("service_shutdown_failed: {error}"));
+        }
+        if let Err(error) = self.issuer.shutdown() {
+            failures.push(format!("issuer_shutdown_failed: {error}"));
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(failures.join("; ")))
+        }
+    }
+
     /// Start the service over a fresh log, with the fake issuer's administrator
     /// and link-audit source configured.
     pub async fn start() -> Result<Self, Box<dyn Error>> {
@@ -443,7 +470,7 @@ impl Service {
     /// connection of the stopped service carries over. Signed-in sessions are
     /// among what is opened from disk: a cookie from before still answers.
     pub async fn restart(&mut self) -> Result<(), Box<dyn Error>> {
-        self.server.abort();
+        self.server.stop()?;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let listen = listener.local_addr()?;
         self.base = format!("http://{listen}");

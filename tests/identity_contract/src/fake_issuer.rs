@@ -182,6 +182,7 @@ impl Inner {
 #[derive(Clone)]
 pub struct FakeIssuer {
     inner: Arc<Inner>,
+    serving: Arc<Mutex<crate::harness_serve::Serving>>,
 }
 
 impl FakeIssuer {
@@ -252,7 +253,6 @@ impl FakeIssuer {
             .route("/login/oauth/authorize", get(provider_authorize))
             .route("/{tenant}/v2.0/authorize", get(provider_authorize))
             .with_state(Arc::clone(&inner));
-        tokio::spawn(async move { axum::serve(provider, provider_router).await });
         let router = Router::new()
             .route("/.well-known/openid-configuration", get(discovery))
             .route("/jwks", get(jwks))
@@ -268,8 +268,19 @@ impl FakeIssuer {
         } else {
             Router::new().nest(path, router)
         };
-        tokio::spawn(async move { axum::serve(listener, router).await });
-        Ok(Self { inner })
+        let serving = crate::harness_serve::Serving::start(vec![
+            (provider, provider_router),
+            (listener, router),
+        ])
+        .await?;
+        Ok(Self {
+            inner,
+            serving: Arc::new(Mutex::new(serving)),
+        })
+    }
+
+    pub(crate) fn shutdown(&self) -> std::io::Result<()> {
+        held(&self.serving)?.stop()
     }
 
     /// The issuer URL, exactly as it signs it.
