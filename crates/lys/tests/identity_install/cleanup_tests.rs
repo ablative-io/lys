@@ -85,3 +85,19 @@ fn an_install_can_select_its_own_loopback_ports() -> TestResult {
     assert!(text.contains("--broker-port"), "{text}");
     Ok(())
 }
+
+#[test]
+fn a_successful_test_reports_teardown_failure() -> TestResult {
+    let estate = Estate {
+        root: tempfile::tempdir()?,
+        project: "cleanup-failure".to_owned(),
+        rauthy_port: 1,
+        service_port: 2,
+        broker_port: 3,
+    };
+    let run = estate.root.path().join("run");
+    std::fs::create_dir(&run)?;
+    std::fs::write(run.join("identity.pid"), "invalid-pid")?;
+    assert!(estate.close().is_err(), "teardown failure was swallowed");
+    Ok(())
+}

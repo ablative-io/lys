@@ -77,3 +77,10 @@ impl Drop for Estate {
         }
     }
 }
+
+impl Estate {
+    pub fn close(self) -> TestResult {
+        drop(self);
+        Ok(())
+    }
+}
