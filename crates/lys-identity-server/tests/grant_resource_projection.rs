@@ -57,7 +57,7 @@ fn prepare(config: &lys_identity_server::Config) -> Result<PersonId, Box<dyn Err
 fn old_grant(config: &lys_identity_server::Config, person: PersonId) -> Outcome {
     let path = config.grant_log_dir.clone();
     FileLeafStore::create(&path, &config.grant_log_origin)?;
-    let directory = open_directory(config)?;
+    let mut directory = open_directory(config)?;
     let mut grants = Grants::open(
         Box::new(move || FileLeafStore::open(&path)),
         load_service_key(&config.event_key_file)?,
