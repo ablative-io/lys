@@ -202,26 +202,21 @@ pub(crate) fn with_network<T>(
     act(&mut store)
 }
 
-fn view(
-    directory: &Projection,
-    machine: &Machine,
-    last_report_at: Option<u64>,
-) -> Result<MachineView, ServerError> {
+fn view(directory: &Projection, machine: &Machine, last_report_at: Option<u64>) -> MachineView {
     let may_run = machine
         .may_run
         .iter()
-        .map(|id| {
-            let agent = AgentId::from_str(id)?;
-            let identity = IdentityId::Agent(agent);
-            let record = directory.record(identity).ok_or_else(|| {
-                lys_identity::IdentityError::IdentityUnknown {
-                    identity: id.clone(),
-                }
-            })?;
-            crate::read_api::agent_summary(directory, identity, record)
+        .filter_map(|id| {
+            let agent = AgentId::from_str(id).ok()?;
+            let record = directory.record(IdentityId::Agent(agent))?;
+            Some(AgentSummary {
+                id: id.clone(),
+                display_name: record.profile().display_name().to_owned(),
+                state: record.state().to_string(),
+            })
         })
-        .collect::<Result<_, ServerError>>()?;
-    Ok(MachineView {
+        .collect();
+    MachineView {
         id: machine.id.clone(),
         name: machine.name.clone(),
         kind: machine.kind.clone(),
@@ -240,7 +235,7 @@ fn view(
         },
         retired_at: machine.retired.as_ref().map(|retired| retired.at),
         last_report_at,
-    })
+    }
 }
 
 async fn list(
@@ -263,7 +258,7 @@ async fn list(
                 .machines()
                 .iter()
                 .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
-                .collect::<Result<_, _>>()?;
+                .collect();
             let totals = if let Some(page) = &page {
                 machines.retain(|machine| {
                     page.matches([machine.name.as_str()])
@@ -374,7 +369,7 @@ async fn name(
             let kept = store
                 .machine(&machine.id)
                 .ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(view(directory, kept, last.get(&kept.id).copied())?))
+            Ok(Json(view(directory, kept, last.get(&kept.id).copied())))
         })
     })
 }
@@ -445,7 +440,7 @@ async fn assign_team(
             })?;
             let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
             Ok(Json(MachineTeamChanged {
-                machine: view(directory, machine, last.get(&id).copied())?,
+                machine: view(directory, machine, last.get(&id).copied()),
                 recorded,
             }))
         })
@@ -503,7 +498,7 @@ async fn change_agent(
     })?;
     with_directory(&state, |directory| {
         Ok(Json(MachineAgentsChanged {
-            machine: view(directory.projection()?, &machine, last.get(&id).copied())?,
+            machine: view(directory.projection()?, &machine, last.get(&id).copied()),
             recorded,
         }))
     })
@@ -523,7 +518,7 @@ async fn retire(
         with_network(&state, |store| {
             store.retire(&id, Retirement { by, at: now() })?;
             let kept = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(view(directory, kept, last.get(&kept.id).copied())?))
+            Ok(Json(view(directory, kept, last.get(&kept.id).copied())))
         })
     })
 }

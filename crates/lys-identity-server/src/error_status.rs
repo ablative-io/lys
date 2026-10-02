@@ -10,20 +10,14 @@ use crate::error::ServerError;
 
 pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
     match error {
-        IdentityError::IdentityUnknown { .. } | IdentityError::AnswersToUnknown { .. } => {
-            StatusCode::NOT_FOUND
-        }
-        IdentityError::AnswersToInactive { .. } => StatusCode::FORBIDDEN,
+        IdentityError::IdentityUnknown { .. } => StatusCode::NOT_FOUND,
         IdentityError::AppendUncertain { .. }
         | IdentityError::LogUnavailable { .. }
         | IdentityError::AppendRefused { .. }
         | IdentityError::RandomSourceUnavailable { .. }
         | IdentityError::KeyUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
         IdentityError::IdentifierMalformed { .. } => StatusCode::BAD_REQUEST,
-        IdentityError::AnswersToCycle { .. }
-        | IdentityError::NoAccountablePerson { .. }
-        | IdentityError::DirectorySnapshotUnmigrated { .. }
-        | IdentityError::AlreadyBootstrapped { .. }
+        IdentityError::AlreadyBootstrapped { .. }
         | IdentityError::BindingMalformed { .. }
         | IdentityError::ProfileInvalid { .. }
         | IdentityError::ReasonRequired { .. }
@@ -79,57 +73,31 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         GrantError::OperationReused { .. }
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
-        GrantError::RelationUnknown { .. }
-        | GrantError::ActionsOutside { .. }
-        | GrantError::LineageCycle { .. }
-        | GrantError::IssuerNotHolder { .. }
-        | GrantError::NotHolder { .. }
-        | GrantError::ResourceOutside { .. }
-        | GrantError::UseOnly { .. }
-        | GrantError::RecipientRefused { .. }
-        | GrantError::PassOnBeyondSource { .. }
-        | GrantError::ExpiryBeyondSource { .. }
-        | GrantError::ResponsibleMismatch { .. }
-        | GrantError::IdentityNotActive { .. }
-        | GrantError::Revoked { .. }
-        | GrantError::Expired { .. }
-        | GrantError::NotStarted { .. }
-        | GrantError::RootAuthorityRefused { .. }
-        | GrantError::RevokeRefused { .. }
-        | GrantError::NotHeld { .. }
-        | GrantError::EnvelopeMismatch { .. }
-        | GrantError::PermissionAbsent { .. } => StatusCode::FORBIDDEN,
+        _ => StatusCode::FORBIDDEN,
     }
 }
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
-        let mut body = serde_json::json!({
+        let body = serde_json::json!({
             "refusal": self.name(),
             "reason": self.to_string(),
             "fields": self.fields(),
         });
-        if let Self::Identity(error) = &self {
-            match error {
-                IdentityError::AnswersToCycle { chain }
-                | IdentityError::NoAccountablePerson { chain } => {
-                    body["chain"] = serde_json::json!(chain);
-                }
-                IdentityError::AnswersToInactive { identity, state } => {
-                    body["identity"] = serde_json::json!(identity);
-                    body["state"] = serde_json::json!(state.to_string());
-                }
-                IdentityError::AnswersToUnknown { identity } => {
-                    body["identity"] = serde_json::json!(identity);
-                }
-                _ => {}
-            }
-        }
         (self.status(), Json(body)).into_response()
     }
 }
 
 impl ServerError {
+    /// The stable refusal name, derived from the message unless its words stand alone.
+    pub fn name(&self) -> String {
+        if matches!(self, Self::ProfileVersionReplaced { .. }) {
+            return "ProfileVersionReplaced".to_owned();
+        }
+        let text = self.to_string();
+        text.split(':').next().unwrap_or_default().to_owned()
+    }
+
     /// The fields at fault, as JSON pointers into the request body; none
     /// when the refusal is not about a field.
     pub fn fields(&self) -> Vec<crate::apps_error::Field> {
@@ -151,7 +119,6 @@ impl ServerError {
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::Inactive { .. }
-            | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
@@ -159,8 +126,7 @@ impl ServerError {
             | Self::MachineNotForAgent
             | Self::SecondFactorUnsupported
             | Self::NotPermitted { .. }
-            | Self::ReviewerOnly
-            | Self::McpBeyondRemit { .. } => StatusCode::FORBIDDEN,
+            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::McpServerUnknown { .. }
             | Self::GrantNotVisible
@@ -197,7 +163,6 @@ impl ServerError {
             | Self::ProfileNotReviewed { .. }
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
-            | Self::MachineWithoutRunner
             | Self::LaunchUnrenderable { .. }
             | Self::HarnessUndeclared { .. }
             | Self::McpHandleUnsupported { .. }
@@ -260,7 +225,6 @@ impl ServerError {
             Self::Goal(error) => error.status(),
             Self::Team(error) => error.status(),
             Self::Budget(error) => error.status(),
-            Self::Holding(error) => error.status(),
         }
     }
 }

@@ -7,8 +7,8 @@ use lys_openapi::{Auth, Method};
 
 use crate::openapi_refusals::{
     ADMIN, ADMIN_BODY, AGENT, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE, GRANT_READ,
-    MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, REPORTING, RESTART, SIGNED, SIGNED_BODY,
-    START_BUDGET, START_RUNNER, UNANSWERED,
+    MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, RESTART, SIGNED, SIGNED_BODY, START_BUDGET,
+    START_RUNNER, UNANSWERED,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -50,11 +50,10 @@ macro_rules! entries {
 pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
     GET "/login" "Redirect to the sign-in screen" P [];
-    GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown", "SignInFailed", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
+    GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]];
-    POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]];
-    POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING];
+    POST "/agents" "Register an agent" A [ADMIN_BODY, &["credential_refused", "ServiceAccountUnknown", "NotHeld"]];
     GET "/identities" "Every identity the directory holds" S [ADMIN];
     GET "/identities/{id}" "One identity" S [ADMIN];
     POST "/identities/{id}/profile" "Change an identity's profile" S [ADMIN_BODY];
@@ -66,14 +65,14 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/directory/people" "Every person, for the administrator" S [ADMIN, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/directory/agents/{id}" "Any agent, for the administrator" S [ADMIN, &["AgentNotVisible"]];
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]];
-    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused"]];
+    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly"]];
     GET "/grants/model" "Lys's own permission model" S [SIGNED];
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused"]];
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]];
     POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, UNANSWERED, &["NotHeld"]];
     POST "/grants/who" "Who may act on a resource" S [GRANT_ASKED, UNANSWERED];
     POST "/grants/reach" "Who may act on each of many resources" S [GRANT_ASKED, UNANSWERED];
-    GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown", "NotHolder", "IdentityNotActive"]];
+    GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown"]];
     GET "/grants/{id}" "One grant the caller may see" S [GRANT_READ, &["GrantIdMalformed"]];
     POST "/grants/{id}/revoke" "Revoke a grant and all it derives" S [GRANT_READ, RECORDED, &["GrantUnknown", "RevokeRefused"]];
     GET "/receipts/{index}" "A directory receipt, publicly" P [&["RequestMalformed"]];
@@ -104,14 +103,13 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
     POST "/network/machines/{id}/agents" "Allow or remove one agent on a computer" S [ADMIN_BODY, MACHINE_AGENTS, &["NoPerson", "IdentifierMalformed", "AgentNotVisible", "MachineUnknown", "MachineRetired", "MachineWithoutRuntime", "NetworkUnavailable", "RuntimeUnavailable"]];
     GET "/agents/{id}/provisioning" "An agent's profile" S [SIGNED, &["AgentNotVisible"]];
-    GET "/agents/{id}/mcp-requests" "An agent's MCP requests" S [SIGNED, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProvisioningReused"]];
-    POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProvisioningReused", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]];
-    POST "/agents/{id}/mcp-requests/{request}/approve" "Approve an MCP request within remit" G [SIGNED_BODY, AGENT, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "TeamsUnavailable", "ProfileNotReviewed", "ProvisioningReused", "RequestUnknown", "RequestDecided", "RequestReused", "mcp_beyond_remit", "mcp_server_held", "McpSettingUnrepresentable"]];
+    GET "/agents/{id}/mcp-requests" "An agent's pending MCP requests" S [SIGNED, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable"]];
+    POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]];
     POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]];
     GET "/skills" "The skills Lys keeps" S [SIGNED];
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY];
     POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, PROFILE_REVIEW];
-    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], &["SecretsUnavailable"], START_RUNNER, START_BUDGET];
+    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], START_RUNNER, START_BUDGET];
     POST "/agents/{id}/restart" "Restart an agent on its latest reviewed profile" S [SIGNED_BODY, RESTART];
     POST "/agents/{id}/runtime/sessions/{session}/reports" "A runtime report" G [AGENT, &["NotAdmitted"], &["AgentNotVisible", "RequestMalformed", "RuntimeSessionUnknown"]];
     GET "/agents/{id}/runtime/sessions" "An agent's runtime sessions" S [SIGNED, &["AgentNotVisible"]];
@@ -123,9 +121,9 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
     POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
     GET "/budgets/{kind}/{id}" "A holder's limits and measured usage" S [SIGNED, BUDGET_READ];
-    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
+    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
     GET "/teams/{id}/budget" "A team's limits and measured usage" S [SIGNED, BUDGET_READ];
-    PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
+    PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
     POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
     GET "/agents/{id}/refusals" "An agent's refused tool calls" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/input-bytes" "Write exact bytes to a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
@@ -141,8 +139,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/network/machines/{id}/runner" "A machine's runner" S [SIGNED, &["MachineUnknown"]];
     POST "/network/machines/{id}/runner" "Name a machine's runner" S [ADMIN_BODY, &["MachineUnknown"]];
     GET "/runner/protocol" "The runner protocol" P [];
-    POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
-    POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
+    POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale"]];
+    POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale"]];
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
     GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown"]];
     POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown", "RuntimeUnavailable", "ProvisioningUnavailable"]];
@@ -150,21 +148,21 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]];
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
     GET "/oauth/authorize" "Begin an authorization" P [&["RedirectUnregistered"]];
-    POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable"]];
+    POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUsed", "RedirectUnregistered", "VerifierWrong"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
-    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable"]];
-    POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
+    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED];
+    POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
-    POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused", "DirectoryUnavailable"]];
-    POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
-    POST "/setup/password" "Set the first administrator's password" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
+    POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused"]];
+    POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused"]];
+    POST "/setup/password" "Set the first administrator's password" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused"]];
     GET "/me/account" "The caller's sign-in account" C [SIGNED, &["AccountRefused"]];
     POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY, &["AccountRefused"]];
     POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
     GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN, &["AccountRefused", "IdentityUnknown"]];
     POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
-    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown", "SessionsUnavailable", "ProviderUnavailable"]];
+    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
     POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
     GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]];
     POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused", "reminder_needs_deadline"]];
@@ -205,11 +203,9 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]];
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]];
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn"], &["CertificateWithdrawn"]];
-    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable"]];
-    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable"]];
+    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET];
+    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY];
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY];
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED];
-    GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]];
-    GET "/surface-contract" "The surface registration and computer admission contract" P [];
     GET "/openapi.json" "This document" P [];
 };

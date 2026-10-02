@@ -15,16 +15,6 @@ pub(crate) const ADMIN: &[&str] = &["NotSignedIn", "NotAdmitted"];
 pub(crate) const ADMIN_BODY: &[&str] = &["NotSignedIn", "NotAdmitted", "RequestMalformed"];
 /// An allowance operation reused for different words.
 pub(crate) const MACHINE_AGENTS: &[&str] = &["MachineAgentsReused"];
-/// A reporting edge must resolve to an active accountable person.
-pub(crate) const REPORTING: &[&str] = &[
-    "IdentifierMalformed",
-    "AnswersToUnknown",
-    "AnswersToInactive",
-    "AnswersToCycle",
-    "NoAccountablePerson",
-    "OperationReused",
-    "IdentityUnknown",
-];
 /// A signed-in person bound to a person.
 pub(crate) const PERSON: &[&str] = &["NotSignedIn", "NoPerson"];
 /// A grant the caller may see.
@@ -57,7 +47,7 @@ pub(crate) const UNANSWERED: &[&str] = &[
     "StaleDecision",
 ];
 /// An agent's signed request.
-pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused", "CertificatesUnavailable"];
+pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused"];
 /// A registration.
 pub(crate) const REGISTER: &[&str] = &[
     "NotHeld",
@@ -69,17 +59,12 @@ pub(crate) const REGISTER: &[&str] = &[
     "app_exists",
     "redirect_invalid",
     "credential_refused",
-    "ServiceAccountsUnavailable",
     "app_operation_reused",
 ];
 /// An app the caller may see.
 pub(crate) const APP_READ: &[&str] = &["NotSignedIn", "app_unknown", "credential_refused"];
 /// An app's own sign-in.
-pub(crate) const APP_SELF: &[&str] = &[
-    "credential_refused",
-    "ServiceAccountsUnavailable",
-    "app_retired",
-];
+pub(crate) const APP_SELF: &[&str] = &["credential_refused", "app_retired"];
 /// A decision on a registration.
 pub(crate) const DECIDE: &[&str] = &[
     "NotAdmitted",
@@ -119,7 +104,6 @@ pub(crate) const BATCH: &[&str] = &[
     "RequestMalformed",
     "batch_too_large",
     "credential_refused",
-    "ServiceAccountsUnavailable",
 ];
 /// The ids a subject may act on.
 pub(crate) const WHICH: &[&str] = &[
@@ -134,9 +118,6 @@ pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
 
 /// A start and the status read that settles an already-held session.
 pub(crate) const START_RUNNER: &[&str] = &[
-    "AgentHasNoPolicy",
-    "PolicyUnavailable",
-    "MachineWithoutRunner",
     "runner_request_unsigned",
     "runner_request_malformed",
     "runner_protocol_mismatch",
@@ -161,8 +142,6 @@ pub(crate) const START_RUNNER: &[&str] = &[
 
 /// An operator restart shares the start and runner's named refusals.
 pub(crate) const RESTART: &[&str] = &[
-    "AgentHasNoPolicy",
-    "PolicyUnavailable",
     "AgentNotVisible",
     "AgentNotActive",
     "NotAdmitted",
@@ -177,7 +156,6 @@ pub(crate) const RESTART: &[&str] = &[
     "MachineRetired",
     "MachineUnknown",
     "MachineWithoutRuntime",
-    "MachineWithoutRunner",
     "HarnessUndeclared",
     "LaunchUnrenderable",
     "McpHandleUnsupported",
