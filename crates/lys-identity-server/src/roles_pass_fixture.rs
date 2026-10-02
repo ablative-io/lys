@@ -235,7 +235,8 @@ impl Table {
     }
 
     /// Pass `action` on a role to the agent through a root of the
-    /// person's, answering the status and body of the pass on.
+    /// person's, answering the status and body of the pass on, or of the
+    /// root when it is refused.
     pub(super) async fn give(
         &self,
         resource: &str,
@@ -248,7 +249,9 @@ impl Table {
             "relation":relation, "pass_on":{"kind":"to", "actions":[action], "recipients":["agent"]},
             "window":{"starts_at":0,"ends_at":null}
         })).await?;
-        assert_eq!(status, 200, "{root}");
+        if status != 200 {
+            return Ok((status, root));
+        }
         self.service.post("/grants", Some(&self.cookie), &json!({
             "operation":operation()?, "route":"api", "source":root["grant"], "recipient":self.agent,
             "responsible":self.person, "resource":resource, "relation":relation,
