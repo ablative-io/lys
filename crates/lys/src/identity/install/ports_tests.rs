@@ -18,7 +18,10 @@ fn an_upgrade_keeps_listeners_from_the_existing_configuration()
     let existing = serde_json::json!({
         "listen": "127.0.0.1:19001", "secrets": {"broker": "http://127.0.0.1:19002"},
     });
-    std::fs::write(layout.service_config(), existing.to_string())?;
+    crate::identity::private_files::write(
+        &layout.service_config(),
+        existing.to_string().as_bytes(),
+    )?;
     let carried = server_config::carried(&layout)?.ok_or("configuration missing")?;
     assert_eq!(carried.ports.service, 19001);
     assert_eq!(carried.ports.broker, 19002);
@@ -43,5 +46,17 @@ fn an_upgrade_keeps_listeners_from_the_existing_configuration()
         "http://localhost:19001/api/callback"
     );
     assert_eq!(carried.ports.setup_url(), "http://localhost:19001/setup");
+    Ok(())
+}
+
+#[test]
+fn an_earlier_install_without_listener_choices_keeps_the_defaults()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = tempfile::tempdir()?;
+    let layout = Layout::at(root.path().to_path_buf());
+    crate::identity::private_files::write(&layout.service_config(), b"{}")?;
+    let ports = Ports::load(&layout)?;
+    assert_eq!(ports.service, 8490);
+    assert_eq!(ports.broker, 8472);
     Ok(())
 }
