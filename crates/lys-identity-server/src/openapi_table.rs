@@ -131,6 +131,7 @@ mod tests;
 /// Every route of the table; `openapi_types.rs` names the types each takes and answers.
 pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
+    GET "/health" "That this service is serving, with its name and build" P [];
     GET "/login" "Redirect to the sign-in screen" P [];
     GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown", "SignInFailed", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];

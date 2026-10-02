@@ -97,6 +97,7 @@ pub mod grants_batch;
 pub mod grants_reach;
 pub mod grants_refusals;
 pub mod harness_catalogue;
+pub mod health_api;
 mod import_api;
 mod import_bootstrap;
 mod import_bootstrap_state;
