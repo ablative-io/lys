@@ -85,8 +85,14 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     }
     return [...groups.values()];
   }, [options, resourceLabels]);
-  const unpickable = grants.model ? grants.grants.some((grant) => grant.holder === person && grant.actions.some((action) =>
-    !grant.resource.kind.includes('.') && !withheldFromAgents(grants.model)?.includes(action) && !singleActionCarriers(grants.model!).has(action))) : false;
+  const unpickable = useMemo(() => {
+    const model = grants.model;
+    const withheld = withheldFromAgents(model);
+    if (!model || withheld === null) return false;
+    const relations = singleActionCarriers(model);
+    return grants.grants.some((grant) => grant.holder === person && grant.actions.some((action) =>
+      !grant.resource.kind.includes('.') && !withheld.includes(action) && !relations.has(action)));
+  }, [grants, person]);
   const unavailable = !capability.answersTo && person !== me.person.id;
   const unsupported = unavailable ? pending || walk ? 'Your saved request names another person or agent. This service cannot accept that choice; the saved request has not been sent.' : 'This service cannot register an agent under that person or agent.' : '';
   const taken = pending || walk ? undefined : names.get(name.trim().toLowerCase());
