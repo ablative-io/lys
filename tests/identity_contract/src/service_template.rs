@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::{self, File};
+use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Instant;
@@ -18,12 +19,33 @@ fn executable_hash() -> Result<&'static str, Failure> {
     static HASH: OnceLock<Result<String, String>> = OnceLock::new();
     HASH.get_or_init(|| {
         std::env::current_exe()
-            .and_then(|path| template_files::hash_file(&path))
+            .and_then(|path| program_hash(&path))
             .map_err(|error| format!("service template executable hash: {error}"))
     })
     .as_ref()
     .map(String::as_str)
     .map_err(|error| error.as_str().into())
+}
+
+fn program_hash(path: &Path) -> io::Result<String> {
+    let mut input = io::BufReader::with_capacity(256 * 1024, File::open(path)?);
+    let mut hash = ring::digest::Context::new(&ring::digest::SHA256);
+    loop {
+        let bytes = input.fill_buf()?;
+        if bytes.is_empty() {
+            break;
+        }
+        hash.update(bytes);
+        let count = bytes.len();
+        input.consume(count);
+    }
+    let digest = hash.finish();
+    let mut encoded = String::with_capacity(64);
+    for byte in digest.as_ref() {
+        std::fmt::Write::write_fmt(&mut encoded, format_args!("{byte:02x}"))
+            .map_err(io::Error::other)?;
+    }
+    Ok(encoded)
 }
 
 fn cache_dir() -> Result<PathBuf, Failure> {
@@ -73,6 +95,85 @@ fn absent(path: &Path) -> std::io::Result<bool> {
     }
 }
 
+fn missing_targets(paths: Vec<(&str, PathBuf)>) -> std::io::Result<Vec<(&str, PathBuf)>> {
+    let mut missing = Vec::with_capacity(paths.len());
+    for (name, target) in paths {
+        if absent(&target)? {
+            missing.push((name, target));
+        }
+    }
+    Ok(missing)
+}
+
+fn build_stores(paths: &[(&str, PathBuf)], stores: &Path, config: &Config) -> Result<(), Failure> {
+    let lanes = paths.len().min(4);
+    let mut failures = Vec::new();
+    std::thread::scope(|scope| {
+        let mut workers = Vec::with_capacity(lanes);
+        for lane in 0..lanes {
+            let worker = std::thread::Builder::new()
+                .name(format!("fixture-store-{lane}"))
+                .spawn_scoped(scope, move || {
+                    let mut failures = Vec::new();
+                    for (name, _) in paths.iter().skip(lane).step_by(lanes) {
+                        if let Err(error) = template_stores::build(name, &stores.join(name), config)
+                        {
+                            failures.push(format!("service_template_store_failed {name}: {error}"));
+                        }
+                    }
+                    failures
+                });
+            match worker {
+                Ok(worker) => {
+                    workers.push(worker);
+                }
+                Err(error) => {
+                    failures.push(format!("service_template_worker_start_failed: {error}"));
+                }
+            }
+        }
+        for worker in workers {
+            match worker.join() {
+                Ok(errors) => {
+                    failures.extend(errors);
+                }
+                Err(error) => {
+                    failures.push(format!("service_template_worker_panicked: {error:?}"));
+                }
+            }
+        }
+    });
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("; ").into())
+    }
+}
+
+fn cache_lock(path: &Path) -> io::Result<File> {
+    let lock = File::options()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(path)?;
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockShared)?;
+    Ok(lock)
+}
+
+fn needs_build(lock: &File, ready: &Path) -> io::Result<bool> {
+    if ready.try_exists()? {
+        return Ok(false);
+    }
+    // Release the reader before claiming publication, then recheck what another publisher did.
+    rustix::fs::flock(lock, rustix::fs::FlockOperation::Unlock)?;
+    rustix::fs::flock(lock, rustix::fs::FlockOperation::LockExclusive)?;
+    let missing = !ready.try_exists()?;
+    if !missing {
+        rustix::fs::flock(lock, rustix::fs::FlockOperation::LockShared)?;
+    }
+    Ok(missing)
+}
+
 pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
     let mut paths = template_stores::paths(config);
     // Existing application logs deliberately ignore the model file, including
@@ -82,33 +183,23 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error.into()),
     }
-    let mut missing = false;
-    for (_, target) in &paths {
-        missing |= absent(target)?;
-    }
-    if !missing {
+    let paths = missing_targets(paths)?;
+    if paths.is_empty() {
         return Ok(());
     }
     let key = fingerprint(config, &paths)?;
     let cache = cache_dir()?;
     fs::create_dir_all(&cache)?;
-    let lock = File::options()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(cache.join(format!("{key}.lock")))?;
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
+    let lock = cache_lock(&cache.join(format!("{key}.lock")))?;
     let ready = cache.join(&key);
-    if !ready.try_exists()? {
+    if needs_build(&lock, &ready)? {
         let started = Instant::now();
         let stage = tempfile::Builder::new()
             .prefix("building-")
             .tempdir_in(&cache)?;
         let stores = stage.path().join("stores");
         fs::create_dir(&stores)?;
-        for (name, _) in &paths {
-            template_stores::build(name, &stores.join(name), config)?;
-        }
+        build_stores(&paths, &stores, config)?;
         let files = template_files::inventory(&stores)?;
         fs::write(
             stage.path().join("manifest.json"),
@@ -120,6 +211,7 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
             paths.len(),
             started.elapsed()
         );
+        rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockShared)?;
     }
     let expected: BTreeMap<String, String> =
         serde_json::from_slice(&fs::read(ready.join("manifest.json"))?)?;
@@ -143,4 +235,107 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cold_publication_excludes_readers_and_a_published_cache_needs_no_second_build()
+    -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("cache.lock");
+        let ready = dir.path().join("cache");
+        let first = cache_lock(&path)?;
+        assert!(needs_build(&first, &ready)?);
+        let second = File::options().write(true).open(&path)?;
+        assert!(
+            rustix::fs::flock(&second, rustix::fs::FlockOperation::NonBlockingLockShared).is_err()
+        );
+        fs::create_dir(&ready)?;
+        drop(first);
+        let cached = cache_lock(&path)?;
+        assert!(!needs_build(&cached, &ready)?);
+        rustix::fs::flock(&second, rustix::fs::FlockOperation::NonBlockingLockShared)?;
+        drop(cached);
+        Ok(())
+    }
+
+    #[test]
+    fn warm_cache_verification_does_not_exclude_another_reader() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("cache.lock");
+        let first = cache_lock(&path)?;
+        let second = File::options().write(true).open(&path)?;
+        let shared = rustix::fs::flock(&second, rustix::fs::FlockOperation::NonBlockingLockShared);
+        assert!(
+            shared.is_ok(),
+            "parallel cache verification refused: {shared:?}"
+        );
+        drop(first);
+        Ok(())
+    }
+
+    #[test]
+    fn program_hash_reads_every_byte_across_its_buffer_boundary() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("program");
+        let mut bytes = vec![13; 256 * 1024 * 2 + 1];
+        for content in [&b""[..], &b"abc"[..], &bytes] {
+            fs::write(&path, content)?;
+            assert_eq!(program_hash(&path)?, template_files::hash_file(&path)?);
+        }
+        bytes[256 * 1024 * 2] = 17;
+        fs::write(&path, bytes)?;
+        assert_eq!(program_hash(&path)?, template_files::hash_file(&path)?);
+        Ok(())
+    }
+
+    #[test]
+    fn caller_prepared_stores_are_not_rebuilt() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let prepared = dir.path().join("prepared");
+        fs::create_dir(&prepared)?;
+        fs::write(prepared.join("snapshot.bin"), b"old format")?;
+        let broken = dir.path().join("broken");
+        fs::write(&broken, b"invalid store")?;
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink("missing", &link)?;
+        let missing = dir.path().join("new");
+        let paths = missing_targets(vec![
+            ("prepared", prepared.clone()),
+            ("broken", broken.clone()),
+            ("link", link.clone()),
+            ("new", missing.clone()),
+        ])?;
+        assert_eq!(paths, vec![("new", missing)]);
+        assert_eq!(fs::read(prepared.join("snapshot.bin"))?, b"old format");
+        assert_eq!(fs::read(broken)?, b"invalid store");
+        assert_eq!(fs::read_link(link)?, Path::new("missing"));
+        Ok(())
+    }
+
+    #[test]
+    fn target_metadata_failure_is_not_an_absent_store() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let file = dir.path().join("file");
+        fs::write(&file, b"regular file")?;
+        let result = missing_targets(vec![
+            ("new", dir.path().join("new")),
+            ("invalid", file.join("child")),
+        ]);
+        assert_eq!(
+            result.err().map(|error| error.kind()),
+            Some(std::io::ErrorKind::NotADirectory)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_install_needs_no_template() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        assert!(missing_targets(vec![("prepared", dir.path().to_owned())])?.is_empty());
+        Ok(())
+    }
 }
