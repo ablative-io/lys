@@ -25,24 +25,6 @@ mod bench;
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 
-fn model() -> Result<Model, Box<dyn std::error::Error>> {
-    let carries = |relation: &str, actions: &[&str]| -> Result<_, Box<dyn std::error::Error>> {
-        let actions = actions
-            .iter()
-            .map(|action| Action::new(action))
-            .collect::<Result<BTreeSet<_>, _>>()?;
-        Ok((Relation::new(relation)?, actions))
-    };
-    Ok(Model::new(
-        1,
-        [
-            carries("owner", &["view", "edit", "grant"])?,
-            carries("editor", &["view", "edit"])?,
-            carries("viewer", &["view"])?,
-        ],
-    )?)
-}
-
 const MODEL: &str = r#"{"version":1,"relations":{"owner":["view","edit","grant"],"editor":["view","edit"],"viewer":["view"]}}"#;
 
 const BEA: &str = "bea-subject";
@@ -55,8 +37,10 @@ fn settings(mirror: &str) -> Result<SpiceDbSettings, Box<dyn std::error::Error>>
     })
 }
 
+/// The live engine, on the shipped model: every live test writes the same
+/// schema, so none takes away a relation another is checking.
 fn engine() -> Result<SpiceDb, Box<dyn std::error::Error>> {
-    Ok(SpiceDb::open(&settings("proof_live")?, &model()?)?)
+    Ok(SpiceDb::open(&settings("proof_live")?, &shipped()?)?)
 }
 
 fn login(subject: &str) -> Login {
@@ -197,7 +181,7 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
     assert_eq!(status, 200, "{issued}");
     let grant = issued["grant"].as_str().ok_or("no grant")?.to_owned();
 
-    let database = SpiceDb::open(&mirror, &model()?)?;
+    let database = SpiceDb::open(&mirror, &shipped()?)?;
     let resource = Resource::new("document", &name)?;
     let person = IdentityId::Person(bea);
     assert!(
@@ -310,5 +294,49 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
         after.contains("definition fixture_notes/channel"),
         "the service's own app kinds stand beside them: {after}"
     );
+    Ok(())
+}
+
+/// The model Lys ships, every dotted action and `only.` relation in it.
+fn shipped() -> Result<Model, Box<dyn std::error::Error>> {
+    let file: serde_json::Value = serde_json::from_str(&lys_identity::grants::shipped_model())?;
+    let mut relations = Vec::new();
+    for (relation, actions) in file["relations"].as_object().ok_or("no relations")? {
+        let actions = actions
+            .as_array()
+            .ok_or("no actions")?
+            .iter()
+            .map(|action| Action::new(action.as_str().unwrap_or_default()))
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        relations.push((Relation::new(relation)?, actions));
+    }
+    Ok(Model::new(
+        file["version"].as_u64().ok_or("no version")?,
+        relations,
+    )?)
+}
+
+#[test]
+fn the_engine_takes_the_shipped_model_and_a_dotted_grant_gives_its_one_act() -> Outcome {
+    let mut engine = SpiceDb::open(&settings("proof_live_shipped")?, &shipped()?)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let run = format!("{}-{now}", std::process::id());
+    let holder = PersonId::generate()?;
+    let resource = Resource::new("document", &format!("dotted-{run}.txt"))?;
+    let grant = ObjectRef {
+        kind: "grant".to_owned(),
+        id: format!("grant-dotted-{run}"),
+    };
+    let mut held = grant_of(&grant, holder, &resource, now + 3600);
+    held[2].relation = "only.person.profile.set".to_owned();
+    let person = IdentityId::Person(holder);
+    let start = engine.revision()?;
+    engine.write(start + 1, &held, &[])?;
+    assert!(engine.check(&resource, &Action::new("person.profile.set")?, person, now)?);
+    assert!(!engine.check(&resource, &Action::new("person.email.set")?, person, now)?);
+    let read = engine.read()?;
+    assert!(held.iter().all(|relationship| read.contains(relationship)));
+    engine.write(start + 2, &[], &held)?;
+    assert!(!engine.check(&resource, &Action::new("person.profile.set")?, person, now)?);
     Ok(())
 }
