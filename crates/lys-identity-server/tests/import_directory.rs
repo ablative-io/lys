@@ -25,6 +25,7 @@ fn credential() -> String {
     format!("lys-registrar.{ACCOUNT}.{}", "ab".repeat(32))
 }
 
+#[derive(Clone, Copy)]
 enum Seed {
     Administrator,
     SecondPerson,
