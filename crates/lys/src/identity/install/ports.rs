@@ -114,18 +114,24 @@ impl Ports {
             .and_then(|issuer| issuer.get("public_origin"))
             .and_then(toml::Value::as_str)
             .ok_or_else(|| refused("issuer.public_origin"))?;
-        let (_, number) = origin
-            .trim_end_matches('/')
-            .rsplit_once(':')
-            .ok_or_else(|| refused("issuer.public_origin"))?;
-        let service = number.parse::<u16>().map_err(|error| {
-            IdentityError::new(
-                ErrorKind::ConfigInvalid,
-                "read listeners",
-                "issuer.public_origin",
-                error.to_string(),
-            )
-        })?;
+        // A proxy's public origin does not record the local listener.
+        let direct = origin.strip_prefix("http://").and_then(|authority| {
+            let (host, number) = authority.trim_end_matches('/').rsplit_once(':')?;
+            ["localhost", "127.0.0.1", "[::1]"]
+                .contains(&host)
+                .then_some(number)
+        });
+        let service = match direct {
+            Some(number) => number.parse::<u16>().map_err(|error| {
+                IdentityError::new(
+                    ErrorKind::ConfigInvalid,
+                    "read listeners",
+                    "issuer.public_origin",
+                    error.to_string(),
+                )
+            })?,
+            None => SERVICE_PORT,
+        };
         Self {
             service,
             service_recorded: true,
