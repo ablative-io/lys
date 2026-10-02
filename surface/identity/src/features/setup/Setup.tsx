@@ -67,7 +67,7 @@ function CodeEntry({ refusal, take }: { refusal: string; take: (code: string) =>
     <div className="field">
       <label htmlFor="setup-code">Setup code</label>
       <input id="setup-code" name="code" autoComplete="off" spellCheck={false} required aria-describedby="setup-code-where" />
-      <p id="setup-code-where" className="note">The install put it in a file named setup-code, in the folder Lys is installed in on the machine Lys runs on; the install’s output names that file. Only the account that ran the install can read it.</p>
+      <p id="setup-code-where" className="note">The setup code is in the file named setup-code in the folder the install printed. Use the full path shown on the line “the setup code is in …”. Only the account that ran the install can read it. The copy under state/ is a verification record, not the code.</p>
     </div>
     {why ? <p role="alert" className="why-not">{why}</p> : null}
     <button className="btn primary" type="submit">Check the code</button>
