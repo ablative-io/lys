@@ -146,12 +146,12 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let run = format!("{}_{now}", std::process::id());
     let mirror = settings(&format!("proof_service_{run}"))?;
+    drop(SpiceDb::open(&mirror, &shipped()?)?);
     let (service, seeded) =
         Service::start_judging(&live_model()?, Some(mirror.clone()), |config| {
             Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
         })
         .await?;
-    full_schema(&mirror).await?;
     let bea = seeded.people[1].id;
     let ada_cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea_cookie = service.sign_in(login(BEA)).await?;
@@ -163,6 +163,7 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
         .post("/grants/check", Some(&bea_cookie), &question)
         .await?;
     assert_eq!(status, 403, "nothing is granted yet: {refused}");
+    full_schema(&mirror).await?;
 
     let (status, issued) = service
         .post(
@@ -264,6 +265,7 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let run = format!("{}_{now}", std::process::id());
     let engine = settings(&format!("proof_bench_{run}"))?;
+    drop(SpiceDb::open(&engine, &shipped()?)?);
     let broker = identity_contract::app_custody::start().await?;
     let (service, seeded) = Service::start_adjusted(
         &live_model()?,
@@ -280,7 +282,6 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
         |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
     .await?;
-    full_schema(&engine).await?;
     let left = "lys/bdeadbeefdeadbeef";
     let held = held_schema(&engine).await?;
     let planted = format!("{held}\n\ndefinition {left}/person {{}}\n");
@@ -289,6 +290,7 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
     let bea = seeded.people[1].id.to_string();
 
     bench::answers_as_saved(&service, &admin, &bea).await?;
+    full_schema(&engine).await?;
 
     let after = held_schema(&engine).await?;
     assert!(
