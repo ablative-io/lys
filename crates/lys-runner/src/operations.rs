@@ -38,6 +38,7 @@ use delivery::{feed, stop};
 #[path = "../tests/operations_index/cases.rs"]
 mod index_tests;
 mod restart;
+mod withdraw;
 pub(crate) use restart::{begin_restart, finish_restart};
 
 /// The format of the record of operations.

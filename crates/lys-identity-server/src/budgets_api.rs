@@ -260,6 +260,11 @@ async fn set(
     let agents = crate::budgets_members::covered(&holder, &standings);
     let at_ms = jiff::Timestamp::now().as_millisecond();
     crate::budgets_giving::append(&state, &giver, limits, body.version, &zone, &agents, at_ms)?;
+    if let Err(error) = crate::budgets_rejudge::rejudge(&state).await {
+        (state.say)(&format!(
+            "budgets: the compactions waiting under the old budget were not judged again: {error}"
+        ));
+    }
     view(&state, &holder).map(Json)
 }
 

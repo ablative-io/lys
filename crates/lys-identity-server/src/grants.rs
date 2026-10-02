@@ -332,14 +332,10 @@ pub(crate) fn decide<S: LeafStore>(
         let decided = engine_permits(judged.grants, judged.directory, &asked, at)
             .and_then(|()| token_only(judged, &asked, at, at_least))
             .and_then(|()| match decision {
-                    Decision::Exercise => {
-                        judged.grants.check(judged.directory, &asked, at, at_least)
-                    }
-                Decision::Explain => {
-                    judged
-                        .grants
-                        .explain(judged.directory, &asked, at, at_least)
-                }
+                Decision::Exercise => judged.grants.check(judged.directory, &asked, at, at_least),
+                Decision::Explain => judged
+                    .grants
+                    .explain(judged.directory, &asked, at, at_least),
             });
         match decided {
             Ok(permit) => return Ok((permit, resource)),

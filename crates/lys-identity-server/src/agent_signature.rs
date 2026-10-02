@@ -164,7 +164,9 @@ pub(crate) async fn token_scoped<F: std::future::Future>(
     principal: TokenPrincipal,
     work: F,
 ) -> F::Output {
-    TOKEN_GRANT.scope((principal.holder, principal.grant), work).await
+    TOKEN_GRANT
+        .scope((principal.holder, principal.grant), work)
+        .await
 }
 
 /// The only grant `caller` may be permitted by in the call being served,
@@ -173,7 +175,9 @@ pub(crate) fn token_grant(
     caller: lys_identity::IdentityId,
 ) -> Option<lys_identity::grants::GrantId> {
     TOKEN_GRANT
-        .try_with(|(holder, grant)| (lys_identity::IdentityId::Agent(*holder) == caller).then_some(*grant))
+        .try_with(|(holder, grant)| {
+            (lys_identity::IdentityId::Agent(*holder) == caller).then_some(*grant)
+        })
         .ok()
         .flatten()
 }

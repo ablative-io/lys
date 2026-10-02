@@ -171,7 +171,8 @@ pub(super) async fn authorize(
         })
         .collect();
     let choices = if choices.is_empty() {
-        "<p>You hold nothing you can pass on to an agent yet, so it starts with no permissions.</p>".to_owned()
+        "<p>You hold nothing you can pass on to an agent yet, so it starts with no permissions.</p>"
+            .to_owned()
     } else {
         format!("<p>Choose what it may do for you:</p><p>{choices}</p>")
     };

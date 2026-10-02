@@ -46,6 +46,7 @@ pub mod budgets_legacy;
 pub mod budgets_limits;
 pub mod budgets_members;
 pub mod budgets_migration;
+mod budgets_rejudge;
 pub mod budgets_state;
 pub mod budgets_store;
 mod budgets_totals;

@@ -60,3 +60,30 @@ pub async fn operate(
     }
     Ok(outcome)
 }
+
+/// Withdraw an accepted `operation` of `session` before its boundary,
+/// answering how it then stands; a runner refusal (the operation already
+/// being typed, or unknown) is final.
+pub async fn withdraw(
+    state: &Arc<AppState>,
+    session: &str,
+    operation: &str,
+    why: &str,
+) -> Result<OperationOutcome, Undelivered> {
+    let driven = driven(state, session).map_err(|error| Undelivered::Refused(error.to_string()))?;
+    let act = Act::Withdraw {
+        operation: operation.to_owned(),
+        why: why.to_owned(),
+    };
+    match crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await {
+        Ok(Answer::Operation { outcome }) => Ok(outcome),
+        Ok(other) => Err(Undelivered::Unknown(format!(
+            "the runner answered {} to a withdrawal",
+            kind(&other)
+        ))),
+        Err(ServerError::Runner { refusal, words }) if !refusal.starts_with("runner_") => {
+            Err(Undelivered::Refused(format!("{refusal}: {words}")))
+        }
+        Err(other) => Err(Undelivered::Unknown(other.to_string())),
+    }
+}

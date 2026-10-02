@@ -149,6 +149,9 @@ pub(super) fn perform(
             "grant_channel_unheld",
             "a grant channel is held only as the whole of its connection",
         )),
+        Act::Withdraw { operation, why } => sessions
+            .withdraw(&operation, &why)
+            .map(|outcome| Answer::Operation { outcome }),
         Act::Outcome { operation } => sessions
             .outcome(&operation)
             .map(|outcome| Answer::Operation { outcome }),
@@ -187,7 +190,10 @@ fn as_caller(
                 started_at,
             })
         }
-        act @ (Act::Input { .. } | Act::InputBytes { .. } | Act::Keys { .. } | Act::Operate { .. }) => {
+        act @ (Act::Input { .. }
+        | Act::InputBytes { .. }
+        | Act::Keys { .. }
+        | Act::Operate { .. }) => {
             let judge = |_signed: &crate::injection::InputGrant<'_>| Ok::<(), RunnerError>(());
             let context = crate::legacy_input::InputContext {
                 sender: caller,

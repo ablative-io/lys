@@ -40,7 +40,9 @@ pub(crate) fn offers(state: &AppState, person: PersonId) -> Result<Vec<Offer>, S
         let mut offers = Vec::new();
         for record in judged.grants.book().records() {
             let grant = record.grant();
-            if grant.holder() != holder || record.revoked().is_some() || !grant.window().contains(at)
+            if grant.holder() != holder
+                || record.revoked().is_some()
+                || !grant.window().contains(at)
             {
                 continue;
             }

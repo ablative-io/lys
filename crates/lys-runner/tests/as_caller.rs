@@ -82,7 +82,10 @@ fn a_session_started_for_a_person_takes_input_only_for_a_verified_caller() -> Te
     );
 
     let delivered = ask(&for_caller("person.owner", typed()))?;
-    assert!(matches!(delivered, Answer::Delivered { .. }), "{delivered:?}");
+    assert!(
+        matches!(delivered, Answer::Delivered { .. }),
+        "{delivered:?}"
+    );
 
     for act in [
         for_caller("person.owner", for_caller("person.owner", typed())),
@@ -99,6 +102,54 @@ fn a_session_started_for_a_person_takes_input_only_for_a_verified_caller() -> Te
     assert!(
         matches!(&empty, Answer::Refused { refusal, .. } if refusal == "InjectionSenderInvalid"),
         "{empty:?}"
+    );
+    sessions.stop_all()?;
+    Ok(())
+}
+
+#[test]
+fn only_an_operation_still_waiting_for_its_boundary_can_be_withdrawn() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+    let server = key.public_key_bytes();
+    std::fs::create_dir_all(dir.path().join("state"))?;
+    let sessions = Sessions::open(&dir.path().join("state"), 4096)?;
+    let greeting = Greeting::fresh("22");
+    let left = AtomicBool::new(false);
+    let ask = |act: &Act| -> Result<Answer, Box<dyn Error>> {
+        Ok(dispatch(
+            &sessions,
+            &server,
+            &greeting,
+            &sign_request(&key, &greeting, act)?,
+            &left,
+        ))
+    };
+    let unknown = ask(&Act::Withdraw {
+        operation: "never-asked".to_owned(),
+        why: "re-judged".to_owned(),
+    })?;
+    assert!(
+        matches!(&unknown, Answer::Refused { refusal, .. } if refusal == "operation_unknown"),
+        "{unknown:?}"
+    );
+    sessions.start(launch())?;
+    let notice = lys_runner::operations::Operation {
+        operation: "notice-typed".to_owned(),
+        session: "owned".to_owned(),
+        request: lys_runner::operations::OperationRequest::Notice {
+            text: "a notice".to_owned(),
+        },
+    };
+    let typed = ask(&Act::Operate { operation: notice })?;
+    assert!(matches!(typed, Answer::Operation { .. }), "{typed:?}");
+    let late = ask(&Act::Withdraw {
+        operation: "notice-typed".to_owned(),
+        why: "re-judged".to_owned(),
+    })?;
+    assert!(
+        matches!(&late, Answer::Refused { refusal, .. } if refusal == "operation_past_its_boundary"),
+        "{late:?}"
     );
     sessions.stop_all()?;
     Ok(())

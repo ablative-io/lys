@@ -150,7 +150,8 @@ pub async fn settle(state: &Arc<AppState>) -> Result<(), ServerError> {
         return Ok(());
     }
     let unsettled = with_budgets(state, |store| Ok(store.held().crossings.unsettled()))?;
-    settle_crossings(state, unsettled).await
+    settle_crossings(state, unsettled).await?;
+    crate::budgets_rejudge::rejudge(state).await
 }
 
 pub(crate) async fn settle_for(state: &Arc<AppState>, agent: &str) -> Result<(), ServerError> {

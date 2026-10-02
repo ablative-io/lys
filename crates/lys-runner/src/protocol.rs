@@ -256,6 +256,14 @@ pub enum Act {
         /// The operation.
         operation: crate::operations::Operation,
     },
+    /// Withdraw an accepted operation the server re-judged before its
+    /// boundary, so it is never typed.
+    Withdraw {
+        /// The operation's id.
+        operation: String,
+        /// Why the server withdrew it.
+        why: String,
+    },
     /// How an operation stands, as the runner's record keeps it.
     Outcome {
         /// The operation's id.
