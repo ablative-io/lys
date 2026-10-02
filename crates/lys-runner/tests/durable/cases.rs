@@ -46,7 +46,18 @@ fn a_blocked_refusal_append_holds_no_session_table_lock() -> Result<(), Box<dyn 
     let mut reader = std::fs::File::open(&path)?;
     let mut first = [0; 1];
     reader.read_exact(&mut first)?;
-    let available = sessions.table.try_lock().is_ok();
+    // The writer can take its first byte to the pipe in the instant before
+    // the caller lets the table go, so one look can land inside that window.
+    // Were the table held across the blocked write it would never come free
+    // while this reader waits, so it is looked at again, a bounded number of
+    // times, rather than once.
+    let available = (0..100_000).any(|_| {
+        let free = sessions.table.try_lock().is_ok();
+        if !free {
+            std::thread::yield_now();
+        }
+        free
+    });
     let mut rest = Vec::new();
     reader.read_to_end(&mut rest)?;
     let verdict = joined

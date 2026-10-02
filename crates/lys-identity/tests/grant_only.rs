@@ -45,7 +45,10 @@ fn read(world: &World) -> Result<ExerciseRequest, Box<dyn Error>> {
 #[test]
 fn a_decision_held_to_one_grant_exercises_that_grant_and_no_other() -> TestResult {
     let mut world = World::new()?;
-    assert!(world.now >= T0, "the world starts no earlier than its epoch");
+    assert!(
+        world.now >= T0,
+        "the world starts no earlier than its epoch"
+    );
     let (_, first) = lent(&mut world)?;
     let (dana_root, second) = lent(&mut world)?;
     let request = read(&world)?;
