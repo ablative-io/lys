@@ -208,6 +208,7 @@ pub struct SessionSettings {
     /// the variable the handle in use is set in, and what says a limit.
     /// Handles only: the broker swaps each for its account on the way out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
     pub accounts: Option<lys_runner::Rotation>,
 }
 

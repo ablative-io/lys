@@ -69,7 +69,94 @@
       ],
       "stories": [
         "S158"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity-server/src/routes.rs",
+            "change": "modified",
+            "note": "service_saying passes Arc::clone(&key) to apps_api::opened, so the key is still held when Runners::new takes it. This fixes E0382 at routes.rs:181:53, 'the type `Arc` does not implement `Copy`'."
+          },
+          {
+            "path": "crates/lys-identity-server/src/stop_api.rs",
+            "change": "modified",
+            "note": "ConfirmedEnd derives utoipa::ToSchema, fixing E0277 at stop_api.rs:91:33 ('the trait bound `ConfirmedEnd: ToSchema` is not satisfied')."
+          },
+          {
+            "path": "crates/lys-identity-server/src/grant_contract/views.rs",
+            "change": "modified",
+            "note": "UnreportedView, StandingView and the RefusedView that StandingView flattens now derive utoipa::ToSchema. This fixes E0277 at views.rs:117:28 and views.rs:208:19."
+          },
+          {
+            "path": "crates/lys-identity-server/src/provisioning_store.rs",
+            "change": "modified",
+            "note": "SessionSettings derives utoipa::ToSchema, fixing E0277 at provisioning_api.rs:136:21. Its lys_runner::Rotation field is given #[schema(value_type = Option<Object>)], the same pattern apps_views.rs uses for foreign types. lys-runner does not depend on utoipa."
+          }
+        ],
+        "how": "No team plan code was written. This round only made the base compile, so the gate can measure the card's own work. The team plan record (team_plans_api.rs, team_plans_state.rs, tests/team_plans.rs) needs two things first: a budget share and goals shape from DIRECTORY-051, and routes and refusals whose OpenAPI and error entries are outside this wall.",
+        "deviation": "Four files outside R1's wall were edited: stop_api.rs, grant_contract/views.rs, provisioning_store.rs and the ToSchema-side of the base. routes.rs is inside the wall. These edits fix measured base compile errors. They add no team plan behaviour, and they use no allow, cfg or ignore. The review asked for every measured failure to be fixed at its cause in this directory. They are declared here so the reviewer can approve them or move them to their own card. Still needed before R1 can start: DIRECTORY-051 landed, and a CN9 brief revision adding openapi_table.rs, openapi_types.rs, error.rs, error_status.rs, openapi_refusals.rs and the file defining the provision_team permission.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A plan whose member shares exceed its total is refused naming the total.",
+            "met": false,
+            "evidence": "No team_plans_api.rs or team_plans_state.rs in crates/lys-identity-server/src (ls shows only teams_api/state/store.rs, which belong to other work); nothing in the diff."
+          },
+          {
+            "criterion": "A member with no checker is refused naming the member.",
+            "met": false,
+            "evidence": "Not implemented; no team plan code in the diff."
+          },
+          {
+            "criterion": "A member given a grant the provisioning person does not hold is refused, naming the grant and the reason from cannot-give.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A member naming an account handle the broker does not hold is refused account_unknown.",
+            "met": false,
+            "evidence": "Not implemented; no account_unknown refusal exists."
+          },
+          {
+            "criterion": "Three members who check each other in a ring (A checks B, B checks C, C checks A) are refused checkers_circular naming all three.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A person without provision_team who creates a plan is refused, and nothing is written.",
+            "met": false,
+            "evidence": "grep -rn provision_team crates surface/identity/src returns nothing."
+          },
+          {
+            "criterion": "A plan is read back unchanged after the service restarts.",
+            "met": false,
+            "evidence": "Not implemented; crates/lys-identity-server/tests/team_plans.rs does not exist."
+          },
+          {
+            "criterion": "That restart reads no plan event from before the checkpoint.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A person who is not the plan's responsible person, one of its checkers or an administrator is refused not_your_plan when reading it.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Build the team plan record in team_plans_api.rs and team_plans_state.rs with tests/team_plans.rs covering all nine rows; it is entirely unbuilt.",
+          "DIRECTORY-051 (a declared depends_on of this brief) has not landed: budgets_state.rs, goals_state.rs are missing, so a member's budget share and goals have no shape. Land DIRECTORY-051 first; this brief cannot be dispatched until then (compare CN12's rule on dependency-blocked briefs).",
+          "R1's file wall omits files the work must touch: openapi_table.rs, openapi_types.rs (tests/openapi.rs requires every route to have an entry), error.rs, error_status.rs, openapi_refusals.rs (for plan_invalid, checkers_circular, checker_reports_to_member, not_your_plan, account_unknown) and wherever the provision_team permission is defined. A reviewed brief revision adding them to the wall is required under CN9 before implementation; the developer correctly stopped and named them."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R2",
@@ -110,7 +197,83 @@
       ],
       "stories": [
         "S158"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. All-or-nothing provisioning in team_plans_provision.rs needs DIRECTORY-051's budgets and goals, and the runner's durable per-operation start records (crates/lys-runner/src/operations.rs), which are not in the tree. POST /team-plans/{id}/provision also needs the same out-of-wall OpenAPI and error files as R1.",
+        "deviation": "Blocked on DIRECTORY-051 (CN12) and on a CN9 brief revision for the OpenAPI and error files.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Provisioning a three-member plan leaves three running agents with their budgets and goals.",
+            "met": false,
+            "evidence": "No team_plans_provision.rs; nothing in the diff."
+          },
+          {
+            "criterion": "A refusal at the third member leaves the first two retired with their grants revoked and never started, naming the member and step.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Sending the same operation twice does nothing the second time.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A start that fails at the third member, after the first two started, leaves the first two stopped.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "That test finds the runner's exit record for each of the first two processes.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "That test finds the first two members retired.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "That test finds the first two members' grants revoked.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "That refusal names the third member and the start step.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A provision interrupted by a service restart between the record and start passes, sent again with the same operation id, starts each member exactly once.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A provision cut off after the runner started a member but before its answer was recorded, sent again with the same operation id after a restart, starts that member no second time.",
+            "met": false,
+            "evidence": "Not implemented; crates/lys-runner/src has no operations.rs (ls)."
+          },
+          {
+            "criterion": "That resumed provision records the member as started from the runner's own start record.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Build all-or-nothing provisioning in team_plans_provision.rs with its eleven rows tested; entirely unbuilt.",
+          "Depends on DIRECTORY-051 R2/R3/R4 (budgets, the runner's durable per-operation start records in crates/lys-runner/src/operations.rs, goals), none of which is in the tree. Land DIRECTORY-051 first.",
+          "Same out-of-wall OpenAPI/error files as R1 for POST /team-plans/{id}/provision; needs the same reviewed brief revision."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -144,7 +307,83 @@
       ],
       "stories": [
         "S158"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/cli/fewshot.rs",
+            "change": "modified",
+            "note": "Adds pub fn write_fewshot(out, turns, cwd). It writes the turns as a Claude Code JSONL transcript with create_new, refuses an existing file as HomeError::Exists, and syncs the file and its directory."
+          },
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "Re-exports write_fewshot. The fewshot command parses its turns file and then calls the same library writer."
+          },
+          {
+            "path": "crates/lys-home/src/lib.rs",
+            "change": "modified",
+            "note": "pub use cli::write_fewshot and Role, so the identity server can write a member's opening conversation across the crate boundary."
+          },
+          {
+            "path": "crates/lys-home/tests/fewshot_write.rs",
+            "change": "created",
+            "note": "The command is the second party: turns written through the library read back record for record as the fewshot command writes them from a file. A second test checks the library writer never writes over an existing transcript."
+          }
+        ],
+        "how": "The lys-home half is done: the fewshot writer the command uses is a public library function, and a test holds it to the command's output. The review confirmed this refactor is correct and within the wall. The rest is still to do: calling the writer and lantern.rs from team_plans_provision.rs, recording both digests in given.rs, and the fixture-harness first-turn test. All of it rides on R2.",
+        "deviation": "The member-side rows are blocked with R2, on DIRECTORY-051.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "With a fixture harness, the input given to a member's first turn holds its starting memory text and its opening conversation, and no model is called.",
+            "met": false,
+            "evidence": "No provisioning exists; no such test."
+          },
+          {
+            "criterion": "The given record names both by digest.",
+            "met": false,
+            "evidence": "crates/lys-home/src/record/given.rs unchanged."
+          },
+          {
+            "criterion": "The starting memory is written into the member's home as lantern notes through crates/lys-home/src/record/lantern.rs.",
+            "met": false,
+            "evidence": "lantern.rs unchanged; no caller."
+          },
+          {
+            "criterion": "The opening conversation is written as fewshot turns through crates/lys-home/src/cli/fewshot.rs.",
+            "met": false,
+            "evidence": "Only half: crates/lys-home/src/cli/fewshot.rs:23 now exposes pub fn write_fewshot, re-exported at src/lib.rs (pub use cli::write_fewshot); no provisioning call site writes a member's opening conversation through it."
+          },
+          {
+            "criterion": "The rendered first turn shows the starting memory text.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The rendered first turn shows the opening conversation.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "crates/lys-home/tests/fewshot_write.rs writes turns through lys-home's public library function and reads them back as the fewshot command writes them.",
+            "met": true,
+            "evidence": "crates/lys-home/tests/fewshot_write.rs turns_written_through_the_library_read_back_as_the_command_writes_them compares lys_home::write_fewshot output with the fewshot command's output record for record (fresh ids and timestamps removed), plus parent chain and session id; the_library_writer_never_writes_over_a_transcript asserts HomeError::Exists and untouched content. `cargo test -p lys-home --test fewshot_write`: 2 passed; `cargo clippy -p lys-home --all-targets -- -D warnings` clean."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "The lys-home refactor is correct and within R3's wall (fewshot.rs, cli.rs, lib.rs, tests/fewshot_write.rs); behaviour of the fewshot command is preserved (parse_turns then write_fewshot).",
+          "Still to do: write each member's starting memory as lantern notes through lantern.rs, write its opening conversation through lys_home::write_fewshot from team_plans_provision.rs, record both by digest in the given record (given.rs), and test with a fixture harness that the first turn holds and renders both with no model call. These ride on R2, which is blocked on DIRECTORY-051."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -175,7 +414,42 @@
       ],
       "stories": [
         "S158"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. goals_api.rs and budgets_act.rs, the two files R4 modifies, are created by DIRECTORY-051, which has not landed.",
+        "deviation": "Blocked on DIRECTORY-051. The evidence_missing refusal also needs error.rs, error_status.rs and openapi_refusals.rs, which are outside the wall and must be added by CN9 revision.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A deliverable marked ready without evidence is refused evidence_missing.",
+            "met": false,
+            "evidence": "Not implemented; goals_api.rs does not exist in crates/lys-identity-server/src."
+          },
+          {
+            "criterion": "Only the named checker can accept it.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The team total reached stops every member when the plan says stop.",
+            "met": false,
+            "evidence": "Not implemented; budgets_act.rs does not exist."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "The two files R4 modifies (goals_api.rs, budgets_act.rs) are created by DIRECTORY-051, which has not landed. Land DIRECTORY-051, then implement deliverable acceptance by checker with evidence and the team-total stop.",
+          "evidence_missing needs error.rs/error_status.rs/openapi_refusals.rs, outside the wall; include them in the brief revision."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -211,7 +485,71 @@
       ],
       "stories": [
         "S158"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. The Teams screen, its route, its rail entry and team-plans.test.tsx need the R1 and R2 API to exist.",
+        "deviation": "Blocked on R1 and R2. surface/identity/src/api.ts and the generated OpenAPI types must be added to the wall by CN9 revision.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A plan built from a template on the screen provisions and appears with every member running.",
+            "met": false,
+            "evidence": "surface/identity/src/features/team-plans/ does not exist."
+          },
+          {
+            "criterion": "The screen shows spend, goals and deliverables per member.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Surface tests cover building, provisioning and the refusals.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The Teams screen is reached from the rail.",
+            "met": false,
+            "evidence": "railItems.ts unchanged."
+          },
+          {
+            "criterion": "The Teams screen is reached at its own route.",
+            "met": false,
+            "evidence": "routes.tsx unchanged."
+          },
+          {
+            "criterion": "surface/identity/tests/team-plans.test.tsx covers reaching the screen.",
+            "met": false,
+            "evidence": "File does not exist."
+          },
+          {
+            "criterion": "That test file covers building a plan from a template.",
+            "met": false,
+            "evidence": "File does not exist."
+          },
+          {
+            "criterion": "That test file covers provisioning a plan.",
+            "met": false,
+            "evidence": "File does not exist."
+          },
+          {
+            "criterion": "That test file covers each refusal the screen can show.",
+            "met": false,
+            "evidence": "File does not exist."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Build the Teams screen, route, rail entry and team-plans.test.tsx once R1/R2 API exists; surface/identity/src/api.ts and generated OpenAPI types must be added to the wall by brief revision."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -238,7 +576,41 @@
       ],
       "stories": [
         "S158"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. Storing and assigning accounts by handle, the no-value-shown test and the proxy/no-env-secret test all depend on R2, R4 and R5.",
+        "deviation": "Blocked on R2, R4 and R5, and so on DIRECTORY-051.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "An account stored on the screen is assignable to a member and the member runs on it.",
+            "met": false,
+            "evidence": "Not implemented; secrets_api.rs unchanged."
+          },
+          {
+            "criterion": "No answer, screen or log shows the value after it is stored, checked by a test.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A member whose harness takes a base address reaches its account through the proxy, and its process environment holds no secret value, checked by a test.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement storing and assigning accounts by handle, the no-value-shown test and the proxy/no-env-secret test; blocked on R2, R4, R5."
+        ],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [
