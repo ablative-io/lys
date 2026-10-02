@@ -204,7 +204,8 @@ def observe(browser, ids):
         "provisioning": f"/agents/{ids['agent']}/provisioning",
     }
     result = {name: browser.ask("GET", path) for name, path in paths.items()}
-    for domain, member in [("sessions", "sessions"), ("budgets", "budgets"), ("goals", "goals")]:
+    budgets = "budgets" if "budgets" in result["budgets"] else "limits"
+    for domain, member in [("sessions", "sessions"), ("budgets", budgets), ("goals", "goals")]:
         if not result[domain][member]:
             raise RuntimeError(f"empty {domain} fixture cannot prove an upgrade")
     if not result["policy"]["policy"]["rules"]:
@@ -257,33 +258,183 @@ def migrated_people(before, after):
     return value
 
 
+SHIPPED_MODEL_VERSION = 2
+LIVE_UNITS = ("dollars", "plan_percent", "context_percent")
+
+
+def legacy_limit(budget):
+    """One per-measure budget as the candidate's limit collection holds it."""
+    period = budget["period"]
+    limit = {"unit": budget["measure"], "amount": budget["limit"],
+             "period": None if period is None else period["length"], "act": budget["act"]}
+    if period is not None:
+        limit["zone"] = period["zone"]
+    return limit
+
+
+def measured(used, unavailable, effective, name):
+    """Live figures: one per effective limit, each a figure or a named gap, never both."""
+    if not isinstance(used, list) or len(used) != len(effective):
+        raise RuntimeError(f"upgrade did not measure each effective {name} limit")
+    for figure, limit in zip(used, effective):
+        if set(figure) != {"unit", "period", "figure", "since_ms", "unavailable"} \
+                or (figure["unit"], figure["period"]) != (limit["unit"], limit["period"]):
+            raise RuntimeError(f"upgrade measured another {name} limit than the one held")
+        gap = figure["unavailable"]
+        if (figure["figure"] is None) == (gap is None) or (gap is not None and not isinstance(gap, str)) or gap == "":
+            raise RuntimeError(f"upgrade {name} figure is neither measured nor named unavailable")
+    context = next((figure["unavailable"] for figure in used
+                    if figure["unit"] == "context_percent" and figure["unavailable"]), None)
+    units = [entry.get("unit") for entry in unavailable] if isinstance(unavailable, list) else None
+    if units is None or len(set(units)) != len(units) or not set(units) <= set(LIVE_UNITS) \
+            or any(set(entry) != {"unit", "reason"} or not isinstance(entry["reason"], str)
+                   or not entry["reason"] for entry in unavailable):
+        raise RuntimeError(f"upgrade {name} unavailable units are not each named once")
+    named = next((entry["reason"] for entry in unavailable if entry["unit"] == "context_percent"), None)
+    if named != context:
+        raise RuntimeError(f"upgrade {name} context gap differs from its measured figure")
+
+
+def migrated_budgets(before, after, zone, pending):
+    """Every old per-measure budget read back in the candidate's limit collection.
+
+    `pending` maps each measure the upgrade must hold for confirmation to the
+    full budget that stays enforced; every other measure must be confirmed.
+    """
+    name = f"{before['holder']['kind']} budgets"
+    if "budgets" not in before or "budgets" in after:
+        if after != before:
+            raise RuntimeError(f"upgrade changed the {name} readback")
+        return
+    if set(before) != {"holder", "budgets"}:
+        raise RuntimeError(f"old {name} readback has an unknown shape")
+    rows = before["budgets"]
+    measures = [row["measure"] for row in rows]
+    if len(set(measures)) != len(measures) or not set(pending) <= set(measures):
+        raise RuntimeError(f"old {name} readback does not name each measure once")
+    limits = [legacy_limit(row) for row in rows]
+    latest = max((row["at"] for row in rows), default=None)
+    expected = {
+        "holder": before["holder"], "limits": limits, "warn_at": None, "zone": zone,
+        "version": sum(row["version"] for row in rows),
+        "at": latest, "within": [],
+    }
+    keys = set(expected) | {"by", "used", "unavailable", "unconfirmed"}
+    effective = [legacy_limit(pending.get(row["measure"], row)) for row in rows]
+    if pending:
+        keys.add("effective_limits")
+    if set(after) != keys:
+        raise RuntimeError(f"upgrade {name} readback members differ: {sorted(set(after) ^ keys)}")
+    for field, wanted in expected.items():
+        if after[field] != wanted:
+            raise RuntimeError(f"upgrade changed the {name} {field}")
+    authors = {row["by"] for row in rows if row["at"] == latest}
+    if (after["by"] is None) != (latest is None) or (rows and after["by"] not in authors):
+        raise RuntimeError(f"upgrade changed who last set the {name}")
+    if pending and after["effective_limits"] != effective:
+        raise RuntimeError(f"upgrade loosened the {name} effective limits")
+    held = after["unconfirmed"]
+    if not isinstance(held, list) or len(held) != len(pending):
+        raise RuntimeError(f"upgrade did not hold exactly {len(pending)} {name} for confirmation")
+    requested = {row["measure"]: row for row in rows}
+    seen = set()
+    for entry in held:
+        if not isinstance(entry, dict) or set(entry) != {"requested", "effective", "reason"}:
+            raise RuntimeError(f"upgrade {name} confirmation has an unknown shape")
+        measure = entry["requested"].get("measure")
+        if measure in seen or measure not in pending:
+            raise RuntimeError(f"upgrade held an unexpected {name} measure {measure}")
+        seen.add(measure)
+        if entry["requested"] != requested[measure]:
+            raise RuntimeError(f"upgrade changed the requested {name} {measure}")
+        if entry["effective"] != pending[measure]:
+            raise RuntimeError(f"upgrade did not keep the full effective {name} {measure}")
+        if not isinstance(entry["reason"], str) or not entry["reason"]:
+            raise RuntimeError(f"upgrade {name} {measure} confirmation names no reason")
+    measured(after["used"], after["unavailable"], effective, name)
+
+
+def migrated_configuration(before, after, started):
+    """The old settings unchanged, the grant model raised only to the shipped one,
+    and an organisation zone recorded once by the host setup after the old session began."""
+    value = json.loads(json.dumps(after))
+    old = before["permissions"]["model_version"]
+    wanted = old + 1 if old < SHIPPED_MODEL_VERSION else old
+    if value.get("permissions", {}).get("model_version") != wanted:
+        raise RuntimeError(f"upgrade configuration model version is not {wanted}")
+    value["permissions"]["model_version"] = old
+    if "organisation" not in before and "organisation" in value:
+        zone = value.pop("organisation")
+        if not isinstance(zone, dict) or set(zone) != {"zone", "version", "by", "at"} \
+                or not isinstance(zone["zone"], str) or not zone["zone"] \
+                or zone["version"] != 1 or zone["by"] != "host_setup" \
+                or type(zone["at"]) is not int or zone["at"] < started:
+            raise RuntimeError("upgrade configuration organisation is not the first host setting")
+    if value != before:
+        raise RuntimeError("upgrade changed the configuration readback")
+
+
+def migrated_goals(before, after):
+    """Each old goal unchanged; a goal never deactivated reads back active."""
+    if not isinstance(after.get("goals"), list) or len(after["goals"]) != len(before["goals"]):
+        raise RuntimeError("upgrade changed the goals readback")
+    items = []
+    for old, item in zip(before["goals"], after["goals"]):
+        goal = dict(item.get("goal") or {})
+        if "active" not in old["goal"] and "active" in goal:
+            if goal.pop("active") is not True:
+                raise RuntimeError("upgrade deactivated one of the goals")
+        items.append(dict(item, goal=goal))
+    if dict(after, goals=items) != before:
+        raise RuntimeError("upgrade changed the goals readback")
+
+
+PROFILE_DEFAULTS = (("skill_pins", []), ("harness", None), ("permissions", None),
+                    ("instructions_mode", "append"), ("session", None))
+
+
+def migrated_provisioning(before, after):
+    """The old profile unchanged, with only the candidate's declared defaults added."""
+    value = after
+    if isinstance(after.get("profile"), dict) and isinstance(before.get("profile"), dict):
+        profile = dict(after["profile"])
+        for field, empty in PROFILE_DEFAULTS:
+            if field not in before["profile"] and field in profile:
+                if profile[field] != empty:
+                    raise RuntimeError(f"upgrade changed the provisioning {field} readback")
+                del profile[field]
+        value = dict(after, profile=profile)
+    if value != before:
+        raise RuntimeError("upgrade changed the provisioning readback")
+
+
 def same_records(before, after):
     if before.keys() != after.keys():
         raise RuntimeError("upgrade readback domains differ")
-    for name in before:
+    if not before["sessions"]["sessions"]:
+        raise RuntimeError("the old install had no session to preserve")
+    started = max(session["started_at"] for session in before["sessions"]["sessions"])
+    zone = after.get("configuration", {}).get("organisation", {}).get("zone")
+    for name in sorted(before, key=lambda domain: domain != "configuration"):
         value = after[name]
         if name == "agent":
             value = migrated_agent(before[name], value, before[name]["person"])
         if name == "people":
             value = migrated_people(before[name], value)
-        # This fixture's agent budget cannot need personal-budget confirmation.
-        # Accept only the declared additive empty field, never erase its contents.
-        if name == "budgets" and "unconfirmed" not in before[name] and "unconfirmed" in value:
-            if value.get("unconfirmed") != []:
-                raise RuntimeError("upgrade changed the budgets confirmation readback")
-            value = {key: entry for key, entry in value.items() if key != "unconfirmed"}
-        if name == "provisioning" and isinstance(value.get("profile"), dict):
-            profile = dict(value["profile"])
-            for field, empty in (("skill_pins", []), ("harness", None), ("permissions", None)):
-                if field not in before[name]["profile"] and field in profile:
-                    if profile[field] != empty:
-                        raise RuntimeError(f"upgrade changed the provisioning {field} readback")
-                    del profile[field]
-            value = dict(value, profile=profile)
+        if name == "budgets":
+            migrated_budgets(before[name], value, zone, {})
+            continue
+        if name == "configuration":
+            migrated_configuration(before[name], value, started)
+            continue
+        if name == "goals":
+            migrated_goals(before[name], value)
+            continue
+        if name == "provisioning":
+            migrated_provisioning(before[name], value)
+            continue
         if before[name] != value:
             raise RuntimeError(f"upgrade changed the {name} readback")
-    if not before["sessions"]["sessions"]:
-        raise RuntimeError("the old install had no session to preserve")
 
 
 def admitted_after_upgrade(browser, administrator):

@@ -55,17 +55,26 @@ and tears down only its own processes and compose project.
 
 The old API also creates an ordinary person's real issuer login, a team with
 that person and two foreign members, a first self-set personal budget, a raised
-budget and a period-only budget edit. After upgrade it requires exactly the two
-foreign members held, all membership history retained, all three budgets named
-unconfirmed, and the complete earlier effective limit, period and action.
-The ordinary person's original session must also still work. Only the declared
-empty `unconfirmed` field is additive on the unchanged agent budget readback.
+budget and a period-only budget edit. After upgrade it requires every old team
+member unchanged, the team's `members` unchanged, null `parent` and `lead`, and
+`held` naming exactly the two foreign members, each hold carrying the operation,
+login and time of the old record that added it. Every old per-measure budget
+must read back as one limit of the holder's collection, with the collection
+version the sum of the old versions and the last setter and time kept; all three
+personal budgets are named unconfirmed with the old request unchanged and the
+complete earlier effective limit, period and action enforced. The agent budget
+has no confirmation and no team aggregate; live usage figures must each be a
+figure or a named gap. The ordinary person's original session must also still work.
 
 An ordinary old provisioning profile includes an MCP server. Its HTTP readback
 and complete stored file must survive the window, rollback and normal upgrade.
-Only the candidate's declared empty `skill_pins`, null `harness` and null
-`permissions` may be added to the HTTP profile; old fields and stored bytes
-remain exact. The old setup creates an Active administrator, which is asserted.
+Only the candidate's declared empty `skill_pins`, null `harness`, null
+`permissions`, null `session` and `instructions_mode` of `append` may be added to
+the HTTP profile; old fields and stored bytes remain exact. A goal never
+deactivated reads back `active`. The configuration keeps every old setting; the
+grant model version rises by one only when the old one is below the shipped
+version, and an old release gains one organisation zone recorded by the host
+setup after its session began. The old setup creates an Active administrator, which is asserted.
 The ordinary person is activated through the old transition API before a root
 grant is issued. The proof never claims that a Registered administrator was
 admitted after upgrade.

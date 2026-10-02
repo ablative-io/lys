@@ -1,12 +1,13 @@
 """Legacy authority cases created through the real old installer and HTTP APIs."""
 
+import hashlib
 import http.client
 import json
 from pathlib import Path
 import secrets
 from urllib.parse import urlsplit
 
-from upgrade_fixture import Browser, operation
+from upgrade_fixture import Browser, migrated_budgets, operation
 
 
 def issuer_person(root, config, email):
@@ -52,8 +53,10 @@ def seed(admin, root, ids):
     team = member.ask("POST", "/teams", {
         "operation": operation(), "name": "Legacy team", "description": "Upgrade authority proof",
     })["id"]
+    added = {}
     for who in (person, ids["agent"], ids["owner"]):
-        member.ask("POST", f"/teams/{team}/members", {"operation": operation(), "member": who})
+        added[who] = member.ask("POST", f"/teams/{team}/members",
+                                {"operation": operation(), "member": who})["recorded"]
     path = f"/budgets/person/{person}"
     first = member.ask("PUT", path, {"version": 0, "measure": "context_percent",
         "limit": 60, "period": None, "act": "tell"})
@@ -66,34 +69,54 @@ def seed(admin, root, ids):
             "period": {"length": "day" if measure == "running_ms" else "week", "zone": "UTC"},
             "act": "stop"})
     return {"team": team, "person": person, "foreign": [ids["agent"], ids["owner"]],
-            "first": first, "original": original,
+            "added": added, "first": first, "original": original,
             "team_before": admin.ask("GET", f"/teams/{team}"),
             "budgets_before": admin.ask("GET", path)}, member
+
+
+def expected_hold(team, member, added):
+    """The hold the candidate derives from the old adding record, naming who added it."""
+    digest = hashlib.sha256(f"lys/teams/legacy-membership/v1\n{added['operation']}".encode())
+    login = added["by"]
+    return {"operation": "op-" + digest.hexdigest()[:32], "team": team, "member": member,
+            "reason": f"membership added by {login['provider']}/{login['subject']} under operation "
+                      f"`{added['operation']}` has no current authority for this member",
+            "at": added["at"]}
+
+
+def migrated_team(old, team, fixture):
+    """Every old team member unchanged; a legacy team gains no parent or lead, and
+    holds exactly its foreign members, in membership order, from their adding records."""
+    for key, value in old.items():
+        if key not in team or team[key] != value:
+            raise RuntimeError(f"legacy team {key} changed during upgrade")
+    added = {key: team[key] for key in team.keys() - old.keys()}
+    unknown = sorted(set(added) - {"parent", "lead", "held"})
+    if unknown:
+        raise RuntimeError(f"legacy team gained unknown members {unknown}")
+    for key in ("parent", "lead"):
+        if key in added and added[key] is not None:
+            raise RuntimeError(f"legacy team gained a {key} during upgrade")
+    held = team.get("held")
+    if not isinstance(held, list) or [entry.get("member") for entry in held] != [
+            who for who in old["members"] if who in fixture["foreign"]] or len(held) != 2:
+        raise RuntimeError("legacy team did not retain exactly its two foreign memberships as held")
+    if any(not isinstance(entry.get("reason"), str) or not entry["reason"] for entry in held):
+        raise RuntimeError("legacy team hold lacks its named reason")
+    if "held" in added and held != [expected_hold(old["id"], who, fixture["added"][who])
+                                    for who in old["members"] if who in fixture["foreign"]]:
+        raise RuntimeError("legacy team hold does not name its old adding record")
+    return held
 
 
 def verify(admin, fixture):
     """Require exact historical values, two named holds, and three effective budgets."""
     team = admin.ask("GET", f"/teams/{fixture['team']}")
-    old = fixture["team_before"]
-    held = team.get("held")
-    if not isinstance(held, list) or {entry["member"] for entry in held} != set(fixture["foreign"]) or len(held) != 2:
-        raise RuntimeError("legacy team did not retain exactly its two foreign memberships as held")
-    if any(not entry.get("reason") for entry in held):
-        raise RuntimeError("legacy team hold lacks its named reason")
-    if {key: value for key, value in team.items() if key != "held"} != old:
-        raise RuntimeError("legacy team membership or history changed during upgrade")
+    held = migrated_team(fixture["team_before"], team, fixture)
     budgets = admin.ask("GET", f"/budgets/person/{fixture['person']}")
-    if {key: value for key, value in budgets.items() if key != "unconfirmed"} != fixture["budgets_before"]:
-        raise RuntimeError("legacy requested budgets changed during upgrade")
-    pending = budgets.get("unconfirmed")
-    if not isinstance(pending, list) or len(pending) != 3:
-        raise RuntimeError("legacy budgets did not name all three pending confirmations")
+    zone = admin.ask("GET", "/configuration")["organisation"]["zone"]
     effective = {"context_percent": fixture["first"], **fixture["original"]}
-    requested = {entry["measure"]: entry for entry in budgets["budgets"]}
-    for entry in pending:
-        measure = entry["requested"]["measure"]
-        if entry["requested"] != requested[measure] or entry["effective"] != effective[measure] or not entry.get("reason"):
-            raise RuntimeError(f"legacy {measure} did not preserve its full effective budget")
-    if {entry["requested"]["measure"] for entry in pending} != set(effective):
+    if {row["measure"] for row in fixture["budgets_before"].get("budgets", [])} != set(effective):
         raise RuntimeError("legacy pending budget measures differ")
-    return {"held_members": len(held), "unconfirmed_budgets": len(pending)}
+    migrated_budgets(fixture["budgets_before"], budgets, zone, effective)
+    return {"held_members": len(held), "unconfirmed_budgets": len(budgets["unconfirmed"])}
