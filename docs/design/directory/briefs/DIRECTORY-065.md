@@ -60,6 +60,18 @@ The source contract is explicit. hooks/src/legacy_notify.rs carries only agent-t
 **Stories:**
 - S175 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the acceptance rows can be met. Missing prerequisites: crates/lys-runner doesn't exist (so there is no src/lib.rs or src/harness_control/codex.rs to extend, and no DIRECTORY-064 app-server transport owner), and crates/lys-home/src/harness/codex/config.rs doesn't exist (no DIRECTORY-051 isolated config writer; the directory only has account, beside, leaf, parts, rollout and zone). The pinned codex-channels source bd3798fa, the 7cbba483 cross-check and the 0.0.0-channels.3 package aren't on this machine; the installed package is standalone 0.145.0 (~/.codex/packages/standalone/current/codex-package.json). Row by row: the capability receipt naming the executable and trusted package isn't met, because there's no launch path and no trusted package record for the pinned build. Refusing a 0.36.0 executable isn't met, because the measured bd3798fa build isn't installed to measure. Failing an unknown config key isn't met, because there's no native strict-config check to run against the pinned parser. Returning codex_policy_contract_unsupported for an unsupported event schema isn't met, because there's no 064 event projection. A turn-complete notify creating no refusal isn't met, because there's no 051 refusal store. CODEX-POLICY-CONTRACT.md was deliberately not written: its file:line references to hooks/src/legacy_notify.rs, config/src/config_toml.rs, permissions_toml.rs, hooks/src/events/pre_tool_use.rs, core/src/tools/events.rs and rollout/src/policy.rs would be unchecked claims without the source. To unblock: land DIRECTORY-050/051/064, and install the codex-channels 0.0.0-channels.3 package and its source at bd3798fa on the venue.
+- Deviation: No file created or modified. The prerequisites are named instead of recreated, per the SHALL NOT boundary on absent prerequisite implementations.
+- Checklist delivery:
+  - [ ] C439 — Pin the actual Codex executable and its supported policy contract (DIRECTORY-065 R1). — Blocked on DIRECTORY-051/064 code and on the pinned codex-channels package and source being absent.
+- Story delivery:
+  - [ ] S175 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings. — Blocked: no Codex launch path or config writer exists to carry the policy.
+
 ### R2: Render native Codex permissions from the bound Lys policy
 
 Behavioural. Extend the config.toml writer in the isolated CODEX_HOME. Derive settings from the same policy version and digest as DIRECTORY-062's signed containment plan, not a second allow list. Use one named permissions profile selected by default_permissions. Its filesystem entries use the native read, write and deny vocabulary, and its network domains use native allow/deny entries. Only plan-owned writable roots are writable. Runtime reads and permitted hostnames come from the plan. Root, temporary-directory, proxy, loopback and Unix-socket exceptions are explicit and never blanket. Compile the complete policy or refuse codex_policy_unrepresentable naming the unsupported rule. A setting that only approximates a rule cannot silently replace it. Keep native sandboxing enabled. Never generate danger-full-access, a bypass CLI flag or global hook-trust bypass.
@@ -95,6 +107,18 @@ For unattended managed sessions set approval_policy to never, meaning reject esc
 **Stories:**
 - S175 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the ten acceptance rows can be met. Missing: DIRECTORY-062's signed containment plan (no crates/lys-runner/src/containment_policy.rs, crates/lys-identity-server/src/containment_policy.rs or agent_policy_store.rs), DIRECTORY-051's CODEX_HOME config writer (no crates/lys-home/src/harness/codex/config.rs), and DIRECTORY-064's app-server connection for the effective-settings readback. Without the signed plan there are no writable roots, deny paths, hostnames or digest to render, compare or refuse against. Writing a separate allow list in policy.rs would be the 'second allow list' the spec forbids.
+- Deviation: No files created. crates/lys-home/src/harness/codex/policy.rs was not made standalone, because it has to derive from 062's plan, which doesn't exist.
+- Checklist delivery:
+  - [ ] C440 — Render native Codex permissions from the bound Lys policy (DIRECTORY-065 R2). — Blocked on DIRECTORY-062 plan, 051 config writer and 064 readback.
+- Story delivery:
+  - [ ] S175 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings. — Blocked.
+
 ### R3: Bind Codex pre-tool policy checks to the existing Lys judge
 
 Behavioural. Use the measured native PreToolUse contract where supported to cover tool-specific Lys rules that native filesystem/network settings cannot express. Extend 051's judge adapter with explicit Codex tool-name and structured-input mappings read from core/src/tools/handlers. Do not assume Claude and Codex payloads are identical. Codex exec_command maps to Bash, apply_patch carries patch input, and resumed write_stdin does not emit a second PreToolUse in the pinned source. Uninspectable effects remain denied under 051's policy. Reuse peer.rs to prove the caller's socket credentials, ancestry and leader start identity. No hook-supplied agent id establishes authority. Reuse the same current-grant checks and durable refusal-before-deny rule. Return the native hookSpecificOutput PreToolUse deny with a nonempty permissionDecisionReason. Do not emit allow overrides. Install only the Lys-owned hook declaration and its narrowly scoped native trust entry, retaining other admitted hooks.
@@ -128,6 +152,18 @@ The source parser can fail open on malformed or unsupported hook output. Therefo
 
 **Stories:**
 - S175 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the eight acceptance rows can be met. Missing: DIRECTORY-051's judge adapter (no crates/lys-runner/src/judge.rs), its peer proof (no crates/lys-runner/src/peer.rs), and crates/lys/src/commands/runner_judge.rs. The durable refusal-before-deny store and the current-grant checks don't exist either. The Codex tool-name and structured-input mappings have to be read from core/src/tools/handlers at the pinned bd3798fa source, which isn't available here. The 'actual Codex harness blocks a tool' row needs the pinned package, which isn't installed.
+- Deviation: No files created. Recreating the judge or peer proof would be the inconsistent recreation the boundary forbids.
+- Checklist delivery:
+  - [ ] C441 — Bind Codex pre-tool policy checks to the existing Lys judge (DIRECTORY-065 R3). — Blocked on DIRECTORY-051 judge and peer code, and on the pinned source.
+- Story delivery:
+  - [ ] S175 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings. — Blocked.
 
 ### R4: Record native Codex rejections with honest provenance
 
@@ -164,6 +200,18 @@ Use064's bounded durable cursor handoff. Atomically append the refusal and advan
 **Stories:**
 - S176 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the nine acceptance rows can be met. Missing: DIRECTORY-064's session-owned typed event projection and its bounded durable cursor handoff (no crates/lys-runner/src/harness_control/events.rs or protocol.rs), and DIRECTORY-051's refusal store (no crates/lys-runner/src/refusals.rs, crates/lys-identity-server/src/refusals_store.rs or refusals_api.rs; crates/lys-identity-server/tests/refusals.rs doesn't exist either). Building a separate event reader would break the SHALL NOT on a second app-server owner or event reader.
+- Deviation: No files created. No competing event reader was built.
+- Checklist delivery:
+  - [ ] C442 — Record native Codex rejections with honest provenance (DIRECTORY-065 R4). — Blocked on DIRECTORY-064 events and cursor, and on the DIRECTORY-051 refusal store.
+- Story delivery:
+  - [ ] S176 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me. — Blocked.
+
 ### R5: The Codex agent page shows measured policy and refusal coverage
 
 Behavioural. Replace051's unconditional Codex not-observed sentence with capability-derived fields. Show native config verified, native containment enforced, pre-tool policy observed and rejection stream complete as separate states with their actual evidence and failures. An unavailable capability keeps its named reason. A Codex-reported rejection whose cause is unknown says so in plain language. Show the effective policy version and digest, writable roots, network restrictions and the meaning of unattended approvals. The usual view uses plain words. Advanced details expose the generated non-secret settings and source/build identity. Keep the existing refusal component, visibility checks and push cursor. Never expose raw command text or secrets. An empty list with an incomplete source is not an all-clear. Required protection unavailable prevents start and names the corrective act.
@@ -191,6 +239,18 @@ Behavioural. Replace051's unconditional Codex not-observed sentence with capabil
 
 **Stories:**
 - S176 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the seven acceptance rows can be met. The components the spec says to keep and modify don't exist: surface/identity/src/features/file has no AgentRefusals.tsx, AgentPolicy.tsx or AgentContainment.tsx (051/062). There is no unconditional not-observed sentence to replace, and crates/lys-identity-server has no containment_api.rs or refusals_api.rs to carry capability fields, visibility checks or the push cursor. The capability states depend on R1–R4, which are all blocked.
+- Deviation: No files created or modified.
+- Checklist delivery:
+  - [ ] C443 — The Codex agent page shows measured policy and refusal coverage (DIRECTORY-065 R5). — Blocked on 051/062 surface components and APIs, and on R1–R4.
+- Story delivery:
+  - [ ] S176 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me. — Blocked.
 
 ### R6: Prove config enforcement and denial delivery through the real harness
 
@@ -228,6 +288,18 @@ Register the native and browser legs in the repository gate on Dean for macOS an
 
 **Stories:**
 - S176 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the eleven acceptance rows can be met. The evidence needs the exact packaged Codex (0.0.0-channels.3 at bd3798fa, not installed here; only standalone 0.145.0 is present), DIRECTORY-064's transport, DIRECTORY-062's capability prerequisite and native OS denial records, and R1–R5, none of which exist. The native legs on Dean (macOS) and 205 (Linux) can't be registered against code that isn't there. PROOF-CODEX-POLICY.md wasn't written, because it has to carry real case receipts, policy digests and package identities, and making those up would be claiming coverage without evidence.
+- Deviation: No gate registration, test, script or proof document created. Registering legs for absent code would make the gate fail or pretend.
+- Checklist delivery:
+  - [ ] C444 — Prove config enforcement and denial delivery through the real harness (DIRECTORY-065 R6). — Blocked on the pinned package, 062/064, and R1–R5.
+- Story delivery:
+  - [ ] S176 (Person running a Codex agent, Sets policy and inspects its actual enforcement) — As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me. — Blocked.
 
 ## Boundaries
 

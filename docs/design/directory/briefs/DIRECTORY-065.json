@@ -56,7 +56,27 @@
       ],
       "stories": [
         "S175"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the acceptance rows can be met. Missing prerequisites: crates/lys-runner doesn't exist (so there is no src/lib.rs or src/harness_control/codex.rs to extend, and no DIRECTORY-064 app-server transport owner), and crates/lys-home/src/harness/codex/config.rs doesn't exist (no DIRECTORY-051 isolated config writer; the directory only has account, beside, leaf, parts, rollout and zone). The pinned codex-channels source bd3798fa, the 7cbba483 cross-check and the 0.0.0-channels.3 package aren't on this machine; the installed package is standalone 0.145.0 (~/.codex/packages/standalone/current/codex-package.json). Row by row: the capability receipt naming the executable and trusted package isn't met, because there's no launch path and no trusted package record for the pinned build. Refusing a 0.36.0 executable isn't met, because the measured bd3798fa build isn't installed to measure. Failing an unknown config key isn't met, because there's no native strict-config check to run against the pinned parser. Returning codex_policy_contract_unsupported for an unsupported event schema isn't met, because there's no 064 event projection. A turn-complete notify creating no refusal isn't met, because there's no 051 refusal store. CODEX-POLICY-CONTRACT.md was deliberately not written: its file:line references to hooks/src/legacy_notify.rs, config/src/config_toml.rs, permissions_toml.rs, hooks/src/events/pre_tool_use.rs, core/src/tools/events.rs and rollout/src/policy.rs would be unchecked claims without the source. To unblock: land DIRECTORY-050/051/064, and install the codex-channels 0.0.0-channels.3 package and its source at bd3798fa on the venue.",
+        "deviation": "No file created or modified. The prerequisites are named instead of recreated, per the SHALL NOT boundary on absent prerequisite implementations.",
+        "checklist": [
+          {
+            "id": "C439",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051/064 code and on the pinned codex-channels package and source being absent."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S175",
+            "satisfied": false,
+            "note": "Blocked: no Codex launch path or config writer exists to carry the policy."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -95,7 +115,27 @@
       ],
       "stories": [
         "S175"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the ten acceptance rows can be met. Missing: DIRECTORY-062's signed containment plan (no crates/lys-runner/src/containment_policy.rs, crates/lys-identity-server/src/containment_policy.rs or agent_policy_store.rs), DIRECTORY-051's CODEX_HOME config writer (no crates/lys-home/src/harness/codex/config.rs), and DIRECTORY-064's app-server connection for the effective-settings readback. Without the signed plan there are no writable roots, deny paths, hostnames or digest to render, compare or refuse against. Writing a separate allow list in policy.rs would be the 'second allow list' the spec forbids.",
+        "deviation": "No files created. crates/lys-home/src/harness/codex/policy.rs was not made standalone, because it has to derive from 062's plan, which doesn't exist.",
+        "checklist": [
+          {
+            "id": "C440",
+            "done": false,
+            "note": "Blocked on DIRECTORY-062 plan, 051 config writer and 064 readback."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S175",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -133,7 +173,27 @@
       ],
       "stories": [
         "S175"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the eight acceptance rows can be met. Missing: DIRECTORY-051's judge adapter (no crates/lys-runner/src/judge.rs), its peer proof (no crates/lys-runner/src/peer.rs), and crates/lys/src/commands/runner_judge.rs. The durable refusal-before-deny store and the current-grant checks don't exist either. The Codex tool-name and structured-input mappings have to be read from core/src/tools/handlers at the pinned bd3798fa source, which isn't available here. The 'actual Codex harness blocks a tool' row needs the pinned package, which isn't installed.",
+        "deviation": "No files created. Recreating the judge or peer proof would be the inconsistent recreation the boundary forbids.",
+        "checklist": [
+          {
+            "id": "C441",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051 judge and peer code, and on the pinned source."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S175",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -172,7 +232,27 @@
       ],
       "stories": [
         "S176"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the nine acceptance rows can be met. Missing: DIRECTORY-064's session-owned typed event projection and its bounded durable cursor handoff (no crates/lys-runner/src/harness_control/events.rs or protocol.rs), and DIRECTORY-051's refusal store (no crates/lys-runner/src/refusals.rs, crates/lys-identity-server/src/refusals_store.rs or refusals_api.rs; crates/lys-identity-server/tests/refusals.rs doesn't exist either). Building a separate event reader would break the SHALL NOT on a second app-server owner or event reader.",
+        "deviation": "No files created. No competing event reader was built.",
+        "checklist": [
+          {
+            "id": "C442",
+            "done": false,
+            "note": "Blocked on DIRECTORY-064 events and cursor, and on the DIRECTORY-051 refusal store."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S176",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -206,7 +286,27 @@
       ],
       "stories": [
         "S176"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the seven acceptance rows can be met. The components the spec says to keep and modify don't exist: surface/identity/src/features/file has no AgentRefusals.tsx, AgentPolicy.tsx or AgentContainment.tsx (051/062). There is no unconditional not-observed sentence to replace, and crates/lys-identity-server has no containment_api.rs or refusals_api.rs to carry capability fields, visibility checks or the push cursor. The capability states depend on R1–R4, which are all blocked.",
+        "deviation": "No files created or modified.",
+        "checklist": [
+          {
+            "id": "C443",
+            "done": false,
+            "note": "Blocked on 051/062 surface components and APIs, and on R1–R4."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S176",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -247,7 +347,27 @@
       ],
       "stories": [
         "S176"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the eleven acceptance rows can be met. The evidence needs the exact packaged Codex (0.0.0-channels.3 at bd3798fa, not installed here; only standalone 0.145.0 is present), DIRECTORY-064's transport, DIRECTORY-062's capability prerequisite and native OS denial records, and R1–R5, none of which exist. The native legs on Dean (macOS) and 205 (Linux) can't be registered against code that isn't there. PROOF-CODEX-POLICY.md wasn't written, because it has to carry real case receipts, policy digests and package identities, and making those up would be claiming coverage without evidence.",
+        "deviation": "No gate registration, test, script or proof document created. Registering legs for absent code would make the gate fail or pretend.",
+        "checklist": [
+          {
+            "id": "C444",
+            "done": false,
+            "note": "Blocked on the pinned package, 062/064, and R1–R5."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S176",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
