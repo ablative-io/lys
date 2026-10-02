@@ -79,13 +79,14 @@ export function AskForm({ person, resources, model, changed }: {
   const [rest, setRest] = useState<Rest>(() => readRest(key));
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const keepRest = (left: Ask[]) => {
-    // A copy: the caller goes on shifting its queue, and state must say what storage says.
-    setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
+    // Storage first, then a copy into state: state says what storage says, never a rest the browser refused to keep.
     if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
+    setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
   };
   const finish = (recorded: AccessRequest) => {
-    sessionStorage.removeItem(key);
-    setPending({ kind: 'empty' });
+    try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch {
+      setFailure('Recorded, but the browser could not release the retained request; Check original request will confirm it again, never record it twice.');
+    }
     changed(recorded);
   };
   /** Retain one ask under the pending key: always before the rest is shortened, so no ask is ever both forgotten and unsent. */
@@ -103,10 +104,11 @@ export function AskForm({ person, resources, model, changed }: {
       return true;
     } catch (error) {
       // A later refusal cannot undo an earlier uncertain admission.
+      let release = '';
       if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) {
-        sessionStorage.removeItem(key); setPending({ kind: 'empty' });
+        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (failed) { release = ' The browser could not release the retained request; Check original request will answer this same refusal, never record a second: ' + String(failed); }
       }
-      setFailure(failureWords(error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.'));
+      setFailure(failureWords(error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.') + release);
       return false;
     }
   };
@@ -118,13 +120,11 @@ export function AskForm({ person, resources, model, changed }: {
     try {
       const queue = [...more];
       try {
-        if (!retry) retain(asked);
+        // The whole run is kept before anything else, so a failure at any later write leaves every ask somewhere it is offered again by name.
+        if (!retry) { keepRest([asked, ...queue]); retain(asked); }
         keepRest(queue);
       } catch (error) {
-        // Nothing has been sent. Release the retained ask if the browser lets us; otherwise it stays retained and is checked, never duplicated.
-        if (!retry) {
-          try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { setPending({ kind: 'held', asked }); }
-        }
+        // Nothing has been sent. What is stored is offered again, exactly as asked, never twice.
         throw new Error('Nothing was sent because this browser could not retain the request: ' + (error instanceof Error ? error.message : String(error)));
       }
       let recorded = 0;
@@ -150,8 +150,9 @@ export function AskForm({ person, resources, model, changed }: {
         if (!(await sendOne(next, false))) {
           // A definite refusal ends the run; what was recorded stays recorded and the rest is named, never re-sent by itself.
           if (sessionStorage.getItem(key) === null) {
-            keepRest([]);
-            setAnswer(`${recorded} recorded before the refusal; not sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.`);
+            let cleared = true;
+            try { keepRest([]); } catch { cleared = false; }
+            setAnswer(`${recorded} recorded before the refusal; not sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
           }
           return;
         }
