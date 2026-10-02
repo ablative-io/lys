@@ -260,7 +260,7 @@ async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Res
     let result = match method {
         "initialize" => initialize(&value["params"]),
         "ping" => Ok(json!({})),
-        "tools/call" => call(&endpoint, parts, &value["params"], (signer, app)).await,
+        "tools/call" => call(&endpoint, parts, &value["params"], (signer, app), &bytes).await,
         _ => Err((-32601, "the MCP method is not supported".to_owned())),
     };
     match result {
@@ -346,6 +346,7 @@ async fn call(
     mut parts: axum::http::request::Parts,
     params: &Value,
     (signer, app): crate::mcp_callers::Callers,
+    message: &[u8],
 ) -> ResultValue {
     let call: Call = serde_json::from_value(params.clone())
         .map_err(|error| (-32602, format!("invalid tool call: {error}")))?;
@@ -424,7 +425,13 @@ async fn call(
                     format!("the call's agent could not be named: {error}"),
                 )
             })?;
-    let relayed = signer.or_else(|| app.as_ref().map(|(agent, _)| *agent));
+    let signed = signer
+        .and_then(|_| parts.headers.get(crate::agent_signature::HEADER))
+        .and_then(|value| value.to_str().ok())
+        .map(|header| (header.to_owned(), Arc::<[u8]>::from(message)));
+    let relayed = signer
+        .or_else(|| app.as_ref().map(|(agent, _)| *agent))
+        .map(|agent| crate::agent_signature::Relay { agent, signed });
     let kept = (
         parts.method.clone(),
         parts.uri.to_string(),
@@ -442,7 +449,7 @@ async fn call(
         .clone()
         .oneshot(Request::from_parts(parts, body));
     let answered = match relayed {
-        Some(agent) => crate::agent_signature::relayed(agent, relay).await,
+        Some(relayed) => crate::agent_signature::relayed(relayed, relay).await,
         None => relay.await,
     };
     let response = match answered {

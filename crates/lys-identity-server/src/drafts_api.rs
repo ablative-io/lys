@@ -264,14 +264,30 @@ async fn create(
         let at = crate::session::now();
         let actor = Actor::new(binding, Provenance::by_agent(agent, at));
         let mut created = creation(body, actor, IdentityId::Person(person), at, None)?;
-        let original = headers.get(crate::agent_signature::HEADER).ok_or(
-            ServerError::AgentSignatureRefused {
-                reason: "the signature header is missing",
-            },
-        )?;
-        let text = original
-            .to_str()
-            .map_err(|error| malformed(format!("the signature header is not text: {error}")))?;
+        let (text, signed_path, signed_body) = match headers.get(crate::agent_signature::HEADER) {
+            Some(original) => (
+                original
+                    .to_str()
+                    .map_err(|error| {
+                        malformed(format!("the signature header is not text: {error}"))
+                    })?
+                    .to_owned(),
+                path.to_owned(),
+                bytes.to_vec(),
+            ),
+            None => {
+                let (header, message) = crate::agent_signature::relayed_signature().ok_or(
+                    ServerError::AgentSignatureRefused {
+                        reason: "the signature header is missing",
+                    },
+                )?;
+                (
+                    header,
+                    crate::agent_signature::RELAY_PATH.to_owned(),
+                    message.to_vec(),
+                )
+            }
+        };
         let words: Vec<_> = text.split_ascii_whitespace().collect();
         let [author, signed_at, nonce, signature] = words.as_slice() else {
             return Err(malformed(
@@ -286,18 +302,25 @@ async fn create(
         let signed_at_ms = signed_at
             .parse()
             .map_err(|error| malformed(format!("the signing time does not read: {error}")))?;
+        let payload = crate::agent_signature::payload(
+            "POST",
+            &signed_path,
+            &signed_body,
+            signed_at_ms,
+            nonce,
+        );
         created.evidence = Some(RequestEvidence {
             agent,
             method: "POST".to_owned(),
-            path: path.to_owned(),
-            body: bytes.to_vec(),
+            path: signed_path,
+            body: signed_body,
             signed_at_ms,
             nonce: (*nonce).to_owned(),
             cose_sign1: unhex(signature)?,
         });
         created.request_signature = Some(RequestSignature {
-            header: original.as_bytes().to_vec(),
-            payload: crate::agent_signature::payload("POST", path, &bytes, signed_at_ms, nonce),
+            header: text.as_bytes().to_vec(),
+            payload,
         });
         let event = DraftEvent::Created(Arc::new(created));
         let draft = event.operation();

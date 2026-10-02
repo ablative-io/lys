@@ -52,7 +52,7 @@ pub(crate) struct Store {
     held: Held,
 }
 
-fn unavailable(reason: String) -> ServerError {
+fn unavailable(reason: &str) -> ServerError {
     ServerError::ConfigInvalid {
         reason: format!("the connected-apps store is unavailable: {reason}"),
     }
@@ -63,10 +63,10 @@ impl Store {
     pub(crate) fn open(path: &Path) -> Result<Self, ServerError> {
         let held = match std::fs::read(path) {
             Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
-                unavailable(format!("{} does not read: {error}", path.display()))
+                unavailable(&format!("{} does not read: {error}", path.display()))
             })?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Held::default(),
-            Err(error) => return Err(unavailable(format!("{}: {error}", path.display()))),
+            Err(error) => return Err(unavailable(&format!("{}: {error}", path.display()))),
         };
         Ok(Self {
             path: path.to_owned(),
@@ -76,19 +76,19 @@ impl Store {
 
     fn save(&self) -> Result<(), ServerError> {
         let bytes = serde_json::to_vec(&self.held)
-            .map_err(|error| unavailable(format!("the store does not render: {error}")))?;
+            .map_err(|error| unavailable(&format!("the store does not render: {error}")))?;
         let temporary = self.path.with_extension("json.next");
         let mut file = std::fs::File::create(&temporary)
-            .map_err(|error| unavailable(format!("{}: {error}", temporary.display())))?;
+            .map_err(|error| unavailable(&format!("{}: {error}", temporary.display())))?;
         file.write_all(&bytes)
             .and_then(|()| file.sync_all())
-            .map_err(|error| unavailable(format!("{}: {error}", temporary.display())))?;
+            .map_err(|error| unavailable(&format!("{}: {error}", temporary.display())))?;
         std::fs::rename(&temporary, &self.path)
-            .map_err(|error| unavailable(format!("{}: {error}", self.path.display())))?;
+            .map_err(|error| unavailable(&format!("{}: {error}", self.path.display())))?;
         if let Some(parent) = self.path.parent() {
             std::fs::File::open(parent)
                 .and_then(|directory| directory.sync_all())
-                .map_err(|error| unavailable(format!("{}: {error}", parent.display())))?;
+                .map_err(|error| unavailable(&format!("{}: {error}", parent.display())))?;
         }
         Ok(())
     }

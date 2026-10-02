@@ -14,6 +14,10 @@ use sha2::{Digest, Sha256};
 use crate::error::ServerError;
 use crate::routes::AppState;
 
+/// How a change made under a grant token is told apart from a run Lys
+/// started.
+const GRANT_TOKEN: &str = "grant-token";
+
 /// Who a relayed change is kept against, and the evidence kept with it.
 pub(crate) struct Witness {
     agent: AgentId,
@@ -56,6 +60,20 @@ pub(crate) fn witness(
             agent,
             provenance: Provenance::by_agent(agent, crate::session::now()),
             signature,
+        }));
+    }
+    if let Some(principal) = parts
+        .extensions
+        .get::<crate::agent_signature::TokenPrincipal>()
+    {
+        return Ok(Some(Witness {
+            agent: principal.holder,
+            provenance: Provenance::by_pass(
+                principal.holder,
+                GRANT_TOKEN,
+                &principal.grant().to_string(),
+            )?,
+            signature: String::new(),
         }));
     }
     let Some(state) = state else {

@@ -115,21 +115,40 @@ pub fn signed_agent(
     Ok(Some(agent))
 }
 
-tokio::task_local! {
-    static RELAYED: AgentId;
+/// A call relayed from an MCP message: the agent it is from and, when the
+/// agent signed the message, the signature header and the exact message
+/// bytes it signed at the MCP door.
+#[derive(Clone)]
+pub(crate) struct Relay {
+    pub(crate) agent: AgentId,
+    pub(crate) signed: Option<(String, std::sync::Arc<[u8]>)>,
 }
 
-/// Serves `work` as a call from `agent`, whose signature over the MCP
-/// message carrying the call was verified before the call was relayed into
-/// the router. The routes judge the agent against its live grants as they
-/// judge a signed request; the signature itself is never seen twice.
-pub(crate) async fn relayed<F: std::future::Future>(agent: AgentId, work: F) -> F::Output {
-    RELAYED.scope(agent, work).await
+/// The path a relayed message's signature was made over.
+pub(crate) const RELAY_PATH: &str = "/mcp";
+
+tokio::task_local! {
+    static RELAYED: Relay;
+}
+
+/// Serves `work` as a call relayed for `relay.agent`, whose credential on
+/// the MCP message carrying the call was verified before the call was
+/// relayed into the router. The routes judge the agent against its live
+/// grants as they judge a signed request; the signature itself is never
+/// verified twice.
+pub(crate) async fn relayed<F: std::future::Future>(relay: Relay, work: F) -> F::Output {
+    RELAYED.scope(relay, work).await
 }
 
 /// The agent the call being served was relayed for, if any.
 pub(crate) fn relayed_agent() -> Option<AgentId> {
-    RELAYED.try_with(|agent| *agent).ok()
+    RELAYED.try_with(|relay| relay.agent).ok()
+}
+
+/// The signature header and signed message of the call being served, when
+/// it was relayed from a signed MCP message.
+pub(crate) fn relayed_signature() -> Option<(String, std::sync::Arc<[u8]>)> {
+    RELAYED.try_with(|relay| relay.signed.clone()).ok().flatten()
 }
 
 /// A relayed agent is judged again as it stands now: it must still be
