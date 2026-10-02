@@ -16,8 +16,8 @@ describe('What you hold', () => {
     expect(requests).toContain('/grants');
     const rows = holdText();
     expect(rows).toEqual([
-      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
-      ['You can view project ledger.', 'viewer', 'project:ledger', 'root', 'no', ''],
+      ['You can do everything here (project identity).', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+      ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(unreachable()).toEqual([]);
   });
@@ -359,8 +359,8 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(meReads).toBeGreaterThan(0);
     expect($('h1')?.textContent).toBe('Ada (test person)');
     expect(holdText()).toEqual([
-      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
-      ['You can view project ledger.', 'viewer', 'project:ledger', 'root', 'no', ''],
+      ['You can do everything here (project identity).', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+      ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(grantIdsOnScreen()).toEqual([ROOT_G]);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
@@ -377,7 +377,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     // The second session read its own identity for itself; nothing was carried over.
     expect(bea.requests.filter((r) => r === '/me')).toHaveLength(meReads);
     expect($('h1')?.textContent).toBe('Bea (test person)');
-    expect(holdText()).toEqual([['You can view and edit project ledger.', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
+    expect(holdText()).toEqual([['Edit this resource; View this resource (project ledger).', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
     expect(grantIdsOnScreen()).toEqual([BEA_ROOT_G]);
     // Her agent, and what it holds under her root grant, not Ada's.
     location.hash = '#/me';

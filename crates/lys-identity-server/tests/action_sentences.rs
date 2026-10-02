@@ -1,4 +1,5 @@
 #![cfg(test)]
+//! Shipped permission words are served without changing the stored model.
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -22,6 +23,7 @@ fn every_shipped_action_is_served_with_a_plain_sentence() -> Result<(), Box<dyn 
     let sentences = view["action_sentences"]
         .as_object()
         .ok_or("missing action sentences")?;
+    assert_eq!(sentences.len(), owner.len());
     for action in owner {
         let action = action.as_str().ok_or("invalid action")?;
         let sentence = sentences
