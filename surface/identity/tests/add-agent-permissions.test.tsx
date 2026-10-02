@@ -51,6 +51,12 @@ async function submit(form: HTMLFormElement) {
 }
 
 describe('Add-agent reporting and permissions', () => {
+  it('reads a grant held by a service account and never offers it', async () => {
+    const loader = { ...GRANTS[0], id: 'grant-' + 'e'.repeat(32), holder: 'op-' + 'd'.repeat(32) };
+    const { form } = await open({ '/grants': ok({ grants: [...GRANTS, loader], revision: 7 }) });
+    expect(form.textContent).not.toContain('GrantsUnreadable');
+    expect([...form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].map((entry) => entry.value)).toEqual([GRANTS[0].id, GRANTS[1].id]);
+  });
   it('offers a live named default and only the chosen boss grants, with nothing checked', async () => {
     const { form, posted } = await open();
     expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
