@@ -79,11 +79,7 @@ impl Table {
     }
 
     /// Command scenarios need one active agent and the two sign-in subjects.
-    pub async fn unprofiled_for_commands() -> Result<Self, Box<dyn Error>> {
-        Self::unprofiled_with(true).await
-    }
-
-    async fn unprofiled_with(commands_only: bool) -> Result<Self, Box<dyn Error>> {
+    pub async fn unprofiled_with(commands_only: bool) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });

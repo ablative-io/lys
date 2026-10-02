@@ -18,6 +18,7 @@ fn the_start_command_carries_the_declared_program_and_models() -> Result<(), Box
             "harness": harness_description::declared(),
             "model_access": ["primary-model", "fallback-model"],
             "tools": [], "skills": [], "mcp_servers": [],
+            "permissions": {"default_mode": "plan"},
             "instructions": "Follow the reviewed instructions.", "note": ""
         }
     }))?;
@@ -189,6 +190,7 @@ fn instructions_mode_renders_only_the_reviewed_claude_prompt_flag() -> Result<()
             "settings": {
                 "harness": harness_description::declared(),
                 "model_access": ["primary-model"], "tools": [], "skills": [], "mcp_servers": [],
+                "permissions": {"default_mode": "plan"},
                 "instructions": "Exact reviewed instructions.\n", "instructions_mode": mode, "note": ""
             }
         }))?;

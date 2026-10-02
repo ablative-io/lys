@@ -21,7 +21,7 @@ const BEA: &str = "bea-subject";
 
 #[tokio::test]
 async fn claude_first_run_defaults_start_with_native_workspace_settings() -> TestResult {
-    let table = Table::unprofiled_for_commands().await?;
+    let table = Table::unprofiled_with(true).await?;
     let agent = table.agent();
     let catalogue: Value = serde_json::from_str(include_str!(
         "../../../docs/harness/catalogue/claude-code.json"
@@ -72,7 +72,7 @@ async fn claude_first_run_defaults_start_with_native_workspace_settings() -> Tes
 
 #[tokio::test]
 async fn claude_without_a_confinement_choice_refuses_before_rendering() -> TestResult {
-    let table = Table::unprofiled_for_commands().await?;
+    let table = Table::unprofiled_with(true).await?;
     table.launch_profile_mode(None).await?;
     let agent = table.agent();
     let machine = table
@@ -169,7 +169,7 @@ impl Table {
 
 #[tokio::test]
 async fn each_refusal_is_by_name() -> TestResult {
-    let table = Table::unprofiled_for_commands().await?;
+    let table = Table::unprofiled_with(true).await?;
     let bea = table
         .service
         .sign_in(Login {
@@ -243,7 +243,7 @@ async fn each_refusal_is_by_name() -> TestResult {
 
 #[tokio::test]
 async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> TestResult {
-    let table = Table::unprofiled_for_commands().await?;
+    let table = Table::unprofiled_with(true).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -313,7 +313,7 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
 
 #[tokio::test]
 async fn a_start_is_kept_once_under_its_operation() -> TestResult {
-    let table = Table::unprofiled_for_commands().await?;
+    let table = Table::unprofiled_with(true).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -350,7 +350,7 @@ async fn a_start_is_kept_once_under_its_operation() -> TestResult {
 
 #[tokio::test]
 async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
-    let table = Table::unprofiled_for_commands().await?;
+    let table = Table::unprofiled_with(true).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = operation()?;
