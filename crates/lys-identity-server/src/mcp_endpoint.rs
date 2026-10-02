@@ -377,6 +377,7 @@ async fn call(
             .resolve(&call.name, &call.arguments.method, uri.path())
             .map_err(|reason| (-32602, reason))?;
     }
+    let mut token = None;
     if parts.headers.contains_key(crate::grant_tokens::HEADER) {
         let admitted = (|| {
             let token = crate::grant_tokens::header(&parts.headers)?;
@@ -391,6 +392,7 @@ async fn call(
         })();
         match admitted {
             Ok(principal) => {
+                token = Some(principal);
                 parts.extensions.insert(principal);
             }
             Err(error) => return crate::mcp_callers::rendered(error.into_response()).await,
@@ -451,9 +453,10 @@ async fn call(
         .router
         .clone()
         .oneshot(Request::from_parts(parts, body));
-    let answered = match relayed {
-        Some(relayed) => crate::agent_signature::relayed(relayed, relay).await,
-        None => relay.await,
+    let answered = match (relayed, token) {
+        (Some(relayed), _) => crate::agent_signature::relayed(relayed, relay).await,
+        (None, Some(principal)) => crate::agent_signature::token_scoped(principal, relay).await,
+        (None, None) => relay.await,
     };
     let response = match answered {
         Ok(response) => response,

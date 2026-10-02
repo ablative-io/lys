@@ -86,9 +86,11 @@ parallel cargo doc --no-deps
 parallel ast-grep scan --config sgconfig.yml
 parallel sh scripts/file-length.sh
 parallel python3 -B -m unittest discover -s scripts/identity-gates -p surface_fixture_tests.py
+parallel python3 -B -m unittest discover -s scripts/identity-gates -p 'test_*.py'
 parallel surface_leg
 leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
 leg cargo test --doc --workspace --all-features
 leg identity_leg
+leg sh scripts/identity-gates/upgrade_proof_leg.sh
 finish_parallel
 exit "$status"

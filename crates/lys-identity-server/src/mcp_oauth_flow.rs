@@ -139,6 +139,7 @@ pub(super) async fn authorize(
         }
         Err(error) => return Err(error),
     };
+    let session_actor = session.actor.clone();
     let asking = random()?;
     let at = now();
     {
@@ -147,7 +148,7 @@ pub(super) async fn authorize(
         held_asking.insert(
             asking.clone(),
             Asking {
-                session_id: session.id,
+                session_id: session.id.clone(),
                 client_id: asked.client_id,
                 redirect_uri: asked.redirect_uri.clone(),
                 challenge,
@@ -156,6 +157,24 @@ pub(super) async fn authorize(
             },
         );
     }
+    let person = crate::routes::with_directory(&apps.state, |directory| {
+        crate::read_api::own_person(directory.projection()?, &session_actor)
+    })?;
+    let choices: String = crate::mcp_oauth_grants::offers(&apps.state, person)?
+        .iter()
+        .map(|offer| {
+            format!(
+                "<label><input type=\"checkbox\" name=\"grant\" value=\"{}\"> {}</label><br>",
+                escaped(&offer.key),
+                escaped(&offer.words())
+            )
+        })
+        .collect();
+    let choices = if choices.is_empty() {
+        "<p>You hold nothing you can pass on to an agent yet, so it starts with no permissions.</p>".to_owned()
+    } else {
+        format!("<p>Choose what it may do for you:</p><p>{choices}</p>")
+    };
     let name = escaped(&name);
     let site = escaped(
         &reqwest::Url::parse(&asked.redirect_uri)
@@ -178,10 +197,10 @@ button{{font:inherit;padding:.6rem 1.2rem;margin-right:.75rem;border-radius:.5re
 button[value=approve]{{background:#1d1d1f;color:#fff;border-color:#1d1d1f}}</style></head><body>\
 <h1>Connect {name}?</h1>\
 <p>{name}, at {site}, is asking to act for you in Lys.</p>\
-<p>If you connect it, Lys adds it as one of your agents. It can do nothing until you give it permission, \
+<p>If you connect it, Lys adds it as one of your agents. It can do only what you choose here, \
 and you can take that away or remove it at any time from your agents in Lys.</p>\
 <form method=\"post\" action=\"/oauth/mcp/consent\">\
-<input type=\"hidden\" name=\"asking\" value=\"{asking}\">\
+<input type=\"hidden\" name=\"asking\" value=\"{asking}\">{choices}\
 <button type=\"submit\" name=\"decision\" value=\"approve\">Connect {name}</button>\
 <button type=\"submit\" name=\"decision\" value=\"refuse\">Don't connect</button>\
 </form></body></html>"
@@ -190,18 +209,40 @@ and you can take that away or remove it at any time from your agents in Lys.</p>
         .into_response())
 }
 
-#[derive(Deserialize)]
-pub(super) struct Answer {
+/// The approval form's answer: which approval, the decision, and each
+/// permission chosen, read in the order the form sent them.
+struct Answer {
     asking: String,
     decision: String,
+    grants: Vec<String>,
+}
+
+fn answer(body: &[u8]) -> Result<Answer, ServerError> {
+    let text = std::str::from_utf8(body).map_err(|_unread| malformed("an approval is a form"))?;
+    let url = reqwest::Url::parse(&format!("http://form.invalid/?{text}"))
+        .map_err(|_unread| malformed("an approval is a form"))?;
+    let (mut asking, mut decision, mut grants) = (None, None, Vec::new());
+    for (name, value) in url.query_pairs() {
+        match name.as_ref() {
+            "asking" => asking = Some(value.into_owned()),
+            "decision" => decision = Some(value.into_owned()),
+            "grant" => grants.push(value.into_owned()),
+            _ => return Err(malformed("an approval carries only its own fields")),
+        }
+    }
+    Ok(Answer {
+        asking: asking.ok_or_else(|| malformed("an approval names what it answers"))?,
+        decision: decision.ok_or_else(|| malformed("an approval carries its decision"))?,
+        grants,
+    })
 }
 
 pub(super) async fn consent(
     State(apps): State<Arc<Apps>>,
     headers: HeaderMap,
-    form: Result<Form<Answer>, axum::extract::rejection::FormRejection>,
+    body: axum::body::Bytes,
 ) -> Result<Response, ServerError> {
-    let Form(answer) = form.map_err(|refused| malformed(&refused.body_text()))?;
+    let answer = answer(&body)?;
     if let Some(origin) = headers.get(header::ORIGIN)
         && origin.to_str().ok() != Some(apps.origin.as_str())
     {
@@ -229,7 +270,12 @@ pub(super) async fn consent(
                 .app(&asking.client_id)
                 .map(|app| app.name.clone())
                 .ok_or(ServerError::RedirectUnregistered)?;
+            let person = crate::routes::with_directory(&apps.state, |directory| {
+                crate::read_api::own_person(directory.projection()?, &session.actor)
+            })?;
+            let picked = crate::mcp_oauth_grants::chosen(&apps.state, person, &answer.grants)?;
             let agent = apps.agent_for(&asking.client_id, &name, &session.actor)?;
+            crate::mcp_oauth_grants::pass_on(&apps.state, person, &agent, &picked)?;
             let code = random()?;
             let at = now();
             {

@@ -299,3 +299,53 @@ async fn an_app_asking_while_signed_out_is_sent_to_sign_in_first() -> Result<(),
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn an_app_is_given_only_what_the_person_holds_to_pass_on() -> Result<(), Box<dyn Error>> {
+    let (service, cookie) = service().await?;
+    let client = client()?;
+    let registered: Value = client
+        .post(format!("{}/oauth/mcp/register", service.base))
+        .json(&json!({"client_name":"Notes", "redirect_uris":[REDIRECT]}))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let client_id = registered["client_id"].as_str().ok_or("no client id")?;
+    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
+    let page = client
+        .get(format!("{}/oauth/mcp/authorize", service.base))
+        .query(&[
+            ("response_type", "code"),
+            ("client_id", client_id),
+            ("redirect_uri", REDIRECT),
+            ("code_challenge", challenge.as_str()),
+            ("code_challenge_method", "S256"),
+        ])
+        .header("cookie", &cookie)
+        .send()
+        .await?
+        .text()
+        .await?;
+    assert!(page.contains("starts with no permissions"), "{page}");
+    let asking = page
+        .split("name=\"asking\" value=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .ok_or("no approval on the page")?
+        .to_owned();
+    let forged = client
+        .post(format!("{}/oauth/mcp/consent", service.base))
+        .header("cookie", &cookie)
+        .form(&[
+            ("asking", asking.as_str()),
+            ("decision", "approve"),
+            ("grant", "not-a-grant:owner"),
+        ])
+        .send()
+        .await?;
+    assert_eq!(forged.status(), StatusCode::BAD_REQUEST);
+    let refused: Value = forged.json().await?;
+    assert_eq!(refused["refusal"], "RequestMalformed", "{refused}");
+    Ok(())
+}

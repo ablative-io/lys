@@ -154,6 +154,30 @@ pub(crate) fn relayed_signature() -> Option<(String, std::sync::Arc<[u8]>)> {
         .flatten()
 }
 
+tokio::task_local! {
+    static TOKEN_GRANT: (AgentId, lys_identity::grants::GrantId);
+}
+
+/// Serves `work` as a call admitted by a grant token: while it is served,
+/// the token's holder is permitted by the token's own grant alone.
+pub(crate) async fn token_scoped<F: std::future::Future>(
+    principal: TokenPrincipal,
+    work: F,
+) -> F::Output {
+    TOKEN_GRANT.scope((principal.holder, principal.grant), work).await
+}
+
+/// The only grant `caller` may be permitted by in the call being served,
+/// when the call was admitted by a grant token `caller` holds.
+pub(crate) fn token_grant(
+    caller: lys_identity::IdentityId,
+) -> Option<lys_identity::grants::GrantId> {
+    TOKEN_GRANT
+        .try_with(|(holder, grant)| (lys_identity::IdentityId::Agent(*holder) == caller).then_some(*grant))
+        .ok()
+        .flatten()
+}
+
 /// A relayed agent is judged again as it stands now: it must still be
 /// active and still answer to an active person.
 fn relayed_caller(directory: &Projection, agent: AgentId) -> Result<AgentId, ServerError> {
