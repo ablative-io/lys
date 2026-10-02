@@ -115,7 +115,9 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       } else if (retry || uncertain(refused)) {
         setOutcome({ at: 'pending', reason: refused.refusal.reason });
       } else {
-        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { /* still retained: a retry sends it once more and is refused by name again */ }
+        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (release) {
+          refused = new Refused(refused.status, { refusal: refused.refusal.refusal, reason: refused.refusal.reason + ' The browser could not release the retained request; Check original grant will answer this same refusal, never a second grant: ' + String(release) });
+        }
         setOutcome({ at: 'refused', refused });
       }
       return false;
@@ -186,9 +188,10 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         if (!confirmed) {
           // An uncertain answer keeps the rest for the retry; a definite refusal ends the run and names what did and did not happen.
           if (outcome.at !== 'pending' && sessionStorage.getItem(key) === null) {
-            try { keepRest([]); } catch (error) { notRetained(error); }
-            if (given.length || queue.length) {
-              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${onText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}`);
+            let cleared = true;
+            try { keepRest([]); } catch { cleared = false; }
+            if (given.length || queue.length || !cleared) {
+              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${givenOnText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
             }
           }
           return;

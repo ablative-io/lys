@@ -150,8 +150,9 @@ export function AskForm({ person, resources, model, changed }: {
         if (!(await sendOne(next, false))) {
           // A definite refusal ends the run; what was recorded stays recorded and the rest is named, never re-sent by itself.
           if (sessionStorage.getItem(key) === null) {
-            try { keepRest([]); } catch { /* the rest stays retained and is offered again, never sent by itself */ }
-            setAnswer(`${recorded} recorded before the refusal; not sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.`);
+            let cleared = true;
+            try { keepRest([]); } catch { cleared = false; }
+            setAnswer(`${recorded} recorded before the refusal; not sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
           }
           return;
         }
