@@ -29,14 +29,24 @@ done
 # enough to break it before any install starts.
 private=$(mktemp -d /tmp/lys-upgrade-proof.XXXXXX)
 chmod 700 "$private"
+# Cleanup never replaces the leg's own exit code: what it cannot remove is
+# named, and the leg ends with the code it was ending with.
 cleanup() {
+  status=$?
   for tree in "$private"/old-*; do
-    [ -d "$tree" ] && git -C "$root" worktree remove --force "$tree" >/dev/null 2>&1
+    if [ -d "$tree" ] && ! git -C "$root" worktree remove --force "$tree" >/dev/null 2>&1; then
+      echo "upgrade_proof_cleanup: the old release tree $tree could not be removed"
+    fi
   done
-  git -C "$root" worktree prune
+  if ! git -C "$root" worktree prune; then
+    echo "upgrade_proof_cleanup: git worktree prune failed"
+  fi
   rm -rf "$private"
+  exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 package_surface() {
   # $1 source tree, $2 where the package is written

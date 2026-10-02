@@ -64,8 +64,11 @@ class DirectoryUpgradeTests(unittest.TestCase):
             [0],
             None,
         ]
+        parts, fields = upgrade_live.OWNER_SHAPES.get(version, (3, 8))
+        administrator = administrator[:fields]
         if owner is None:
-            owner = cbor([version, folded, [[administrator], [], []]])
+            projection = [[administrator]] + [[] for _ in range(parts - 1)]
+            owner = cbor([version, folded, projection])
         state = cbor([wrap, [b""], owner])
         root = hashlib.sha256(b"\x00" + bytes([0, 0, 255])).digest()
         body = (
@@ -159,9 +162,32 @@ class DirectoryUpgradeTests(unittest.TestCase):
         self.assertEqual(proof["administrator"], self.admin["person"]["id"])
         self.assertEqual(proof["sha256"], hashlib.sha256(sealed).hexdigest())
 
-    def test_version_three_elsewhere_does_not_prove_owner_version(self):
-        self.snapshot(version=5)
-        with self.assertRaisesRegex(RuntimeError, "owner version"):
+    def test_every_released_owner_version_is_read_by_its_own_shape(self):
+        for version in (2, 3, 4, 5):
+            with self.subTest(version=version):
+                self.snapshot(version=version)
+                proof = self.old_snapshot()
+                self.assertEqual(proof["owner_version"], version)
+                self.assertEqual(proof["administrator"], self.admin["person"]["id"])
+
+    def test_an_owner_version_no_release_wrote_is_refused_by_name(self):
+        self.snapshot(version=6)
+        with self.assertRaisesRegex(RuntimeError, "owner version 6"):
+            self.old_snapshot()
+
+    def test_a_version_in_another_versions_shape_is_refused(self):
+        administrator = [
+            [1, bytes.fromhex("11" * 16)],
+            "Owner",
+            2,
+            None,
+            [["fixture", "owner"]],
+            ["fixture", "owner"],
+            [0],
+            None,
+        ]
+        self.snapshot(owner=cbor([5, 1, [[administrator], [], []]]))
+        with self.assertRaisesRegex(RuntimeError, "projection has the wrong shape"):
             self.old_snapshot()
 
     def test_wrong_wrapper_is_rejected(self):

@@ -194,6 +194,15 @@ def snapshot_value(data):
     return value
 
 
+# The directory state each released version writes, as (projection parts,
+# fields in a record), from crates/lys-identity/src/directory_state.rs and
+# projection_state.rs at the release: version 2 has no
+# reports_to field, version 3 added it, and versions 4 and 5 hold a fourth
+# projection part. Every version keeps a record's first five fields (identity,
+# name, state, responsible, logins), which is all this proof reads.
+OWNER_SHAPES = {2: (3, 7), 3: (3, 8), 4: (4, 8), 5: (4, 8)}
+
+
 def old_directory_snapshot(root, config, leaves, administrator):
     """Inspect the actual old writer's sealed owner state, never synthesize it."""
     path = directory_path(root, config) / "snapshot.bin"
@@ -248,14 +257,20 @@ def old_directory_snapshot(root, config, leaves, administrator):
     if not isinstance(owner, bytes):
         raise RuntimeError("directory snapshot owner is not bytes")
     owner = snapshot_value(owner)
-    if not isinstance(owner, list) or len(owner) != 3 or owner[0] != 3:
-        raise RuntimeError("old directory snapshot owner version is not 3")
+    if not isinstance(owner, list) or len(owner) != 3 or type(owner[0]) is not int:
+        raise RuntimeError("old directory snapshot owner has the wrong shape")
+    version = owner[0]
+    if version not in OWNER_SHAPES:
+        raise RuntimeError(
+            f"old directory snapshot owner version {version} is not one this proof reads"
+        )
+    parts, fields = OWNER_SHAPES[version]
     if type(owner[1]) is not int or owner[1] != size:
         raise RuntimeError("directory snapshot folded count differs from its tree size")
     projection = owner[2]
     if (
         not isinstance(projection, list)
-        or len(projection) != 3
+        or len(projection) != parts
         or not isinstance(projection[0], list)
     ):
         raise RuntimeError("old directory snapshot projection has the wrong shape")
@@ -266,7 +281,7 @@ def old_directory_snapshot(root, config, leaves, administrator):
         record
         for record in projection[0]
         if isinstance(record, list)
-        and len(record) == 8
+        and len(record) == fields
         and record[0] == [1, bytes.fromhex(identifier[7:])]
     ]
     login = administrator["signed_in"]
@@ -278,7 +293,7 @@ def old_directory_snapshot(root, config, leaves, administrator):
     ):
         raise RuntimeError("old snapshot does not hold the active bound administrator")
     return {
-        "owner_version": 3,
+        "owner_version": version,
         "folded": size,
         "administrator": identifier,
         "sha256": hashlib.sha256(sealed).hexdigest(),
