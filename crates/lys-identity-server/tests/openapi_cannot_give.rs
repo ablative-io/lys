@@ -13,8 +13,13 @@ fn the_published_cannot_give_reason_enum_contains_every_reason() -> Result<(), B
     let schemas = &document["components"]["schemas"];
     let expected = json!(CannotGiveReason::ALL.map(CannotGiveReason::name));
     assert_eq!(schemas["CannotGiveReasonView"]["enum"], expected);
+    let item = &schemas["CannotGiveItemView"];
+    let reason = std::iter::once(item)
+        .chain(item["allOf"].as_array().into_iter().flatten())
+        .find_map(|part| part.pointer("/properties/reason/$ref"))
+        .ok_or("the published item has no reason schema reference")?;
     assert_eq!(
-        schemas["CannotGiveItemView"]["properties"]["reason"]["$ref"],
+        reason,
         "#/components/schemas/CannotGiveReasonView"
     );
     println!(
