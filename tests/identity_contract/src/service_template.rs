@@ -73,6 +73,14 @@ fn absent(path: &Path) -> std::io::Result<bool> {
     }
 }
 
+fn missing_targets(paths: Vec<(&str, PathBuf)>) -> std::io::Result<Vec<(&str, PathBuf)>> {
+    let mut missing = false;
+    for (_, target) in &paths {
+        missing |= absent(target)?;
+    }
+    if missing { Ok(paths) } else { Ok(Vec::new()) }
+}
+
 pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
     let mut paths = template_stores::paths(config);
     // Existing application logs deliberately ignore the model file, including
@@ -82,11 +90,8 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error.into()),
     }
-    let mut missing = false;
-    for (_, target) in &paths {
-        missing |= absent(target)?;
-    }
-    if !missing {
+    let paths = missing_targets(paths)?;
+    if paths.is_empty() {
         return Ok(());
     }
     let key = fingerprint(config, &paths)?;
@@ -143,4 +148,56 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn caller_prepared_stores_are_not_rebuilt() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let prepared = dir.path().join("prepared");
+        fs::create_dir(&prepared)?;
+        fs::write(prepared.join("snapshot.bin"), b"old format")?;
+        let broken = dir.path().join("broken");
+        fs::write(&broken, b"invalid store")?;
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink("missing", &link)?;
+        let missing = dir.path().join("new");
+        let paths = missing_targets(vec![
+            ("prepared", prepared.clone()),
+            ("broken", broken.clone()),
+            ("link", link.clone()),
+            ("new", missing.clone()),
+        ])?;
+        assert_eq!(paths, vec![("new", missing)]);
+        assert_eq!(fs::read(prepared.join("snapshot.bin"))?, b"old format");
+        assert_eq!(fs::read(broken)?, b"invalid store");
+        assert_eq!(fs::read_link(link)?, Path::new("missing"));
+        Ok(())
+    }
+
+    #[test]
+    fn target_metadata_failure_is_not_an_absent_store() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let file = dir.path().join("file");
+        fs::write(&file, b"regular file")?;
+        let result = missing_targets(vec![
+            ("new", dir.path().join("new")),
+            ("invalid", file.join("child")),
+        ]);
+        assert_eq!(
+            result.err().map(|error| error.kind()),
+            Some(std::io::ErrorKind::NotADirectory)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_install_needs_no_template() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        assert!(missing_targets(vec![("prepared", dir.path().to_owned())])?.is_empty());
+        Ok(())
+    }
 }
