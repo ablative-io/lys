@@ -1,4 +1,3 @@
-import { readTogether } from '../../reads';
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
@@ -109,10 +108,11 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
     return grouped;
   }, [teams]);
   const addUnder = (entry: Entry) => {
-    const person = entry.person?.id ?? entry.id;
+    const person = entry.kind === 'person' ? entry.id : entry.person?.id;
+    if (!person) return null;
     const memberships = memberTeams.get(entry.id) ?? memberTeams.get(person) ?? [];
     const team = whose.kind === 'team' && memberships.includes(whose.team) ? whose.team : memberships.length === 1 ? memberships[0] : '';
-    const query = new URLSearchParams({ answers_to: entry.id });
+    const query = new URLSearchParams({ answers_to: person });
     if (team) query.set('team', team);
     return <a href={'#/agents/new?' + query.toString()} onClick={(event) => event.stopPropagation()}>Add agent under them</a>;
   };
@@ -149,7 +149,7 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
 
 export function People() {
   const shell = useShell();
-  const load = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
+  const load = useLoad(async () => ({ view: await api.people(), me: await api.me(), teams: await readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
   if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
     return (
       <div className="page fill">

@@ -1,7 +1,6 @@
 //! Reporting indexes change with their signed events, so reads need no ancestry scan.
 
 use std::collections::{HashSet, VecDeque};
-use std::sync::Arc;
 
 use super::{
     AgentId, IdentityError, IdentityId, LifecycleState, PersonId, Projection, Record, ReportingGap,
@@ -137,12 +136,12 @@ impl Projection {
         let (_, gap) = self.target_accountability(target)?;
         record.reports_to = Some(target);
         record.reporting_gap = gap;
-        Arc::make_mut(&mut self.records).insert(identity, record);
-        Arc::make_mut(&mut self.agents_by_person)
+        self.records.insert(identity, record);
+        self.agents_by_person
             .entry(responsible)
             .or_default()
             .insert(identity);
-        Arc::make_mut(&mut self.reporting_children)
+        self.reporting_children
             .entry(target)
             .or_default()
             .insert(identity);
@@ -162,7 +161,8 @@ impl Projection {
             .ok_or(IdentityError::ChangeMismatch {
                 reason: "the changed agent has no reporting edge",
             })?;
-        let old = Arc::make_mut(&mut self.reporting_children)
+        let old = self
+            .reporting_children
             .get_mut(&from)
             .ok_or(IdentityError::ChangeMismatch {
                 reason: "the reporting parent index is missing",
@@ -173,9 +173,9 @@ impl Projection {
             });
         }
         if old.is_empty() {
-            Arc::make_mut(&mut self.reporting_children).remove(&from);
+            self.reporting_children.remove(&from);
         }
-        Arc::make_mut(&mut self.reporting_children)
+        self.reporting_children
             .entry(target)
             .or_default()
             .insert(identity);
@@ -198,20 +198,21 @@ impl Projection {
                 reason: "the reporting child has no accountable person",
             })?;
         if previous != person {
-            let old = Arc::make_mut(&mut self.agents_by_person)
-                .get_mut(&previous)
-                .ok_or(IdentityError::ChangeMismatch {
-                    reason: "the accountable person index is missing",
-                })?;
+            let old =
+                self.agents_by_person
+                    .get_mut(&previous)
+                    .ok_or(IdentityError::ChangeMismatch {
+                        reason: "the accountable person index is missing",
+                    })?;
             if !old.remove(&identity) {
                 return Err(IdentityError::ChangeMismatch {
                     reason: "the accountable person index omits its agent",
                 });
             }
             if old.is_empty() {
-                Arc::make_mut(&mut self.agents_by_person).remove(&previous);
+                self.agents_by_person.remove(&previous);
             }
-            Arc::make_mut(&mut self.agents_by_person)
+            self.agents_by_person
                 .entry(person)
                 .or_default()
                 .insert(identity);
@@ -254,11 +255,11 @@ impl Projection {
     }
 
     pub(super) fn rebuild_reporting_indexes(&mut self) -> Result<(), IdentityError> {
-        Arc::make_mut(&mut self.agents_by_person).clear();
-        Arc::make_mut(&mut self.reporting_children).clear();
+        self.agents_by_person.clear();
+        self.reporting_children.clear();
         self.agent_count = 0;
         let mut pending = VecDeque::new();
-        for (identity, record) in self.records.iter() {
+        for (identity, record) in &self.records {
             match identity {
                 IdentityId::Person(_) => {
                     if record.responsible.is_some() || record.reports_to.is_some() {
@@ -275,11 +276,11 @@ impl Projection {
                     let target = record.reports_to.ok_or(IdentityError::ChangeMismatch {
                         reason: "an agent snapshot has no reporting edge",
                     })?;
-                    Arc::make_mut(&mut self.agents_by_person)
+                    self.agents_by_person
                         .entry(person)
                         .or_default()
                         .insert(*identity);
-                    Arc::make_mut(&mut self.reporting_children)
+                    self.reporting_children
                         .entry(target)
                         .or_default()
                         .insert(*identity);

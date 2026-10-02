@@ -8,7 +8,7 @@ use crate::state_value::{
 };
 
 /// The version of the directory state this crate writes and reads.
-pub(crate) const STATE_VERSION: u64 = 5;
+pub(crate) const STATE_VERSION: u64 = 3;
 
 /// The stored owner's version, after checking the canonical outer shape.
 pub(crate) fn version(bytes: &[u8]) -> Result<u64, Unreadable> {
@@ -43,18 +43,12 @@ pub(crate) fn encode(projection: &Projection, folded: u64) -> Result<Vec<u8>, Un
 pub(crate) fn decode(bytes: &[u8], size: u64) -> Result<Projection, Unreadable> {
     let [version, folded, projection] = tuple::<3>(decode_value(bytes)?, "a directory state")?;
     let version = read_uint(&version, "a state version")?;
-    if version != STATE_VERSION && version != 3 && version != 4 {
+    if version != STATE_VERSION {
         return Err(format!(
             "directory state version {version} is not {STATE_VERSION}"
         ));
     }
     check_folded(read_uint(&folded, "a folded count")?, size)?;
-    let expected = if version == 3 { 3 } else { 4 };
-    if !matches!(&projection, ciborium::Value::Array(parts) if parts.len() == expected) {
-        return Err(format!(
-            "directory state version {version} has the wrong projection shape"
-        ));
-    }
     state::decode(projection)
 }
 

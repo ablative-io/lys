@@ -17,8 +17,7 @@ struct Record {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Session {
-    #[serde(rename = "session")]
-    id: String,
+    session: String,
     pid: Option<u32>,
     started_at: u64,
     columns: u16,
@@ -46,7 +45,7 @@ pub(super) fn migrate(value: Value) -> Result<Kept, serde_json::Error> {
         .sessions
         .into_iter()
         .map(|session| KeptSession {
-            session: session.id,
+            session: session.session,
             pid: session.pid,
             leader_start: None,
             started_at: session.started_at,
@@ -62,20 +61,4 @@ pub(super) fn migrate(value: Value) -> Result<Kept, serde_json::Error> {
         })
         .collect();
     Ok(Kept::new(sessions))
-}
-
-pub(super) fn migrate_v2(value: Value) -> Result<Kept, serde_json::Error> {
-    #[derive(Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct Previous {
-        format: String,
-        sessions: Vec<KeptSession>,
-    }
-    let previous: Previous = serde_json::from_value(value)?;
-    if previous.format != "lys-runner-sessions/v2" {
-        return Err(serde::de::Error::custom(
-            "the previous session format is invalid",
-        ));
-    }
-    Ok(Kept::new(previous.sessions))
 }

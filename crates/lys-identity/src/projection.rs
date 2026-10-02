@@ -8,7 +8,6 @@
 //! before it is signed and never after it is in the log.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::Arc;
 
 use crate::binding::LoginBinding;
 use crate::error::IdentityError;
@@ -17,16 +16,9 @@ use crate::id::{AgentId, IdentityId, PersonId};
 use crate::lifecycle::LifecycleState;
 use crate::operation::OperationId;
 use crate::profile::Profile;
-use crate::signer::Entry;
 
 #[path = "projection_reporting.rs"]
 mod reporting;
-
-#[path = "projection_accounts.rs"]
-pub mod accounts;
-
-#[path = "projection_draft.rs"]
-pub mod draft;
 
 /// The inactive identity that interrupts a reporting chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,17 +87,14 @@ impl Record {
 /// Every identity the directory holds, and the indexes a change is judged against.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Projection {
-    records: Arc<BTreeMap<IdentityId, Record>>,
-    people: Arc<BTreeMap<String, PersonId>>,
-    agents_by_person: Arc<BTreeMap<PersonId, BTreeSet<IdentityId>>>,
-    reporting_children: Arc<BTreeMap<IdentityId, BTreeSet<IdentityId>>>,
+    records: BTreeMap<IdentityId, Record>,
+    agents_by_person: BTreeMap<PersonId, BTreeSet<IdentityId>>,
+    reporting_children: BTreeMap<IdentityId, BTreeSet<IdentityId>>,
     agent_count: usize,
-    bindings: Arc<HashMap<LoginBinding, PersonId>>,
-    agent_bindings: Arc<HashMap<LoginBinding, AgentId>>,
-    operations: Arc<HashMap<OperationId, u64>>,
-    link_sources: Arc<HashMap<String, u64>>,
-    accounts: Arc<accounts::Accounts>,
-    drafts: Arc<BTreeMap<OperationId, Arc<draft::DraftRecord>>>,
+    bindings: HashMap<LoginBinding, PersonId>,
+    agent_bindings: HashMap<LoginBinding, AgentId>,
+    operations: HashMap<OperationId, u64>,
+    link_sources: HashMap<String, u64>,
 }
 
 fn unknown(identity: IdentityId) -> IdentityError {
@@ -115,30 +104,6 @@ fn unknown(identity: IdentityId) -> IdentityError {
 }
 
 impl Projection {
-    /// A request snapshot sharing every directory index without copying its records.
-    #[must_use]
-    pub fn shared(&self) -> Self {
-        self.with_accounts(Arc::clone(&self.accounts))
-    }
-
-    /// A shared directory snapshot with separately indexed service accounts.
-    #[must_use]
-    pub fn with_accounts(&self, accounts: Arc<accounts::Accounts>) -> Self {
-        Self {
-            records: Arc::clone(&self.records),
-            people: Arc::clone(&self.people),
-            agents_by_person: Arc::clone(&self.agents_by_person),
-            reporting_children: Arc::clone(&self.reporting_children),
-            agent_count: self.agent_count,
-            bindings: Arc::clone(&self.bindings),
-            agent_bindings: Arc::clone(&self.agent_bindings),
-            operations: Arc::clone(&self.operations),
-            link_sources: Arc::clone(&self.link_sources),
-            accounts,
-            drafts: Arc::clone(&self.drafts),
-        }
-    }
-
     /// Add an account from the separately signed service-account log to a
     /// request's projection. Call only on a clone after settling that log.
     /// This never creates a login binding or changes the directory's log.
@@ -166,7 +131,7 @@ impl Projection {
                 identity: identity.to_string(),
             });
         }
-        Arc::make_mut(&mut self.records).insert(
+        self.records.insert(
             identity,
             Record {
                 profile,
@@ -189,36 +154,12 @@ impl Projection {
 
     /// The identity `id`, if the directory holds it.
     pub fn record(&self, id: IdentityId) -> Option<&Record> {
-        self.records
-            .get(&id)
-            .or_else(|| self.accounts.record(id, self))
+        self.records.get(&id)
     }
 
     /// Every identity, in identifier order.
     pub fn records(&self) -> impl Iterator<Item = (&IdentityId, &Record)> {
-        self.records.iter().chain(self.accounts.records(self))
-    }
-
-    /// People in wire identifier order, starting after the supplied identifier.
-    pub fn people(&self, after: std::ops::Bound<&str>) -> impl Iterator<Item = (&str, PersonId)> {
-        self.people
-            .range::<str, _>((after, std::ops::Bound::Unbounded))
-            .map(|(id, person)| (id.as_str(), *person))
-    }
-
-    /// The maintained number of people.
-    pub fn people_count(&self) -> usize {
-        self.people.len()
-    }
-
-    /// The maintained number of agents answering to people.
-    pub fn people_agents_count(&self) -> usize {
-        self.agent_count
-    }
-
-    /// The maintained number of one person's agents.
-    pub fn person_agents_count(&self, person: PersonId) -> usize {
-        self.agents_by_person.get(&person).map_or(0, BTreeSet::len)
+        self.records.iter()
     }
 
     /// The named person's agents, without visiting unrelated directory records.
@@ -364,20 +305,11 @@ impl Projection {
         }
     }
 
-    /// Advance the directory by the leaf `entry`, committed at log index `index`.
-    pub fn apply_entry(&mut self, entry: &Entry, index: u64) -> Result<(), IdentityError> {
-        match entry {
-            Entry::Identity(event) => self.apply(event, index),
-            Entry::Install(event) => self.apply_install(event, index),
-            Entry::Draft(event) => self.apply_draft(event, index),
-        }
-    }
-
     /// Advance the directory by `event`, committed at log index `index`.
     pub fn apply(&mut self, event: &IdentityEvent, index: u64) -> Result<(), IdentityError> {
         self.check(event)?;
         let identity = event.identity();
-        Arc::make_mut(&mut self.operations).insert(event.operation(), index);
+        self.operations.insert(event.operation(), index);
         let registered_by = event.actor().binding().clone();
         match event.change() {
             Change::SetupPerson { profile } => {
@@ -389,11 +321,11 @@ impl Projection {
                 let mut record = fresh(profile, None, registered_by.clone(), index);
                 record.state = LifecycleState::Active;
                 record.bindings.push(registered_by.clone());
-                Arc::make_mut(&mut self.records).insert(identity, record);
-                Arc::make_mut(&mut self.bindings).insert(registered_by, person);
+                self.records.insert(identity, record);
+                self.bindings.insert(registered_by, person);
             }
             Change::RegisterPerson { profile } => {
-                Arc::make_mut(&mut self.records)
+                self.records
                     .insert(identity, fresh(profile, None, registered_by, index));
             }
             Change::RegisterAgent {
@@ -425,10 +357,10 @@ impl Projection {
                 record.events.push(index);
                 match identity {
                     IdentityId::Person(person) => {
-                        Arc::make_mut(&mut self.bindings).insert(binding.clone(), person);
+                        self.bindings.insert(binding.clone(), person);
                     }
                     IdentityId::Agent(agent) => {
-                        Arc::make_mut(&mut self.agent_bindings).insert(binding.clone(), agent);
+                        self.agent_bindings.insert(binding.clone(), agent);
                     }
                     IdentityId::ServiceAccount(_) => {
                         return Err(IdentityError::ChangeMismatch {
@@ -445,18 +377,15 @@ impl Projection {
             }
             Change::LinkAudit(seen) => {
                 self.held(identity)?.events.push(index);
-                Arc::make_mut(&mut self.link_sources)
+                self.link_sources
                     .insert(seen.source_operation_id().to_owned(), index);
             }
-        }
-        if let IdentityId::Person(person) = identity {
-            Arc::make_mut(&mut self.people).insert(identity.to_string(), person);
         }
         Ok(())
     }
 
     fn held(&mut self, identity: IdentityId) -> Result<&mut Record, IdentityError> {
-        Arc::make_mut(&mut self.records)
+        self.records
             .get_mut(&identity)
             .ok_or_else(|| unknown(identity))
     }
@@ -483,13 +412,6 @@ fn fresh(
 #[path = "projection_state.rs"]
 pub(crate) mod state;
 
-#[path = "projection_install.rs"]
-mod install;
-
 #[cfg(test)]
 #[path = "projection_reporting_tests.rs"]
 mod reporting_tests;
-
-#[cfg(test)]
-#[path = "projection_shared_tests.rs"]
-mod shared_tests;

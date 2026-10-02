@@ -24,13 +24,13 @@ function registrationOf(document: unknown): boolean {
 }
 
 export async function registrationCapability(): Promise<RegistrationCapability> {
-  try { return { answersTo: registrationOf(await request<unknown>('/surface-contract')), problem: null }; }
+  try { return { answersTo: registrationOf(await request<unknown>('/openapi.json')), problem: null }; }
   catch (problem) { return { answersTo: false, problem }; }
 }
 
 export async function addAndRunCapability(): Promise<AddAndRunCapability> {
   let document: unknown;
-  try { document = await request<unknown>('/surface-contract'); }
+  try { document = await request<unknown>('/openapi.json'); }
   catch (problem) { return { answersTo: null, problem, machineAdmission: null, admissionProblem: problem }; }
   let answersTo: boolean | null = null; let problem: unknown = null;
   let machineAdmission: boolean | null = null; let admissionProblem: unknown = null;

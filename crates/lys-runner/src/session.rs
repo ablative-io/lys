@@ -25,9 +25,10 @@
 //! identity still matches. A group whose ownership cannot be proved is
 //! never signalled, and the reported end says why.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak, mpsc};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak, mpsc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use portable_pty::MasterPty;
@@ -38,40 +39,20 @@ use crate::input::Input;
 use crate::judge::Policy;
 use crate::operations::Operations;
 use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Launch, SessionView};
+use crate::protocol::{Ended, EndedHow, Key, Launch, SessionView, StatusView};
 use crate::refusals::Desk;
 use crate::rotation::RotationState;
+use crate::scrollback::Scrollback;
 use crate::state::{Kept, KeptSession, StateFile};
 use crate::tracking::Tracking;
 use crate::tracking_store::Feed;
 
-mod control;
-
-#[cfg(test)]
-#[path = "../tests/injection/cases.rs"]
-mod injection_tests;
-
-mod peer_view;
-
 mod lifecycle;
-pub(crate) mod output;
-mod owned;
 mod restart;
-
-#[cfg(test)]
-#[path = "../tests/session_start/cases.rs"]
-mod start_tests;
-
-#[cfg(test)]
-#[path = "../tests/session_poison/cases.rs"]
-mod poison_tests;
-
-#[cfg(test)]
-type SpawnProbe = Box<dyn FnOnce() + Send>;
 
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
-pub(crate) use lifecycle::{Wake, accounts, append, transcript_parent, window_limit};
+pub(crate) use lifecycle::{Wake, accounts, append};
 
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
@@ -90,32 +71,21 @@ pub(crate) struct Live {
     pub(crate) writer: Input,
     master: Box<dyn MasterPty + Send>,
     pid: u32,
-    leader: Option<Leader>,
 }
 
 #[cfg(test)]
 #[path = "../tests/input_no_screen/shared_lock.rs"]
 mod input_no_screen;
 
-#[cfg(test)]
-#[path = "../tests/durable/cases.rs"]
-mod durable_tests;
-
 impl Live {
-    /// Ask the verified leader to exit so its final usage can be flushed.
-    pub(crate) fn end(&self) -> Result<(), RunnerError> {
-        let leader = self.leader.as_ref().ok_or_else(|| {
-            RunnerError::refused(
-                "leader_unproved",
-                "the process's start identity was not recorded",
-            )
-        })?;
-        crate::pty::end(leader)
-    }
-
-    /// Emergency stop retains immediate process-group termination.
-    pub(crate) fn kill(&self) -> Result<(), RunnerError> {
-        crate::pty::end_group(self.pid)
+    /// End the process and everything it started, naming a failure in the
+    /// runner's log: the exit, when it comes, is what answers.
+    pub(crate) fn end(&self, id: &str) {
+        if let Err(error) = crate::pty::end_group(self.pid) {
+            crate::error::said(&format!(
+                "session {id}: the process was already ending: {error}"
+            ));
+        }
     }
 }
 
@@ -142,29 +112,37 @@ pub(crate) struct Session {
     pub(crate) leader_start: Option<Leader>,
     columns: u16,
     rows: u16,
-    pub(crate) output: Arc<output::OutputHandle>,
+    scrollback: Scrollback,
     pub(crate) ended: Option<Ended>,
     pub(crate) live: Option<Live>,
-    pub(crate) generation: u64,
+    generation: u64,
     pub(crate) launch: Option<Launch>,
     pub(crate) rotation: Option<RotationState>,
     pub(crate) ending: bool,
     pub(crate) guard: Guard,
     pub(crate) follower: Option<mpsc::Sender<Wake>>,
-    pub(crate) pending_status: Option<crate::collector::status::PendingStatus>,
 }
 
 impl Session {
-    fn view(&self, id: &str) -> Result<SessionView, RunnerError> {
-        let output = self.output.lock()?;
-        Ok(SessionView {
+    /// The session's scrollback.
+    pub(crate) fn scrollback(&self) -> &Scrollback {
+        &self.scrollback
+    }
+
+    /// The session's end, once it has ended.
+    pub(crate) fn ended(&self) -> Option<Ended> {
+        self.ended.clone()
+    }
+
+    fn view(&self, id: &str) -> SessionView {
+        SessionView {
             session: id.to_owned(),
             pid: self.pid,
             started_at: self.started_at,
             columns: self.columns,
             rows: self.rows,
-            oldest: output.scrollback().oldest(),
-            cursor: output.scrollback().end(),
+            oldest: self.scrollback.oldest(),
+            cursor: self.scrollback.end(),
             account: self
                 .rotation
                 .as_ref()
@@ -180,7 +158,7 @@ impl Session {
                 .as_ref()
                 .and_then(|launch| launch.policy.as_deref())
                 .map(Admitted::judged_under),
-        })
+        }
     }
 
     pub(crate) fn live(&mut self, id: &str) -> Result<&mut Live, RunnerError> {
@@ -203,8 +181,6 @@ impl Session {
 pub(crate) struct Table {
     pub(crate) owner: Weak<Sessions>,
     pub(crate) sessions: BTreeMap<String, Session>,
-    pub(crate) responsible: BTreeMap<String, String>,
-    starting: BTreeSet<String>,
     stopping: bool,
     pub(crate) feed: Feed,
     pub(crate) desk: Desk,
@@ -219,28 +195,6 @@ pub struct Sessions {
     state: StateFile,
     state_dir: PathBuf,
     scrollback: usize,
-    pub(crate) writer: crate::durable::Writer,
-    #[cfg(test)]
-    spawn_probe: Mutex<Option<SpawnProbe>>,
-}
-
-pub(super) struct Starting {
-    sessions: Arc<Sessions>,
-    id: String,
-}
-
-impl Drop for Starting {
-    fn drop(&mut self) {
-        if let Some(mut table) = self.sessions.lock_logged() {
-            table.starting.remove(&self.id);
-            drop(table);
-            self.sessions.wake();
-        }
-    }
-}
-
-fn table_poisoned(error: impl std::fmt::Display) -> RunnerError {
-    RunnerError::refused("session_table_poisoned", error.to_string())
 }
 
 pub(crate) fn unknown(id: &str) -> RunnerError {
@@ -293,32 +247,29 @@ impl Sessions {
                 "a session's scrollback keeps at least one byte",
             ));
         }
-        let mut state = StateFile::open(state_dir)?;
+        let state = StateFile::open(state_dir)?;
         let found_at = now_ms();
         let mut table = Table {
             owner: Weak::new(),
             sessions: BTreeMap::new(),
-            responsible: BTreeMap::new(),
-            starting: BTreeSet::new(),
             stopping: false,
             feed: Feed::open(state_dir)?,
             desk: Desk::default(),
             gaps: BTreeMap::new(),
             operations: Operations::open(state_dir)?,
         };
-        let kept = state.read()?;
-        table.responsible = kept.responsible;
-        for kept in kept.sessions {
-            let ended = if let Some(ended) = kept.ended {
-                ended
-            } else {
-                let (signal, reason) = left_behind(&kept.session, kept.leader_start.as_ref());
-                Ended {
-                    how: EndedHow::EndedByRunnerRestart,
-                    at: found_at,
-                    status: None,
-                    signal,
-                    reason,
+        for kept in state.read()?.sessions {
+            let ended = match kept.ended {
+                Some(ended) => ended,
+                None => {
+                    let (signal, reason) = left_behind(&kept.session, kept.leader_start.as_ref());
+                    Ended {
+                        how: EndedHow::EndedByRunnerRestart,
+                        at: found_at,
+                        status: None,
+                        signal,
+                        reason,
+                    }
                 }
             };
             table.sessions.insert(
@@ -329,7 +280,7 @@ impl Sessions {
                     leader_start: kept.leader_start,
                     columns: kept.columns,
                     rows: kept.rows,
-                    output: Arc::new(output::OutputHandle::new(scrollback, Some(ended.clone()))),
+                    scrollback: Scrollback::new(scrollback),
                     ended: Some(ended),
                     live: None,
                     generation: 0,
@@ -338,17 +289,12 @@ impl Sessions {
                     ending: false,
                     guard: Guard::default(),
                     follower: None,
-                    pending_status: None,
                 },
             );
         }
         let state_dir = state_dir
             .canonicalize()
             .map_err(|error| RunnerError::refused("launch_config_refused", error.to_string()))?;
-        let writer = crate::durable::Writer::new()?;
-        state.writer(writer.clone());
-        table.feed.writer(writer.clone());
-        table.operations.writer(writer.clone());
         let sessions = Arc::new_cyclic(|owner| {
             table.owner = Weak::clone(owner);
             Self {
@@ -357,15 +303,11 @@ impl Sessions {
                 state,
                 state_dir,
                 scrollback,
-                writer,
-                #[cfg(test)]
-                spawn_probe: Mutex::new(None),
             }
         });
-        let table = sessions.lock()?;
+        let table = sessions.lock();
         sessions.persist(&table)?;
         drop(table);
-        sessions.writer.barrier()?;
         Ok(sessions)
     }
 
@@ -374,47 +316,19 @@ impl Sessions {
         self.state.runner()
     }
 
-    pub(crate) fn read_lock(&self) -> Result<MutexGuard<'_, Table>, RunnerError> {
-        #[cfg(test)]
-        lifecycle::output_tests::table_locked();
-        self.table.lock().map_err(table_poisoned)
+    pub(crate) fn lock(&self) -> MutexGuard<'_, Table> {
+        self.table.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Table>, RunnerError> {
-        let mut table = self.read_lock()?;
-        table.operations.prune(now_ms());
-        Ok(table)
-    }
-
-    pub(crate) fn lock_logged(&self) -> Option<MutexGuard<'_, Table>> {
-        match self.lock() {
-            Ok(table) => Some(table),
-            Err(error) => {
-                crate::error::said(&error.to_string());
-                self.wake();
-                None
-            }
-        }
-    }
-
-    fn wait<'a>(&self, table: MutexGuard<'a, Table>) -> Result<MutexGuard<'a, Table>, RunnerError> {
-        self.changed.wait(table).map_err(table_poisoned)
+    fn wait<'a>(&self, table: MutexGuard<'a, Table>) -> MutexGuard<'a, Table> {
+        self.changed
+            .wait(table)
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Wake everything waiting on the table: a caller left, or a thing changed.
     pub fn wake(&self) {
-        #[cfg(test)]
-        lifecycle::output_tests::table_woken();
         self.changed.notify_all();
-    }
-
-    /// Wake a cancelled output request and the shared control waiters.
-    pub fn wake_session(&self, id: &str) -> Result<(), RunnerError> {
-        let table = self.lock()?;
-        let output = Arc::clone(&table.sessions.get(id).ok_or_else(|| unknown(id))?.output);
-        self.changed.notify_all();
-        drop(table);
-        output.wake()
     }
 
     fn persist(&self, table: &Table) -> Result<(), RunnerError> {
@@ -431,8 +345,7 @@ impl Sessions {
                 ended: session.ended.clone(),
             })
             .collect();
-        self.state
-            .write_responsible(&Kept::new(sessions), &table.responsible)
+        self.state.write(&Kept::new(sessions))
     }
 
     /// Record the table, naming any failure where the runner's log shows it:
@@ -455,23 +368,17 @@ impl Sessions {
     /// so is an executable that reports another version.
     pub fn begin(
         self: &Arc<Self>,
-        launch: Launch,
-        policy: Option<Policy>,
-        tracking: Option<Tracking>,
-    ) -> Result<(u32, u64), RunnerError> {
-        self.begin_owned(launch, policy, tracking, None)
-    }
-
-    fn begin_owned(
-        self: &Arc<Self>,
         mut launch: Launch,
         policy: Option<Policy>,
         tracking: Option<Tracking>,
-        responsible: Option<String>,
     ) -> Result<(u32, u64), RunnerError> {
-        if let Some(tracking) = &tracking {
-            tracking.checked()?;
-        }
+        let launched = match &tracking {
+            Some(tracking) => {
+                tracking.checked()?;
+                Some(lifecycle::launched(&launch, tracking)?)
+            }
+            None => None,
+        };
         if !valid_id(&launch.session) {
             return Err(RunnerError::refused(
                 "session_invalid",
@@ -483,30 +390,19 @@ impl Sessions {
             .clone()
             .map(RotationState::new)
             .transpose()?;
-        let mut table = self.lock()?;
+        let mut table = self.lock();
         if table.stopping {
             return Err(RunnerError::refused(
                 "runner_stopping",
                 "the runner is stopping and starts nothing",
             ));
         }
-        if table.sessions.contains_key(&launch.session) || table.starting.contains(&launch.session)
-        {
+        if table.sessions.contains_key(&launch.session) {
             return Err(RunnerError::refused(
                 "session_exists",
                 format!("session {} is already held", launch.session),
             ));
         }
-        table.starting.insert(launch.session.clone());
-        let reservation = Starting {
-            sessions: Arc::clone(self),
-            id: launch.session.clone(),
-        };
-        drop(table);
-        let launched = tracking
-            .as_ref()
-            .map(|tracking| lifecycle::launched(&launch, tracking))
-            .transpose()?;
         crate::launch_config::prepare(&self.state_dir, &mut launch)?;
         let id = launch.session.clone();
         let cwd = lifecycle::bound_directory(&launch.directory);
@@ -516,7 +412,7 @@ impl Sessions {
             leader_start: None,
             columns: launch.columns,
             rows: launch.rows,
-            output: Arc::new(output::OutputHandle::new(self.scrollback, None)),
+            scrollback: Scrollback::new(self.scrollback),
             ended: None,
             live: None,
             generation: 0,
@@ -531,49 +427,171 @@ impl Sessions {
                 idle: true,
             },
             follower: None,
-            pending_status: None,
         };
-        let prepared = self.run(&lifecycle::plan(&session, false)?)?;
-        let pending = Self::install(&mut session, prepared)?;
-        let pid = session.pid.ok_or_else(|| {
-            RunnerError::refused(
-                "spawn_install_failed",
-                "the installed child has no process id",
-            )
-        })?;
+        let pid = self.run(&id, &mut session, false)?;
         let started_at = session.started_at;
-        let mut table = match self.lock() {
-            Ok(table) => table,
-            Err(error) => {
-                if let Err(cleanup) = pending.cancel() {
-                    crate::error::said(&format!("cancelled_spawn_cleanup_failed: {cleanup}"));
-                }
-                return Err(error);
-            }
-        };
-        if table.stopping {
-            drop(table);
-            pending.cancel()?;
-            return Err(RunnerError::refused(
-                "runner_stopping",
-                "the runner stopped during the launch",
-            ));
-        }
         table.sessions.insert(id.clone(), session);
-        if let Some(person) = responsible {
-            table.responsible.insert(id.clone(), person);
-        }
-        let mut recorded = self.persist(&table);
+        self.persist(&table)?;
         if let Some((executable, version)) = launched {
-            recorded = recorded
-                .and_then(|()| lifecycle::tracking_started(&mut table, &id, &executable, &version));
+            lifecycle::tracking_started(&mut table, &id, &executable, &version);
         }
         drop(table);
-        self.activate(&id, pending)?;
-        drop(reservation);
-        recorded?;
-        self.writer.barrier()?;
         self.wake();
         Ok((pid, started_at))
+    }
+
+    /// Run `check` on the table each time it changes, until it answers, the
+    /// caller leaves, or the runner stops.
+    pub(crate) fn until_any<T>(
+        &self,
+        left: &AtomicBool,
+        mut check: impl FnMut(&mut Table) -> Option<T>,
+    ) -> Result<T, RunnerError> {
+        let mut table = self.lock();
+        loop {
+            if let Some(answer) = check(&mut table) {
+                return Ok(answer);
+            }
+            if left.load(Ordering::SeqCst) {
+                return Err(RunnerError::refused(
+                    "caller_left",
+                    "the caller closed the request",
+                ));
+            }
+            if table.stopping {
+                return Err(RunnerError::refused(
+                    "runner_stopping",
+                    "the runner is stopping",
+                ));
+            }
+            table = self.wait(table);
+        }
+    }
+
+    /// Type `bytes` into session `id`.
+    pub fn write(&self, id: &str, bytes: &[u8]) -> Result<(), RunnerError> {
+        let writer = {
+            let mut table = self.lock();
+            let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
+            session.live(id)?.writer.clone()
+        };
+        writer.write(bytes.to_vec())
+    }
+
+    /// Type `text`, then Enter when asked.
+    pub fn input(&self, id: &str, text: &str, enter: bool) -> Result<(), RunnerError> {
+        let mut bytes = text.as_bytes().to_vec();
+        if enter {
+            bytes.extend_from_slice(Key::Enter.bytes());
+        }
+        self.write(id, &bytes)
+    }
+
+    /// Send `keys`, in order.
+    pub fn keys(&self, id: &str, keys: &[Key]) -> Result<(), RunnerError> {
+        let bytes: Vec<u8> = keys
+            .iter()
+            .flat_map(|key| key.bytes().iter().copied())
+            .collect();
+        self.write(id, &bytes)
+    }
+
+    /// Resize session `id`'s terminal.
+    pub fn resize(&self, id: &str, columns: u16, rows: u16) -> Result<(), RunnerError> {
+        let mut table = self.lock();
+        let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
+        crate::pty::resize(&*session.live(id)?.master, columns, rows)?;
+        session.columns = columns;
+        session.rows = rows;
+        Ok(())
+    }
+
+    /// Run `check` on session `id` each time the table changes, until it
+    /// answers, the caller leaves, or the runner stops.
+    pub(crate) fn until<T>(
+        &self,
+        id: &str,
+        left: &AtomicBool,
+        mut check: impl FnMut(&mut Session, &str) -> Option<Result<T, RunnerError>>,
+    ) -> Result<T, RunnerError> {
+        let mut table = self.lock();
+        loop {
+            let stopping = table.stopping;
+            let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
+            if let Some(answer) = check(session, id) {
+                return answer;
+            }
+            if left.load(Ordering::SeqCst) {
+                return Err(RunnerError::refused(
+                    "caller_left",
+                    "the caller closed the request",
+                ));
+            }
+            if stopping {
+                return Err(RunnerError::refused(
+                    "runner_stopping",
+                    "the runner is stopping",
+                ));
+            }
+            table = self.wait(table);
+        }
+    }
+
+    /// End session `id`'s process and answer once its exit is seen.
+    pub fn end(&self, id: &str, left: &AtomicBool) -> Result<Ended, RunnerError> {
+        {
+            let mut table = self.lock();
+            let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
+            if session.ended.is_none() {
+                session.ending = true;
+                if let Some(live) = &session.live {
+                    live.end(id);
+                }
+            }
+        }
+        self.until(id, left, |session, _| session.ended.clone().map(Ok))
+    }
+
+    /// What the runner holds: every session, or the one named.
+    pub fn status(&self, only: Option<&str>) -> Result<StatusView, RunnerError> {
+        let table = self.lock();
+        let sessions = match only {
+            Some(id) => vec![table.sessions.get(id).ok_or_else(|| unknown(id))?.view(id)],
+            None => table
+                .sessions
+                .iter()
+                .map(|(id, session)| session.view(id))
+                .collect(),
+        };
+        Ok(StatusView {
+            runner: RUNNER.to_owned(),
+            protocol: crate::protocol::PROTOCOL_VERSION,
+            sessions,
+        })
+    }
+
+    /// End every running session and answer once each exit is seen; the
+    /// runner then starts nothing more.
+    pub fn stop_all(&self) {
+        let mut table = self.lock();
+        table.stopping = true;
+        for (id, session) in &mut table.sessions {
+            if session.ended.is_none() {
+                session.ending = true;
+                if let Some(live) = &session.live {
+                    live.end(id);
+                }
+            }
+        }
+        while table
+            .sessions
+            .values()
+            .any(|session| session.ended.is_none() && session.live.is_some())
+        {
+            table = self.wait(table);
+        }
+        self.persist_logged(&table);
+        drop(table);
+        self.wake();
     }
 }

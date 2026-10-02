@@ -7,11 +7,9 @@ pub use crate::routes_table::router;
 
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 
-use axum::body::Bytes;
-use axum::extract::rejection::BytesRejection;
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, header};
 use axum::{Json, Router};
 use lys_identity::{
@@ -35,16 +33,8 @@ use crate::reviews_store::ReviewStore;
 use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::{Sessions, now};
 
-#[path = "people_giving.rs"]
-pub(crate) mod people_giving;
-
-#[cfg(test)]
-#[path = "people_giving_tests.rs"]
-pub(crate) mod people_giving_tests;
-
 /// Everything a request is served from.
 pub struct AppState {
-    pub(crate) changes: crate::changes::Changes,
     /// The directory, one caller at a time.
     pub directory: Mutex<Directory<FileLeafStore>>,
     /// Sign-in.
@@ -107,12 +97,6 @@ pub struct AppState {
     /// The apps, kept beside the grant log: always open, holding at least
     /// the app `lys`.
     pub apps: Mutex<crate::apps_store::AppStore>,
-    /// Cached durable grant-bound credentials.
-    pub grant_tokens: Mutex<crate::grant_token_store::Tokens>,
-    /// Cached digests for the agent runs this install starts.
-    pub agent_passes: Arc<Mutex<crate::agent_pass_store::Passes>>,
-    /// Responsibilities loaded from the deployment data before serving.
-    pub(crate) kept_responsibilities: crate::kept_responsibilities::Kept,
     /// The schema builder's test benches, each a throwaway draft.
     pub benches: crate::apps_bench::Benches,
     /// The issuer's administration API the sign-in providers are set
@@ -173,21 +157,7 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
     })?;
     lys_identity::directory_migration::migrate(store, &key)?;
     let reopen = Box::new(move || FileLeafStore::open(&log_dir));
-    let mut directory = Directory::open(reopen, key)?;
-    if let Some(from) = &config.issuer_moved_from
-        && directory.record_issuer_move(
-            from,
-            &config.issuer,
-            crate::read_api::BUILD,
-            crate::session::now(),
-        )?
-    {
-        println!(
-            "lys-identity-server recorded the issuer move from {from} to {}",
-            config.issuer
-        );
-    }
-    Ok(directory)
+    Ok(Directory::open(reopen, key)?)
 }
 
 fn malformed(reason: String) -> ServerError {
@@ -204,53 +174,10 @@ pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
 /// The signed-in actor, or a refusal: the administrator for a request
 /// carrying the install's operator token, else the session's actor.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
-    if let Some((agent, provenance)) = crate::agent_pass::verified(state, headers)? {
-        return Ok(Actor::new(
-            lys_identity::LoginBinding::new(state.oidc.issuer(), &agent.to_string())?,
-            provenance,
-        ));
-    }
     if let Some(actor) = crate::operator::actor(state, headers)? {
         return Ok(actor);
     }
     state.sessions.actor(cookie_header(headers))
-}
-
-/// Require an active administrator using the current directory projection.
-pub(crate) fn administrator(state: &AppState, actor: &Actor) -> Result<(), ServerError> {
-    with_directory(state, |directory| {
-        if admitted_agent(directory.projection()?, actor)? {
-            return Ok(());
-        }
-        state
-            .admission
-            .administrator(directory.projection()?, actor)
-    })
-}
-
-/// Admit a pass actor whose route grant was exercised by the guarded router.
-/// A signed agent cannot borrow this exception to personal admission.
-pub(crate) fn admitted_agent(
-    directory: &lys_identity::projection::Projection,
-    actor: &Actor,
-) -> Result<bool, ServerError> {
-    if matches!(
-        actor.provenance().method(),
-        lys_identity::AuthMethod::AgentPass(_)
-    ) {
-        crate::caller_admission::active_caller(directory, actor)?;
-        return Ok(true);
-    }
-    Ok(false)
-}
-
-/// Whether the caller is an administrator, retaining operational refusals.
-pub(crate) fn is_administrator(state: &AppState, actor: &Actor) -> Result<bool, ServerError> {
-    with_directory(state, |directory| {
-        state
-            .admission
-            .is_administrator(directory.projection()?, actor)
-    })
 }
 
 /// Run `act` on the directory, one caller at a time.
@@ -258,13 +185,10 @@ pub(crate) fn with_directory<T>(
     state: &AppState,
     act: impl FnOnce(&mut Directory<FileLeafStore>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    let mut directory =
-        state
-            .directory
-            .lock()
-            .map_err(|error| ServerError::DirectoryUnavailable {
-                reason: format!("the directory lock is poisoned: {error}"),
-            })?;
+    let mut directory = state
+        .directory
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
     act(&mut directory)
 }
 
@@ -338,7 +262,7 @@ pub(crate) async fn register_person(
     Json(body): Json<Named>,
 ) -> Result<Json<PersonRegistered>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    state.admission.administrator(&actor)?;
     let (op, profile) = (
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
@@ -359,7 +283,7 @@ pub(crate) async fn register_agent(
 ) -> Result<Json<AgentRegistered>, ServerError> {
     if !headers.contains_key(axum::http::header::AUTHORIZATION) {
         let actor = signed_in(&state, &headers)?;
-        crate::routes::administrator(&state, &actor)?;
+        state.admission.administrator(&actor)?;
         let (op, profile) = (
             operation(&body.operation)?,
             Profile::new(&body.display_name)?,
@@ -375,36 +299,22 @@ pub(crate) async fn register_agent(
                 }
             };
             let target = registration_target(own, body.answers_to.as_deref(), true)?;
-            crate::agent_policy_api::with_policies(&state, |policies| {
-                let answer =
-                    directory.register_reporting_agent(actor, op, target, profile, now())?;
-                policies.ensure_default(&answer.agent.to_string())?;
-                crate::reporting_api::registered(&answer).map(Json)
-            })
+            let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
+            crate::reporting_api::registered(&answer).map(Json)
         });
     }
     let (op, profile) = (
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    crate::grants::with_directory_grants(
-        &state,
-        |mut judged| {
-            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-            crate::service_account_grants::admit(&mut judged, caller, "agents")?;
-            let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
-            let target = registration_target(responsible, body.answers_to.as_deref(), false)?;
-            Ok((actor, target))
-        },
-        |directory, (actor, target)| {
-            crate::agent_policy_api::with_policies(&state, |policies| {
-                let answer =
-                    directory.register_reporting_agent(actor, op, target, profile, now())?;
-                policies.ensure_default(&answer.agent.to_string())?;
-                crate::reporting_api::registered(&answer).map(Json)
-            })
-        },
-    )
+    crate::grants::with_directory_grants(&state, |directory, mut judged| {
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+        crate::service_account_grants::admit(&mut judged, caller, "agents")?;
+        let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
+        let target = registration_target(responsible, body.answers_to.as_deref(), false)?;
+        let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
+        crate::reporting_api::registered(&answer).map(Json)
+    })
 }
 
 pub(crate) async fn list(
@@ -412,7 +322,7 @@ pub(crate) async fn list(
     headers: HeaderMap,
 ) -> Result<Json<IdentitiesView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    state.admission.administrator(&actor)?;
     with_directory(&state, |directory| {
         let identities = directory
             .projection()?
@@ -429,7 +339,7 @@ pub(crate) async fn read(
     Path(id): Path<String>,
 ) -> Result<Json<IdentityRecordView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    state.admission.administrator(&actor)?;
     let id = identity_id(&id)?;
     with_directory(&state, |directory| {
         let record =
@@ -445,30 +355,16 @@ pub(crate) async fn read(
 pub(crate) async fn change_profile(
     State(state): State<Shared>,
     headers: HeaderMap,
-    OriginalUri(uri): OriginalUri,
     Path(id): Path<String>,
-    principal: Option<axum::Extension<crate::agent_signature::TokenPrincipal>>,
-    body: Result<Bytes, BytesRejection>,
+    Json(body): Json<Named>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
-    let bytes = body.map_err(|error| malformed(error.body_text()))?;
-    let actor = people_giving::actor(
-        &state,
-        &headers,
-        ("POST", uri.path(), &bytes),
-        principal.as_ref().map(|value| &value.0),
-    )?;
-    if actor.provenance().agent().is_none() {
-        crate::routes::administrator(&state, &actor)?;
-    }
-    let body = people_giving::body(headers, bytes).await?;
+    let actor = signed_in(&state, &headers)?;
+    state.admission.administrator(&actor)?;
     let (id, op, profile) = (
         identity_id(&id)?,
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    if actor.provenance().agent().is_some() {
-        return people_giving::profile(&state, &actor, id, op, profile).map(Json);
-    }
     with_directory(&state, |directory| {
         let receipt = directory.change_profile(actor, op, id, profile, now())?;
         Ok(Json(ReceiptAnswer {
@@ -494,7 +390,7 @@ pub(crate) async fn transition(
     Json(body): Json<Moved>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    state.admission.administrator(&actor)?;
     let moved = match body.transition.as_str() {
         "activate" => Transition::Activate,
         "suspend" => Transition::Suspend,
@@ -538,7 +434,7 @@ pub(crate) async fn bind_login(
     Json(body): Json<Bound>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    state.admission.administrator(&actor)?;
     let person = PersonId::from_str(&id)?;
     let (op, binding) = (
         operation(&body.operation)?,

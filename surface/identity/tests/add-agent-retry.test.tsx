@@ -18,7 +18,7 @@ afterEach(() => { const mounted = root; if (mounted) act(() => mounted.unmount()
 
 async function form(routes: Record<string, Route>, query = '') {
   const posted: { path: string; body: unknown }[] = [];
-  serve({ ...SERVICE, '/surface-contract': schema(true), ...routes }, posted);
+  serve({ ...SERVICE, '/openapi.json': schema(true), ...routes }, posted);
   history.replaceState(null, '', '/#/agents/new' + query);
   const container = document.createElement('div'); document.body.appendChild(container);
   const mounted = createRoot(container); root = mounted;
@@ -122,19 +122,19 @@ describe('Add-agent retry safety', () => {
   });
 
   it.each([
-    { label: 'has no answers_to field', answer: schema(false), words: 'under You only' },
+    { label: 'has no answers_to field', answer: schema(false), words: 'coming' },
     { label: 'cannot be read', answer: ok({ broken: true }), words: 'could not be read' },
     { label: 'is unavailable', answer: refused(503, 'StorageUnavailable', 'Not available'), words: 'could not be read' },
   ])('still adds under You when the served schema $label', async ({ answer, words }) => {
     const { entry, posted } = await form({
-      '/surface-contract': answer,
+      '/openapi.json': answer,
       '/directory/people': ok({ ...DIRECTORY, people: DIRECTORY.people.map((person) => ({ ...person, state: 'active' })) }),
       'POST /agents': (body) => ok({ agent: COURIER, responsible: ADA, receipt: receipt(body) }),
       ['POST /identities/' + COURIER + '/transitions']: (body) => ok({ receipt: { ...receipt(body), change_kind: 5 } }),
     });
     const other = entry.querySelector<HTMLOptionElement>('select[name="answers_to"] option[value="' + BEA + '"]');
     expect(other?.disabled).toBe(true);
-    expect(other?.textContent).toContain('not served');
+    expect(other?.textContent).toContain('(coming)');
     expect(entry.textContent).toContain(words);
     await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
     await submit(entry);
@@ -146,7 +146,7 @@ describe('Add-agent retry safety', () => {
   it('keeps a saved other-person request unsent when that field is not served', async () => {
     const saved = { name: 'Held helper', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null, answersTo: BEA, team: null, membership: null, activated: false };
     sessionStorage.setItem('lys.add-agent.' + ADA, JSON.stringify(saved));
-    const { entry, posted } = await form({ '/surface-contract': schema(false) });
+    const { entry, posted } = await form({ '/openapi.json': schema(false) });
     expect(entry.textContent).toContain('saved request');
     expect(entry.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
     await submit(entry);

@@ -14,9 +14,6 @@ pub enum ServerError {
     /// A budget or organisation setting refusal, preserving its response.
     #[error(transparent)]
     Budget(#[from] crate::error_budget::BudgetError),
-    /// A giver's holding does not cover the requested gift.
-    #[error(transparent)]
-    Holding(#[from] crate::error_holding::HoldingError),
     /// A catalogue description could not be read before serving.
     #[error("harness_catalogue_unreadable: {file}: {reason}")]
     HarnessCatalogueUnreadable {
@@ -125,12 +122,6 @@ pub enum ServerError {
         /// What is wrong with it.
         reason: String,
     },
-    /// Recorded bootstrap authority requires an explicit administrator recovery.
-    #[error("BootstrapInterrupted: {reason}")]
-    BootstrapInterrupted {
-        /// The interruption and exact recovery requests.
-        reason: String,
-    },
     /// A request body or path is not one the route takes.
     #[error("RequestMalformed: {reason}")]
     RequestMalformed {
@@ -177,18 +168,6 @@ pub enum ServerError {
         /// The server requested.
         server: String,
     },
-    /// The caller cannot pass this server to the requesting agent.
-    #[error(
-        "mcp_beyond_remit: approver `{approver}` cannot approve MCP server `{server}` for agent `{agent}`"
-    )]
-    McpBeyondRemit {
-        /// The approver's identity.
-        approver: String,
-        /// The requesting agent.
-        agent: String,
-        /// The server requested.
-        server: String,
-    },
     /// The request is not one the caller may see: none is kept by that id, or it is another's.
     #[error("RequestUnknown: no access request by that id is visible to the signed-in caller")]
     RequestUnknown,
@@ -230,9 +209,28 @@ pub enum ServerError {
     /// No machine is kept by that id.
     #[error("MachineUnknown: no machine is kept by that id")]
     MachineUnknown,
-    /// A machine act's operation id already names a different act.
-    #[error(transparent)]
-    Machine(#[from] crate::error_machine::MachineError),
+    /// The operation id already names a machine named in other words.
+    #[error("MachineReused: operation `{machine}` already names a machine named in other words")]
+    MachineReused {
+        /// The operation id.
+        machine: String,
+    },
+    /// The operation already names an ownership act in different words.
+    #[error(
+        "MachineTeamReused: operation `{operation}` already assigned this computer to a different team; a new assignment needs a new operation"
+    )]
+    MachineTeamReused {
+        /// The reused operation.
+        operation: String,
+    },
+    /// The operation already names an agent allowance act in different words.
+    #[error(
+        "MachineAgentsReused: operation `{operation}` already names another computer allowance; a new allowance needs a new operation"
+    )]
+    MachineAgentsReused {
+        /// The reused operation.
+        operation: String,
+    },
     /// The signed-in sessions could not be kept or read back.
     #[error("SessionsUnavailable: {reason}")]
     SessionsUnavailable {
@@ -379,12 +377,6 @@ pub enum ServerError {
         /// Which check refused it.
         reason: &'static str,
     },
-    /// An unknown, ended or mixed run pass was refused.
-    #[error("AgentPassRefused: {reason}")]
-    AgentPassRefused {
-        /// The check that refused it, without credential material.
-        reason: String,
-    },
     /// The agent is not active, so it is not started.
     #[error("AgentNotActive: the agent is {state} and only an active agent is started")]
     AgentNotActive {
@@ -408,9 +400,6 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
-    /// The machine cannot execute a start without a recorded runner.
-    #[error("MachineWithoutRunner: the machine has no recorded runner to start the agent with")]
-    MachineWithoutRunner,
     /// A skill Lys keeps no text for.
     #[error("SkillUnknown: Lys keeps no skill named `{name}`; keep its text under /skills first")]
     SkillUnknown {
@@ -556,12 +545,6 @@ pub enum ServerError {
     PolicyUnavailable {
         /// Why.
         reason: String,
-    },
-    /// A launch requires an explicitly recorded policy.
-    #[error("AgentHasNoPolicy: agent {agent} has no policy; record its policy before starting it")]
-    AgentHasNoPolicy {
-        /// The agent whose launch was refused.
-        agent: String,
     },
     /// Another change to the policy came between the caller's read and its
     /// change.

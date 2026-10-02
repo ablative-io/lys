@@ -328,7 +328,7 @@ async fn an_old_directory_requires_migration_and_preserves_every_registration()
             .ok_or("unmigrated version-two snapshot was accepted")?;
         assert_eq!(
             format!("{error:?}"),
-            "DirectorySnapshotUnmigrated { found: 2, expected: 5 }"
+            "DirectorySnapshotUnmigrated { found: 2, expected: 3 }"
         );
         assert_eq!(
             std::fs::read(config.log_dir.join("snapshot.bin"))?,

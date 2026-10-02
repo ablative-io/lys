@@ -1,5 +1,6 @@
-//! The machines agents can run on, folded from a snapshot and subsequent
-//! changes in one file. An existing snapshot is migrated on its first change.
+//! The machines agents can run on, as they are kept: one file holding every
+//! machine as it stands, replaced whole and atomically at each change. A
+//! start reads that one file and nothing else, whatever was changed before.
 //!
 //! A change is written before it is answered. When a write fails, what the
 //! file holds is read again before anything else is answered, so memory
@@ -14,24 +15,15 @@
 //! machine that dials in with the machine's key. A machine with none is
 //! given its start command and nothing is run.
 
-use crate::error_machine::MachineError;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
-use std::ops::Bound;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 use crate::runner_client::RunnerRecord;
-
-#[path = "network_store/journal.rs"]
-mod journal;
-
-use journal::Change;
-use lys_identity::SNAPSHOT_EVERY;
 
 /// A machine's retirement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,7 +109,7 @@ pub struct AgentsRecorded {
     pub original_may_run: Option<Vec<String>>,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Kept {
     machines: Vec<Machine>,
@@ -137,9 +129,6 @@ pub struct NetworkStore {
     kept: Kept,
     original_agents: BTreeMap<String, Vec<String>>,
     uncertain: bool,
-    ordered: Arc<BTreeMap<String, usize>>,
-    journal: bool,
-    since_snapshot: u64,
 }
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
@@ -148,12 +137,18 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
     }
 }
 
-fn ordered(kept: &Kept) -> BTreeMap<String, usize> {
-    let mut ordered = BTreeMap::new();
-    for (position, machine) in kept.machines.iter().enumerate() {
-        ordered.entry(machine.id.clone()).or_insert(position);
-    }
-    ordered
+fn read(path: &Path) -> Result<Kept, ServerError> {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(Kept::default());
+        }
+        Err(error) => {
+            return Err(unavailable(format!("reading {}: {error}", path.display())));
+        }
+    };
+    serde_json::from_slice(&bytes)
+        .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())))
 }
 
 fn original_agents(kept: &Kept) -> Result<BTreeMap<String, Vec<String>>, ServerError> {
@@ -188,8 +183,6 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let beside = path.with_extension("writing");
     let mut file = fs::File::create(&beside)?;
     file.write_all(bytes)?;
-    #[cfg(test)]
-    journal_tests::written(bytes.len());
     file.sync_all()?;
     drop(file);
     fs::rename(&beside, path)?;
@@ -202,57 +195,31 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 impl NetworkStore {
     /// The machines kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
-        let (kept, is_journal, mut since_snapshot) = journal::read(path)?;
+        let kept = read(path)?;
         let original_agents = original_agents(&kept)?;
-        let ordered = Arc::new(ordered(&kept));
-        if since_snapshot >= SNAPSHOT_EVERY.get() {
-            journal::snapshot(path, &kept)?;
-            since_snapshot = 0;
-        }
         Ok(Self {
             path: path.to_owned(),
             kept,
             original_agents,
-            ordered,
             uncertain: false,
-            journal: is_journal,
-            since_snapshot,
         })
     }
 
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            let (kept, is_journal, mut since_snapshot) = journal::read(&self.path)?;
+            let kept = read(&self.path)?;
             let original_agents = original_agents(&kept)?;
-            match fs::File::open(&self.path) {
-                Ok(file) => file.sync_all().map_err(unavailable)?,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(unavailable(error)),
-            }
-            if let Some(parent) = self.path.parent()
-                && !parent.as_os_str().is_empty()
-            {
-                fs::File::open(parent)
-                    .and_then(|directory| directory.sync_all())
-                    .map_err(unavailable)?;
-            }
-            if since_snapshot >= SNAPSHOT_EVERY.get() {
-                journal::snapshot(&self.path, &kept)?;
-                since_snapshot = 0;
-            }
-            self.ordered = Arc::new(ordered(&kept));
             self.kept = kept;
             self.original_agents = original_agents;
             self.uncertain = false;
-            self.journal = is_journal;
-            self.since_snapshot = since_snapshot;
         }
         Ok(())
     }
 
-    fn write(&mut self, change: Change) -> Result<(), ServerError> {
-        if let Err(failure) = journal::write(&self.path, &self.kept, &change, self.journal) {
+    fn write(&mut self, next: Kept) -> Result<(), ServerError> {
+        let bytes = serde_json::to_vec_pretty(&next).map_err(unavailable)?;
+        if let Err(failure) = replace(&self.path, &bytes) {
             self.uncertain = true;
             self.settle()?;
             return Err(unavailable(format!(
@@ -260,37 +227,8 @@ impl NetworkStore {
                 self.path.display()
             )));
         }
-        self.journal = true;
-        let applied = change.apply(
-            &mut self.kept,
-            &mut self.original_agents,
-            Arc::make_mut(&mut self.ordered),
-        );
-        if let Err(error) = applied {
-            self.uncertain = true;
-            self.settle()?;
-            return Err(error);
-        }
-        self.since_snapshot = self
-            .since_snapshot
-            .checked_add(1)
-            .ok_or_else(|| unavailable("network_append_count_overflow"))?;
-        if self.since_snapshot >= SNAPSHOT_EVERY.get() {
-            if let Err(error) = journal::snapshot(&self.path, &self.kept) {
-                self.uncertain = true;
-                self.settle()?;
-                return Err(error);
-            }
-            self.since_snapshot = 0;
-        }
+        self.kept = next;
         Ok(())
-    }
-
-    /// Machines in identifier order, starting after the supplied identifier.
-    pub fn machines_ordered(&self, after: Bound<&str>) -> impl Iterator<Item = &Machine> {
-        self.ordered
-            .range::<str, _>((after, Bound::Unbounded))
-            .map(|(_, position)| &self.kept.machines[*position])
     }
 
     /// Every machine, in the order named.
@@ -300,9 +238,7 @@ impl NetworkStore {
 
     /// The machine named `id`.
     pub fn machine(&self, id: &str) -> Option<&Machine> {
-        self.ordered
-            .get(id)
-            .and_then(|position| self.kept.machines.get(*position))
+        self.kept.machines.iter().find(|machine| machine.id == id)
     }
 
     /// Keep `machine`. Named again in the same words it is kept once; the
@@ -320,21 +256,20 @@ impl NetworkStore {
             {
                 Ok(())
             }
-            Some(_) => Err(ServerError::Machine(MachineError::Reused {
+            Some(_) => Err(ServerError::MachineReused {
                 machine: machine.id,
-            })),
-            None => self.write(Change::Named { machine }),
+            }),
+            None => {
+                let mut next = self.kept.clone();
+                next.machines.push(machine);
+                self.write(next)
+            }
         }
     }
 
     /// The original ownership receipt, if this operation has been recorded.
     pub fn team_recorded(&self, operation: &str) -> Option<&TeamRecorded> {
         self.kept.team_changes.get(operation)
-    }
-
-    /// Every retained ownership receipt, in operation order.
-    pub fn team_records(&self) -> impl Iterator<Item = &TeamRecorded> {
-        self.kept.team_changes.values()
     }
 
     /// Keep ownership and its receipt together. A repeat writes nothing.
@@ -347,30 +282,29 @@ impl NetworkStore {
             {
                 return Ok(first.clone());
             }
-            return Err(ServerError::Machine(MachineError::TeamReused {
+            return Err(ServerError::MachineTeamReused {
                 operation: recorded.operation,
-            }));
+            });
         }
-        let machine = self
-            .machine(&recorded.machine)
+        let mut next = self.kept.clone();
+        let machine = next
+            .machines
+            .iter_mut()
+            .find(|machine| machine.id == recorded.machine)
             .ok_or(ServerError::MachineUnknown)?;
         if machine.retired.is_some() {
             return Err(ServerError::MachineRetired);
         }
-        self.write(Change::Team {
-            recorded: recorded.clone(),
-        })?;
+        machine.team.clone_from(&recorded.team);
+        next.team_changes
+            .insert(recorded.operation.clone(), recorded.clone());
+        self.write(next)?;
         Ok(recorded)
     }
 
     /// The original allowance receipt, if this operation has been recorded.
     pub fn agent_recorded(&self, operation: &str) -> Option<&AgentsRecorded> {
         self.kept.agent_changes.get(operation)
-    }
-
-    /// Every retained allowance receipt, in operation order.
-    pub fn agent_records(&self) -> impl Iterator<Item = &AgentsRecorded> {
-        self.kept.agent_changes.values()
     }
 
     /// Keep allowance and receipt together. A repeat writes nothing and never reapplies the act.
@@ -387,12 +321,15 @@ impl NetworkStore {
             {
                 return Ok(first.clone());
             }
-            return Err(ServerError::Machine(MachineError::AgentsReused {
+            return Err(ServerError::MachineAgentsReused {
                 operation: recorded.operation,
-            }));
+            });
         }
-        let machine = self
-            .machine(&recorded.machine)
+        let mut next = self.kept.clone();
+        let machine = next
+            .machines
+            .iter_mut()
+            .find(|machine| machine.id == recorded.machine)
             .ok_or(ServerError::MachineUnknown)?;
         if machine.retired.is_some() {
             return Err(ServerError::MachineRetired);
@@ -405,23 +342,37 @@ impl NetworkStore {
         } else {
             Some(machine.may_run.clone())
         };
-        self.write(Change::Agent {
-            recorded: recorded.clone(),
-        })?;
+        if recorded.allow {
+            if !machine.may_run.contains(&recorded.agent) {
+                machine.may_run.push(recorded.agent.clone());
+            }
+        } else {
+            machine.may_run.retain(|agent| agent != &recorded.agent);
+        }
+        next.agent_changes
+            .insert(recorded.operation.clone(), recorded.clone());
+        self.write(next)?;
+        if let Some(agents) = &recorded.original_may_run {
+            self.original_agents
+                .insert(recorded.machine.clone(), agents.clone());
+        }
         Ok(recorded)
     }
 
     /// Retire the machine `id`. A machine already retired stays as it was retired.
     pub fn retire(&mut self, id: &str, retirement: Retirement) -> Result<(), ServerError> {
         self.settle()?;
-        let machine = self.machine(id).ok_or(ServerError::MachineUnknown)?;
+        let mut next = self.kept.clone();
+        let machine = next
+            .machines
+            .iter_mut()
+            .find(|machine| machine.id == id)
+            .ok_or(ServerError::MachineUnknown)?;
         if machine.retired.is_some() {
             return Ok(());
         }
-        self.write(Change::Retired {
-            machine: id.to_owned(),
-            retirement,
-        })
+        machine.retired = Some(retirement);
+        self.write(next)
     }
 
     /// The runner the machine `id` names, none when it names none.
@@ -441,10 +392,12 @@ impl NetworkStore {
         if machine.retired.is_some() {
             return Err(ServerError::MachineRetired);
         }
-        self.write(Change::Runner {
-            machine: id.to_owned(),
-            runner,
-        })
+        let mut next = self.kept.clone();
+        match runner {
+            Some(runner) => next.runners.insert(id.to_owned(), runner),
+            None => next.runners.remove(id),
+        };
+        self.write(next)
     }
 }
 
@@ -464,7 +417,3 @@ fn same_words(kept: &Machine, named: &Machine, original_agents: Option<&[String]
     };
     original == timeless
 }
-
-#[cfg(test)]
-#[path = "network_store/journal_tests.rs"]
-mod journal_tests;

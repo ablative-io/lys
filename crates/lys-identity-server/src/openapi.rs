@@ -15,13 +15,10 @@
 //! answer is open, and a body-taking route that names no body.
 
 use std::borrow::Cow;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
-use axum::Router;
-use axum::body::Bytes;
-use axum::http::{HeaderValue, header};
-use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum::{Json, Router};
 use lys_openapi::{Api, Auth, Method, Route};
 use serde_json::Value;
 
@@ -54,33 +51,9 @@ pub(crate) fn route(
             named.push(refusal);
         }
     }
-    // The ingress guard judges credentials before the route.
-    for refusal in [
-        "OperatorRefused",
-        "AgentSignatureRefused",
-        "AgentPassRefused",
-        "TokenScopeUndeclared",
-        "ResponsibilityKept",
-        "NotHeld",
-        "PermissionAbsent",
-        "Revoked",
-        "Expired",
-        "NotStarted",
-        "IdentityNotActive",
-        "LogUnavailable",
-        "PermissionEngineUnavailable",
-        "ResourceKindUnheld",
-        "ProjectionPending",
-        "OperationUnresolved",
-        "StaleDecision",
-        "kind_not_registered",
-        "app_not_approved",
-        "app_retired",
-        "action_not_declared",
-    ] {
-        if !named.contains(&refusal) {
-            named.push(refusal);
-        }
+    // The global admission guard refuses a bad operator header on every route.
+    if !named.contains(&"OperatorRefused") {
+        named.push("OperatorRefused");
     }
     Route {
         method,
@@ -101,7 +74,7 @@ pub fn api() -> Api {
         "Sign-in, identities, grants and the apps that register with Lys. Every refusal answers {refusal, reason, fields}.",
     );
     let named = types(&mut api);
-    for E(method, path, summary, auth, refusals, ..) in TABLE {
+    for E(method, path, summary, auth, refusals) in TABLE {
         let (request, response) = named.get(&(*method, path)).cloned().unwrap_or_default();
         api.route(route(
             (*method, path, summary),
@@ -117,8 +90,6 @@ pub fn api() -> Api {
 
 /// The document, generated from the table.
 pub fn document() -> Result<Value, ServerError> {
-    #[cfg(test)]
-    cache_tests::built();
     let mut document = api()
         .document()
         .map_err(|faults| ServerError::ConfigInvalid {
@@ -139,64 +110,15 @@ pub fn document() -> Result<Value, ServerError> {
         "x-lys-answers-to".to_owned(),
         serde_json::json!(["person", "agent"]),
     );
-    document["paths"]["/changes"]["get"]["parameters"] = serde_json::json!([{
-        "name": "after", "in": "query", "required": false,
-        "description": "The generation last received; wait until it changes.",
-        "schema": {"type": "string"}
-    }]);
     Ok(document)
 }
 
 /// The document's route: public, since the document describes the API and
 /// grants nothing to whoever reads it.
-#[path = "openapi_surface.rs"]
-pub(crate) mod surface;
-
-/// Serve the full API document and the compact surface contract.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/openapi.json", get(served))
-        .route("/surface-contract", get(surface::served))
+    Router::new().route("/openapi.json", get(served))
 }
 
-static DOCUMENT: OnceLock<Result<Bytes, String>> = OnceLock::new();
-
-/// Validate and encode the document before any request is served.
-pub(crate) fn prepare() -> Result<&'static Bytes, ServerError> {
-    DOCUMENT
-        .get_or_init(|| {
-            let value = document().map_err(|error| error.to_string())?;
-            encode(&value).map_err(|error| error.to_string())
-        })
-        .as_ref()
-        .map_err(|reason| ServerError::ConfigInvalid {
-            reason: reason.clone(),
-        })
+async fn served() -> Result<Json<Value>, ServerError> {
+    document().map(Json)
 }
-
-fn encode(value: &Value) -> Result<Bytes, ServerError> {
-    let faults = lys_openapi::validate(value);
-    if !faults.is_empty() {
-        return Err(ServerError::ConfigInvalid {
-            reason: format!("the OpenAPI document is invalid: {}", faults.join("; ")),
-        });
-    }
-    serde_json::to_vec(value)
-        .map(Bytes::from)
-        .map_err(|error| ServerError::ConfigInvalid {
-            reason: format!("the OpenAPI document could not be encoded: {error}"),
-        })
-}
-
-async fn served() -> Result<Response, ServerError> {
-    let mut answer = prepare()?.clone().into_response();
-    answer.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-    );
-    Ok(answer)
-}
-
-#[cfg(test)]
-#[path = "openapi_cache_tests.rs"]
-mod cache_tests;
