@@ -82,12 +82,14 @@ pub(crate) async fn rendered(
         })?;
     let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
         Ok(body) => body,
-        Err(_) => serde_json::Value::String(String::from_utf8(bytes.to_vec()).map_err(|error| {
-            (
-                -32603,
-                format!("the HTTP route response is not JSON or text: {error}"),
-            )
-        })?),
+        Err(_) => {
+            serde_json::Value::String(String::from_utf8(bytes.to_vec()).map_err(|error| {
+                (
+                    -32603,
+                    format!("the HTTP route response is not JSON or text: {error}"),
+                )
+            })?)
+        }
     };
     let answer = serde_json::json!({"status":status.as_u16(),"body":body});
     Ok(

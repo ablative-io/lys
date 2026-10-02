@@ -148,7 +148,10 @@ pub(crate) fn relayed_agent() -> Option<AgentId> {
 /// The signature header and signed message of the call being served, when
 /// it was relayed from a signed MCP message.
 pub(crate) fn relayed_signature() -> Option<(String, std::sync::Arc<[u8]>)> {
-    RELAYED.try_with(|relay| relay.signed.clone()).ok().flatten()
+    RELAYED
+        .try_with(|relay| relay.signed.clone())
+        .ok()
+        .flatten()
 }
 
 /// A relayed agent is judged again as it stands now: it must still be
