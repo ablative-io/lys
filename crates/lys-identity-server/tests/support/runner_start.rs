@@ -75,11 +75,14 @@ impl Table {
 
     /// Start once, leaving the scenario to record and review its own profile.
     pub async fn unprofiled() -> Result<Self, Box<dyn Error>> {
-        Self::unprofiled_with(false).await
+        Self::unprofiled_with(false, None).await
     }
 
-    /// Command scenarios need one active agent and the two sign-in subjects.
-    pub async fn unprofiled_with(commands_only: bool) -> Result<Self, Box<dyn Error>> {
+    /// Command scenarios seed a second sign-in subject only when they use one.
+    pub async fn unprofiled_with(
+        commands_only: bool,
+        other_subject: Option<&str>,
+    ) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
@@ -116,7 +119,7 @@ impl Table {
             },
             move |config| {
                 let seeded = if commands_only {
-                    command_seed(config)?
+                    command_seed(config, other_subject)?
                 } else {
                     seed_configured(config, [ADMINISTRATOR, "bea-subject"])?
                 };
@@ -235,7 +238,10 @@ impl Table {
     }
 }
 
-fn command_seed(config: &lys_identity_server::Config) -> Result<Seeded, Box<dyn Error>> {
+fn command_seed(
+    config: &lys_identity_server::Config,
+    other_subject: Option<&str>,
+) -> Result<Seeded, Box<dyn Error>> {
     let actor = Actor::new(
         LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
         Provenance::new(AuthMethod::Oidc, 1),
@@ -262,27 +268,29 @@ fn command_seed(config: &lys_identity_server::Config) -> Result<Seeded, Box<dyn 
         "",
         3,
     )?;
-    let (other, _) = directory.register_person(
-        actor.clone(),
-        OperationId::generate()?,
-        Profile::new("Other")?,
-        4,
-    )?;
-    directory.bind_login(
-        actor.clone(),
-        OperationId::generate()?,
-        other,
-        LoginBinding::new(&config.issuer, "bea-subject")?,
-        5,
-    )?;
-    directory.transition(
-        actor,
-        OperationId::generate()?,
-        IdentityId::Person(other),
-        Transition::Activate,
-        "",
-        6,
-    )?;
+    if let Some(subject) = other_subject {
+        let (other, _) = directory.register_person(
+            actor.clone(),
+            OperationId::generate()?,
+            Profile::new("Other")?,
+            4,
+        )?;
+        directory.bind_login(
+            actor.clone(),
+            OperationId::generate()?,
+            other,
+            LoginBinding::new(&config.issuer, subject)?,
+            5,
+        )?;
+        directory.transition(
+            actor,
+            OperationId::generate()?,
+            IdentityId::Person(other),
+            Transition::Activate,
+            "",
+            6,
+        )?;
+    }
     Ok(Seeded {
         people: vec![SeededPerson {
             id: owner,
