@@ -84,9 +84,8 @@ export function AskForm({ person, resources, model, changed }: {
     setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
   };
   const finish = (recorded: AccessRequest) => {
-    try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch {
-      setFailure('Recorded, but the browser could not release the retained request; Check original request will confirm it again, never record it twice.');
-    }
+    sessionStorage.removeItem(key);
+    setPending({ kind: 'empty' });
     changed(recorded);
   };
   /** Retain one ask under the pending key: always before the rest is shortened, so no ask is ever both forgotten and unsent. */
@@ -104,11 +103,10 @@ export function AskForm({ person, resources, model, changed }: {
       return true;
     } catch (error) {
       // A later refusal cannot undo an earlier uncertain admission.
-      let release = '';
       if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) {
-        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (failed) { release = ' The browser could not release the retained request; Check original request will answer this same refusal, never record a second: ' + String(failed); }
+        sessionStorage.removeItem(key); setPending({ kind: 'empty' });
       }
-      setFailure(failureWords(error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.') + release);
+      setFailure(failureWords(error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.'));
       return false;
     }
   };
@@ -120,11 +118,13 @@ export function AskForm({ person, resources, model, changed }: {
     try {
       const queue = [...more];
       try {
-        // The whole run is kept before anything else, so a failure at any later write leaves every ask somewhere it is offered again by name.
-        if (!retry) { keepRest([asked, ...queue]); retain(asked); }
+        if (!retry) retain(asked);
         keepRest(queue);
       } catch (error) {
-        // Nothing has been sent. What is stored is offered again, exactly as asked, never twice.
+        // Nothing has been sent. Release the retained ask if the browser lets us; otherwise it stays retained and is checked, never duplicated.
+        if (!retry) {
+          try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { setPending({ kind: 'held', asked }); }
+        }
         throw new Error('Nothing was sent because this browser could not retain the request: ' + (error instanceof Error ? error.message : String(error)));
       }
       let recorded = 0;
@@ -150,9 +150,8 @@ export function AskForm({ person, resources, model, changed }: {
         if (!(await sendOne(next, false))) {
           // A definite refusal ends the run; what was recorded stays recorded and the rest is named, never re-sent by itself.
           if (sessionStorage.getItem(key) === null) {
-            let cleared = true;
-            try { keepRest([]); } catch { cleared = false; }
-            setAnswer(`${recorded} recorded before the refusal; not sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
+            try { keepRest([]); } catch { /* the rest stays retained and is offered again, never sent by itself */ }
+            setAnswer(`${recorded} recorded before the refusal; not sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.`);
           }
           return;
         }
@@ -198,8 +197,9 @@ export function AskForm({ person, resources, model, changed }: {
         const resource = advanced ? undefined : resources[Number(resourceIndex)];
         const offered = askable(model, resource);
         return offered.length
-          ? <><ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={setPicked} agents={false} title="Access needed" />
-            <p className="note">Each ticked action is asked for on its own and approved on its own.</p></>
+          ? <div className="field"><label>Access needed</label>
+            <ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={setPicked} agents={false} />
+            <p className="note">Each ticked action is asked for on its own and approved on its own.</p></div>
           : <label className="field">Access needed<select name="relation" required defaultValue=""><option value="">Choose access</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>;
       })()}
       <label className="field">Why do you need this access?<textarea name="why" required maxLength={500} /></label>
