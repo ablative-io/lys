@@ -273,6 +273,10 @@ fn remember_nonce(
 #[path = "agent_signature_poison_tests.rs"]
 mod poison_tests;
 
+#[cfg(test)]
+#[path = "agent_signature_token_tests.rs"]
+mod token_tests;
+
 /// An in-process principal inserted only after MCP validates the token's scope.
 #[derive(Clone, Copy)]
 pub struct TokenPrincipal {
