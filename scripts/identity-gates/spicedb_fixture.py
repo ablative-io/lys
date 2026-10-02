@@ -35,7 +35,9 @@ def cancel(signum, frame):
 def owned_process(arguments, **options):
     previous = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
     try:
-        process = subprocess.Popen(arguments, **options)
+        # Restore the child mask after PID acquisition and before the command exec.
+        launch = "import json,os,signal,sys; signal.pthread_sigmask(signal.SIG_SETMASK, json.loads(sys.argv[1])); os.execvpe(sys.argv[2], sys.argv[2:], os.environ)"
+        process = subprocess.Popen([sys.executable, "-c", launch, json.dumps(sorted(previous)), *arguments], **options)
         try:
             signal.pthread_sigmask(signal.SIG_SETMASK, previous)
             yield process

@@ -80,7 +80,7 @@ python3() { printf 'python3 %s\n' "$*" >> "$TRACE"; }
         def wait():
             os.kill(os.getpid(), signal.SIGTERM)
         def spawn(arguments, **options):
-            if arguments[0] == "docker":
+            if arguments[4] == "docker":
                 return logger
             key_files.append(Path(options["env"]["LYS_SPICEDB_KEY_FILE"]))
             child.wait.side_effect = lambda: wait() if child.wait.call_count == 1 else 0
