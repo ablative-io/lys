@@ -125,7 +125,8 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
 
   /** The requests still to send after the retained one, written whole so a reload finishes the run exactly as it was ticked, never twice. */
   const keepRest = (left: DelegateBody[]) => {
-    setRest(left.length ? { kind: 'held', bodies: left } : { kind: 'empty' });
+    // A copy: the caller goes on shifting its queue, and state must say what storage says.
+    setRest(left.length ? { kind: 'held', bodies: [...left] } : { kind: 'empty' });
     if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
   };
 
@@ -133,16 +134,26 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   const grantedWords = (bodies: DelegateBody[]): string =>
     actionWords(w.model, source.resource, bodies.flatMap((body) => relations.find(([name]) => name === body.relation)?.[1] ?? [body.relation]));
 
+  /** Retain one body under the pending key: always before the rest is shortened, so no body is ever both forgotten and unsent. */
+  const retain = (body: DelegateBody) => {
+    sessionStorage.setItem(key, JSON.stringify(body));
+    setPending({ kind: 'held', body });
+  };
+  const notRetained = (error: unknown) => setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'RequestNotRetained', reason: 'Nothing more was sent because this browser could not retain the grant request: ' + (error instanceof Error ? error.message : String(error)) }) });
+
   const give = async () => {
     if (working.current || damaged) return;
     working.current = true;
     try {
-      // The retained request first, exactly as sent, then the rest exactly as ticked; or a fresh run, every body fixed now.
+      // The retained request first, exactly as sent, then the rest exactly as ticked; a rest left without a retained body resumes from the rest; or a fresh run, every body fixed now.
       let first: DelegateBody;
       let queue: DelegateBody[];
       let retry = false;
       if (pending.kind === 'held') {
-        first = pending.body; queue = rest.kind === 'held' ? rest.bodies : []; retry = true;
+        const held = pending.body;
+        first = held; queue = rest.kind === 'held' ? rest.bodies.filter((body) => body.operation !== held.operation) : []; retry = true;
+      } else if (rest.kind === 'held') {
+        [first, ...queue] = rest.bodies;
       } else if (toAgent) {
         const bodies: DelegateBody[] = [];
         for (const action of picked) {
@@ -159,7 +170,17 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         first = bodyFor(relation, actions); queue = [];
       }
       const given: DelegateBody[] = [];
-      keepRest(queue);
+      try {
+        if (!retry) retain(first);
+        keepRest(queue);
+      } catch (error) {
+        // Nothing has been sent. Release the retained body if the browser lets us; otherwise it stays retained and is retried, never duplicated.
+        if (!retry) {
+          try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { setPending({ kind: 'held', body: first }); }
+        }
+        notRetained(error);
+        return;
+      }
       let current: DelegateBody | undefined = first;
       while (current !== undefined) {
         const confirmed = await sendOne(current, retry);
@@ -175,8 +196,19 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
           return;
         }
         given.push(current);
-        current = queue.shift();
-        keepRest(queue);
+        const next = queue.shift();
+        if (next !== undefined) {
+          try {
+            retain(next);
+            keepRest(queue);
+          } catch (error) {
+            // Either the rest still holds next (retain failed) or the key holds it beside the rest (shortening failed): both resume exactly, so stop and say so.
+            notRetained(error);
+            shell.toast(`Given before the browser stopped retaining: ${grantedWords(given)} ${onText(source)}. Not sent: ${grantedWords([next, ...queue])}.`);
+            return;
+          }
+        }
+        current = next;
       }
       shell.closeAll();
       shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${onText(source)}, through you.`);
@@ -264,7 +296,8 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       ) : null}
       {damaged ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || damaged || !recipient || !leaseKnown || (pending.kind !== 'held' && (toAgent ? picked.length === 0 : !relation))} onClick={give}>
+        {pending.kind === 'empty' && rest.kind === 'held' ? <div className="note" data-rest-held>{rest.bodies.length} of an earlier run not yet sent: {grantedWords(rest.bodies)}. Give sends them exactly as ticked, nothing else.</div> : null}
+        <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || damaged || !recipient || !leaseKnown || (pending.kind !== 'held' && rest.kind !== 'held' && (toAgent ? picked.length === 0 : !relation))} onClick={give}>
           {pending.kind === 'held' ? 'Check original grant' : 'Give'}
         </button>
         <button className="btn" data-act="close" onClick={shell.closeAll}>Cancel</button>
