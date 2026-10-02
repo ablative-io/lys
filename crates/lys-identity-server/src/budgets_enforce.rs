@@ -160,7 +160,7 @@ fn crossings(
     standings: &[Standing],
     targets: &BTreeMap<String, Target>,
     zone: &str,
-    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
+    sessions: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<Vec<Crossing>, ServerError> {
     let mut crossed = Vec::new();
     for collection in &held.limit_sets {
@@ -426,7 +426,7 @@ fn levels(
     limit: &Limit,
     agents: &std::collections::BTreeSet<String>,
     zone: &str,
-    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
+    sessions: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<Option<Levels>, ServerError> {
     if limit.unit == Measure::ContextPercent {
         let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
