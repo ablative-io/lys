@@ -30,10 +30,10 @@ const VERIFIER: &str = "a-fixture-product-verifier-of-enough-length-0123456789";
 
 /// The install the product is registered with.
 pub struct Installed<'a> {
-    pub service_port: u16,
-    pub broker_port: u16,
     /// The install root.
     pub root: &'a Path,
+    pub service_port: u16,
+    pub broker_port: u16,
     /// The `lys` binary.
     pub lys: &'a Path,
     /// The screens package the install was given.

@@ -33,11 +33,23 @@ fn refused(field: &str) -> IdentityError {
 
 fn port(value: &Value, field: &str) -> IdentityResult<u16> {
     let address = value.as_str().ok_or_else(|| refused(field))?;
-    let (_, number) = address
-        .trim_end_matches('/')
-        .rsplit_once(':')
-        .ok_or_else(|| refused(field))?;
-    let port: u16 = number.parse().map_err(|_| refused(field))?;
+    let authority = if field == "secrets.broker" {
+        address
+            .strip_prefix("http://")
+            .ok_or_else(|| refused(field))?
+    } else {
+        address
+    };
+    let socket: std::net::SocketAddr =
+        authority.trim_end_matches('/').parse().map_err(|error| {
+            IdentityError::new(
+                ErrorKind::ConfigInvalid,
+                "read listener",
+                field,
+                format!("invalid listener address: {error}"),
+            )
+        })?;
+    let port = socket.port();
     if port == 0 {
         return Err(refused(field));
     }
@@ -54,7 +66,7 @@ impl Ports {
         if let Some(broker) = value.pointer("/secrets/broker") {
             ports.broker = port(broker, "secrets.broker")?;
         }
-        Ok(ports)
+        ports.chosen(None, None)
     }
 
     /// Read recorded listeners, retaining defaults for a new install.

@@ -77,12 +77,12 @@ fn main() -> ExitCode {
                 message_service,
             } => identity::install::run(
                 &identity::install::Options {
-                    service_port,
-                    broker_port,
                     root,
                     admin_email,
                     surface,
                     message_service,
+                    service_port,
+                    broker_port,
                 },
                 json,
             ),

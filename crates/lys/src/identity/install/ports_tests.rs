@@ -60,3 +60,23 @@ fn an_earlier_install_without_listener_choices_keeps_the_defaults()
     assert_eq!(ports.broker, 8472);
     Ok(())
 }
+
+#[test]
+fn invalid_recorded_listeners_are_refused_by_field() {
+    for (value, field) in [
+        (
+            serde_json::json!({"listen":"not-an-address:9000"}),
+            "listen",
+        ),
+        (
+            serde_json::json!({"secrets":{"broker":"https://127.0.0.1:9000"}}),
+            "secrets.broker",
+        ),
+        (serde_json::json!({"listen":"127.0.0.1:0"}), "listen"),
+    ] {
+        let Err(refusal) = Ports::from_value(&value) else {
+            panic!("invalid listener accepted");
+        };
+        assert!(refusal.to_string().contains(field), "{refusal}");
+    }
+}

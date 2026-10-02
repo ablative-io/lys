@@ -73,7 +73,7 @@ fn reversible(layout: &Layout) -> ProbeResult {
 fn window(layout: &Layout, from: &Path, surface: &Path, verifier: &Path) -> ProbeResult {
     let config = DeploymentConfig::load_install(&layout.deployment_config())?;
     install::server_state(layout, &config)?;
-    let units = upgrade::units(layout);
+    let units = upgrade::units(layout)?;
     let runner = from.join("lys");
     let templates = Templates::default();
     let mut parts = Parts {
@@ -118,7 +118,7 @@ fn required<'a>(value: &'a Value, key: &str) -> ProbeResult<&'a str> {
 
 fn poison(layout: &Layout, fixture: &Path) -> ProbeResult {
     reversible(layout)?;
-    upgrade::swap::stop_all(&upgrade::units(layout), &mut |line| println!("{line}"))?;
+    upgrade::swap::stop_all(&upgrade::units(layout)?, &mut |line| println!("{line}"))?;
     let config: Value = serde_json::from_slice(&std::fs::read(layout.service_config())?)?;
     let directory = PathBuf::from(required(&config, "teams_dir")?).canonicalize()?;
     if !directory.starts_with(&layout.root) {
@@ -149,7 +149,7 @@ fn run(arguments: Arguments) -> ProbeResult {
             reversible(&layout)?;
             upgrade::swap::recover(
                 &layout,
-                &upgrade::units(&layout),
+                &upgrade::units(&layout)?,
                 &mut Compose,
                 &mut |line| println!("{line}"),
             )?;
@@ -168,7 +168,7 @@ fn restart(layout: &Layout) -> ProbeResult {
     if Intent::read(layout)?.is_some() {
         return Err("restart proof requires the upgrade intent to be cleared".into());
     }
-    let units = upgrade::units(layout);
+    let units = upgrade::units(layout)?;
     upgrade::swap::stop_all(&units, &mut |line| println!("{line}"))?;
     for unit in &units {
         upgrade::launch(layout, unit, true)?;
