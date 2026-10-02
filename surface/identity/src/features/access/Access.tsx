@@ -53,6 +53,13 @@ const person = (w: GrantWorld, id: string) => {
   return { id, display_name: x?.name ?? nameOf(w, id), state: x?.state ?? 'active' } as const;
 };
 
+/**
+ * Whether Lys itself acts on the resource: one of its own directory collections.
+ * Nothing outside Lys asks before acting on those, so their reach claims no
+ * `built in` check; every other resource keeps the mock-up's service mark.
+ */
+const servedByLys = (res: string): boolean => resourceFromText(res).kind === 'directory';
+
 function Reach({ w, id }: { w: GrantWorld; id: string }) {
   const load = useLoad(() => allReach(w), 'reach');
   return (
@@ -61,7 +68,7 @@ function Reach({ w, id }: { w: GrantWorld; id: string }) {
       return rows.length ? (
         <table><tbody>
           {rows.map(([res, acts]) => (
-            <tr key={res}><td>{resourceWords(resourceFromText(res))}</td><td><span className="svc built-in">built in</span></td><td className="mono">{actionWords(w.model, resourceFromText(res), acts)}</td><td /></tr>
+            <tr key={res}><td>{resourceWords(resourceFromText(res))}</td>{servedByLys(res) ? null : <td><span className="svc built-in">built in</span></td>}<td className="mono">{actionWords(w.model, resourceFromText(res), acts)}</td><td /></tr>
           ))}
         </tbody></table>
       ) : <div className="dim">Nothing.</div>;

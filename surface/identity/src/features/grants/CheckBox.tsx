@@ -3,6 +3,7 @@ import { resourceText } from '../../generated/grants';
 import type { ResourceRef } from '../../generated/grants';
 import { calledBy } from '../people/directory';
 import { Picker } from '../../shell/Picker';
+import { actionSentence } from './action-words';
 import { AnswerView } from './Answer';
 import { ask } from './check';
 import type { Answer } from './check';
@@ -30,7 +31,8 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
   const resources = resourcesSeen(w);
   const keys = [...resources.keys()];
   const [res, setRes] = useState(keys[0] ?? '');
-  const actions = resources.get(res)?.actions ?? [];
+  const picked = resources.get(res);
+  const actions = picked?.actions ?? [];
   const [action, setAction] = useState(actions[0] ?? '');
   const people = [...w.who.entries()];
   const [chosen, setChosen] = useState(who ?? w.me.person.id);
@@ -60,7 +62,7 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
   );
   const permSelect = (
     <select id="cPerm" value={action} onChange={(e) => setAction(e.target.value)} aria-label="Action">
-      {actions.map((a) => <option key={a}>{a}</option>)}
+      {picked ? actions.map((a) => <option key={a} value={a}>{actionSentence(w.model, picked.resource, a)}</option>) : null}
     </select>
   );
   const button = (

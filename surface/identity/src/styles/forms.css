@@ -18,7 +18,7 @@ select {
   background-repeat: no-repeat; background-position: right 11px center;
 }
 select option { background: var(--surface-default); color: var(--text-primary); }
-input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; padding: 0; }
 .btn { cursor: pointer; min-height: 32px; transition: background .12s ease, border-color .12s ease, transform .08s ease; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }

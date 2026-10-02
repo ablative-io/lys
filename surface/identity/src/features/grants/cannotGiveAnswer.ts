@@ -2,7 +2,7 @@ import { Refused, request } from '../../api';
 import { CANNOT_GIVE_REASONS } from '../../generated';
 import type { CannotGiveAnswer, CannotGiveQuery, CannotGiveReason } from '../../generated';
 
-/** The refusal of an answer that carries a reason outside the six. */
+/** The refusal of an answer that carries a reason outside `CANNOT_GIVE_REASONS`. */
 export const UNKNOWN_CANNOT_GIVE_REASON = 'unknown_cannot_give_reason';
 
 const SUBJECTS = ['grant', 'service_account', 'relation', 'sign_in_identity'];
@@ -15,7 +15,7 @@ const unreadable = (reason: string) =>
 
 /**
  * The cannot-give answer as the server's contract types it (conformance 2.4).
- * An item whose reason is not one of the six refuses the whole answer by
+ * An item whose reason is not one of `CANNOT_GIVE_REASONS` refuses the whole answer by
  * name, so no item of it is shown and no reason is left blank; nothing is
  * defaulted, and nothing is added, dropped or reordered.
  */

@@ -6,7 +6,7 @@ import { askCannotGive } from './cannotGiveAnswer';
 import { grantNo, onText } from './model';
 import type { GrantWorld } from './model';
 
-/** What each of the six reasons says. */
+/** What each reason says; the compiler refuses a reason left without words. */
 const WORDS: Record<CannotGiveReason, string> = {
   sign_in_identity: 'They prove who you are. No agent can hold them.',
   above_what_you_hold: 'More than you hold.',
@@ -14,6 +14,7 @@ const WORDS: Record<CannotGiveReason, string> = {
   use_only: 'You may use it; it does not let you pass it on.',
   people_only: 'This can be passed on only to a person.',
   agents_only: 'This can be passed on only to an agent.',
+  recipient_kind_excluded: 'This access cannot be passed on to this kind of recipient.',
 };
 
 /** The item's name. The service decides every item; this only names it from the grants already read. */

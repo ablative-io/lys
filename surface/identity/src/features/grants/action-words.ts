@@ -2,6 +2,12 @@ import type { GrantModel, ResourceRef } from '../../generated/grants';
 
 const definitions = new WeakMap<GrantModel, string[]>();
 
+/** One action as a sentence: an app action keeps its own name; a shipped action reads as the model's sentence. */
+export function actionSentence(model: GrantModel, resource: ResourceRef, action: string): string {
+  if (resource.kind.includes('.')) return action;
+  return model.action_sentences[action] ?? action;
+}
+
 /** App actions retain their own names; only the shipped model supplies sentences. */
 export function actionWords(model: GrantModel, resource: ResourceRef, actions: string[]): string {
   if (resource.kind.includes('.')) return actions.join('; ');
@@ -12,7 +18,7 @@ export function actionWords(model: GrantModel, resource: ResourceRef, actions: s
   }
   const held = new Set(actions);
   if (shipped.length && shipped.every((action) => held.has(action))) return 'everything here';
-  return actions.map((action) => model.action_sentences[action] ?? action).join('; ');
+  return actions.map((action) => actionSentence(model, resource, action)).join('; ');
 }
 
 export function resourceFromText(text: string): ResourceRef {

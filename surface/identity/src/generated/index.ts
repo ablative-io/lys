@@ -142,11 +142,13 @@ export interface DirectoryRecord {
 
 /**
  * `CannotGiveReasonView`, in crates/lys-identity-server/src/grant_contract/views.rs:
- * why an item cannot be given, one of six, in precedence order.
+ * why an item cannot be given, one of the seven `CannotGiveReason::ALL`
+ * names in crates/lys-identity/src/grants/cannot_give.rs, in precedence order.
+ * The OpenAPI document publishes the same names as the reason's enum.
  */
-export type CannotGiveReason = 'sign_in_identity' | 'above_what_you_hold' | 'lent_to_you' | 'use_only' | 'people_only' | 'agents_only';
+export type CannotGiveReason = 'sign_in_identity' | 'above_what_you_hold' | 'lent_to_you' | 'use_only' | 'people_only' | 'agents_only' | 'recipient_kind_excluded';
 
-export const CANNOT_GIVE_REASONS: readonly CannotGiveReason[] = ['sign_in_identity', 'above_what_you_hold', 'lent_to_you', 'use_only', 'people_only', 'agents_only'];
+export const CANNOT_GIVE_REASONS: readonly CannotGiveReason[] = ['sign_in_identity', 'above_what_you_hold', 'lent_to_you', 'use_only', 'people_only', 'agents_only', 'recipient_kind_excluded'];
 
 /** `CannotGiveSubjectView`: a grant or service account by the caller's own grant id, a relation by name, or the caller's sign-in identity. */
 export type CannotGiveSubject =

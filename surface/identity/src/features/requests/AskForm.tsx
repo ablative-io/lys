@@ -198,9 +198,8 @@ export function AskForm({ person, resources, model, changed }: {
         const resource = advanced ? undefined : resources[Number(resourceIndex)];
         const offered = askable(model, resource);
         return offered.length
-          ? <div className="field"><label>Access needed</label>
-            <ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={setPicked} agents={false} />
-            <p className="note">Each ticked action is asked for on its own and approved on its own.</p></div>
+          ? <><ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={setPicked} agents={false} title="Access needed" />
+            <p className="note">Each ticked action is asked for on its own and approved on its own.</p></>
           : <label className="field">Access needed<select name="relation" required defaultValue=""><option value="">Choose access</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>;
       })()}
       <label className="field">Why do you need this access?<textarea name="why" required maxLength={500} /></label>

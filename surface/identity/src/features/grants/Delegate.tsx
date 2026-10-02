@@ -10,7 +10,7 @@ import { useShell } from '../../shell/ShellContext';
 import { day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotGiveList } from './CannotGiveList';
-import { grantNo, nameOf, onText, passText, relationsOf, withinPassOn } from './model';
+import { givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 
@@ -191,7 +191,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
             let cleared = true;
             try { keepRest([]); } catch { cleared = false; }
             if (given.length || queue.length || !cleared) {
-              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${onText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
+              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${givenOnText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
             }
           }
           return;
@@ -205,14 +205,14 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
           } catch (error) {
             // Either the rest still holds next (retain failed) or the key holds it beside the rest (shortening failed): both resume exactly, so stop and say so.
             notRetained(error);
-            shell.toast(`Given before the browser stopped retaining: ${grantedWords(given)} ${onText(source)}. Not sent: ${grantedWords([next, ...queue])}.`);
+            shell.toast(`Given before the browser stopped retaining: ${grantedWords(given)} ${givenOnText(source)}. Not sent: ${grantedWords([next, ...queue])}.`);
             return;
           }
         }
         current = next;
       }
       shell.closeAll();
-      shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${onText(source)}, through you.${unreleased.current ? ' The browser could not release the retained request; opening this again checks it, never gives it twice.' : ''}`);
+      shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${givenOnText(source)}, through you.${unreleased.current ? ' The browser could not release the retained request; opening this again checks it, never gives it twice.' : ''}`);
       done();
     } finally { working.current = false; }
   };
@@ -220,7 +220,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   return (
     <>
       <div className="eyebrow">Your access</div>
-      <h2 style={{ marginTop: 6, fontSize: 16 }}>Give part of {source.relation} of {onText(source)} to an agent</h2>
+      <h2 style={{ marginTop: 6, fontSize: 16 }}>Give part of {source.relation} of {sourceText(source)} to an agent</h2>
       <p className="sub" style={{ marginTop: 6 }}>Only what you hold and may pass on. It traces back to you, and ends when yours does.</p>
       <fieldset disabled={locked} style={{ border: 0, padding: 0 }}>
       <div className="field">
@@ -239,7 +239,8 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         </select>
       </div>
       {toAgent ? <div className="field">
-        <label>Actions</label>
+        {/* The picker's own legend names the actions; a label is the heading only when no picker is shown. */}
+        {offer.known && carried.length ? null : <label>Actions</label>}
         {!offer.known ? <div className="note">The service has not said which actions an agent may hold, so none are offered yet.</div>
           : !carried.length ? <div className="note">{source.resource.kind.includes('.') ? "Lys can't give an agent this app's actions until the app allows it." : 'Nothing you may pass on here can be held by an agent.'}</div>
           : <ActionPicker model={w.model} resource={source.resource} actions={carried} value={picked} onChange={setPicked} disabled={locked} />}
@@ -279,7 +280,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       </fieldset>
       <div className="card" style={{ marginTop: 4 }}>
         <h2>Where it comes from</h2>
-        <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {onText(source)}</span></div>
+        <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {sourceText(source)}</span></div>
         <div className="row"><span className="sec">Actions it allows</span><span className="mono">{actionWords(w.model, source.resource, source.actions)}</span></div>
         <div className="row"><span className="sec">You may pass it on</span><span className="pass">{passText(source.pass_on)}</span></div>
         <div className="row"><span className="sec">Ends no later than</span><span>{source.effective_ends_at !== null ? day(source.effective_ends_at) : 'no end'}</span></div>

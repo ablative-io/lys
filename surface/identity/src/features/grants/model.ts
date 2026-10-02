@@ -1,4 +1,4 @@
-import { actionWords } from './action-words';
+import { actionWords, resourceWords } from './action-words';
 import { api } from '../../api';
 import type { LifecycleState, MeView, PeopleView } from '../../generated';
 import { resourceText } from '../../generated/grants';
@@ -44,6 +44,12 @@ export const grantNo = (id: string): string => 'G/' + id.slice(id.indexOf('-') +
 
 export const onText = (g: Grant): string => resourceText(g.resource);
 
+/** A grant's resource as a name: a directory collection in plain words (`the agents directory`), anything else as its reference. */
+export const sourceText = (g: Grant): string => (g.resource.kind === 'directory' ? resourceWords(g.resource) : onText(g));
+
+/** What follows the actions given on a grant's resource: `on the agents directory` for a directory collection, the reference otherwise. */
+export const givenOnText = (g: Grant): string => (g.resource.kind === 'directory' ? 'on ' + resourceWords(g.resource) : onText(g));
+
 /**
  * A resource named in a sentence: a directory collection as the directory's,
  * an identity the caller may see by its name, anything else as its kind and id.
@@ -65,9 +71,14 @@ export function mayText(w: GrantWorld, g: Grant): string {
   return `${listed === 'everything here' ? 'You can do everything here' : listed} (${objectText(w, g.resource)}).`;
 }
 
-/** A resource as the mock-up's pickers name it: a project or organisation by its id, anything else as `name (type)`. */
-export const resourceLabel = (r: ResourceRef): string =>
-  r.kind === 'project' || r.kind === 'organisation' ? resourceText(r) : `${r.id} (${r.kind})`;
+/**
+ * A resource as the mock-up's pickers name it: a project or organisation by its id,
+ * a directory collection in plain words (`the agents directory`), anything else as `name (type)`.
+ */
+export const resourceLabel = (r: ResourceRef): string => {
+  if (r.kind === 'project' || r.kind === 'organisation') return resourceText(r);
+  return r.kind === 'directory' ? resourceWords(r) : `${r.id} (${r.kind})`;
+};
 
 /** The chain from the root grant down to `g`. */
 export function chainOf(w: GrantWorld, g: Grant): Grant[] {

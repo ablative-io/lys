@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import { actionWords } from './action-words';
 
@@ -53,17 +54,19 @@ function GroupedActionPicker({ model, groups, selected, change, disabled = false
       <legend>{group.href ? <a href={group.href}>{group.title}</a> : group.title}</legend>
       {available.length ? <label><input type="checkbox" name="all_actions" checked={all.every((id) => held.has(id))}
         onChange={(event) => change(event.target.checked ? [...selected.filter((id) => !choiceIds.has(id)), ...all] : selected.filter((id) => !allIds.has(id)))} /> Everything here</label> : null}
-      {choices.map((choice) => <div key={choice.id}><label className={choice.reason ? 'dim' : undefined}>
+      {/* Each label sits directly in the fieldset, as "Everything here" does, so one rule sets every checkbox beside its words. */}
+      {choices.map((choice) => <Fragment key={choice.id}><label className={choice.reason ? 'dim' : undefined}>
         <input type="checkbox" name="action" value={choice.id} disabled={Boolean(choice.reason)} checked={held.has(choice.id)}
           onChange={(event) => { if (everything) change(event.target.checked ? [...selected.filter((id) => id !== everything.id), choice.id] : selected.filter((id) => id !== choice.id)); else toggle([choice.id], event.target.checked); }} /> {actionWords(model, choice.resource, choice.actions)}
-      </label>{choice.reason ? <p className="hint">{choice.reason}</p> : null}</div>)}
+      </label>{choice.reason ? <p className="hint">{choice.reason}</p> : null}</Fragment>)}
     </fieldset>;
   })}</>;
 }
 
 
 type GroupedProps = Parameters<typeof GroupedActionPicker>[0];
-type SingleProps = { model: GrantModel; resource: ResourceRef; actions: string[]; value: string[]; onChange: (value: string[]) => void; disabled?: boolean; agents?: boolean };
+/** `title` is the picker's one heading, its legend: `Actions` unless the form names the choice itself. */
+type SingleProps = { model: GrantModel; resource: ResourceRef; actions: string[]; value: string[]; onChange: (value: string[]) => void; disabled?: boolean; agents?: boolean; title?: string };
 
 /** A single resource uses action names as its value; grouped callers retain their source keys. */
 export function ActionPicker(props: SingleProps | GroupedProps) {
@@ -74,7 +77,7 @@ export function ActionPicker(props: SingleProps | GroupedProps) {
     const relation = relations.get(action);
     return relation ? [{ id: action, resource: props.resource, relation, actions: [action], reason: '' }] : [];
   });
-  return <><GroupedActionPicker model={props.model} groups={[{ id: JSON.stringify(props.resource), title: 'Actions', choices }]}
+  return <><GroupedActionPicker model={props.model} groups={[{ id: JSON.stringify(props.resource), title: props.title ?? 'Actions', choices }]}
     selected={props.value} change={props.onChange} disabled={props.disabled} agents={props.agents} />
     {choices.length < props.actions.length ? <p>Some actions cannot be selected because the model has no relation carrying that action alone.</p> : null}</>;
 }
