@@ -33,7 +33,12 @@ pub async fn operate(
 ) -> Result<OperationOutcome, Undelivered> {
     let driven = driven(state, &operation.session)
         .map_err(|error| Undelivered::Refused(error.to_string()))?;
-    let act = Act::Operate { operation };
+    // Lys itself asks a durable operation, so it is attributed to Lys by
+    // the operation's name, never to a person who did not ask it.
+    let act = Act::AsCaller {
+        caller: format!("lys:{}", operation.request.name()),
+        act: Box::new(Act::Operate { operation }),
+    };
     let answered =
         crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;
     let outcome = match answered {

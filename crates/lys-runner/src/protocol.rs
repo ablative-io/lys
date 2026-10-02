@@ -272,6 +272,16 @@ pub enum Act {
         #[serde(default)]
         follow: bool,
     },
+    /// Do `act` for `caller`, the person or agent the server verified and
+    /// judged before it signed this request. A start done for a caller is
+    /// owned by them; typed input and operations done for a caller are
+    /// admitted to an owned session and attributed to them.
+    AsCaller {
+        /// The verified caller.
+        caller: String,
+        /// The act done for them.
+        act: Box<Act>,
+    },
     /// Hold this connection as the live grant authority's channel: the
     /// runner answers `grant_channel`, then writes each grantable question
     /// as one line and reads the answer line to it, until the connection

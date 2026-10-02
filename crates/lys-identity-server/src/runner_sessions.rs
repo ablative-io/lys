@@ -323,6 +323,7 @@ pub async fn run_on_runner(
         )?
     };
     let missing_config = matches!(&act, Act::Start { lys_mcp: None, .. });
+    let act = owned_start(state, agent, act)?;
     let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
     let answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
@@ -495,4 +496,24 @@ impl Launcher for DirectoryLauncher {
             Some(run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await)
         })
     }
+}
+
+/// A start owned by the agent's responsible person, so the runner admits
+/// input to it only for a verified caller; any other act is sent as it is.
+fn owned_start(state: &AppState, agent: &str, act: Act) -> Result<Act, ServerError> {
+    if !matches!(act, Act::Start { .. }) {
+        return Ok(act);
+    }
+    let agent = AgentId::from_str(agent)?;
+    let person = crate::routes::with_directory(state, |directory| {
+        directory
+            .projection()?
+            .record(lys_identity::IdentityId::Agent(agent))
+            .and_then(lys_identity::projection::Record::responsible)
+            .ok_or(ServerError::NoPerson)
+    })?;
+    Ok(Act::AsCaller {
+        caller: person.to_string(),
+        act: Box::new(act),
+    })
 }

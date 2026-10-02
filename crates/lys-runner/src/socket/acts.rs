@@ -144,6 +144,7 @@ pub(super) fn perform(
             let page = reader.page(cursor.as_deref())?;
             Ok(Answer::Feed { page })
         }
+        Act::AsCaller { caller, act } => as_caller(sessions, server, &caller, *act, left),
         Act::GrantChannel => Err(RunnerError::refused(
             "grant_channel_unheld",
             "a grant channel is held only as the whole of its connection",
@@ -151,6 +152,55 @@ pub(super) fn perform(
         Act::Outcome { operation } => sessions
             .outcome(&operation)
             .map(|outcome| Answer::Operation { outcome }),
+    }
+}
+
+/// Do `act` for `caller`: a start owned by them, or typed input and an
+/// operation attributed to them. The server signed this request only after
+/// verifying the caller and judging their grant, so its signature is the
+/// judgement the runner holds them to; anything else is refused by name.
+fn as_caller(
+    sessions: &Arc<Sessions>,
+    server: &[u8; 32],
+    caller: &str,
+    act: Act,
+    left: &AtomicBool,
+) -> Result<Answer, RunnerError> {
+    match act {
+        Act::Start {
+            mut launch,
+            lys_mcp,
+        } => {
+            if let Some(entry) = lys_mcp {
+                crate::launch_config::add_lys_mcp(&mut launch, &entry)?;
+            }
+            let session = launch.session.clone();
+            let policy = launch
+                .policy
+                .clone()
+                .map(|admitted| Admitted::verified(*admitted))
+                .transpose()?;
+            let (pid, started_at) = sessions.begin_for(*launch, policy, None, caller)?;
+            Ok(Answer::Started {
+                session,
+                pid,
+                started_at,
+            })
+        }
+        act @ (Act::Input { .. } | Act::InputBytes { .. } | Act::Keys { .. } | Act::Operate { .. }) => {
+            let judge = |_signed: &crate::injection::InputGrant<'_>| Ok::<(), RunnerError>(());
+            let context = crate::legacy_input::InputContext {
+                sender: caller,
+                signed: false,
+                cookie: None,
+                judge: &judge,
+            };
+            perform(sessions, server, act, left, Some(&context))
+        }
+        _ => Err(RunnerError::refused(
+            "caller_act_unsupported",
+            "only a start, typed input or an operation is done for a caller",
+        )),
     }
 }
 

@@ -153,6 +153,10 @@ pub(crate) async fn perform(
     carried: Carried,
     act: Act,
 ) -> Result<Json<Value>, ServerError> {
+    let act = lys_runner::Act::AsCaller {
+        caller: caller.clone(),
+        act: Box::new(act),
+    };
     let answered =
         crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;
     if let Some(ended) = answered.as_ref().ok().and_then(ended_in) {
