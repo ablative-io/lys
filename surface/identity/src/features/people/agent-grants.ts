@@ -1,7 +1,7 @@
 import { operationId, Refused, request } from '../../api';
 import type { DelegateBody, Grant, GrantModel } from '../../generated/grants';
 import { isRecord, strings } from '../network/contract';
-import { singleActionCarriers, withheldFromAgents } from '../grants/ActionPicker';
+import { appAgentRefusal, singleActionCarriers, withheldFromAgents } from '../grants/ActionPicker';
 import { actionWords } from '../grants/action-words';
 import { resourceWords } from './agent-resource-names';
 
@@ -30,7 +30,7 @@ export async function readGrantChoices(): Promise<GrantChoices> {
     return { grants: answer.grants, model: model as unknown as GrantModel, problem: null };
   } catch (problem) { return { grants: [], model: null, problem }; }
 }
-export const grantOptionKey = (option: GrantOption): string => option.grant.id + ':' + option.relation;
+export const grantOptionKey = (option: GrantOption): string => option.grant.id + ':' + option.relation + (option.grant.resource.kind.includes('.') ? ':' + option.actions[0] : '');
 export function grantOptions(choices: GrantChoices, boss: string, caller: string, name: string): GrantOption[] {
   const model = choices.model;
   const withheld = withheldFromAgents(model);
@@ -41,11 +41,12 @@ export function grantOptions(choices: GrantChoices, boss: string, caller: string
   for (const grant of choices.grants) {
     if (grant.holder !== boss) continue;
     const pass = grant.pass_on;
-    const reason = boss !== caller ? 'Only ' + name + ' can pass this on.' : !grant.standing.stands ? 'This access no longer stands.'
+    const app = grant.resource.kind.includes('.');
+    const reason = app ? appAgentRefusal : boss !== caller ? 'Only ' + name + ' can pass this on.' : !grant.standing.stands ? 'This access no longer stands.'
       : pass.kind !== 'to' ? 'This access cannot be passed on.' : !pass.recipients.includes('agent') ? 'This access cannot be given to an agent.' : '';
     for (const action of grant.actions) {
-      if (!grant.resource.kind.includes('.') && excluded.has(action)) continue;
-      const relation = grant.resource.kind.includes('.') ? grant.actions.length === 1 ? grant.relation : undefined : relations.get(action);
+      if (!app && excluded.has(action)) continue;
+      const relation = app ? grant.relation : relations.get(action);
       if (!relation || !reason && pass.kind === 'to' && !pass.actions.includes(action)) continue;
       const key = JSON.stringify([grant.resource.kind, grant.resource.id, action]);
       const previous = options.get(key);
@@ -63,7 +64,7 @@ export function newAgentGrants(options: GrantOption[], selected: string[]): Agen
   const byKey = new Map(options.map((option) => [grantOptionKey(option), option]));
   return [...new Set(selected)].map((id) => {
     const option = byKey.get(id);
-    if (!option || option.reason || !option.relation || option.grant.effective_ends_at !== null && option.grant.effective_ends_at <= now) {
+    if (!option || option.reason || option.grant.resource.kind.includes('.') || !option.relation || option.grant.effective_ends_at !== null && option.grant.effective_ends_at <= now) {
       throw new Refused(0, { refusal: 'GrantChoiceUnavailable', reason: 'The selected access can no longer be passed on. Nothing has been sent.' });
     }
     return { operation: operationId(), source: option.grant.id, resource: option.grant.resource, relation: option.relation, actions: option.actions,
@@ -93,6 +94,7 @@ export function agentGrantsOf(value: unknown, agent: string | null, responsible:
   });
 }
 export async function delegateAgentGrant(entry: AgentGrant, caller: string): Promise<string> {
+  if (entry.resource.kind.includes('.')) throw new Refused(0, { refusal: 'WithheldFromAgents', reason: appAgentRefusal });
   const body = entry.body;
   const mismatch = (): never => { throw new Refused(200, { refusal: 'GrantReceiptMismatch', reason: 'Lys did not confirm this exact access request. Its original details are saved; no completion is claimed.' }); };
   if (!body) return mismatch();

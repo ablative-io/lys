@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentGrantsOf, grantOptions, newAgentGrants } from '../src/features/people/agent-grants';
+import { agentGrantsOf, delegateAgentGrant, grantOptionKey, grantOptions, newAgentGrants } from '../src/features/people/agent-grants';
 import { ADA, GRANTS, MODEL } from './fixtures';
 
 const source = { ...GRANTS[0], actions: ['agent.start', 'agent.stop', 'grant.revoke', 'read'],
@@ -23,7 +23,12 @@ describe('Per action agent grants', () => {
     const options = grantOptions({ ...choices, grants: [app] }, ADA, ADA, 'Ada');
     expect(options).toHaveLength(1);
     expect(options[0].reason).toBe("Lys can't give an agent this app's actions until the app allows it.");
-    expect(() => newAgentGrants(options, [app.id + ':reader'])).toThrow('GrantChoiceUnavailable');
+    expect(() => newAgentGrants(options, [grantOptionKey(options[0])])).toThrow('GrantChoiceUnavailable');
+  });
+  it('refuses a retained app grant before issuing its original request', async () => {
+    const options = grantOptions(choices, ADA, ADA, 'Ada');
+    const [entry] = newAgentGrants(options, [grantOptionKey(options[0])]);
+    await expect(delegateAgentGrant({ ...entry, resource: { kind: 'fixture.doc', id: 'doc7' } }, ADA)).rejects.toThrow('WithheldFromAgents');
   });
   it('records each selected act as its own operation and retains both from one source', () => {
     const options = grantOptions(choices, ADA, ADA, 'Ada');

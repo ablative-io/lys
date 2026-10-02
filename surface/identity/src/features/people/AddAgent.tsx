@@ -91,8 +91,8 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     const withheld = withheldFromAgents(model);
     if (!model || withheld === null) return false;
     const relations = singleActionCarriers(model);
-    return grants.grants.some((grant) => grant.holder === person && (grant.resource.kind.includes('.')
-      ? grant.actions.length > 1 : grant.actions.some((action) => !withheld.includes(action) && !relations.has(action))));
+    return grants.grants.some((grant) => grant.holder === person && !grant.resource.kind.includes('.')
+      && grant.actions.some((action) => !withheld.includes(action) && !relations.has(action)));
   }, [grants, person]);
   const unavailable = !capability.answersTo && person !== me.person.id;
   const unsupported = unavailable ? pending || walk ? 'Your saved request names another person or agent. This service cannot accept that choice; the saved request has not been sent.' : 'This service cannot register an agent under that person or agent.' : '';
