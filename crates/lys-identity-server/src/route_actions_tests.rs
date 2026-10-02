@@ -59,7 +59,6 @@ async fn fixture() -> TestResult<(Service, String, String, String, String)> {
         None,
         None,
         |config| {
-            config.requests_dir = None;
             config.certificates_dir = None;
             config.network_file = None;
             config.roles_file = None;
@@ -163,6 +162,12 @@ async fn fixture() -> TestResult<(Service, String, String, String, String)> {
             let pass = passes
                 .issue(agent, "launch-proof", "session-proof")?
                 .to_string();
+            // A pass whose run has ended, kept beside the log for the test that needs one.
+            let ended = passes
+                .issue(agent, "launch-ended", "session-ended")?
+                .to_string();
+            passes.end_session("session-ended")?;
+            std::fs::write(config.log_dir.with_file_name("ended-pass"), ended)?;
             let sessions = crate::session::Sessions::open(
                 config
                     .sessions_file
@@ -337,34 +342,48 @@ async fn a_pass_cannot_borrow_credentials_or_reach_undeclared_or_kept_routes() -
     Ok(())
 }
 
+async fn ask(service: &Service, pass: &str) -> TestResult<(u16, Value)> {
+    let body = json!({"operation": operation()?, "resource": {"kind":"configuration", "id":"all"},
+        "relation":"beta", "ends_at": null, "why":"to read the configuration"});
+    let response = client()
+        .post(format!("{}/requests", service.base))
+        .header("lys-agent-pass", pass)
+        .json(&body)
+        .send()
+        .await?;
+    let status = response.status().as_u16();
+    Ok((status, response.json().await?))
+}
+
 #[tokio::test]
-async fn a_pass_asks_for_access_without_a_grant_and_an_unknown_pass_cannot() -> TestResult {
-    let (service, pass, _, person, _) = fixture().await?;
-    let ask = |pass: String| {
-        let body = json!({"operation": operation().unwrap_or_default(), "resource":
-            {"kind":"configuration", "id":"all"}, "relation":"beta", "responsible": person});
-        let url = format!("{}/requests", service.base);
-        async move {
-            let response = client()
-                .post(url)
-                .header("lys-agent-pass", pass)
-                .json(&body)
-                .send()
-                .await?;
-            let status = response.status().as_u16();
-            let body: Value = response.json().await.unwrap_or(Value::Null);
-            TestResult::Ok((status, body))
-        }
-    };
-    let (status, asked) = ask(pass.clone()).await?;
-    assert_ne!(asked["refusal"], "NotHeld", "{status} {asked}");
-    assert_ne!(asked["refusal"], "TokenScopeUndeclared", "{status} {asked}");
-    assert!(
-        asked.get("can_grant").is_none(),
-        "asking names no grantor: {asked}"
-    );
-    let (status, unknown) = ask(format!("{pass}x")).await?;
-    assert_eq!(status, 401, "{unknown}");
+async fn a_pass_asks_for_access_without_a_grant_and_an_unknown_or_ended_pass_cannot() -> TestResult
+{
+    let (service, pass, cookie, _, agent) = fixture().await?;
+    let (status, asked) = ask(&service, &pass).await?;
+    assert_eq!(status, 200, "{asked}");
+    assert_eq!(asked["asked_by"], agent, "{asked}");
+    let id = asked["id"].as_str().ok_or("the request has no id")?;
+    let (status, held) = service.get("/requests", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{held}");
+    let recorded = held["requests"]
+        .as_array()
+        .ok_or("no requests")?
+        .iter()
+        .find(|request| request["id"] == id)
+        .ok_or("the request was not recorded")?;
+    assert_eq!(recorded["asked_by"], agent, "{recorded}");
+    let (status, unanswered) = get(&service, "/configuration", &pass).await?;
+    assert_eq!(status, 403, "asking grants nothing: {unanswered}");
+    let last = pass.chars().last().ok_or("empty pass")?;
+    let swapped = if last == 'a' { 'b' } else { 'a' };
+    let unknown = format!("{}{swapped}", &pass[..pass.len() - 1]);
+    assert_eq!(unknown.len(), pass.len());
+    let (status, refused) = ask(&service, &unknown).await?;
+    assert_eq!(status, 401, "{refused}");
+    let ended = std::fs::read_to_string(service.dir.path().join("ended-pass"))?;
+    assert_eq!(ended.len(), pass.len());
+    let (status, refused) = ask(&service, &ended).await?;
+    assert_eq!(status, 401, "{refused}");
     Ok(())
 }
 
