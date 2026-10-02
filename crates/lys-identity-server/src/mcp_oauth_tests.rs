@@ -134,7 +134,8 @@ async fn connected(service: &Service, cookie: &str) -> Result<(String, Value), B
 }
 
 async fn tree(service: &Service, token: &str) -> Result<reqwest::Response, Box<dyn Error>> {
-    Ok(client()?
+    let client = client()?;
+    Ok(client
         .post(format!("{}/mcp", service.base))
         .header("accept", "application/json, text/event-stream")
         .header("mcp-protocol-version", "2025-11-25")
