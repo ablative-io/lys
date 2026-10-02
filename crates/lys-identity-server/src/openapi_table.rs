@@ -305,7 +305,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn", "CertificatesUnavailable"], &["CertificateWithdrawn"]] scope("agent", "agent.certificate.withdraw", ["id"]);
     POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable"]] scope("agent", "agent.start", ["id"]);
-    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotVisible", "CertificatesUnavailable"]] scope("launch-record", "launch-record.start-again", ["id"]);
+    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable"]] scope("launch-record", "launch-record.start-again", ["id"]);
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY] scope("launch-record", "launch-record.withdraw", ["id"]);
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED] scope("launch-record", "read", ["id"]);
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]] scope("change", "read", []);

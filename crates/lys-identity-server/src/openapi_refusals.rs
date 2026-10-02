@@ -135,6 +135,7 @@ pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
 /// A start and the status read that settles an already-held session.
 pub(crate) const START_RUNNER: &[&str] = &[
     "AgentHasNoPolicy",
+    "AgentNotActive",
     "AgentNotVisible",
     "CertificatesUnavailable",
     "PolicyUnavailable",
@@ -219,6 +220,7 @@ pub(crate) const BUDGET_SET: &[&str] = &[
 ];
 /// Fresh starts check authority before enforcing a known stop threshold.
 pub(crate) const START_BUDGET: &[&str] = &[
+    "AgentNotActive",
     "AgentNotVisible",
     "CertificatesUnavailable",
     "BudgetExhausted",

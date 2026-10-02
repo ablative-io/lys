@@ -6,6 +6,11 @@
 //! the next start and withdrawn, so the AI stands on one certificate; a
 //! replacement leaves the AI's runs running, while a person's withdrawal
 //! ends them.
+//!
+//! A withdrawal takes back the AI's credential, as a key believed exposed is
+//! taken back: its runs end, and its next start is issued a new certificate
+//! over a new key. Keeping an AI from acting at all is its suspension: no
+//! certificate is issued to an AI that is not active.
 
 use std::sync::Arc;
 
@@ -19,6 +24,10 @@ use crate::certificates_store::Withdrawn;
 use crate::error::ServerError;
 use crate::routes::{AppState, with_directory};
 use crate::session::now;
+
+/// Who a replacement withdrawal names as its author: Lys itself, never a
+/// person who did not act.
+pub(crate) const REPLACED_BY: &str = "lys";
 
 /// How long before it lapses a certificate is replaced at a start.
 pub(crate) const RENEW_WITHIN: u64 = 7 * 24 * 60 * 60;
@@ -63,11 +72,12 @@ pub(crate) fn standing(state: &AppState, agent: AgentId) -> Result<String, Serve
         return Ok(serial);
     }
     let responsible = with_directory(state, |directory| {
-        Ok(directory
-            .projection()?
+        let projection = directory.projection()?;
+        let record = projection
             .record(IdentityId::Agent(agent))
-            .ok_or(ServerError::AgentNotVisible)?
-            .responsible())
+            .ok_or(ServerError::AgentNotVisible)?;
+        crate::start_checks::active(record.state())?;
+        Ok(record.responsible())
     })?
     .ok_or(ServerError::AgentNotVisible)?;
     let serial = OperationId::generate()?.to_string();
@@ -90,13 +100,21 @@ pub(crate) fn standing(state: &AppState, agent: AgentId) -> Result<String, Serve
             .map(|entered| (entered.issued.serial.clone(), entered.issued.issued_at))
             .collect();
         if let Some(serial) = lasting(&now_standing, at) {
+            // The key made for the certificate not entered names nothing;
+            // it is not kept.
+            std::fs::remove_file(&path).map_err(|error| {
+                unavailable(format!(
+                    "the key of a certificate not entered could not be removed from {}: {error}",
+                    path.display()
+                ))
+            })?;
             return Ok(serial);
         }
         store.issue(made)?;
         for (replaced, _) in &now_standing {
             store.withdraw(Withdrawn {
                 serial: replaced.clone(),
-                by: responsible.to_string(),
+                by: REPLACED_BY.to_owned(),
                 reason: format!("Lys replaced it before it lapsed, with {serial}"),
                 withdrawn_at: at,
             })?;
