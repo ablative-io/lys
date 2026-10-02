@@ -230,28 +230,9 @@ pub enum ServerError {
     /// No machine is kept by that id.
     #[error("MachineUnknown: no machine is kept by that id")]
     MachineUnknown,
-    /// The operation id already names a machine named in other words.
-    #[error("MachineReused: operation `{machine}` already names a machine named in other words")]
-    MachineReused {
-        /// The operation id.
-        machine: String,
-    },
-    /// The operation already names an ownership act in different words.
-    #[error(
-        "MachineTeamReused: operation `{operation}` already assigned this computer to a different team; a new assignment needs a new operation"
-    )]
-    MachineTeamReused {
-        /// The reused operation.
-        operation: String,
-    },
-    /// The operation already names an agent allowance act in different words.
-    #[error(
-        "MachineAgentsReused: operation `{operation}` already names another computer allowance; a new allowance needs a new operation"
-    )]
-    MachineAgentsReused {
-        /// The reused operation.
-        operation: String,
-    },
+    /// A machine act's operation id already names a different act.
+    #[error(transparent)]
+    Machine(#[from] crate::error_machine::MachineError),
     /// The signed-in sessions could not be kept or read back.
     #[error("SessionsUnavailable: {reason}")]
     SessionsUnavailable {

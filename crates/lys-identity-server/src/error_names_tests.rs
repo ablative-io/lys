@@ -194,21 +194,21 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         (ServerError::LoginUnbound, "LoginUnbound"),
         (ServerError::MachineUnknown, "MachineUnknown"),
         (
-            ServerError::MachineReused {
+            ServerError::Machine(crate::error_machine::MachineError::Reused {
                 machine: detail.to_owned(),
-            },
+            }),
             "MachineReused",
         ),
         (
-            ServerError::MachineTeamReused {
+            ServerError::Machine(crate::error_machine::MachineError::TeamReused {
                 operation: detail.to_owned(),
-            },
+            }),
             "MachineTeamReused",
         ),
         (
-            ServerError::MachineAgentsReused {
+            ServerError::Machine(crate::error_machine::MachineError::AgentsReused {
                 operation: detail.to_owned(),
-            },
+            }),
             "MachineAgentsReused",
         ),
         (

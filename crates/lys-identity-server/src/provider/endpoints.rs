@@ -216,9 +216,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::NetworkUnavailable { .. }
         | ServerError::LoginUnbound
         | ServerError::MachineUnknown
-        | ServerError::MachineReused { .. }
-        | ServerError::MachineTeamReused { .. }
-        | ServerError::MachineAgentsReused { .. }
+        | ServerError::Machine(..)
         | ServerError::SessionsUnavailable { .. }
         | ServerError::MemoryUnavailable { .. }
         | ServerError::ProvisioningUnavailable { .. }

@@ -187,9 +187,6 @@ impl ServerError {
             | Self::RequestHeld { .. }
             | Self::RequestReused { .. }
             | Self::McpServerHeld { .. }
-            | Self::MachineReused { .. }
-            | Self::MachineTeamReused { .. }
-            | Self::MachineAgentsReused { .. }
             | Self::RoleReused { .. }
             | Self::RoleHeld { .. }
             | Self::HoldingOver { .. }
@@ -269,6 +266,7 @@ impl ServerError {
             Self::Team(error) => error.status(),
             Self::Budget(error) => error.status(),
             Self::Holding(error) => error.status(),
+            Self::Machine(error) => error.status(),
         }
     }
 }

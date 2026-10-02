@@ -70,6 +70,7 @@ mod drafts_api_tests;
 pub mod error;
 pub mod error_budget;
 pub mod error_holding;
+pub mod error_machine;
 mod error_names;
 #[cfg(test)]
 mod error_names_tests;
@@ -122,6 +123,7 @@ pub mod network_store;
 pub mod oidc;
 pub mod openapi;
 mod openapi_accounts_types;
+mod openapi_goals_types;
 mod openapi_refusals;
 mod openapi_runner_types;
 mod openapi_table;

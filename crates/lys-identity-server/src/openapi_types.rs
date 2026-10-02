@@ -50,9 +50,6 @@ use crate::directory_views::{
     AgentRegistered, IdentitiesView, IdentityRecordView, LinkAuditPerson, PersonRegistered,
     ReceiptAnswer, ReceiptPage, ServiceKeyView, SignedInView,
 };
-use crate::goals_api::{GoalsView, MarkBody, SetBody as GoalBody};
-use crate::goals_edit::{ActiveBody, WordsBody};
-use crate::goals_views::ItemView as GoalItem;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
     RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
@@ -112,7 +109,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
         api,
     ));
     entries.extend(crate::openapi_runner_types::runner(api));
-    entries.extend(goals(api));
+    entries.extend(crate::openapi_goals_types::goals(api));
     entries
         .into_iter()
         .map(|(method, path, request, response)| ((method, path), (request, response)))
@@ -534,31 +531,5 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::accounts::Reset>()),
             None,
         ),
-    ]
-}
-
-/// The goals, expectations and deliverables on agents and teams.
-fn goals(api: &mut Api) -> Vec<Entry> {
-    let (list, item) = (api.schema::<GoalsView>(), api.schema::<GoalItem>());
-    let (set, mark) = (api.schema::<GoalBody>(), api.schema::<MarkBody>());
-    let (active, words) = (api.schema::<ActiveBody>(), api.schema::<WordsBody>());
-    vec![
-        (GET, "/agents/{id}/goals", None, Some(list.clone())),
-        (
-            POST,
-            "/agents/{id}/goals",
-            Some(set.clone()),
-            Some(item.clone()),
-        ),
-        (GET, "/teams/{id}/goals", None, Some(list)),
-        (POST, "/teams/{id}/goals", Some(set), Some(item.clone())),
-        (POST, "/goals/{goal}/mark", Some(mark), Some(item.clone())),
-        (
-            POST,
-            "/goals/{goal}/active",
-            Some(active),
-            Some(item.clone()),
-        ),
-        (POST, "/goals/{goal}/words", Some(words), Some(item)),
     ]
 }
