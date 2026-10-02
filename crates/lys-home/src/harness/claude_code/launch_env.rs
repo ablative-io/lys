@@ -16,29 +16,6 @@ use crate::error::HomeError;
 use crate::harness::claude_code::template::Template;
 use crate::record::blocks::Hash;
 
-/// Refuse a template that does not say how the agent is confined: a
-/// permissions slot that is absent, names no `defaultMode`, or names an empty
-/// one. Checked before anything is written, so nothing is ever rendered
-/// unconfined and the operator's file is never rewritten.
-///
-/// # Errors
-/// `TemplateShape` naming `slots.permissions.defaultMode`.
-pub fn confinement_named(template: &Template) -> Result<(), HomeError> {
-    if template
-        .permissions
-        .as_ref()
-        .and_then(|permissions| permissions.get("defaultMode"))
-        .and_then(serde_json::Value::as_str)
-        .is_none_or(str::is_empty)
-    {
-        return Err(HomeError::TemplateShape {
-            field: "slots.permissions.defaultMode".to_owned(),
-            reason: "names no mode: choose how this agent is confined",
-        });
-    }
-    Ok(())
-}
-
 /// The settings file's bytes: `{"env": {...}}`, keys sorted, with the
 /// template's `permissions` beside `env` when it sets them; one trailing
 /// newline.
