@@ -34,7 +34,10 @@ impl Engine {
                 let listener = tokio::net::TcpListener::from_std(listener)?;
                 let app = Router::new()
                     .fallback(exchange)
-                    .with_state(Arc::new(Mutex::new(Held::default())));
+                    .with_state(Arc::new(Mutex::new(Held {
+                        schema: lys_identity::grants::SCHEMA.to_owned(),
+                        relationships: Vec::new(),
+                    })));
                 ready.send(()).map_err(io::Error::other)?;
                 axum::serve(listener, app)
                     .with_graceful_shutdown(async move {

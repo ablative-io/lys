@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::error::GrantError;
 use super::permission::{MemoryRelationships, Relationship, RelationshipStore};
+use super::types::Resource;
 
 /// An in-process permission engine that can be taken down. Clones share one
 /// engine and one switch.
@@ -37,6 +38,10 @@ impl FailingRelationships {
 }
 
 impl RelationshipStore for FailingRelationships {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        self.inner.admit_resource(resource)
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         self.up()?;
         self.inner.revision()

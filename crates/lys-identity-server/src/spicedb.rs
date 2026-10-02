@@ -52,6 +52,8 @@ const FIXED: [&str; 6] = [
     "lys_revision",
     "lys_mirror",
 ];
+/// Principals that also carry ordinary resource relations.
+const RESOURCE_SUBJECTS: [&str; 3] = ["person", "agent", "service_account"];
 /// The definitions the mirror's revision is kept in.
 const MIRROR_SCHEMA: &str = "\ndefinition lys_revision {}\n\ndefinition lys_mirror {\n  relation revision: lys_revision\n}\n";
 
@@ -244,7 +246,7 @@ impl SpiceDb {
         let body: String = relations.chain(permissions).collect();
         let kinds = kinds
             .iter()
-            .filter(|kind| !kind.contains('.') && kind.as_str() != "service_account")
+            .filter(|kind| !kind.contains('.') && !RESOURCE_SUBJECTS.contains(&kind.as_str()))
             .map(|kind| format!("\ndefinition {kind} {{\n{body}}}\n"));
         let app_kinds = self
             .app_kinds
@@ -254,20 +256,20 @@ impl SpiceDb {
         let apps = app_kinds
             .iter()
             .map(|(kind, model)| app_definition(kind, model, &app_kinds));
-        // A service account is also an existing resource kind. Keep one
-        // definition with its ordinary resource relations, never emit a
-        // second definition when a grant names an account as a resource.
-        Ok([
-            SCHEMA.replace(
-                "definition service_account {}",
-                &format!("definition service_account {{\n{body}}}"),
-            ),
-            MIRROR_SCHEMA.to_owned(),
-        ]
-        .into_iter()
-        .chain(kinds)
-        .chain(apps)
-        .collect())
+        // Principals are both subjects and resources, so their one definition
+        // must carry ordinary resource relations.
+        let mut subjects = SCHEMA.to_owned();
+        for kind in RESOURCE_SUBJECTS {
+            subjects = subjects.replace(
+                &format!("definition {kind} {{}}"),
+                &format!("definition {kind} {{\n{body}}}"),
+            );
+        }
+        Ok([subjects, MIRROR_SCHEMA.to_owned()]
+            .into_iter()
+            .chain(kinds)
+            .chain(apps)
+            .collect())
     }
 
     pub(crate) fn schema_writer(&self) -> Result<Self, GrantError> {
@@ -348,7 +350,7 @@ impl SpiceDb {
             .lines()
             .filter_map(|line| line.strip_prefix("definition "))
             .filter_map(|rest| rest.split([' ', '{']).next())
-            .filter(|name| *name == "service_account" || !FIXED.contains(name))
+            .filter(|name| RESOURCE_SUBJECTS.contains(name) || !FIXED.contains(name))
             .map(|name| name.replacen('/', ".", 1))
             .collect())
     }
@@ -452,6 +454,34 @@ impl SpiceDb {
 }
 
 impl RelationshipStore for SpiceDb {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        let kind = resource.kind();
+        if kind.contains('.') {
+            if self
+                .app_kinds
+                .lock()
+                .map_err(|error| unavailable(format!("app kinds unavailable: {error}")))?
+                .contains_key(kind)
+            {
+                return Ok(());
+            }
+            return Err(unavailable(format!(
+                "resource kind {kind} has no held permission model; the app owner must publish its resource schema and the Lys administrator must approve it before a grant can be committed"
+            )));
+        }
+        if FIXED.contains(&kind) && !RESOURCE_SUBJECTS.contains(&kind) {
+            return Err(unavailable(format!(
+                "resource kind {kind} is an internal permission-engine definition without model resource relations; a Lys maintainer must add support for that resource kind before a grant can be committed"
+            )));
+        }
+        if !names::engine_takes(kind) {
+            return Err(unavailable(format!(
+                "resource kind {kind} is not a name the permission engine can hold; the Lys administrator must choose three to sixty-four lowercase letters, digits and underscores, starting with a letter and not ending with an underscore, or a Lys maintainer must add a supported resource-kind mapping"
+            )));
+        }
+        Ok(())
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         let held = self.read_of(&json!({
             "resourceType": "lys_mirror",
@@ -545,6 +575,13 @@ pub enum Relationships {
 }
 
 impl RelationshipStore for Relationships {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        match self {
+            Self::Memory(held) => held.admit_resource(resource),
+            Self::SpiceDb(engine) => engine.admit_resource(resource),
+        }
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         match self {
             Self::Memory(held) => held.revision(),

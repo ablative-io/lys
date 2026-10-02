@@ -157,6 +157,10 @@ pub fn placement(child: &Resource, parent: &Resource) -> Relationship {
 
 /// A permission engine holding relationships at a revision.
 pub trait RelationshipStore {
+    /// Refuse a resource whose kind this engine cannot project, before its
+    /// grant is committed. This check performs no engine I/O.
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError>;
+
     /// The number of grant events the relationships reflect.
     fn revision(&self) -> Result<u64, GrantError>;
 
@@ -181,6 +185,10 @@ pub struct MemoryRelationships {
 }
 
 impl RelationshipStore for MemoryRelationships {
+    fn admit_resource(&self, _: &Resource) -> Result<(), GrantError> {
+        Ok(())
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         Ok(self
             .state

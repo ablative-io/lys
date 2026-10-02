@@ -6,6 +6,10 @@ use std::os::unix::fs::PermissionsExt;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use lys_identity::grants::{
+    Grants, MemoryRelationships, PassOn, Relation, Resource, RootRequest, Route, Window,
+};
+use lys_identity::signer::load_service_key;
 use lys_identity::{
     Actor, AuthMethod, IdentityId, LoginBinding, OperationId, PersonId, Profile, Provenance,
     Transition,
@@ -50,8 +54,38 @@ fn prepare(config: &lys_identity_server::Config) -> Result<PersonId, Box<dyn Err
     Ok(person)
 }
 
-async fn started()
--> Result<(grant_resource_engine::Engine, Service, PersonId, String), Box<dyn Error>> {
+fn old_grant(config: &lys_identity_server::Config, person: PersonId) -> Outcome {
+    let path = config.grant_log_dir.clone();
+    FileLeafStore::create(&path, &config.grant_log_origin)?;
+    let directory = open_directory(config)?;
+    let mut grants = Grants::open(
+        Box::new(move || FileLeafStore::open(&path)),
+        load_service_key(&config.event_key_file)?,
+        MemoryRelationships::default(),
+        config.grant_model()?,
+        person,
+    )?;
+    grants.issue_root(
+        directory.projection()?,
+        &RootRequest {
+            operation: OperationId::generate()?,
+            caller: IdentityId::Person(person),
+            route: Route::Browser,
+            holder: person,
+            resource: Resource::new("person", "target")?,
+            relation: Relation::new("alpha")?,
+            pass_on: PassOn::UseOnly,
+            window: Window::new(0, None)?,
+        },
+        4,
+    )?;
+    assert_eq!(grants.revision(), 1);
+    Ok(())
+}
+
+async fn started(
+    preexisting: bool,
+) -> Result<(grant_resource_engine::Engine, Service, PersonId, String), Box<dyn Error>> {
     let engine = grant_resource_engine::Engine::start()?;
     let key = tempfile::NamedTempFile::new()?;
     std::fs::write(key.path(), "fixture-only")?;
@@ -81,7 +115,7 @@ async fn started()
             config.goals_dir = None;
             config.reviews_dir = None;
         },
-        |config| {
+        move |config| {
             let path = &config
                 .spicedb
                 .as_ref()
@@ -89,7 +123,11 @@ async fn started()
                 .key_file;
             std::fs::write(path, "fixture-only")?;
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-            prepare(config)
+            let person = prepare(config)?;
+            if preexisting {
+                old_grant(config, person)?;
+            }
+            Ok(person)
         },
     )
     .await?;
@@ -112,7 +150,7 @@ fn root(person: PersonId, kind: &str) -> Result<Value, Box<dyn Error>> {
 }
 
 async fn restart_grant(kind: &str) -> Outcome {
-    let (mut engine, mut service, person, cookie) = started().await?;
+    let (mut engine, mut service, person, cookie) = started(false).await?;
     let body = root(person, kind)?;
     let issued = service.post("/grants/roots", Some(&cookie), &body).await?;
     service.restart().await?;
@@ -149,11 +187,11 @@ async fn a_service_account_resource_root_keeps_its_restart_behavior() -> Outcome
 
 #[tokio::test]
 async fn an_unprojectable_root_names_its_kind_and_owner_without_committing() -> Outcome {
-    let (mut engine, mut service, person, cookie) = started().await?;
+    let (mut engine, mut service, person, cookie) = started(false).await?;
     let (status, opened) = service.get("/grants", Some(&cookie)).await?;
     assert_eq!(status, 200, "{opened}");
     let path = service.dir.path().join("grant-log");
-    let before = FileLeafStore::open(&path)?.extent();
+    let before = FileLeafStore::open(&path)?.pinned();
     for kind in [
         "grant",
         "lys_revision",
@@ -176,12 +214,40 @@ async fn an_unprojectable_root_names_its_kind_and_owner_without_committing() -> 
             "{words}"
         );
         assert_eq!(
-            FileLeafStore::open(&path)?.extent(),
+            FileLeafStore::open(&path)?.pinned(),
             before,
             "{kind} committed"
         );
     }
     service.restart().await?;
+    service.close()?;
+    engine.stop()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_preexisting_person_grant_starts_against_an_old_engine_schema() -> Outcome {
+    let (mut engine, mut service, _, cookie) = started(true).await?;
+    let path = service.dir.path().join("grant-log");
+    let before = FileLeafStore::open(&path)?.pinned();
+    assert_eq!(FileLeafStore::open(&path)?.extent(), 1);
+    let (status, answer) = service.get("/grants", Some(&cookie)).await?;
+    assert_eq!(status, 200, "old person grant at start: {answer}");
+    assert_eq!(
+        FileLeafStore::open(&path)?.pinned(),
+        before,
+        "start wrote a replacement grant"
+    );
+    let question = json!({"route": "browser", "resource": {"kind": "person", "id": "target"}, "action": "read"});
+    for again in [false, true] {
+        if again {
+            service.restart().await?;
+        }
+        let (status, answer) = service
+            .post("/grants/check", Some(&cookie), &question)
+            .await?;
+        assert_eq!(status, 200, "preexisting person grant: {answer}");
+    }
     service.close()?;
     engine.stop()?;
     Ok(())

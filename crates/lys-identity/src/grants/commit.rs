@@ -258,6 +258,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// until it is resolved and never answering before the event is recorded.
     pub(super) fn commit(&mut self, event: GrantEvent) -> Result<Recorded, GrantError> {
         self.book.check(&event)?;
+        if let GrantChange::Issue(grant) = event.change() {
+            self.relationships.admit_resource(grant.resource())?;
+        }
         let operation = event.operation();
         let signed = sign_grant_event(event, &self.key)?;
         match self.ledger.append(&signed) {

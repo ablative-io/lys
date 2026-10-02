@@ -14,7 +14,7 @@ use lys_identity::grants::admission::effective;
 use lys_identity::grants::test_support::FailingRelationships;
 use lys_identity::grants::{
     ExerciseRequest, GrantError, GrantId, MemoryRelationships, PassOn, RecipientKind, Relationship,
-    RelationshipStore, RevokeRequest, Route,
+    RelationshipStore, Resource, RevokeRequest, Route,
 };
 use lys_identity::log::Reopen;
 use lys_identity::{IdentityId, OperationId};
@@ -155,6 +155,10 @@ impl Pausable {
 }
 
 impl RelationshipStore for Pausable {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        self.inner.admit_resource(resource)
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         self.inner.revision()
     }

@@ -13,8 +13,8 @@ use std::sync::{Arc, Mutex};
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
     Grant, GrantBook, GrantChange, GrantError, GrantEvent, GrantId, GrantParts,
-    MemoryRelationships, PassOn, RecipientKind, Relation, Relationship, RelationshipStore, Route,
-    Source, Window, sign_grant_event,
+    MemoryRelationships, PassOn, RecipientKind, Relation, Relationship, RelationshipStore,
+    Resource, Route, Source, Window, sign_grant_event,
 };
 use lys_identity::log::Reopen;
 use lys_identity::{IdentityId, OperationId};
@@ -140,6 +140,10 @@ impl FaultEngine {
 }
 
 impl RelationshipStore for FaultEngine {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        self.inner.admit_resource(resource)
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         self.inner.revision()
     }

@@ -31,6 +31,10 @@ struct Measured {
 }
 
 impl RelationshipStore for Measured {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        self.inner.admit_resource(resource)
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         self.inner.revision()
     }
@@ -306,6 +310,10 @@ struct Stalled {
 }
 
 impl RelationshipStore for Stalled {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        self.inner.admit_resource(resource)
+    }
+
     fn revision(&self) -> Result<u64, GrantError> {
         self.inner.revision()
     }
