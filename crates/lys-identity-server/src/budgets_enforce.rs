@@ -1,14 +1,9 @@
 //! A known threshold crossing asks each covered agent's act under a durable identity.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde_json::Number;
-
-mod levels;
-mod validation;
-use levels::{Levels, levels};
-pub use validation::checked;
 
 use crate::budgets_api::{with_budgets, with_budgets_mut};
 use crate::budgets_crossing::Crossing;
@@ -18,13 +13,42 @@ use crate::error::ServerError;
 use crate::error_budget::BudgetError;
 use crate::routes::AppState;
 
-mod dispatch;
-use dispatch::{Dispatch, dispatch};
-
 fn unavailable(reason: impl std::fmt::Display) -> ServerError {
     ServerError::Budget(BudgetError::BudgetsUnavailable {
         reason: reason.to_string(),
     })
+}
+
+/// Validate reported fields before charging any event or asking any act.
+pub fn checked(usage: &Usage) -> Result<(), ServerError> {
+    if usage.event.is_empty()
+        || usage.at_ms < 0
+        || usage.context_percent.is_some_and(|value| value > 100)
+        || usage.account.as_ref().is_some_and(String::is_empty)
+    {
+        return Err(ServerError::RequestMalformed { reason: "usage names an event and nonnegative observation instant, context is 0 to 100, and a reported account is nonempty".to_owned() });
+    }
+    if let Some(windows) = &usage.plan_windows {
+        for (index, window) in windows.iter().enumerate() {
+            if windows[..index]
+                .iter()
+                .any(|earlier| earlier.duration_minutes == window.duration_minutes)
+                || window
+                    .duration_minutes
+                    .checked_mul(60_000)
+                    .is_none_or(|duration| window.resets_at_ms < duration)
+                || window.duration_minutes == 0
+                || window.resets_at_ms > i64::MAX.unsigned_abs()
+                || lys_runner::tracking_budget::percent(&serde_json::Value::Number(
+                    window.used_percent.clone(),
+                ))
+                .is_none()
+            {
+                return Err(ServerError::RequestMalformed { reason: "a reported plan window names a positive duration, representable reset instant and percentage from 0 to 100".to_owned() });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Unknown figures make no claim about being under a stop threshold.
@@ -59,9 +83,10 @@ fn warning(limit: &Limit, percent: &Number) -> Result<Number, String> {
 
 struct Target {
     live: Vec<String>,
+    compact: Option<String>,
 }
 
-/// Capture indexed activity, resolve only crossed compaction targets, then commit at one revision.
+/// Capture every member's actual sessions before storing a crossing.
 pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError> {
     checked(&usage)?;
     crate::budgets_migration::require_committed(state)?;
@@ -75,144 +100,41 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
     {
         return Err(ServerError::AgentNotVisible);
     }
-    let agent = usage.agent.clone();
     let zone = crate::configuration_api::organisation(state)?.zone;
-    let selected = session_coverage(state, &agent, &standings)?;
-    let sessions = crate::runtime_api::session_agents(state, &selected)?;
-    let targets: BTreeMap<_, _> = selected
-        .iter()
-        .map(|agent| {
-            let live = sessions
-                .as_ref()
-                .and_then(|sessions| sessions.get(agent))
-                .map(|activity| activity.live_sessions().iter().cloned().collect())
-                .unwrap_or_default();
-            (agent.clone(), Target { live })
-        })
-        .collect();
-    let mut incoming = Some(usage);
-    loop {
-        let snapshot = with_budgets(state, |store| {
-            let usage = incoming
-                .as_ref()
-                .ok_or_else(|| unavailable("the usage was already committed"))?;
-            if store.held().charged.contains(&usage.event) {
-                return Ok(None);
-            }
-            Ok(Some((
-                store.revision(),
-                crossings(
-                    store.held(),
-                    usage,
-                    &standings,
-                    &targets,
-                    &zone,
-                    sessions.as_ref(),
-                )?,
-            )))
-        })?;
-        let Some((revision, mut assessed)) = snapshot else {
-            return crate::budgets_act::settle_for(state, &agent).await;
+    let mut targets = BTreeMap::new();
+    for standing in &standings {
+        let live = if state.runtime.is_some() {
+            crate::runtime_api::with_runtime(state, |store| {
+                Ok(store
+                    .sessions()
+                    .iter()
+                    .filter(|tracked| {
+                        #[cfg(test)]
+                        crate::budgets_work::visit(crate::budgets_work::Work::Target);
+                        tracked.agent.as_deref() == Some(standing.agent.as_str())
+                            && !tracked.stopped()
+                    })
+                    .map(|tracked| tracked.session.clone())
+                    .collect())
+            })?
+        } else {
+            Vec::new()
         };
-        resolve_commands(state, &mut assessed.crossed)?;
-        let committed = with_budgets_mut(state, |store| {
-            commit_assessment(
-                store,
-                &mut incoming,
-                revision,
-                assessed,
-                sessions.as_ref(),
-                &agent,
-            )
-        })?;
-        if let Some(pending) = committed {
-            return crate::budgets_act::settle_crossings(state, pending).await;
+        #[cfg(test)]
+        crate::budgets_work::visit(crate::budgets_work::Work::Settings);
+        let compact = crate::runner_api::session_settings(state, &standing.agent)?
+            .and_then(|settings| settings.compact);
+        targets.insert(standing.agent.clone(), Target { live, compact });
+    }
+    with_budgets_mut(state, |store| {
+        if store.held().charged.contains(&usage.event) {
+            return Ok(());
         }
-    }
-}
-
-fn resolve_commands(state: &AppState, crossed: &mut [Crossing]) -> Result<(), ServerError> {
-    let mut commands = BTreeMap::new();
-    for crossing in crossed {
-        if crossing.act == Act::Compact {
-            if !commands.contains_key(&crossing.agent) {
-                let command = crate::runner_api::session_settings(state, &crossing.agent)?
-                    .and_then(|settings| settings.compact);
-                commands.insert(crossing.agent.clone(), command);
-            }
-            crossing.text = commands.get(&crossing.agent).cloned().flatten();
-        }
-    }
-    Ok(())
-}
-
-fn commit_assessment(
-    store: &mut crate::budgets_store::BudgetStore,
-    incoming: &mut Option<Usage>,
-    revision: u64,
-    assessed: Assessment,
-    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
-    agent: &str,
-) -> Result<Option<Vec<Crossing>>, ServerError> {
-    if store.revision() != revision {
-        return Ok(None);
-    }
-    let mut usage = incoming
-        .take()
-        .ok_or_else(|| unavailable("the usage was already committed"))?;
-    if let Some(reason) = assessed.missing
-        && !usage
-            .unavailable
-            .iter()
-            .any(|gap| gap.figure == "context_percent" && gap.reason == reason)
-    {
-        usage.unavailable.push(lys_runner::tracking::Unavailable {
-            figure: "context_percent".to_owned(),
-            reason: reason.to_owned(),
-        });
-    }
-    let other: Vec<_> = assessed
-        .crossed
-        .iter()
-        .filter(|crossing| crossing.agent != *agent)
-        .cloned()
-        .collect();
-    store.charge(Usage {
-        crossed: assessed.crossed,
-        ..usage
+        let crossed = crossings(store.held(), &usage, &standings, &targets, &zone)?;
+        store.charge(Usage { crossed, ..usage })?;
+        Ok(())
     })?;
-    store.reconcile_context(sessions)?;
-    let mut pending = store.held().crossings.unsettled_for(agent);
-    pending.extend(other);
-    Ok(Some(pending))
-}
-
-fn session_coverage(
-    state: &AppState,
-    agent: &str,
-    standings: &[Standing],
-) -> Result<BTreeSet<String>, ServerError> {
-    with_budgets(state, |store| {
-        Ok(store
-            .held()
-            .limit_sets
-            .iter()
-            .map(|collection| crate::budgets_members::covered(&collection.holder, standings))
-            .filter(|agents| agents.contains(agent))
-            .flatten()
-            .collect())
-    })
-}
-
-struct Assessment {
-    crossed: Vec<Crossing>,
-    missing: Option<&'static str>,
-}
-
-struct LimitAt<'a> {
-    collection: &'a Limits,
-    limit: &'a Limit,
-    index: usize,
+    crate::budgets_act::settle(state).await
 }
 
 fn crossings(
@@ -221,160 +143,98 @@ fn crossings(
     standings: &[Standing],
     targets: &BTreeMap<String, Target>,
     zone: &str,
-    sessions: Option<&std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
-) -> Result<Assessment, ServerError> {
-    let mut assessed = Assessment {
-        crossed: Vec::new(),
-        missing: None,
-    };
+) -> Result<Vec<Crossing>, ServerError> {
+    let mut crossed = Vec::new();
     for collection in &held.limit_sets {
         let agents = crate::budgets_members::covered(&collection.holder, standings);
         if !agents.contains(&usage.agent) {
             continue;
         }
         for (index, limit) in held.effective_limits(collection).iter().enumerate() {
-            let Some(level) = levels(held, usage, limit, &agents, zone, sessions)? else {
+            let Some(Levels {
+                before,
+                figure,
+                since,
+                account,
+            }) = levels(held, usage, limit, &agents, zone)?
+            else {
                 continue;
             };
-            if let Some(reason) = level.missing {
-                assessed.missing = crate::budgets_context::missing(usage);
-                if limit.act == Act::Stop {
-                    assessed.crossed.extend(dispatch(
-                        held,
-                        usage,
-                        &agents,
-                        targets,
-                        &Dispatch {
-                            collection,
-                            limit,
-                            index,
-                            figure: None,
-                            missing: Some(reason),
-                            account: None,
-                            act: Act::Stop,
-                            is_warning: false,
-                            mark: &format!("unavailable {}", usage.event),
-                        },
-                    )?);
-                }
+            let mark = if limit.unit == Measure::ContextPercent {
+                format!("rise {}", usage.event)
             } else {
-                assessed.crossed.extend(measured_crossings(
+                format!(
+                    "period {}",
+                    since.ok_or_else(|| unavailable(
+                        "periodic limit has no reported period start"
+                    ))?
+                )
+            };
+            let mut thresholds = vec![(limit.amount.clone(), limit.act, false)];
+            if let Some(percent) = &collection.warn_at {
+                thresholds.insert(
+                    0,
+                    (
+                        warning(limit, percent).map_err(unavailable)?,
+                        Act::Tell,
+                        true,
+                    ),
+                );
+            }
+            for (threshold, act, is_warning) in thresholds {
+                if !reached(limit.unit, &figure, &threshold).map_err(unavailable)? {
+                    continue;
+                }
+                if !is_warning
+                    && before
+                        .as_ref()
+                        .map(|before| reached(limit.unit, before, &threshold))
+                        .transpose()
+                        .map_err(unavailable)?
+                        .unwrap_or(false)
+                {
+                    continue;
+                }
+                let mark = if is_warning && limit.unit == Measure::ContextPercent {
+                    format!(
+                        "session {}",
+                        usage
+                            .session
+                            .as_deref()
+                            .ok_or_else(|| unavailable("a context warning names its session"))?
+                    )
+                } else {
+                    mark.clone()
+                };
+                crossed.extend(dispatch(
                     held,
                     usage,
                     &agents,
                     targets,
-                    &LimitAt {
+                    &Dispatch {
                         collection,
                         limit,
                         index,
+                        figure: &figure,
+                        account: account.as_deref(),
+                        act,
+                        is_warning,
+                        mark: &mark,
                     },
-                    level,
                 )?);
             }
         }
     }
-    Ok(assessed)
-}
-
-fn measured_crossings(
-    held: &Held,
-    usage: &Usage,
-    agents: &std::collections::BTreeSet<String>,
-    targets: &BTreeMap<String, Target>,
-    position: &LimitAt<'_>,
-    level: Levels,
-) -> Result<Vec<Crossing>, ServerError> {
-    let LimitAt {
-        collection,
-        limit,
-        index,
-    } = *position;
-    let Levels {
-        before,
-        figure,
-        since,
-        account,
-        missing,
-    } = level;
-    if let Some(reason) = missing {
-        return Err(unavailable(reason));
-    }
-    let mut crossed = Vec::new();
-    let figure = figure.ok_or_else(|| unavailable("a measured level has no figure"))?;
-    let mark = if limit.unit == Measure::ContextPercent {
-        format!("rise {}", usage.event)
-    } else {
-        format!(
-            "period {}",
-            since.ok_or_else(|| unavailable("periodic limit has no reported period start"))?
-        )
-    };
-    let mut thresholds = vec![(limit.amount.clone(), limit.act, false)];
-    if let Some(percent) = &collection.warn_at {
-        thresholds.insert(
-            0,
-            (
-                warning(limit, percent).map_err(unavailable)?,
-                Act::Tell,
-                true,
-            ),
-        );
-    }
-    for (threshold, act, is_warning) in thresholds {
-        if !reached(limit.unit, &figure, &threshold).map_err(unavailable)? {
-            continue;
-        }
-        if !is_warning
-            && before
-                .as_ref()
-                .map(|before| reached(limit.unit, before, &threshold))
-                .transpose()
-                .map_err(unavailable)?
-                .unwrap_or(false)
-        {
-            continue;
-        }
-        let mark = if is_warning && limit.unit == Measure::ContextPercent {
-            format!(
-                "session {}",
-                usage
-                    .session
-                    .as_deref()
-                    .ok_or_else(|| unavailable("a context warning names its session"))?
-            )
-        } else {
-            mark.clone()
-        };
-        crossed.extend(dispatch(
-            held,
-            usage,
-            agents,
-            targets,
-            &Dispatch {
-                collection,
-                limit,
-                index,
-                figure: Some(&figure),
-                missing: None,
-                account: account.as_deref(),
-                act,
-                is_warning,
-                mark: &mark,
-            },
-        )?);
-    }
     Ok(crossed)
 }
 
-/// Fresh starts require an available figure below every periodic stop limit.
+/// Fresh starts are refused at a known periodic stop limit before runner admission.
 pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerError> {
     if state.budgets.is_none() {
         return Ok(());
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let selected = session_coverage(state, agent, &standings)?;
-    let sessions = crate::runtime_api::session_agents(state, &selected)?;
     with_budgets(state, |store| {
         for collection in &store.held().limit_sets {
             let agents = crate::budgets_members::covered(&collection.holder, &standings);
@@ -385,31 +245,12 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                 if limit.act != Act::Stop || limit.period.is_none() {
                     continue;
                 }
-                let used = crate::budgets_usage::figure_with_sessions(
-                    store.held(),
-                    &limit,
-                    &agents,
-                    &zone,
-                    at_ms,
-                    None,
-                    sessions.as_ref(),
-                )
-                .map_err(unavailable)?;
-                let figure = match used.figure {
-                    Some(figure) => figure,
-                    // Running is needed to observe the next window after its recorded reset.
-                    None if limit.unit == Measure::PlanPercent
-                        && used.since_ms.is_some_and(|boundary| boundary <= at_ms) =>
-                    {
-                        0.into()
-                    }
-                    None => {
-                        return Err(unavailable(used.unavailable.as_deref().unwrap_or(
-                            "a periodic Stop limit has no figure and no source reason",
-                        )));
-                    }
-                };
-                if reached(limit.unit, &figure, &limit.amount).map_err(unavailable)? {
+                let used =
+                    crate::budgets_usage::figure(store.held(), &limit, &agents, &zone, at_ms, None)
+                        .map_err(unavailable)?;
+                if let Some(figure) = used.figure
+                    && reached(limit.unit, &figure, &limit.amount).map_err(unavailable)?
+                {
                     let reset = if limit.unit == Measure::PlanPercent {
                         used.since_ms.and_then(|start| {
                             start.checked_add(
@@ -443,4 +284,165 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
         }
         Ok(())
     })
+}
+
+fn notice(limit: &Limit, figure: &Number, account: Option<&str>) -> Result<String, String> {
+    Ok(match limit.unit {
+        Measure::ContextPercent => format!(
+            "Lys: context is at {figure}%; the budget is {}%.",
+            limit.amount
+        ),
+        Measure::PlanPercent => format!(
+            "Lys: account {} is at {figure}% of its shared {} plan; the budget is {}%.",
+            account.ok_or("a reported plan figure names its account")?,
+            limit
+                .period
+                .ok_or("a reported plan figure names its period")?
+                .name(),
+            limit.amount
+        ),
+        Measure::Dollars => format!(
+            "Lys: reported dollar spend is ${figure}; the budget is ${}.",
+            limit.amount
+        ),
+        Measure::Tokens | Measure::RunningMs => format!(
+            "Lys: {} is at {figure}; the budget is {}.",
+            limit.unit.name(),
+            limit.amount
+        ),
+    })
+}
+
+struct Levels {
+    before: Option<Number>,
+    figure: Number,
+    since: Option<i64>,
+    account: Option<String>,
+}
+
+fn levels(
+    held: &Held,
+    usage: &Usage,
+    limit: &Limit,
+    agents: &std::collections::BTreeSet<String>,
+    zone: &str,
+) -> Result<Option<Levels>, ServerError> {
+    if limit.unit == Measure::ContextPercent {
+        let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
+            return Ok(None);
+        };
+        return Ok(Some(Levels {
+            before: held
+                .crossings
+                .context
+                .get(session)
+                .copied()
+                .map(Number::from),
+            figure: context.into(),
+            since: None,
+            account: None,
+        }));
+    }
+    let before = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, None)
+        .map_err(unavailable)?;
+    let after = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, Some(usage))
+        .map_err(unavailable)?;
+    let Some(figure) = after.figure else {
+        return Ok(None);
+    };
+    Ok(Some(Levels {
+        before: before.figure,
+        figure,
+        since: after.since_ms,
+        account: after.account,
+    }))
+}
+
+struct Dispatch<'a> {
+    collection: &'a Limits,
+    limit: &'a Limit,
+    index: usize,
+    figure: &'a Number,
+    account: Option<&'a str>,
+    act: Act,
+    is_warning: bool,
+    mark: &'a str,
+}
+
+fn dispatch(
+    held: &Held,
+    usage: &Usage,
+    agents: &std::collections::BTreeSet<String>,
+    targets: &BTreeMap<String, Target>,
+    request: &Dispatch<'_>,
+) -> Result<Vec<Crossing>, ServerError> {
+    let Dispatch {
+        collection,
+        limit,
+        index,
+        figure,
+        account,
+        act,
+        is_warning,
+        mark,
+    } = *request;
+    let mut crossed = Vec::new();
+    let recipients = if limit.unit == Measure::ContextPercent {
+        std::collections::BTreeSet::from([usage.agent.clone()])
+    } else {
+        agents.clone()
+    };
+    for agent in recipients {
+        let target = targets
+            .get(&agent)
+            .ok_or_else(|| unavailable("a covered agent has no target snapshot"))?;
+        let sessions = if act == Act::Tell
+            || (limit.unit != Measure::ContextPercent && target.live.is_empty())
+        {
+            vec![None]
+        } else if limit.unit == Measure::ContextPercent {
+            vec![usage.session.clone()]
+        } else {
+            target.live.iter().cloned().map(Some).collect()
+        };
+        for session in sessions {
+            let identity = format!("limit {index} warning {is_warning} recipient {agent} {mark}");
+            let operation = Crossing::id(
+                &collection.holder,
+                limit.unit,
+                collection.version,
+                &identity,
+                session.as_deref().unwrap_or_default(),
+            );
+            if held.crossings.crossed.iter().any(|crossing| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::CrossingLookup);
+                crossing.operation == operation
+            }) {
+                continue;
+            }
+            let text = match act {
+                Act::Compact => target.compact.clone(),
+                Act::Notice => Some(notice(limit, figure, account).map_err(unavailable)?),
+                Act::Stop | Act::Tell => None,
+            };
+            crossed.push(Crossing {
+                operation,
+                holder: collection.holder.clone(),
+                measure: limit.unit,
+                version: collection.version,
+                limit: limit.amount.clone(),
+                figure: figure.clone(),
+                limit_index: u64::try_from(index).map_err(unavailable)?,
+                warning: is_warning,
+                account: account.map(str::to_owned),
+                act,
+                agent: agent.clone(),
+                session,
+                text,
+                at_ms: usage.at_ms,
+            });
+        }
+    }
+    Ok(crossed)
 }

@@ -1,20 +1,30 @@
-//! Accounting regressions count work on their own test thread.
+#![cfg(test)]
+//! Work counters belong to each test thread and never enter a served build.
 
 use std::cell::Cell;
 
-mod tests;
+#[path = "budgets_work_accounting.rs"]
+mod accounting;
+#[path = "budgets_work_members.rs"]
+mod members;
+#[path = "budgets_work_state.rs"]
+mod state;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Work {
     Usage,
     Running,
+    Team,
+    Parent,
+    Target,
+    Settings,
+    CrossingLookup,
+    Pending,
     StateCopy,
-    IndexCopy,
-    Crossing,
 }
 
 thread_local! {
-    static COUNTS: Cell<[usize; 5]> = const { Cell::new([0; 5]) };
+    static COUNTS: Cell<[usize; 9]> = const { Cell::new([0; 9]) };
 }
 
 pub(crate) fn visit(work: Work) {
@@ -26,7 +36,7 @@ pub(crate) fn visit(work: Work) {
 }
 
 fn reset() {
-    COUNTS.set([0; 5]);
+    COUNTS.set([0; 9]);
 }
 
 fn count(work: Work) -> usize {

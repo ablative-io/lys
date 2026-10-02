@@ -55,7 +55,7 @@ pub async fn keep_page(
                 crate::budgets_enforce::keep(state, usage).await?;
             }
             Body::Refusal(record) => refusals.push(record),
-            Body::Coverage(_) | Body::Boundary(_) | Body::Operation(_) | Body::Injection(_) => {}
+            Body::Coverage(_) | Body::Boundary(_) | Body::Operation(_) => {}
             Body::Commit(_) => {
                 return Err(refused("a runner feed page unexpectedly contains a commit"));
             }
@@ -100,10 +100,11 @@ pub fn convert(
                     .get(position)
                     .ok_or_else(|| {
                         refused(format!("running index names missing record {position}"))
-                    })?
-                    .reported_running_ms
-                    .ok_or_else(|| {
-                        refused("running index names a record without a cumulative report")
+                    })
+                    .and_then(|usage| {
+                        usage.reported_running_ms.ok_or_else(|| {
+                            refused("running index names a record without a cumulative report")
+                        })
                     })
             })
             .transpose()?;

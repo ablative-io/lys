@@ -10,17 +10,16 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::body::{Body, Bytes};
-use axum::extract::rejection::BytesRejection;
-use axum::extract::{FromRequest, OriginalUri, Path, State};
-use axum::http::{HeaderMap, Request};
+use axum::extract::rejection::JsonRejection;
+use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{Actor, AgentId, IdentityId};
 use serde::{Deserialize, Serialize};
 
 use crate::budgets_limits::{Limit, Limits};
-use crate::budgets_state::{Holder, HolderKind, Measure};
+use crate::budgets_state::{Act, Budget, Holder, HolderKind, Length, Measure};
 use crate::budgets_store::BudgetStore;
 use crate::budgets_usage::Used;
 use crate::error::ServerError;
@@ -28,10 +27,6 @@ use crate::error_budget::BudgetError;
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
-
-mod confirm;
-pub(crate) use confirm::ConfirmBody;
-use confirm::{confirm, source_gaps};
 
 /// A budget to set on a holder.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -143,7 +138,7 @@ pub(crate) fn authorised(
     actor: &Actor,
     holder: &Holder,
 ) -> Result<String, ServerError> {
-    let administrator = crate::routes::is_administrator(state, actor)?;
+    let administrator = state.admission.administrator(actor).is_ok();
     let (person, responsible) = with_directory(state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, actor)?.to_string();
@@ -208,11 +203,11 @@ async fn read(
 async fn set(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    OriginalUri(uri): OriginalUri,
     Path((kind, id)): Path<(String, String)>,
-    body: Result<Bytes, BytesRejection>,
+    body: Result<Json<BudgetBody>, JsonRejection>,
 ) -> Result<Json<BudgetsView>, ServerError> {
-    let bytes = body.map_err(|rejected| {
+    let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|rejected| {
         ServerError::Budget(BudgetError::BudgetRefused {
             refusal: "budget_malformed",
             words: rejected.body_text(),
@@ -222,24 +217,21 @@ async fn set(
         kind: kind_of(&kind)?,
         id,
     };
-    let giver =
-        crate::budgets_giving::giver(&state, &headers, ("PUT", uri.path(), &bytes), &holder)?;
-    let mut request = Request::new(Body::from(bytes));
-    *request.headers_mut() = headers;
-    let Json(body) = Json::<BudgetBody>::from_request(request, &state)
-        .await
-        .map_err(|rejected| {
-            ServerError::Budget(BudgetError::BudgetRefused {
-                refusal: "budget_malformed",
-                words: rejected.body_text(),
-            })
-        })?;
+    let by = authorised(&state, &actor, &holder)?;
+    if holder.kind == HolderKind::Person && state.admission.administrator(&actor).is_err() {
+        return Err(ServerError::NotPermitted {
+            reason: format!(
+                "a person's budget limits that person, so only an administrator sets the budget on person {}",
+                holder.id
+            ),
+        });
+    }
     let limits = Limits {
         holder: holder.clone(),
         limits: body.limits,
         warn_at: body.warn_at,
         version: body.version,
-        by: giver.by(),
+        by,
         at: now(),
     }
     .checked()
@@ -253,7 +245,45 @@ async fn set(
     let standings = crate::budgets_members::standings(&state)?;
     let agents = crate::budgets_members::covered(&holder, &standings);
     let at_ms = jiff::Timestamp::now().as_millisecond();
-    crate::budgets_giving::append(&state, &giver, limits, body.version, &zone, &agents, at_ms)?;
+    with_budgets(&state, |store| {
+        let old = store.held().limit_set(&holder);
+        let held = old.map_or(0, |limits| limits.version);
+        if held != body.version {
+            return Err(ServerError::Budget(BudgetError::BudgetVersionConflict {
+                held,
+                expected: body.version,
+            }));
+        }
+        for limit in &limits.limits {
+            if limit.zone.is_some()
+                && old.is_none_or(|old| {
+                    !old.limits.iter().any(|earlier| {
+                        earlier.unit == limit.unit
+                            && earlier.period == limit.period
+                            && earlier.zone == limit.zone
+                    })
+                })
+            {
+                return Err(ServerError::Budget(BudgetError::BudgetRefused{ refusal: "BudgetZoneRefused", words: "new limits use the organisation zone; only an existing explicit migrated zone may be retained".to_owned() }));
+            }
+            if matches!(limit.unit, Measure::Dollars | Measure::PlanPercent) {
+                let used =
+                    crate::budgets_usage::figure(store.held(), limit, &agents, &zone, at_ms, None)
+                        .map_err(|reason| {
+                            ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
+                        })?;
+                if let Some(reason) = used.unavailable {
+                    return Err(ServerError::Budget(BudgetError::BudgetRefused {
+                        refusal: "BudgetUnitUnavailable",
+                        words: format!("{} in {:?}: {reason}", limit.unit.name(), limit.period),
+                    }));
+                }
+            }
+        }
+        Ok(())
+    })?;
+    crate::budgets_migration::require_committed(&state)?;
+    with_budgets_mut(&state, |store| store.set_limits(limits, body.version))?;
     view(&state, &holder).map(Json)
 }
 
@@ -277,18 +307,10 @@ async fn team_budget(
 async fn set_team_budget(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    uri: OriginalUri,
     Path(id): Path<String>,
-    body: Result<Bytes, BytesRejection>,
+    body: Result<Json<BudgetBody>, JsonRejection>,
 ) -> Result<Json<BudgetsView>, ServerError> {
-    set(
-        State(state),
-        headers,
-        uri,
-        Path(("team".to_owned(), id)),
-        body,
-    )
-    .await
+    set(State(state), headers, Path(("team".to_owned(), id)), body).await
 }
 
 /// All budget reads share the same source validation and team aggregate computation.
@@ -300,77 +322,37 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
     } else {
         Vec::new()
     };
-    let mut agents = crate::budgets_members::covered(holder, &standings);
-    if holder.kind == HolderKind::Agent {
-        let standing = standings
-            .iter()
-            .find(|standing| standing.agent == holder.id);
-        for team in teams.iter().filter(|team| {
-            standing.is_some_and(|standing| standing.teams.contains(&team.created.id))
-        }) {
-            agents.extend(crate::budgets_members::covered(
-                &Holder {
-                    kind: HolderKind::Team,
-                    id: team.created.id.clone(),
-                },
-                &standings,
-            ));
-        }
-    }
-    let sessions = crate::runtime_api::session_agents(state, &agents)?;
-    let read = ViewRead {
-        holder,
-        zone: &zone,
-        standings: &standings,
-        teams: &teams,
-        sessions: sessions.as_ref(),
-        at_ms: jiff::Timestamp::now().as_millisecond(),
-    };
     with_budgets(state, |store| {
-        store.reconcile_context(sessions.as_ref())?;
-        view_held(store.held(), &read)
+        view_held(
+            store.held(),
+            holder,
+            &zone,
+            &standings,
+            &teams,
+            jiff::Timestamp::now().as_millisecond(),
+        )
     })
 }
 
-struct ViewRead<'a> {
-    holder: &'a Holder,
-    zone: &'a str,
-    standings: &'a [crate::budgets_state::Standing],
-    teams: &'a [crate::teams_state::Team],
-    sessions: Option<&'a std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
-    at_ms: i64,
-}
-
-fn view_held(
+pub(crate) fn view_held(
     held: &crate::budgets_state::Held,
-    read: &ViewRead<'_>,
+    holder: &Holder,
+    zone: &str,
+    standings: &[crate::budgets_state::Standing],
+    teams: &[crate::teams_state::Team],
+    at_ms: i64,
 ) -> Result<BudgetsView, ServerError> {
-    let ViewRead {
-        holder,
-        zone,
-        standings,
-        teams,
-        sessions,
-        at_ms,
-    } = *read;
     let collection = held.limit_set(holder);
     let effective = collection.map_or_else(Vec::new, |limits| held.effective_limits(limits));
     let agents = crate::budgets_members::covered(holder, standings);
     let used = effective
         .iter()
-        .map(|limit| current_usage(held, limit, &agents, zone, at_ms, sessions))
+        .map(|limit| {
+            crate::budgets_usage::figure(held, limit, &agents, zone, at_ms, None)
+                .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
+        })
         .collect::<Result<Vec<_>, _>>()?;
-    let mut unavailable = source_gaps(held, &agents, zone, at_ms)?;
-    if let Some(reason) = used.iter().find_map(|used| {
-        (used.unit == Measure::ContextPercent)
-            .then_some(used.unavailable.as_ref())
-            .flatten()
-    }) {
-        unavailable.push(UnitUnavailable {
-            unit: Measure::ContextPercent,
-            reason: reason.clone(),
-        });
-    }
+    let unavailable = source_gaps(held, &agents, zone, at_ms)?;
     let unconfirmed: Vec<_> = held
         .unconfirmed
         .iter()
@@ -397,7 +379,12 @@ fn view_held(
                     .map_or_else(Vec::new, |limits| held.effective_limits(limits));
                 let used = limits
                     .iter()
-                    .map(|limit| current_usage(held, limit, &agents, zone, at_ms, sessions))
+                    .map(|limit| {
+                        crate::budgets_usage::figure(held, limit, &agents, zone, at_ms, None)
+                            .map_err(|reason| {
+                                ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
+                            })
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Within {
                     team: holder.id,
@@ -426,23 +413,101 @@ fn view_held(
     })
 }
 
-fn current_usage(
+/// The exact legacy budget version an administrator confirms.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ConfirmBody {
+    measure: Measure,
+    version: u64,
+}
+
+async fn confirm(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Result<Json<ConfirmBody>, JsonRejection>,
+) -> Result<Json<Budget>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    state.admission.administrator(&actor)?;
+    crate::budgets_migration::require_committed(&state)?;
+    let Json(body) = body.map_err(|error| ServerError::RequestMalformed {
+        reason: error.body_text(),
+    })?;
+    let holder = Holder {
+        kind: HolderKind::Person,
+        id,
+    };
+    let by = authorised(&state, &actor, &holder)?;
+    with_budgets_mut(&state, |store| {
+        if !store.held().unconfirmed.iter().any(|pending| {
+            pending.requested.holder == holder && pending.requested.measure == body.measure
+        }) {
+            return Err(ServerError::Budget(BudgetError::BudgetRefused {
+                refusal: "budget_invalid",
+                words: "only an unconfirmed legacy personal budget can be confirmed".to_owned(),
+            }));
+        }
+        let budget = store
+            .held()
+            .budget(&holder, body.measure)
+            .cloned()
+            .ok_or_else(|| {
+                ServerError::Budget(BudgetError::BudgetRefused {
+                    refusal: "budget_invalid",
+                    words: format!(
+                        "person `{}` has no {:?} budget to confirm",
+                        holder.id, body.measure
+                    ),
+                })
+            })?;
+        store.set_confirmed(
+            Budget {
+                by,
+                at: now(),
+                ..budget
+            },
+            body.version,
+        )
+    })
+    .map(Json)
+}
+
+fn source_gaps(
     held: &crate::budgets_state::Held,
-    limit: &Limit,
     agents: &std::collections::BTreeSet<String>,
     zone: &str,
     at_ms: i64,
-    sessions: Option<&std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
-) -> Result<Used, ServerError> {
-    if limit.unit == Measure::ContextPercent {
-        return Ok(held
-            .context_availability
-            .used_live(limit, agents, at_ms, sessions));
+) -> Result<Vec<UnitUnavailable>, ServerError> {
+    let mut unavailable = Vec::new();
+    for (unit, periods) in [
+        (Measure::Dollars, vec![Length::Week]),
+        (Measure::PlanPercent, vec![Length::FiveHour, Length::Week]),
+    ] {
+        let probes = periods
+            .into_iter()
+            .map(|period| {
+                let limit = Limit {
+                    unit,
+                    amount: 1.into(),
+                    period: Some(period),
+                    act: Act::Stop,
+                    zone: None,
+                };
+                crate::budgets_usage::figure(held, &limit, agents, zone, at_ms, None).map_err(
+                    |reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if probes.iter().all(|probe| probe.figure.is_none()) {
+            let reasons: Vec<_> = probes
+                .into_iter()
+                .filter_map(|probe| probe.unavailable)
+                .collect();
+            unavailable.push(UnitUnavailable {
+                unit,
+                reason: reasons.join("; "),
+            });
+        }
     }
-    crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, at_ms, None, sessions)
-        .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
+    Ok(unavailable)
 }
-
-#[cfg(test)]
-#[path = "budgets_live_context_tests.rs"]
-mod live_context_tests;

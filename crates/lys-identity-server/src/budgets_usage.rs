@@ -2,15 +2,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lys_runner::tracking_budget::PlanWindow;
 use serde::Serialize;
 use serde_json::Number;
 
 use crate::budgets_limits::Limit;
 use crate::budgets_state::{Held, Length, Measure, Period, Usage};
-
-mod spend;
-use spend::spend_gap;
 
 /// One limit's measured figure or its named gap, never an invented zero.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
@@ -22,7 +18,7 @@ pub struct Used {
     /// The current figure in the named unit.
     #[schema(value_type = Option<f64>)]
     pub figure: Option<Number>,
-    /// The current period's start, reported window's start, or recorded expired reset.
+    /// The start of the current period or reported window.
     pub since_ms: Option<i64>,
     /// Why the figure is unavailable; absent exactly when a figure is present.
     pub unavailable: Option<String>,
@@ -49,21 +45,25 @@ pub fn number(unit: Measure, amount: u64) -> Result<Number, String> {
 
 /// The calendar or fixed interval starts in the limit's effective zone.
 pub fn start(limit: &Limit, zone: &str, at_ms: i64) -> Result<Option<i64>, String> {
-    let Some(length) = limit.period else {
-        return Ok(None);
-    };
-    Period {
-        length,
-        zone: limit.zone(zone).to_owned(),
-    }
-    .start_of(at_ms)
-    .map(Some)
+    limit
+        .period
+        .map(|length| {
+            Period {
+                length,
+                zone: limit.zone(zone).to_owned(),
+            }
+            .start_of(at_ms)
+        })
+        .transpose()
 }
 
 /// The next boundary is computed in the same zone, including daylight-saving changes.
 pub fn reset(limit: &Limit, zone: &str, at_ms: i64) -> Result<Option<i64>, String> {
     use jiff::ToSpan;
-    let Some((length, start)) = limit.period.zip(start(limit, zone, at_ms)?) else {
+    let Some(length) = limit.period else {
+        return Ok(None);
+    };
+    let Some(start) = start(limit, zone, at_ms)? else {
         return Ok(None);
     };
     if length == Length::FiveHour {
@@ -122,182 +122,80 @@ pub fn figure(
     at_ms: i64,
     incoming: Option<&Usage>,
 ) -> Result<Used, String> {
-    figure_with_sessions(held, limit, agents, zone, at_ms, incoming, None)
-}
-
-/// Distinguish a never-run agent from one awaiting its first usage report.
-pub(crate) fn figure_with_sessions(
-    held: &Held,
-    limit: &Limit,
-    agents: &BTreeSet<String>,
-    zone: &str,
-    at_ms: i64,
-    incoming: Option<&Usage>,
-    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
-) -> Result<Used, String> {
-    if let Some(known) = sessions
-        && let Some(agent) = agents.iter().find(|agent| !known.contains_key(*agent))
-    {
-        return Err(format!(
-            "session activity was not selected for agent {agent}"
-        ));
-    }
-    Reading {
-        held,
-        limit,
-        agents,
-        zone,
-        at_ms,
-        incoming,
-        sessions,
-    }
-    .figure(Purpose::Spend)
-}
-
-/// Probe native reporting separately from a fresh period's known zero spend.
-pub(crate) fn source_figure(
-    held: &Held,
-    limit: &Limit,
-    agents: &BTreeSet<String>,
-    zone: &str,
-    at_ms: i64,
-) -> Result<Used, String> {
-    Reading {
-        held,
-        limit,
-        agents,
-        zone,
-        at_ms,
-        incoming: None,
-        sessions: None,
-    }
-    .figure(Purpose::Source)
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Purpose {
-    Spend,
-    Source,
-}
-
-struct Reading<'a> {
-    held: &'a Held,
-    limit: &'a Limit,
-    agents: &'a BTreeSet<String>,
-    zone: &'a str,
-    at_ms: i64,
-    incoming: Option<&'a Usage>,
-    sessions: Option<&'a BTreeMap<String, crate::runtime_store::SessionActivity>>,
-}
-
-impl Reading<'_> {
-    fn figure(self, purpose: Purpose) -> Result<Used, String> {
-        let Self {
-            held,
-            limit,
-            agents,
-            zone,
-            at_ms,
-            incoming,
-            sessions,
-        } = self;
-        let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
-        let since = if matches!(limit.unit, Measure::PlanPercent | Measure::ContextPercent) {
-            None
-        } else {
-            start(limit, zone, at_ms)?
-        };
-        let selected = held.index.positions(
-            agents,
-            limit.unit,
-            at_ms,
-            if purpose == Purpose::Spend {
-                since
-            } else {
-                None
-            },
-        );
-        let selected = selected
-            .into_iter()
-            .map(|position| {
-                held.uses
-                    .get(position)
-                    .ok_or_else(|| format!("usage index names missing record {position}"))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let uses: Vec<_> = selected
-            .into_iter()
-            .chain(incoming)
-            .filter(|usage| {
-                #[cfg(test)]
-                crate::budgets_work::visit(crate::budgets_work::Work::Usage);
-                agents.contains(&usage.agent)
-                    && usage.at_ms <= at_ms
-                    && (purpose != Purpose::Spend || since.is_none_or(|since| usage.at_ms >= since))
-            })
-            .collect();
-        let never_run = |agent: &str| {
-            sessions.is_some_and(|known| {
-                known
-                    .get(agent)
-                    .is_some_and(crate::runtime_store::SessionActivity::never_ran)
-            }) && !held.index.has_usage(agent)
-                && incoming.is_none_or(|usage| usage.agent != agent)
-        };
-        if limit.unit == Measure::PlanPercent {
-            return plan(limit, agents, &uses, at_ms, purpose, &never_run);
-        }
-        if limit.unit == Measure::ContextPercent {
-            return context(limit, &uses);
-        }
-        let mut spend = held
-            .index
-            .spend(&held.uses, agents, limit, zone, since, at_ms)?;
-        if let Some(incoming) = incoming.filter(|usage| {
-            agents.contains(&usage.agent)
-                && usage.at_ms <= at_ms
-                && since.is_none_or(|since| usage.at_ms >= since)
-        }) {
-            spend.add(limit.unit, incoming, held.uses.len())?;
-        }
-        if let Some(position) = spend.gap {
-            let usage = if position == held.uses.len() {
-                incoming.ok_or("period gap names no incoming record")?
-            } else {
-                held.uses
-                    .get(position)
-                    .ok_or("period gap names a missing record")?
-            };
-            return Ok(unavailable(limit, since, period_gap(limit.unit, usage)?));
-        }
-        if let Some(reason) = spend_gap(limit, agents, &uses, since, purpose, sessions) {
-            return Ok(unavailable(limit, since, reason));
-        }
-        let total = spend
-            .total
-            .and_then(|total| u64::try_from(total).ok())
-            .ok_or("budget spend overflows its reported unit")?;
-        present(limit, since, total)
-    }
-}
-
-fn period_gap(unit: Measure, usage: &Usage) -> Result<&str, String> {
-    let field = match unit {
-        Measure::Tokens => "tokens",
-        Measure::RunningMs => "running_ms",
-        Measure::Dollars => "dollars_micros",
-        Measure::PlanPercent | Measure::ContextPercent => {
-            return Err("a level reached spend summation".to_owned());
-        }
+    let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
+    let since = if matches!(limit.unit, Measure::PlanPercent | Measure::ContextPercent) {
+        None
+    } else {
+        start(limit, zone, at_ms)?
     };
-    usage
-        .unavailable
-        .iter()
-        .find(|gap| {
-            gap.figure == field && (unit == Measure::Tokens || gap.reason.contains("reset"))
+    let selected = held.index.positions(agents, limit.unit, at_ms);
+    let uses = selected
+        .into_iter()
+        .map(|position| {
+            held.uses
+                .get(position)
+                .ok_or_else(|| format!("usage index names missing record {position}"))
         })
-        .map(|gap| gap.reason.as_str())
-        .ok_or_else(|| "period gap names a record without its source refusal".to_owned())
+        .collect::<Result<Vec<_>, _>>()?;
+    let uses: Vec<_> = uses
+        .into_iter()
+        .chain(incoming)
+        .filter(|usage| {
+            #[cfg(test)]
+            crate::budgets_work::visit(crate::budgets_work::Work::Usage);
+            agents.contains(&usage.agent) && usage.at_ms <= at_ms
+        })
+        .collect();
+    if limit.unit == Measure::PlanPercent {
+        return plan(limit, agents, &uses, at_ms);
+    }
+    if limit.unit == Measure::ContextPercent {
+        return context(limit, &uses);
+    }
+    let mut spend = held
+        .index
+        .spend(&held.uses, agents, limit, zone, since, at_ms)?;
+    if let Some(incoming) = incoming.filter(|usage| {
+        agents.contains(&usage.agent)
+            && usage.at_ms <= at_ms
+            && since.is_none_or(|since| usage.at_ms >= since)
+    }) {
+        spend.add(limit.unit, incoming, held.uses.len())?;
+    }
+    if let Some(position) = spend.gap {
+        let usage = if position == held.uses.len() {
+            incoming.ok_or("period gap names no incoming record")?
+        } else {
+            held.uses
+                .get(position)
+                .ok_or("period gap names a missing record")?
+        };
+        let field = match limit.unit {
+            Measure::Tokens => "tokens",
+            Measure::RunningMs => "running_ms",
+            Measure::Dollars => "dollars_micros",
+            Measure::PlanPercent | Measure::ContextPercent => {
+                return Err("a level reached spend summation".to_owned());
+            }
+        };
+        let gap = usage
+            .unavailable
+            .iter()
+            .find(|gap| {
+                gap.figure == field
+                    && (limit.unit == Measure::Tokens || gap.reason.contains("reset"))
+            })
+            .ok_or("period gap names a record without its source refusal")?;
+        return Ok(unavailable(limit, since, &gap.reason));
+    }
+    if let Some(reason) = spend_gap(limit, agents, &uses, since) {
+        return Ok(unavailable(limit, since, reason));
+    }
+    let total = spend
+        .total
+        .and_then(|total| u64::try_from(total).ok())
+        .ok_or("budget spend overflows its reported unit")?;
+    present(limit, since, total)
 }
 
 fn plan(
@@ -305,8 +203,6 @@ fn plan(
     agents: &BTreeSet<String>,
     uses: &[&Usage],
     at_ms: i64,
-    purpose: Purpose,
-    never_run: &impl Fn(&str) -> bool,
 ) -> Result<Used, String> {
     let duration = match limit.period {
         Some(Length::FiveHour) => 300,
@@ -319,19 +215,27 @@ fn plan(
             ));
         }
     };
-    let now = u64::try_from(at_ms)
-        .map_err(|error| format!("plan observation is before the Unix epoch: {error}"))?;
-    let reports = match plan_reports(agents, uses, duration, now, purpose, never_run) {
+    let reports = match plan_reports(agents, uses) {
         Ok(reports) => reports,
         Err(reason) => return Ok(unavailable(limit, None, reason)),
     };
-    if reports.is_empty() && purpose == Purpose::Spend {
-        return present(limit, None, 0);
-    }
+    let now = u64::try_from(at_ms)
+        .map_err(|error| format!("plan observation is before the Unix epoch: {error}"))?;
     let mut largest: Option<(Number, i64, String)> = None;
-    let mut expired: Option<i64> = None;
-    for (account, window) in reports {
-        let Some(window) = window else {
+    let mut expired = false;
+    for (account, report) in reports {
+        let Some(window) = report.plan_windows.as_ref().and_then(|windows| {
+            windows
+                .iter()
+                .find(|window| window.duration_minutes == duration)
+        }) else {
+            if report.unavailable.iter().any(|gap| {
+                gap.figure == "plan_windows"
+                    && gap.reason == format!("{duration}_minute_window_expired")
+            }) {
+                expired = true;
+                continue;
+            }
             return Ok(unavailable(
                 limit,
                 None,
@@ -339,9 +243,7 @@ fn plan(
             ));
         };
         if window.resets_at_ms <= now {
-            let boundary = i64::try_from(window.resets_at_ms)
-                .map_err(|error| format!("reported plan reset is not representable: {error}"))?;
-            expired = Some(expired.map_or(boundary, |earlier| earlier.max(boundary)));
+            expired = true;
             continue;
         }
         lys_runner::tracking_budget::percent(&serde_json::Value::Number(
@@ -379,11 +281,12 @@ fn plan(
         }),
         None => Ok(unavailable(
             limit,
-            expired,
-            expired.map_or_else(
-                || "no accounts report the requested plan window".to_owned(),
-                |boundary| format!("the plan window reset at {boundary}; no report since"),
-            ),
+            None,
+            if expired {
+                "the reported account plan window has expired"
+            } else {
+                "no accounts report the requested plan window"
+            },
         )),
     }
 }
@@ -416,72 +319,115 @@ fn context(limit: &Limit, uses: &[&Usage]) -> Result<Used, String> {
     }
 }
 
+fn spend_gap(
+    limit: &Limit,
+    agents: &BTreeSet<String>,
+    uses: &[&Usage],
+    since: Option<i64>,
+) -> Option<String> {
+    if matches!(limit.unit, Measure::Dollars | Measure::RunningMs) {
+        let field = if limit.unit == Measure::Dollars {
+            "dollars_micros"
+        } else {
+            "running_ms"
+        };
+        if let Some(gap) = uses
+            .iter()
+            .filter(|usage| since.is_none_or(|start| usage.at_ms >= start))
+            .flat_map(|usage| &usage.unavailable)
+            .find(|gap| gap.figure == field && gap.reason.contains("reset"))
+        {
+            return Some(gap.reason.clone());
+        }
+        let mut reports = BTreeMap::new();
+        for usage in uses {
+            let reported = if limit.unit == Measure::Dollars {
+                usage.dollars_micros.is_some()
+            } else {
+                usage.reported_running_ms.is_some()
+            };
+            if usage.native_snapshot || reported {
+                let key = (&usage.agent, &usage.session);
+                if reports
+                    .get(&key)
+                    .is_none_or(|earlier: &&Usage| earlier.at_ms <= usage.at_ms)
+                {
+                    reports.insert(key, *usage);
+                }
+            }
+        }
+        if limit.unit == Measure::Dollars {
+            for agent in agents {
+                if !reports.keys().any(|(reported, _)| *reported == agent) {
+                    return Some(format!("dollars have not been reported for agent {agent}"));
+                }
+            }
+            if agents.is_empty() {
+                return Some("no agents report dollar spend".to_owned());
+            }
+        }
+        for report in reports.values() {
+            let missing = if limit.unit == Measure::Dollars {
+                report.dollars_micros.is_none()
+            } else {
+                report.reported_running_ms.is_none()
+            };
+            if missing {
+                let reason = report
+                    .unavailable
+                    .iter()
+                    .find(|gap| gap.figure == field)
+                    .map_or("native source does not report this spend figure", |gap| {
+                        gap.reason.as_str()
+                    });
+                return Some(reason.to_owned());
+            }
+        }
+    }
+    None
+}
+
 fn plan_reports<'a>(
     agents: &BTreeSet<String>,
     uses: &[&'a Usage],
-    duration: u64,
-    now: u64,
-    purpose: Purpose,
-    never_run: &impl Fn(&str) -> bool,
-) -> Result<BTreeMap<&'a str, Option<&'a PlanWindow>>, String> {
+) -> Result<BTreeMap<&'a str, &'a Usage>, String> {
     let mut sessions = BTreeMap::new();
-    let mut resets = BTreeMap::new();
     for (index, usage) in uses.iter().copied().enumerate() {
-        let window = usage.plan_windows.as_ref().and_then(|windows| {
-            windows
-                .iter()
-                .find(|window| window.duration_minutes == duration)
-        });
-        if let Some(window) = window {
-            let key = (&usage.agent, &usage.session, usage.account.as_deref());
-            let latest = resets.entry(key).or_insert((index, usage, window));
-            if (usage.at_ms, index) > (latest.1.at_ms, latest.0) {
-                *latest = (index, usage, window);
-            }
-        }
         if usage.plan_windows.is_some() {
             let key = (&usage.agent, &usage.session);
-            let latest = sessions.entry(key).or_insert((index, usage, window));
-            if (usage.at_ms, index) > (latest.1.at_ms, latest.0) {
-                *latest = (index, usage, window);
+            if sessions
+                .get(&key)
+                .is_none_or(|(earlier_index, earlier): &(usize, &Usage)| {
+                    (usage.at_ms, index) > (earlier.at_ms, *earlier_index)
+                })
+            {
+                sessions.insert(key, (index, usage));
             }
         }
     }
     for agent in agents {
-        if (purpose != Purpose::Spend || !never_run(agent))
-            && !sessions.keys().any(|(reported, _)| *reported == agent)
-        {
+        if !sessions.keys().any(|(reported, _)| *reported == agent) {
             return Err(format!("plan window unreported for agent {agent}"));
         }
     }
     let mut accounts = BTreeMap::new();
-    for (index, report, window) in sessions.values().copied() {
+    for (index, report) in sessions.values().copied() {
         let account = report
             .account
             .as_deref()
             .filter(|account| !account.is_empty())
             .ok_or("the reported plan window names no account")?;
-        let latest = accounts.entry(account).or_insert((index, report, window));
-        if (report.at_ms, index) > (latest.1.at_ms, latest.0) {
-            *latest = (index, report, window);
+        if accounts
+            .get(account)
+            .is_none_or(|(earlier_index, earlier): &(usize, &Usage)| {
+                (report.at_ms, index) > (earlier.at_ms, *earlier_index)
+            })
+        {
+            accounts.insert(account, (index, report));
         }
     }
     Ok(accounts
         .into_iter()
-        .map(|(account, (_, report, window))| {
-            let window = window.or_else(|| {
-                if !report.unavailable.iter().any(|gap| {
-                    gap.figure == "plan_windows"
-                        && gap.reason == format!("{duration}_minute_window_expired")
-                }) {
-                    return None;
-                }
-                resets
-                    .get(&(&report.agent, &report.session, Some(account)))
-                    .map(|(_, _, window)| *window)
-                    .filter(|window| window.resets_at_ms <= now)
-            });
-            (account, window)
-        })
+        .map(|(account, (_, report))| (account, report))
         .collect())
 }
