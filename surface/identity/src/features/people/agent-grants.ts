@@ -74,7 +74,7 @@ export function newAgentGrants(options: GrantOption[], selected: string[]): Agen
 export function agentGrantsOf(value: unknown, agent: string | null, responsible: string | null): AgentGrant[] {
   const bad = (): never => { throw new Refused(0, { refusal: 'PendingAgentGrantsUnreadable', reason: 'The saved access requests cannot be read. Their outcomes must be checked before adding another agent.' }); };
   if (!Array.isArray(value)) return bad();
-  const operations = new Set<string>(); const sources = new Set<string>(); let unfinished = false;
+  const operations = new Set<string>(); const given = new Set<string>(); let unfinished = false;
   return value.map((entry: unknown) => {
     if (!isRecord(entry) || !operation(entry.operation) || !grantId(entry.source) || !resource(entry.resource) || typeof entry.relation !== 'string' || !entry.relation
       || !strings(entry.actions) || !entry.actions.length || !window(entry.window) || !(entry.granted === null || grantId(entry.granted))
