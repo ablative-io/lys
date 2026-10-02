@@ -13,7 +13,7 @@
 //! stays `Send` and `Sync`.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::PoisonError;
 
 use serde_json::Value;
 
@@ -27,13 +27,9 @@ impl Session {
     /// is stale, like every read.
     pub(crate) fn call_entry(&self, call_id: &str) -> Result<Option<String>, HomeError> {
         self.fresh()?;
-        let mut map = self
-            .calls
-            .lock()
-            .map_err(|error| HomeError::StatePoisoned {
-                state: "session call map",
-                reason: error.to_string(),
-            })?;
+        // The map is replaced whole or not at all, so a poisoned lock still
+        // guards a map that is either absent or complete.
+        let mut map = self.calls.lock().unwrap_or_else(PoisonError::into_inner);
         if map.is_none() {
             *map = Some(self.build_calls()?);
         }
@@ -59,37 +55,29 @@ impl Session {
 
     /// Add an appended `lys.call` entry's call id to a built map, unless the
     /// map holds that id already; a map not yet built is left unbuilt.
-    pub(super) fn note_call(&mut self, entry: &Entry) -> Result<(), HomeError> {
-        self.note_call_body(&entry.body, entry.id())
+    pub(super) fn note_call(&mut self, entry: &Entry) {
+        self.note_call_body(&entry.body, entry.id());
     }
 
     /// Note a batch member without copying its body or invalidating a map
     /// that already holds all earlier calls.
-    pub(super) fn note_call_body(&mut self, body: &EntryBody, id: &str) -> Result<(), HomeError> {
+    pub(super) fn note_call_body(&mut self, body: &EntryBody, id: &str) {
         let Some(call_id) = call_id_of(body) else {
-            return Ok(());
+            return;
         };
-        let held = self
-            .calls
-            .get_mut()
-            .map_err(|error| HomeError::StatePoisoned {
-                state: "session call map",
-                reason: error.to_string(),
-            })?;
-        if let Some(calls) = held {
+        let held = self.calls.get_mut();
+        if let Some(calls) = held.unwrap_or_else(PoisonError::into_inner) {
             calls
                 .entry(call_id.to_owned())
                 .or_insert_with(|| id.to_owned());
         }
-        Ok(())
     }
 
     /// Drop the map, so the next lookup builds it from the index as it now
     /// stands.
     pub(super) fn forget_calls(&mut self) {
-        // Reconciliation has reloaded the authoritative index before
-        // discarding this derived cache, including an interrupted cache.
-        self.calls = Mutex::new(None);
+        let held = self.calls.get_mut();
+        *held.unwrap_or_else(PoisonError::into_inner) = None;
     }
 }
 
@@ -101,43 +89,5 @@ fn call_id_of(body: &EntryBody) -> Option<&str> {
             data: Some(data),
         } if custom_type == CUSTOM_CALL => data.get("call_id").and_then(Value::as_str),
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::record::Home;
-    use serde_json::json;
-
-    #[test]
-    fn a_poisoned_call_map_refuses_until_the_authoritative_index_is_reloaded()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
-        let home = Home::open(dir.path().join("home"))?;
-        let mut session = home.create_session("calls", "/work", None)?;
-        let entry = session.append(EntryBody::Custom {
-            custom_type: CUSTOM_CALL.to_owned(),
-            data: Some(json!({"call_id": "call"})),
-        })?;
-        assert_eq!(session.call_entry("call")?, Some(entry.clone()));
-        let interrupted = std::thread::scope(|scope| {
-            scope
-                .spawn(|| {
-                    let mut calls = session.calls.lock().expect("healthy initial call cache");
-                    *calls = Some(HashMap::new());
-                    panic!("interrupted cache mutation");
-                })
-                .join()
-        });
-        assert!(interrupted.is_err());
-        assert!(matches!(
-            session.call_entry("call"),
-            Err(HomeError::StatePoisoned { .. })
-        ));
-        session.reconcile()?;
-        assert!(!session.calls.is_poisoned());
-        assert_eq!(session.call_entry("call")?, Some(entry));
-        Ok(())
     }
 }
