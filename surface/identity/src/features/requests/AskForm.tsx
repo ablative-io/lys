@@ -79,9 +79,9 @@ export function AskForm({ person, resources, model, changed }: {
   const [rest, setRest] = useState<Rest>(() => readRest(key));
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const keepRest = (left: Ask[]) => {
-    // A copy: the caller goes on shifting its queue, and state must say what storage says.
-    setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
+    // Storage first, then a copy into state: state says what storage says, never a rest the browser refused to keep.
     if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
+    setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
   };
   const finish = (recorded: AccessRequest) => {
     sessionStorage.removeItem(key);
@@ -150,7 +150,7 @@ export function AskForm({ person, resources, model, changed }: {
         if (!(await sendOne(next, false))) {
           // A definite refusal ends the run; what was recorded stays recorded and the rest is named, never re-sent by itself.
           if (sessionStorage.getItem(key) === null) {
-            keepRest([]);
+            try { keepRest([]); } catch { /* the rest stays retained and is offered again, never sent by itself */ }
             setAnswer(`${recorded} recorded before the refusal; not sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.`);
           }
           return;

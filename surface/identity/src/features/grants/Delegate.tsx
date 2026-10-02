@@ -115,8 +115,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       } else if (retry || uncertain(refused)) {
         setOutcome({ at: 'pending', reason: refused.refusal.reason });
       } else {
-        sessionStorage.removeItem(key);
-        setPending({ kind: 'empty' });
+        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { /* still retained: a retry sends it once more and is refused by name again */ }
         setOutcome({ at: 'refused', refused });
       }
       return false;
@@ -125,9 +124,9 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
 
   /** The requests still to send after the retained one, written whole so a reload finishes the run exactly as it was ticked, never twice. */
   const keepRest = (left: DelegateBody[]) => {
-    // A copy: the caller goes on shifting its queue, and state must say what storage says.
-    setRest(left.length ? { kind: 'held', bodies: [...left] } : { kind: 'empty' });
+    // Storage first, then a copy into state: state says what storage says, never a rest the browser refused to keep.
     if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
+    setRest(left.length ? { kind: 'held', bodies: [...left] } : { kind: 'empty' });
   };
 
   /** The words for what a body grants, as the model says them. */
@@ -188,7 +187,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         if (!confirmed) {
           // An uncertain answer keeps the rest for the retry; a definite refusal ends the run and names what did and did not happen.
           if (outcome.at !== 'pending' && sessionStorage.getItem(key) === null) {
-            keepRest([]);
+            try { keepRest([]); } catch (error) { notRetained(error); }
             if (given.length || queue.length) {
               shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${onText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}`);
             }
