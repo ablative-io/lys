@@ -174,7 +174,7 @@ impl Table {
         Ok(())
     }
 
-    async fn give(&self, body: &Value, cookie: bool) -> TestResult<(u16, Value)> {
+    async fn give(&self, body: &Value) -> TestResult<(u16, Value)> {
         let path = format!("/budgets/agent/{}", self.target);
         let bytes = serde_json::to_vec(body)?;
         let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
@@ -183,11 +183,9 @@ impl Table {
         ));
         let signed = crate::agent_signature::payload("PUT", &path, &bytes, at, &nonce);
         let signature = crate::routes::hex(&sign_attestation(&signed, &self.key).to_cose_bytes());
-        let mut request = reqwest::Client::new().put(format!("{}{path}", self.service.base));
-        if cookie {
-            request = request.header(reqwest::header::COOKIE, &self.cookie);
-        }
-        let response = request
+        let response = reqwest::Client::new()
+            .put(format!("{}{path}", self.service.base))
+            .header(reqwest::header::COOKIE, &self.cookie)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .header(
                 crate::agent_signature::HEADER,
@@ -205,9 +203,9 @@ impl Table {
 async fn an_agent_cannot_give_a_budget_beyond_its_own_holding() -> TestResult {
     let table = Table::fresh().await?;
     table.grant().await?;
-    let (status, answer) = table.give(&body(100, 0), false).await?;
+    let (status, answer) = table.give(&body(100, 0)).await?;
     assert_eq!(status, 200, "the holding boundary is included: {answer}");
-    let (status, answer) = table.give(&body(101, 1), false).await?;
+    let (status, answer) = table.give(&body(101, 1)).await?;
     assert_eq!(status, 403, "{answer}");
     assert_eq!(answer["refusal"], "HoldingNotHeld", "{answer}");
     let (status, held) = table
@@ -226,14 +224,11 @@ async fn an_agent_cannot_give_a_budget_beyond_its_own_holding() -> TestResult {
 #[tokio::test]
 async fn an_agent_without_a_grant_is_refused_on_budgets() -> TestResult {
     let table = Table::fresh().await?;
-    let (status, answer) = table.give(&body(50, 0), true).await?;
+    let (status, answer) = table.give(&body(50, 0)).await?;
     assert_eq!(
-        status, 401,
+        status, 403,
         "an administrator cookie must not lend authority to its agent: {answer}"
     );
-    assert_eq!(answer["refusal"], "AgentSignatureRefused", "{answer}");
-    let (status, answer) = table.give(&body(50, 0), false).await?;
-    assert_eq!(status, 403, "{answer}");
     assert_eq!(answer["refusal"], "NotHeld", "{answer}");
     let (status, held) = table
         .service

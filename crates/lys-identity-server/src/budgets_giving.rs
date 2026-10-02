@@ -18,16 +18,13 @@ use crate::routes::{AppState, signed_in, with_directory};
 pub(crate) enum Giver {
     Person(String),
     Agent(AgentId),
-    /// An agent acting through its pass, whose act the guarded router
-    /// already judged against the route's action.
-    Pass(AgentId),
 }
 
 impl Giver {
     pub(crate) fn by(&self) -> String {
         match self {
             Self::Person(person) => person.clone(),
-            Self::Agent(agent) | Self::Pass(agent) => agent.to_string(),
+            Self::Agent(agent) => agent.to_string(),
         }
     }
 }
@@ -37,16 +34,9 @@ pub(crate) fn giver(
     headers: &HeaderMap,
     request: (&str, &str, &[u8]),
     holder: &Holder,
-    principal: Option<&crate::agent_signature::TokenPrincipal>,
 ) -> Result<Giver, ServerError> {
     if let Some(agent) = with_directory(state, |directory| {
-        crate::agent_signature::signed_agent_with_token(
-            state,
-            directory.projection()?,
-            headers,
-            request,
-            principal,
-        )
+        crate::agent_signature::signed_agent(state, directory.projection()?, headers, request)
     })? {
         return Ok(Giver::Agent(agent));
     }
@@ -55,12 +45,6 @@ pub(crate) fn giver(
         crate::caller_admission::active_caller(directory.projection()?, &actor)
     })?;
     if let IdentityId::Agent(agent) = caller {
-        if matches!(
-            actor.provenance().method(),
-            lys_identity::AuthMethod::AgentPass(_)
-        ) {
-            return Ok(Giver::Pass(agent));
-        }
         return Ok(Giver::Agent(agent));
     }
     let by = authorised(state, &actor, holder)?;
@@ -87,7 +71,7 @@ pub(crate) fn append(
     crate::budgets_migration::require_committed(state)?;
     crate::budgets_migration::advance(state)?;
     match giver {
-        Giver::Person(_) | Giver::Pass(_) => with_budgets(state, |store| {
+        Giver::Person(_) => with_budgets(state, |store| {
             validate(store, &limits, expected, zone, agents, at_ms)?;
             store.set_limits(limits, expected)?;
             Ok(())

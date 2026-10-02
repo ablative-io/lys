@@ -1,17 +1,16 @@
-//! An actor cannot act on what is absent from its own current holding: a
-//! budget it gives, a team it changes, a person or account it writes.
+//! A giver cannot convey a budget absent from its own current holding.
 
 use axum::http::StatusCode;
 
-/// A request reaches beyond the authenticated actor's current holding.
+/// A budget giving request exceeds the authenticated giver's holding.
 #[derive(Debug, thiserror::Error)]
 pub enum HoldingError {
-    /// The actor holds nothing that covers the request; the reason names what.
-    #[error("HoldingNotHeld: {giver} does not hold what it is acting on: {reason}")]
+    /// The giver has no covering current limit, or its amount is smaller.
+    #[error("HoldingNotHeld: {giver} does not hold the budget it is giving: {reason}")]
     NotHeld {
         /// The authenticated giver, never a supplied substitute.
         giver: String,
-        /// What is uncovered: a budget dimension or amount, a team, a person.
+        /// The uncovered dimension or amount.
         reason: String,
     },
 }
