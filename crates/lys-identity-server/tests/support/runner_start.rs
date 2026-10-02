@@ -107,7 +107,6 @@ impl Table {
                 if commands_only {
                     config.sessions_file = None;
                     config.requests_dir = None;
-                    config.certificates_dir = None;
                     config.roles_file = None;
                     config.service_accounts_dir = None;
                     config.teams_dir = None;

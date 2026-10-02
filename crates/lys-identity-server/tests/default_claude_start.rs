@@ -57,7 +57,6 @@ impl Table {
             move |config| {
                 config.runner_socket = Some(adjusted);
                 config.requests_dir = None;
-                config.certificates_dir = None;
                 config.roles_file = None;
                 config.service_accounts_dir = None;
                 config.teams_dir = None;
