@@ -18,10 +18,7 @@ fn the_published_cannot_give_reason_enum_contains_every_reason() -> Result<(), B
         .chain(item["allOf"].as_array().into_iter().flatten())
         .find_map(|part| part.pointer("/properties/reason/$ref"))
         .ok_or("the published item has no reason schema reference")?;
-    assert_eq!(
-        reason,
-        "#/components/schemas/CannotGiveReasonView"
-    );
+    assert_eq!(reason, "#/components/schemas/CannotGiveReasonView");
     println!(
         "published_reason_schema={}",
         schemas["CannotGiveReasonView"]
