@@ -33,20 +33,22 @@ def poison_line(teams):
     raise RuntimeError(f"no negative control for a release whose teams are {teams!r}")
 
 
-def refuse_old_put_back(installed, log, env, root):
-    """An old installer that keeps no data must refuse the record by name and touch nothing.
+# What an old installer that cannot end the candidate's upgrade must name.
+REFUSALS = {"no_data": "unknown variant `data_kept`", "needs_runner": "runner_unreachable"}
 
-    It cannot put back the data the candidate wrote, which its own build cannot
-    read, so it must refuse the record on the step it does not know before it
-    stops or moves anything: the record and the kept binaries stand for the
-    candidate's installer, which puts the kept data back, to finish.
+
+def refuse_old_put_back(installed, log, env, root, named):
+    """An old installer that cannot end the upgrade must refuse by name and touch nothing.
+
+    The record and the kept binaries stand for the candidate's installer, which
+    puts the kept data back and starts the runner, to finish.
     """
     with log.open("wb") as output:
         completed = subprocess.run(installed, stdout=output, stderr=subprocess.STDOUT, env=env)
     if completed.returncode == 0:
         raise RuntimeError(f"old installer reported a put-back it cannot make; evidence: {log}")
-    if "unknown variant `data_kept`" not in log.read_text(errors="replace"):
-        raise RuntimeError(f"old installer did not refuse the record by its kept-data step; evidence: {log}")
+    if named not in log.read_text(errors="replace"):
+        raise RuntimeError(f"old installer did not refuse by {named}; evidence: {log}")
     if not (root / "install/upgrade.json").is_file():
         raise RuntimeError(f"old installer's refusal removed the upgrade record; evidence: {log}")
     if not (root / "bin.previous").is_dir():
@@ -54,14 +56,15 @@ def refuse_old_put_back(installed, log, env, root):
 
 
 def put_back(root, evidence, driver, installed, env, run, release_put_back, prefix):
-    """The put-back each release can make: the old installer's own, or, for a release
-    that keeps no data, the candidate's after the old installer refuses the record."""
+    """The put-back each release can make: the old installer's own, or, for one that
+    cannot end the candidate's upgrade, the candidate's after the old one refuses."""
     if release_put_back == "keeps_data":
         run(installed, evidence / f"{prefix}recover-old.log", env)
         return "old"
-    if release_put_back != "no_data":
+    if release_put_back not in REFUSALS:
         raise RuntimeError(f"no put-back for a release whose put-back is {release_put_back!r}")
-    refuse_old_put_back(installed, evidence / f"{prefix}recover-old.log", env, root)
+    refuse_old_put_back(installed, evidence / f"{prefix}recover-old.log", env, root,
+                        REFUSALS[release_put_back])
     run([str(driver), "--root", str(root), "recover"], evidence / f"{prefix}recover-after-old.log", env)
     return "candidate"
 

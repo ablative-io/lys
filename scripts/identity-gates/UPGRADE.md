@@ -120,8 +120,14 @@ such a release the old installer must refuse the record by its unknown
 `data_kept` step before it stops or moves anything, leaving `upgrade.json` and
 `bin.previous/` standing; the candidate's installer then finishes the recovery,
 putting the kept data back, and every check that follows is the same.
-An install on such a release that is interrupted mid-upgrade is recovered with
-the new `lys`, never the old one. A release whose published refusals name
+A release that keeps data but recovers only with the runner
+answering (`needs_runner`, read from its own `swap.rs`: cced4195 and 255a3bca)
+cannot end the candidate's upgrade either, since an upgrade stops the runner
+before it places anything; its installer must refuse by `runner_unreachable`
+with the record and `bin.previous/` standing, and the candidate's installer
+finishes the same way. An install on any release before the candidate's
+recovery started a stopped runner that is interrupted mid-upgrade is recovered
+with the new `lys`, never the old one. A release whose published refusals name
 `BudgetZoneRefused` (cced4195 and 255a3bca) counts every new limit in the
 organisation zone, so the seed gives it the same limits without a zone of their
 own; older releases take the limits with their explicit zones. A second reversible window independently exercises the candidate recovery path, with the same byte and record checks. It finally runs the normal candidate CLI upgrade separately.

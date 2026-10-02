@@ -9,6 +9,7 @@ import re
 BUDGETS_API = "crates/lys-identity-server/src/budgets_api.rs"
 TEAMS_API = "crates/lys-identity-server/src/teams_api.rs"
 INTENT = "crates/lys/src/identity/upgrade/intent.rs"
+SWAP = "crates/lys/src/identity/upgrade/swap.rs"
 REFUSALS = "crates/lys-identity-server/src/openapi_refusals.rs"
 
 # `PUT /budgets/{kind}/{id}`: one measure per request, or the holder's whole collection.
@@ -49,17 +50,22 @@ def team_model(text, path=TEAMS_API):
     return "guarded" if "held" in fields else "unguarded"
 
 
-def put_back_model(text, path=INTENT):
-    """`keeps_data` when the release's upgrade record knows the kept-data step, else `no_data`.
+def put_back_model(text, swap="", path=INTENT):
+    """Which installer can end an interrupted upgrade of this release.
 
-    A `no_data` release's installer puts back binaries and files but never the
-    data the candidate wrote, so once the candidate has started it cannot bring
-    its own build back; that install recovers through the candidate's installer.
+    `no_data`: its record knows no `data_kept` step, so it cannot put data back
+    and refuses the candidate's record by that step. `needs_runner`: it keeps
+    data but recovers only with the runner answering, and an upgrade stops the
+    runner before it places anything, so it refuses by `runner_unreachable`.
+    Either way it touches nothing and the candidate's installer finishes.
+    `keeps_data`: it recovers a stopped runner itself.
     """
     match = re.search(r"\benum Step\s*\{(.*?)\n\}", text, re.S)
     if match is None:
         raise RuntimeError(f"{path} declares no enum Step")
-    return "keeps_data" if re.search(r"^\s*DataKept\b", match.group(1), re.M) else "no_data"
+    if not re.search(r"^\s*DataKept\b", match.group(1), re.M):
+        return "no_data"
+    return "keeps_data" if "prepare_for_recovery" in swap else "needs_runner"
 
 
 def zone_model(text):
@@ -85,7 +91,7 @@ def old_release(read):
     return {
         "budgets": budget_model(read(BUDGETS_API)),
         "teams": team_model(read(TEAMS_API)),
-        "put_back": put_back_model(read(INTENT)),
+        "put_back": put_back_model(read(INTENT), read(SWAP)),
         "zones": zone_model(read(REFUSALS)),
     }
 

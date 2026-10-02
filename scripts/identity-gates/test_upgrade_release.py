@@ -81,8 +81,8 @@ class ReleaseShapeTests(unittest.TestCase):
         self.assertEqual(found, {
             "1b568cd9": {"budgets": "per_measure", "teams": "unguarded", "put_back": "no_data", "zones": "explicit"},
             "8c064b62": {"budgets": "per_measure", "teams": "unguarded", "put_back": "no_data", "zones": "explicit"},
-            "cced4195": {"budgets": "limits", "teams": "guarded", "put_back": "keeps_data", "zones": "organisation"},
-            "255a3bca": {"budgets": "limits", "teams": "guarded", "put_back": "keeps_data", "zones": "organisation"},
+            "cced4195": {"budgets": "limits", "teams": "guarded", "put_back": "needs_runner", "zones": "organisation"},
+            "255a3bca": {"budgets": "limits", "teams": "guarded", "put_back": "needs_runner", "zones": "organisation"},
         })
         self.assertEqual((BUDGETS_API, TEAMS_API, INTENT), (
             "crates/lys-identity-server/src/budgets_api.rs",
@@ -102,7 +102,8 @@ class ReleaseShapeTests(unittest.TestCase):
 
     def test_a_record_that_knows_the_kept_data_step_names_a_release_that_puts_data_back(self):
         keeps = "pub enum Step {\n    /// Stopped.\n    Stopped,\n    DataKept,\n    Started,\n}\n"
-        self.assertEqual(put_back_model(keeps), "keeps_data")
+        self.assertEqual(put_back_model(keeps, "Restart::prepare_for_recovery(layout)"), "keeps_data")
+        self.assertEqual(put_back_model(keeps, "Some(Restart::prepare(layout)?)"), "needs_runner")
         self.assertEqual(put_back_model(keeps.replace("    DataKept,\n", "")), "no_data")
         self.assertEqual(put_back_model(keeps.replace("    DataKept,\n", "    /// DataKept\n")),
                          "no_data")
