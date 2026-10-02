@@ -77,7 +77,7 @@ describe('The delegation form', () => {
     const onApp = GRANTS.map((g) => (g.id === ROOT_G ? { ...g, resource: { kind: 'fixture.doc', id: 'd1' } } : g));
     await open({ ...SERVICE, '/grants': ok({ grants: onApp, revision: 7 }) });
     expect($$('#drawer input[name="action"]')).toEqual([]);
-    expect($('#drawer')?.textContent).toContain("cannot be given access to an app's resource");
+    expect($('#drawer')?.textContent).toContain("can't give an agent this app's actions until the app allows it");
     expect(($('[data-act="delegatedo"]') as HTMLButtonElement).disabled).toBe(true);
   });
 

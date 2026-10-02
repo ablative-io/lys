@@ -208,7 +208,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       {toAgent ? <div className="field">
         <label>Actions</label>
         {!offer.known ? <div className="note">The service has not said which actions an agent may hold, so none are offered yet.</div>
-          : !carried.length ? <div className="note">{source.resource.kind.includes('.') ? "An agent cannot be given access to an app's resource until that app allows it." : 'Nothing you may pass on here can be held by an agent.'}</div>
+          : !carried.length ? <div className="note">{source.resource.kind.includes('.') ? "Lys can't give an agent this app's actions until the app allows it." : 'Nothing you may pass on here can be held by an agent.'}</div>
           : <ActionPicker model={w.model} resource={source.resource} actions={carried} value={picked} onChange={setPicked} disabled={locked} />}
         <div className="note">Each ticked action is given on its own; an agent is never given a wider relation.</div>
       </div> : <div className="field">
