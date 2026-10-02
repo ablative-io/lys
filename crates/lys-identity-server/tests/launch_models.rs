@@ -25,7 +25,7 @@ impl Table {
         let body = json!({
             "operation": operation()?, "from_version": from,
             "model_access": models, "tools": [], "skills": [],
-            "mcp_servers": [], "instructions": "", "note": "", "harness": harness,
+            "mcp_servers": [], "instructions": "", "note": "", "permissions": {"default_mode": "plan"}, "harness": harness,
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         self.service.post(&path, Some(&self.ada), &body).await

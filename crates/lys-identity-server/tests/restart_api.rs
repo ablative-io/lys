@@ -137,7 +137,7 @@ impl Held {
         let mut harness = harness_description::declared();
         harness["program"] = json!(self.dir.path().join("seat").display().to_string());
         self.ok(&path, &json!({ "operation": operation()?, "from_version": from,
-            "model_access": [format!("model-{}", from + 1)], "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": "", "harness": harness })).await?;
+            "model_access": [format!("model-{}", from + 1)], "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": "", "permissions": {"default_mode": "plan"}, "harness": harness })).await?;
         if reviewed {
             self.review(from + 1).await?;
         }

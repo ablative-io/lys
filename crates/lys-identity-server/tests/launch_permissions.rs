@@ -174,7 +174,7 @@ async fn a_hard_policy_rule_the_settings_file_cannot_express_refuses_the_start_b
             Some("/probe")
         )]))
         .await?;
-    let (status, set) = table.record(0, &json!([]), &json!({})).await?;
+    let (status, set) = table.record(0, &json!([]), &json!({"default_mode": "plan"})).await?;
     assert_eq!(status, 200, "{set}");
     table.review(1).await?;
     let (status, refused) = table.start_profile("Box one").await?;
@@ -193,19 +193,24 @@ async fn a_hard_policy_rule_the_settings_file_cannot_express_refuses_the_start_b
 }
 
 #[tokio::test]
-async fn a_profile_with_no_permissions_writes_environment_only() -> TestResult {
+async fn a_claude_profile_with_no_permissions_is_refused_until_it_names_a_mode() -> TestResult {
     let table = Table::unprofiled().await?;
     table.policy(&json!([])).await?;
     let (status, set) = table.record(0, &json!([]), &Value::Null).await?;
     assert_eq!(status, 200, "{set}");
     table.review(1).await?;
-    let (status, started) = table.start_profile("Box one").await?;
-    assert_eq!(status, 200, "{started}");
-    let text = started["template"].as_str().ok_or("no template")?;
-    let template = parse_template(text.as_bytes())?;
-    let settings: Value = serde_json::from_slice(&env_settings(&template)?)?;
-    let members: Vec<&String> = settings.as_object().ok_or("no object")?.keys().collect();
-    assert_eq!(members, ["env"]);
+    let (status, refused) = table.start_profile("Box one").await?;
+    assert_eq!(
+        (status, &refused["refusal"]),
+        (400, &json!("PolicyUnrepresentable")),
+        "{refused}"
+    );
+    assert!(
+        refused["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("choose how this agent is confined")),
+        "{refused}"
+    );
     table.close()
 }
 

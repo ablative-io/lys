@@ -147,7 +147,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": [],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
-            "harness": harness,
+            "permissions": {"default_mode": "plan"}, "harness": harness,
             "instructions": "", "note": "", "session": session,
         });
         self.ok(&path, &body).await?;
