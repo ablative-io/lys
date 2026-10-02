@@ -24,7 +24,10 @@ for tool in cargo npm python3 docker; do
   fi
 done
 
-private=$(mktemp -d "${TMPDIR:-/tmp}/lys-upgrade-proof.XXXXXX")
+# Under /tmp, never the seat's TMPDIR: a fixture's socket path must stay
+# inside the 104 bytes macOS allows, and a per-user TMPDIR on macOS is long
+# enough to break it before any install starts.
+private=$(mktemp -d /tmp/lys-upgrade-proof.XXXXXX)
 chmod 700 "$private"
 cleanup() {
   for tree in "$private"/old-*; do
