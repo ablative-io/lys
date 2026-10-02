@@ -34,7 +34,7 @@ use axum::http::{Extensions, HeaderMap, Request};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{Actor, IdentityId, PersonId};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::error::ServerError;

@@ -148,7 +148,7 @@ pub(super) async fn authorize(
         held_asking.insert(
             asking.clone(),
             Asking {
-                session_id: session.id.clone(),
+                session_id: session.id,
                 client_id: asked.client_id,
                 redirect_uri: asked.redirect_uri.clone(),
                 challenge,
@@ -160,16 +160,14 @@ pub(super) async fn authorize(
     let person = crate::routes::with_directory(&apps.state, |directory| {
         crate::read_api::own_person(directory.projection()?, &session_actor)
     })?;
-    let choices: String = crate::mcp_oauth_grants::offers(&apps.state, person)?
-        .iter()
-        .map(|offer| {
-            format!(
-                "<label><input type=\"checkbox\" name=\"grant\" value=\"{}\"> {}</label><br>",
-                escaped(&offer.key),
-                escaped(&offer.words())
-            )
-        })
-        .collect();
+    let mut choices = String::new();
+    for offer in crate::mcp_oauth_grants::offers(&apps.state, person)? {
+        choices.push_str("<label><input type=\"checkbox\" name=\"grant\" value=\"");
+        choices.push_str(&escaped(&offer.key));
+        choices.push_str("\"> ");
+        choices.push_str(&escaped(&offer.words()));
+        choices.push_str("</label><br>");
+    }
     let choices = if choices.is_empty() {
         "<p>You hold nothing you can pass on to an agent yet, so it starts with no permissions.</p>"
             .to_owned()

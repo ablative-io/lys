@@ -37,7 +37,7 @@ pub async fn operate(
     // the operation's name, never to a person who did not ask it.
     let act = Act::AsCaller {
         caller: format!("lys:{}", operation.request.name()),
-        act: Box::new(Act::Operate { operation }),
+        done: Box::new(Act::Operate { operation }),
     };
     let answered =
         crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;

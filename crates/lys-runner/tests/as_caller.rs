@@ -32,7 +32,7 @@ fn launch() -> Launch {
 fn for_caller(caller: &str, act: Act) -> Act {
     Act::AsCaller {
         caller: caller.to_owned(),
-        act: Box::new(act),
+        done: Box::new(act),
     }
 }
 

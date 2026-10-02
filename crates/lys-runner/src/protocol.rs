@@ -218,7 +218,7 @@ pub enum Act {
         /// The verified caller.
         caller: String,
         /// The act done for them.
-        act: Box<Act>,
+        done: Box<Act>,
     },
     /// Hold this connection as the live grant authority's channel: the
     /// runner answers `grant_channel`, then writes each grantable question

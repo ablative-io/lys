@@ -144,7 +144,7 @@ pub(super) fn perform(
             let page = reader.page(cursor.as_deref())?;
             Ok(Answer::Feed { page })
         }
-        Act::AsCaller { caller, act } => as_caller(sessions, server, &caller, *act, left),
+        Act::AsCaller { caller, done } => as_caller(sessions, server, &caller, *done, left),
         Act::GrantChannel => Err(RunnerError::refused(
             "grant_channel_unheld",
             "a grant channel is held only as the whole of its connection",

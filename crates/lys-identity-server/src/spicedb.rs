@@ -38,7 +38,7 @@ mod names;
 mod wire;
 pub use credential::{SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
 use names::{engine_ident, engine_ident_on, engine_name_for, lys_name_on};
-use wire::{object_json, object_of, relationship_json, relationship_of};
+use wire::{object_json, relationship_json, relationship_of};
 
 #[path = "spicedb_scope.rs"]
 pub(crate) mod scope;
