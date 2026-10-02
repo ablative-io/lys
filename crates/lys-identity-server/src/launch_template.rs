@@ -147,6 +147,19 @@ pub fn from_template(
         .ok_or(ServerError::HarnessUndeclared {
             version: version.number,
         })?;
+    if harness.description.rendering_contract == "claude-code/template-v1"
+        && version
+            .settings
+            .permissions
+            .as_ref()
+            .and_then(|permissions| permissions.default_mode.as_deref())
+            .is_none_or(str::is_empty)
+    {
+        return Err(ServerError::PolicyUnrepresentable {
+            rule: "permissions.default_mode".to_owned(),
+            reason: "choose how this agent is confined".to_owned(),
+        });
+    }
     lys_home::harness::rendering_launch::render(
         &harness.description.rendering_contract,
         &harness.program,
