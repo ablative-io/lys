@@ -38,6 +38,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::caller_admission::active_caller;
 use crate::certificates_store::Withdrawn;
 use crate::error::ServerError;
 use crate::read_api::own_person;
@@ -72,7 +73,7 @@ pub struct StopView {
     /// Whether every part is done. A stop that is only asked claims
     /// nothing about certificates, sessions or credentials yet.
     pub done: bool,
-    /// The person who stopped it.
+    /// The identity that stopped it.
     pub by: String,
     /// When, in seconds since the Unix epoch.
     pub at: u64,
@@ -153,14 +154,21 @@ fn admitted(
     let administrator = crate::routes::is_administrator(state, actor)?;
     with_directory(state, |directory| {
         let projection = directory.projection()?;
-        let person = own_person(projection, actor)?;
+        let passed = crate::routes::admitted_agent(projection, actor)?;
+        let caller = if passed {
+            active_caller(projection, actor)?
+        } else {
+            IdentityId::Person(own_person(projection, actor)?)
+        };
         let record = projection
             .record(IdentityId::Agent(agent))
             .ok_or(ServerError::AgentNotVisible)?;
-        if !administrator && record.responsible() != Some(person) {
+        let responsible =
+            matches!(caller, IdentityId::Person(person) if record.responsible() == Some(person));
+        if !passed && !administrator && !responsible {
             return Err(ServerError::AgentNotVisible);
         }
-        Ok((agent, person.to_string(), record.state()))
+        Ok((agent, caller.to_string(), record.state()))
     })
 }
 
