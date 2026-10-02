@@ -70,6 +70,28 @@ async fn claude_first_run_defaults_start_with_native_workspace_settings() -> Tes
     Ok(())
 }
 
+#[tokio::test]
+async fn claude_without_a_confinement_choice_refuses_before_rendering() -> TestResult {
+    let table = Table::unprofiled().await?;
+    table.launch_profile().await?;
+    let agent = table.agent();
+    let machine = table
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
+        .await?;
+    let answer = table.ask(&agent, &machine, &table.ada).await?;
+    table.close()?;
+    assert_eq!(answer.0, 400, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "PolicyUnrepresentable");
+    assert!(
+        answer
+            .1
+            .to_string()
+            .contains("choose how this agent is confined")
+    );
+    assert!(answer.1.get("template").is_none());
+    Ok(())
+}
+
 fn refused(answer: &(u16, Value), status: u16, name: &str) {
     assert_eq!(answer.0, status, "{}", answer.1);
     assert_eq!(answer.1["refusal"], name, "{}", answer.1);
