@@ -208,6 +208,7 @@ fn grant(error: &GrantError) -> &str {
         GrantError::ResourceOutside { .. } => "ResourceOutside",
         GrantError::UseOnly { .. } => "UseOnly",
         GrantError::RecipientRefused { .. } => "RecipientRefused",
+        GrantError::WithheldFromAgents { .. } => "WithheldFromAgents",
         GrantError::PassOnBeyondSource { .. } => "PassOnBeyondSource",
         GrantError::ExpiryBeyondSource { .. } => "ExpiryBeyondSource",
         GrantError::ResponsibleMismatch { .. } => "ResponsibleMismatch",

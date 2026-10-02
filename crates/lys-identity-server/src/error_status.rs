@@ -92,6 +92,7 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::ResourceOutside { .. }
         | GrantError::UseOnly { .. }
         | GrantError::RecipientRefused { .. }
+        | GrantError::WithheldFromAgents { .. }
         | GrantError::PassOnBeyondSource { .. }
         | GrantError::ExpiryBeyondSource { .. }
         | GrantError::ResponsibleMismatch { .. }

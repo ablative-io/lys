@@ -434,6 +434,8 @@ pub struct ModelView {
     pub version: u64,
     /// Each relation's name, with the actions it carries.
     pub relations: BTreeMap<String, Vec<String>>,
+    /// The acts no agent may be given, so a screen never offers them.
+    pub withheld_from_agents: Vec<String>,
 }
 
 impl From<&Model> for ModelView {
@@ -455,6 +457,10 @@ impl From<&Model> for ModelView {
                             .collect(),
                     )
                 })
+                .collect(),
+            withheld_from_agents: lys_identity::grants::WITHHELD_FROM_AGENTS
+                .iter()
+                .map(|action| (*action).to_owned())
                 .collect(),
         }
     }

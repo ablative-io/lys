@@ -11,7 +11,7 @@ import { AgentCredentials } from './AgentCredentials';
 import { Provisioning } from '../provisioning/Provisioning';
 import { PersonCredentials, PersonSessions } from './PersonSecurity';
 import { AssignedRoles } from '../roles/AssignedRoles';
-import { api, useLoad } from '../../api';
+import { api, Refused, request, useLoad } from '../../api';
 import type { ReceiptAnswer } from '../../generated';
 import { DirectoryGate as Gate } from '../people/Words';
 import { useShell } from '../../shell/ShellContext';
@@ -103,12 +103,20 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
               onClick={() =>
                 mineToGive && passable.length
                   ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />)
-                  : shell.toast(mineToGive ? 'You hold nothing you may pass on to an agent' : `Only the person ${name} answers to gives it access`)
+                  : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)
               }
             >
               Grant access
             </button>
-            <button className="btn" data-act="temporary-access" onClick={() => mineToGive && passable.length ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />) : shell.toast(mineToGive ? 'You hold nothing you may pass on to an agent' : `Only the person ${name} answers to gives it access`)}>Temporary access…</button>
+            <button className="btn" data-act="temporary-access" onClick={() => mineToGive && passable.length ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />) : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)}>Temporary access…</button>
+          </div>
+        ) : null}
+        {mineToGive && !passable.length ? (
+          <div style={{ marginTop: 12 }}>
+            <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record it once, for themselves.</p>
+            <button className="btn" data-act="agent-roots" onClick={() => {
+              request<unknown>('/grants/agent-roots', {}).then(reload, (problem: unknown) => shell.toast(problem instanceof Refused ? problem.refusal.reason : 'Lys could not record access you can give agents.'));
+            }}>Let me give agents access</button>
           </div>
         ) : null}
       </div>

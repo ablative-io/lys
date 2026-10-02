@@ -94,6 +94,103 @@ pub const ACTIONS: &[&str] = &[
     "write",
 ];
 
+/// The acts no agent may be given, whatever grant they come from: each
+/// hands out authority, changes an agent's confinement, mints an identity
+/// or decides on access. Every other shipped action is one an agent may
+/// hold; an act Lys does not ship is never one.
+pub const WITHHELD_FROM_AGENTS: &[&str] = &[
+    "agent.certificate.issue",
+    "agent.certificate.withdraw",
+    "agent.policy.set",
+    "agent.provisioning.review",
+    "agent.provisioning.set",
+    "budget.set",
+    "configuration.zone.set",
+    "grant",
+    "grant.delegate",
+    "grant.revoke",
+    "identity.transition",
+    "machine.agent.set",
+    "person.email.set",
+    "person.login.bind",
+    "person.password.set",
+    "person.sign-in.set",
+    "request.approve",
+    "request.decline",
+    "role.create",
+    "role.holder.assign",
+    "role.holder.end",
+    "role.holder.move",
+    "role.revise",
+    "secret.drop",
+    "secret.recipients",
+    "secret.scope",
+    "service-account.create",
+    "service-account.retire",
+    "team.budget.set",
+];
+
+/// The acts an agent may hold, each decided: with [`WITHHELD_FROM_AGENTS`]
+/// it names every shipped act exactly once, so a new act cannot ship
+/// undecided.
+pub const AGENT_MAY_HOLD: &[&str] = &[
+    "agent.create",
+    "agent.mcp-request.approve",
+    "agent.mcp-request.create",
+    "agent.reports-to.set",
+    "agent.restart",
+    "agent.runtime.report",
+    "agent.start",
+    "agent.start-command",
+    "agent.stop",
+    "agent.usage.report",
+    "agent.wake",
+    "edit",
+    "grant.check",
+    "grant.reach",
+    "grant.who",
+    "grant.why",
+    "launch-record.start-again",
+    "launch-record.withdraw",
+    "machine.create",
+    "machine.retire",
+    "machine.runner.set",
+    "machine.team.set",
+    "operate",
+    "person.create",
+    "person.profile.set",
+    "person.session.end",
+    "read",
+    "request.create",
+    "request.reconcile",
+    "review.keep",
+    "runtime-session.compact",
+    "runtime-session.end",
+    "runtime-session.found.report",
+    "runtime-session.input",
+    "runtime-session.input-bytes",
+    "runtime-session.keys",
+    "runtime-session.resize",
+    "session.end",
+    "skill.keep",
+    "team.create",
+    "team.member.add",
+    "team.member.confirm",
+    "team.member.remove",
+    "team.parent.set",
+    "team.retire",
+    "view",
+    "write",
+];
+
+/// Whether an agent may hold `action` on an object of `kind`. An approved
+/// app's kind, `{app}.{kind}`, marks none of its acts as an agent's, so none
+/// is; a Lys act is an agent's only when [`AGENT_MAY_HOLD`] names it.
+#[must_use]
+pub fn agent_may_hold(kind: &str, action: &str) -> bool {
+    !kind.contains('.') && AGENT_MAY_HOLD.contains(&action)
+}
+
 /// Plain sentences for shipped actions, served separately from the stored model.
 pub const ACTION_SENTENCES: &[(&str, &str)] = &[
     ("view", "View this resource"),
@@ -239,7 +336,10 @@ pub fn shipped_model() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{ACTIONS, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, shipped_model};
+    use super::{
+        ACTIONS, AGENT_MAY_HOLD, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS,
+        agent_may_hold, shipped_model,
+    };
     use crate::grants::{Action, Relation};
     use serde_json::Value;
 
@@ -276,5 +376,47 @@ mod tests {
         }
         assert_eq!(relations["reader"], serde_json::json!([READ]));
         Ok(())
+    }
+
+    #[test]
+    fn every_shipped_action_is_classified_for_agents_and_authority_is_withheld() {
+        for withheld in WITHHELD_FROM_AGENTS {
+            assert!(
+                ACTIONS.contains(withheld) || FIRST_ACTIONS.contains(withheld),
+                "{withheld} is not shipped"
+            );
+            assert!(!agent_may_hold("person", withheld), "{withheld}");
+        }
+        for action in ACTIONS.iter().chain(&FIRST_ACTIONS).chain(&[READ]) {
+            assert_ne!(
+                AGENT_MAY_HOLD.contains(action),
+                WITHHELD_FROM_AGENTS.contains(action),
+                "{action} is decided exactly once"
+            );
+        }
+        for allowed in AGENT_MAY_HOLD {
+            // `operate` is the server's own act for driving an agent's
+            // sessions, given on the agent itself.
+            assert!(
+                ACTIONS.contains(allowed)
+                    || FIRST_ACTIONS.contains(allowed)
+                    || [READ, "operate"].contains(allowed),
+                "{allowed} is not shipped"
+            );
+        }
+        for authority in ["grant", "grant.delegate", "role.create", "secret.scope"] {
+            assert!(!agent_may_hold("directory", authority));
+        }
+        for read_only in [
+            "grant.check",
+            "grant.who",
+            "grant.why",
+            "grant.reach",
+            "read",
+        ] {
+            assert!(agent_may_hold("directory", read_only), "{read_only}");
+        }
+        assert!(!agent_may_hold("person", "made.up"));
+        assert!(!agent_may_hold("fixture.doc", "view"));
     }
 }

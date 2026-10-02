@@ -864,6 +864,13 @@ fn grant_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "RecipientRefused",
         ),
         (
+            ServerError::Grant(GrantError::WithheldFromAgents {
+                relation: detail.to_owned(),
+                withheld: detail.to_owned(),
+            }),
+            "WithheldFromAgents",
+        ),
+        (
             ServerError::Grant(GrantError::PassOnBeyondSource {
                 source_grant: detail.to_owned(),
             }),
@@ -1368,6 +1375,7 @@ fn grant_authority_refusals_keep_their_forbidden_status() {
                 | "ResourceOutside"
                 | "UseOnly"
                 | "RecipientRefused"
+                | "WithheldFromAgents"
                 | "PassOnBeyondSource"
                 | "ExpiryBeyondSource"
                 | "ResponsibleMismatch"

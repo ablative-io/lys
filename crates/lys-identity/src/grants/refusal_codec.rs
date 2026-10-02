@@ -27,6 +27,7 @@ const EXPIRY_BEYOND_SOURCE: u64 = 10;
 const GRANT_UNKNOWN: u64 = 11;
 const ALREADY_REVOKED: u64 = 12;
 const EVENT_MISMATCH: u64 = 13;
+const WITHHELD_FROM_AGENTS: u64 = 14;
 
 /// The reasons an `EventMismatch` the book keeps may give.
 const MISMATCH_REASONS: [&str; 1] = [USE_BY_HOLDER];
@@ -78,6 +79,9 @@ pub(crate) fn encode_refusal(refusal: &GrantError) -> Result<Value, Unreadable> 
         GrantError::GrantUnknown { grant } => coded(GRANT_UNKNOWN, vec![text(grant)]),
         GrantError::AlreadyRevoked { grant } => coded(ALREADY_REVOKED, vec![text(grant)]),
         GrantError::EventMismatch { reason } => coded(EVENT_MISMATCH, vec![text(reason)]),
+        GrantError::WithheldFromAgents { relation, withheld } => {
+            coded(WITHHELD_FROM_AGENTS, vec![text(relation), text(withheld)])
+        }
         other => {
             return Err(format!(
                 "the book holds a refusal with no stable encoded form: {other}"
@@ -156,6 +160,10 @@ pub(crate) fn decode_refusal(value: Value) -> Result<GrantError, Unreadable> {
         ALREADY_REVOKED => GrantError::AlreadyRevoked {
             grant: next_text(members)?,
         },
+        WITHHELD_FROM_AGENTS => GrantError::WithheldFromAgents {
+            relation: next_text(members)?,
+            withheld: next_text(members)?,
+        },
         EVENT_MISMATCH => {
             let found = next_text(members)?;
             let reason = MISMATCH_REASONS
@@ -211,6 +219,10 @@ mod tests {
             GrantError::RecipientRefused {
                 kind: RecipientKind::Agent,
                 grant: "g".to_owned(),
+            },
+            GrantError::WithheldFromAgents {
+                relation: "editor".to_owned(),
+                withheld: "grant.delegate, role.create".to_owned(),
             },
             GrantError::ActionsOutside {
                 relation: "kite".to_owned(),
