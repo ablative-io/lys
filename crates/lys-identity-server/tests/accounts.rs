@@ -191,6 +191,15 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
         None,
         Some(settings),
         |config| {
+            config.password_policy = Some(accounts::PasswordPolicy {
+                length_min: 14,
+                length_max: 128,
+                lower_case: Some(1),
+                upper_case: Some(1),
+                digits: Some(1),
+                special: None,
+                not_recently_used: None,
+            });
             config.requests_dir = None;
             config.certificates_dir = None;
             config.network_file = None;

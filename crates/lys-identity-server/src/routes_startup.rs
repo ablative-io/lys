@@ -222,7 +222,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             .merge(configured)
             .merge(starts)
             .layer(axum::Extension(catalogue))
-            .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
+            .fallback(crate::surface::not_an_api_route),
     );
     let dispatcher = api.clone().layer(axum::middleware::from_fn_with_state(
         Arc::clone(&state),

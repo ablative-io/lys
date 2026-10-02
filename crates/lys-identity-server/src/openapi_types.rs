@@ -149,6 +149,12 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::openapi::surface::SurfaceContract>()),
         ),
         (GET, "/authority", None, None),
+        (
+            GET,
+            "/health",
+            None,
+            Some(api.schema::<crate::health_api::Health>()),
+        ),
         (GET, "/login", None, None),
         (GET, "/callback", None, None),
         (POST, "/setup", Some(setup), Some(made.clone())),

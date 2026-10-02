@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use axum::routing::get;
 use axum::{Json, Router};
-use serde_json::{Value, json};
+use serde::Serialize;
 
 use crate::routes::AppState;
 
@@ -24,8 +24,20 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/health", get(health))
 }
 
-async fn health() -> Json<Value> {
-    Json(json!({ "service": SERVICE, "version": env!("CARGO_PKG_VERSION") }))
+/// The health answer: this service's name and build, and nothing else.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct Health {
+    /// The service answering.
+    pub service: &'static str,
+    /// Its build version.
+    pub version: &'static str,
+}
+
+async fn health() -> Json<Health> {
+    Json(Health {
+        service: SERVICE,
+        version: env!("CARGO_PKG_VERSION"),
+    })
 }
 
 #[cfg(test)]
