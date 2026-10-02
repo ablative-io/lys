@@ -66,3 +66,61 @@ fn workspace_only_refuses_an_extra_allowed_tool_or_directory() -> Result<(), Box
     }
     Ok(())
 }
+
+#[test]
+fn a_claude_template_that_names_no_mode_is_refused_never_rendered_unconfined()
+-> Result<(), Box<dyn Error>> {
+    let base: Value = serde_json::from_str(include_str!("fixtures/launch/template.json"))?;
+    let mut absent_permissions = base.clone();
+    absent_permissions["slots"]
+        .as_object_mut()
+        .ok_or("slots absent")?
+        .remove("permissions");
+    let mut absent_mode = base.clone();
+    absent_mode["slots"]["permissions"] = json!({"deny": ["WebFetch"]});
+    let mut empty_mode = base;
+    empty_mode["slots"]["permissions"] = json!({"defaultMode": ""});
+    for (name, template) in [
+        ("no permissions", absent_permissions),
+        ("no mode", absent_mode),
+        ("empty mode", empty_mode),
+    ] {
+        let error = render(
+            "claude-code/template-v1",
+            "/opt/seat/bin/claude",
+            &template.to_string(),
+            InstructionsMode::Keep,
+        )
+        .err()
+        .ok_or_else(|| format!("{name}: rendered unconfined"))?;
+        assert!(
+            error.contains("choose how this agent is confined"),
+            "{name}: {error}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_named_mode_renders_the_permissions_exactly_as_written() -> Result<(), Box<dyn Error>> {
+    let mut template: Value = serde_json::from_str(include_str!("fixtures/launch/template.json"))?;
+    let written = json!({"defaultMode": "acceptEdits", "deny": ["WebFetch"]});
+    template["slots"]["permissions"] = written.clone();
+    let launch = render(
+        "claude-code/template-v1",
+        "/opt/seat/bin/claude",
+        &template.to_string(),
+        InstructionsMode::Keep,
+    )?;
+    let settings: Value = serde_json::from_str(
+        &launch
+            .files
+            .iter()
+            .find(|file| file.path == "settings.json")
+            .ok_or("settings absent")?
+            .text,
+    )?;
+    assert_eq!(settings["permissions"], written);
+    assert!(settings.get("sandbox").is_none(), "{settings}");
+    Ok(())
+}
