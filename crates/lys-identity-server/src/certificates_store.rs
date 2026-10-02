@@ -12,7 +12,7 @@
 //! or a state that does not read back, sends the start to every leaf by name.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
@@ -191,6 +191,7 @@ pub struct CertificateStore<S: LeafStore = FileLeafStore> {
     snapshot_failure: Option<String>,
     uncertain: bool,
     signing: BTreeMap<String, BTreeMap<String, Arc<SigningCertificate>>>,
+    keys: Option<PathBuf>,
 }
 
 impl CertificateStore<FileLeafStore> {
@@ -200,8 +201,11 @@ impl CertificateStore<FileLeafStore> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
         }
+        let keys = dir.with_file_name("agent-keys");
         let dir = dir.to_owned();
-        Self::over(Box::new(move || FileLeafStore::open(&dir)), key)
+        let mut store = Self::over(Box::new(move || FileLeafStore::open(&dir)), key)?;
+        store.keys = Some(keys);
+        Ok(store)
     }
 
     /// As `open`, saying through `say` how the log was started and how many
@@ -237,6 +241,7 @@ impl<S: LeafStore> CertificateStore<S> {
             snapshot_failure: None,
             uncertain: false,
             signing,
+            keys: None,
         };
         store.after_start(&start);
         Ok(store)
@@ -255,6 +260,15 @@ impl<S: LeafStore> CertificateStore<S> {
     /// Every certificate as it stands, by serial.
     pub fn certificates(&self) -> impl Iterator<Item = &Entered> {
         self.held.certificates.values()
+    }
+
+    /// Where Lys keeps the key of `agent`'s certificate `serial`, beside the
+    /// log and never on the machine the agent runs on; none for a log not
+    /// kept in a directory.
+    pub(crate) fn agent_key(&self, agent: &str, serial: &str) -> Option<PathBuf> {
+        self.keys
+            .as_ref()
+            .map(|keys| keys.join(agent).join(format!("{serial}.key")))
     }
 
     /// The certificate named `serial`, as it stands.

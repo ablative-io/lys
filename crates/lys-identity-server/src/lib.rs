@@ -57,6 +57,7 @@ pub mod caller_admission;
 mod certificate_keys;
 pub mod certificates_api;
 mod certificates_issue;
+mod certificates_own;
 pub mod certificates_store;
 mod changes;
 pub mod config;

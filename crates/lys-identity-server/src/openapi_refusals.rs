@@ -135,6 +135,8 @@ pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
 /// A start and the status read that settles an already-held session.
 pub(crate) const START_RUNNER: &[&str] = &[
     "AgentHasNoPolicy",
+    "AgentNotVisible",
+    "CertificatesUnavailable",
     "PolicyUnavailable",
     "MachineWithoutRunner",
     "runner_request_unsigned",
@@ -162,6 +164,7 @@ pub(crate) const START_RUNNER: &[&str] = &[
 /// An operator restart shares the start and runner's named refusals.
 pub(crate) const RESTART: &[&str] = &[
     "AgentHasNoPolicy",
+    "CertificatesUnavailable",
     "PolicyUnavailable",
     "AgentNotVisible",
     "AgentNotActive",
@@ -216,6 +219,8 @@ pub(crate) const BUDGET_SET: &[&str] = &[
 ];
 /// Fresh starts check authority before enforcing a known stop threshold.
 pub(crate) const START_BUDGET: &[&str] = &[
+    "AgentNotVisible",
+    "CertificatesUnavailable",
     "BudgetExhausted",
     "BudgetsUnavailable",
     "ConfigurationUnavailable",

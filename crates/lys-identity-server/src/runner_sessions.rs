@@ -313,6 +313,9 @@ pub async fn run_on_runner(
         runner: runner.clone(),
     };
     let session = launch.session.clone();
+    // An AI Lys starts stands on its one certificate, issued here when it
+    // holds none that stands.
+    crate::certificates_own::standing(state, AgentId::from_str(agent)?)?;
     let act = {
         let mut passes = crate::agent_pass::store(state)?;
         crate::runner_start_pass::act(

@@ -44,7 +44,7 @@ use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
 
 /// How long a certificate is valid for from its issuance.
-const VALID_FOR: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+pub(crate) const VALID_FOR: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 /// The sub-component of the lys arc the capability claims are carried under.
 const CLAIMS_COMPONENT: u64 = 1;
 /// The most characters a reason carries.
@@ -77,7 +77,7 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
     }
 }
 
-fn with_store<T>(
+pub(crate) fn with_store<T>(
     state: &AppState,
     act: impl FnOnce(&mut CertificateStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
@@ -202,10 +202,7 @@ pub(crate) async fn issue(
     let proved = verify_certificate_request(&request)
         .map_err(|error| malformed(format!("the request was refused: {error}")))?;
     let agent = seen.agent.to_string();
-    let person = seen
-        .responsible
-        .ok_or(ServerError::AgentNotVisible)?
-        .to_string();
+    seen.responsible.ok_or(ServerError::AgentNotVisible)?;
     let kept = with_store(&state, |store| Ok(store.certificate(&serial).cloned()))?;
     if let Some(kept) = kept {
         let der = STANDARD.decode(&kept.issued.der).map_err(unavailable)?;
@@ -216,19 +213,36 @@ pub(crate) async fn issue(
             Err(ServerError::CertificateReused { serial })
         };
     }
-    let at = now();
-    let claims = claims(&state, &seen, at)?;
-    let der = certificate(&state, &request, &agent, &claims)?;
+    let issued = issued(&state, &seen, &request, serial.clone(), now())?;
     with_store(&state, |store| {
-        store.issue(Issued {
-            serial: serial.clone(),
-            agent: agent.clone(),
-            person,
-            claims,
-            der: STANDARD.encode(der),
-            issued_at: at,
-        })?;
+        store.issue(issued)?;
         answer(store, &agent, Some(serial))
+    })
+}
+
+/// The certificate `serial` for `seen`'s agent over the key `request`
+/// proves, carrying what holds for the agent at `at`; not yet entered.
+pub(crate) fn issued(
+    state: &AppState,
+    seen: &SeenAgent,
+    request: &[u8],
+    serial: String,
+    at: u64,
+) -> Result<Issued, ServerError> {
+    let agent = seen.agent.to_string();
+    let person = seen
+        .responsible
+        .ok_or(ServerError::AgentNotVisible)?
+        .to_string();
+    let claims = claims(state, seen, at)?;
+    let der = certificate(state, request, &agent, &claims)?;
+    Ok(Issued {
+        serial,
+        agent,
+        person,
+        claims,
+        der: STANDARD.encode(der),
+        issued_at: at,
     })
 }
 
@@ -255,7 +269,7 @@ pub(crate) async fn withdraw(
         Ok(own_person(directory.projection()?, &actor)?.to_string())
     })?;
     let agent = seen.agent.to_string();
-    with_store(&state, |store| {
+    let view = with_store(&state, |store| {
         let of_agent = store
             .certificate(&serial)
             .is_some_and(|kept| kept.issued.agent == agent);
@@ -269,5 +283,15 @@ pub(crate) async fn withdraw(
             withdrawn_at: now(),
         })?;
         answer(store, &agent, Some(serial))
-    })
+    })?;
+    // The certificate is the agent's identity: once it is withdrawn, no run
+    // started on it may act again, so every run pass the agent holds ends.
+    crate::agent_pass::end_agent(&state, seen.agent).map_err(|error| {
+        ServerError::CertificatesUnavailable {
+            reason: format!(
+                "the certificate was withdrawn, but the agent's runs could not be ended: {error}"
+            ),
+        }
+    })?;
+    Ok(view)
 }
