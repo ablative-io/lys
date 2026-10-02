@@ -1,3 +1,5 @@
+//! Recorded local listeners and explicit choices for new installations.
+
 use serde_json::Value;
 
 use super::layout::{BROKER_PORT, Layout, SERVICE_PORT};
@@ -11,6 +13,8 @@ pub struct Ports {
     pub service: u16,
     /// The local secrets broker listener.
     pub broker: u16,
+    service_recorded: bool,
+    broker_recorded: bool,
 }
 
 impl Default for Ports {
@@ -18,6 +22,8 @@ impl Default for Ports {
         Self {
             service: SERVICE_PORT,
             broker: BROKER_PORT,
+            service_recorded: false,
+            broker_recorded: false,
         }
     }
 }
@@ -59,7 +65,11 @@ fn port(value: &Value, field: &str) -> IdentityResult<u16> {
 impl Ports {
     /// Read listener choices from the existing service configuration.
     pub fn from_value(value: &Value) -> IdentityResult<Self> {
-        let mut ports = Self::default();
+        let mut ports = Self {
+            service_recorded: true,
+            broker_recorded: true,
+            ..Self::default()
+        };
         if let Some(listen) = value.get("listen") {
             ports.service = port(listen, "listen")?;
         }
@@ -71,14 +81,78 @@ impl Ports {
 
     /// Read recorded listeners, retaining defaults for a new install.
     pub fn load(layout: &Layout) -> IdentityResult<Self> {
-        Ok(server_config::carried(layout)?.map_or_else(Self::default, |carried| carried.ports))
+        if let Some(carried) = server_config::carried(layout)? {
+            return Ok(carried.ports);
+        }
+        let path = layout.deployment_config();
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Self::default());
+            }
+            Err(error) => {
+                return Err(IdentityError::new(
+                    ErrorKind::ConfigInvalid,
+                    "read listeners",
+                    "deployment.toml",
+                    error.to_string(),
+                )
+                .at(&path));
+            }
+        };
+        let deployment: toml::Table = toml::from_str(&text).map_err(|error| {
+            IdentityError::new(
+                ErrorKind::ConfigInvalid,
+                "read listeners",
+                "deployment.toml",
+                error.to_string(),
+            )
+            .at(&path)
+        })?;
+        let origin = deployment
+            .get("issuer")
+            .and_then(|issuer| issuer.get("public_origin"))
+            .and_then(toml::Value::as_str)
+            .ok_or_else(|| refused("issuer.public_origin"))?;
+        let (_, number) = origin
+            .trim_end_matches('/')
+            .rsplit_once(':')
+            .ok_or_else(|| refused("issuer.public_origin"))?;
+        let service = number.parse::<u16>().map_err(|error| {
+            IdentityError::new(
+                ErrorKind::ConfigInvalid,
+                "read listeners",
+                "issuer.public_origin",
+                error.to_string(),
+            )
+        })?;
+        Self {
+            service,
+            service_recorded: true,
+            ..Self::default()
+        }
+        .chosen(None, None)
     }
 
     /// Apply explicit choices after refusing zero or shared listener ports.
     pub fn chosen(self, service: Option<u16>, broker: Option<u16>) -> IdentityResult<Self> {
+        for (selected, held, recorded, field) in [
+            (service, self.service, self.service_recorded, "service-port"),
+            (broker, self.broker, self.broker_recorded, "broker-port"),
+        ] {
+            if recorded && selected.is_some_and(|selected| selected != held) {
+                return Err(IdentityError::new(
+                    ErrorKind::ConfigInvalid,
+                    "choose listeners",
+                    field,
+                    "an existing install keeps its recorded port; changing it needs a coordinated migration",
+                ));
+            }
+        }
         let ports = Self {
             service: service.unwrap_or(self.service),
             broker: broker.unwrap_or(self.broker),
+            ..self
         };
         if ports.service == 0 || ports.broker == 0 || ports.service == ports.broker {
             return Err(IdentityError::new(

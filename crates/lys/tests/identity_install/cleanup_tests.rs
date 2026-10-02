@@ -56,6 +56,7 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
             rauthy_port: 1,
             service_port: 2,
             broker_port: 3,
+            cleaned: false,
         };
         let guard = estate;
         std::panic::panic_any(guard.root.path().to_path_buf());
@@ -94,6 +95,7 @@ fn a_successful_test_reports_teardown_failure() -> TestResult {
         rauthy_port: 1,
         service_port: 2,
         broker_port: 3,
+        cleaned: false,
     };
     let run = estate.root.path().join("run");
     std::fs::create_dir(&run)?;

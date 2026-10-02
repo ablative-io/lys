@@ -300,6 +300,7 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         rauthy_port: free_port()?,
         service_port: listeners[0].local_addr()?.port(),
         broker_port: listeners[1].local_addr()?.port(),
+        cleaned: false,
     };
     drop(listeners);
     let origin = format!("http://localhost:{}", estate.service_port);
@@ -475,6 +476,6 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
             "{location} is not the product's registered address"
         );
     }
-    drop(estate);
+    estate.close()?;
     Ok(())
 }

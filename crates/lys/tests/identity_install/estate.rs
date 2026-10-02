@@ -14,6 +14,7 @@ pub(super) struct Estate {
     pub rauthy_port: u16,
     pub service_port: u16,
     pub broker_port: u16,
+    pub cleaned: bool,
 }
 
 fn lock(file: &File, operation: FlockOperation) -> Result<(), Errno> {
@@ -47,40 +48,54 @@ fn stop_service(pid_file: &Path) -> TestResult {
     Ok(())
 }
 
-impl Drop for Estate {
-    fn drop(&mut self) {
+impl Estate {
+    fn cleanup(&self) -> TestResult {
+        let mut failures = Vec::new();
         for name in ["runner.pid", "identity.pid", "secrets.pid"] {
             let path = self.root.path().join("run").join(name);
             if let Err(error) = stop_service(&path) {
-                eprintln!("install cleanup failed for {}: {error}", path.display());
+                failures.push(format!("{}: {error}", path.display()));
             }
         }
-        if !self.root.path().join("state/compose.env").exists() {
-            return;
-        }
-        let down = Command::new("docker")
-            .arg("compose")
-            .arg("-f")
-            .arg(self.root.path().join("deploy/compose.yaml"))
-            .arg("--env-file")
-            .arg(self.root.path().join("state/compose.env"))
-            .args(["-p", &self.project, "--profile", "bundled-db"])
-            .args(["down", "-v", "--remove-orphans"])
-            .output();
-        match down {
-            Ok(output) => {
-                if let Err(error) = succeeded(&output, "remove install containers") {
-                    eprintln!("teardown of {} failed: {error}", self.project);
+        if self.root.path().join("state/compose.env").exists() {
+            let down = Command::new("docker")
+                .arg("compose")
+                .arg("-f")
+                .arg(self.root.path().join("deploy/compose.yaml"))
+                .arg("--env-file")
+                .arg(self.root.path().join("state/compose.env"))
+                .args(["-p", &self.project, "--profile", "bundled-db"])
+                .args(["down", "-v", "--remove-orphans"])
+                .output();
+            match down {
+                Ok(output) => {
+                    if let Err(error) = succeeded(&output, "remove install containers") {
+                        failures.push(error.to_string());
+                    }
                 }
+                Err(error) => failures.push(format!("remove install containers: {error}")),
             }
-            Err(error) => eprintln!("teardown of {} failed: {error}", self.project),
         }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(format!("install_teardown_failed: {}", failures.join("; ")).into())
+        }
+    }
+
+    pub fn close(mut self) -> TestResult {
+        self.cleanup()?;
+        self.cleaned = true;
+        Ok(())
     }
 }
 
-impl Estate {
-    pub fn close(self) -> TestResult {
-        drop(self);
-        Ok(())
+impl Drop for Estate {
+    fn drop(&mut self) {
+        if !self.cleaned {
+            if let Err(error) = self.cleanup() {
+                eprintln!("install failure cleanup: {error}");
+            }
+        }
     }
 }
