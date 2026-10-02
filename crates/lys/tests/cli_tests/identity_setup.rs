@@ -221,6 +221,9 @@ fn setup_over_ssh_writes_the_readable_code_without_opening_a_browser() -> TestRe
     let root = tempfile::tempdir()?;
     let tools = tempfile::tempdir()?;
     write_deployment(root.path())?;
+    let state = root.path().join("state");
+    std::fs::create_dir(&state)?;
+    std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700))?;
     let opened = tools.path().join("opened");
     for name in ["open", "xdg-open"] {
         let opener = tools.path().join(name);
