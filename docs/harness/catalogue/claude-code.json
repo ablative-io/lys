@@ -27,10 +27,6 @@
   ],
   "modes": [
     {
-      "id": "workspace-only",
-      "meaning": "Works in its own folder with shell sandboxing and internet tools off. Shell commands can also write to the program's temporary folder."
-    },
-    {
       "id": "default",
       "meaning": "Reads freely and asks before most changes and commands."
     },
@@ -53,6 +49,10 @@
     {
       "id": "bypassPermissions",
       "meaning": "Skips permission prompts; explicit denial rules still apply."
+    },
+    {
+      "id": "workspace-only",
+      "meaning": "Works in its own folder with shell sandboxing and internet tools off. Shell commands can also write to the program's temporary folder."
     }
   ],
   "description": {
@@ -66,13 +66,13 @@
     },
     "permissions": {
       "modes": [
-        "workspace-only",
         "default",
         "acceptEdits",
         "plan",
         "auto",
         "dontAsk",
-        "bypassPermissions"
+        "bypassPermissions",
+        "workspace-only"
       ],
       "rule_forms": [
         "tool_specifier"
