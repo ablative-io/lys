@@ -38,7 +38,7 @@ describe('The delegation form', () => {
     const from = $$('#drawer .card')[0].textContent ?? '';
     expect(from).toContain('Source grant');
     expect(from).toContain('owner of project:identity');
-    expect(from).toContain('Actions it allowsedit, grant, view');
+    expect(from).toContain('Actions it allowseverything here');
     expect(from).toContain('You may pass it onagent');
     expect(from).toContain('Ends no later than27 Oct');
     const ends = () => $$('#drawer .card')[0].querySelectorAll('.row')[3];
@@ -263,7 +263,7 @@ describe('Who can reach this? (conformance 8.2)', () => {
   it('lists everyone with what they can do, from the same answers', async () => {
     await mount('#/access/who/project:identity');
     const rows = $$('#whoCan .row').map((r) => r.textContent);
-    expect(rows).toEqual(['Ada (test person)edit, grant, view', "Scribeview"]);
+    expect(rows).toEqual(['Ada (test person)everything here', "ScribeView this resource"]);
     await choose($('select[aria-label="Resource"]'), 'project:ledger');
     expect(location.hash).toBe('#/access/who/project:ledger');
     expect($$('#whoCan .row').map((r) => r.textContent)).toEqual(['Ada (test person)view']);
@@ -271,7 +271,7 @@ describe('Who can reach this? (conformance 8.2)', () => {
 
   it('lists every grant, with where it derives from, and keeps every control reachable', async () => {
     await mount('#/access/reach/' + SCRIBE);
-    expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project:identitybuilt inview']);
+    expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project identitybuilt inView this resource']);
     const grants = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[4].textContent);
     expect(grants).toEqual(['root', 'root', `G/${ROOT_G.slice(6, 14)} · Ada (test person)`]);
     const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[7].textContent);
@@ -367,7 +367,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect($('#drawer')?.textContent).toContain('Scribe');
     const adaSource = $$('#drawer .card')[0].textContent ?? '';
     expect(adaSource).toContain('owner of project:identity');
-    expect(adaSource).toContain('Actions it allowsedit, grant, view');
+    expect(adaSource).toContain('Actions it allowseverything here');
     expect(adaSource).toContain('You may pass it onagent');
     expect(adaSource).toContain('Ends no later than27 Oct');
 
