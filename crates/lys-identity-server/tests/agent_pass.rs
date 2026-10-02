@@ -82,6 +82,8 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
         assert_eq!(status, 200);
         assert!(!receipt.to_string().contains(&entry.pass));
         assert!(!receipt.to_string().contains("lys_mcp"));
+        let seat = entry.seat.as_ref().ok_or("an AI's start carries no seat")?;
+        assert!(!receipt.to_string().contains(&seat.key));
         let path = format!(
             "/agents/{}/runtime/sessions/{session}/reports",
             table.agent()
@@ -189,6 +191,12 @@ async fn an_ai_lys_starts_stands_on_one_certificate_and_its_withdrawal_ends_the_
         .join(format!("{serial}.key"));
     assert!(key.is_file(), "Lys keeps the AI's key in its own store");
     assert!(pass_held(&table, &first.pass)?);
+    let seat = first.seat.as_ref().ok_or("an AI's start carries no seat")?;
+    assert_eq!(
+        seat.serial, serial,
+        "the seat is delegated by its certificate"
+    );
+    assert!(!format!("{first:?}").contains(&seat.key));
 
     let (status, withdrawn) = table
         .service

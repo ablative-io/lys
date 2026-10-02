@@ -1,11 +1,21 @@
 //! A run pass is added only to the generated, session-owned native config.
+//!
+//! When Lys gives the run a seat, the runner signs the pass with the seat's
+//! key as it writes the config: the `lys-seat` header carries the
+//! certificate the seat speaks for, the seat's public key, the delegation the
+//! AI's certificate key signed for it, and the seat's signature over the
+//! pass. The seat's key itself is never written anywhere.
 
 use std::collections::BTreeMap;
 use std::fmt;
 
 use hyper::Uri;
+use lys_core::Ed25519Identity;
+use lys_core::attestation::{Attestation, sign_attestation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 use super::rendering_launch::File;
 use crate::record::blocks::Hash;
@@ -18,6 +28,122 @@ pub struct LysMcp {
     pub url: String,
     /// The opaque run pass, never a template or environment setting.
     pub pass: String,
+    /// The run's seat, when Lys gave it one: the runner signs the pass with it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seat: Option<Seat>,
+}
+
+/// A key Lys made for one run and delegated to it from the AI's certificate.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Seat {
+    /// The agent the run is for.
+    pub agent: String,
+    /// The session the seat is for.
+    pub session: String,
+    /// The serial of the certificate whose key signed the delegation.
+    pub serial: String,
+    /// The end of the delegation, in seconds since the Unix epoch.
+    pub not_after: u64,
+    /// The delegation, a `COSE_Sign1` in hex over [`delegation_bytes`].
+    pub delegation: String,
+    /// The seat's private seed, in hex; held by the runner, never written.
+    pub key: String,
+}
+
+impl fmt::Debug for Seat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Seat")
+            .field("agent", &self.agent)
+            .field("session", &self.session)
+            .field("serial", &self.serial)
+            .field("not_after", &self.not_after)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The header a seated run's calls carry beside the pass.
+pub const SEAT_HEADER: &str = "lys-seat";
+
+/// The bytes the AI's certificate key signs to delegate to a seat.
+pub fn delegation_bytes(
+    agent: &str,
+    serial: &str,
+    session: &str,
+    seat_public: &[u8; 32],
+    not_after: u64,
+) -> Vec<u8> {
+    format!(
+        "lys-identity/seat-delegation/v1\n{agent}\n{serial}\n{session}\n{}\n{not_after}",
+        hex(seat_public)
+    )
+    .into_bytes()
+}
+
+/// The bytes a seat signs over its run's pass.
+pub fn pass_bytes(agent: &str, session: &str, pass: &str) -> Vec<u8> {
+    format!(
+        "lys-identity/seat-pass/v1\n{agent}\n{session}\n{}",
+        hex(&Sha256::digest(pass.as_bytes()))
+    )
+    .into_bytes()
+}
+
+/// Lowercase hex of `bytes`.
+pub fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut text = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    text
+}
+
+/// The bytes of lowercase or uppercase hex `text`; none when it is not hex.
+pub fn unhex(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2) {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|at| u8::from_str_radix(text.get(at..at + 2)?, 16).ok())
+        .collect()
+}
+
+/// The `lys-seat` header value: the runner signs the pass with the seat key.
+/// A seat that names no agent, session or certificate, ends at zero, or whose
+/// delegation is not a `COSE_Sign1`, is refused, so no runner writes a header
+/// Lys would refuse.
+///
+/// # Errors
+///
+/// [`Refusal::Invalid`] when the seat cannot be carried.
+pub fn seat_header(seat: &Seat, pass: &str) -> Result<String, Refusal> {
+    let seed = Zeroizing::new(
+        unhex(&seat.key)
+            .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
+            .ok_or(Refusal::Invalid)?,
+    );
+    let key = Ed25519Identity::from_seed(&seed);
+    let named = |word: &str| !word.is_empty() && !word.contains(char::is_whitespace);
+    if !named(&seat.agent)
+        || !named(&seat.session)
+        || !named(&seat.serial)
+        || seat.not_after == 0
+        || unhex(&seat.delegation).is_none_or(|bytes| Attestation::from_cose_bytes(&bytes).is_err())
+    {
+        return Err(Refusal::Invalid);
+    }
+    let signature = sign_attestation(&pass_bytes(&seat.agent, &seat.session, pass), &key);
+    Ok(format!(
+        "{} {} {} {} {}",
+        seat.serial,
+        seat.not_after,
+        hex(&key.public_key_bytes()),
+        seat.delegation,
+        hex(&signature.to_cose_bytes())
+    ))
 }
 
 impl fmt::Debug for LysMcp {
@@ -101,16 +227,35 @@ fn claude(text: &str, entry: &LysMcp) -> Result<String, Refusal> {
     if servers.contains_key("lys") {
         return Err(Refusal::Duplicate);
     }
+    let mut headers = serde_json::Map::new();
+    headers.insert("lys-agent-pass".to_owned(), json!(entry.pass));
+    if let Some(seat) = &entry.seat {
+        headers.insert(
+            SEAT_HEADER.to_owned(),
+            json!(seat_header(seat, &entry.pass)?),
+        );
+    }
     servers.insert(
         "lys".to_owned(),
-        json!({
-            "type": "http", "url": entry.url,
-            "headers": {"lys-agent-pass": entry.pass}
-        }),
+        json!({"type": "http", "url": entry.url, "headers": headers}),
     );
     serde_json::to_string_pretty(root)
         .map(|encoded| encoded + "\n")
         .map_err(Refusal::Json)
+}
+
+fn codex_headers(entry: &LysMcp) -> Result<toml::Table, Refusal> {
+    let mut headers = toml::Table::from_iter([(
+        "lys-agent-pass".to_owned(),
+        toml::Value::String(entry.pass.clone()),
+    )]);
+    if let Some(seat) = &entry.seat {
+        headers.insert(
+            SEAT_HEADER.to_owned(),
+            toml::Value::String(seat_header(seat, &entry.pass)?),
+        );
+    }
+    Ok(headers)
 }
 
 fn codex(text: &str, entry: &LysMcp) -> Result<String, Refusal> {
@@ -129,10 +274,7 @@ fn codex(text: &str, entry: &LysMcp) -> Result<String, Refusal> {
             ("url".to_owned(), toml::Value::String(entry.url.clone())),
             (
                 "http_headers".to_owned(),
-                toml::Value::Table(toml::Table::from_iter([(
-                    "lys-agent-pass".to_owned(),
-                    toml::Value::String(entry.pass.clone()),
-                )])),
+                toml::Value::Table(codex_headers(entry)?),
             ),
         ])),
     );

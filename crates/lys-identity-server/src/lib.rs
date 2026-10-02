@@ -13,6 +13,7 @@ mod agent_grants_api;
 pub mod agent_pass;
 mod agent_pass_recovery;
 pub mod agent_pass_store;
+mod agent_seat;
 
 pub mod agent_policy_api;
 pub mod agent_policy_store;

@@ -315,7 +315,10 @@ pub async fn run_on_runner(
     let session = launch.session.clone();
     // An AI Lys starts stands on its one certificate, issued here when it
     // holds none that stands.
-    crate::certificates_own::standing(state, AgentId::from_str(agent)?)?;
+    let serial = crate::certificates_own::standing(state, AgentId::from_str(agent)?)?;
+    // The run sits on a seat delegated from that certificate; the runner
+    // signs the run's pass with the seat's key.
+    let seat = crate::agent_seat::seat(state, AgentId::from_str(agent)?, &serial, &session)?;
     let act = {
         let mut passes = crate::agent_pass::store(state)?;
         crate::runner_start_pass::act(
@@ -323,6 +326,7 @@ pub async fn run_on_runner(
             AgentId::from_str(agent)?,
             state.oidc.public_origin(),
             launch,
+            seat,
         )?
     };
     let missing_config = matches!(&act, Act::Start { lys_mcp: None, .. });

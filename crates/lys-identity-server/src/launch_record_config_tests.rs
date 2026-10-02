@@ -85,7 +85,8 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
     ));
     let launch = build(&store, &record, "session-fixture".to_owned(), "sh", None)?;
     let mut passes = Passes::open(dir.path().join("passes.json"))?;
-    let act = crate::runner_start_pass::act(&mut passes, agent, "http://fixture.test", launch)?;
+    let act =
+        crate::runner_start_pass::act(&mut passes, agent, "http://fixture.test", launch, None)?;
     if !matches!(&act, Act::Start { launch, lys_mcp:Some(_) } if launch.config.is_some()) {
         return Err("the record start carries no native config or run pass".into());
     }

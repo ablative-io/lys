@@ -38,6 +38,7 @@ fn a_launch_without_native_config_issues_no_agent_pass() -> TestResult {
         AgentId::from_bytes([1; 16]),
         "http://fixture.test",
         launch(false),
+        None,
     )?;
     assert!(matches!(selected, Act::Start { lys_mcp: None, .. }));
     assert!(!passes.has_session("session-fixture")?);
@@ -61,6 +62,7 @@ fn concurrent_start_selection_issues_one_pass() -> TestResult {
                 AgentId::from_bytes([1; 16]),
                 "http://fixture.test",
                 launch(true),
+                None,
             )
             .map_err(|error| error.to_string())
         }));

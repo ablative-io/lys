@@ -28,9 +28,15 @@ pub fn holder(state: &AppState, headers: &HeaderMap) -> Result<Option<AgentId>, 
     let Some(pass) = value(headers)? else {
         return Ok(None);
     };
-    store(state)?.lookup(pass).map(Some)
+    let (agent, session) = {
+        let passes = store(state)?;
+        (passes.lookup(pass)?, passes.session_of(pass)?)
+    };
+    crate::agent_seat::check(state, headers, agent, &session, pass)?;
+    Ok(Some(agent))
 }
 
+/// The run a pass is for, once its seat signed it.
 pub(crate) fn verified(
     state: &AppState,
     headers: &HeaderMap,
@@ -38,7 +44,12 @@ pub(crate) fn verified(
     let Some(pass) = value(headers)? else {
         return Ok(None);
     };
-    store(state)?.lookup_run(pass).map(Some)
+    let (run, session) = {
+        let passes = store(state)?;
+        (passes.lookup_run(pass)?, passes.session_of(pass)?)
+    };
+    crate::agent_seat::check(state, headers, run.0, &session, pass)?;
+    Ok(Some(run))
 }
 
 fn value(headers: &HeaderMap) -> Result<Option<&str>, ServerError> {

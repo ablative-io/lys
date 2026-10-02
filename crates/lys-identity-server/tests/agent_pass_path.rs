@@ -25,6 +25,7 @@ use serde_json::{Value, json};
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const PASS_HEADER: &str = "lys-agent-pass";
+const SEAT_HEADER: &str = "lys-seat";
 
 fn operation() -> TestResult<String> {
     Ok(OperationId::generate()?.to_string())
@@ -135,8 +136,9 @@ impl Held {
         Ok(answer)
     }
 
-    /// The lys entry the session's native config holds: its url and pass.
-    fn rendered(&self, session: &str) -> TestResult<(String, String)> {
+    /// The lys entry the session's native config holds: its url, its pass,
+    /// and the runner's seat signature over the pass.
+    fn rendered(&self, session: &str) -> TestResult<(String, String, String)> {
         let dir: PathBuf = self
             .dir
             .path()
@@ -149,10 +151,12 @@ impl Held {
                 continue;
             };
             let lys = &native["mcpServers"]["lys"];
-            if let (Some(url), Some(pass)) =
-                (lys["url"].as_str(), lys["headers"][PASS_HEADER].as_str())
-            {
-                return Ok((url.to_owned(), pass.to_owned()));
+            if let (Some(url), Some(pass), Some(seat)) = (
+                lys["url"].as_str(),
+                lys["headers"][PASS_HEADER].as_str(),
+                lys["headers"][SEAT_HEADER].as_str(),
+            ) {
+                return Ok((url.to_owned(), pass.to_owned(), seat.to_owned()));
             }
         }
         Err(format!("no lys entry under {}", dir.display()).into())
@@ -161,15 +165,19 @@ impl Held {
     async fn mcp(
         &self,
         url: &str,
-        pass: &str,
+        (pass, seat): (&str, Option<&str>),
         method: &str,
         params: Value,
     ) -> TestResult<(u16, Value)> {
-        let response = reqwest::Client::new()
+        let mut request = reqwest::Client::new()
             .post(url)
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
-            .header(PASS_HEADER, pass)
+            .header(PASS_HEADER, pass);
+        if let Some(seat) = seat {
+            request = request.header(SEAT_HEADER, seat);
+        }
+        let response = request
             .json(&json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}))
             .send()
             .await?;
@@ -218,7 +226,7 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         )
         .await?;
     let session = started["session"].as_str().ok_or("no session")?;
-    let (url, pass) = held.rendered(session)?;
+    let (url, pass, seat) = held.rendered(session)?;
     assert!(url.ends_with("/api/mcp"), "{url}");
     // The screens nest the API under /api; the harness serves it bare.
     let url = url.replace("/api/mcp", "/mcp");
@@ -227,7 +235,31 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         pass.len()
     );
 
-    let (status, tools) = held.mcp(&url, &pass, "tools/list", json!({})).await?;
+    let signed = (pass.as_str(), Some(seat.as_str()));
+    let (status, bare) = held
+        .mcp(&url, (pass.as_str(), None), "tools/list", json!({}))
+        .await?;
+    assert_eq!(status, 401, "a pass without its seat is refused: {bare}");
+    // The runner's signature with its last digit changed: the same seat, a
+    // signature it never made.
+    let mut forged = seat.clone();
+    let last = forged.pop().ok_or("the seat is empty")?;
+    forged.push(if last == '0' { '1' } else { '0' });
+    let (status, refused) = held
+        .mcp(
+            &url,
+            (pass.as_str(), Some(forged.as_str())),
+            "tools/list",
+            json!({}),
+        )
+        .await?;
+    assert_eq!(
+        status, 401,
+        "a seat that did not sign the pass is refused: {refused}"
+    );
+    eprintln!("proof: a bare pass and a forged seat are both refused 401");
+
+    let (status, tools) = held.mcp(&url, signed, "tools/list", json!({})).await?;
     assert_eq!(status, 200, "{tools}");
     eprintln!(
         "proof: tools/list answered {} tools",
@@ -238,7 +270,7 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
     let (status, inside) = held
         .mcp(
             &url,
-            &pass,
+            signed,
             "tools/call",
             call(format!("/identities/{person}/profile")),
         )
@@ -254,7 +286,7 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
     let (_, outside) = held
         .mcp(
             &url,
-            &pass,
+            signed,
             "tools/call",
             call(format!("/identities/{other}/profile")),
         )
@@ -274,7 +306,7 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         &json!({ "operation": operation()?, "reason": "proof" }),
     )
     .await?;
-    let (status, after) = held.mcp(&url, &pass, "tools/list", json!({})).await?;
+    let (status, after) = held.mcp(&url, signed, "tools/list", json!({})).await?;
     assert_eq!(status, 401, "{after}");
     eprintln!(
         "proof: after stop, the pass is refused {status} {}",

@@ -205,6 +205,11 @@ impl Passes {
         Ok((agent, provenance))
     }
 
+    /// The session the pass was issued for.
+    pub(crate) fn session_of(&self, pass: &str) -> Result<String, ServerError> {
+        Ok(self.entry(pass)?.session.clone())
+    }
+
     /// Whether this run already has a pass, without retaining its secret.
     pub fn has_session(&self, session: &str) -> Result<bool, ServerError> {
         self.ready()?;

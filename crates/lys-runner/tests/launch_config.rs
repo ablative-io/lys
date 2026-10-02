@@ -367,6 +367,7 @@ fn signed_run_pass_reaches_only_the_generated_config_for_both_harnesses() -> Tes
             lys_mcp: Some(lys_runner::protocol::LysMcp {
                 url: "https://service.invalid/api/mcp".to_owned(),
                 pass: RUN_PASS.to_owned(),
+                seat: None,
             }),
         };
         let signed = sign_request(&key, &greeting, &act)?;
@@ -415,6 +416,7 @@ fn an_invalid_signed_original_config_is_refused_before_pass_insertion() -> TestR
         lys_mcp: Some(lys_runner::protocol::LysMcp {
             url: "https://service.invalid/api/mcp".to_owned(),
             pass: RUN_PASS.to_owned(),
+            seat: None,
         }),
     };
     let answer = lys_runner::socket::dispatch(

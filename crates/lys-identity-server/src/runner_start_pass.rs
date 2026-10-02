@@ -13,6 +13,7 @@ pub(crate) fn act(
     agent: AgentId,
     origin: &str,
     launch: Launch,
+    seat: Option<lys_home::harness::lys_mcp::Seat>,
 ) -> Result<Act, ServerError> {
     if passes.has_session(&launch.session)? {
         return Ok(Act::Status {
@@ -41,6 +42,7 @@ pub(crate) fn act(
         lys_mcp: Some(lys_runner::protocol::LysMcp {
             url: format!("{origin}/api/mcp"),
             pass: pass.to_string(),
+            seat,
         }),
     })
 }

@@ -1707,6 +1707,7 @@ dependencies = [
  "time",
  "tokio",
  "toml",
+ "zeroize",
 ]
 
 [[package]]
