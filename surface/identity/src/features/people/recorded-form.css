@@ -1,8 +1,8 @@
 /* Recorded changes reuse the identity surface's field and card styling. */
 .recorded-form fieldset { min-width: 0; margin: 0; }
-.recorded-form .field label { display: grid; gap: 4px; }
+.recorded-form .field label:not(:has(input[type="checkbox"])) { display: grid; gap: 4px; }
 .recorded-form .field { text-align: left; }
-.recorded-form .field input, .recorded-form .field select { width: 100%; min-width: 0; }
+.recorded-form .field input:not([type="checkbox"]), .recorded-form .field select { width: 100%; min-width: 0; }
 .recorded-form fieldset > label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
 .recorded-form button[type="submit"] { margin-top: 12px; }
 .grid2 > .card.recorded-form { margin-top: 0; }
