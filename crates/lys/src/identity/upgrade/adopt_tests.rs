@@ -8,7 +8,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
-use super::super::scratch::{A, B, Behaviour, Recorder, Scratch, TestResult, build, ready_lines};
+use super::super::scratch::{
+    A, B, Behaviour, Recorder, Scratch, TestResult, build, ready_lines, recorded_as,
+};
 use super::super::{Unit, version};
 use super::{UNSTAMPED, check_placed_build, settle};
 use crate::identity::error::{ErrorKind, IdentityResult};
@@ -330,5 +332,71 @@ fn install_from_another_build_is_refused_and_stops_nothing() -> TestResult {
         version(&scratch.layout.binary(BINARIES[1]), BINARIES[1])?,
         A
     );
+    Ok(())
+}
+
+/// Writes into `bin/` the two binaries as a build before this card made
+/// them: the broker refuses `--version` as an unexpected argument and exits
+/// 2, and the service takes it for its configuration path and fails; each
+/// says ready and blocks when started as its unit starts it.
+fn unstamped_build(scratch: &Scratch) -> TestResult {
+    let bin = scratch.layout.bin_dir();
+    std::fs::create_dir_all(&bin)?;
+    let broker = format!(
+        "#!/bin/sh\nfor arg in \"$@\"; do case \"$arg\" in --*) \
+         echo \"error: unexpected argument '$arg' found\" >&2; exit 2;; esac; done\n\
+         echo \"{} old ready\"\nexec cat \"$1\"\n",
+        BINARIES[0]
+    );
+    let service = format!(
+        "#!/bin/sh\nif [ ! -e \"$1\" ]; then \
+         echo \"cannot read the configuration at $1\" >&2; exit 1; fi\n\
+         echo \"{} old ready\"\nexec cat \"$1\"\n",
+        BINARIES[1]
+    );
+    for (name, script) in BINARIES.into_iter().zip([broker, service]) {
+        let path = bin.join(name);
+        std::fs::write(&path, script)?;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn binaries_that_fail_at_version_are_recorded_unstamped_and_upgraded() -> TestResult {
+    let scratch = Scratch::laid_out()?;
+    unstamped_build(&scratch)?;
+    let mut failures = Vec::new();
+    for name in BINARIES {
+        let read = version(&scratch.layout.binary(name), name);
+        failures.push(read.err().map(|error| (error.kind(), error.to_string())));
+    }
+    let [Some((broker, said_broker)), Some((service, said_service))] = &failures[..] else {
+        return Err(format!("an unstamped binary answered --version: {failures:?}").into());
+    };
+    assert_eq!([*broker, *service], [ErrorKind::VersionUnreadable; 2]);
+    assert!(said_broker.contains("exit status: 2"), "{said_broker}");
+    assert!(said_service.contains("exit status: 1"), "{said_service}");
+    let mut before = Vec::new();
+    for unit in &scratch.units {
+        before.push(start_unlocked(&scratch.layout.binary(unit.binary), unit)?);
+    }
+    assert!(!scratch.layout.build_record().exists());
+    let new = scratch.work().join("b");
+    build(&new, B, Behaviour::Serves)?;
+    let mut said = Vec::new();
+    let record = scratch.upgrade(&new, None, &mut Recorder::default(), &mut said)?;
+    for child in &mut before {
+        child.wait()?;
+    }
+    for name in BINARIES {
+        let recorded = format!("{name}: installed {UNSTAMPED}, new {B}");
+        assert!(said.contains(&recorded), "{said:?}");
+        let kept = scratch.layout.bin_previous_dir().join(name);
+        assert!(version(&kept, name).is_err(), "A is kept as it was");
+    }
+    assert_eq!(scratch.running()?, ready_lines(B));
+    assert_eq!(scratch.recorded()?, recorded_as(B));
+    assert_eq!(record.binaries, recorded_as(B));
     Ok(())
 }
