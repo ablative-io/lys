@@ -1,3 +1,5 @@
+import { ActionPicker, singleActionCarriers, withheldFromAgents } from '../grants/ActionPicker';
+import type { ActionGroup } from '../grants/ActionPicker';
 import { useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -14,7 +16,7 @@ import { addAndRun, AddAndRunFailure, addAndRunStep, firstRunChoices, newAddAndR
 import type { AddAndRun, FirstRunOptions } from './add-and-run';
 import { ProfileFields } from '../provisioning/ProfileEditor';
 import { validComputerName } from '../network/AddMachine';
-import { grantOptions, grantWords, newAgentGrants, readGrantChoices } from './agent-grants';
+import { grantOptions, grantOptionKey, newAgentGrants, readGrantChoices } from './agent-grants';
 import type { GrantChoices } from './agent-grants';
 import { resourceNames, resourceWords } from './agent-resource-names';
 
@@ -52,7 +54,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const [refusal, setRefusal] = useState<unknown>(saved.error);
   const [pending, setPending] = useState(saved.pending);
   const [walk, setWalk] = useState(saved.walk);
-  const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source) ?? []);
+  const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source + ':' + entry.relation) ?? []);
   const [computerName, setComputerName] = useState(saved.walk?.placement.kind === 'new' ? saved.walk.placement.machine.body.name : '');
   const [computer, setComputer] = useState(saved.walk?.placement.kind === 'existing' ? saved.walk.placement.computer.id : runOptions.computers.length === 1 ? runOptions.computers[0].id : '');
   const selectedComputer = runOptions.computers.find((entry) => entry.id === computer);
@@ -72,6 +74,26 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const activeTeams = useMemo(() => teams.filter((entry) => entry.state === 'active'), [teams]);
   const options = useMemo(() => grantOptions(grants, person, me.person.id, chosen?.display_name ?? 'the holder'), [grants, person, me.person.id, chosen?.display_name]);
   const resourceLabels = useMemo(() => resourceNames(people, teams, runOptions.network), [people, teams, runOptions.network]);
+  const actionGroups = useMemo(() => {
+    const groups = new Map<string, ActionGroup>();
+    for (const option of options) {
+      const resource = option.grant.resource;
+      const id = JSON.stringify(resource);
+      const label = resourceWords(resource, resourceLabels);
+      const group = groups.get(id) ?? { id, title: label.words, href: label.unnamed ? '#/resources' : undefined, choices: [] };
+      group.choices.push({ id: grantOptionKey(option), resource, relation: option.relation ?? '', actions: option.actions, reason: option.reason });
+      groups.set(id, group);
+    }
+    return [...groups.values()];
+  }, [options, resourceLabels]);
+  const unpickable = useMemo(() => {
+    const model = grants.model;
+    const withheld = withheldFromAgents(model);
+    if (!model || withheld === null) return false;
+    const relations = singleActionCarriers(model);
+    return grants.grants.some((grant) => grant.holder === person && (grant.resource.kind.includes('.')
+      ? grant.actions.length > 1 : grant.actions.some((action) => !withheld.includes(action) && !relations.has(action))));
+  }, [grants, person]);
   const unavailable = !capability.answersTo && person !== me.person.id;
   const unsupported = unavailable ? pending || walk ? 'Your saved request names another person or agent. This service cannot accept that choice; the saved request has not been sent.' : 'This service cannot register an agent under that person or agent.' : '';
   const taken = pending || walk ? undefined : names.get(name.trim().toLowerCase());
@@ -117,7 +139,9 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     </select></label>
     <fieldset style={{ border: 0, padding: 0, margin: '16px 0' }}><legend>What this agent may do</legend>
       {chosen?.kind === 'agent' ? <p>This form cannot pass on {chosen.display_name}’s access. Add {name.trim() || 'this agent'} without extra access; <a href={'#/file/' + encodeURIComponent(chosen.id) + '/access'}>review {chosen.display_name}’s access</a>.</p> : <>
-        {options.map((option) => <div key={option.grant.id}><label className={option.reason ? 'dim' : undefined}><input type="checkbox" name="grant" value={option.grant.id} disabled={locked || Boolean(option.reason)} checked={selectedGrants.includes(option.grant.id)} onChange={(event) => { const checked = event.target.checked; setSelectedGrants((current) => checked ? [...new Set([...current, option.grant.id])] : current.filter((id) => id !== option.grant.id)); }} /> {grantWords(option, resourceLabels)}</label>{resourceWords(option.grant.resource, resourceLabels).unnamed ? <span> · <a href="#/resources">Open Resources</a></span> : null}{option.reason ? <p className="hint">{option.reason}</p> : null}</div>)}
+        {grants.model && withheldFromAgents(grants.model) !== null ? <ActionPicker model={grants.model} groups={actionGroups} selected={selectedGrants} change={setSelectedGrants} disabled={locked} />
+          : !grants.problem ? <p>Agent access choices are unavailable until Lys declares which actions are withheld from agents. Nothing is selected.</p> : null}
+        {unpickable ? <p>Some actions cannot be selected because the model has no relation carrying that action alone.</p> : null}
         {!options.length && !grants.problem ? <p>No grants were returned for {chosen?.display_name ?? 'this reporting target'}.</p> : null}
         {grants.problem ? <ErrorWords problem={grants.problem} /> : null}
       </>}
