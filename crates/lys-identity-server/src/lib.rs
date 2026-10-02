@@ -16,6 +16,7 @@ pub mod agent_pass_store;
 
 pub mod agent_policy_api;
 pub mod agent_policy_store;
+mod agent_roots;
 mod agent_sight;
 pub mod agent_signature;
 pub mod apps_api;
@@ -96,7 +97,6 @@ pub mod grants_reach;
 pub mod grants_refusals;
 pub mod harness_catalogue;
 mod import_api;
-mod agent_roots;
 mod import_bootstrap;
 mod import_bootstrap_state;
 mod kept_responsibilities;

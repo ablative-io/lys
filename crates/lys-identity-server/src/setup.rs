@@ -459,7 +459,8 @@ pub struct SetupRequest {
 }
 
 /// Complete setup for a configured administrator already signed in, in one
-/// signed log write, with no implied resource grants.
+/// signed log write. Its only grants are the administrator's own roots for
+/// giving people and agents access (see `agent_roots`).
 ///
 /// The caller is admitted before the body is read, so a body the route does
 /// not take is refused `RequestMalformed` only to the administrator.

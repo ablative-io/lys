@@ -152,6 +152,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants", get(list).post(delegate))
         .route("/grants/model", get(model))
         .route("/grants/roots", post(issue_root))
+        .route("/grants/agent-roots", post(crate::agent_roots::reissue))
         .route("/grants/check", post(check))
         .route("/grants/check/batch", post(crate::grants_batch::batch))
         .route("/grants/which", post(crate::grants_batch::which))

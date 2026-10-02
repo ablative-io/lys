@@ -244,7 +244,9 @@ fn withheld_from_agents(
     actions: &BTreeSet<Action>,
 ) -> Result<(), GrantError> {
     let onward = match &request.pass_on {
-        PassOn::To { actions: onward, .. } => Some(onward),
+        PassOn::To {
+            actions: onward, ..
+        } => Some(onward),
         PassOn::UseOnly => None,
     };
     let withheld: BTreeSet<&str> = actions

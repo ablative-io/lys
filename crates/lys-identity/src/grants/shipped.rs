@@ -231,7 +231,13 @@ mod tests {
         for authority in ["grant", "grant.delegate", "role.create", "secret.scope"] {
             assert!(!agent_may_hold("directory", authority));
         }
-        for read_only in ["grant.check", "grant.who", "grant.why", "grant.reach", "read"] {
+        for read_only in [
+            "grant.check",
+            "grant.who",
+            "grant.why",
+            "grant.reach",
+            "read",
+        ] {
             assert!(agent_may_hold("directory", read_only), "{read_only}");
         }
         assert!(!agent_may_hold("person", "made.up"));

@@ -6,14 +6,20 @@
 //! from agents can ever be passed through them.
 
 use lys_identity::grants::{
-    Action, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window,
-    agent_may_hold,
+    Action, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window, agent_may_hold,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use sha2::{Digest, Sha256};
 
+use std::sync::Arc;
+
+use axum::Json;
+use axum::extract::State;
+use axum::http::HeaderMap;
+use serde_json::{Value, json};
+
 use crate::error::ServerError;
-use crate::routes::AppState;
+use crate::routes::{AppState, signed_in};
 use crate::session::now;
 
 /// The directory collections the roots are on.
@@ -33,13 +39,20 @@ pub(crate) fn issue(state: &AppState, owner: PersonId) -> Result<Vec<String>, Se
         let editor = Relation::new("editor")?;
         let model = judged.grants.model();
         let version = model.version();
-        let passable: std::collections::BTreeSet<Action> = model
-            .actions(&editor)?
+        // A model with no `editor`, or none of whose acts an agent may hold,
+        // has no roots to give agents access through.
+        let Ok(carried) = model.actions(&editor) else {
+            return Ok(Vec::new());
+        };
+        let passable: std::collections::BTreeSet<Action> = carried
             .iter()
             .filter(|action| agent_may_hold("directory", action.as_str()))
             .cloned()
             .collect();
         let mut roots = Vec::new();
+        if passable.is_empty() {
+            return Ok(roots);
+        }
         for collection in COLLECTIONS {
             let root = judged
                 .grants
@@ -84,4 +97,17 @@ pub(crate) fn at_setup(state: &AppState) -> Result<(), ServerError> {
         issue(state, owner)?;
     }
     Ok(())
+}
+
+/// `POST /grants/agent-roots`: the configured administrator records their
+/// own roots for giving people and agents access, once. This is how an
+/// install set up before them gains them; nothing else issues them.
+pub(crate) async fn reissue(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    state.admission.configured_administrator(&actor)?;
+    let owner = administrator(&state)?.ok_or(ServerError::NoPerson)?;
+    Ok(Json(json!({ "grants": issue(&state, owner)? })))
 }
