@@ -17,7 +17,8 @@ struct Record {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Session {
-    session: String,
+    #[serde(rename = "session")]
+    id: String,
     pid: Option<u32>,
     started_at: u64,
     columns: u16,
@@ -45,7 +46,7 @@ pub(super) fn migrate(value: Value) -> Result<Kept, serde_json::Error> {
         .sessions
         .into_iter()
         .map(|session| KeptSession {
-            session: session.session,
+            session: session.id,
             pid: session.pid,
             leader_start: None,
             started_at: session.started_at,
