@@ -1,11 +1,15 @@
 #![cfg(test)]
 //! Grant header admission preserves the ordinary route holding checks.
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
 use serde_json::{Value, json};
 use std::error::Error;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+
+/// The profile route names `person.profile.set`, so the writing relation carries it.
+const MODEL: &str =
+    r#"{"version":1,"relations":{"alpha":["read","write","person.profile.set"],"beta":["read"]}}"#;
 
 struct Fixture {
     service: Service,
@@ -23,7 +27,7 @@ impl Fixture {
     async fn new(chain: bool, teams: bool) -> TestResult<Self> {
         // Only the stores token admission and the profile route touch are opened.
         let (service, (person, agent, lead)) = Service::start_adjusted(
-            GRANT_MODEL,
+            MODEL,
             None,
             None,
             None,
@@ -161,11 +165,11 @@ impl Fixture {
         through_lead: bool,
     ) -> TestResult<String> {
         let wire = json!({"kind":"person","id":resource});
-        let (status, root) = self.service.post("/grants/roots",Some(&self.cookie),&json!({"operation":operation()?,"route":"api","holder":self.person,"resource":wire,"relation":"alpha","pass_on":{"kind":"to","actions":["read","write"],"recipients":["agent"]},"window":{"starts_at":0,"ends_at":null}})).await?;
+        let (status, root) = self.service.post("/grants/roots",Some(&self.cookie),&json!({"operation":operation()?,"route":"api","holder":self.person,"resource":wire,"relation":"alpha","pass_on":{"kind":"to","actions":["read","write","person.profile.set"],"recipients":["agent"]},"window":{"starts_at":0,"ends_at":null}})).await?;
         assert_eq!(status, 200);
         let mut source = root["grant"].clone();
         if through_lead {
-            let (status, held) = self.service.post("/grants", Some(&self.cookie), &json!({"operation":operation()?, "route":"api", "source":source, "recipient":self.lead, "responsible":self.person, "resource":wire, "relation":"alpha", "pass_on":{"kind":"to","actions":["read","write"],"recipients":["agent"]}, "window":{"starts_at":0,"ends_at":null}})).await?;
+            let (status, held) = self.service.post("/grants", Some(&self.cookie), &json!({"operation":operation()?, "route":"api", "source":source, "recipient":self.lead, "responsible":self.person, "resource":wire, "relation":"alpha", "pass_on":{"kind":"to","actions":["read","write","person.profile.set"],"recipients":["agent"]}, "window":{"starts_at":0,"ends_at":null}})).await?;
             assert_eq!(status, 200);
             source = held["grant"].clone();
         }
@@ -243,7 +247,7 @@ async fn mcp_grant_token_refuses_an_undeclared_route() -> TestResult {
     let fixture = Fixture::new(false, false).await?;
     let token = fixture.token(&fixture.person, "alpha").await?;
     let (status, answer) = fixture
-        .call(&token, "GET", "/directory/people", Value::Null, false)
+        .call(&token, "GET", "/sessions", Value::Null, false)
         .await?;
     assert_eq!(status, 200);
     assert_eq!(
