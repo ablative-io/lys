@@ -35,8 +35,10 @@ use crate::spicedb_apps::{app_definition, app_definitions, definition};
 
 mod credential;
 mod names;
+mod wire;
 pub use credential::{SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
 use names::{engine_ident, engine_ident_on, engine_name_for, lys_name_on};
+use wire::{object_json, object_of, relationship_json, relationship_of};
 
 #[path = "spicedb_scope.rs"]
 pub(crate) mod scope;
@@ -99,60 +101,6 @@ fn engine_name(what: &str, name: &str) -> Result<(), GrantError> {
     Err(unavailable(format!(
         "the {what} {name} is not a name the permission engine takes: three to sixty-four lowercase letters, digits and underscores, starting with a letter"
     )))
-}
-
-fn object_json(object: &ObjectRef) -> Value {
-    json!({"objectType": definition(&object.kind), "objectId": object.id.replace('.', "|")})
-}
-
-fn relationship_json(relationship: &Relationship) -> Value {
-    let mut subject = json!({"object": object_json(&relationship.subject)});
-    if let Some(relation) = &relationship.subject_relation {
-        subject["optionalRelation"] = json!(engine_ident_on(&relationship.subject.kind, relation));
-    }
-    let mut value = json!({
-        "resource": object_json(&relationship.resource),
-        "relation": engine_ident_on(&relationship.resource.kind, &relationship.relation),
-        "subject": subject,
-    });
-    if let Some(ends_at) = relationship.ends_at {
-        value["optionalCaveat"] =
-            json!({"caveatName": "unexpired", "context": {"ends_at": ends_at}});
-    }
-    value
-}
-
-fn object_of(value: &Value) -> Option<ObjectRef> {
-    Some(ObjectRef {
-        kind: value.get("objectType")?.as_str()?.replacen('/', ".", 1),
-        id: value.get("objectId")?.as_str()?.replace('|', "."),
-    })
-}
-
-fn relationship_of(value: &Value) -> Option<Relationship> {
-    let subject = value.get("subject")?;
-    let ends_at = match value.pointer("/optionalCaveat/context/ends_at") {
-        Some(end) => Some(end.as_u64()?),
-        None => None,
-    };
-    let resource = object_of(value.get("resource")?)?;
-    let relation = lys_name_on(&resource.kind, value.get("relation")?.as_str()?)?;
-    let object = object_of(subject.get("object")?)?;
-    let subject_relation = match subject
-        .get("optionalRelation")
-        .and_then(Value::as_str)
-        .filter(|relation| !relation.is_empty())
-    {
-        Some(relation) => Some(lys_name_on(&object.kind, relation)?),
-        None => None,
-    };
-    Some(Relationship {
-        resource,
-        relation,
-        subject: object,
-        subject_relation,
-        ends_at,
-    })
 }
 
 pub(super) static SCHEMA_WRITE: Mutex<()> = Mutex::new(());

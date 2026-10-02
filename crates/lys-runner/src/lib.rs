@@ -59,6 +59,7 @@ pub mod legacy_input;
 pub mod operations;
 pub mod peer;
 pub mod protocol;
+mod protocol_key;
 mod protocol_request;
 pub mod pty;
 mod pty_command;
