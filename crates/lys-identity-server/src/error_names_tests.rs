@@ -83,6 +83,7 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         (ServerError::SignInStateUnknown, "SignInStateUnknown"),
         (ServerError::SignInRefused, "SignInRefused"),
         (ServerError::SignInThrottled, "SignInThrottled"),
+        (ServerError::RegistrationThrottled, "RegistrationThrottled"),
         (
             ServerError::SecondFactorUnsupported,
             "SecondFactorUnsupported",

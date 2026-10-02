@@ -1,8 +1,9 @@
-//! A change an agent made through the Lys MCP endpoint, kept as a leaf of the
-//! directory log. The leaf names the route, the digest of the body the route
-//! was given, the status it answered and, when the agent signed the message
-//! that asked for the change, that signature as it was sent, so the change
-//! carries a receipt and its evidence survives replay with it.
+//! A change an agent asks for through the Lys MCP endpoint, kept as a leaf
+//! of the directory log before the change is made, so no change stands
+//! without its receipt. The leaf names the route, the digest of the body the
+//! route is given and, when the agent signed the message that asked for the
+//! change, that signature as it was sent, so its evidence survives replay
+//! with it. What the route then answered is the route's own record.
 
 use lys_log_store::LeafStore;
 
@@ -17,25 +18,22 @@ use crate::receipt::Receipt;
 /// The most bytes an agent call's path or signature carries.
 const TEXT_MAX: usize = 4096;
 
-/// One change an agent made through MCP.
+/// One change an agent asked for through MCP.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AgentCall {
     method: String,
     path: String,
     body_sha256: String,
-    status: u16,
     signature: String,
 }
 
 impl AgentCall {
     /// A call record, refused unless it names a changing method, a local
-    /// route, a SHA-256 digest in lowercase hex and a status the route
-    /// answered for a change it made.
+    /// route and a SHA-256 digest in lowercase hex.
     pub fn new(
         method: &str,
         path: &str,
         body_sha256: &str,
-        status: u16,
         signature: &str,
     ) -> Result<Self, IdentityError> {
         if !matches!(method, "POST" | "PUT" | "PATCH" | "DELETE") {
@@ -57,11 +55,6 @@ impl AgentCall {
                 reason: "an agent call's body digest is SHA-256 in lowercase hex",
             });
         }
-        if !(200..300).contains(&status) {
-            return Err(IdentityError::ChangeMismatch {
-                reason: "an agent call records a change the route made",
-            });
-        }
         if signature.len() > TEXT_MAX {
             return Err(IdentityError::ChangeMismatch {
                 reason: "an agent call's signature is at most 4096 bytes",
@@ -71,7 +64,6 @@ impl AgentCall {
             method: method.to_owned(),
             path: path.to_owned(),
             body_sha256: body_sha256.to_owned(),
-            status,
             signature: signature.to_owned(),
         })
     }
@@ -91,11 +83,6 @@ impl AgentCall {
         &self.body_sha256
     }
 
-    /// The status the route answered.
-    pub fn status(&self) -> u16 {
-        self.status
-    }
-
     /// The agent's signature header over the MCP message, as it was sent;
     /// empty when the call was admitted by a run pass or a grant token.
     pub fn signature(&self) -> &str {
@@ -104,8 +91,9 @@ impl AgentCall {
 }
 
 impl<S: LeafStore> Directory<S> {
-    /// Record a change `agent` made through MCP, answering its receipt. The
-    /// actor must be the agent acting for its responsible person.
+    /// Record a change `agent` asks for through MCP, before it is made,
+    /// answering its receipt. The actor must be the agent acting for its
+    /// responsible person.
     pub fn record_agent_call(
         &mut self,
         actor: Actor,

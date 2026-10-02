@@ -157,7 +157,7 @@ impl ServerError {
             | Self::ClientUnknown
             | Self::DialRefused { .. }
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
-            Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
+            Self::SignInThrottled | Self::RegistrationThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::Inactive { .. }
             | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }

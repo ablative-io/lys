@@ -86,6 +86,11 @@ pub enum ServerError {
         "SignInThrottled: too many sign-ins failed from this address; wait a little, then try again"
     )]
     SignInThrottled,
+    /// Too many apps registered to connect in the last minute.
+    #[error(
+        "RegistrationThrottled: too many apps registered to connect in the last minute; wait a minute, then register again"
+    )]
+    RegistrationThrottled,
     /// The account asks for a second factor, which Lys's sign-in does not take.
     #[error(
         "SecondFactorUnsupported: this account asks for a second factor, such as a passkey, which Lys's sign-in does not take yet (act: ask your administrator to reset the account to a password)"

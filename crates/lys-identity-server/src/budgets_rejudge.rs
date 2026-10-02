@@ -2,7 +2,8 @@
 //! an accepted compaction until the session's turn ends; if the budget it
 //! was crossed under has since been changed, the crossing no longer stands
 //! as it was judged, so the compaction is withdrawn before it is typed. One
-//! the runner already began typing stands as typed, and is said.
+//! the runner already began typing is kept as typed, and one the runner no
+//! longer holds is kept as not done, so neither is asked again.
 
 use std::sync::Arc;
 
@@ -62,10 +63,14 @@ pub(crate) async fn rejudge(state: &Arc<AppState>) -> Result<(), ServerError> {
                     store.acted(Acted::from_runner(&outcome, at_ms))
                 })?;
             }
-            Err(Undelivered::Refused(words)) => (state.say)(&format!(
-                "budget compaction {} was not withdrawn and stands as the runner holds it: {words}",
-                crossing.operation
-            )),
+            Err(Undelivered::Refused(words)) => {
+                let acted = refused(&crossing.operation, words, at_ms);
+                (state.say)(&format!(
+                    "budget compaction {} was not withdrawn: {}",
+                    crossing.operation, acted.words
+                ));
+                with_budgets_mut(state, |store| store.acted(acted))?;
+            }
             Err(Undelivered::Unknown(words)) => (state.say)(&format!(
                 "budget compaction {} awaits its withdrawal: {words}",
                 crossing.operation
@@ -73,4 +78,43 @@ pub(crate) async fn rejudge(state: &Arc<AppState>) -> Result<(), ServerError> {
         }
     }
     Ok(())
+}
+
+/// What a refused withdrawal says of the crossing: one the runner had
+/// already begun typing stands as typed; any other refusal means the runner
+/// no longer holds it, so it will not be typed.
+fn refused(operation: &str, words: String, at_ms: i64) -> Acted {
+    let (stands, words) = if words.starts_with("operation_past_its_boundary") {
+        (
+            Stands::Delivered,
+            format!("it was typed before the change could withdraw it ({words})"),
+        )
+    } else {
+        (
+            Stands::Refused,
+            format!("the runner no longer holds it, so it will not be typed ({words})"),
+        )
+    };
+    Acted {
+        operation: operation.to_owned(),
+        stands,
+        words,
+        at_ms,
+        ended: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Stands, refused};
+
+    #[test]
+    fn a_refused_withdrawal_is_kept_as_typed_or_as_not_done() {
+        let typed = refused("op", "operation_past_its_boundary: begun".to_owned(), 5);
+        assert_eq!((typed.stands, typed.at_ms), (Stands::Delivered, 5));
+        assert!(typed.words.contains("typed"));
+        let gone = refused("op", "operation_unknown: none".to_owned(), 6);
+        assert_eq!(gone.stands, Stands::Refused);
+        assert!(gone.words.contains("operation_unknown"));
+    }
 }

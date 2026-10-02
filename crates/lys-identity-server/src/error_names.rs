@@ -41,6 +41,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::SignInStateUnknown => "SignInStateUnknown",
         ServerError::SignInRefused => "SignInRefused",
         ServerError::SignInThrottled => "SignInThrottled",
+        ServerError::RegistrationThrottled => "RegistrationThrottled",
         ServerError::SecondFactorUnsupported => "SecondFactorUnsupported",
         ServerError::SetupClosed => "SetupClosed",
         ServerError::SetupCodeRefused => "SetupCodeRefused",

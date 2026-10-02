@@ -46,6 +46,15 @@ struct Held {
     tokens: BTreeMap<String, Issued>,
 }
 
+/// How many apps may register, how fast, and how long one waits for a
+/// person's approval before it is let go.
+#[derive(Clone, Copy)]
+pub(crate) struct Limits {
+    pub(crate) most: usize,
+    pub(crate) per_minute: usize,
+    pub(crate) unapproved_seconds: u64,
+}
+
 /// The kept state and the file it is kept in.
 pub(crate) struct Store {
     path: PathBuf,
@@ -98,13 +107,39 @@ impl Store {
         self.held.apps.get(client_id)
     }
 
-    /// How many apps are registered.
-    pub(crate) fn apps_held(&self) -> usize {
-        self.held.apps.len()
-    }
-
-    /// Keep a newly registered app.
-    pub(crate) fn register(&mut self, client_id: String, app: App) -> Result<(), ServerError> {
+    /// Keep a newly registered app. An app no person has approved within
+    /// `limits.unapproved_seconds` of registering is let go first, so an
+    /// abandoned registration never holds a place; a registration beyond
+    /// `limits.per_minute` in the last minute, or beyond `limits.most` apps
+    /// held, is refused by name.
+    pub(crate) fn register(
+        &mut self,
+        client_id: String,
+        app: App,
+        limits: Limits,
+    ) -> Result<(), ServerError> {
+        let at = app.registered_at;
+        let connections = &self.held.connections;
+        self.held.apps.retain(|id, kept| {
+            kept.registered_at.saturating_add(limits.unapproved_seconds) > at
+                || connections
+                    .keys()
+                    .any(|key| key.split_once(' ').is_some_and(|(client, _)| client == id))
+        });
+        let recent = self
+            .held
+            .apps
+            .values()
+            .filter(|kept| kept.registered_at.saturating_add(60) > at)
+            .count();
+        if recent >= limits.per_minute {
+            return Err(ServerError::RegistrationThrottled);
+        }
+        if self.held.apps.len() >= limits.most {
+            return Err(ServerError::RequestMalformed {
+                reason: "this install holds as many connected apps as it keeps".to_owned(),
+            });
+        }
         self.held.apps.insert(client_id, app);
         self.save()
     }

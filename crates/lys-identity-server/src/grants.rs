@@ -329,14 +329,24 @@ pub(crate) fn decide<S: LeafStore>(
             resource: resource.clone(),
             ..request.clone()
         };
-        let decided = engine_permits(judged.grants, judged.directory, &asked, at)
-            .and_then(|()| token_only(judged, &asked, at, at_least))
-            .and_then(|()| match decision {
-                Decision::Exercise => judged.grants.check(judged.directory, &asked, at, at_least),
-                Decision::Explain => judged
-                    .grants
-                    .explain(judged.directory, &asked, at, at_least),
-            });
+        // A caller admitted by a grant token rests on that token's grant
+        // alone; any other grant it holds is never considered.
+        let only = crate::agent_signature::token_grant(asked.caller);
+        let decided =
+            engine_permits(judged.grants, judged.directory, &asked, at).and_then(
+                |()| match decision {
+                    Decision::Exercise => {
+                        judged
+                            .grants
+                            .check_by(judged.directory, &asked, only, at, at_least)
+                    }
+                    Decision::Explain => {
+                        judged
+                            .grants
+                            .explain_by(judged.directory, &asked, only, at, at_least)
+                    }
+                },
+            );
         match decided {
             Ok(permit) => return Ok((permit, resource)),
             Err(error) => {
@@ -349,31 +359,6 @@ pub(crate) fn decide<S: LeafStore>(
         resource: request.resource.to_string(),
         action: request.action.to_string(),
     }))
-}
-
-/// A caller admitted by a grant token is permitted by that token's grant
-/// alone: the grant the decision would exercise is read first, recording
-/// nothing, and any other grant is refused before a use is recorded.
-fn token_only<S: LeafStore>(
-    judged: &mut Judged<'_, S>,
-    asked: &ExerciseRequest,
-    at: u64,
-    at_least: Option<u64>,
-) -> Result<(), GrantError> {
-    let Some(grant) = crate::agent_signature::token_grant(asked.caller) else {
-        return Ok(());
-    };
-    let permit = judged
-        .grants
-        .explain(judged.directory, asked, at, at_least)?;
-    if permit.grant == grant {
-        return Ok(());
-    }
-    Err(GrantError::NotHeld {
-        identity: asked.caller.to_string(),
-        resource: asked.resource.to_string(),
-        action: asked.action.to_string(),
-    })
 }
 
 /// The identity the signed-in caller's login is bound to, person or agent.

@@ -67,7 +67,7 @@ fn an_agent_call_is_kept_with_a_receipt_and_read_back_on_reopen() -> TestResult 
         13,
     )?;
     let actor = Actor::new(binding, Provenance::by_agent(agent, 1_790_000_100));
-    let call = AgentCall::new("POST", "/agents/x/goals", DIGEST, 200, "signed header")?;
+    let call = AgentCall::new("POST", "/agents/x/goals", DIGEST, "signed header")?;
     assert!(
         directory
             .record_agent_call(actor.clone(), other, call.clone(), 14)

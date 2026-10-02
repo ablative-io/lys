@@ -437,11 +437,28 @@ async fn call(
             agent,
             signed: relay_evidence,
         });
-    let kept = (
-        parts.method.clone(),
-        parts.uri.to_string(),
-        crate::mcp_receipts::digest(&bytes),
-    );
+    let receipt = match (endpoint.state.as_deref(), witness) {
+        (Some(state), Some(witness)) if crate::mcp_receipts::changing(&parts.method) => Some(
+            crate::mcp_receipts::keep(
+                state,
+                witness,
+                (
+                    &parts.method,
+                    &crate::mcp_receipts::recorded_path(&parts.uri),
+                    &crate::mcp_receipts::digest(&bytes),
+                ),
+            )
+            .map_err(|error| {
+                (
+                    -32603,
+                    format!(
+                        "the change was not made: its receipt could not be kept first: {error}"
+                    ),
+                )
+            })?,
+        ),
+        _ => None,
+    };
     let body = Body::from(bytes);
     if signer.is_some() {
         parts.headers.remove(crate::agent_signature::HEADER);
@@ -462,26 +479,9 @@ async fn call(
         Ok(response) => response,
         Err(error) => match error {},
     };
-    let status = response.status();
     let mut result = crate::mcp_callers::rendered(response).await?;
-    let (Some(state), Some(witness)) = (endpoint.state.as_deref(), witness) else {
-        return Ok(result);
-    };
-    let (method, path, body_sha256) = kept;
-    if !crate::mcp_receipts::kept(&method, status) {
-        return Ok(result);
+    if let Some(receipt) = receipt {
+        result["receipt"] = receipt;
     }
-    match crate::mcp_receipts::keep(state, witness, (&method, &path, &body_sha256, status)) {
-        Ok(receipt) => {
-            result["receipt"] = receipt;
-            Ok(result)
-        }
-        Err(error) => {
-            tracing::error!("an agent's MCP change was made but its receipt was not kept: {error}");
-            Err((
-                -32603,
-                format!("the change was made but its receipt could not be kept: {error}"),
-            ))
-        }
-    }
+    Ok(result)
 }

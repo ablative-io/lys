@@ -158,7 +158,7 @@ fn change(out: &mut Vec<u8>, value: &Change) {
             uint(out, seen.observed_at());
         }
         Change::AgentCall(call) => {
-            map(out, 5);
+            map(out, 4);
             uint(out, 1);
             text(out, call.method());
             uint(out, 2);
@@ -166,8 +166,6 @@ fn change(out: &mut Vec<u8>, value: &Change) {
             uint(out, 3);
             text(out, call.body_sha256());
             uint(out, 4);
-            uint(out, u64::from(call.status()));
-            uint(out, 5);
             text(out, call.signature());
         }
     }
@@ -380,15 +378,12 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
         }
         wire::REPORTING_REGISTRATION | wire::REPORTS_TO_CHANGED => reporting::decode(kind, value),
         wire::AGENT_CALL => {
-            let [method, path, digest, status, signature] =
-                fields::<5>(value, "an agent call is a map of keys 1 to 5")?;
-            let status = u16::try_from(as_uint(&status, "an agent call's status is a code")?)
-                .map_err(|_large| malformed("an agent call's status is a code"))?;
+            let [method, path, digest, signature] =
+                fields::<4>(value, "an agent call is a map of keys 1 to 4")?;
             Ok(Change::AgentCall(crate::agent_call::AgentCall::new(
                 &as_text(method, TEXT)?,
                 &as_text(path, TEXT)?,
                 &as_text(digest, TEXT)?,
-                status,
                 &as_text(signature, TEXT)?,
             )?))
         }

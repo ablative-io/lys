@@ -247,7 +247,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/.well-known/oauth-protected-resource/mcp" "Where the MCP door's authorization is found, by its address" P [];
     GET "/.well-known/oauth-protected-resource/api/mcp" "Where the MCP door's authorization is found, by its screens address" P [];
     GET "/.well-known/oauth-authorization-server" "How a connected app is authorized" P [];
-    POST "/oauth/mcp/register" "An app registers to connect to the MCP door" P [&["RequestMalformed"]];
+    POST "/oauth/mcp/register" "An app registers to connect to the MCP door" P [&["RequestMalformed", "RegistrationThrottled", "ConfigInvalid"]];
     GET "/oauth/mcp/authorize" "Ask the person to connect an app" P [&["RequestMalformed", "RedirectUnregistered"]];
     POST "/oauth/mcp/consent" "The person connects an app or refuses it" P [&["RequestMalformed", "RedirectUnregistered", "CodeUnknown", "NotSignedIn"]];
     POST "/oauth/mcp/token" "Exchange a connected app's code or refresh token for tokens" P [];

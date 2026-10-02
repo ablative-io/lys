@@ -408,7 +408,21 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
         at_least: Option<u64>,
     ) -> Result<Permit, GrantError> {
-        let mut permit = self.explain(directory, request, at, at_least)?;
+        self.check_by(directory, request, None, at, at_least)
+    }
+
+    /// [`Grants::check`] resting only on `only` when it names a grant: no
+    /// other grant the caller holds is considered, so the use is recorded
+    /// against that grant or the exercise is refused.
+    pub fn check_by(
+        &mut self,
+        directory: &Projection,
+        request: &ExerciseRequest,
+        only: Option<GrantId>,
+        at: u64,
+        at_least: Option<u64>,
+    ) -> Result<Permit, GrantError> {
+        let mut permit = self.explain_by(directory, request, only, at, at_least)?;
         let used = self.record_use(request.caller, permit.grant, request.route, at);
         if let Err(error) = &used {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);
@@ -432,9 +446,21 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
         at_least: Option<u64>,
     ) -> Result<Permit, GrantError> {
+        self.explain_by(directory, request, None, at, at_least)
+    }
+
+    /// [`Grants::explain`] resting only on `only` when it names a grant.
+    pub fn explain_by(
+        &mut self,
+        directory: &Projection,
+        request: &ExerciseRequest,
+        only: Option<GrantId>,
+        at: u64,
+        at_least: Option<u64>,
+    ) -> Result<Permit, GrantError> {
         let settled = self.settle(at_least)?;
         self.unresolved_issue(request)?;
         let frame = super::frame::Frame::read(self, directory, settled)?;
-        self.explain_in(&frame, request, at)
+        self.explain_only(&frame, request, only, at)
     }
 }
