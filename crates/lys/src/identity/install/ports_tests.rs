@@ -80,3 +80,44 @@ fn invalid_recorded_listeners_are_refused_by_field() {
         assert!(refusal.to_string().contains(field), "{refusal}");
     }
 }
+
+#[test]
+fn an_existing_install_refuses_listener_changes_before_writes()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = tempfile::tempdir()?;
+    let layout = Layout::at(root.path().to_path_buf());
+    let original = br#"{"listen":"127.0.0.1:19001","secrets":{"broker":"http://127.0.0.1:19002"}}"#;
+    crate::identity::private_files::write(&layout.service_config(), original)?;
+    let ports = Ports::load(&layout)?;
+    for (service, broker, name) in [
+        (Some(19003), None, "service-port"),
+        (None, Some(19003), "broker-port"),
+    ] {
+        let Err(refusal) = ports.chosen(service, broker) else {
+            panic!("recorded listener changed");
+        };
+        assert!(refusal.to_string().contains(name), "{refusal}");
+        assert_eq!(std::fs::read(layout.service_config())?, original);
+    }
+    Ok(())
+}
+
+#[test]
+fn an_interrupted_install_resumes_the_deployment_listener() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = tempfile::tempdir()?;
+    let layout = Layout::at(root.path().to_path_buf());
+    let deployment = crate::identity::install::layout::render_deployment_at(None, 19001);
+    std::fs::write(layout.deployment_config(), &deployment)?;
+    assert!(!layout.service_config().exists());
+    let ports = Ports::load(&layout)?;
+    assert_eq!(ports.service, 19001);
+    assert_eq!(ports.broker, 8472);
+    assert!(ports.chosen(Some(19003), None).is_err());
+    assert_eq!(
+        std::fs::read_to_string(layout.deployment_config())?,
+        deployment
+    );
+    assert!(!layout.service_config().exists());
+    Ok(())
+}
