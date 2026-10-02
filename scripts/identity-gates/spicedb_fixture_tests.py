@@ -2,6 +2,7 @@
 
 import os
 import signal
+import sys
 import io
 import json
 from pathlib import Path
@@ -94,6 +95,19 @@ python3() { printf 'python3 %s\n' "$*" >> "$TRACE"; }
         docker.assert_any_call("rm", "--force", owned)
         self.assertTrue(key_files)
         self.assertFalse(key_files[0].exists())
+
+    def test_owned_child_restores_mask_before_exec_and_reaps_on_termination(self):
+        probe = "import signal,sys; print('BLOCKED' if signal.SIGTERM in signal.pthread_sigmask(signal.SIG_BLOCK, set()) else 'READY', flush=True); sys.stdin.readline()"
+        with spicedb_fixture.owned_process([sys.executable, "-c", probe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) as child:
+            state = child.stdout.readline().strip()
+            child.stdin.write("exit\n")
+            child.stdin.flush()
+            self.assertEqual(child.wait(), 0)
+        self.assertEqual(state, "READY")
+        ready = "import signal; print('READY', flush=True); signal.pause()"
+        with spicedb_fixture.owned_process([sys.executable, "-c", ready], stdout=subprocess.PIPE, text=True) as child:
+            self.assertEqual(child.stdout.readline().strip(), "READY")
+        self.assertEqual(child.returncode, -signal.SIGTERM)
 
     def test_early_database_exit_refuses_and_removes_its_container(self):
         owned = "a" * 64
