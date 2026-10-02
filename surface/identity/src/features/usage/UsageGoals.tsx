@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { operationId } from '../../api';
 import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
-import type { GoalItem, GoalKind } from './contract';
+import type { GoalItem } from './contract';
 
 type Props = { agent: string; goals: GoalItem[]; changed: (words: string) => void };
 
@@ -48,22 +48,22 @@ function GoalEdits({ agent, item, changed }: { agent: string; item: GoalItem; ch
 }
 
 function SetGoal({ agent, changed }: { agent: string; changed: (words: string) => void }) {
-  const [kind, setKind] = useState<GoalKind>('goal');
   const [words, setWords] = useState('');
   const [deadline, setDeadline] = useState('');
-  const [evidence, setEvidence] = useState<'commit' | 'document' | 'check'>('commit');
+  const [dated, setDated] = useState(false);
   const path = '/agents/' + encodeURIComponent(agent) + '/goals';
-  const change = useRoleChange<GoalItem>('lys.pending.goal.' + agent, path, (answer, body) => answer.goal.id === body.operation && answer.goal.words === body.words, () => changed('Goal kept.'));
+  const change = useRoleChange<GoalItem>('lys.pending.goal.' + agent, path, (answer, body) => answer.goal.id === body.operation && answer.goal.words === body.words, () => { setWords(''); setDeadline(''); setDated(false); changed('Goal kept.'); });
+  const seconds = dated ? Math.floor(Date.parse(deadline) / 1000) : null;
+  const ready = !!words.trim() && (seconds === null || Number.isFinite(seconds));
   const submit = () => {
-    const seconds = Math.floor(Date.parse(deadline) / 1000);
-    if (!words.trim() || !Number.isFinite(seconds)) return;
-    change.submit({ operation: operationId(), kind, words: words.trim(), deadline: seconds, ...(kind === 'deliverable' ? { evidence } : {}) });
+    if (!ready || change.blocked) return;
+    change.submit({ operation: operationId(), kind: 'goal', words: words.trim(), deadline: seconds });
   };
   return <form aria-label="Set a goal" onSubmit={(event) => { event.preventDefault(); submit(); }}><h4>Set a goal</h4>
-    <label className="field">Kind<select value={kind} disabled={change.blocked} onChange={(event) => setKind(event.target.value as GoalKind)}><option value="goal">Goal</option><option value="expectation">Expectation</option><option value="deliverable">Deliverable</option></select></label>
-    <label className="field usage-what">What<textarea name="words" rows={4} value={words} required maxLength={500} disabled={change.blocked} onChange={(event) => setWords(event.target.value)} /></label>
-    <label className="field">Deadline<input name="deadline" type="datetime-local" required value={deadline} disabled={change.blocked} onChange={(event) => setDeadline(event.target.value)} /></label>
-    {kind === 'deliverable' ? <label className="field">Proved by<select value={evidence} disabled={change.blocked} onChange={(event) => setEvidence(event.target.value as 'commit' | 'document' | 'check')}><option value="commit">A landed commit</option><option value="document">A document</option><option value="check">A passing check</option></select></label> : null}
-    <button className="btn primary" type="submit" disabled={change.blocked || !words.trim() || !deadline}>Set goal</button><ChangeStatus change={change} />
+    <label className="field usage-what">What the agent is reminded of<textarea name="words" rows={4} value={words} required maxLength={500} disabled={change.blocked} placeholder="Type a goal and press Enter" onChange={(event) => setWords(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } }} /></label>
+    {dated
+      ? <label className="field">Deadline<input name="deadline" type="datetime-local" required value={deadline} disabled={change.blocked} onChange={(event) => setDeadline(event.target.value)} /></label>
+      : <button className="btn" type="button" disabled={change.blocked} onClick={() => setDated(true)}>Add a deadline</button>}
+    <button className="btn primary" type="submit" disabled={change.blocked || !ready}>Set goal</button><ChangeStatus change={change} />
   </form>;
 }

@@ -108,11 +108,24 @@ describe('Usage', () => {
     const routes = keeping();
     await mount(file, routes);
     await type('textarea[name="words"]', 'Land the Usage screen');
+    await click([...document.querySelectorAll('button')].find((button) => button.textContent === 'Add a deadline') ?? null);
     await type('input[name="deadline"]', '2026-10-01T12:00');
     await submit('Set a goal');
     await reload(routes);
     expect($('section[aria-label="Goals"] table')?.textContent).toContain('Land the Usage screen');
     expect($('section[aria-label="Goals"] table')?.textContent).toContain('Open');
+  });
+
+  it('keeps a goal set with no deadline, asking for none', async () => {
+    const routes = keeping();
+    await mount(file, routes);
+    expect($('form[aria-label="Set a goal"] select')).toBeNull();
+    expect($('input[name="deadline"]')).toBeNull();
+    await type('textarea[name="words"]', 'Answer every question in plain words');
+    await submit('Set a goal');
+    await reload(routes);
+    expect($('section[aria-label="Goals"] table')?.textContent).toContain('Answer every question in plain words');
+    expect($('section[aria-label="Goals"] table')?.textContent).toContain('No deadline');
   });
 
   it('keeps both existing actions and the holder warning when adding a limit', async () => {
