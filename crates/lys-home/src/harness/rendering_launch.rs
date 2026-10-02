@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use super::claude_code::launch_env::env_settings;
+use super::claude_code::launch_env::{confinement_named, env_settings};
 use super::claude_code::template::parse_template;
 use super::launch_fields::InstructionsMode;
 use crate::record::blocks::Hash;
@@ -75,18 +75,7 @@ pub fn render(
         return super::codex::launch::render(program, text, instructions_mode);
     }
     let template = parse_template(text.as_bytes()).map_err(|error| error.to_string())?;
-    if template
-        .permissions
-        .as_ref()
-        .and_then(|permissions| permissions.get("defaultMode"))
-        .and_then(serde_json::Value::as_str)
-        .is_none_or(str::is_empty)
-    {
-        return Err(
-            "slots.permissions.defaultMode names no mode: choose how this agent is confined"
-                .to_owned(),
-        );
-    }
+    confinement_named(&template).map_err(|error| error.to_string())?;
     let settings = String::from_utf8(env_settings(&template).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?;
     let mcp =

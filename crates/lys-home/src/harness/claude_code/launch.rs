@@ -42,7 +42,7 @@ use crate::harness::claude_code::events::{ManifestFile, RenderManifest, template
 use crate::harness::claude_code::given::{
     CONFIG_DIR_NAME, CONFIG_DIR_VARIABLE, ConfigDir, ConfigSource, resolve_given,
 };
-use crate::harness::claude_code::launch_env::{Judge, write_env_file, write_new};
+use crate::harness::claude_code::launch_env::{Judge, confinement_named, write_env_file, write_new};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::harness::claude_code::seed::seed_argument;
 use crate::harness::claude_code::template::{Template, read_template};
@@ -119,6 +119,7 @@ fn targets(out: &Path, uuid: &str) -> [PathBuf; 5] {
 /// Run `render-launch` and return its report.
 pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     let (mut template, template_bytes) = read_template(&args.template)?;
+    confinement_named(&template)?;
     safe_component("uuid", &args.uuid)?;
     let key = args
         .key
