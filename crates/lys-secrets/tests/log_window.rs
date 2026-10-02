@@ -47,11 +47,6 @@ struct Folders {
     dir: TempDir,
 }
 
-struct Seed {
-    folders: Folders,
-    appends: u64,
-}
-
 impl Folders {
     fn root(&self) -> PathBuf {
         self.dir.path().join("broker")
@@ -79,105 +74,9 @@ impl Folders {
     }
 }
 
-/// A refused use whose outcome names the line's own index.
-fn refusal(index: u64) -> AuditLine {
-    AuditLine {
-        kind: AuditKind::Use,
-        at_ms: AT_MS,
-        handle: None,
-        identity: Some("agent:noor".to_owned()),
-        secret: Some("github-token".to_owned()),
-        operation: None,
-        request: None,
-        uses: None,
-        spend: None,
-        outcome: format!("{OUTCOME} {index}"),
-    }
-}
-
-/// Makes a broker, fills its log to `LINES` signed lines, and opens it once
-/// so its snapshot is written at the full log.
-fn build(folders: &Folders) -> Result<u64, Box<dyn Error>> {
-    fs::create_dir_all(folders.root())?;
-    fs::create_dir_all(folders.keys())?;
-    let paths = folders.paths();
-    drop(Broker::create(
-        &paths,
-        LocalGrants::new(),
-        Box::new(|| AT_MS),
-    )?);
-    let guarded = [paths.store_dir.as_path(), paths.log_dir.as_path()];
-    let audit_key = StoreKey::load(&paths.audit_key, &guarded)?;
-    let signer = Ed25519Identity::load(&paths.audit_key)?;
-    let mut audit = AuditLog::open(&paths.log_dir, &paths.anchor, &guarded, &audit_key)?.0;
-    let mut appends = 0;
-    while audit.len() + 1 < LINES {
-        audit.append_unanchored(&refusal(audit.len()), &signer)?;
-        appends += 1;
-    }
-    audit.append(&refusal(audit.len()), &signer)?;
-    appends += 1;
-    drop(audit);
-    let broker = folders.open()?;
-    let len = broker.audit().len();
-    if len != LINES {
-        return Err(format!("the built log holds {len} lines, not {LINES}").into());
-    }
-    Ok(appends)
-}
-
-/// The 10,000-line broker, written once per run under the target's
-/// temporary folder.
-fn built() -> Result<&'static Seed, Box<dyn Error>> {
-    static BUILT: OnceLock<Result<Seed, String>> = OnceLock::new();
-    BUILT
-        .get_or_init(|| {
-            let dir = tempfile::Builder::new()
-                .prefix("log-window-")
-                .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
-                .map_err(|error| format!("making the fixture folder: {error}"))?;
-            let folders = Folders { dir };
-            let appends = build(&folders)
-                .map_err(|error| format!("building the 10,000-line log: {error}"))?;
-            Ok(Seed { folders, appends })
-        })
-        .as_ref()
-        .map_err(|error| error.as_str().into())
-}
-
-fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
-    fs::create_dir_all(to)?;
-    for entry in fs::read_dir(from)? {
-        let entry = entry?;
-        let target = to.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_tree(&entry.path(), &target)?;
-        } else {
-            fs::copy(entry.path(), &target)?;
-        }
-    }
-    Ok(())
-}
-
 /// A copy of the 10,000-line broker for one test.
 fn ten_thousand() -> Result<Folders, Box<dyn Error>> {
-    let built = built()?;
-    let copy = Folders {
-        dir: tempfile::tempdir()?,
-    };
-    copy_tree(&built.folders.root(), &copy.root())?;
-    copy_tree(&built.folders.keys(), &copy.keys())?;
-    Ok(copy)
-}
-
-#[test]
-fn the_large_fixture_requires_no_runtime_store_appends() -> TestResult {
-    let seed = built()?;
-    assert_eq!(
-        seed.appends, 0,
-        "the large fixture must load recorded bytes without appending to the store"
-    );
-    Ok(())
+    fixture::copy()
 }
 
 /// One printed page: each row's index and the index its outcome names,

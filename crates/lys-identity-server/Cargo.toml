@@ -28,6 +28,7 @@ serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tempfile.workspace = true
+toml.workspace = true
 tokio = { workspace = true, features = ["time"] }
 tower.workspace = true
 tracing.workspace = true
@@ -40,6 +41,7 @@ ciborium.workspace = true
 identity-contract = { path = "../../tests/identity_contract" }
 rustix.workspace = true
 tempfile.workspace = true
+toml.workspace = true
 
 # The target that needs a running permission database runs only when it is
 # named, never under `cargo test --workspace --all-features`.
