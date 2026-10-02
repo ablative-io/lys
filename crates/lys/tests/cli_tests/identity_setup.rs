@@ -272,3 +272,40 @@ fn setup_over_ssh_writes_the_readable_code_without_opening_a_browser() -> TestRe
     );
     Ok(())
 }
+
+#[test]
+fn a_readable_setup_file_is_reported_by_its_absolute_path() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let tools = tempfile::tempdir()?;
+    write_deployment(root.path())?;
+    let state = root.path().join("state");
+    std::fs::create_dir(&state)?;
+    std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700))?;
+    for name in ["open", "xdg-open"] {
+        let opener = tools.path().join(name);
+        std::fs::write(&opener, "#!/bin/sh\nexit 1\n")?;
+        std::fs::set_permissions(&opener, std::fs::Permissions::from_mode(0o700))?;
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_lys"))
+        .args(["identity", "setup-code", "--root", "."])
+        .current_dir(root.path())
+        .env("PATH", tools.path())
+        .env("SSH_CONNECTION", "127.0.0.1 12345 127.0.0.1 22")
+        .output()?;
+    assert!(output.status.success(), "setup-code failed");
+    let path = root.path().join("setup-code");
+    let named = format!("the setup code is in {}", path.display());
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains(&named),
+        "the readable setup code's absolute path was not printed"
+    );
+    let code = std::fs::read(&path)?;
+    assert!(
+        !output
+            .stdout
+            .windows(code.len())
+            .any(|window| window == code),
+        "the code itself was printed"
+    );
+    Ok(())
+}
