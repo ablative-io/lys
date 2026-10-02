@@ -74,6 +74,69 @@ def records():
     return before, after
 
 
+def already_new_records():
+    """A limits release's own answers: already the candidate's shapes, so the upgrade
+    must answer every one of them exactly as the old release did."""
+    old, new = records()
+    before = copy.deepcopy(new)
+    return before, copy.deepcopy(before)
+
+
+class AlreadyNewReleaseTests(unittest.TestCase):
+    def test_equal_answers_pass(self):
+        before, after = already_new_records()
+        same_records(before, after)
+
+    def test_each_changed_value_is_refused(self):
+        mutations = [
+            ("budgets", lambda value: value["budgets"]["limits"][0].update(amount=200)),
+            ("budgets", lambda value: value["budgets"]["limits"][0].update(period="week")),
+            ("budgets", lambda value: value["budgets"]["limits"][0].update(zone="UTC")),
+            ("budgets", lambda value: value["budgets"]["limits"][0].update(act="stop")),
+            ("budgets", lambda value: value["budgets"]["limits"].append(
+                {"unit": "running_ms", "amount": 1, "period": "day", "act": "stop"})),
+            ("budgets", lambda value: value["budgets"].update(unconfirmed=[{"requested": {}}])),
+            ("budgets", lambda value: value["budgets"].update(
+                effective_limits=value["budgets"]["limits"])),
+            ("budgets", lambda value: value["budgets"].update(version=2)),
+            ("budgets", lambda value: value["budgets"].update(by="person-other")),
+            ("budgets", lambda value: value["budgets"].update(warn_at=80)),
+            ("budgets", lambda value: value["budgets"]["used"][0].update(figure=5)),
+            ("budgets", lambda value: value["budgets"]["unavailable"].pop()),
+            ("budgets", lambda value: value["budgets"].update(within=[{"team": "t"}])),
+            ("configuration", lambda value: value["configuration"]["permissions"].update(
+                model_version=3)),
+            ("configuration", lambda value: value["configuration"]["sign_in"].update(
+                session_seconds=1)),
+            ("configuration", lambda value: value["configuration"]["organisation"].update(
+                zone="UTC")),
+            ("configuration", lambda value: value["configuration"]["organisation"].update(at=1)),
+            ("configuration", lambda value: value["configuration"].pop("organisation")),
+            ("goals", lambda value: value["goals"]["goals"][0]["goal"].update(active=False)),
+            ("goals", lambda value: value["goals"]["goals"][0]["goal"].pop("active")),
+            ("goals", lambda value: value["goals"]["goals"][0]["goal"].update(words="Other")),
+            ("provisioning", lambda value: value["provisioning"]["profile"].update(
+                instructions_mode="replace")),
+            ("provisioning", lambda value: value["provisioning"]["profile"].update(
+                skill_pins=["pinned"])),
+            ("provisioning", lambda value: value["provisioning"]["profile"].pop("harness")),
+            ("provisioning", lambda value: value["provisioning"]["profile"].update(note="Other")),
+        ]
+        for index, (domain, mutate) in enumerate(mutations):
+            with self.subTest(case=index, domain=domain):
+                before, after = already_new_records()
+                mutate(after)
+                with self.assertRaisesRegex(RuntimeError, domain):
+                    same_records(before, after)
+
+    def test_a_limits_answer_holding_unconfirmed_budgets_is_refused(self):
+        before, after = already_new_records()
+        before["budgets"]["unconfirmed"] = [{"requested": {}}]
+        after["budgets"]["unconfirmed"] = [{"requested": {}}]
+        with self.assertRaisesRegex(RuntimeError, "already held budgets unconfirmed"):
+            same_records(before, after)
+
+
 class UpgradeProofTests(unittest.TestCase):
     def test_installed_stamps_use_only_the_installers_declared_binaries(self):
         with tempfile.TemporaryDirectory() as directory:

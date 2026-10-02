@@ -61,8 +61,14 @@ def refused_writes(fixture, provisioning):
     """Exercise every new-format writer while the actual old-reader rollback is possible."""
     team = f"/teams/{fixture['team']}/members/{fixture['foreign'][0]}/confirm"
     budgets = f"/budgets/person/{fixture['person']}/confirm"
-    tokens = next(value for value in fixture["budgets_before"]["budgets"]
-                  if value["measure"] == "tokens")
+    held = fixture["budgets_before"]
+    if fixture["release"]["budgets"] == "per_measure":
+        version = next(value for value in held["budgets"] if value["measure"] == "tokens")["version"]
+    elif fixture["release"]["budgets"] == "limits":
+        # A limits release keeps one version for the holder's whole collection.
+        version = held["version"]
+    else:
+        raise RuntimeError(f"no budget confirmation for the {fixture['release']['budgets']} model")
     profile = provisioning["profile"]
     path = f"/agents/{provisioning['agent']}/provisioning"
     change = {name: profile[name] for name in (
@@ -70,7 +76,7 @@ def refused_writes(fixture, provisioning):
     change.update(operation=operation(), from_version=profile["version"])
     return [
         (team, {"operation": operation()}, "TeamsUnavailable"),
-        (budgets, {"measure": "tokens", "version": tokens["version"]}, "BudgetsUnavailable"),
+        (budgets, {"measure": "tokens", "version": version}, "BudgetsUnavailable"),
         (path, change, "ProvisioningUnavailable"),
         (f"{path}/{profile['version']}/review", {"operation": operation()}, "ProvisioningUnavailable"),
         ("/skills", {"name": "upgrade-fixture-skill", "text": "# Held during upgrade\n"},

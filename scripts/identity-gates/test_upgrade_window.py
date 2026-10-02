@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from upgrade_negative import require_old_refusal
+from upgrade_negative import UNDEFINED_LINE, poison_line, require_old_refusal
 from upgrade_window import family_files, pending, profile_file, refuse_operator, refused_writes, unchanged
 
 
@@ -42,7 +42,9 @@ class WindowProofTests(unittest.TestCase):
 
     def test_all_five_mutations_use_real_record_ids_and_stored_versions(self):
         legacy = {"team": "kept-team", "foreign": ["kept-member"], "person": "kept-person",
-                  "budgets_before": {"budgets": [{"measure": "tokens", "version": 17}]}}
+                  "release": {"budgets": "per_measure", "teams": "unguarded"},
+                  "budgets_before": {"budgets": [{"measure": "context_percent", "version": 3},
+                                                 {"measure": "tokens", "version": 17}]}}
         profile = {"version": 9, "model_access": ["kept-model"], "tools": ["Read"],
                    "skills": [], "mcp_servers": [{"name": "kept", "url": "https://example.test/mcp"}],
                    "instructions": "Kept instructions", "note": "Kept note"}
@@ -55,6 +57,19 @@ class WindowProofTests(unittest.TestCase):
         self.assertEqual(writes[2][1]["mcp_servers"], profile["mcp_servers"])
         self.assertEqual([kind for route, body, kind in writes], [
             "TeamsUnavailable", "BudgetsUnavailable", *(["ProvisioningUnavailable"] * 3)])
+
+    def test_a_limits_release_confirmation_names_the_collection_version(self):
+        legacy = {"team": "kept-team", "foreign": ["kept-member"], "person": "kept-person",
+                  "release": {"budgets": "limits", "teams": "guarded"},
+                  "budgets_before": {"limits": [{"unit": "tokens"}], "version": 4}}
+        profile = {"version": 9, "model_access": [], "tools": [], "skills": [], "mcp_servers": [],
+                   "instructions": "", "note": ""}
+        writes = refused_writes(legacy, {"agent": "kept-agent", "profile": profile})
+        self.assertEqual(writes[1][:2], ("/budgets/person/kept-person/confirm",
+                                         {"measure": "tokens", "version": 4}))
+        legacy["release"]["budgets"] = "unknown"
+        with self.assertRaisesRegex(RuntimeError, "unknown"):
+            refused_writes(legacy, {"agent": "kept-agent", "profile": profile})
 
     def test_an_added_profile_member_is_a_byte_change_even_when_empty(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -109,12 +124,19 @@ class WindowProofTests(unittest.TestCase):
 
     def test_negative_control_requires_its_exact_leaf_decoder_refusal(self):
         path = Path("/fixture/teams/leaves/00000000000000000012")
-        require_old_refusal("leaf 12 is not a team line: unknown variant `held`", path)
-        for text in ("port busy", "leaf 11 is not a team line: unknown variant `held`",
-                     "leaf 12 is not a team line: malformed json"):
-            with self.subTest(text=text), self.assertRaisesRegex(RuntimeError, str(path)):
-                require_old_refusal(text, path)
+        for line in ("held", UNDEFINED_LINE):
+            require_old_refusal(f"leaf 12 is not a team line: unknown variant `{line}`", path, line)
+            for text in ("port busy", f"leaf 11 is not a team line: unknown variant `{line}`",
+                         "leaf 12 is not a team line: malformed json",
+                         "leaf 12 is not a team line: unknown variant `other`"):
+                with self.subTest(line=line, text=text), self.assertRaisesRegex(RuntimeError, str(path)):
+                    require_old_refusal(text, path, line)
 
+    def test_negative_control_writes_a_line_each_release_cannot_read(self):
+        self.assertEqual(poison_line("unguarded"), "held")
+        self.assertEqual(poison_line("guarded"), UNDEFINED_LINE)
+        with self.assertRaisesRegex(RuntimeError, "no negative control"):
+            poison_line("unknown")
 
 if __name__ == "__main__":
     unittest.main()

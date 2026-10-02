@@ -4,6 +4,8 @@ import http.client
 import json
 import secrets
 
+from upgrade_release import limits_body, per_measure_body
+
 
 def operation():
     return "op-" + secrets.token_hex(16)
@@ -38,7 +40,20 @@ class Browser:
             connection.close()
 
 
-def populate(browser, root):
+AGENT_LIMIT = {"unit": "tokens", "amount": 100, "period": "day", "zone": "Australia/Melbourne",
+               "act": "tell"}
+
+
+def agent_budget_body(release):
+    """The agent's one budget, in the request shape the old release accepts."""
+    if release["budgets"] == "limits":
+        return limits_body([AGENT_LIMIT], 0)
+    if release["budgets"] == "per_measure":
+        return per_measure_body(AGENT_LIMIT, 0)
+    raise RuntimeError(f"no agent budget request for the {release['budgets']} budget model")
+
+
+def populate(browser, root, release):
     code = (root / "setup-code").read_text().strip()
     password = "Upgrade-" + secrets.token_hex(24) + "-1aA!"
     email = "upgrade-fixture@example.test"
@@ -132,17 +147,7 @@ def populate(browser, root):
             "window": {"starts_at": 0, "ends_at": None},
         },
     )["grant"]
-    browser.ask(
-        "PUT",
-        f"/budgets/agent/{agent}",
-        {
-            "version": 0,
-            "measure": "tokens",
-            "limit": 100,
-            "period": {"length": "day", "zone": "Australia/Melbourne"},
-            "act": "tell",
-        },
-    )
+    browser.ask("PUT", f"/budgets/agent/{agent}", agent_budget_body(release))
     browser.ask(
         "POST",
         f"/agents/{agent}/goals",
@@ -295,6 +300,28 @@ def measured(used, unavailable, effective, name):
         raise RuntimeError(f"upgrade {name} context gap differs from its measured figure")
 
 
+def kept_limits(before, after, name, pending):
+    """A release that already answered limit collections: nothing to map, nothing to hold.
+
+    Such a release refuses a person's own budget edit, so no legacy self-set
+    budget exists to be held unconfirmed; its limits must read back unchanged.
+    """
+    if not isinstance(before.get("limits"), list) or not isinstance(before.get("unconfirmed"), list):
+        raise RuntimeError(f"old {name} readback has an unknown shape")
+    if pending:
+        raise RuntimeError(f"old {name} came from a limits release, which holds nothing for confirmation")
+    if before["unconfirmed"]:
+        raise RuntimeError(f"old {name} readback already held budgets unconfirmed")
+    if after.get("limits") != before["limits"]:
+        raise RuntimeError(f"upgrade changed the {name} limits")
+    if after.get("unconfirmed") != []:
+        raise RuntimeError(f"upgrade held {name} unconfirmed that the old release had confirmed")
+    if "effective_limits" in after:
+        raise RuntimeError(f"upgrade enforced other {name} than the limits it holds")
+    if after != before:
+        raise RuntimeError(f"upgrade changed the {name} readback")
+
+
 def migrated_budgets(before, after, zone, pending):
     """Every old per-measure budget read back in the candidate's limit collection.
 
@@ -302,9 +329,12 @@ def migrated_budgets(before, after, zone, pending):
     full budget that stays enforced; every other measure must be confirmed.
     """
     name = f"{before['holder']['kind']} budgets"
-    if "budgets" not in before or "budgets" in after:
+    if "budgets" in after:
         if after != before:
             raise RuntimeError(f"upgrade changed the {name} readback")
+        return
+    if "budgets" not in before:
+        kept_limits(before, after, name, pending)
         return
     if set(before) != {"holder", "budgets"}:
         raise RuntimeError(f"old {name} readback has an unknown shape")

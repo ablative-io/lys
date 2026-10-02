@@ -23,6 +23,7 @@ from upgrade_provenance import seed as seed_provenance, verify as verify_provena
 from upgrade_preflight import socket_paths
 from upgrade_teardown import terminate_fixture
 from upgrade_layout import inventory, executables, harness_inventory, harness_paths
+from upgrade_release import old_release
 
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
 
@@ -440,7 +441,12 @@ def prepare(args):
     )
     if dirty:
         raise RuntimeError("old source must be clean, including its deployment template")
-    layouts = {"old": inventory(lambda path: (args.old_source / path).read_text(), args.old_commit)}
+
+    def old_text(path):
+        return (args.old_source / path).read_text()
+
+    layouts = {"old": inventory(old_text, args.old_commit)}
+    release = old_release(old_text)
     repository = Path(__file__).resolve().parents[2]
 
     def candidate_source(path):
@@ -496,6 +502,7 @@ def prepare(args):
         "surfaces": surfaces,
         "socket_paths": paths,
         "layouts": layouts,
+        "release": release,
         "executables": executables(),
         "verifiers": verifiers,
         "harness_paths": harness_paths(verifiers, layouts),
@@ -539,8 +546,9 @@ def exercise(args):
     primary = None
     try:
         run(installed, evidence / "install-old.log", env)
-        ids = populate(browser, root)
-        legacy, legacy_browser = seed_legacy(browser, root, ids)
+        release = args.prepared["release"]
+        ids = populate(browser, root, release)
+        legacy, legacy_browser = seed_legacy(browser, root, ids, release)
         (evidence / "legacy-before.json").write_text(json.dumps(legacy, indent=2))
         config_file = root / "identity.json"
         config = json.loads(config_file.read_text())
@@ -604,7 +612,8 @@ def exercise(args):
         unchanged(files, legacy_files(root, json.loads(config_file.read_text())))
         if args.negative_control:
             receipt = exercise_negative(
-                root, evidence, driver, installed, env, files, run, installed_stamp, args.old_commit
+                root, evidence, driver, installed, env, files, run, installed_stamp, args.old_commit,
+                args.prepared["release"]["teams"],
             )
         else:
             # Re-enter the real old installer. Its existing recovery runs before installation.

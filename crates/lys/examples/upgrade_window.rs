@@ -46,8 +46,13 @@ enum Mode {
         #[arg(long)]
         verifier: PathBuf,
     },
-    /// Deliberately append a new-format team hold to a stopped disposable store.
+    /// Deliberately append a team line the old release cannot read to a
+    /// stopped disposable store.
     Poison {
+        /// The line's kind: `held`, the candidate's own hold, or one no
+        /// release defines.
+        #[arg(long)]
+        line: String,
         #[arg(long)]
         fixture: PathBuf,
     },
@@ -116,7 +121,7 @@ fn required<'a>(value: &'a Value, key: &str) -> ProbeResult<&'a str> {
         .ok_or_else(|| format!("legacy fixture has no string member {key}").into())
 }
 
-fn poison(layout: &Layout, fixture: &Path) -> ProbeResult {
+fn poison(layout: &Layout, line: &str, fixture: &Path) -> ProbeResult {
     reversible(layout)?;
     upgrade::swap::stop_all(&upgrade::units(layout)?, &mut |line| println!("{line}"))?;
     let config: Value = serde_json::from_slice(&std::fs::read(layout.service_config())?)?;
@@ -132,7 +137,7 @@ fn poison(layout: &Layout, fixture: &Path) -> ProbeResult {
         .and_then(|values| values.first())
         .and_then(Value::as_str)
         .ok_or("legacy fixture has no foreign member")?;
-    let leaf = json!({"line":"held", "operation":"op-deaddeaddeaddeaddeaddeaddeaddead",
+    let leaf = json!({"line":line, "operation":"op-deaddeaddeaddeaddeaddeaddeaddead",
         "team":team, "member":member, "reason":"deliberate upgrade proof negative control", "at":0});
     let (mut log, _) = FrontierLog::open(FileLeafStore::open(&directory)?)?;
     let (index, _) = log.append(&serde_json::to_vec(&leaf)?)?;
@@ -160,7 +165,7 @@ fn run(arguments: Arguments) -> ProbeResult {
             surface,
             verifier,
         } => window(&layout, &from, &surface, &verifier),
-        Mode::Poison { fixture } => poison(&layout, &fixture),
+        Mode::Poison { line, fixture } => poison(&layout, &line, &fixture),
     }
 }
 

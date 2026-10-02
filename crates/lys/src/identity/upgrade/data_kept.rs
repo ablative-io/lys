@@ -8,7 +8,9 @@
 //! last ran on. That the copy was kept is marked by a file beside the
 //! upgrade record, never by a step in it, so a release that predates the
 //! copy still reads the record when it finishes or puts back an upgrade
-//! this build began. A file that is neither a regular file nor a directory is
+//! this build began. Such a release puts back no data, since it knows no
+//! mark, and its clear leaves the mark behind; the next upgrade forgets it
+//! before writing its record, so it is never trusted. A file that is neither a regular file nor a directory is
 //! refused by name before anything is copied, never skipped.
 
 use std::path::Path;

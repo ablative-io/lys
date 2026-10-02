@@ -6,6 +6,9 @@ from pathlib import Path
 
 from upgrade_fixture import populate
 
+PER_MEASURE = {"budgets": "per_measure", "teams": "unguarded"}
+LIMITS = {"budgets": "limits", "teams": "guarded"}
+
 
 class OldApi:
     def __init__(self, state="active", responsible="owner"):
@@ -36,11 +39,34 @@ class OldApi:
 
 
 class SeedTests(unittest.TestCase):
-    def exercise(self, browser):
+    def exercise(self, browser, release=PER_MEASURE):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "setup-code").write_text("test-only-code")
-            return populate(browser, root)
+            return populate(browser, root, release)
+
+    def budget_request(self, release):
+        browser = OldApi()
+        self.exercise(browser, release)
+        return [(method, body) for method, path, body in browser.calls
+                if path == "/budgets/agent/agent"]
+
+    def test_a_per_measure_release_is_sent_one_measure_with_its_zoned_period(self):
+        self.assertEqual(self.budget_request(PER_MEASURE), [("PUT", {
+            "version": 0, "measure": "tokens", "limit": 100,
+            "period": {"length": "day", "zone": "Australia/Melbourne"}, "act": "tell"})])
+
+    def test_a_limits_release_is_sent_the_same_limit_as_its_whole_collection(self):
+        self.assertEqual(self.budget_request(LIMITS), [("PUT", {
+            "version": 0, "warn_at": None,
+            "limits": [{"unit": "tokens", "amount": 100, "period": "day",
+                        "zone": "Australia/Melbourne", "act": "tell"}]})])
+
+    def test_an_unknown_budget_model_is_refused_before_any_budget_is_sent(self):
+        browser = OldApi()
+        with self.assertRaisesRegex(RuntimeError, "budget model"):
+            self.exercise(browser, {"budgets": "unknown", "teams": "guarded"})
+        self.assertNotIn("/budgets/agent/agent", [path for method, path, body in browser.calls])
 
     def test_supported_setup_and_holder_activation(self):
         browser = OldApi()

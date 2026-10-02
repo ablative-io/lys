@@ -66,6 +66,29 @@ complete earlier effective limit, period and action enforced. The agent budget
 has no confirmation and no team aggregate; live usage figures must each be a
 figure or a named gap. The ordinary person's original session must also still work.
 
+Preparation reads what the old release is from its own source tree, never from a
+list of commits: the fields of `BudgetBody` in
+`crates/lys-identity-server/src/budgets_api.rs` say whether `PUT /budgets/{kind}/{id}`
+takes one measure (`version`, `measure`, `limit`, `period`, `act`) or the holder's
+whole collection (`version`, `limits`, `warn_at`), and a `held` field in `TeamView`
+in `teams_api.rs` says the release keeps its own membership holds. The result is
+in the preparation receipt as `release`. Every other request the seed sends has
+the same body at every baseline. The agent and personal budgets carry the same
+limits, periods, zones and actions in either shape.
+
+The unconfirmed-budget path and the two legacy team holds are proven only from
+the per-measure baselines (1b568cd9 and 8c064b62 today). A release that already
+takes limit collections refuses a person's own budget edit, and a guarded
+release refuses an ordinary member adding another person or an agent they do not
+operate, so neither case can be created there. For such a release the seed makes
+those requests anyway and requires each refused by name (`not_permitted`,
+`NotAdmitted`); the administrator sets the same three personal limits and adds the
+two foreign members. After upgrade the proof requires the team unchanged with
+nothing held, the personal and agent limits equal before and after, `unconfirmed`
+empty and no `effective_limits`, every other answer equal, no new
+team row at the first restart after commit, and the budget store byte-equal across
+it, since that release already wrote the current format.
+
 An ordinary old provisioning profile includes an MCP server. Its HTTP readback
 and complete stored file must survive the window, rollback and normal upgrade.
 Only the candidate's declared empty `skill_pins`, null `harness`, null
@@ -96,10 +119,15 @@ The old loader also creates an agent through the real bearer import endpoint. It
 
 The negative leg creates its own fresh old install. At the same interruption
 point the driver stops only that install using the production unit lifecycle,
-then deliberately appends one new-format Held leaf through the actual log
-store. The byte checker must name that record and the real old installer's
-recovery must fail with that exact leaf's unknown Held variant. A generic boot
-failure does not count. The private receipt records the path and decoder refusal.
+then deliberately appends one team leaf the old release cannot read through
+the actual log store. Against an unguarded release (one whose team answer has
+no `held`) that leaf is the candidate's own `held` line. A guarded release
+already reads every team line the candidate writes, so no candidate record is
+unreadable to it; the leaf is then the `upgrade_proof_undefined` line, which no
+release defines, and the receipt records `candidate_format: false`. The byte
+checker must name that record and the real old installer's recovery must fail
+with that exact leaf's unknown variant. A generic boot failure does not count.
+The private receipt records the path, the line and the decoder refusal.
 
 After the positive normal upgrade clears its intent, the proof checks that the
 old family bytes still stand, crashes only its own identity process, and waits
