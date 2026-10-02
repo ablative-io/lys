@@ -253,6 +253,53 @@ describe('The delegation form', () => {
     expect(posted).toHaveLength(1);
   });
 
+  it('after one failed rest write, Give again sends every ticked action, not only the tail', async () => {
+    const KEY = 'lys.pending.grant.' + ADA + '.' + ROOT_G;
+    const { posted } = await open();
+    await tick('edit', 'view');
+    const real = Storage.prototype.setItem;
+    let failed = false;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k.endsWith('.rest') && !failed) { failed = true; throw new Error('storage unavailable'); }
+      real.call(this, k, v);
+    });
+    await click($('[data-act="delegatedo"]'));
+    spy.mockRestore();
+    const given = () => posted.filter((p) => p.path === '/grants').map((p) => p.body as DelegateBody);
+    expect(given()).toEqual([]);
+    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+    // State says what storage says: nothing is held, so nothing is offered as an earlier run.
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+    expect(sessionStorage.getItem(KEY + '.rest')).toBeNull();
+    expect($('[data-rest-held]')).toBeNull();
+    await click($('[data-act="delegatedo"]'));
+    expect(given().map((b) => b.relation).sort()).toEqual(['only.edit', 'viewer']);
+    expect($('#toast')?.textContent).toContain('Given.');
+  });
+
+  it('names a rest that could not be cleared after a definite refusal mid-run, and offers it again', async () => {
+    const KEY = 'lys.pending.grant.' + ADA + '.' + ROOT_G;
+    let calls = 0;
+    const { posted } = await open({
+      ...SERVICE,
+      'POST /grants': (body) => (++calls === 2 ? refused(403, 'RecipientRefused', 'RecipientRefused: not now') : ok({ operation: (body as DelegateBody).operation, grant: SCRIBE_G, receipt: { caller: ADA } })),
+    });
+    await tick('edit', 'view');
+    const real = Storage.prototype.removeItem;
+    const spy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, k: string) {
+      // The clear that follows the refusal is the one that fails; the shortening before the second send succeeds.
+      if (k.endsWith('.rest') && calls >= 2) throw new Error('storage unavailable');
+      real.call(this, k);
+    });
+    await click($('[data-act="delegatedo"]'));
+    spy.mockRestore();
+    expect(posted.filter((p) => p.path === '/grants')).toHaveLength(2);
+    expect($('#dAnswer b')?.textContent).toBe('RecipientRefused');
+    expect($('#toast')?.textContent).toContain('could not clear them');
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+    expect(sessionStorage.getItem(KEY + '.rest')).toBeNull();
+  });
+
   it('sends nothing and names it when the rest of a two-action run cannot be retained', async () => {
     const KEY = 'lys.pending.grant.' + ADA + '.' + ROOT_G;
     const { posted } = await open();

@@ -54,6 +54,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   const [pending, setPending] = useState(() => readPendingGrant(key, me, source.id));
   const [rest, setRest] = useState(() => readPendingRest(key, me, source.id));
   const working = useRef(false);
+  const unreleased = useRef(false);
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const locked = pending.kind !== 'empty' || outcome.at === 'sending';
   const toAgent = w.who.get(recipient)?.kind !== 'person';
@@ -104,19 +105,19 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         || typeof answer.grant !== 'string' || !/^grant-[0-9a-f]{32}$/.test(answer.grant)) {
         throw new Refused(200, { refusal: 'UnconfirmedAnswer', reason: 'The service did not confirm this grant operation. Its original details remain retained.' });
       }
-      sessionStorage.removeItem(key);
-      setPending({ kind: 'empty' });
+      try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { unreleased.current = true; }
       return true;
     } catch (error) {
-      const refused = error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
+      let refused = error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
       if (!submitted && !retry) {
         setPending({ kind: 'empty' });
         setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'RequestNotRetained', reason: 'Nothing was sent because this browser could not retain the grant request: ' + refused.message }) });
       } else if (retry || uncertain(refused)) {
         setOutcome({ at: 'pending', reason: refused.refusal.reason });
       } else {
-        sessionStorage.removeItem(key);
-        setPending({ kind: 'empty' });
+        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (release) {
+          refused = new Refused(refused.status, { refusal: refused.refusal.refusal, reason: refused.refusal.reason + ' The browser could not release the retained request; Check original grant will answer this same refusal, never a second grant: ' + String(release) });
+        }
         setOutcome({ at: 'refused', refused });
       }
       return false;
@@ -125,9 +126,9 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
 
   /** The requests still to send after the retained one, written whole so a reload finishes the run exactly as it was ticked, never twice. */
   const keepRest = (left: DelegateBody[]) => {
-    // A copy: the caller goes on shifting its queue, and state must say what storage says.
-    setRest(left.length ? { kind: 'held', bodies: [...left] } : { kind: 'empty' });
+    // Storage first, then a copy into state: state says what storage says, never a rest the browser refused to keep.
     if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
+    setRest(left.length ? { kind: 'held', bodies: [...left] } : { kind: 'empty' });
   };
 
   /** The words for what a body grants, as the model says them. */
@@ -170,14 +171,13 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         first = bodyFor(relation, actions); queue = [];
       }
       const given: DelegateBody[] = [];
+      unreleased.current = false;
       try {
-        if (!retry) retain(first);
+        // The whole run is kept before anything else, so a failure at any later write leaves every body somewhere it is offered again by name.
+        if (!retry) { keepRest([first, ...queue]); retain(first); }
         keepRest(queue);
       } catch (error) {
-        // Nothing has been sent. Release the retained body if the browser lets us; otherwise it stays retained and is retried, never duplicated.
-        if (!retry) {
-          try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { setPending({ kind: 'held', body: first }); }
-        }
+        // Nothing has been sent. What is stored is offered again on the next Give, exactly as ticked, never twice.
         notRetained(error);
         return;
       }
@@ -188,9 +188,10 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         if (!confirmed) {
           // An uncertain answer keeps the rest for the retry; a definite refusal ends the run and names what did and did not happen.
           if (outcome.at !== 'pending' && sessionStorage.getItem(key) === null) {
-            keepRest([]);
-            if (given.length || queue.length) {
-              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${onText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}`);
+            let cleared = true;
+            try { keepRest([]); } catch { cleared = false; }
+            if (given.length || queue.length || !cleared) {
+              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${onText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}${cleared ? '' : ' The browser could not clear them; they will be offered again, never sent by themselves.'}`);
             }
           }
           return;
@@ -211,7 +212,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         current = next;
       }
       shell.closeAll();
-      shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${onText(source)}, through you.`);
+      shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${onText(source)}, through you.${unreleased.current ? ' The browser could not release the retained request; opening this again checks it, never gives it twice.' : ''}`);
       done();
     } finally { working.current = false; }
   };
