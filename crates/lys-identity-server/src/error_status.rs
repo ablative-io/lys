@@ -66,7 +66,8 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::GrantNotCanonical
         | GrantError::EventMalformed { .. }
         | GrantError::EventNotCanonical
-        | GrantError::EventTooLarge { .. } => StatusCode::BAD_REQUEST,
+        | GrantError::EventTooLarge { .. }
+        | GrantError::ResourceKindUnheld { .. } => StatusCode::BAD_REQUEST,
         GrantError::SourceUnknown { .. } | GrantError::GrantUnknown { .. } => StatusCode::NOT_FOUND,
         GrantError::ModelInvalid { .. }
         | GrantError::EventMismatch { .. }
@@ -85,7 +86,6 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
         GrantError::RelationUnknown { .. }
-        | GrantError::ResourceKindUnheld { .. }
         | GrantError::ActionsOutside { .. }
         | GrantError::LineageCycle { .. }
         | GrantError::IssuerNotHolder { .. }

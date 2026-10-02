@@ -473,19 +473,28 @@ impl RelationshipStore for SpiceDb {
             {
                 return Ok(());
             }
-            return Err(unheld(kind, format!(
-                "resource kind {kind} has no held permission model; the app owner must publish its resource schema and the Lys administrator must approve it before a grant can be committed"
-            )));
+            return Err(unheld(
+                kind,
+                format!(
+                    "resource kind {kind} has no held permission model; the app owner must publish its resource schema and the Lys administrator must approve it before a grant can be committed"
+                ),
+            ));
         }
         if FIXED.contains(&kind) && !RESOURCE_SUBJECTS.contains(&kind) {
-            return Err(unheld(kind, format!(
-                "resource kind {kind} is an internal permission-engine definition without model resource relations; a Lys maintainer must add support for that resource kind before a grant can be committed"
-            )));
+            return Err(unheld(
+                kind,
+                format!(
+                    "resource kind {kind} is an internal permission-engine definition without model resource relations; a Lys maintainer must add support for that resource kind before a grant can be committed"
+                ),
+            ));
         }
         if !names::engine_takes(kind) {
-            return Err(unheld(kind, format!(
-                "resource kind {kind} is not a name the permission engine can hold; the Lys administrator must choose three to sixty-four lowercase letters, digits and underscores, starting with a letter and not ending with an underscore, or a Lys maintainer must add a supported resource-kind mapping"
-            )));
+            return Err(unheld(
+                kind,
+                format!(
+                    "resource kind {kind} is not a name the permission engine can hold; the Lys administrator must choose three to sixty-four lowercase letters, digits and underscores, starting with a letter and not ending with an underscore, or a Lys maintainer must add a supported resource-kind mapping"
+                ),
+            ));
         }
         Ok(())
     }
