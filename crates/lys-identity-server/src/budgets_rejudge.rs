@@ -64,7 +64,7 @@ pub(crate) async fn rejudge(state: &Arc<AppState>) -> Result<(), ServerError> {
                 })?;
             }
             Err(Undelivered::Refused(words)) => {
-                let acted = refused(&crossing.operation, words, at_ms);
+                let acted = refused(&crossing.operation, &words, at_ms);
                 (state.say)(&format!(
                     "budget compaction {} was not withdrawn: {}",
                     crossing.operation, acted.words
@@ -83,7 +83,7 @@ pub(crate) async fn rejudge(state: &Arc<AppState>) -> Result<(), ServerError> {
 /// What a refused withdrawal says of the crossing: one the runner had
 /// already begun typing stands as typed; any other refusal means the runner
 /// no longer holds it, so it will not be typed.
-fn refused(operation: &str, words: String, at_ms: i64) -> Acted {
+fn refused(operation: &str, words: &str, at_ms: i64) -> Acted {
     let (stands, words) = if words.starts_with("operation_past_its_boundary") {
         (
             Stands::Delivered,
@@ -110,10 +110,10 @@ mod tests {
 
     #[test]
     fn a_refused_withdrawal_is_kept_as_typed_or_as_not_done() {
-        let typed = refused("op", "operation_past_its_boundary: begun".to_owned(), 5);
+        let typed = refused("op", "operation_past_its_boundary: begun", 5);
         assert_eq!((typed.stands, typed.at_ms), (Stands::Delivered, 5));
         assert!(typed.words.contains("typed"));
-        let gone = refused("op", "operation_unknown: none".to_owned(), 6);
+        let gone = refused("op", "operation_unknown: none", 6);
         assert_eq!(gone.stands, Stands::Refused);
         assert!(gone.words.contains("operation_unknown"));
     }
