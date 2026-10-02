@@ -54,7 +54,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const [refusal, setRefusal] = useState<unknown>(saved.error);
   const [pending, setPending] = useState(saved.pending);
   const [walk, setWalk] = useState(saved.walk);
-  const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source) ?? []);
+  const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source + ':' + entry.relation) ?? []);
   const [computerName, setComputerName] = useState(saved.walk?.placement.kind === 'new' ? saved.walk.placement.machine.body.name : '');
   const [computer, setComputer] = useState(saved.walk?.placement.kind === 'existing' ? saved.walk.placement.computer.id : runOptions.computers.length === 1 ? runOptions.computers[0].id : '');
   const selectedComputer = runOptions.computers.find((entry) => entry.id === computer);
@@ -79,7 +79,8 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     for (const option of options) {
       const resource = option.grant.resource;
       const id = JSON.stringify(resource);
-      const group = groups.get(id) ?? { id, title: resourceWords(resource, resourceLabels).words, choices: [] };
+      const label = resourceWords(resource, resourceLabels);
+      const group = groups.get(id) ?? { id, title: label.words, href: label.unnamed ? '#/resources' : undefined, choices: [] };
       group.choices.push({ id: grantOptionKey(option), resource, relation: option.relation ?? '', actions: option.actions, reason: option.reason });
       groups.set(id, group);
     }
@@ -90,8 +91,8 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     const withheld = withheldFromAgents(model);
     if (!model || withheld === null) return false;
     const relations = singleActionCarriers(model);
-    return grants.grants.some((grant) => grant.holder === person && grant.actions.some((action) =>
-      !grant.resource.kind.includes('.') && !withheld.includes(action) && !relations.has(action)));
+    return grants.grants.some((grant) => grant.holder === person && (grant.resource.kind.includes('.')
+      ? grant.actions.length > 1 : grant.actions.some((action) => !withheld.includes(action) && !relations.has(action))));
   }, [grants, person]);
   const unavailable = !capability.answersTo && person !== me.person.id;
   const unsupported = unavailable ? pending || walk ? 'Your saved request names another person or agent. This service cannot accept that choice; the saved request has not been sent.' : 'This service cannot register an agent under that person or agent.' : '';

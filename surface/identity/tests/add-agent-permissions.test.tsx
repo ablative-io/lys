@@ -110,6 +110,7 @@ describe('Add-agent reporting and permissions', () => {
     const saved = sessionStorage.getItem(key); expect(saved).not.toBeNull();
     act(() => root?.unmount()); root = null; document.body.innerHTML = '';
     const second = await open(extra); expect(second.posted).toEqual([]);
+    expect(second.form.querySelector<HTMLInputElement>('input[value="' + editChoice + '"]')?.checked).toBe(true);
     await submit(second.form);
     expect(second.posted).toEqual([first.posted[2]]);
     expect(sessionStorage.getItem(key)).toBe(saved);
