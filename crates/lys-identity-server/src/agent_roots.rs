@@ -6,7 +6,7 @@
 //! from agents can ever be passed through them.
 
 use lys_identity::grants::{
-    Action, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window, agent_may_hold,
+    Action, GrantError, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window, agent_may_hold,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use sha2::{Digest, Sha256};
@@ -33,26 +33,32 @@ fn operation(owner: PersonId, label: &str) -> OperationId {
 }
 
 /// Record `owner`'s roots under the held model, once: a repeat with the
-/// same model answers the roots already recorded.
+/// same model answers the roots already recorded. A model with no `editor`
+/// is refused `RelationUnknown`, and one whose `editor` carries nothing an
+/// agent may hold is refused `WithheldFromAgents`, by name.
 pub(crate) fn issue(state: &AppState, owner: PersonId) -> Result<Vec<String>, ServerError> {
     crate::grants::with_grants(state, |judged| {
         let editor = Relation::new("editor")?;
         let model = judged.grants.model();
         let version = model.version();
-        // A model with no `editor`, or none of whose acts an agent may hold,
-        // has no roots to give agents access through.
-        let Ok(carried) = model.actions(&editor) else {
-            return Ok(Vec::new());
-        };
+        let carried = model.actions(&editor)?;
         let passable: std::collections::BTreeSet<Action> = carried
             .iter()
             .filter(|action| agent_may_hold("directory", action.as_str()))
             .cloned()
             .collect();
-        let mut roots = Vec::new();
         if passable.is_empty() {
-            return Ok(roots);
+            return Err(GrantError::WithheldFromAgents {
+                relation: editor.to_string(),
+                withheld: carried
+                    .iter()
+                    .map(Action::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            }
+            .into());
         }
+        let mut roots = Vec::new();
         for collection in COLLECTIONS {
             let root = judged
                 .grants
@@ -91,12 +97,20 @@ pub(crate) fn administrator(state: &AppState) -> Result<Option<PersonId>, Server
     })
 }
 
-/// First-run setup's roots for its administrator.
+/// First-run setup's roots for its administrator. A model that cannot give
+/// agents access through `editor` records none at setup, deliberately: setup
+/// finishes, and the explicit `POST /grants/agent-roots` names the refusal.
 pub(crate) fn at_setup(state: &AppState) -> Result<(), ServerError> {
-    if let Some(owner) = administrator(state)? {
-        issue(state, owner)?;
+    let Some(owner) = administrator(state)? else {
+        return Ok(());
+    };
+    match issue(state, owner) {
+        Ok(_)
+        | Err(ServerError::Grant(
+            GrantError::RelationUnknown { .. } | GrantError::WithheldFromAgents { .. },
+        )) => Ok(()),
+        Err(other) => Err(other),
     }
-    Ok(())
 }
 
 /// The administrator's roots for giving people and agents access.

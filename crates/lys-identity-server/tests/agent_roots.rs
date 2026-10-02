@@ -17,10 +17,16 @@ fn ok((status, answer): (u16, Value)) -> Result<Value, Box<dyn Error>> {
     Ok(answer)
 }
 
-/// A service on the shipped model whose administrator has finished setup,
-/// with their signed-in cookie and person.
-async fn set_up() -> Result<(Service, String, String), Box<dyn Error>> {
-    let service = Service::start_adjusted(&shipped_model(), None, None, None, |_| {}, |_| Ok(()))
+/// The grant log's revision: what a refusal must leave unchanged.
+async fn revision(service: &Service, cookie: &str) -> Result<u64, Box<dyn Error>> {
+    let grants = ok(get(service, "/grants", Auth::Cookie(cookie)).await?)?;
+    Ok(grants["revision"].as_u64().ok_or("no revision")?)
+}
+
+/// A service on `model` whose administrator has finished setup, with their
+/// signed-in cookie and person.
+async fn set_up_on(model: &str) -> Result<(Service, String, String), Box<dyn Error>> {
+    let service = Service::start_adjusted(model, None, None, None, |_| {}, |_| Ok(()))
         .await?
         .0;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -33,6 +39,10 @@ async fn set_up() -> Result<(Service, String, String), Box<dyn Error>> {
     .await?)?;
     let person = person["person"].as_str().ok_or("no person")?.to_owned();
     Ok((service, cookie, person))
+}
+
+async fn set_up() -> Result<(Service, String, String), Box<dyn Error>> {
+    set_up_on(&shipped_model()).await
 }
 
 /// The administrator's grants passable to an agent.
@@ -66,7 +76,9 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
             assert!(!passable.contains(&json!(withheld)), "{withheld} in {root}");
         }
     }
+    let recorded = revision(&service, &cookie).await?;
     let again = ok(post(&service, "/grants/agent-roots", auth, &json!({})).await?)?;
+    assert_eq!(revision(&service, &cookie).await?, recorded, "asking again writes nothing");
     let mut ids: Vec<&str> = roots.iter().filter_map(|root| root["id"].as_str()).collect();
     ids.sort_unstable();
     let mut repeated: Vec<&str> = again["grants"]
@@ -119,7 +131,7 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
     let give = |relation: &str, pass_on: Value| -> Result<Value, Box<dyn Error>> {
         Ok(json!({"operation": op()?, "route": "api", "source": wide["grant"], "recipient": agent, "responsible": person, "resource": source["resource"], "relation": relation, "pass_on": pass_on, "window": {"starts_at": 0, "ends_at": null}}))
     };
-    let before = service.log_size().await?;
+    let before = revision(&service, &cookie).await?;
     for (relation, pass_on) in [
         ("only.grant.delegate", use_only.clone()),
         ("only.role.create", use_only),
@@ -132,6 +144,19 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
         assert_eq!(status, 403, "{relation}: {refused}");
         assert_eq!(refused["refusal"], "WithheldFromAgents", "{relation}: {refused}");
     }
-    assert_eq!(service.log_size().await?, before, "a refusal writes nothing");
+    assert_eq!(revision(&service, &cookie).await?, before, "a refusal writes nothing to the grant log");
+    Ok(())
+}
+
+#[tokio::test]
+async fn asking_for_agent_roots_on_a_model_with_no_editor_is_refused_by_name() -> TestResult {
+    let model = json!({"version": 1, "relations": {"viewer": ["view"]}}).to_string();
+    let (service, cookie, _) = set_up_on(&model).await?;
+    let before = revision(&service, &cookie).await?;
+    let (status, refused) =
+        post(&service, "/grants/agent-roots", Auth::Cookie(&cookie), &json!({})).await?;
+    assert_eq!(refused["refusal"], "RelationUnknown", "{status}: {refused}");
+    assert!((400..500).contains(&status), "{status}: {refused}");
+    assert_eq!(revision(&service, &cookie).await?, before, "a refusal writes nothing to the grant log");
     Ok(())
 }
