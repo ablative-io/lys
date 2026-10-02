@@ -242,7 +242,7 @@ async fn evidence(mode: Option<&str>) -> Result<Evidence, Box<dyn Error>> {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread")]
 async fn claude_form_workspace_defaults_start_a_real_runner_with_native_settings() -> Outcome {
     let evidence = evidence(Some("workspace-only")).await?;
     assert_eq!(evidence.status, 200, "{}", evidence.answer);
@@ -285,7 +285,7 @@ async fn claude_form_workspace_defaults_start_a_real_runner_with_native_settings
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread")]
 async fn claude_without_a_confinement_choice_refuses_before_render_or_start() -> Outcome {
     let evidence = evidence(None).await?;
     assert_eq!(evidence.status, 400, "{}", evidence.answer);
