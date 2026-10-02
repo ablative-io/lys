@@ -1,3 +1,6 @@
+//! Registration replays an agent's answers-to after its responsible person
+//! changes, without rewriting what the directory already recorded.
+
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
