@@ -8,7 +8,7 @@ import { MemoryRouter } from 'react-router';
 import { Refused } from '../src/api';
 import { SignInProviders } from '../src/features/connections/SignInProviders';
 import { Secrets } from '../src/features/secrets/Secrets';
-import { ADA, DIRECTORY, ME, SERVICE } from './fixtures';
+import { ADA, DIRECTORY, ME, MODEL, SERVICE } from './fixtures';
 import { Requests } from '../src/features/requests/Requests';
 import { Apps } from '../src/features/apps/Apps';
 import { SessionList } from '../src/features/sessions/Sessions';
@@ -190,6 +190,7 @@ it('shows the kept review and its person from the confirmed answer without rerea
       return Response.json({ ...JSON.parse(String(init.body)), grant: 'grant-review', kept_by: ADA, at: 2, revision: 4 });
     }
     if (path === '/reviews') { reads += 1; return Response.json(review); }
+    if (path === '/grants/model') return Response.json(MODEL);
     if (path === '/me') return Response.json(ME);
     if (path === '/directory/people') return Response.json(DIRECTORY);
     throw new Error('Unexpected fixture read: ' + path);
