@@ -15,7 +15,7 @@ describe('Identity graph', () => {
     const app = await mount('#/graph');
     const labels = $$('g.gn').map((node) => node.getAttribute('aria-label'));
     for (const name of ['Ada (test person)', 'Scribe', 'Courier', 'Archivist', 'Bea (test person)', 'Reviewer', 'Lamplighter', 'identity', 'ledger']) expect(labels).toContain(name);
-    expect(titles('grant')).toEqual(['Ada (test person) may edit, grant, view on identity', 'Ada (test person) may view on ledger', 'Scribe may view on identity']);
+    expect(titles('grant')).toEqual(['Ada (test person): everything here on project identity', 'Ada (test person): View this resource on project ledger', 'Scribe: View this resource on project identity']);
     expect(titles('answers')).toHaveLength(5);
     expect(titles('answers')).toContain('Scribe answers to Ada (test person)');
     expect(app.posted.map((call) => call.path)).toEqual(['/grants/reach']);
@@ -25,11 +25,11 @@ describe('Identity graph', () => {
     const hot = titles('hot');
     expect(hot).toHaveLength(2);
     expect(hot).toContain('Scribe answers to Ada (test person)');
-    expect(hot).toContain('Scribe may view on identity');
+    expect(hot).toContain('Scribe: View this resource on project identity');
     const lit = $$('g.gn:not(.dimmed)').map((node) => node.getAttribute('aria-label'));
     expect(lit.sort()).toEqual(['Ada (test person)', 'Scribe', 'identity']);
     expect($('.node-card h2')?.textContent).toBe('Scribe');
-    expect($('.node-card a[href="#/access/who/project%3Aidentity"]')?.textContent).toContain('view');
+    expect($('.node-card a[href="#/access/who/project%3Aidentity"]')?.textContent).toContain('View this resource');
     expect($('.node-card a[href="#/file/' + SCRIBE + '"]')).not.toBeNull();
   });
   it('shows a resource reached by the holders the service names, and opens it by its full name', async () => {
@@ -42,7 +42,7 @@ describe('Identity graph', () => {
   });
   it('does not turn recorded grants into permission when the evaluator returns none', async () => {
     await mount('#/graph/' + SCRIBE, { ...SERVICE, 'POST /grants/reach': noHolders });
-    expect(titles('grant')).toContain('Scribe may view on identity');
+    expect(titles('grant')).toContain('Scribe: View this resource on project identity');
     expect(card()).toContain('Nothing.');
     expect($('.node-card a[href^="#/access/who/"]')).toBeNull();
   });
@@ -77,7 +77,7 @@ describe('Directory reach', () => {
   it('shares service answers across the table and preview without exercising a grant', async () => {
     const app = await mount('#/people');
     expect($('tbody tr td:last-child')?.textContent).toBe('2 resources');
-    expect($('.detail')?.textContent).toContain('project:identity');
+    expect($('.detail')?.textContent).toContain('project identity');
     expect($('.detail')?.textContent).not.toContain('reach comes from grants');
     expect(app.posted.map((call) => call.path)).toEqual(['/grants/reach']);
   });

@@ -6,7 +6,7 @@ import { ADA, ME, SERVICE, ok, refused } from './fixtures';
 import type { Ask } from '../src/features/requests/contract';
 
 beforeEach(() => sessionStorage.clear());
-const model = { version: 1, relations: { reader: ['read'], editor: ['read', 'write'] } };
+const model = { action_sentences: { read: 'Read this resource', write: 'Write to this resource' }, version: 1, relations: { reader: ['read'], editor: ['read', 'write'] } };
 const routes = { ...SERVICE, '/requests': ok({ requests: [] }), '/grants/model': ok(model),
   '/grants': ok({ revision: 1, grants: [{ resource: { kind: 'project', id: 'Lys' } }] }) };
 const kept = (asked: Ask) => ({ ...asked, id: asked.operation, asked_by: ADA, asked_by_name: ME.person.display_name, responsible: ME.person,
