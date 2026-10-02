@@ -101,6 +101,7 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         return Err(ServerError::AgentNotVisible);
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
+    let sessions = crate::runtime_api::session_agents(state)?;
     let mut targets = BTreeMap::new();
     for standing in &standings {
         let live = if state.runtime.is_some() {
@@ -109,8 +110,6 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
                     .sessions()
                     .iter()
                     .filter(|tracked| {
-                        #[cfg(test)]
-                        crate::budgets_work::visit(crate::budgets_work::Work::Target);
                         tracked.agent.as_deref() == Some(standing.agent.as_str())
                             && !tracked.stopped()
                     })
@@ -120,8 +119,6 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         } else {
             Vec::new()
         };
-        #[cfg(test)]
-        crate::budgets_work::visit(crate::budgets_work::Work::Settings);
         let compact = crate::runner_api::session_settings(state, &standing.agent)?
             .and_then(|settings| settings.compact);
         targets.insert(standing.agent.clone(), Target { live, compact });
@@ -130,7 +127,14 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         if store.held().charged.contains(&usage.event) {
             return Ok(());
         }
-        let crossed = crossings(store.held(), &usage, &standings, &targets, &zone)?;
+        let crossed = crossings(
+            store.held(),
+            &usage,
+            &standings,
+            &targets,
+            &zone,
+            sessions.as_deref(),
+        )?;
         store.charge(Usage { crossed, ..usage })?;
         Ok(())
     })?;
@@ -143,6 +147,7 @@ fn crossings(
     standings: &[Standing],
     targets: &BTreeMap<String, Target>,
     zone: &str,
+    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
 ) -> Result<Vec<Crossing>, ServerError> {
     let mut crossed = Vec::new();
     for collection in &held.limit_sets {
@@ -156,7 +161,7 @@ fn crossings(
                 figure,
                 since,
                 account,
-            }) = levels(held, usage, limit, &agents, zone)?
+            }) = levels(held, usage, limit, &agents, zone, sessions)?
             else {
                 continue;
             };
@@ -228,13 +233,14 @@ fn crossings(
     Ok(crossed)
 }
 
-/// Fresh starts are refused at a known periodic stop limit before runner admission.
+/// Fresh starts require an available figure below every periodic stop limit.
 pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerError> {
     if state.budgets.is_none() {
         return Ok(());
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
+    let sessions = crate::runtime_api::session_agents(state)?;
     with_budgets(state, |store| {
         for collection in &store.held().limit_sets {
             let agents = crate::budgets_members::covered(&collection.holder, &standings);
@@ -245,12 +251,31 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                 if limit.act != Act::Stop || limit.period.is_none() {
                     continue;
                 }
-                let used =
-                    crate::budgets_usage::figure(store.held(), &limit, &agents, &zone, at_ms, None)
-                        .map_err(unavailable)?;
-                if let Some(figure) = used.figure
-                    && reached(limit.unit, &figure, &limit.amount).map_err(unavailable)?
-                {
+                let used = crate::budgets_usage::figure_with_sessions(
+                    store.held(),
+                    &limit,
+                    &agents,
+                    &zone,
+                    at_ms,
+                    None,
+                    sessions.as_deref(),
+                )
+                .map_err(unavailable)?;
+                let figure = match used.figure {
+                    Some(figure) => figure,
+                    // Running is needed to observe the next window after its recorded reset.
+                    None if limit.unit == Measure::PlanPercent
+                        && used.since_ms.is_some_and(|boundary| boundary <= at_ms) =>
+                    {
+                        0.into()
+                    }
+                    None => {
+                        return Err(unavailable(used.unavailable.as_deref().unwrap_or(
+                            "a periodic Stop limit has no figure and no source reason",
+                        )));
+                    }
+                };
+                if reached(limit.unit, &figure, &limit.amount).map_err(unavailable)? {
                     let reset = if limit.unit == Measure::PlanPercent {
                         used.since_ms.and_then(|start| {
                             start.checked_add(
@@ -326,6 +351,7 @@ fn levels(
     limit: &Limit,
     agents: &std::collections::BTreeSet<String>,
     zone: &str,
+    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
 ) -> Result<Option<Levels>, ServerError> {
     if limit.unit == Measure::ContextPercent {
         let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
@@ -343,10 +369,26 @@ fn levels(
             account: None,
         }));
     }
-    let before = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, None)
-        .map_err(unavailable)?;
-    let after = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, Some(usage))
-        .map_err(unavailable)?;
+    let before = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        None,
+        sessions,
+    )
+    .map_err(unavailable)?;
+    let after = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        Some(usage),
+        sessions,
+    )
+    .map_err(unavailable)?;
     let Some(figure) = after.figure else {
         return Ok(None);
     };
@@ -414,11 +456,12 @@ fn dispatch(
                 &identity,
                 session.as_deref().unwrap_or_default(),
             );
-            if held.crossings.crossed.iter().any(|crossing| {
-                #[cfg(test)]
-                crate::budgets_work::visit(crate::budgets_work::Work::CrossingLookup);
-                crossing.operation == operation
-            }) {
+            if held
+                .crossings
+                .crossed
+                .iter()
+                .any(|crossing| crossing.operation == operation)
+            {
                 continue;
             }
             let text = match act {
