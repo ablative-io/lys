@@ -225,7 +225,7 @@ async fn walk(table: &Table) -> Outcome {
         Answer::Matched { .. }
     ));
     table.post(&format!("/agents/{agent}/policy"), &json!({"version": 1, "rules": [{
-        "id": "owner-deny", "tool": "Read", "kind": "Tool", "target": null, "authority": "Hard"
+        "id": "owner-deny", "tool": "Read", "kind": "tool", "target": null, "authority": "hard"
     }]})).await?;
     let (status, refused) = post(
         &table.service,

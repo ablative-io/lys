@@ -1,11 +1,10 @@
-//! Missing policies receive a durable restrictive first version.
+//! Initial policies preserve the reviewed program's native permission boundary.
 
 use std::error::Error;
-use std::path::Path;
 
 use identity_contract::apps::{Auth, get, login, op, post};
 use identity_contract::harness::ADMINISTRATOR;
-use lys_runner::judge::{Asked, Judgement, PATH_TOOLS, Policy, judge};
+use lys_runner::judge::Policy;
 use serde_json::json;
 
 #[path = "support/agent_policy.rs"]
@@ -13,52 +12,6 @@ mod support;
 use support::table;
 
 type TestResult = Result<(), Box<dyn Error>>;
-
-fn denies_calls(policy: &Policy) {
-    for subagent in [false, true] {
-        for (tool, field) in PATH_TOOLS {
-            for input in [
-                json!({field: "/"}),
-                json!({field: "missing/../file"}),
-                json!({}),
-            ] {
-                assert!(
-                    matches!(
-                        judge(
-                            policy,
-                            &Asked {
-                                tool,
-                                input: &input,
-                                cwd: Path::new("/"),
-                                subagent
-                            }
-                        ),
-                        Judgement::Deny { .. }
-                    ),
-                    "{tool}: {input}"
-                );
-            }
-        }
-        for tool in ["WebFetch", "Bash", "mcp__server__tool", "FutureTool"] {
-            let input = json!({"url": "https://example.test/", "command": "true"});
-            assert!(
-                matches!(
-                    judge(
-                        policy,
-                        &Asked {
-                            tool,
-                            input: &input,
-                            cwd: Path::new("/"),
-                            subagent
-                        }
-                    ),
-                    Judgement::Deny { .. }
-                ),
-                "{tool}"
-            );
-        }
-    }
-}
 
 #[tokio::test]
 async fn an_old_install_gets_only_missing_policies_and_keeps_them_after_restart() -> TestResult {
@@ -73,7 +26,7 @@ async fn an_old_install_gets_only_missing_policies_and_keeps_them_after_restart(
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["policy"]["version"], 1, "{answer}");
     let policy: Policy = serde_json::from_value(answer["policy"].clone())?;
-    denies_calls(&policy);
+    assert!(policy.rules.is_empty());
     service.restart().await?;
     let (_, restarted) = get(
         &service,
@@ -109,7 +62,7 @@ async fn registration_keeps_a_default_policy_before_answering_and_retry_keeps_it
     )
     .await?;
     assert_eq!(policy["policy"]["version"], 1, "{policy}");
-    denies_calls(&serde_json::from_value(policy["policy"].clone())?);
+    assert_eq!(policy["policy"]["rules"], json!([]));
     let (status, retry) = post(&service, "/agents", Auth::Cookie(&cookie), &body).await?;
     assert_eq!(status, 200, "{retry}");
     assert_eq!(retry["agent"], agent);

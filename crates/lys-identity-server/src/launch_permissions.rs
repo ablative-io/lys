@@ -122,6 +122,17 @@ pub fn settings(
     policy: Option<&Policy>,
     contract: &PermissionContract,
 ) -> Result<Value, ServerError> {
+    if contract.rule_forms.is_empty()
+        && let Some(rule) = policy
+            .into_iter()
+            .flat_map(|policy| &policy.rules)
+            .find(|rule| rule.authority == Authority::Hard)
+    {
+        return Err(unrepresentable(
+            &rule.id,
+            "the program declares no supported hard policy rule form",
+        ));
+    }
     let given = permissions.cloned().unwrap_or_default();
     let mut allow = given.allow;
     for tool in tools {
