@@ -28,6 +28,10 @@ fn unavailable() -> ServerError {
     }
 }
 
+/// What the first model's `editor` carried, which the root recorded under
+/// it passes on.
+const FIRST_EDITOR: [&str; 2] = ["view", "edit"];
+
 fn operation(account: &str, label: &str) -> OperationId {
     let hash = Sha256::digest(format!("lys/import-bootstrap/v1/{account}/{label}"));
     let mut id = [0; 16];
@@ -133,21 +137,45 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
         })?;
     let Some(owner) = owner else { return Ok(()) };
     crate::grants::with_grants(state, |judged| {
+        let editor = Relation::new("editor")?;
         for collection in ["apps", "agents"] {
             let resource = Resource::new("directory", collection)?;
+            // An install first brought forward under the first model replays
+            // exactly what it recorded then: the same operations and the
+            // same pass_on, so every grant it holds, or had revoked, stands
+            // as recorded and nothing new is issued. A later install's root
+            // passes on what its model's `editor` carries, under operations
+            // of their own.
+            let first = operation(account, &format!("{collection}/root"));
+            let (version, carried) = if judged.grants.book().operation(first).is_some() {
+                (
+                    String::new(),
+                    FIRST_EDITOR
+                        .iter()
+                        .map(|action| Action::new(action))
+                        .collect::<Result<_, _>>()?,
+                )
+            } else {
+                let model = judged.grants.model();
+                let version = match model.version() {
+                    1 => String::new(),
+                    later => format!("/v{later}"),
+                };
+                (version, model.actions(&editor)?.clone())
+            };
             let root = judged
                 .grants
                 .issue_root(
                     judged.directory,
                     &RootRequest {
-                        operation: operation(account, &format!("{collection}/root")),
+                        operation: operation(account, &format!("{collection}/root{version}")),
                         caller: IdentityId::Person(owner),
                         route: Route::Api,
                         holder: owner,
                         resource: resource.clone(),
-                        relation: Relation::new("editor")?,
+                        relation: editor.clone(),
                         pass_on: PassOn::to(
-                            [Action::new("view")?, Action::new("edit")?].into(),
+                            carried.clone(),
                             [RecipientKind::ServiceAccount].into(),
                         )?,
                         window: Window::new(0, None)?,
@@ -159,14 +187,14 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
             judged.grants.delegate(
                 judged.directory,
                 &DelegateRequest {
-                    operation: operation(account, &format!("{collection}/delegated")),
+                    operation: operation(account, &format!("{collection}/delegated{version}")),
                     caller: IdentityId::Person(owner),
                     route: Route::Api,
                     source: root,
                     recipient: IdentityId::ServiceAccount(id),
                     responsible: owner,
                     resource,
-                    relation: Relation::new("editor")?,
+                    relation: editor.clone(),
                     pass_on: PassOn::UseOnly,
                     window: Window::new(0, None)?,
                 },

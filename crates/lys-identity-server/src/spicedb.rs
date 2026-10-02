@@ -34,7 +34,9 @@ use serde_json::{Value, json};
 use crate::spicedb_apps::{app_definition, app_definitions, definition};
 
 mod credential;
+mod names;
 pub use credential::{SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
+use names::{engine_ident, engine_ident_on, engine_name_for, lys_name_on};
 
 #[path = "spicedb_scope.rs"]
 pub(crate) mod scope;
@@ -81,13 +83,7 @@ fn unavailable(reason: impl Into<String>) -> GrantError {
 
 /// Refuse a name the engine's schema does not take.
 fn engine_name(what: &str, name: &str) -> Result<(), GrantError> {
-    let bytes = name.as_bytes();
-    let inner = |byte: &u8| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_';
-    let fits = (3..=64).contains(&bytes.len())
-        && bytes.first().is_some_and(u8::is_ascii_lowercase)
-        && bytes.last().is_some_and(|byte| *byte != b'_')
-        && bytes.iter().all(inner);
-    if fits {
+    if names::engine_takes(name) {
         return Ok(());
     }
     Err(unavailable(format!(
@@ -102,11 +98,11 @@ fn object_json(object: &ObjectRef) -> Value {
 fn relationship_json(relationship: &Relationship) -> Value {
     let mut subject = json!({"object": object_json(&relationship.subject)});
     if let Some(relation) = &relationship.subject_relation {
-        subject["optionalRelation"] = json!(relation);
+        subject["optionalRelation"] = json!(engine_ident_on(&relationship.subject.kind, relation));
     }
     let mut value = json!({
         "resource": object_json(&relationship.resource),
-        "relation": relationship.relation,
+        "relation": engine_ident_on(&relationship.resource.kind, &relationship.relation),
         "subject": subject,
     });
     if let Some(ends_at) = relationship.ends_at {
@@ -129,15 +125,22 @@ fn relationship_of(value: &Value) -> Option<Relationship> {
         Some(end) => Some(end.as_u64()?),
         None => None,
     };
+    let resource = object_of(value.get("resource")?)?;
+    let relation = lys_name_on(&resource.kind, value.get("relation")?.as_str()?)?;
+    let object = object_of(subject.get("object")?)?;
+    let subject_relation = match subject
+        .get("optionalRelation")
+        .and_then(Value::as_str)
+        .filter(|relation| !relation.is_empty())
+    {
+        Some(relation) => Some(lys_name_on(&object.kind, relation)?),
+        None => None,
+    };
     Some(Relationship {
-        resource: object_of(value.get("resource")?)?,
-        relation: value.get("relation")?.as_str()?.to_owned(),
-        subject: object_of(subject.get("object")?)?,
-        subject_relation: subject
-            .get("optionalRelation")
-            .and_then(Value::as_str)
-            .filter(|relation| !relation.is_empty())
-            .map(str::to_owned),
+        resource,
+        relation,
+        subject: object,
+        subject_relation,
         ends_at,
     })
 }
@@ -176,12 +179,20 @@ impl SpiceDb {
         scope: Option<String>,
     ) -> Result<Self, GrantError> {
         let mut relations = BTreeMap::new();
+        let mut engine_names = BTreeMap::new();
         for (relation, actions) in model.relations() {
             let relation = relation.to_string();
-            engine_name("relation", &relation)?;
+            engine_names.insert(engine_name_for("relation", &relation)?, relation.clone());
             let actions: BTreeSet<String> = actions.iter().map(ToString::to_string).collect();
             for action in &actions {
-                engine_name("action", action)?;
+                let engine = engine_name_for("action", action)?;
+                if let Some(other) = engine_names.insert(engine.clone(), action.clone()) {
+                    if other != *action {
+                        return Err(unavailable(format!(
+                            "{other} and {action} both become {engine} in the permission engine"
+                        )));
+                    }
+                }
             }
             relations.insert(relation, actions);
         }
@@ -218,9 +229,17 @@ impl SpiceDb {
         let relations = self
             .relations
             .keys()
-            .map(|relation| format!("  relation {relation}: grant#holder\n"));
+            .map(|relation| format!("  relation {}: grant#holder\n", engine_ident(relation)));
         let permissions = carried.iter().map(|(action, relations)| {
-            format!("  permission {action} = {}\n", relations.join(" + "))
+            let terms: Vec<String> = relations
+                .iter()
+                .map(|relation| engine_ident(relation))
+                .collect();
+            format!(
+                "  permission {} = {}\n",
+                engine_ident(action),
+                terms.join(" + ")
+            )
         });
         let body: String = relations.chain(permissions).collect();
         let kinds = kinds
@@ -420,7 +439,7 @@ impl SpiceDb {
         let request = json!({
             "consistency": {"fullyConsistent": true},
             "resource": object_json(&ObjectRef::resource(resource)),
-            "permission": action.as_str(),
+            "permission": engine_ident_on(resource.kind(), action.as_str()),
             "subject": {"object": object_json(&ObjectRef::identity(subject))},
             "context": {"now": now},
         });

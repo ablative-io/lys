@@ -321,3 +321,82 @@ async fn import_preserves_named_action_and_recipient_refusals_without_grant_writ
     }
     Ok(())
 }
+
+/// Restart `service` on the model Lys ships, as an upgrade brings it.
+async fn on_the_shipped_model(service: &mut Service) -> Outcome {
+    fs::write(
+        service.dir.path().join("grant-model.json"),
+        lys_identity::grants::shipped_model(),
+    )?;
+    service.restart().await
+}
+
+#[tokio::test]
+async fn an_upgraded_install_replays_its_loader_grants_and_issues_none() -> Outcome {
+    let mut service = upgraded().await?;
+    let before = extents(&service)?;
+    on_the_shipped_model(&mut service).await?;
+    let after = extents(&service)?;
+    assert_eq!(after[1], before[1], "the upgrade issues no grant");
+    let token = credential();
+    let grants = ok(get(&service, "/grants", Auth::Bearer(&token)).await?)?;
+    assert!(
+        grants["grants"]
+            .as_array()
+            .ok_or("no grants")?
+            .iter()
+            .any(|grant| grant["holder"] == ACCOUNT && grant["resource"]["id"] == "apps"),
+        "{grants}"
+    );
+    service.restart().await?;
+    assert_eq!(
+        extents(&service)?[1],
+        before[1],
+        "a later start issues none either"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_revoked_loader_grant_stays_revoked_through_the_upgrade() -> Outcome {
+    let mut service = upgraded().await?;
+    let token = credential();
+    let grants = ok(get(&service, "/grants", Auth::Bearer(&token)).await?)?;
+    let id = grants["grants"]
+        .as_array()
+        .ok_or("no grants")?
+        .iter()
+        .find(|grant| grant["holder"] == ACCOUNT && grant["resource"]["id"] == "apps")
+        .and_then(|grant| grant["id"].as_str())
+        .ok_or("the installed loader has no apps grant")?
+        .to_owned();
+    let admin = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "fixture@example.test".to_owned(),
+        })
+        .await?;
+    ok(post(
+        &service,
+        &format!("/grants/{id}/revoke"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?,"route":"api","reason":"remove import authority"}),
+    )
+    .await?)?;
+    let before = extents(&service)?;
+    on_the_shipped_model(&mut service).await?;
+    assert_eq!(
+        extents(&service)?[1],
+        before[1],
+        "the upgrade restores nothing"
+    );
+    let refused = post(
+        &service,
+        "/identity/import",
+        Auth::Bearer(&token),
+        &document(),
+    )
+    .await?;
+    assert_ne!(refused.0, 200, "{}", refused.1);
+    Ok(())
+}
