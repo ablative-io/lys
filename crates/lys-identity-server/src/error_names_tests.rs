@@ -64,6 +64,12 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         (ServerError::NotSignedIn, "NotSignedIn"),
         (ServerError::NotAdmitted { reason: detail }, "NotAdmitted"),
         (ServerError::NoPerson, "NoPerson"),
+        (
+            ServerError::BootstrapInterrupted {
+                reason: detail.to_owned(),
+            },
+            "BootstrapInterrupted",
+        ),
         (ServerError::SetupRequired, "SetupRequired"),
         (ServerError::AgentNotVisible, "AgentNotVisible"),
         (ServerError::GrantNotVisible, "GrantNotVisible"),

@@ -97,6 +97,7 @@ pub mod grants_refusals;
 pub mod harness_catalogue;
 mod import_api;
 mod import_bootstrap;
+mod import_bootstrap_state;
 mod kept_responsibilities;
 pub mod launch_api;
 pub mod launch_fields;

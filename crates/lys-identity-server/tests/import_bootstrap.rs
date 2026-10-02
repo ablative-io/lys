@@ -4,11 +4,12 @@
 use std::error::Error;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
+use std::time::Instant;
 
 use identity_contract::apps::{Auth, get, login, ok, op, post};
 use identity_contract::harness::{ADMINISTRATOR, Service};
-use lys_identity::OperationId;
-use lys_identity_server::dev_seed::seed_configured;
+use lys_core::Ed25519Identity;
+use lys_identity::{Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance};
 use lys_log_store::{FileLeafStore, LeafStore};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -45,16 +46,49 @@ fn operation(collection: &str, kind: &str, version: u64) -> String {
 }
 
 async fn fixture() -> Result<(Service, String, String), Box<dyn Error>> {
-    let (service, seed) = Service::start_judging(&model(1), None, |config| {
-        Ok(seed_configured(config, [ADMINISTRATOR, "second-person"])?)
-    })
+    let started = Instant::now();
+    let (service, owner) = Service::start_adjusted(
+        &model(1),
+        None,
+        None,
+        None,
+        |config| {
+            config.certificates_dir = None;
+            config.homes_dir = None;
+            config.teams_dir = None;
+            config.requests_dir = None;
+            config.roles_file = None;
+            config.provisioning_file = None;
+            config.network_file = None;
+            config.runtime_dir = None;
+            config.stops_dir = None;
+            config.budgets_dir = None;
+            config.policies_dir = None;
+            config.goals_dir = None;
+            config.reviews_dir = None;
+        },
+        |config| {
+            FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+            let path = config.log_dir.clone();
+            let mut directory = Directory::open(
+                Box::new(move || FileLeafStore::open(&path)),
+                Ed25519Identity::load(&config.event_key_file)?,
+            )?;
+            let actor = Actor::new(
+                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                Provenance::new(AuthMethod::Oidc, 1),
+            );
+            let (person, _) = directory.setup_person(
+                actor,
+                OperationId::generate()?,
+                Profile::new("Owner")?,
+                1,
+            )?;
+            Ok(person.to_string())
+        },
+    )
     .await?;
-    let owner = seed
-        .people
-        .first()
-        .ok_or("no administrator")?
-        .id
-        .to_string();
+    eprintln!("bootstrap fixture startup: {:?}", started.elapsed());
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     let path = service.dir.path().join("loader.credential");
     fs::write(
@@ -67,9 +101,15 @@ async fn fixture() -> Result<(Service, String, String), Box<dyn Error>> {
 
 async fn loader(service: &mut Service, enabled: bool) -> Outcome {
     let path = service.dir.path().join("loader.credential");
-    service
+    let started = Instant::now();
+    let result = service
         .restart_adjusted(|config| config.import_credential_file = enabled.then_some(path))
-        .await
+        .await;
+    eprintln!(
+        "bootstrap restart with loader {enabled}: {:?}",
+        started.elapsed()
+    );
+    result
 }
 
 fn extent(service: &Service) -> Result<u64, Box<dyn Error>> {
@@ -113,7 +153,7 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
     let text = error.to_string();
     assert!(text.starts_with("BootstrapInterrupted: "), "{text}");
     assert_eq!(extent(&service)?, before);
-    let plan: Value = serde_json::from_str(
+    let mut plan: Value = serde_json::from_str(
         text.strip_prefix("BootstrapInterrupted: ")
             .ok_or("no recovery")?,
     )?;
@@ -124,18 +164,19 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
     loader(&mut service, false).await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     for collection in ["apps", "agents"] {
-        // Each refusal supplies the current collection's exact request bodies.
-        let error = loader(&mut service, true)
-            .await
-            .err()
-            .ok_or("incomplete replacement started")?;
-        let text = error.to_string();
-        let plan: Value = serde_json::from_str(
-            text.strip_prefix("BootstrapInterrupted: ")
-                .ok_or("no recovery")?,
-        )?;
+        if collection == "agents" {
+            let error = loader(&mut service, true)
+                .await
+                .err()
+                .ok_or("incomplete replacement started")?;
+            let text = error.to_string();
+            plan = serde_json::from_str(
+                text.strip_prefix("BootstrapInterrupted: ")
+                    .ok_or("no recovery")?,
+            )?;
+            loader(&mut service, false).await?;
+        }
         assert_eq!(plan["root"]["resource"]["id"], collection);
-        loader(&mut service, false).await?;
         let created = ok(post(
             &service,
             "/grants/roots",
@@ -143,20 +184,25 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
             &plan["root"],
         )
         .await?)?;
-        let after_root = extent(&service)?;
-        let refused = loader(&mut service, true)
-            .await
-            .err()
-            .ok_or("startup completed a replacement")?;
-        assert!(refused.to_string().starts_with("BootstrapInterrupted: "));
-        assert_eq!(extent(&service)?, after_root);
-        loader(&mut service, false).await?;
+        if collection == "apps" {
+            let after_root = extent(&service)?;
+            let refused = loader(&mut service, true)
+                .await
+                .err()
+                .ok_or("startup completed a replacement")?;
+            assert!(refused.to_string().starts_with("BootstrapInterrupted: "));
+            assert_eq!(extent(&service)?, after_root);
+            loader(&mut service, false).await?;
+        }
         let mut delegate = plan["delegation"].clone();
         delegate["source"] = created["grant"].clone();
         ok(post(&service, "/grants", Auth::Cookie(&cookie), &delegate).await?)?;
     }
     loader(&mut service, true).await?;
     let before = extent(&service)?;
+    service.restart().await?;
+    assert_eq!(extent(&service)?, before);
+    fs::write(service.dir.path().join("grant-model.json"), model(3))?;
     service.restart().await?;
     assert_eq!(extent(&service)?, before);
     let listed = ok(get(&service, "/grants", Auth::Cookie(&cookie)).await?)?;

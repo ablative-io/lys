@@ -220,7 +220,8 @@ impl ServerError {
             | Self::RunnerAbsent { .. }
             | Self::DialStale { .. }
             | Self::SetupClosed
-            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
+            | Self::ReviewReused { .. }
+            | Self::BootstrapInterrupted { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown
             | Self::RequestMalformed { .. }
             | Self::AccountRefused { .. }

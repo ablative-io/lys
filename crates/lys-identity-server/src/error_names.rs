@@ -47,6 +47,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::AccountRefused { .. } => "AccountRefused",
         ServerError::SignInFailed { .. } => "SignInFailed",
         ServerError::ConfigInvalid { .. } => "ConfigInvalid",
+        ServerError::BootstrapInterrupted { .. } => "BootstrapInterrupted",
         ServerError::RequestMalformed { .. } => "RequestMalformed",
         ServerError::SecretsUnavailable { .. } => "SecretsUnavailable",
         ServerError::RequestsUnavailable { .. } => "RequestsUnavailable",
