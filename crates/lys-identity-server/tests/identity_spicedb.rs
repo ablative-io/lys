@@ -38,7 +38,7 @@ fn settings(mirror: &str) -> Result<SpiceDbSettings, Box<dyn std::error::Error>>
 /// The live engine, on the shipped model: every live test writes the same
 /// schema, so none takes away a relation another is checking.
 fn engine() -> Result<SpiceDb, Box<dyn std::error::Error>> {
-    let mirror = OperationId::generate()?.to_string();
+    let mirror = OperationId::generate()?.to_string().replace('-', "_");
     Ok(SpiceDb::open(&settings(&mirror)?, &shipped()?)?)
 }
 
