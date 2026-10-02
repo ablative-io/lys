@@ -7,7 +7,8 @@
 //! authority, every effective ancestor and the model; being a person or an
 //! agent is no permit, and pass-on is established only by an affirmative
 //! pass-on member of the source grant. An agent is never given, nor let
-//! pass on, an act withheld from agents.
+//! pass on, an act withheld from agents, and no root lets an agent be
+//! passed one.
 
 use std::collections::BTreeSet;
 
@@ -220,6 +221,14 @@ pub fn judge_root(
     active(directory, request.caller)?;
     active(directory, IdentityId::Person(request.holder))?;
     let kind = request.resource.kind();
+    if let PassOn::To {
+        actions: onward,
+        recipients,
+    } = &request.pass_on
+        && recipients.contains(&RecipientKind::Agent)
+    {
+        refuse_withheld(&request.relation, kind, onward)?;
+    }
     let actions = model.actions_on(kind, &request.relation)?.clone();
     Grant::new(GrantParts {
         id,
@@ -237,6 +246,27 @@ pub fn judge_root(
     })
 }
 
+/// Refuse, by name, `relation` when any of `actions` on an object of `kind`
+/// is one no agent may hold.
+fn refuse_withheld<'a>(
+    relation: &Relation,
+    kind: &str,
+    actions: impl IntoIterator<Item = &'a Action>,
+) -> Result<(), GrantError> {
+    let withheld: BTreeSet<&str> = actions
+        .into_iter()
+        .map(Action::as_str)
+        .filter(|action| !super::agent_may_hold(kind, action))
+        .collect();
+    if withheld.is_empty() {
+        return Ok(());
+    }
+    Err(GrantError::WithheldFromAgents {
+        relation: relation.to_string(),
+        withheld: withheld.into_iter().collect::<Vec<_>>().join(", "),
+    })
+}
+
 /// Refuse, by name, an agent's grant that carries, or would let the agent
 /// pass on, an act no agent may hold, whatever its source.
 fn withheld_from_agents(
@@ -249,19 +279,11 @@ fn withheld_from_agents(
         } => Some(onward),
         PassOn::UseOnly => None,
     };
-    let withheld: BTreeSet<&str> = actions
-        .iter()
-        .chain(onward.into_iter().flatten())
-        .map(Action::as_str)
-        .filter(|action| !super::agent_may_hold(request.resource.kind(), action))
-        .collect();
-    if withheld.is_empty() {
-        return Ok(());
-    }
-    Err(GrantError::WithheldFromAgents {
-        relation: request.relation.to_string(),
-        withheld: withheld.into_iter().collect::<Vec<_>>().join(", "),
-    })
+    refuse_withheld(
+        &request.relation,
+        request.resource.kind(),
+        actions.iter().chain(onward.into_iter().flatten()),
+    )
 }
 
 /// Judge a request to pass on part of a grant, answering the grant it would issue.

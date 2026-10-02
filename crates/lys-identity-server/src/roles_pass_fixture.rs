@@ -235,7 +235,8 @@ impl Table {
     }
 
     /// Pass `action` on a role to the agent through a root of the
-    /// person's, answering the status and body of the pass on.
+    /// person's, answering the status and body of the pass on, or of the
+    /// root when it is refused.
     pub(super) async fn give(
         &self,
         resource: &str,
@@ -248,12 +249,28 @@ impl Table {
             "relation":relation, "pass_on":{"kind":"to", "actions":[action], "recipients":["agent"]},
             "window":{"starts_at":0,"ends_at":null}
         })).await?;
-        assert_eq!(status, 200, "{root}");
+        if status != 200 {
+            return Ok((status, root));
+        }
         self.service.post("/grants", Some(&self.cookie), &json!({
             "operation":operation()?, "route":"api", "source":root["grant"], "recipient":self.agent,
             "responsible":self.person, "resource":resource, "relation":relation,
             "pass_on":{"kind":"use_only"}, "window":{"starts_at":0,"ends_at":null}
         })).await
+    }
+
+    /// The administrator's own call, answering its status and body.
+    pub(super) async fn as_administrator(
+        &self,
+        path: &str,
+        body: &Value,
+    ) -> TestResult<(u16, Value)> {
+        self.service.post(path, Some(&self.cookie), body).await
+    }
+
+    /// The administrator's own read, answering its status and body.
+    pub(super) async fn administrator_get(&self, path: &str) -> TestResult<(u16, Value)> {
+        self.service.get(path, Some(&self.cookie)).await
     }
 
     pub(super) async fn role_view(&self, id: &str) -> TestResult<Value> {
