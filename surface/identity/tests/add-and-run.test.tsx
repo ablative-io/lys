@@ -240,6 +240,17 @@ describe('Add and run on the first computer', () => {
     expect(document.body.textContent).toContain('Running, as its runner last reported');
   });
 
+  it('shows a start refusal in its own words, not as an unconfirmed step', async () => {
+    const server = service();
+    server.routes['POST /agents/' + agent + '/start-command'] = () => refused(400, 'PolicyUnrepresentable', 'The settings file cannot express these permissions for this program.');
+    await open(server.routes); await names(); await submit();
+    const face = document.body.cloneNode(true) as HTMLElement;
+    for (const detail of face.querySelectorAll('details')) detail.remove();
+    expect(face.textContent).toContain('The settings file cannot express these permissions for this program.');
+    expect(face.textContent).not.toContain('could not confirm');
+    expect(face.textContent).not.toContain('PolicyUnrepresentable');
+  });
+
   it('does not navigate or claim running without a confirmed runner start', async () => {
     const { posted } = await open(service(undefined, 'absent').routes); await names(); await submit();
     expect(posted).toHaveLength(7);
@@ -296,7 +307,8 @@ describe('Add and run on an existing computer', () => {
     server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }] }] });
     const { posted } = await open(server.routes);
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
-    expect(document.body.textContent).toContain('WorkspaceOnlyUnavailable');
+    expect(document.body.textContent).toContain('This program has no setting that keeps it to its own folder with internet off.');
+    expect(document.body.textContent).not.toContain('WorkspaceOnlyUnavailable');
     expect(document.body.textContent).not.toContain('Works in its own folder; no internet.');
     expect(document.querySelector('form details')).toBeNull();
     await submit();
