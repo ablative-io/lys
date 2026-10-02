@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentGrantsOf, grantOptions, newAgentGrants } from '../src/features/people/agent-grants';
+import { agentGrantsOf, delegateAgentGrant, grantOptionKey, grantOptions, newAgentGrants } from '../src/features/people/agent-grants';
 import { ADA, GRANTS, MODEL } from './fixtures';
 
 const source = { ...GRANTS[0], actions: ['agent.start', 'agent.stop', 'grant.revoke', 'read'],
@@ -17,6 +17,20 @@ describe('Per action agent grants', () => {
   });
   it('offers nothing to agents when the withheld declaration is missing', () => {
     expect(grantOptions({ ...choices, model: { ...MODEL } }, ADA, ADA, 'Ada')).toEqual([]);
+  });
+  it('keeps app actions visible but refuses an agent grant plan before sending', () => {
+    const app = { ...source, resource: { kind: 'fixture.doc', id: 'doc7' }, relation: 'reader', actions: ['read'] };
+    const options = grantOptions({ ...choices, grants: [app] }, ADA, ADA, 'Ada');
+    expect(options).toHaveLength(1);
+    expect(options[0].reason).toBe("Lys can't give an agent this app's actions until the app allows it.");
+    let refusal: unknown;
+    try { newAgentGrants(options, [grantOptionKey(options[0])]); } catch (problem) { refusal = problem; }
+    expect(refusal).toMatchObject({ status: 0, refusal: { refusal: 'GrantChoiceUnavailable' } });
+  });
+  it('refuses a retained app grant before issuing its original request', async () => {
+    const options = grantOptions(choices, ADA, ADA, 'Ada');
+    const [entry] = newAgentGrants(options, [grantOptionKey(options[0])]);
+    await expect(delegateAgentGrant({ ...entry, resource: { kind: 'fixture.doc', id: 'doc7' } }, ADA)).rejects.toMatchObject({ status: 0, refusal: { refusal: 'WithheldFromAgents' } });
   });
   it('records each selected act as its own operation and retains both from one source', () => {
     const options = grantOptions(choices, ADA, ADA, 'Ada');

@@ -3,6 +3,7 @@ import { actionWords } from './action-words';
 
 export interface ActionChoice { id: string; resource: ResourceRef; relation: string; actions: string[]; reason: string }
 export interface ActionGroup { id: string; title: string; href?: string; choices: ActionChoice[]; everything?: ActionChoice }
+export const appAgentRefusal = "Lys can't give an agent this app's actions until the app allows it.";
 
 export function withheldFromAgents(model: GrantModel | null): string[] | null {
   if (!model || !('withheld_from_agents' in model) || !Array.isArray(model.withheld_from_agents)
@@ -40,7 +41,8 @@ function GroupedActionPicker({ model, groups, selected, change, disabled = false
     change([...next]);
   };
   return <>{groups.map((group) => {
-    const choices = group.choices.filter((choice) => !agents || choice.resource.kind.includes('.') || choice.actions.every((action) => !excluded.has(action)));
+    const choices = group.choices.filter((choice) => !agents || choice.resource.kind.includes('.') || choice.actions.every((action) => !excluded.has(action)))
+      .map((choice) => agents && choice.resource.kind.includes('.') ? { ...choice, reason: appAgentRefusal } : choice);
     if (!choices.length) return null;
     const available = choices.filter((choice) => !choice.reason);
     const everything = agents ? undefined : group.everything;
@@ -68,6 +70,7 @@ export function ActionPicker(props: SingleProps | GroupedProps) {
   if ('groups' in props) return <GroupedActionPicker {...props} />;
   const relations = singleActionCarriers(props.model);
   const choices = props.actions.flatMap((action) => {
+    if (props.agents !== false && props.resource.kind.includes('.')) return [{ id: action, resource: props.resource, relation: '', actions: [action], reason: appAgentRefusal }];
     const relation = relations.get(action);
     return relation ? [{ id: action, resource: props.resource, relation, actions: [action], reason: '' }] : [];
   });

@@ -1,6 +1,6 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ActionPicker } from '../src/features/grants/ActionPicker';
 import { MODEL } from './fixtures';
 
@@ -37,5 +37,29 @@ describe('Shared action picker', () => {
     const container = mount(silent);
     expect(container.querySelector('input')).toBeNull();
     expect(container.textContent).toContain('until Lys declares');
+  });
+  it('disables a grouped app action for an agent even if its caller marked it available', () => {
+    const change = vi.fn();
+    const container = document.createElement('div'); document.body.append(container);
+    const root = createRoot(container); roots.push(root);
+    const app = { id: 'read', resource: { kind: 'fixture.doc', id: 'doc7' }, relation: 'reader', actions: ['read'], reason: '' };
+    act(() => root.render(<ActionPicker model={model} groups={[{ id: 'doc7', title: 'A document', choices: [app] }]} selected={[]} change={change} />));
+    const checkbox = container.querySelector<HTMLInputElement>('input[name="action"]');
+    expect(checkbox?.disabled).toBe(true);
+    expect(container.textContent).toContain("Lys can't give an agent this app's actions until the app allows it.");
+    act(() => checkbox?.click());
+    expect(change).not.toHaveBeenCalled();
+    expect(container.querySelector('input[name="all_actions"]')).toBeNull();
+  });
+  it('shows a disabled app action without requiring a shipped Lys carrier', () => {
+    const change = vi.fn();
+    const container = document.createElement('div'); document.body.append(container);
+    const root = createRoot(container); roots.push(root);
+    act(() => root.render(<ActionPicker model={model} resource={{ kind: 'fixture.doc', id: 'doc7' }} actions={['publish']} value={[]} onChange={change} />));
+    const checkbox = container.querySelector<HTMLInputElement>('input[name="action"]');
+    expect(checkbox?.disabled).toBe(true);
+    expect(container.textContent).toContain('publish');
+    act(() => checkbox?.click());
+    expect(change).not.toHaveBeenCalled();
   });
 });
