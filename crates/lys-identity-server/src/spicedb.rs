@@ -83,6 +83,14 @@ fn unavailable(reason: impl Into<String>) -> GrantError {
     }
 }
 
+/// A resource kind the engine cannot hold, refused by name before any commit.
+fn unheld(kind: &str, reason: impl Into<String>) -> GrantError {
+    GrantError::ResourceKindUnheld {
+        kind: kind.to_owned(),
+        reason: reason.into(),
+    }
+}
+
 /// Refuse a name the engine's schema does not take.
 fn engine_name(what: &str, name: &str) -> Result<(), GrantError> {
     if names::engine_takes(name) {
@@ -465,17 +473,17 @@ impl RelationshipStore for SpiceDb {
             {
                 return Ok(());
             }
-            return Err(unavailable(format!(
+            return Err(unheld(kind, format!(
                 "resource kind {kind} has no held permission model; the app owner must publish its resource schema and the Lys administrator must approve it before a grant can be committed"
             )));
         }
         if FIXED.contains(&kind) && !RESOURCE_SUBJECTS.contains(&kind) {
-            return Err(unavailable(format!(
+            return Err(unheld(kind, format!(
                 "resource kind {kind} is an internal permission-engine definition without model resource relations; a Lys maintainer must add support for that resource kind before a grant can be committed"
             )));
         }
         if !names::engine_takes(kind) {
-            return Err(unavailable(format!(
+            return Err(unheld(kind, format!(
                 "resource kind {kind} is not a name the permission engine can hold; the Lys administrator must choose three to sixty-four lowercase letters, digits and underscores, starting with a letter and not ending with an underscore, or a Lys maintainer must add a supported resource-kind mapping"
             )));
         }

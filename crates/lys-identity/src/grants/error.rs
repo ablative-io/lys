@@ -387,6 +387,15 @@ pub enum GrantError {
         /// What the engine reported.
         reason: String,
     },
+    /// A grant names a resource kind the permission engine cannot hold; it is
+    /// refused before anything is committed.
+    #[error("ResourceKindUnheld: resource kind {kind} cannot be held: {reason}")]
+    ResourceKindUnheld {
+        /// The resource kind named.
+        kind: String,
+        /// Why the engine cannot hold it and who can change that.
+        reason: String,
+    },
     /// The permission relationships hold no live relationship for a grant the book holds.
     #[error("PermissionAbsent: the permission relationships hold no live relationship for {grant}")]
     PermissionAbsent {

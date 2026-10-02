@@ -202,11 +202,8 @@ async fn an_unprojectable_root_names_its_kind_and_owner_without_committing() -> 
     ] {
         let body = root(person, kind)?;
         let (status, answer) = service.post("/grants/roots", Some(&cookie), &body).await?;
-        assert_eq!(status, 503, "{kind}: {answer}");
-        assert_eq!(
-            answer["refusal"], "PermissionEngineUnavailable",
-            "{kind}: {answer}"
-        );
+        assert_eq!(status, 400, "{kind}: {answer}");
+        assert_eq!(answer["refusal"], "ResourceKindUnheld", "{kind}: {answer}");
         let words = answer["reason"].as_str().ok_or("refusal reason missing")?;
         assert!(words.contains(kind), "{words}");
         assert!(

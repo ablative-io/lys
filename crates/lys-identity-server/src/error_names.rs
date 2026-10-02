@@ -189,6 +189,7 @@ fn grant(error: &GrantError) -> &str {
         GrantError::TokenInvalid { .. } => "TokenInvalid",
         GrantError::ModelInvalid { .. } => "ModelInvalid",
         GrantError::RelationUnknown { .. } => "RelationUnknown",
+        GrantError::ResourceKindUnheld { .. } => "ResourceKindUnheld",
         GrantError::ActionsOutside { .. } => "ActionsOutside",
         GrantError::AuthorityAbsent { .. } => "AuthorityAbsent",
         GrantError::PassOnOutside => "PassOnOutside",
