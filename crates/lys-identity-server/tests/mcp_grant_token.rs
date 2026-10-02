@@ -220,6 +220,10 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
         answer["result"]["receipt"].is_object(),
         "a change through MCP is answered with its receipt: {answer}"
     );
+    assert!(
+        answer["result"].get("asked").is_none(),
+        "a made change is a receipt, not an ask: {answer}"
+    );
     let (status, answer) = fixture
         .call(
             &writer,
@@ -235,8 +239,8 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
         "GrantTokenScopeMismatch"
     );
     assert!(
-        answer["result"].get("receipt").is_none(),
-        "a refused call keeps nothing: {answer}"
+        answer["result"].get("receipt").is_none() && answer["result"].get("asked").is_none(),
+        "a call refused before it is kept keeps nothing: {answer}"
     );
     let reader = fixture.token(&fixture.person, "beta").await?;
     let (status, answer) = fixture.call(&reader, "POST", &path, body()?, false).await?;

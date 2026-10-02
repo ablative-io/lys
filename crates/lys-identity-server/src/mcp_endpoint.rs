@@ -30,6 +30,7 @@ struct Endpoint {
     origin: String,
     tools: &'static crate::mcp_tools::Catalogue,
     apps: Option<Arc<crate::mcp_oauth::Apps>>,
+    refused: crate::mcp_receipts::RefusedAsks,
 }
 
 #[cfg(test)]
@@ -61,6 +62,7 @@ fn registered(
         origin: origin.origin().ascii_serialization(),
         tools: crate::mcp_tools::prepare()?,
         apps,
+        refused: crate::mcp_receipts::RefusedAsks::new(),
     });
     Ok(Router::new()
         .route("/mcp", post(message).get(no_stream))
@@ -437,16 +439,15 @@ async fn call(
             agent,
             signed: relay_evidence,
         });
-    let receipt = match (endpoint.state.as_deref(), witness) {
+    let kept = match (endpoint.state.as_deref(), witness) {
         (Some(state), Some(witness)) if crate::mcp_receipts::changing(&parts.method) => Some(
-            crate::mcp_receipts::keep(
+            crate::mcp_receipts::Kept::before(
                 state,
+                &endpoint.refused,
                 witness,
-                (
-                    &parts.method,
-                    &crate::mcp_receipts::recorded_path(&parts.uri),
-                    &crate::mcp_receipts::digest(&bytes),
-                ),
+                &parts.method,
+                &parts.uri,
+                &bytes,
             )
             .map_err(|error| {
                 (
@@ -479,9 +480,11 @@ async fn call(
         Ok(response) => response,
         Err(error) => match error {},
     };
+    let made = response.status().is_success();
     let mut result = crate::mcp_callers::rendered(response).await?;
-    if let Some(receipt) = receipt {
-        result["receipt"] = receipt;
+    if let Some(kept) = kept {
+        kept.answer(&endpoint.refused, made, &mut result)
+            .map_err(|error| (-32603, format!("the kept leaf could not be named: {error}")))?;
     }
     Ok(result)
 }

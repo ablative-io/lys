@@ -82,6 +82,88 @@ async fn certified_agent() -> Result<
     Ok((service, cookie, agent, key))
 }
 
+fn change_call(id: u64, path: &str, body: &Value) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(serde_json::to_vec(&json!({
+        "jsonrpc":"2.0", "id":id, "method":"tools/call", "params":{
+            "name":"change", "arguments":{"method":"POST","path":path,"body":body}
+        }
+    }))?)
+}
+
+async fn leaves(
+    service: &identity_contract::harness::Service,
+    cookie: &str,
+) -> Result<u64, Box<dyn Error>> {
+    let (status, page) = service.get("/receipts/0", Some(cookie)).await?;
+    assert_eq!(status, 200, "{page}");
+    Ok(page["checkpoint"]["tree_size"]
+        .as_u64()
+        .ok_or("the receipt checkpoint has no tree size")?)
+}
+
+/// A change the route refuses is kept once as an ask, never answered as a
+/// receipt, and the same refused ask made again writes no second leaf.
+#[tokio::test]
+async fn a_refused_ask_is_kept_once_and_answered_as_asked_not_as_a_receipt()
+-> Result<(), Box<dyn Error>> {
+    let (service, cookie, agent, key) = certified_agent().await?;
+    let body = json!({
+        "operation": lys_identity::OperationId::generate()?.to_string(),
+        "display_name": "Nobody"
+    });
+    let before = leaves(&service, &cookie).await?;
+    let mut first = None;
+    for id in [11_u64, 12] {
+        let bytes = change_call(id, "/people", &body)?;
+        let signature = signed(&agent, &key, &bytes)?;
+        let response = post_signed(&service.base, bytes, &signature).await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        let answer: Value = response.json().await?;
+        assert_eq!(answer["result"]["isError"], true, "{answer}");
+        assert_eq!(
+            answer["result"]["structuredContent"]["status"], 401,
+            "an agent is no signed-in person, so the route refuses after the ask is kept: {answer}"
+        );
+        assert_eq!(
+            answer["result"]["structuredContent"]["body"]["refusal"],
+            "NotSignedIn"
+        );
+        assert!(
+            answer["result"].get("receipt").is_none(),
+            "a refused change is never answered as a receipt: {answer}"
+        );
+        let asked = answer["result"]["asked"].clone();
+        assert!(asked["operation"].is_string(), "the ask is named: {answer}");
+        match &first {
+            None => first = Some(asked),
+            Some(first) => assert_eq!(&asked, first, "the same ask, the same leaf"),
+        }
+        assert_eq!(
+            leaves(&service, &cookie).await?,
+            before + 1,
+            "one leaf for the ask, whatever the number of attempts"
+        );
+    }
+    let other = json!({
+        "operation": lys_identity::OperationId::generate()?.to_string(),
+        "display_name": "Somebody"
+    });
+    let bytes = change_call(13, "/people", &other)?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let answer: Value = post_signed(&service.base, bytes, &signature)
+        .await?
+        .json()
+        .await?;
+    assert_eq!(answer["result"]["isError"], true, "{answer}");
+    assert_ne!(
+        answer["result"]["asked"],
+        first.ok_or("the first ask")?,
+        "a different ask is its own leaf"
+    );
+    assert_eq!(leaves(&service, &cookie).await?, before + 2);
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_signed_mcp_call_cannot_borrow_an_administrator_cookie() -> Result<(), Box<dyn Error>> {
     use sha2::{Digest, Sha256};
