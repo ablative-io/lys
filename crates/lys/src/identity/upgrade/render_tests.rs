@@ -152,6 +152,7 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
     assert!(environment.compose && environment.private);
     let config = DeploymentConfig::load(&layout.deployment_config())?;
     let carried = server_config::Carried {
+        ports: super::super::install::ports::Ports::default(),
         administrator: Some(
             serde_json::json!({"issuer": "http://localhost:18080/auth/v1/", "subject": "recorded-subject"}),
         ),

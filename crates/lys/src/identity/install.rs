@@ -42,6 +42,7 @@ pub mod broker_trust;
 pub mod exit_wait;
 pub mod layout;
 pub mod log_wait;
+pub mod ports;
 pub mod server_config;
 pub mod services;
 pub mod setup_code;
@@ -61,6 +62,10 @@ pub struct Options {
     pub surface: Option<PathBuf>,
     /// The message service connection to keep in the configuration.
     pub message_service: Option<PathBuf>,
+    /// An explicit local identity listener; otherwise keep the recorded listener.
+    pub service_port: Option<u16>,
+    /// An explicit local broker listener; otherwise keep the recorded listener.
+    pub broker_port: Option<u16>,
 }
 
 fn write_plain(path: &Path, text: &str) -> IdentityResult<()> {
@@ -231,7 +236,8 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         None => Layout::discover()?,
     };
     let mut emitter = Emitter::new(json);
-    let units = upgrade::units(&layout);
+    let ports = ports::Ports::load(&layout)?.chosen(options.service_port, options.broker_port)?;
+    let units = upgrade::units_at(&layout, ports);
     swap::recover(&layout, &units, &mut Compose, &mut |line| {
         emitter.note(line);
     })?;
@@ -256,10 +262,12 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         layout::POSTGRES_INIT_SQL,
     )?;
     let config_path = layout.deployment_config();
-    if write_absent(
-        &config_path,
-        &layout::render_deployment(options.admin_email.as_deref()),
-    )? {
+    let deployment = if ports.service == layout::SERVICE_PORT {
+        layout::render_deployment(options.admin_email.as_deref())
+    } else {
+        layout::render_deployment_at(options.admin_email.as_deref(), ports.service)
+    };
+    if write_absent(&config_path, &deployment)? {
         emitter.note("deployment.toml written");
     }
     let config = DeploymentConfig::load_install(&config_path)?;
@@ -295,6 +303,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         layout::ESTATE_PLAN.as_bytes(),
     )?;
     let mut carried = server_config::carried(&layout)?.unwrap_or_default();
+    carried.ports = ports;
     if let Some(path) = &options.message_service {
         carried.message_service = Some(server_config::messages_from(path)?);
         emitter.note("message service connection kept");
@@ -342,10 +351,10 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     start_runner(&layout, &key, &services::sibling("lys")?, &mut |line| {
         emitter.note(line);
     })?;
-    emitter.field("open", "url", Layout::service_url());
-    emitter.field("sign-in for products", "issuer", Layout::service_url());
+    emitter.field("open", "url", ports.service_url());
+    emitter.field("sign-in for products", "issuer", ports.service_url());
     if let Some(code) = code {
-        emitter.field("setup", "setup", Layout::setup_url());
+        emitter.field("setup", "setup", ports.setup_url());
         setup_code::hand_over(
             &layout,
             code.expose(),

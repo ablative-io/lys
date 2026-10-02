@@ -14,7 +14,8 @@ use serde_json::{Value, json};
 use super::super::config::DeploymentConfig;
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::super::private_files;
-use super::layout::{BROKER_PORT, Layout, SERVICE_PORT};
+use super::layout::Layout;
+use super::ports::Ports;
 
 /// The origin the directory service names its own log by.
 pub const LOG_ORIGIN: &str = "lys-identity";
@@ -56,6 +57,8 @@ pub fn issuer(config: &DeploymentConfig) -> String {
 /// the administrator, and the products registered as clients of Lys.
 #[derive(Debug, Default)]
 pub struct Carried {
+    /// The listeners an earlier install recorded.
+    pub ports: Ports,
     /// The administrator an earlier configuration named.
     pub administrator: Option<Value>,
     /// The products an earlier configuration registered as clients of Lys.
@@ -89,7 +92,7 @@ pub fn render(
     let data = layout.data_dir();
     let dir = |name: &str| Value::String(data.join(name).display().to_string());
     let mut rendered = json!({
-        "listen": format!("127.0.0.1:{SERVICE_PORT}"),
+        "listen": format!("127.0.0.1:{}", carried.ports.service),
         "log_dir": dir("directory-log"),
         "log_origin": LOG_ORIGIN,
         "event_key_file": layout.service_key().display().to_string(),
@@ -102,7 +105,7 @@ pub fn render(
             .join(format!("{}-client-secret", config.clients.platform.id))
             .display()
             .to_string(),
-        "redirect_url": format!("{}/api/callback", Layout::service_url()),
+        "redirect_url": format!("{}/api/callback", carried.ports.service_url()),
         "sign_in_api": format!("{}/auth/v1", config.issuer.admin_url.trim_end_matches('/')),
         "setup": {
             "code_file": state.join(super::setup_code::CODE_FILE).display().to_string(),
@@ -121,7 +124,7 @@ pub fn render(
             "key_file": state.join("spicedb-preshared-key").display().to_string(),
         },
         "secrets": {
-            "broker": format!("http://127.0.0.1:{BROKER_PORT}"),
+            "broker": format!("http://127.0.0.1:{}", carried.ports.broker),
             "service": SERVICE_NAME,
             "service_key_file": layout.service_key().display().to_string(),
         },
@@ -200,6 +203,7 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     })?;
     let named = |value: Option<&Value>| value.filter(|value| !value.is_null()).cloned();
     Ok(Some(Carried {
+        ports: Ports::from_value(&earlier)?,
         administrator: named(earlier.get("administrator")),
         products: named(earlier.pointer("/provider/clients")),
         message_service: message_service(&earlier, &path)?,

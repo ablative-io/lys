@@ -88,8 +88,8 @@ pub fn write_pending(state_dir: &Path, purpose: Purpose, code: &str) -> Identity
 }
 
 /// The setup page's address carrying `code` in its fragment.
-pub fn address_with(code: &str) -> String {
-    format!("{}#code={code}", Layout::setup_url())
+pub fn address_with(code: &str, setup: &str) -> String {
+    format!("{setup}#code={code}")
 }
 
 /// Open `address` in the person's browser, answering whether a browser
@@ -119,7 +119,8 @@ pub fn hand_over(
     open: &dyn Fn(&str) -> bool,
     emitter: &mut Emitter,
 ) -> IdentityResult<()> {
-    if open(&address_with(code)) {
+    let setup = super::ports::Ports::load(layout)?.setup_url();
+    if open(&address_with(code, &setup)) {
         emitter.note("the setup page is open in your browser");
         return Ok(());
     }
@@ -128,7 +129,7 @@ pub fn hand_over(
     emitter.note(&format!(
         "no browser could be opened: the setup code is in {} (only you can read it); open {} and enter it in the Setup code field",
         path.display(),
-        Layout::setup_url()
+        setup
     ));
     if emitter.is_json() {
         emitter.field(
@@ -194,7 +195,11 @@ fn issue(root: Option<std::path::PathBuf>, json: bool) -> IdentityResult<()> {
     let code = generate();
     write_pending(&config.state_dir(), purpose, code.expose())?;
     let mut emitter = Emitter::new(json);
-    emitter.field("setup", "setup", Layout::setup_url());
+    emitter.field(
+        "setup",
+        "setup",
+        super::ports::Ports::load(&layout)?.setup_url(),
+    );
     emitter.field("purpose", "purpose", purpose.word());
     hand_over(&layout, code.expose(), &open_in_browser, &mut emitter)?;
     emitter.finish();

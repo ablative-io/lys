@@ -39,8 +39,9 @@ use sha2::{Digest, Sha256};
 
 use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
-use super::install::layout::{BINARIES, BROKER_PORT, Layout, SERVICE_PORT};
+use super::install::layout::{BINARIES, Layout};
 use super::install::log_wait::{self, LogCursor};
+use super::install::ports::Ports;
 use super::install::{self, services, surface};
 use super::private_files;
 use crate::commands::output::Emitter;
@@ -96,7 +97,12 @@ pub struct Unit {
 }
 
 /// The broker and the service as the install runs them, in start order.
-pub fn units(layout: &Layout) -> Vec<Unit> {
+pub fn units(layout: &Layout) -> IdentityResult<Vec<Unit>> {
+    Ok(units_at(layout, Ports::load(layout)?))
+}
+
+/// The broker and service with explicitly selected listeners.
+pub fn units_at(layout: &Layout, ports: Ports) -> Vec<Unit> {
     let broker_args = [
         "serve",
         "--root",
@@ -104,7 +110,7 @@ pub fn units(layout: &Layout) -> Vec<Unit> {
         "--keys",
         &layout.broker_keys().display().to_string(),
         "--listen",
-        &format!("127.0.0.1:{BROKER_PORT}"),
+        &format!("127.0.0.1:{}", ports.broker),
         "--directory-config",
         &layout.service_config().display().to_string(),
     ]
@@ -117,7 +123,7 @@ pub fn units(layout: &Layout) -> Vec<Unit> {
             pid: layout.run_dir().join("secrets.pid"),
             ready: Ready {
                 says: "listening on".to_string(),
-                answers: Some((BROKER_PORT, "/")),
+                answers: Some((ports.broker, "/")),
             },
         },
         Unit {
@@ -127,7 +133,7 @@ pub fn units(layout: &Layout) -> Vec<Unit> {
             pid: layout.run_dir().join("identity.pid"),
             ready: Ready {
                 says: "listening on".to_string(),
-                answers: Some((SERVICE_PORT, "/api/authority")),
+                answers: Some((ports.service, "/api/authority")),
             },
         },
     ]
@@ -474,7 +480,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     };
     let mut emitter = Emitter::new(json);
     emitter.field("root", "root", layout.root.display().to_string());
-    let units = units(&layout);
+    let units = units(&layout)?;
     require_install(&layout)?;
     let config = DeploymentConfig::load_install(&layout.deployment_config())?;
     install::server_state(&layout, &config)?;
