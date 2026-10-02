@@ -69,8 +69,10 @@ fn twenty(world: &mut World<FileLeafStore, Measured>) -> Result<Vec<Resource>, B
             holder: world.dana,
             resource: resource.clone(),
             relation: Relation::new("kite")?,
+            // Delete is withheld from agents, so a root reaching agents
+            // passes on only what heron and tern carry.
             pass_on: pass(
-                &["delete", "read", "write"],
+                &["read", "write"],
                 &[RecipientKind::Person, RecipientKind::Agent],
             )?,
             window: Window::new(T0, None)?,
