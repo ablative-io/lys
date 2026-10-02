@@ -399,11 +399,12 @@ fn upgrade_command_child() -> TestResult {
 }
 
 #[test]
-fn recovery_after_lys_is_placed_restores_the_runner_or_refuses_unsafe_status() -> TestResult {
+fn recovery_after_lys_is_placed_restores_the_runner_starts_a_stopped_one_or_refuses_live_sessions()
+-> TestResult {
     use super::super::intent::{Intent, Step};
     use super::super::{launch, swap};
 
-    for state in ["empty", "live", "unreadable"] {
+    for state in ["empty", "live", "down"] {
         let running = Running::new()?;
         let new = running.new_build(false)?;
         let layout = &running.scratch.layout;
@@ -438,7 +439,7 @@ fn recovery_after_lys_is_placed_restores_the_runner_or_refuses_unsafe_status() -
         for unit in &running.scratch.units {
             launch(layout, unit, false)?;
         }
-        if state != "unreadable" {
+        if state != "down" {
             install::start_runner(layout, &running.key, &layout.binary("lys"), &mut |_| {})?;
         }
         if state == "live" {
@@ -471,7 +472,7 @@ fn recovery_after_lys_is_placed_restores_the_runner_or_refuses_unsafe_status() -
             &mut Recorder::default(),
             &mut |_| {},
         );
-        if state == "empty" {
+        if state != "live" {
             result?;
             assert_eq!(version(&layout.binary("lys"), "lys")?, A);
             assert_ne!(
@@ -485,17 +486,10 @@ fn recovery_after_lys_is_placed_restores_the_runner_or_refuses_unsafe_status() -
             ));
             assert!(!layout.upgrade_intent().exists());
         } else {
-            let error = result.err().ok_or("recovery acted on unsafe Status")?;
+            let error = result.err().ok_or("recovery acted on live sessions")?;
             let named = error.to_string();
-            let expected = if state == "live" {
-                "runner_sessions_live"
-            } else {
-                "runner_status_unreadable"
-            };
-            assert!(named.contains(expected), "{named}");
-            if state == "live" {
-                assert!(named.contains("recovery-held"), "{named}");
-            }
+            assert!(named.contains("runner_sessions_live"), "{named}");
+            assert!(named.contains("recovery-held"), "{named}");
             assert_eq!(running.unchanged()?, before);
             assert_eq!(std::fs::read(layout.upgrade_intent())?, recorded);
         }

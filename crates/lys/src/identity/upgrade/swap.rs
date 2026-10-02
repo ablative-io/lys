@@ -392,7 +392,7 @@ pub fn recover(
         return Ok(());
     };
     let mut restart = if intent.from.contains_key("lys") || intent.to.contains_key("lys") {
-        Some(Restart::prepare(layout)?)
+        Some(Restart::prepare_for_recovery(layout)?)
     } else {
         None
     };

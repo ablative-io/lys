@@ -73,7 +73,22 @@ pub struct Restart {
 
 impl Restart {
     /// Reads the existing key and Status before any file or process changes.
+    /// When an upgrade stopped part-way, which the upgrade ends first, the
+    /// runner is read as for [`Restart::prepare_for_recovery`].
     pub fn prepare(layout: &Layout) -> IdentityResult<Self> {
+        Self::capture(layout, super::intent::Intent::read(layout)?.is_some())
+    }
+
+    /// The runner of an upgrade that stopped part-way. An upgrade stops the
+    /// runner before it places anything, so this runner is usually down: one
+    /// whose recorded process holds no exit lock runs no session, needs no
+    /// Status, and is started once the previous build is back. One that is
+    /// up is still asked, and refused while any session lives.
+    pub fn prepare_for_recovery(layout: &Layout) -> IdentityResult<Self> {
+        Self::capture(layout, true)
+    }
+
+    fn capture(layout: &Layout, down_allowed: bool) -> IdentityResult<Self> {
         let socket = layout.runner_socket();
         let key = Arc::new(
             Ed25519Identity::load(&layout.service_key()).map_err(|error| {
@@ -81,7 +96,11 @@ impl Restart {
             })?,
         );
         let client = Client::new(socket.clone(), Arc::clone(&key));
-        Self::empty(&client, &socket)?;
+        let pid_file = layout.run_dir().join("runner.pid");
+        let down = down_allowed && ExitWatch::open(&pid_file)?.exited()?;
+        if !down {
+            Self::empty(&client, &socket)?;
+        }
         let public = layout.run_dir().join("runner-server.pub");
         let bytes = std::fs::read_to_string(&public)
             .map_err(|error| refuse("runner_key_unreadable", error, &public))?;
@@ -92,10 +111,9 @@ impl Restart {
                 &public,
             ));
         }
-        let pid_file = layout.run_dir().join("runner.pid");
         let pid = pid_at(&pid_file)?;
         let exit = ExitWatch::open(&pid_file)?;
-        if exit.exited()? {
+        if !down && exit.exited()? {
             return Err(refuse(
                 "runner_process_unreadable",
                 "Status answered but the recorded runner holds no exit lock",
