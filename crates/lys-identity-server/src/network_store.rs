@@ -14,6 +14,7 @@
 //! machine that dials in with the machine's key. A machine with none is
 //! given its start command and nothing is run.
 
+use crate::error_machine::MachineError;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
@@ -319,9 +320,9 @@ impl NetworkStore {
             {
                 Ok(())
             }
-            Some(_) => Err(ServerError::MachineReused {
+            Some(_) => Err(ServerError::Machine(MachineError::Reused {
                 machine: machine.id,
-            }),
+            })),
             None => self.write(Change::Named { machine }),
         }
     }
@@ -346,9 +347,9 @@ impl NetworkStore {
             {
                 return Ok(first.clone());
             }
-            return Err(ServerError::MachineTeamReused {
+            return Err(ServerError::Machine(MachineError::TeamReused {
                 operation: recorded.operation,
-            });
+            }));
         }
         let machine = self
             .machine(&recorded.machine)
@@ -386,9 +387,9 @@ impl NetworkStore {
             {
                 return Ok(first.clone());
             }
-            return Err(ServerError::MachineAgentsReused {
+            return Err(ServerError::Machine(MachineError::AgentsReused {
                 operation: recorded.operation,
-            });
+            }));
         }
         let machine = self
             .machine(&recorded.machine)
