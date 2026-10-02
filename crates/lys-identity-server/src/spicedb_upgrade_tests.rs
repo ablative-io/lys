@@ -104,5 +104,11 @@ fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
     assert!(schema.contains("definition directory {"));
     assert!(schema.contains("definition fixture/doc {"));
     assert!(schema.contains("person | person with unexpired"));
+    for kind in ["person", "agent"] {
+        assert_eq!(schema.matches(&format!("definition {kind} {{")).count(), 1);
+        assert!(schema.contains(&format!(
+            "definition {kind} {{\n  relation viewer: grant#holder\n  permission view = viewer\n}}"
+        )), "{schema}");
+    }
     Ok(())
 }
