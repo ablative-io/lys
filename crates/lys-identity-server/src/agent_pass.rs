@@ -3,7 +3,7 @@ use crate::agent_pass_store::Passes;
 use crate::error::ServerError;
 use crate::routes::AppState;
 use axum::http::{HeaderMap, header};
-use lys_identity::AgentId;
+use lys_identity::{AgentId, Provenance};
 use std::sync::MutexGuard;
 
 /// The sole header carrying a pass for a Lys-started run.
@@ -29,6 +29,16 @@ pub fn holder(state: &AppState, headers: &HeaderMap) -> Result<Option<AgentId>, 
         return Ok(None);
     };
     store(state)?.lookup(pass).map(Some)
+}
+
+pub(crate) fn verified(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<(AgentId, Provenance)>, ServerError> {
+    let Some(pass) = value(headers)? else {
+        return Ok(None);
+    };
+    store(state)?.lookup_run(pass).map(Some)
 }
 
 fn value(headers: &HeaderMap) -> Result<Option<&str>, ServerError> {

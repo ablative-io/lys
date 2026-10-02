@@ -24,12 +24,22 @@ pub struct ReceiptActorView {
     /// The independently authenticated service account, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_account: Option<String>,
+    /// The agent whose run pass authenticated the actor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// The verified pass's launch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch: Option<String>,
+    /// The verified pass's session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
     /// The issuer its login was authenticated at.
     pub issuer: String,
     /// The subject that login names.
     pub subject: String,
     /// When it was authenticated, in seconds since the Unix epoch.
-    pub authenticated_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authenticated_at: Option<u64>,
 }
 
 /// Where a receipt's event stands in the directory log.
@@ -76,12 +86,31 @@ pub(crate) fn receipt_view(receipt: &Receipt) -> DirectoryReceiptView {
         actor: ReceiptActorView {
             authentication: actor
                 .provenance()
-                .service_account()
-                .map(|_| "service_account_bearer".to_owned()),
+                .run()
+                .map(|_| "agent_pass".to_owned())
+                .or_else(|| {
+                    actor
+                        .provenance()
+                        .service_account()
+                        .map(|_| "service_account_bearer".to_owned())
+                }),
             service_account: actor
                 .provenance()
                 .service_account()
                 .map(|account| account.to_string()),
+            agent: actor
+                .provenance()
+                .run()
+                .and_then(|_| actor.provenance().agent())
+                .map(|agent| agent.to_string()),
+            launch: actor
+                .provenance()
+                .run()
+                .map(|(launch, _)| launch.to_owned()),
+            session: actor
+                .provenance()
+                .run()
+                .map(|(_, session)| session.to_owned()),
             issuer: actor.binding().issuer().to_owned(),
             subject: actor.binding().subject().to_owned(),
             authenticated_at: actor.provenance().authenticated_at(),

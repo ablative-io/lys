@@ -204,13 +204,10 @@ pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
 /// The signed-in actor, or a refusal: the administrator for a request
 /// carrying the install's operator token, else the session's actor.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
-    if let Some(agent) = crate::agent_pass::holder(state, headers)? {
+    if let Some((agent, provenance)) = crate::agent_pass::verified(state, headers)? {
         return Ok(Actor::new(
             lys_identity::LoginBinding::new(state.oidc.issuer(), &agent.to_string())?,
-            lys_identity::Provenance::new(
-                lys_identity::AuthMethod::AgentPass(agent),
-                crate::session::now(),
-            ),
+            provenance,
         ));
     }
     if let Some(actor) = crate::operator::actor(state, headers)? {
