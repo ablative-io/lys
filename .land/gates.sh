@@ -75,12 +75,20 @@ leg cargo fmt --all
 leg source_changed
 leg cargo clippy --all-targets --all-features -- -D warnings
 leg cargo clippy --all-targets -- -D warnings
-leg cargo test --workspace --all-features --no-fail-fast
-leg cargo doc --no-deps --all-features
-leg cargo doc --no-deps
-leg ast-grep scan --config sgconfig.yml
-leg sh scripts/file-length.sh
-leg python3 -B -m unittest discover -s scripts/identity-gates -p surface_fixture_tests.py
+mkdir -p target || exit 1
+gate_logs=$(mktemp -d target/land-logs.XXXXXX) || exit 1
+trap 'rm -rf "$gate_logs"' EXIT
+job_index=0
+gate_pids=""
+parallel sh scripts/design/gate.sh
+parallel cargo doc --no-deps --all-features
+parallel cargo doc --no-deps
+parallel ast-grep scan --config sgconfig.yml
+parallel sh scripts/file-length.sh
+parallel python3 -B -m unittest discover -s scripts/identity-gates -p surface_fixture_tests.py
+parallel surface_leg
+leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
+leg cargo test --doc --workspace --all-features
 leg identity_leg
 finish_parallel
 exit "$status"
