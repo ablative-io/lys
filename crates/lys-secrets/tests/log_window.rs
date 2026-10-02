@@ -47,6 +47,11 @@ struct Folders {
     dir: TempDir,
 }
 
+struct Seed {
+    folders: Folders,
+    appends: u64,
+}
+
 impl Folders {
     fn root(&self) -> PathBuf {
         self.dir.path().join("broker")
@@ -77,6 +82,16 @@ impl Folders {
 /// A copy of the 10,000-line broker for one test.
 fn ten_thousand() -> Result<Folders, Box<dyn Error>> {
     fixture::copy()
+}
+
+#[test]
+fn the_large_fixture_requires_no_runtime_store_appends() -> TestResult {
+    let seed = built()?;
+    assert_eq!(
+        seed.appends, 0,
+        "the large fixture must load recorded bytes without appending to the store"
+    );
+    Ok(())
 }
 
 /// One printed page: each row's index and the index its outcome names,
