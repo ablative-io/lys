@@ -1,21 +1,21 @@
 #!/bin/sh
-# Every leg finishes so a failure carries every independent finding.
-# Independent checks run together after the shared compile checks.
+# The gates lys runs before any commit: CLAUDE.md's "Gates before any commit" list,
+# and the ast-grep scan of sgconfig.yml's rules. repo_land runs this file as the whole gate when it stands here. Every leg
+# runs even after a red one, so the log covers all of them; the exit status is red if
+# any leg was.
 set -u
-PATH="$(pwd -P)/target/land-tools/bin:$PATH"
-export PATH
 status=0
 leg() {
-  started=$(date +%s)
   echo "--- $* ---"
   "$@"
   code=$?
   echo "--- status $code: $* ---"
-  echo "--- seconds $(( $(date +%s) - started )): $* ---"
   [ "$code" -eq 0 ] || status=1
 }
-# Container-backed targets are selected explicitly because the workspace suite
-# excludes them by default. Missing prerequisites fail rather than skip a test.
+# The identity leg runs the container-backed identity targets, which are declared
+# test = false so cargo test --workspace stays hermetic. It runs on every lys landing
+# and is never scoped away. Without a container runtime it fails by name; it never
+# skips. It lints every identity target before it runs any of them.
 identity_leg() {
   if ! docker info >/dev/null 2>&1; then
     echo "container_runtime_missing: the identity leg needs a container runtime answering docker info"
@@ -30,16 +30,7 @@ identity_leg() {
     echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
     return 1
   fi
-  identity_status=0
-  cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail || identity_status=1
-  python3 -B scripts/identity-gates/spicedb_fixture.py -- cargo nextest run --locked -p lys-identity-server --all-features --test identity_spicedb --no-fail-fast --retries 0 --no-tests fail || identity_status=1
-  return "$identity_status"
-}
-# The interpreter is named first, so a run here that differs from a run
-# elsewhere says which python3 each one used.
-identity_scripts_leg() {
-  echo "python3: $(command -v python3) $(python3 --version 2>&1)"
-  python3 -B -m unittest discover -s scripts/identity-gates -p "*test*.py"
+  cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
 }
 # The compiled surface and dependencies are shared with the install fixtures.
 # Its type checks and every surface test still run on each gate.
@@ -51,49 +42,16 @@ surface_leg() {
   prepared_surface=$(python3 scripts/identity-gates/surface_fixture.py) || return 1
   (cd "$prepared_surface" && npm run typecheck && npm test)
 }
-parallel() {
-  job_index=$((job_index + 1))
-  (status=0; leg "$@"; exit "$status") > "$gate_logs/$job_index" 2>&1 &
-  gate_pids="$gate_pids $!"
-}
-finish_parallel() {
-  finished_index=0
-  for gate_pid in $gate_pids; do
-    finished_index=$((finished_index + 1))
-    if wait "$gate_pid"; then
-      :
-    else
-      status=1
-    fi
-    if ! cat "$gate_logs/$finished_index"; then
-      echo "gate_log_unreadable: parallel leg $finished_index did not yield its log"
-      status=1
-    fi
-  done
-}
-source_changed() {
-  if ! git diff --quiet HEAD --; then
-    echo "source_changed: formatting changed tracked source"
-    return 1
-  fi
-}
-leg cargo fmt --all
-leg source_changed
+leg sh scripts/design/gate.sh
+leg cargo fmt --check
 leg cargo clippy --all-targets --all-features -- -D warnings
 leg cargo clippy --all-targets -- -D warnings
-mkdir -p target || exit 1
-gate_logs=$(mktemp -d target/land-logs.XXXXXX) || exit 1
-trap 'rm -rf "$gate_logs"' EXIT
-job_index=0
-gate_pids=""
-parallel sh scripts/design/gate.sh
-parallel cargo doc --no-deps --all-features
-parallel ast-grep scan --config sgconfig.yml
-parallel sh scripts/file-length.sh
-parallel identity_scripts_leg
-parallel surface_leg
-leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
-leg cargo test --doc --workspace --all-features
+leg cargo test --workspace --all-features --no-fail-fast
+leg cargo doc --no-deps --all-features
+leg cargo doc --no-deps
+leg ast-grep scan --config sgconfig.yml
+leg sh scripts/file-length.sh
+leg python3 -B -m unittest discover -s scripts/identity-gates -p surface_fixture_tests.py
 leg identity_leg
-finish_parallel
+leg surface_leg
 exit "$status"

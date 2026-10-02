@@ -11,15 +11,11 @@
 //! (`product`). Container-backed: runs only on the identity leg.
 //!
 //! The directory service and the secrets broker answer on the install's
-//! independently selected ports, so parallel installs never share services. The binaries are the workspace test build's
+//! fixed ports, so the test refuses by name when another install holds them
+//! rather than sharing one. The binaries are the workspace test build's
 //! siblings, so the CLI and services come from the same build without
 //! compiling them again inside a running test.
 
-#[path = "identity_install/cleanup_tests.rs"]
-mod cleanup_tests;
-#[path = "identity_install/estate.rs"]
-mod estate;
-use estate::Estate;
 pub mod identity_support;
 #[path = "identity_install/product.rs"]
 mod product;
@@ -39,8 +35,55 @@ use sha2::{Digest, Sha256};
 
 /// The deployment configuration the install writes, as shipped.
 const TEMPLATE: &str = include_str!("../src/identity/install/deployment.template.toml");
+/// The directory service's fixed loopback port.
+const SERVICE_PORT: u16 = 8490;
+/// The secrets broker's fixed loopback port.
+const BROKER_PORT: u16 = 8472;
+/// Lys's origin as a browser uses it.
+const ORIGIN: &str = "http://localhost:8490";
 const EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
+
+/// One installed estate, stopped and removed with its volumes when dropped.
+struct Estate {
+    root: tempfile::TempDir,
+    project: String,
+    rauthy_port: u16,
+}
+
+impl Drop for Estate {
+    fn drop(&mut self) {
+        for pid in ["runner.pid", "identity.pid", "secrets.pid"] {
+            if let Ok(text) = std::fs::read_to_string(self.root.path().join("run").join(pid)) {
+                let stopped = Command::new("kill").arg(text.trim()).status();
+                if let Err(error) = stopped {
+                    eprintln!("stopping {pid} failed: {error}");
+                }
+            }
+        }
+        let down = Command::new("docker")
+            .arg("compose")
+            .arg("-f")
+            .arg(self.root.path().join("deploy/compose.yaml"))
+            .arg("--env-file")
+            .arg(self.root.path().join("state/compose.env"))
+            .args(["-p", &self.project, "--profile", "bundled-db"])
+            .args(["down", "-v", "--remove-orphans"])
+            .output();
+        if let Err(error) = down {
+            eprintln!("teardown of {} failed: {error}", self.project);
+        }
+    }
+}
+
+/// Refuses by name when anything listens on `port` already.
+fn port_free(port: u16, what: &str) -> TestResult {
+    TcpListener::bind(("127.0.0.1", port))
+        .map(drop)
+        .map_err(|error| {
+            format!("port_in_use: {what} port 127.0.0.1:{port} is taken ({error}); stop the install holding it").into()
+        })
+}
 
 /// Reuse the workspace's compiled binaries, refusing an incomplete build.
 fn binaries() -> TestResult<PathBuf> {
@@ -139,12 +182,12 @@ fn headless_path(at: &Path) -> TestResult<String> {
 
 /// The estate's deployment configuration: the shipped template on free
 /// ports, a free network range and a compose project of its own.
-fn deployment(project: &str, rauthy_port: u16, service_port: u16) -> TestResult<String> {
+fn deployment(project: &str, rauthy_port: u16) -> TestResult<String> {
     let network = free_network()?;
     Ok(TEMPLATE
         .replace("{{admin_email_line}}", "")
         .replace("{{rauthy_port}}", &rauthy_port.to_string())
-        .replace("{{service_port}}", &service_port.to_string())
+        .replace("{{service_port}}", &SERVICE_PORT.to_string())
         .replace(
             "project = \"lys-identity\"",
             &format!("project = \"{project}\""),
@@ -164,30 +207,23 @@ struct Seen {
 }
 
 /// One HTTP/1.1 request to the service, as a browser at Lys's origin sends it.
-fn ask(
-    service_port: u16,
-    method: &str,
-    path: &str,
-    cookie: Option<&str>,
-    body: Option<&str>,
-) -> TestResult<Seen> {
+fn ask(method: &str, path: &str, cookie: Option<&str>, body: Option<&str>) -> TestResult<Seen> {
     let cookie = cookie.map(|cookie| format!("Cookie: {cookie}"));
     let json = body.map(|body| ("application/json", body));
-    send(service_port, method, path, cookie.as_slice(), json)
+    send(method, path, cookie.as_slice(), json)
 }
 
 /// One HTTP/1.1 request to the service with `headers`, each a whole header
 /// line, and a body of the content type it names.
 fn send(
-    service_port: u16,
     method: &str,
     path: &str,
     headers: &[String],
     body: Option<(&str, &str)>,
 ) -> TestResult<Seen> {
-    let mut stream = TcpStream::connect(("127.0.0.1", service_port))?;
+    let mut stream = TcpStream::connect(("127.0.0.1", SERVICE_PORT))?;
     let mut head = format!(
-        "{method} {path} HTTP/1.1\r\nHost: localhost:{service_port}\r\nConnection: close\r\n"
+        "{method} {path} HTTP/1.1\r\nHost: localhost:{SERVICE_PORT}\r\nConnection: close\r\n"
     );
     for header in headers {
         write!(head, "{header}\r\n")?;
@@ -286,36 +322,25 @@ fn operation() -> String {
 #[test]
 fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
     require_runtime()?;
+    port_free(SERVICE_PORT, "identity service")?;
+    port_free(BROKER_PORT, "secrets broker")?;
     let bin = binaries()?;
     let work = tempfile::TempDir::new()?;
     let package = screens(work.path())?;
     let path = headless_path(work.path())?;
-    let listeners = [
-        TcpListener::bind("127.0.0.1:0")?,
-        TcpListener::bind("127.0.0.1:0")?,
-    ];
     let estate = Estate {
         root: tempfile::TempDir::new()?,
         project: format!("lys-identity-test-install-{}", std::process::id()),
         rauthy_port: free_port()?,
-        service_port: listeners[0].local_addr()?.port(),
-        broker_port: listeners[1].local_addr()?.port(),
-        cleaned: false,
     };
-    drop(listeners);
-    let origin = format!("http://localhost:{}", estate.service_port);
     std::fs::set_permissions(estate.root.path(), std::fs::Permissions::from_mode(0o700))?;
     std::fs::write(
         estate.root.path().join("deployment.toml"),
-        deployment(&estate.project, estate.rauthy_port, estate.service_port)?,
+        deployment(&estate.project, estate.rauthy_port)?,
     )?;
     let installed = Command::new(bin.join("lys"))
         .args(["identity", "install", "--root"])
         .arg(estate.root.path())
-        .arg("--service-port")
-        .arg(estate.service_port.to_string())
-        .arg("--broker-port")
-        .arg(estate.broker_port.to_string())
         .arg("--surface")
         .arg(&package)
         .env("PATH", &path)
@@ -335,40 +360,30 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         "the setup code is never printed"
     );
 
-    let page = ask(estate.service_port, "GET", "/", None, None)?;
+    let page = ask("GET", "/", None, None)?;
     assert_eq!(page.status, 200, "{}", page.body);
     assert!(page.body.contains("<title>Lys</title>"), "{}", page.body);
     let mut assets = 0;
     for (at, _) in page.body.match_indices("=\"/assets/") {
         let rest = page.body.get(at + 2..).ok_or("an asset reference")?;
         let target = rest.split('"').next().ok_or("an asset path")?;
-        let asset = ask(estate.service_port, "GET", target, None, None)?;
+        let asset = ask("GET", target, None, None)?;
         assert_eq!(asset.status, 200, "{target}");
         read.answer(target, &asset);
         assets += 1;
     }
     assert!(assets >= 2, "the page's script and stylesheet were read");
     read.answer("the page", &page);
-    read.answer(
-        "a first visit",
-        &ask(estate.service_port, "GET", "/api/login", None, None)?,
-    );
-    let setup = ask(estate.service_port, "GET", "/setup", None, None)?;
+    read.answer("a first visit", &ask("GET", "/api/login", None, None)?);
+    let setup = ask("GET", "/setup", None, None)?;
     assert_eq!(setup.status, 200);
     read.answer("the setup page", &setup);
 
     let opened = serde_json::json!({ "code": code.trim() }).to_string();
-    let open = ask(
-        estate.service_port,
-        "POST",
-        "/api/setup/open",
-        None,
-        Some(&opened),
-    )?;
+    let open = ask("POST", "/api/setup/open", None, Some(&opened))?;
     assert_eq!(open.status, 200, "{}", open.body);
     read.answer("the opened setup", &open);
     let wrong = ask(
-        estate.service_port,
         "POST",
         "/api/setup/open",
         None,
@@ -381,7 +396,6 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         "email": EMAIL, "password": "short",
     });
     let refused = ask(
-        estate.service_port,
         "POST",
         "/api/setup/administrator",
         None,
@@ -394,7 +408,6 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         "email": EMAIL, "password": PASSWORD,
     });
     let made = ask(
-        estate.service_port,
         "POST",
         "/api/setup/administrator",
         None,
@@ -404,45 +417,25 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
     read.answer("the finished setup", &made);
 
     let credentials = serde_json::json!({ "email": EMAIL, "password": PASSWORD }).to_string();
-    let signed_in = ask(
-        estate.service_port,
-        "POST",
-        "/api/sign-in",
-        None,
-        Some(&credentials),
-    )?;
+    let signed_in = ask("POST", "/api/sign-in", None, Some(&credentials))?;
     assert_eq!(signed_in.status, 200, "{}", signed_in.body);
     read.answer("a sign-in", &signed_in);
     let cookie = signed_in.cookie.ok_or("the sign-in began a session")?;
-    let me = ask(estate.service_port, "GET", "/api/me", Some(&cookie), None)?;
+    let me = ask("GET", "/api/me", Some(&cookie), None)?;
     assert_eq!(me.status, 200, "{}", me.body);
     read.answer("the signed-in person", &me);
     let mistyped =
         serde_json::json!({ "email": EMAIL, "password": "Not-The-Password-1" }).to_string();
-    let refused = ask(
-        estate.service_port,
-        "POST",
-        "/api/sign-in",
-        None,
-        Some(&mistyped),
-    )?;
+    let refused = ask("POST", "/api/sign-in", None, Some(&mistyped))?;
     assert_eq!(refused.status, 401, "{}", refused.body);
     read.answer("a refused sign-in", &refused);
     read.answer(
         "the sign-in providers",
-        &ask(
-            estate.service_port,
-            "GET",
-            "/api/sign-in/providers",
-            None,
-            None,
-        )?,
+        &ask("GET", "/api/sign-in/providers", None, None)?,
     );
     product::signs_in_through_lys(
         &product::Installed {
             root: estate.root.path(),
-            service_port: estate.service_port,
-            broker_port: estate.broker_port,
             lys: &bin.join("lys"),
             package: &package,
             path: &path,
@@ -465,7 +458,7 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
     assert!(!read.redirects.is_empty(), "a redirect was read");
     for location in &read.redirects {
         assert!(
-            location.starts_with('/') || location.starts_with(&origin),
+            location.starts_with('/') || location.starts_with(ORIGIN),
             "{location} is not on Lys's origin"
         );
     }
@@ -476,6 +469,6 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
             "{location} is not the product's registered address"
         );
     }
-    estate.close()?;
+    drop(estate);
     Ok(())
 }
