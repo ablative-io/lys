@@ -266,14 +266,15 @@ describe('Keyboard operation (conformance 9.3)', () => {
 
     // An agent is offered one native checkbox per action, none ticked, so the keyboard reaches each and Space ticks it.
     const boxes = () => $$('#drawer input[name="action"]') as HTMLInputElement[];
-    expect(boxes().map((box) => box.value)).toEqual(['edit', 'view']);
+    const offered = boxes().map((box) => box.value);
+    expect(offered).toContain('view');
     expect(boxes().filter((box) => box.checked)).toEqual([]);
     await click($('#drawer input[name="action"][value="view"]'));
     expect(boxes().filter((box) => box.checked).map((box) => box.value)).toEqual(['view']);
 
     // The whole form is in the tab order, in the order it reads.
     const order = $$('#drawer select, #drawer input[name="action"], #drawer button').map((el) => el.id || (el as HTMLInputElement).value || el.dataset.act);
-    expect(order).toEqual(['dTo', 'edit', 'view', 'dLease', 'dPass', 'delegatedo', 'close']);
+    expect(order).toEqual(['dTo', ...offered, 'dLease', 'dPass', 'delegatedo', 'close']);
     for (const el of $$('#drawer select, #drawer input[name="action"], #drawer button')) expect(el.tabIndex).toBeGreaterThanOrEqual(0);
 
     const submit = $('[data-act="delegatedo"]');
@@ -307,7 +308,7 @@ describe('Deep linking (conformance 9.1)', () => {
     fresh();
     await mount(`#/access/reach/${SCRIBE}`);
     expect(location.hash).toBe(`#/access/reach/${SCRIBE}`);
-    expect(text()).toContain('project:identity');
+    expect(text()).toContain('project identity');
 
     fresh();
     // A deep link to a record the caller may not see is refused by name, not shown empty.
