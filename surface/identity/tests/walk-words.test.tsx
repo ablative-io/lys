@@ -67,8 +67,8 @@ describe('Walk words', () => {
 
   it('keeps request checkboxes beside their labels and each access heading once, as in the drawer', async () => {
     const style = document.createElement('style');
-    style.textContent = ['forms', 'overlays'].map((name) => readFileSync(new URL(`../src/styles/${name}.css`, import.meta.url), 'utf8')).join('\n')
-      + readFileSync(new URL('../src/features/people/recorded-form.css', import.meta.url), 'utf8');
+    style.textContent = ['forms', 'overlays'].map((name) => readFileSync(`src/styles/${name}.css`, 'utf8')).join('\n')
+      + readFileSync('src/features/people/recorded-form.css', 'utf8');
     document.body.append(style);
     await mount('#/requests', { ...routes, '/requests': ok({ requests: [] }) });
     const form = $('form[aria-label="Ask for access"]');
