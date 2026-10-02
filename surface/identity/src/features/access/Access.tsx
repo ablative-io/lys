@@ -1,3 +1,4 @@
+import { actionWords, resourceFromText, resourceWords } from '../grants/action-words';
 import { readTogether } from '../../reads';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -12,7 +13,7 @@ import { DirectoryGate as Gate, problemWords } from '../people/Words';
 import { readTeams } from '../teams/Teams';
 import { reachMap } from '../grants/check';
 import { CheckBox, resourcesSeen } from '../grants/CheckBox';
-import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
+import { grantNo, lastUsedText, lastsText, nameOf, passText, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import type { Grant } from '../../generated/grants';
 import { Pill } from '../people/Pill';
@@ -60,7 +61,7 @@ function Reach({ w, id }: { w: GrantWorld; id: string }) {
       return rows.length ? (
         <table><tbody>
           {rows.map(([res, acts]) => (
-            <tr key={res}><td>{res}</td><td><span className="svc built-in">built in</span></td><td className="mono">{acts.join(', ')}</td><td /></tr>
+            <tr key={res}><td>{resourceWords(resourceFromText(res))}</td><td><span className="svc built-in">built in</span></td><td className="mono">{actionWords(w.model, resourceFromText(res), acts)}</td><td /></tr>
           ))}
         </tbody></table>
       ) : <div className="dim">Nothing.</div>;
@@ -74,7 +75,7 @@ function WhoCan({ w, res }: { w: GrantWorld; res: string }) {
     <Gate load={load} title="Access" ok={(reach) => {
       const holders = [...(reach.get(res) ?? new Map<string, string[]>())];
       return holders.length ? holders.map(([h, acts]) => (
-        <div className="row" key={h}><span><Pill x={person(w, h)} /></span><span className="mono">{acts.join(', ')}</span></div>
+        <div className="row" key={h}><span><Pill x={person(w, h)} /></span><span className="mono">{actionWords(w.model, resourceFromText(res), acts)}</span></div>
       )) : <div className="dim">Nobody.</div>;
     }} />
   );
@@ -121,7 +122,7 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
     { head: 'Grant', cell: (g) => <span className="mono">{grantNo(g.id)}</span> },
     { head: 'Holder', cell: (g) => nameOf(w, g.holder) },
     { head: 'Relation', cell: (g) => <span className="mono">{g.relation}</span> },
-    { head: 'On', cell: (g) => <span className="mono">{onText(g)}</span> },
+    { head: 'On', cell: (g) => <span className="mono">{resourceWords(g.resource)}</span> },
     { head: 'Derives from', cell: (g) => { const up = g.source ? w.byId.get(g.source) : undefined; return <span className="sec">{g.source ? `${grantNo(g.source)} · ${up ? nameOf(w, up.holder) : 'not visible'}` : <span className="dim">root</span>}</span>; } },
     { head: 'May pass on', cell: (g) => <span className="sec">{passText(g.pass_on)}</span> },
     { head: 'Lasts', cell: (g) => <span className="sec">{lastsText(g)}</span> },
@@ -136,7 +137,7 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
     {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
     <div className="body">
       <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
-        words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + onText(g)} noun="grants"
+        words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceWords(g.resource)} noun="grants"
         holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' grant' : ' grants')}
         selected={chosen?.id ?? null} select={(g) => setPicked(g.id)} open={(g) => navigate(`/file/${g.holder}/access`)}
         tools={<>
@@ -156,7 +157,7 @@ function GrantSummary({ w, g }: { w: GrantWorld; g: Grant }) {
   const v = voidOf(w, g);
   return <article className="card" aria-label="Grant">
     <h2>{grantNo(g.id)} · {nameOf(w, g.holder)}</h2>
-    <p><span className="mono">{g.relation}</span> on <span className="mono">{onText(g)}</span></p>
+    <p><span className="mono">{g.relation}</span> on <span className="mono">{resourceWords(g.resource)}</span></p>
     <p className="sec">{passText(g.pass_on)} · {lastsText(g)} · last used {lastUsedText(g)}</p>
     {v === null ? <p><span className="dot s-active" />Stands.</p> : <p className="why-not">{v.why}</p>}
     <a className="btn" href={`#/file/${g.holder}/access`}>Open {nameOf(w, g.holder)}'s access</a>

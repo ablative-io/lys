@@ -1,3 +1,4 @@
+import { actionWords } from './action-words';
 import { pendingGrantKey, readPendingGrant } from './pendingGrant';
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
@@ -163,7 +164,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       <div className="card" style={{ marginTop: 4 }}>
         <h2>Where it comes from</h2>
         <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {onText(source)}</span></div>
-        <div className="row"><span className="sec">Actions it allows</span><span className="mono">{source.actions.join(', ')}</span></div>
+        <div className="row"><span className="sec">Actions it allows</span><span className="mono">{actionWords(w.model, source.resource, source.actions)}</span></div>
         <div className="row"><span className="sec">You may pass it on</span><span className="pass">{passText(source.pass_on)}</span></div>
         <div className="row"><span className="sec">Ends no later than</span><span>{source.effective_ends_at !== null ? day(source.effective_ends_at) : 'no end'}</span></div>
       </div>

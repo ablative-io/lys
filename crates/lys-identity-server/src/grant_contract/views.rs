@@ -428,6 +428,8 @@ pub struct WhoPage {
 /// The permission model grants are judged against.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ModelView {
+    /// Plain sentences for the shipped model’s actions.
+    pub action_sentences: BTreeMap<String, String>,
     /// The model's version.
     pub version: u64,
     /// Each relation's name, with the actions it carries.
@@ -439,6 +441,10 @@ pub struct ModelView {
 impl From<&Model> for ModelView {
     fn from(model: &Model) -> Self {
         Self {
+            action_sentences: lys_identity::grants::shipped::ACTION_SENTENCES
+                .iter()
+                .map(|(action, sentence)| ((*action).to_owned(), (*sentence).to_owned()))
+                .collect(),
             version: model.version(),
             relations: model
                 .relations()

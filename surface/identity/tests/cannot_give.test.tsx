@@ -32,7 +32,7 @@ const GRANTS: Grant[] = [
 ];
 
 /** The fixture model: the relation names say nothing of their actions. */
-const MODEL: GrantModel = { version: 1, relations: { alder: ['view'], birch: ['comment', 'view'], cedar: ['edit', 'view'], damson: ['comment', 'edit', 'grant', 'view'] } };
+const MODEL: GrantModel = { action_sentences: { view: 'View this resource', edit: 'Edit this resource', grant: 'Give access to this resource' }, version: 1, relations: { alder: ['view'], birch: ['comment', 'view'], cedar: ['edit', 'view'], damson: ['comment', 'edit', 'grant', 'view'] } };
 
 const PEOPLE: PeopleView = {
   scope: 'directory',

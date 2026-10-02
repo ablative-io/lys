@@ -24,7 +24,7 @@ describe('Agent canvas', () => {
     expect(text()).toContain('Test runner');
     expect(text()).toContain('Delivery');
     expect(text()).toContain('Member; no permission implied');
-    expect(text()).toContain('view on project:identity');
+    expect(text()).toContain('View this resource on project identity');
     expect(text()).toContain('Message connections unavailable');
     expect(document.querySelectorAll('.canvas-connections li')).toHaveLength(2);
     expect(posted).toEqual([]);

@@ -1,3 +1,4 @@
+import { actionWords } from './action-words';
 import { api } from '../../api';
 import type { LifecycleState, MeView, PeopleView } from '../../generated';
 import { resourceText } from '../../generated/grants';
@@ -9,7 +10,7 @@ import { clock, day } from '../file/time';
 export interface Who {
   name: string;
   state: LifecycleState;
-  kind: 'person' | 'agent';
+  kind: 'person' | 'agent' | 'service_account';
   responsible: string | null;
 }
 
@@ -32,6 +33,7 @@ export async function readGrantWorld(knownMe?: MeView): Promise<GrantWorld> {
     for (const a of p.agents) who.set(a.id, { name: a.display_name, state: a.state, kind: 'agent', responsible: p.id });
   }
   who.set(me.person.id, { name: me.person.display_name, state: me.person.state, kind: 'person', responsible: null });
+  for (const account of me.service_accounts) who.set(account.id, { name: account.name === 'Lys directory loader' ? "Lys's own service" : account.name, state: account.state as LifecycleState, kind: 'service_account', responsible: account.owner });
   return { me, people, list, model, byId: new Map(list.grants.map((g) => [g.id, g])), who };
 }
 
@@ -59,10 +61,8 @@ export const objectText = (w: GrantWorld, r: ResourceRef): string => {
  */
 export function mayText(w: GrantWorld, g: Grant): string {
   if (!g.actions.length) return `You can take no action on ${objectText(w, g.resource)}.`;
-  const carriers = (a: string) => Object.values(w.model.relations).filter((actions) => actions.includes(a)).length;
-  const actions = [...g.actions].sort((a, b) => carriers(b) - carriers(a) || a.localeCompare(b));
-  const listed = actions.length === 1 ? actions[0] : `${actions.slice(0, -1).join(', ')} and ${actions[actions.length - 1]}`;
-  return `You can ${listed} ${objectText(w, g.resource)}.`;
+  const listed = actionWords(w.model, g.resource, g.actions);
+  return `${listed === 'everything here' ? 'You can do everything here' : listed} (${objectText(w, g.resource)}).`;
 }
 
 /** A resource as the mock-up's pickers name it: a project or organisation by its id, anything else as `name (type)`. */

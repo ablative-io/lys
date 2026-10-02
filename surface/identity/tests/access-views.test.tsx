@@ -5,9 +5,9 @@ import { SERVICE, ok, refused } from './fixtures';
 
 describe('Access read views', () => {
   it('renders the served model version and relations instead of a fixed model', async () => {
-    await mount('#/model', { ...SERVICE, '/grants/model': ok({ version: 19, relations: { reader: ['read'], publisher: ['read', 'publish'] } }) });
+    await mount('#/model', { ...SERVICE, '/grants/model': ok({ action_sentences: { read: 'Read this resource', publish: 'Publish this resource' }, version: 19, relations: { reader: ['read'], publisher: ['read', 'publish'] } }) });
     expect(text()).toContain('version 19');
-    expect($$('tbody tr').map((row) => row.textContent)).toEqual(['readerread', 'publisherread, publish']);
+    expect($$('tbody tr').map((row) => row.textContent)).toEqual(['readerRead this resource', 'publishereverything here']);
   });
   it('shows server-judged counts and filters only the returned resources', async () => {
     const { requests } = await mount('#/resources', { ...SERVICE, '/resources': ok({

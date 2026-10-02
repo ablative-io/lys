@@ -1,3 +1,5 @@
+import { actionWords } from '../grants/action-words';
+import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
 /** The server identifies grants for review; this view never invents a recorded keep decision. */
 import { useState } from 'react';
@@ -33,7 +35,7 @@ export function Reviews() {
   const [confirmed, setConfirmed] = useState<Record<string, Kept>>({});
   const [notice, setNotice] = useState('');
   const load = useLoad(() => readTogether({
-    view: request<ReviewsView>('/reviews'), me: api.me(), people: api.people(),
+    model: api.model(), view: request<ReviewsView>('/reviews'), me: api.me(), people: api.people(),
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'reviews');
   const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
@@ -45,7 +47,7 @@ export function Reviews() {
   </div>;
 }
 
-function Due({ view, me, people, teams, confirmed, kept }: { view: ReviewsView; me: MeView; people: PeopleView; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string }; confirmed: Record<string, Kept>; kept: (answer: Kept) => void }) {
+function Due({ model, view, me, people, teams, confirmed, kept }: { model: GrantModel; view: ReviewsView; me: MeView; people: PeopleView; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string }; confirmed: Record<string, Kept>; kept: (answer: Kept) => void }) {
   const admin = people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [picked, setPicked] = useState<string | null>(null);
@@ -77,7 +79,7 @@ function Due({ view, me, people, teams, confirmed, kept }: { view: ReviewsView; 
       <div className="detail">{open ? <section className="card" aria-label="Grant to review">
         <h2>{open.agent.display_name}</h2>
         <p>{open.grant.relation} on {open.grant.resource.kind} {open.grant.resource.id}</p>
-        <p className="note">{open.grant.actions.join(', ')}</p>
+        <p className="note">{actionWords(model, open.grant.resource, open.grant.actions)}</p>
         <p className="sec">Responsible: {open.reviewer.display_name}</p>
         <p><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>Review access</Link></p>
         {last(open) ? <p>Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} /> on {clock(last(open)?.at ?? 0)}. {last(open)?.note}</p> : null}

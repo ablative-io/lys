@@ -1,3 +1,4 @@
+import { actionWords, resourceFromText, resourceWords } from '../grants/action-words';
 /** Every person, agent and resource, and the relations between them, laid out by a small force simulation. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
@@ -30,7 +31,7 @@ function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: 
   const add = (id: string, label: string, kind: Kind, active: boolean) => {
     if (!nodes.has(id)) nodes.set(id, { id, label, kind, active, x: 0, y: 0, vx: 0, vy: 0 });
   };
-  for (const [id, who] of world.who) add(id, who.name, who.kind, who.state === 'active');
+  for (const [id, who] of world.who) add(id, who.name, who.kind === 'service_account' ? 'app' : who.kind, who.state === 'active');
   const edges: Edge[] = [];
   for (const grant of world.list.grants) {
     if (!world.who.has(grant.holder) && !show.installed) continue;
@@ -44,7 +45,7 @@ function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: 
     if (!members.length) add(targets[0], grant.resource.id, 'resource', true);
     if (show.grants) {
       for (const target of targets) edges.push({ a: grant.holder, b: target, kind: grant.standing.stands ? 'grant' : 'void',
-        label: nameOf(world, grant.holder) + ' may ' + grant.actions.join(', ') + ' on ' + (members.length ? nameOf(world, target) : grant.resource.id) + (grant.standing.stands ? '' : ' (does not stand)') });
+        label: nameOf(world, grant.holder) + ': ' + actionWords(world.model, grant.resource, grant.actions) + ' on ' + (members.length ? nameOf(world, target) : resourceWords(grant.resource)) + (grant.standing.stands ? '' : ' (does not stand)') });
     }
   }
   if (show.answers) {
@@ -192,11 +193,11 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
       <div className="node-card detail">
         {!picked ? <><h2>Click anything</h2><p className="note">A person or agent lights up what it can reach. A resource lights up who can reach it. The same answers as the Access page, drawn.</p></>
           : picked.kind === 'resource' ? <><h2>{picked.label}</h2><p className="note">Highlighted: everyone who can reach it, per the permission service.</p>
-            {reachedBy.map(([holder, actions]) => <div className="row" key={holder}><span>{nameOf(world, holder)}</span><span className="mono dim">{actions.join(', ')}</span></div>)}
+            {reachedBy.map(([holder, actions]) => <div className="row" key={holder}><span>{nameOf(world, holder)}</span><span className="mono dim">{actionWords(world.model, resourceFromText(resourceOf(picked)), actions)}</span></div>)}
             {!reachedBy.length ? <p className="dim">Nobody.</p> : null}
             <div className="actions"><a className="btn" href={'#/access/who/' + encodeURIComponent(resourceOf(picked))}>Open resource</a><a className="btn" href="#/graph">Clear</a></div></>
           : <><h2>{picked.label}</h2><p className="note">Highlighted: everything it can reach, per the permission service.</p>
-            {reaches.map(({ resource, actions }) => <a className="row" key={resource} href={'#/access/who/' + encodeURIComponent(resource)}><span>{resource}</span><span className="mono dim">{actions.join(', ')}</span></a>)}
+            {reaches.map(({ resource, actions }) => <a className="row" key={resource} href={'#/access/who/' + encodeURIComponent(resource)}><span>{resourceWords(resourceFromText(resource))}</span><span className="mono dim">{actionWords(world.model, resourceFromText(resource), actions)}</span></a>)}
             {!reaches.length ? <p className="dim">Nothing.</p> : null}
             <div className="actions">{world.who.has(picked.id) ? <a className="btn" href={'#/file/' + encodeURIComponent(picked.id)}>Open file</a> : null}<a className="btn" href="#/graph">Clear</a></div></>}
       </div>

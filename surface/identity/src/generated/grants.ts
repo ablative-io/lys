@@ -151,6 +151,7 @@ export interface Permit {
 
 /** GET /grants/model: `ModelView`, each relation with the actions it carries. */
 export interface GrantModel {
+  action_sentences: Record<string, string>;
   version: number;
   relations: Record<string, string[]>;
   /** The acts no agent may be given; a screen never offers them. */

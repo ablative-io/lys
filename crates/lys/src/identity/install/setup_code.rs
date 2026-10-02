@@ -96,6 +96,9 @@ pub fn address_with(code: &str, setup: &str) -> String {
 /// opener took it. Nothing the opener writes is shown, so the address is
 /// never printed.
 pub fn open_in_browser(address: &str) -> bool {
+    if std::env::var_os("SSH_CONNECTION").is_some() {
+        return false;
+    }
     let opener = if std::env::consts::OS == "macos" {
         "open"
     } else {
@@ -124,7 +127,16 @@ pub fn hand_over(
         emitter.note("the setup page is open in your browser");
         return Ok(());
     }
-    let path = layout.headless_setup_code();
+    let requested = layout.headless_setup_code();
+    let path = std::path::absolute(&requested).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::PrivateFileIo,
+            "locate readable setup code",
+            "setup code file",
+            error.to_string(),
+        )
+        .at(&requested)
+    })?;
     private_files::write(&path, code.as_bytes())?;
     emitter.note(&format!(
         "no browser could be opened: the setup code is in {} (only you can read it); open {} and enter it in the Setup code field",
