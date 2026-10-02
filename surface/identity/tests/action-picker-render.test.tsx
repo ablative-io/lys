@@ -33,8 +33,9 @@ describe('Shared action picker', () => {
     expect(container.querySelector('output')?.textContent).toBe('["agent.start","agent.stop"]');
   });
   it('offers nothing without the served withheld declaration', () => {
-    const { withheld_from_agents: _withheld, ...silent } = MODEL;
-    const container = mount(silent as typeof MODEL);
+    const withoutDeclaration = { ...MODEL };
+    Reflect.deleteProperty(withoutDeclaration, 'withheld_from_agents');
+    const container = mount(withoutDeclaration);
     expect(container.querySelector('input')).toBeNull();
     expect(container.textContent).toContain('until Lys declares');
   });

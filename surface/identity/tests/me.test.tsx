@@ -117,9 +117,9 @@ describe('What you hold', () => {
   it('starts each row with what the grant lets the person do, from the actions it carries, then the relation, object and source', async () => {
     await mount('#/me?tab=account', withInstallGrants());
     expect(rows()).toEqual([
-      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root'],
-      ['You can view project ledger.', 'viewer', 'project:ledger', 'root'],
-      ["You can view and edit the directory's agents.", 'editor', 'directory:agents', 'root'],
+      ['You can do everything here (project identity).', 'owner', 'project:identity', 'root'],
+      ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root'],
+      ["Edit this resource; View this resource (the directory's agents).", 'editor', 'directory:agents', 'root'],
       ['You can take no action on project atlas.', 'auditor', 'project:atlas', 'root'],
     ]);
   });
