@@ -121,3 +121,31 @@ fn an_interrupted_install_resumes_the_deployment_listener() -> Result<(), Box<dy
     assert!(!layout.service_config().exists());
     Ok(())
 }
+
+#[test]
+fn an_interrupted_proxied_install_keeps_the_local_default_listener()
+-> Result<(), Box<dyn std::error::Error>> {
+    for origin in ["https://id.example.test", "https://id.example.test:443"] {
+        let root = tempfile::tempdir()?;
+        let layout = Layout::at(root.path().to_path_buf());
+        let deployment = crate::identity::install::layout::render_deployment(None)
+            .replace("\"http://localhost:8490\"", &format!("\"{origin}\""));
+        let validated = crate::identity::config::DeploymentConfig::parse(
+            &deployment,
+            root.path().to_path_buf(),
+        )?;
+        assert!(validated.public_tls());
+        std::fs::write(layout.deployment_config(), &deployment)?;
+        assert!(!layout.service_config().exists());
+        let ports = Ports::load(&layout)?;
+        assert_eq!(ports.service, 8490, "public origin {origin}");
+        assert_eq!(ports.broker, 8472);
+        assert!(ports.chosen(Some(19001), None).is_err());
+        assert_eq!(
+            std::fs::read_to_string(layout.deployment_config())?,
+            deployment
+        );
+        assert!(!layout.service_config().exists());
+    }
+    Ok(())
+}
