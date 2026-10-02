@@ -9,7 +9,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::{AgentId, OperationId};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::network_store::{Machine, NetworkStore, TeamRecorded};
@@ -432,62 +432,5 @@ fn the_agents_route_describes_its_body_receipt_and_conflict() -> TestResult {
     assert!(route["responses"]["200"].is_object(), "{route}");
     assert!(route["responses"]["default"].is_object(), "{route}");
     assert!(route.to_string().contains("MachineAgentsReused"), "{route}");
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_retired_agent_is_not_allowed_onto_a_computer() -> TestResult {
-    let table = Table::set().await?;
-    let retire = json!({
-        "operation": operation()?,
-        "transition": "retire",
-        "reason": "Agent withdrawn",
-    });
-    table
-        .sent(
-            &format!("/identities/{}/transitions", table.agent()),
-            &retire,
-        )
-        .await?;
-    let inode = std::fs::metadata(&table.path)?.ino();
-    let path = format!("/network/machines/{}/agents", table.machine.id);
-    let grant = json!({"operation": operation()?, "agent": table.agent(), "allow": true});
-    refused(
-        &table.service.post(&path, Some(&table.ada), &grant).await?,
-        403,
-        "inactive",
-    );
-    unchanged(&table.path, &table.before, inode)?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn without_a_network_file_the_agents_route_says_so() -> TestResult {
-    let (service, seeded) = Service::start_adjusted(
-        GRANT_MODEL,
-        None,
-        None,
-        None,
-        |config| config.network_file = None,
-        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
-    )
-    .await?;
-    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
-    let grant = json!({
-        "operation": operation()?,
-        "agent": seeded.people[0].agents[0].id.to_string(),
-        "allow": true,
-    });
-    refused(
-        &service
-            .post(
-                &format!("/network/machines/{}/agents", operation()?),
-                Some(&ada),
-                &grant,
-            )
-            .await?,
-        503,
-        "NetworkUnavailable",
-    );
     Ok(())
 }

@@ -16,26 +16,7 @@ pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
         | IdentityError::AppendRefused { .. }
         | IdentityError::RandomSourceUnavailable { .. }
         | IdentityError::KeyUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-        IdentityError::IdentifierMalformed { .. } => StatusCode::BAD_REQUEST,
-        IdentityError::AlreadyBootstrapped { .. }
-        | IdentityError::BindingMalformed { .. }
-        | IdentityError::ProfileInvalid { .. }
-        | IdentityError::ReasonRequired { .. }
-        | IdentityError::TransitionRefused { .. }
-        | IdentityError::ChangeMismatch { .. }
-        | IdentityError::EventMalformed { .. }
-        | IdentityError::EventNotCanonical
-        | IdentityError::EventTooLarge { .. }
-        | IdentityError::VersionUnsupported { .. }
-        | IdentityError::SignerMismatch
-        | IdentityError::SignatureInvalid
-        | IdentityError::LeafNotAnEvent { .. }
-        | IdentityError::AlreadyRegistered { .. }
-        | IdentityError::BindingTaken { .. }
-        | IdentityError::StateMismatch { .. }
-        | IdentityError::OperationReused { .. }
-        | IdentityError::LinkSourceSeen { .. }
-        | IdentityError::ReceiptInvalid { .. } => StatusCode::CONFLICT,
+        _ => StatusCode::CONFLICT,
     }
 }
 
