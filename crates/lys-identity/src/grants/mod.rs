@@ -54,7 +54,7 @@ pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};
 pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, owner_of};
 pub use schema_diff::{Named, SchemaDiff, Standing, diff, stranded};
-pub use shipped::{SHIPPED_VERSION, shipped_model};
+pub use shipped::{SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, shipped_model};
 pub use types::{
     Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };

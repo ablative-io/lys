@@ -156,6 +156,16 @@ pub enum GrantError {
         /// The source grant.
         grant: String,
     },
+    /// An agent was to be given acts no agent may hold.
+    #[error(
+        "WithheldFromAgents: `{relation}` carries {withheld}, which no agent may be given; a person may hold it"
+    )]
+    WithheldFromAgents {
+        /// The relation asked for.
+        relation: String,
+        /// The withheld acts it carries, comma-separated.
+        withheld: String,
+    },
     /// A request asks to let the recipient pass on more than the source lets be passed on.
     #[error(
         "PassOnBeyondSource: the requested pass-on is wider than {source_grant} lets be passed on"

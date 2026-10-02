@@ -397,6 +397,7 @@ async fn make_administrator(
         Ok(directory.setup_person(actor.clone(), operation, profile, now())?)
     })?;
     crate::import_bootstrap::ensure(&state)?;
+    crate::agent_roots::at_setup(&state)?;
     spend(settings)?;
     drop(turn);
     let cookie = crate::session_admission::begin(&state, actor).await?;
@@ -480,5 +481,6 @@ pub async fn finish(
         }))
     })?;
     crate::import_bootstrap::ensure(&state)?;
+    crate::agent_roots::at_setup(&state)?;
     Ok(answer)
 }

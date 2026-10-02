@@ -5,8 +5,11 @@
 //! nothing else. It changes nothing, so a refused request leaves no trace but
 //! its refusal. Passing on is judged against the caller's own current
 //! authority, every effective ancestor and the model; being a person or an
-//! agent is neither a permit nor a prohibition, and pass-on is established
-//! only by an affirmative pass-on member of the source grant.
+//! agent is no permit, and pass-on is established only by an affirmative
+//! pass-on member of the source grant. An agent is never given, nor let
+//! pass on, an act withheld from agents.
+
+use std::collections::BTreeSet;
 
 use super::error::GrantError;
 use super::expiry::within_window;
@@ -15,7 +18,7 @@ use super::model::Model;
 use super::projection::GrantBook;
 use super::revocation::unrevoked;
 use super::types::{
-    Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
+    Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };
 use crate::error::IdentityError;
 use crate::id::{IdentityId, PersonId};
@@ -234,6 +237,31 @@ pub fn judge_root(
     })
 }
 
+/// Refuse, by name, an agent's grant that carries, or would let the agent
+/// pass on, an act no agent may hold, whatever its source.
+fn withheld_from_agents(
+    request: &DelegateRequest,
+    actions: &BTreeSet<Action>,
+) -> Result<(), GrantError> {
+    let onward = match &request.pass_on {
+        PassOn::To { actions: onward, .. } => Some(onward),
+        PassOn::UseOnly => None,
+    };
+    let withheld: BTreeSet<&str> = actions
+        .iter()
+        .chain(onward.into_iter().flatten())
+        .map(Action::as_str)
+        .filter(|action| !super::agent_may_hold(request.resource.kind(), action))
+        .collect();
+    if withheld.is_empty() {
+        return Ok(());
+    }
+    Err(GrantError::WithheldFromAgents {
+        relation: request.relation.to_string(),
+        withheld: withheld.into_iter().collect::<Vec<_>>().join(", "),
+    })
+}
+
 /// Judge a request to pass on part of a grant, answering the grant it would issue.
 pub fn judge_delegation(
     book: &GrantBook,
@@ -275,6 +303,9 @@ pub fn judge_delegation(
         });
     }
     let within = model.within_on(request.resource.kind(), &request.relation, passable)?;
+    if kind == RecipientKind::Agent {
+        withheld_from_agents(request, &within.actions)?;
+    }
     if let PassOn::To {
         actions: onward,
         recipients: onward_to,

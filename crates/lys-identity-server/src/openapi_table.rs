@@ -155,7 +155,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/grants/{id}/tokens/{token_id}/revoke" "Revoke one grant credential" C [SIGNED, &["GrantTokenResponsibleRequired", "GrantTokenUnavailable", "GrantTokenUnknown"]] scope("grant", "grant.revoke", ["id"]);
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]] scope("grant", "read", []);
     GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];
-    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused"]] scope("grant", "grant.delegate", []);
+    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused", "WithheldFromAgents"]] scope("grant", "grant.delegate", []);
     GET "/grants/model" "Lys's own permission model" S [SIGNED] scope("grant", "read", []);
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused"]];
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]] scope("grant", "grant.check", []);
@@ -178,7 +178,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/roles/{id}/holders/{holder}/end" "End a holding" S [ADMIN_BODY] scope("role", "role.holder.end", ["id"]);
     GET "/requests" "The access requests" S [SIGNED, &["NoPerson", "NotAdmitted", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("request", "read", []);
     POST "/requests" "Ask for access" S [SIGNED_BODY, &["RelationUnknown"], &["NoPerson", "NotAdmitted", "RequestReused"]] scope("request", "request.create", []);
-    POST "/requests/{id}/approve" "Approve an access request" S [SIGNED_BODY, &["NotAdmitted", "RequestDecided"], &["SourceUnknown"]] scope("request", "request.approve", ["id"]);
+    POST "/requests/{id}/approve" "Approve an access request" S [SIGNED_BODY, &["NotAdmitted", "RequestDecided"], &["SourceUnknown", "WithheldFromAgents"]] scope("request", "request.approve", ["id"]);
     POST "/requests/{id}/decline" "Decline an access request" S [SIGNED_BODY, &["RequestDecided", "RequestUnknown"], &["NotAdmitted"]] scope("request", "request.decline", ["id"]);
     POST "/requests/{id}/reconcile" "Settle an approval" S [SIGNED_BODY, &["NoPerson", "NotAdmitted"]] scope("request", "request.reconcile", ["id"]);
     GET "/connections" "What the service is connected to" S [ADMIN] scope("connection", "read", []);

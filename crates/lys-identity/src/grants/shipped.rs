@@ -94,6 +94,52 @@ pub const ACTIONS: &[&str] = &[
     "write",
 ];
 
+/// The acts no agent may be given, whatever grant they come from: each
+/// hands out authority, changes an agent's confinement, mints an identity
+/// or decides on access. Every other shipped action is one an agent may
+/// hold; an act Lys does not ship is never one.
+pub const WITHHELD_FROM_AGENTS: &[&str] = &[
+    "agent.certificate.issue",
+    "agent.certificate.withdraw",
+    "agent.policy.set",
+    "agent.provisioning.review",
+    "agent.provisioning.set",
+    "budget.set",
+    "configuration.zone.set",
+    "grant",
+    "grant.delegate",
+    "grant.revoke",
+    "identity.transition",
+    "machine.agent.set",
+    "person.email.set",
+    "person.login.bind",
+    "person.password.set",
+    "person.sign-in.set",
+    "request.approve",
+    "request.decline",
+    "role.create",
+    "role.holder.assign",
+    "role.holder.end",
+    "role.holder.move",
+    "role.revise",
+    "secret.drop",
+    "secret.recipients",
+    "secret.scope",
+    "service-account.create",
+    "service-account.retire",
+    "team.budget.set",
+];
+
+/// Whether an agent may hold `action` on an object of `kind`. An approved
+/// app's kind, `{app}.{kind}`, marks none of its acts as an agent's, so none
+/// is; a Lys act is an agent's unless it is withheld or unshipped.
+#[must_use]
+pub fn agent_may_hold(kind: &str, action: &str) -> bool {
+    !kind.contains('.')
+        && !WITHHELD_FROM_AGENTS.contains(&action)
+        && (ACTIONS.contains(&action) || FIRST_ACTIONS.contains(&action) || action == READ)
+}
+
 /// The prefix of the relation that carries one action alone.
 pub const ONE: &str = "only.";
 
@@ -127,7 +173,10 @@ pub fn shipped_model() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{ACTIONS, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, shipped_model};
+    use super::{
+        ACTIONS, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold,
+        shipped_model,
+    };
     use crate::grants::{Action, Relation};
     use serde_json::Value;
 
@@ -164,5 +213,28 @@ mod tests {
         }
         assert_eq!(relations["reader"], serde_json::json!([READ]));
         Ok(())
+    }
+
+    #[test]
+    fn every_shipped_action_is_classified_for_agents_and_authority_is_withheld() {
+        for withheld in WITHHELD_FROM_AGENTS {
+            assert!(
+                ACTIONS.contains(withheld) || FIRST_ACTIONS.contains(withheld),
+                "{withheld} is not shipped"
+            );
+            assert!(!agent_may_hold("person", withheld), "{withheld}");
+        }
+        for action in ACTIONS.iter().chain(&FIRST_ACTIONS).chain(&[READ]) {
+            let allowed = agent_may_hold("person", action);
+            assert_ne!(allowed, WITHHELD_FROM_AGENTS.contains(action), "{action}");
+        }
+        for authority in ["grant", "grant.delegate", "role.create", "secret.scope"] {
+            assert!(!agent_may_hold("directory", authority));
+        }
+        for read_only in ["grant.check", "grant.who", "grant.why", "grant.reach", "read"] {
+            assert!(agent_may_hold("directory", read_only), "{read_only}");
+        }
+        assert!(!agent_may_hold("person", "made.up"));
+        assert!(!agent_may_hold("fixture.doc", "view"));
     }
 }
