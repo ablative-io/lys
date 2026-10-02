@@ -55,9 +55,13 @@ python3() { printf 'python3 %s\n' "$*" >> "$TRACE"; }
             self.assertTrue(key.read_text().strip())
             self.assertEqual(env["LYS_SPICEDB_ENDPOINT"], "127.0.0.1:18765")
             key_files.append(key)
-            return Mock(returncode=17)
+            child = Mock()
+            child.wait.return_value = 17
+            child.poll.return_value = 17
+            child.stdin = child.stdout = child.stderr = None
+            return child
 
-        with patch.object(spicedb_fixture, "docker", side_effect=["", owned, "127.0.0.1:18765", ""]) as docker, patch.object(spicedb_fixture, "ready"), patch.object(spicedb_fixture.subprocess, "run", side_effect=command), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(spicedb_fixture, "docker", side_effect=["", owned, "127.0.0.1:18765", ""]) as docker, patch.object(spicedb_fixture, "ready"), patch.object(spicedb_fixture.subprocess, "Popen", side_effect=command), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(spicedb_fixture.run(["cargo", "nextest"]), 17)
         docker.assert_any_call("rm", "--force", owned)
         self.assertTrue(key_files)
@@ -74,12 +78,10 @@ python3() { printf 'python3 %s\n' "$*" >> "$TRACE"; }
         child.poll.return_value = None
         def wait():
             os.kill(os.getpid(), signal.SIGTERM)
-        child.wait.side_effect = [wait, 0]
         def spawn(arguments, **options):
             if arguments[0] == "docker":
                 return logger
             key_files.append(Path(options["env"]["LYS_SPICEDB_KEY_FILE"]))
-            child.wait.side_effect = [None, 0]
             child.wait.side_effect = lambda: wait() if child.wait.call_count == 1 else 0
             return child
         with patch.object(spicedb_fixture, "docker", side_effect=["", owned, "127.0.0.1:18765", ""]) as docker, patch.object(spicedb_fixture.subprocess, "Popen", side_effect=spawn), patch.object(spicedb_fixture.subprocess, "run", return_value=Mock(returncode=0)), patch("sys.stdout", new_callable=io.StringIO), patch("sys.stderr", new_callable=io.StringIO):
