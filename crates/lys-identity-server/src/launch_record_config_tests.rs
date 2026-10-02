@@ -27,6 +27,7 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
     let version: Version = serde_json::from_value(json!({
         "number":1, "operation":"op-fixture-profile", "settings":{
             "model_access":["fixture-model"], "tools":[], "skills":[], "mcp_servers":[],
+            "permissions":{"default_mode":"plan"},
             "instructions":"", "note":"", "harness":harness
         }, "set_by":"fixture-person", "set_at":1,
         "reviewed":{"operation":"op-fixture-review", "by":"fixture-person", "at":1}
