@@ -25,6 +25,7 @@ const routes = {
     tools: [], skills: [], mcp_servers: [], instructions: '', note: '', set_by: ADA, set_at: 1790000000,
   } }),
   [prefix + '/runtime/sessions']: ok({ sessions: [session] }),
+  '/harnesses': ok({ programs: [{ name: 'Claude Code', line: 'claude', models: [{ id: 'model-one', label: 'Model One' }], modes: [], builds: [] }] }),
 };
 
 async function open(overrides: Record<string, Route> = {}, hash = '#/file/' + SCRIBE) {
@@ -54,12 +55,15 @@ describe('An agent page explains the agent before its controls', () => {
     expect(overview?.textContent).toContain('Ada (test person)');
     expect(overview?.textContent).toContain('Care team');
     expect(overview?.textContent).toContain('Ward computer');
-    expect(overview?.textContent).toContain('model-one');
+    expect(overview?.textContent).toContain('Model One');
+    expect(overview?.textContent).not.toContain('model-one');
     expect(overview?.textContent).toContain('Running, as its runner last reported');
     const actions = $$('[aria-label="Next steps"] a');
     expect(actions.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Start', 'Set limits', 'Give access']);
     expect(actions.map((entry) => entry.getAttribute('href'))).toEqual(['provisioning', 'budgets', 'access'].map((part) => '#/file/' + SCRIBE + '/' + part));
     expect(actions.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
+    expect(actions[0]?.textContent).toContain('Start Scribe on Ward computer with Model One.');
+    expect(actions[0]?.textContent).not.toContain('Choose its computer and model');
     expect($('.file .head')?.textContent).not.toContain('Edit name');
     expect($('.file .head [data-act="suspend"]')).toBeNull();
     expect(requests).not.toContain('/receipts/4');
@@ -67,6 +71,26 @@ describe('An agent page explains the agent before its controls', () => {
     expect(details?.querySelector('summary')?.textContent).toBe('Details');
     expect(details?.textContent).toContain(SCRIBE);
     expect(posted).toEqual([]);
+  });
+
+  it('says a saved model no program lists is unlisted instead of showing a bare id as its name', async () => {
+    await open({ '/harnesses': ok({ programs: [{ name: 'Claude Code', line: 'claude', models: [{ id: 'model-two', label: 'Model Two' }], modes: [], builds: [] }] }) });
+    expect($('[aria-label="About this agent"]')?.textContent).toContain('model-one (no program lists this model now)');
+  });
+
+  it('names an unreadable model list instead of showing the saved id', async () => {
+    await open({ '/harnesses': refused(503, 'HarnessesUnavailable', 'The program list could not be read') });
+    const overview = $('[aria-label="About this agent"]');
+    expect(overview?.textContent).toContain('Lys could not read model names just now');
+    expect(overview?.textContent).not.toContain('model-one');
+    expect($('.agent-details')?.textContent).toContain('HarnessesUnavailable');
+    expect($('[aria-label="Next steps"]')?.textContent).toContain('Choose its computer and model, then start this agent.');
+  });
+
+  it('asks for a computer and model when none is saved', async () => {
+    await open({ [prefix + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: null }) });
+    expect($('[aria-label="About this agent"]')?.textContent).toContain('Choose a model when you start');
+    expect($('[aria-label="Next steps"]')?.textContent).toContain('Choose its computer and model, then start this agent.');
   });
 
   it('keeps absence of a runtime report distinct from the active identity and never guesses stopped', async () => {

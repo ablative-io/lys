@@ -21,7 +21,7 @@ import { GrantCard } from '../grants/GrantCard';
 import { chainOf, onText, passesToAgents } from '../grants/model';
 import { CHANGE_KINDS } from '../../generated';
 import { Pill } from '../people/Pill';
-import { firstName } from '../people/directory';
+import { calledBy, firstName } from '../people/directory';
 import type { FileData } from './IdentityFile';
 import { clock } from './time';
 
@@ -78,7 +78,7 @@ function Profile({ data }: { data: FileData }) {
 function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const shell = useShell();
   const { x, grants: w } = data;
-  const name = firstName(x.display_name);
+  const name = calledBy(x.id, x.display_name);
   const held = w.list.grants.filter((g) => g.holder === x.id);
   const reach = new Map<string, string[]>();
   for (const g of held) {
