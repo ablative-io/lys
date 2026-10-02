@@ -207,8 +207,16 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         starts.merge(crate::launch_api::routes().with_state(Arc::clone(&state))),
         Arc::clone(&state),
     );
+    let origin = crate::sign_in::lys_origin(config)?;
+    let mcp_path = if config.surface_dir.is_some() {
+        "/api/mcp"
+    } else {
+        "/mcp"
+    };
+    let apps = crate::mcp_oauth::Apps::open(Arc::clone(&state), &config.log_dir, &origin, mcp_path)?;
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
-        .merge(crate::provider::routes(Arc::clone(&state)));
+        .merge(crate::provider::routes(Arc::clone(&state)))
+        .merge(crate::mcp_oauth::routes(Arc::clone(&apps)));
     // Authenticate the inner API/provider routes before body extraction. Static
     // screens remain public; the API fallback cannot reach their wildcard.
     let guarded = |routes| {
@@ -228,11 +236,15 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         Arc::clone(&state),
         crate::operator::guard,
     ));
-    let api = api.merge(guarded(crate::mcp_endpoint::admitted_routes(
-        dispatcher,
-        &crate::sign_in::lys_origin(config)?,
-        Arc::clone(&state),
-    )?));
+    let api = api.merge(crate::mcp_oauth::challenged(
+        guarded(crate::mcp_endpoint::admitted_routes(
+            dispatcher,
+            &origin,
+            Arc::clone(&state),
+            Arc::clone(&apps),
+        )?),
+        apps.metadata_address(),
+    ));
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir, api)?,
         None => api,

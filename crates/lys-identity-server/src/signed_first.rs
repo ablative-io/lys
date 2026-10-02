@@ -78,6 +78,7 @@ async fn check(
         .extensions()
         .get::<crate::agent_signature::TokenPrincipal>()
         .is_some()
+        || crate::agent_signature::relayed_agent().is_some()
         || (request.method() == HttpMethod::POST
             && matches!(request.uri().path(), "/mcp" | "/api/mcp")
             && request.headers().contains_key(crate::grant_tokens::HEADER))

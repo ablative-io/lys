@@ -60,15 +60,17 @@ function Providers() {
 }
 
 /**
- * Where a product's sign-in continues once the person is signed in: back to
- * Lys's own authorize address, never anywhere else.
+ * Where a product's sign-in, or a connected app's approval, continues once
+ * the person is signed in: back to one of Lys's own authorize addresses,
+ * never anywhere else.
  */
 export function continuation(): string | null {
   const encoded = /[?&]continue=([^&]+)/.exec(location.hash)?.[1];
   if (!encoded) return null;
   let target: string;
   try { target = decodeURIComponent(encoded); } catch { return null; }
-  return target.startsWith('/oauth/authorize?') ? target : null;
+  const allowed = ['/oauth/authorize?', '/oauth/mcp/authorize?'];
+  return allowed.some((start) => target.startsWith(start)) ? target : null;
 }
 
 /** The sign-in form, on its own or inside a screen that needs a session. */

@@ -58,9 +58,15 @@ pub fn signed_agent(
     headers: &HeaderMap,
     (method, path, body): (&str, &str, &[u8]),
 ) -> Result<Option<AgentId>, ServerError> {
+    let relayed = relayed_agent();
     let Some(value) = headers.get(HEADER) else {
-        return Ok(None);
+        return relayed
+            .map(|agent| relayed_caller(directory, agent))
+            .transpose();
     };
+    if relayed.is_some() {
+        return Err(refused("a relayed call cannot carry a second signature"));
+    }
     let text = value
         .to_str()
         .map_err(|_unread| refused("the header is not text"))?;
@@ -107,6 +113,45 @@ pub fn signed_agent(
     crate::caller_admission::active_caller(directory, &actor)?;
     remember_nonce(&state.agent_nonces, nonce, signed_at, now)?;
     Ok(Some(agent))
+}
+
+tokio::task_local! {
+    static RELAYED: AgentId;
+}
+
+/// Serves `work` as a call from `agent`, whose signature over the MCP
+/// message carrying the call was verified before the call was relayed into
+/// the router. The routes judge the agent against its live grants as they
+/// judge a signed request; the signature itself is never seen twice.
+pub(crate) async fn relayed<F: std::future::Future>(agent: AgentId, work: F) -> F::Output {
+    RELAYED.scope(agent, work).await
+}
+
+/// The agent the call being served was relayed for, if any.
+pub(crate) fn relayed_agent() -> Option<AgentId> {
+    RELAYED.try_with(|agent| *agent).ok()
+}
+
+/// A relayed agent is judged again as it stands now: it must still be
+/// active and still answer to an active person.
+fn relayed_caller(directory: &Projection, agent: AgentId) -> Result<AgentId, ServerError> {
+    let record = directory
+        .record(IdentityId::Agent(agent))
+        .ok_or_else(|| refused("the relayed agent is unknown"))?;
+    if record.state() != LifecycleState::Active {
+        return Err(refused("the agent is not active"));
+    }
+    let binding = record
+        .responsible()
+        .and_then(|person| directory.record(IdentityId::Person(person)))
+        .and_then(|person| person.bindings().first())
+        .ok_or(ServerError::NoPerson)?;
+    let actor = Actor::new(
+        binding.clone(),
+        Provenance::by_agent(agent, crate::session::now()),
+    );
+    crate::caller_admission::active_caller(directory, &actor)?;
+    Ok(agent)
 }
 
 /// The keys of the agent's currently valid, unwithdrawn certificates.

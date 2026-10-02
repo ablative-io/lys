@@ -172,6 +172,8 @@ pub enum Change {
     },
     /// The link-audit receiver accepted an issuer's observation.
     LinkAudit(LinkObservation),
+    /// An agent made a change through MCP.
+    AgentCall(crate::agent_call::AgentCall),
 }
 
 /// A signed directory change, before it is signed or after it is verified.
@@ -225,6 +227,9 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
         }),
         (Change::LinkAudit(_), IdentityId::Agent(_)) => Err(IdentityError::ChangeMismatch {
             reason: "a link observation names the person the login belongs to",
+        }),
+        (Change::AgentCall(_), IdentityId::Person(_)) => Err(IdentityError::ChangeMismatch {
+            reason: "an agent call names the agent that made it",
         }),
         (
             Change::Transition {
@@ -341,6 +346,8 @@ pub(crate) mod wire {
     pub(crate) const REPORTING_REGISTRATION: u64 = 8;
     /// A reporting edge and accountable subtree change.
     pub(crate) const REPORTS_TO_CHANGED: u64 = 9;
+    /// A change an agent made through MCP.
+    pub(crate) const AGENT_CALL: u64 = 10;
 
     pub(crate) fn change(value: &Change) -> u64 {
         match value {
@@ -353,6 +360,7 @@ pub(crate) mod wire {
             Change::BindLogin { .. } => BIND_LOGIN,
             Change::Transition { .. } => TRANSITION,
             Change::LinkAudit(_) => LINK_AUDIT,
+            Change::AgentCall(_) => AGENT_CALL,
         }
     }
 

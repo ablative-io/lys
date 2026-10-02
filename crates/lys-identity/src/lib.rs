@@ -6,6 +6,7 @@
 //! envelope lives here, outside `lys-core`, whose primitives and published
 //! formats it uses and never changes.
 
+pub mod agent_call;
 pub mod binding;
 pub mod checkpoints;
 pub mod directory;

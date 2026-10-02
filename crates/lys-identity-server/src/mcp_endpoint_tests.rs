@@ -126,6 +126,133 @@ async fn a_signed_mcp_call_cannot_borrow_an_administrator_cookie() -> Result<(),
     Ok(())
 }
 
+fn signed(
+    agent: &str,
+    key: &lys_core::Ed25519Identity,
+    bytes: &[u8],
+) -> Result<String, Box<dyn Error>> {
+    use sha2::{Digest, Sha256};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
+    let nonce = crate::routes::hex(&Sha256::digest(
+        lys_identity::OperationId::generate()?
+            .to_string()
+            .as_bytes(),
+    ));
+    let payload = crate::agent_signature::payload("POST", "/mcp", bytes, at, &nonce);
+    let signature = crate::routes::hex(
+        &lys_core::attestation::sign_attestation(&payload, key).to_cose_bytes(),
+    );
+    Ok(format!("{agent} {at} {nonce} {signature}"))
+}
+
+async fn post_signed(
+    base: &str,
+    bytes: Vec<u8>,
+    signature: &str,
+) -> Result<reqwest::Response, Box<dyn Error>> {
+    Ok(reqwest::Client::new()
+        .post(format!("{base}/mcp"))
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("mcp-protocol-version", "2025-11-25")
+        .header(crate::agent_signature::HEADER, signature)
+        .body(bytes)
+        .send()
+        .await?)
+}
+
+fn tree_call(id: u64) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(serde_json::to_vec(&json!({
+        "jsonrpc":"2.0", "id":id, "method":"tools/call", "params":{
+            "name":"read", "arguments":{"method":"GET","path":"/tree"}
+        }
+    }))?)
+}
+
+#[tokio::test]
+async fn a_signed_mcp_call_reaches_the_route_as_the_agent() -> Result<(), Box<dyn Error>> {
+    let (service, _cookie, agent, key) = certified_agent().await?;
+    let bytes = tree_call(10)?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let response = post_signed(&service.base, bytes, &signature).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let called: Value = response.json().await?;
+    assert_eq!(
+        called["result"]["structuredContent"]["status"], 200,
+        "{called}"
+    );
+    assert_eq!(
+        called["result"]["structuredContent"]["body"]["root"]["id"], agent,
+        "{called}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_replayed_signed_mcp_message_is_refused() -> Result<(), Box<dyn Error>> {
+    let (service, _cookie, agent, key) = certified_agent().await?;
+    let bytes = tree_call(11)?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let first = post_signed(&service.base, bytes.clone(), &signature).await?;
+    assert_eq!(first.status(), StatusCode::OK);
+    let replayed = post_signed(&service.base, bytes, &signature).await?;
+    assert_eq!(replayed.status(), StatusCode::UNAUTHORIZED);
+    let refused: Value = replayed.json().await?;
+    assert_eq!(refused["refusal"], "AgentSignatureRefused", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("nonce")
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_signed_mcp_message_altered_after_signing_is_refused() -> Result<(), Box<dyn Error>> {
+    let (service, _cookie, agent, key) = certified_agent().await?;
+    let signature = signed(&agent, &key, &tree_call(12)?)?;
+    let altered = serde_json::to_vec(&json!({
+        "jsonrpc":"2.0", "id":12, "method":"tools/call", "params":{
+            "name":"read", "arguments":{"method":"GET","path":"/directory/people"}
+        }
+    }))?;
+    let response = post_signed(&service.base, altered, &signature).await?;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let refused: Value = response.json().await?;
+    assert_eq!(refused["refusal"], "AgentSignatureRefused", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("does not verify")
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_relayed_agent_gains_nothing_its_grants_do_not_give() -> Result<(), Box<dyn Error>> {
+    let (service, cookie, agent, key) = certified_agent().await?;
+    let (direct_status, _) = service.get("/directory/people", Some(&cookie)).await?;
+    assert_eq!(direct_status, 200);
+    let bytes = serde_json::to_vec(&json!({
+        "jsonrpc":"2.0", "id":13, "method":"tools/call", "params":{
+            "name":"read", "arguments":{"method":"GET","path":"/directory/people"}
+        }
+    }))?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let response = post_signed(&service.base, bytes, &signature).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let called: Value = response.json().await?;
+    assert_eq!(called["result"]["isError"], true, "{called}");
+    assert_ne!(
+        called["result"]["structuredContent"]["status"], 200,
+        "{called}"
+    );
+    Ok(())
+}
+
 fn register(router: Router, origin: &str) -> Result<Router, crate::error::ServerError> {
     Ok(router.clone().merge(super::routes(router, origin)?))
 }

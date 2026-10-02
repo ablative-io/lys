@@ -243,6 +243,14 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/oauth/authorize" "Begin an authorization" P [&["RedirectUnregistered"]];
     POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
+    GET "/.well-known/oauth-protected-resource" "Where the MCP door's authorization is found" P [];
+    GET "/.well-known/oauth-protected-resource/mcp" "Where the MCP door's authorization is found, by its address" P [];
+    GET "/.well-known/oauth-protected-resource/api/mcp" "Where the MCP door's authorization is found, by its screens address" P [];
+    GET "/.well-known/oauth-authorization-server" "How a connected app is authorized" P [];
+    POST "/oauth/mcp/register" "An app registers to connect to the MCP door" P [&["RequestMalformed"]];
+    GET "/oauth/mcp/authorize" "Ask the person to connect an app" P [&["RequestMalformed", "RedirectUnregistered"]];
+    POST "/oauth/mcp/consent" "The person connects an app or refuses it" P [&["RequestMalformed", "RedirectUnregistered", "CodeUnknown", "NotSignedIn"]];
+    POST "/oauth/mcp/token" "Exchange a connected app's code or refresh token for tokens" P [];
     GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable"]];
     POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];

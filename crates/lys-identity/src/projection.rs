@@ -351,6 +351,7 @@ impl Projection {
                     })
                 }
             }
+            Change::AgentCall(_) => held.map(drop).ok_or_else(|| unknown(identity)),
             Change::LinkAudit(seen) => {
                 held.ok_or_else(|| unknown(identity))?;
                 if self.link_sources.contains_key(seen.source_operation_id()) {
@@ -443,6 +444,7 @@ impl Projection {
                 record.events.push(index);
                 self.refresh_reporting_children(identity, None)?;
             }
+            Change::AgentCall(_) => self.held(identity)?.events.push(index),
             Change::LinkAudit(seen) => {
                 self.held(identity)?.events.push(index);
                 Arc::make_mut(&mut self.link_sources)

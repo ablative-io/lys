@@ -29,25 +29,28 @@ struct Endpoint {
     state: Option<Arc<crate::routes::AppState>>,
     origin: String,
     tools: &'static crate::mcp_tools::Catalogue,
+    apps: Option<Arc<crate::mcp_oauth::Apps>>,
 }
 
 #[cfg(test)]
 pub(crate) fn routes(router: Router, origin: &str) -> Result<Router, ServerError> {
-    registered(router, origin, None)
+    registered(router, origin, None, None)
 }
 
 pub(crate) fn admitted_routes(
     router: Router,
     origin: &str,
     state: Arc<crate::routes::AppState>,
+    apps: Arc<crate::mcp_oauth::Apps>,
 ) -> Result<Router, ServerError> {
-    registered(router, origin, Some(state))
+    registered(router, origin, Some(state), Some(apps))
 }
 
 fn registered(
     router: Router,
     origin: &str,
     state: Option<Arc<crate::routes::AppState>>,
+    apps: Option<Arc<crate::mcp_oauth::Apps>>,
 ) -> Result<Router, ServerError> {
     let origin = reqwest::Url::parse(origin).map_err(|error| ServerError::ConfigInvalid {
         reason: format!("the MCP origin is invalid: {error}"),
@@ -57,6 +60,7 @@ fn registered(
         state,
         origin: origin.origin().ascii_serialization(),
         tools: crate::mcp_tools::prepare()?,
+        apps,
     });
     Ok(Router::new()
         .route("/mcp", post(message).get(no_stream))
@@ -242,13 +246,21 @@ async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Res
             )
         };
     }
+    let signer = match signer(&endpoint, &parts, &bytes) {
+        Ok(signer) => signer,
+        Err(error) => return error.into_response(),
+    };
+    let app = match connected_app(&endpoint, &parts) {
+        Ok(app) => app,
+        Err(error) => return error.into_response(),
+    };
     if method == "tools/list" {
         return tools(endpoint.tools, &id, &value["params"]);
     }
     let result = match method {
         "initialize" => initialize(&value["params"]),
         "ping" => Ok(json!({})),
-        "tools/call" => call(&endpoint, parts, &value["params"]).await,
+        "tools/call" => call(&endpoint, parts, &value["params"], (signer, app)).await,
         _ => Err((-32601, "the MCP method is not supported".to_owned())),
     };
     match result {
@@ -329,10 +341,72 @@ struct Arguments {
     body: Option<Value>,
 }
 
+/// The agent that signed this MCP message, verified once over the message
+/// exactly as it arrived; none when it carries no signature.
+fn signer(
+    endpoint: &Endpoint,
+    parts: &axum::http::request::Parts,
+    bytes: &[u8],
+) -> Result<Option<lys_identity::AgentId>, ServerError> {
+    if !parts.headers.contains_key(crate::agent_signature::HEADER) {
+        return Ok(None);
+    }
+    let state = endpoint
+        .state
+        .as_ref()
+        .ok_or(ServerError::AgentSignatureRefused {
+            reason: "MCP has no signature authority state",
+        })?;
+    let path = parts.uri.path();
+    let path = path.strip_prefix("/api").unwrap_or(path);
+    crate::routes::with_directory(state, |directory| {
+        crate::agent_signature::signed_agent(
+            state,
+            directory.projection()?,
+            &parts.headers,
+            ("POST", path, bytes),
+        )
+    })
+}
+
+/// The agent and app a connected app's bearer token names, refused when the
+/// token travels with any other credential.
+fn connected_app(
+    endpoint: &Endpoint,
+    parts: &axum::http::request::Parts,
+) -> Result<Option<(lys_identity::AgentId, String)>, ServerError> {
+    let Some(apps) = endpoint.apps.as_deref() else {
+        return Ok(None);
+    };
+    let Some(app) = apps.bearer(&parts.headers)? else {
+        return Ok(None);
+    };
+    if [
+        header::COOKIE,
+        header::HeaderName::from_static(crate::agent_signature::HEADER),
+        header::HeaderName::from_static(crate::agent_pass::HEADER),
+        header::HeaderName::from_static(crate::grant_tokens::HEADER),
+    ]
+    .iter()
+    .any(|name| parts.headers.contains_key(name))
+    {
+        return Err(ServerError::AgentSignatureRefused {
+            reason: "a connected app's token cannot carry another credential",
+        });
+    }
+    Ok(Some(app))
+}
+
+type Callers = (
+    Option<lys_identity::AgentId>,
+    Option<(lys_identity::AgentId, String)>,
+);
+
 async fn call(
     endpoint: &Endpoint,
     mut parts: axum::http::request::Parts,
     params: &Value,
+    (signer, app): Callers,
 ) -> ResultValue {
     let call: Call = serde_json::from_value(params.clone())
         .map_err(|error| (-32602, format!("invalid tool call: {error}")))?;
@@ -394,25 +468,69 @@ async fn call(
         header::ACCEPT,
         axum::http::HeaderValue::from_static("application/json"),
     );
-    let body = if let Some(body) = call.arguments.body {
+    let bytes = if let Some(body) = call.arguments.body {
         parts.headers.insert(
             header::CONTENT_TYPE,
             axum::http::HeaderValue::from_static("application/json"),
         );
-        Body::from(serde_json::to_vec(&body).map_err(|error| (-32603, error.to_string()))?)
+        serde_json::to_vec(&body).map_err(|error| (-32603, error.to_string()))?
     } else {
-        Body::empty()
+        Vec::new()
     };
-    let response = match endpoint
+    let witness = crate::mcp_receipts::witness(
+        endpoint.state.as_deref(),
+        &parts,
+        signer,
+        app.as_ref(),
+    )
+    .map_err(|error| (-32603, format!("the call's agent could not be named: {error}")))?;
+    let relayed = signer.or_else(|| app.as_ref().map(|(agent, _)| *agent));
+    let kept = (
+        parts.method.clone(),
+        parts.uri.to_string(),
+        crate::mcp_receipts::digest(&bytes),
+    );
+    let body = Body::from(bytes);
+    if signer.is_some() {
+        parts.headers.remove(crate::agent_signature::HEADER);
+    }
+    if app.is_some() {
+        parts.headers.remove(header::AUTHORIZATION);
+    }
+    let relay = endpoint
         .router
         .clone()
-        .oneshot(Request::from_parts(parts, body))
-        .await
-    {
+        .oneshot(Request::from_parts(parts, body));
+    let answered = match relayed {
+        Some(agent) => crate::agent_signature::relayed(agent, relay).await,
+        None => relay.await,
+    };
+    let response = match answered {
         Ok(response) => response,
         Err(error) => match error {},
     };
-    rendered(response).await
+    let status = response.status();
+    let mut result = rendered(response).await?;
+    let (Some(state), Some(witness)) = (endpoint.state.as_deref(), witness) else {
+        return Ok(result);
+    };
+    let (method, path, body_sha256) = kept;
+    if !crate::mcp_receipts::kept(&method, status) {
+        return Ok(result);
+    }
+    match crate::mcp_receipts::keep(state, witness, (&method, &path, &body_sha256, status)) {
+        Ok(receipt) => {
+            result["receipt"] = receipt;
+            Ok(result)
+        }
+        Err(error) => {
+            tracing::error!("an agent's MCP change was made but its receipt was not kept: {error}");
+            Err((
+                -32603,
+                format!("the change was made but its receipt could not be kept: {error}"),
+            ))
+        }
+    }
 }
 
 async fn rendered(response: Response) -> ResultValue {
