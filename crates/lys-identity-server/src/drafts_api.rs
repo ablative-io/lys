@@ -264,18 +264,13 @@ async fn create(
         let at = crate::session::now();
         let actor = Actor::new(binding, Provenance::by_agent(agent, at));
         let mut created = creation(body, actor, IdentityId::Person(person), at, None)?;
-        let (text, signed_path, signed_body) = match headers.get(crate::agent_signature::HEADER) {
-            Some(original) => (
-                original
-                    .to_str()
-                    .map_err(|error| {
-                        malformed(format!("the signature header is not text: {error}"))
-                    })?
-                    .to_owned(),
-                path.to_owned(),
-                bytes.to_vec(),
-            ),
-            None => {
+        let (text, signed_path, signed_body) =
+            if let Some(original) = headers.get(crate::agent_signature::HEADER) {
+                let text = original.to_str().map_err(|error| {
+                    malformed(format!("the signature header is not text: {error}"))
+                })?;
+                (text.to_owned(), path.to_owned(), bytes.to_vec())
+            } else {
                 let (header, message) = crate::agent_signature::relayed_signature().ok_or(
                     ServerError::AgentSignatureRefused {
                         reason: "the signature header is missing",
@@ -286,8 +281,7 @@ async fn create(
                     crate::agent_signature::RELAY_PATH.to_owned(),
                     message.to_vec(),
                 )
-            }
-        };
+            };
         let words: Vec<_> = text.split_ascii_whitespace().collect();
         let [author, signed_at, nonce, signature] = words.as_slice() else {
             return Err(malformed(

@@ -425,13 +425,16 @@ async fn call(
                     format!("the call's agent could not be named: {error}"),
                 )
             })?;
-    let signed = signer
+    let relay_evidence = signer
         .and_then(|_| parts.headers.get(crate::agent_signature::HEADER))
         .and_then(|value| value.to_str().ok())
         .map(|header| (header.to_owned(), Arc::<[u8]>::from(message)));
     let relayed = signer
         .or_else(|| app.as_ref().map(|(agent, _)| *agent))
-        .map(|agent| crate::agent_signature::Relay { agent, signed });
+        .map(|agent| crate::agent_signature::Relay {
+            agent,
+            signed: relay_evidence,
+        });
     let kept = (
         parts.method.clone(),
         parts.uri.to_string(),

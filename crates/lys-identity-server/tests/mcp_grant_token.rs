@@ -216,6 +216,10 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
     let (status, answer) = fixture.call(&writer, "POST", &path, body()?, false).await?;
     assert_eq!(status, 200);
     assert_eq!(answer["result"]["structuredContent"]["status"], 200);
+    assert!(
+        answer["result"]["receipt"].is_object(),
+        "a change through MCP is answered with its receipt: {answer}"
+    );
     let (status, answer) = fixture
         .call(
             &writer,
@@ -229,6 +233,10 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
     assert_eq!(
         answer["result"]["structuredContent"]["body"]["refusal"],
         "GrantTokenScopeMismatch"
+    );
+    assert!(
+        answer["result"].get("receipt").is_none(),
+        "a refused call keeps nothing: {answer}"
     );
     let reader = fixture.token(&fixture.person, "beta").await?;
     let (status, answer) = fixture.call(&reader, "POST", &path, body()?, false).await?;
