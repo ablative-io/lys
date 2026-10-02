@@ -477,9 +477,21 @@ pub struct UnknownCannotGiveReason {
     pub reason: String,
 }
 
-/// Why an item cannot be given, spelled as one of the six `snake_case` names.
+/// Why an item cannot be given, using admission's reason names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CannotGiveReasonView(pub CannotGiveReason);
+
+impl utoipa::ToSchema for CannotGiveReasonView {}
+
+impl utoipa::PartialSchema for CannotGiveReasonView {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        utoipa::openapi::schema::ObjectBuilder::new()
+            .schema_type(utoipa::openapi::schema::Type::String)
+            .enum_values(Some(CannotGiveReason::ALL.map(CannotGiveReason::name)))
+            .build()
+            .into()
+    }
+}
 
 impl Serialize for CannotGiveReasonView {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -527,7 +539,6 @@ pub struct CannotGiveItemView {
     #[serde(flatten)]
     pub subject: CannotGiveSubjectView,
     /// The one reason it cannot be given.
-    #[schema(value_type = String)]
     pub reason: CannotGiveReasonView,
     /// Whether it is the grant the form was opened from.
     pub source: bool,
