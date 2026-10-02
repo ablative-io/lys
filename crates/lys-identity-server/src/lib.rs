@@ -124,7 +124,6 @@ mod mcp_record;
 pub mod mcp_requests_api;
 mod mcp_requests_state;
 pub mod mcp_requests_store;
-mod mcp_tools;
 pub mod memory_api;
 pub mod message_edges;
 pub mod network_api;

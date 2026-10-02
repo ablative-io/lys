@@ -22,13 +22,32 @@ pub(crate) const BODY_LIMIT: usize = 2 * 1024 * 1024;
 #[schema(value_type = Object)]
 pub(crate) struct Envelope(Value);
 const VERSIONS: [&str; 3] = ["2025-03-26", "2025-06-18", "2025-11-25"];
-const LEGACY_TOOLS: [&str; 4] = ["what-can-I-do", "read", "change", "drafts"];
+/// The tools Lys offers: four, whatever Lys grows to (DIRECTORY-049 C369:
+/// a compact list over the published API). What a call acts on is the route
+/// it names, never a tool of its own, so the list never grows with the routes.
+const TOOLS: [(&str, &str); 4] = [
+    (
+        "what-can-I-do",
+        "Ask the existing HTTP routes what the caller may do. Admission is decided by those routes.",
+    ),
+    (
+        "read",
+        "Read through an existing HTTP route with the caller's credentials and admission.",
+    ),
+    (
+        "change",
+        "Change through an existing HTTP route. Its validation, authority checks and refusals apply unchanged.",
+    ),
+    (
+        "drafts",
+        "Ask an existing draft route with the caller's credentials. This transport grants no draft authority.",
+    ),
+];
 
 struct Endpoint {
     router: Router,
     state: Option<Arc<crate::routes::AppState>>,
     origin: String,
-    tools: &'static crate::mcp_tools::Catalogue,
     apps: Option<Arc<crate::mcp_oauth::Apps>>,
     refused: crate::mcp_receipts::RefusedAsks,
 }
@@ -60,7 +79,6 @@ fn registered(
         router,
         state,
         origin: origin.origin().ascii_serialization(),
-        tools: crate::mcp_tools::prepare()?,
         apps,
         refused: crate::mcp_receipts::RefusedAsks::new(),
     });
@@ -257,7 +275,7 @@ async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Res
         Err(error) => return error.into_response(),
     };
     if method == "tools/list" {
-        return tools(endpoint.tools, &id, &value["params"]);
+        return tools(&id, &value["params"]);
     }
     let result = match method {
         "initialize" => initialize(&value["params"]),
@@ -298,7 +316,7 @@ fn initialize(params: &Value) -> ResultValue {
     )
 }
 
-fn tools(catalogue: &crate::mcp_tools::Catalogue, id: &Value, params: &Value) -> Response {
+fn tools(id: &Value, params: &Value) -> Response {
     if !params.is_null() && (!params.is_object() || params.get("cursor").is_some()) {
         return fault(
             id,
@@ -307,25 +325,14 @@ fn tools(catalogue: &crate::mcp_tools::Catalogue, id: &Value, params: &Value) ->
             "this tool list has no continuation cursor",
         );
     }
-    let id = match serde_json::to_vec(id) {
-        Ok(id) => id,
-        Err(error) => {
-            return fault(
-                id,
-                StatusCode::OK,
-                -32603,
-                format!("the MCP id could not be encoded: {error}"),
-            );
-        }
-    };
-    let encoded = catalogue.encoded();
-    let mut body = Vec::with_capacity(encoded.len() + id.len() + 40);
-    body.extend_from_slice(b"{\"jsonrpc\":\"2.0\",\"id\":");
-    body.extend_from_slice(&id);
-    body.extend_from_slice(b",\"result\":");
-    body.extend_from_slice(encoded);
-    body.push(b'}');
-    ([(header::CONTENT_TYPE, "application/json")], body).into_response()
+    let schema = json!({"type":"object","properties":{"method":{"type":"string","enum":["GET","POST","PUT","PATCH","DELETE"]},"path":{"type":"string","description":"An absolute local HTTP path, including its query."},"body":{}},"required":["method","path"],"additionalProperties":false});
+    let tools = TOOLS.map(
+        |(name, description)| json!({"name":name, "description":description, "inputSchema":schema}),
+    );
+    Json(Envelope(
+        json!({"jsonrpc":"2.0", "id":id, "result":{"tools":tools}}),
+    ))
+    .into_response()
 }
 
 #[derive(Deserialize)]
@@ -350,7 +357,15 @@ async fn call(
     (signer, app): crate::mcp_callers::Callers,
     message: &[u8],
 ) -> ResultValue {
-    let call: Call = serde_json::from_value(params.clone())
+    // `_meta` is the field MCP reserves on every request's params for the
+    // client's own use (Claude Code sends one on each call); it asks nothing
+    // of the tool, so it is set aside and every other field is still held to
+    // the call's shape.
+    let mut params = params.clone();
+    if let Some(fields) = params.as_object_mut() {
+        fields.remove("_meta");
+    }
+    let call: Call = serde_json::from_value(params)
         .map_err(|error| (-32602, format!("invalid tool call: {error}")))?;
     if !["GET", "POST", "PUT", "PATCH", "DELETE"].contains(&call.arguments.method.as_str()) {
         return Err((
@@ -373,11 +388,8 @@ async fn call(
             "the tool path must be local to the HTTP router".to_owned(),
         ));
     }
-    if !LEGACY_TOOLS.contains(&call.name.as_str()) {
-        endpoint
-            .tools
-            .resolve(&call.name, &call.arguments.method, uri.path())
-            .map_err(|reason| (-32602, reason))?;
+    if !TOOLS.iter().any(|(name, _)| *name == call.name) {
+        return Err((-32602, format!("unknown tool {}", call.name)));
     }
     let mut token = None;
     if parts.headers.contains_key(crate::grant_tokens::HEADER) {

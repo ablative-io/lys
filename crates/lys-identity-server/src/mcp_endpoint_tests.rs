@@ -308,6 +308,38 @@ async fn a_signed_mcp_call_reaches_the_route_as_the_agent() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+async fn a_call_carrying_the_clients_meta_is_answered_and_any_other_stray_field_refused()
+-> Result<(), Box<dyn Error>> {
+    let (service, _cookie, agent, key) = certified_agent().await?;
+    let call = |id: u64, extra: &str| {
+        serde_json::to_vec(&json!({
+            "jsonrpc":"2.0", "id":id, "method":"tools/call", "params":{
+                "name":"read", "arguments":{"method":"GET","path":"/tree"},
+                extra: {"progressToken": 1}
+            }
+        }))
+    };
+    let bytes = call(20, "_meta")?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let called: Value = post_signed(&service.base, bytes, &signature)
+        .await?
+        .json()
+        .await?;
+    assert_eq!(
+        called["result"]["structuredContent"]["status"], 200,
+        "{called}"
+    );
+    let bytes = call(21, "meta")?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let refused: Value = post_signed(&service.base, bytes, &signature)
+        .await?
+        .json()
+        .await?;
+    assert_eq!(refused["error"]["code"], -32602, "{refused}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_replayed_signed_mcp_message_is_refused() -> Result<(), Box<dyn Error>> {
     let (service, _cookie, agent, key) = certified_agent().await?;
     let bytes = tree_call(11)?;
@@ -415,7 +447,15 @@ async fn mcp_initialize_and_tools_list_answer() -> Result<(), Box<dyn Error>> {
     )
     .await?;
     let tools = listed["result"]["tools"].as_array().ok_or("no tools")?;
-    assert_eq!(tools.len(), crate::openapi_table::TABLE.len());
+    let names: Vec<&str> = tools
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect();
+    assert_eq!(
+        names,
+        ["what-can-I-do", "read", "change", "drafts"],
+        "Lys advertises four tools, not one per route: {listed}"
+    );
     for tool in tools {
         assert!(
             !tool["description"]
