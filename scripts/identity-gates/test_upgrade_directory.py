@@ -44,7 +44,7 @@ class DirectoryUpgradeTests(unittest.TestCase):
         self.config = {"log_dir": str(self.directory), "log_origin": "fixture"}
         self.admin = {
             "person": {"id": "person-" + "11" * 16, "state": "active"},
-            "signed_in": {"issuer": "fixture", "subject": "owner"},
+            "signed_in": {"provider": "fixture", "subject": "owner"},
             "sign_in_identities": [{"issuer": "fixture", "subject": "owner"}],
         }
         for index in range(3):
@@ -282,7 +282,7 @@ class DirectoryUpgradeTests(unittest.TestCase):
 
     def test_administrator_cannot_change_during_the_write(self):
         browser = Mock()
-        changed = dict(self.admin, signed_in={"issuer": "fixture", "subject": "different"})
+        changed = dict(self.admin, signed_in={"provider": "fixture", "subject": "different"})
         browser.ask.side_effect = [
             self.admin,
             {"person": "new"},

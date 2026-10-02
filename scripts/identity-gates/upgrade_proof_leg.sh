@@ -33,7 +33,7 @@ chmod 700 "$private"
 # named, and the leg ends with the code it was ending with.
 cleanup() {
   status=$?
-  for tree in "$private"/old-*; do
+  for tree in "$private"/old-[0-9a-f]*; do
     if [ -d "$tree" ] && ! git -C "$root" worktree remove --force "$tree" >/dev/null 2>&1; then
       echo "upgrade_proof_cleanup: the old release tree $tree could not be removed"
     fi

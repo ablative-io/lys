@@ -284,12 +284,14 @@ def old_directory_snapshot(root, config, leaves, administrator):
         and len(record) == fields
         and record[0] == [1, bytes.fromhex(identifier[7:])]
     ]
+    # /me names a login's issuer URL as `provider`, exactly as the directory
+    # record keeps it in each [issuer, subject] pair.
     login = administrator["signed_in"]
     if (
         len(records) != 1
         or records[0][2] != 2
         or not isinstance(records[0][4], list)
-        or [login["issuer"], login["subject"]] not in records[0][4]
+        or [login["provider"], login["subject"]] not in records[0][4]
     ):
         raise RuntimeError("old snapshot does not hold the active bound administrator")
     return {
