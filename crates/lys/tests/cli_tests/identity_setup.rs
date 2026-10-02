@@ -224,7 +224,7 @@ fn setup_over_ssh_writes_the_readable_code_without_opening_a_browser() -> TestRe
     let state = root.path().join("state");
     std::fs::create_dir(&state)?;
     std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700))?;
-    let opened = tools.path().join("opened");
+    let browser_marker = tools.path().join("opened");
     for name in ["open", "xdg-open"] {
         let opener = tools.path().join(name);
         std::fs::write(
@@ -238,10 +238,13 @@ fn setup_over_ssh_writes_the_readable_code_without_opening_a_browser() -> TestRe
         .arg(root.path())
         .env("PATH", tools.path())
         .env("SSH_CONNECTION", "127.0.0.1 12345 127.0.0.1 22")
-        .env("LYS_SETUP_TEST_OPENED", &opened)
+        .env("LYS_SETUP_TEST_OPENED", &browser_marker)
         .output()?;
     assert!(output.status.success(), "setup-code failed");
-    assert!(!opened.exists(), "SSH setup opened a desktop browser");
+    assert!(
+        !browser_marker.exists(),
+        "SSH setup opened a desktop browser"
+    );
     let path = root.path().join("setup-code");
     let code = std::fs::read_to_string(&path)?;
     assert_eq!(code.len(), 32);
