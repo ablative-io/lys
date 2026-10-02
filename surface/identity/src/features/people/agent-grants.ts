@@ -12,7 +12,7 @@ const second = (value: unknown): value is number => typeof value === 'number' &&
 const resource = (value: unknown): value is { kind: string; id: string } => isRecord(value) && typeof value.kind === 'string' && Boolean(value.kind) && typeof value.id === 'string' && Boolean(value.id);
 const window = (value: unknown): value is { starts_at: number; ends_at: number | null } => isRecord(value) && second(value.starts_at) && (value.ends_at === null || second(value.ends_at) && value.ends_at > value.starts_at);
 function readableGrant(value: unknown): value is Grant {
-  return isRecord(value) && grantId(value.id) && typeof value.holder === 'string' && /^(person|agent)-[0-9a-f]{32}$/.test(value.holder)
+  return isRecord(value) && grantId(value.id) && typeof value.holder === 'string' && /^(person|agent|op)-[0-9a-f]{32}$/.test(value.holder)
     && resource(value.resource) && typeof value.relation === 'string' && strings(value.actions) && isRecord(value.pass_on)
     && (value.pass_on.kind === 'use_only' || value.pass_on.kind === 'to' && strings(value.pass_on.actions) && strings(value.pass_on.recipients))
     && isRecord(value.standing) && typeof value.standing.stands === 'boolean' && window(value.window)
