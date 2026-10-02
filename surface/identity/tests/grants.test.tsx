@@ -266,7 +266,7 @@ describe('Who can reach this? (conformance 8.2)', () => {
     expect(rows).toEqual(['Ada (test person)everything here', "ScribeView this resource"]);
     await choose($('select[aria-label="Resource"]'), 'project:ledger');
     expect(location.hash).toBe('#/access/who/project:ledger');
-    expect($$('#whoCan .row').map((r) => r.textContent)).toEqual(['Ada (test person)view']);
+    expect($$('#whoCan .row').map((r) => r.textContent)).toEqual(['Ada (test person)View this resource']);
   });
 
   it('lists every grant, with where it derives from, and keeps every control reachable', async () => {
@@ -389,7 +389,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     await click($(`[data-act="delegate"][data-g="${BEA_ROOT_G}"]`));
     const beaSource = $$('#drawer .card')[0].textContent ?? '';
     expect(beaSource).toContain('editor of project:ledger');
-    expect(beaSource).toContain('Actions it allowsedit, view');
+    expect(beaSource).toContain('Actions it allowsEdit this resource; View this resource');
     expect(beaSource).toContain('You may pass it onagent');
     expect(beaSource).toContain('Ends no later than15 Nov');
 
