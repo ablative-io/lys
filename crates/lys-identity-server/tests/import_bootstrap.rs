@@ -161,6 +161,8 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
         plan["act"],
         "disable import_credential_file, restart, sign in as the configured administrator, record these requests, then restore import_credential_file"
     );
+    assert_eq!(plan["recorded_model_version"], 1);
+    assert_eq!(plan["current_model_version"], 2);
     loader(&mut service, false).await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     for collection in ["apps", "agents"] {
@@ -177,6 +179,8 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
             loader(&mut service, false).await?;
         }
         assert_eq!(plan["root"]["resource"]["id"], collection);
+        assert_eq!(plan["recorded_model_version"], 1);
+        assert_eq!(plan["current_model_version"], 2);
         let created = ok(post(
             &service,
             "/grants/roots",
@@ -191,6 +195,14 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
                 .err()
                 .ok_or("startup completed a replacement")?;
             assert!(refused.to_string().starts_with("BootstrapInterrupted: "));
+            let interrupted: Value = serde_json::from_str(
+                refused
+                    .to_string()
+                    .strip_prefix("BootstrapInterrupted: ")
+                    .ok_or("no recovery")?,
+            )?;
+            assert_eq!(interrupted["recorded_model_version"], 1);
+            assert_eq!(interrupted["current_model_version"], 2);
             assert_eq!(extent(&service)?, after_root);
             loader(&mut service, false).await?;
         }
