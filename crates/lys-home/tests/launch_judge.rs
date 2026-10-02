@@ -28,6 +28,8 @@ fn a_named_judge_is_the_hook_for_every_tool_beside_the_same_env() -> Fallible {
     let value: Value = serde_json::from_slice(&settings(&template, Some(&judge))?)?;
     let plain: Value = serde_json::from_slice(&env_settings(&template)?)?;
     assert_eq!(value["env"], plain["env"]);
+    assert_eq!(value["permissions"], plain["permissions"]);
+    assert_eq!(value["permissions"], json!({"defaultMode": "plan"}));
     assert_eq!(
         value["hooks"],
         json!({"PreToolUse": [{"matcher": "*", "hooks": [{
@@ -35,7 +37,7 @@ fn a_named_judge_is_the_hook_for_every_tool_beside_the_same_env() -> Fallible {
             "command": "'/opt/lys/bin/lys' runner judge --harness claude --socket '/run/lys/runner.sock'"
         }]}]})
     );
-    assert_eq!(value.as_object().ok_or("not an object")?.len(), 2);
+    assert_eq!(value.as_object().ok_or("not an object")?.len(), 3);
     Ok(())
 }
 

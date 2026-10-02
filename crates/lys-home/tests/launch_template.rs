@@ -50,7 +50,7 @@ const RECORDED: [(&str, &str); 5] = [
     ),
     (
         "env.json",
-        "8dfb898a5cc2c3442f6f79c631ba9d5c504ad98ee85ece40bf19566f943ddc71",
+        "ac30c06cda110b33ab11da81cd353b197b9f567feef17230d614479e5562650e",
     ),
     (
         "instructions.md",
@@ -344,9 +344,12 @@ fn the_environment_file_holds_the_variables_and_the_handle_and_nothing_else_twic
     let value: Value = serde_json::from_slice(&first).unwrap();
     assert_eq!(
         value,
-        json!({"env": {"LYS_FIXTURE_MODE": "fixture", "LYS_FIXTURE_TOKEN": HANDLE}})
+        json!({
+            "env": {"LYS_FIXTURE_MODE": "fixture", "LYS_FIXTURE_TOKEN": HANDLE},
+            "permissions": {"defaultMode": "plan"}
+        })
     );
-    assert_eq!(value.as_object().unwrap().len(), 1);
+    assert_eq!(value.as_object().unwrap().len(), 2);
     assert_eq!(value["env"].as_object().unwrap().len(), 2);
     assert!(!String::from_utf8_lossy(&first).contains(SECRET_VALUE));
 }
