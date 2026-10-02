@@ -129,7 +129,7 @@ pub fn operator(
 ) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
     let id = AgentId::from_str(agent).map_err(|_unread| ServerError::AgentNotVisible)?;
-    let administrator = crate::routes::is_administrator(state, &actor)?;
+    let administrator = state.admission.administrator(&actor).is_ok();
     let (asker, answers) = with_directory(state, |directory| {
         let projection = directory.projection()?;
         let asker = caller(state, headers, projection)?;
@@ -249,8 +249,7 @@ pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<()
             confirmation(ended),
         );
         store.report(report).map(drop)
-    })?;
-    crate::budgets_context::finish(state, &driven.agent, &driven.session)
+    })
 }
 
 /// The end an answer carries, when it carries one.
@@ -291,9 +290,7 @@ pub fn keep_act(state: &AppState, act: RunnerAct) -> Result<ActReceipt, ServerEr
     let mut acts = state
         .acts
         .lock()
-        .map_err(|error| ServerError::RuntimeUnavailable {
-            reason: format!("runner act store unavailable: {error}"),
-        })?;
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     acts.keep(act)
 }
 
@@ -317,7 +314,6 @@ pub async fn run_on_runner(
         machine,
         runner.clone(),
         Act::Start {
-            lys_mcp: None,
             launch: Box::new(launch),
         },
     )
