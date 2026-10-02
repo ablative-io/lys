@@ -256,6 +256,51 @@ describe('The delegation form', () => {
     expect(posted).toHaveLength(1);
   });
 
+  it('sends nothing and names it when the rest of a two-action run cannot be retained', async () => {
+    const KEY = 'lys.pending.grant.' + ADA + '.' + ROOT_G;
+    const { posted } = await open();
+    await tick('edit', 'view');
+    const real = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k.endsWith('.rest')) throw new Error('storage unavailable');
+      real.call(this, k, v);
+    });
+    await click($('[data-act="delegatedo"]'));
+    spy.mockRestore();
+    expect(posted.filter((p) => p.path === '/grants')).toEqual([]);
+    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+    expect(sessionStorage.getItem(KEY + '.rest')).toBeNull();
+  });
+
+  it('retains the next body before shortening the rest, names a failure to do so, and resumes the rest exactly', async () => {
+    const KEY = 'lys.pending.grant.' + ADA + '.' + ROOT_G;
+    const { posted } = await open();
+    await tick('edit', 'view');
+    const real = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k === KEY && v.includes('"viewer"')) throw new Error('storage unavailable');
+      real.call(this, k, v);
+    });
+    await click($('[data-act="delegatedo"]'));
+    spy.mockRestore();
+    const given = () => posted.filter((p) => p.path === '/grants').map((p) => p.body as DelegateBody);
+    expect(given().map((b) => b.relation)).toEqual(['only.edit']);
+    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+    expect($('#toast')?.textContent).toContain('Not sent: View this resource');
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+    const rest = JSON.parse(sessionStorage.getItem(KEY + '.rest') ?? 'null') as DelegateBody[] | null;
+    expect(rest?.map((b) => b.relation)).toEqual(['viewer']);
+    // Nothing is picked, yet the held rest is offered and sent exactly as retained, under its own operation.
+    expect($('[data-rest-held]')?.textContent).toContain('1 of an earlier run not yet sent');
+    expect(($('[data-act="delegatedo"]') as HTMLButtonElement).disabled).toBe(false);
+    await click($('[data-act="delegatedo"]'));
+    expect(given().map((b) => b.relation)).toEqual(['only.edit', 'viewer']);
+    expect(given()[1].operation).toBe(rest?.[0].operation);
+    expect(sessionStorage.getItem(KEY + '.rest')).toBeNull();
+    expect($('#toast')?.textContent).toContain('Given.');
+  });
+
   it('sends nothing if the browser cannot retain the original grant request', async () => {
     const { posted } = await open();
     await tick('view');

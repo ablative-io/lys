@@ -79,7 +79,8 @@ export function AskForm({ person, resources, model, changed }: {
   const [rest, setRest] = useState<Rest>(() => readRest(key));
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const keepRest = (left: Ask[]) => {
-    setRest(left.length ? { kind: 'held', asks: left } : { kind: 'empty' });
+    // A copy: the caller goes on shifting its queue, and state must say what storage says.
+    setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
     if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
   };
   const finish = (recorded: AccessRequest) => {
@@ -87,11 +88,15 @@ export function AskForm({ person, resources, model, changed }: {
     setPending({ kind: 'empty' });
     changed(recorded);
   };
+  /** Retain one ask under the pending key: always before the rest is shortened, so no ask is ever both forgotten and unsent. */
+  const retain = (asked: Ask) => {
+    sessionStorage.setItem(key, JSON.stringify(asked));
+    setPending({ kind: 'held', asked });
+  };
   /** One ask, retained before it is sent and released only on the service's confirmation; true when confirmed. */
   const sendOne = async (asked: Ask, retry: boolean): Promise<boolean> => {
     try {
-      sessionStorage.setItem(key, JSON.stringify(asked));
-      setPending({ kind: 'held', asked });
+      retain(asked);
       const recorded = await request<AccessRequest>('/requests', asked);
       if (!matchesAsk(recorded, asked, person)) throw new Error('The answer did not confirm the request. Its original details are retained.');
       finish(recorded);
@@ -112,7 +117,16 @@ export function AskForm({ person, resources, model, changed }: {
     setBusy(true); setFailure(''); setAnswer('');
     try {
       const queue = [...more];
-      keepRest(queue);
+      try {
+        if (!retry) retain(asked);
+        keepRest(queue);
+      } catch (error) {
+        // Nothing has been sent. Release the retained ask if the browser lets us; otherwise it stays retained and is checked, never duplicated.
+        if (!retry) {
+          try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { setPending({ kind: 'held', asked }); }
+        }
+        throw new Error('Nothing was sent because this browser could not retain the request: ' + (error instanceof Error ? error.message : String(error)));
+      }
       let recorded = 0;
       if (retry) {
         const list = await request<{ requests: AccessRequest[] }>('/requests');
@@ -125,7 +139,14 @@ export function AskForm({ person, resources, model, changed }: {
       recorded += 1;
       while (queue.length) {
         const next = queue.shift() as Ask;
-        keepRest(queue);
+        try {
+          retain(next);
+          keepRest(queue);
+        } catch (error) {
+          // Either the rest still holds next (retain failed) or the key holds it beside the rest (shortening failed): both resume exactly, so stop and say so.
+          setAnswer(`${recorded} recorded before the browser stopped retaining; not yet sent: ${[next, ...queue].map((each) => each.relation).join(', ')}.`);
+          throw new Error('The browser could not retain the next request: ' + (error instanceof Error ? error.message : String(error)));
+        }
         if (!(await sendOne(next, false))) {
           // A definite refusal ends the run; what was recorded stays recorded and the rest is named, never re-sent by itself.
           if (sessionStorage.getItem(key) === null) {
@@ -136,7 +157,6 @@ export function AskForm({ person, resources, model, changed }: {
         }
         recorded += 1;
       }
-      keepRest([]);
       setAnswer(recorded > 1 ? `${recorded} requests recorded, one per action. Access is granted only after approval.` : 'Request recorded. Access is granted only after approval.');
     } catch (error) {
       setFailure(failureWords(error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.'));
@@ -144,7 +164,7 @@ export function AskForm({ person, resources, model, changed }: {
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (pending.kind !== 'empty' || damaged || working.current) return;
+    if (pending.kind !== 'empty' || rest.kind === 'held' || damaged || working.current) return;
     try {
       const data = new FormData(event.currentTarget);
       const resource = advanced ? { kind: field(data, 'kind'), id: field(data, 'resource') } : resources[Number(resourceIndex)];
@@ -165,7 +185,7 @@ export function AskForm({ person, resources, model, changed }: {
   };
   return <form className="card recorded-form" aria-label="Ask for access" onSubmit={submit}>
     <h2>Ask for access</h2><p>Choose what you need and explain why. Someone who can grant that access will review your request.</p>
-    <fieldset disabled={pending.kind !== 'empty' || damaged || busy} style={{ border: 0, padding: 0 }}>
+    <fieldset disabled={pending.kind !== 'empty' || rest.kind === 'held' || damaged || busy} style={{ border: 0, padding: 0 }}>
       {!advanced ? <label className="field">What do you need access to?<select value={resourceIndex} onChange={(event) => setResourceIndex(event.target.value)} required>
         <option value="">Choose what you need</option>{resources.map((resource, index) => <option key={JSON.stringify(resource)} value={index}>{resource.id} · {resource.kind}</option>)}
       </select></label> : null}
@@ -187,7 +207,8 @@ export function AskForm({ person, resources, model, changed }: {
       <label><input type="checkbox" name="no-expiry" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry requested</label>
       <p><button className="btn primary" type="submit" disabled={busy}>Request access</button></p>
     </fieldset>
-    {pending.kind === 'held' ? <div role="status"><p>The result is not yet confirmed. Your original request is retained; checking will not create a duplicate.</p><button type="button" className="btn" disabled={busy} onClick={() => void send(pending.asked, true, rest.kind === 'held' ? rest.asks : [])}>{busy ? 'Checking…' : rest.kind === 'held' ? `Check original request, then ask for the ${rest.asks.length} remaining` : 'Check original request'}</button></div> : null}
+    {pending.kind === 'held' ? <div role="status"><p>The result is not yet confirmed. Your original request is retained; checking will not create a duplicate.</p><button type="button" className="btn" disabled={busy} onClick={() => void send(pending.asked, true, rest.kind === 'held' ? rest.asks.filter((each) => each.operation !== pending.asked.operation) : [])}>{busy ? 'Checking…' : rest.kind === 'held' ? `Check original request, then ask for the ${rest.asks.length} remaining` : 'Check original request'}</button></div> : null}
+    {pending.kind === 'empty' && rest.kind === 'held' ? <div role="status"><p>{rest.asks.length} of an earlier run not yet sent: {rest.asks.map((each) => each.relation).join(', ')}.</p><button type="button" className="btn" data-act="ask-rest" disabled={busy} onClick={() => { const [head, ...tail] = rest.asks; if (head) void send(head, false, tail); }}>{busy ? 'Sending…' : `Ask for the ${rest.asks.length} remaining`}</button></div> : null}
     {damaged ? <p role="alert">The retained request could not be read. Sending is blocked to prevent a duplicate. Ask an administrator to inspect the pending request for this account.</p> : null}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
     {answer ? <p role="status">{answer}</p> : null}
