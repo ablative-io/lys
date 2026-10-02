@@ -472,7 +472,14 @@ fn recovery_after_lys_is_placed_restores_the_runner_starts_a_stopped_one_or_refu
             &mut Recorder::default(),
             &mut |_| {},
         );
-        if state != "live" {
+        if state == "live" {
+            let error = result.err().ok_or("recovery acted on live sessions")?;
+            let named = error.to_string();
+            assert!(named.contains("runner_sessions_live"), "{named}");
+            assert!(named.contains("recovery-held"), "{named}");
+            assert_eq!(running.unchanged()?, before);
+            assert_eq!(std::fs::read(layout.upgrade_intent())?, recorded);
+        } else {
             result?;
             assert_eq!(version(&layout.binary("lys"), "lys")?, A);
             assert_ne!(
@@ -485,13 +492,6 @@ fn recovery_after_lys_is_placed_restores_the_runner_starts_a_stopped_one_or_refu
                 Answer::Status { .. }
             ));
             assert!(!layout.upgrade_intent().exists());
-        } else {
-            let error = result.err().ok_or("recovery acted on live sessions")?;
-            let named = error.to_string();
-            assert!(named.contains("runner_sessions_live"), "{named}");
-            assert!(named.contains("recovery-held"), "{named}");
-            assert_eq!(running.unchanged()?, before);
-            assert_eq!(std::fs::read(layout.upgrade_intent())?, recorded);
         }
         assert_eq!(running.keys()?, keys);
     }
