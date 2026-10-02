@@ -124,7 +124,7 @@ impl Table {
     }
 
     async fn launch_profile(&self) -> TestResult {
-        self.launch_profile_mode(Some("default")).await
+        self.launch_profile_mode(Some("plan")).await
     }
 
     async fn launch_profile_mode(&self, mode: Option<&str>) -> TestResult {
