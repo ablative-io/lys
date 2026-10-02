@@ -156,8 +156,22 @@ fn cache_lock(path: &Path) -> io::Result<File> {
         .truncate(false)
         .write(true)
         .open(path)?;
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockShared)?;
     Ok(lock)
+}
+
+fn needs_build(lock: &File, ready: &Path) -> io::Result<bool> {
+    if ready.try_exists()? {
+        return Ok(false);
+    }
+    // Release the reader before claiming publication, then recheck what another publisher did.
+    rustix::fs::flock(lock, rustix::fs::FlockOperation::Unlock)?;
+    rustix::fs::flock(lock, rustix::fs::FlockOperation::LockExclusive)?;
+    let missing = !ready.try_exists()?;
+    if !missing {
+        rustix::fs::flock(lock, rustix::fs::FlockOperation::LockShared)?;
+    }
+    Ok(missing)
 }
 
 pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
@@ -178,7 +192,7 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
     fs::create_dir_all(&cache)?;
     let lock = cache_lock(&cache.join(format!("{key}.lock")))?;
     let ready = cache.join(&key);
-    if !ready.try_exists()? {
+    if needs_build(&lock, &ready)? {
         let started = Instant::now();
         let stage = tempfile::Builder::new()
             .prefix("building-")
@@ -197,6 +211,7 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
             paths.len(),
             started.elapsed()
         );
+        rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockShared)?;
     }
     let expected: BTreeMap<String, String> =
         serde_json::from_slice(&fs::read(ready.join("manifest.json"))?)?;
@@ -225,6 +240,27 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cold_publication_excludes_readers_and_a_published_cache_needs_no_second_build()
+    -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("cache.lock");
+        let ready = dir.path().join("cache");
+        let first = cache_lock(&path)?;
+        assert!(needs_build(&first, &ready)?);
+        let second = File::options().write(true).open(&path)?;
+        assert!(
+            rustix::fs::flock(&second, rustix::fs::FlockOperation::NonBlockingLockShared).is_err()
+        );
+        fs::create_dir(&ready)?;
+        drop(first);
+        let cached = cache_lock(&path)?;
+        assert!(!needs_build(&cached, &ready)?);
+        rustix::fs::flock(&second, rustix::fs::FlockOperation::NonBlockingLockShared)?;
+        drop(cached);
+        Ok(())
+    }
 
     #[test]
     fn warm_cache_verification_does_not_exclude_another_reader() -> io::Result<()> {
