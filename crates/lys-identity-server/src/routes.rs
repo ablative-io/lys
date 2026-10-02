@@ -63,6 +63,8 @@ pub struct AppState {
     pub identity_upstream: String,
     /// The estate plan placed beside the directory log by install or upgrade.
     pub estate_plan_file: PathBuf,
+    /// Lys's password policy, when the configuration names it.
+    pub password_policy: Option<crate::accounts::PasswordPolicy>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.

@@ -113,6 +113,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             })
             .transpose()?,
         setup: config.setup.clone(),
+        password_policy: config.password_policy.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
         sessions: match &config.sessions_file {
             Some(file) => {

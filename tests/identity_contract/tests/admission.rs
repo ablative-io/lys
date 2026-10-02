@@ -83,6 +83,9 @@ async fn a_caller_without_a_session_is_refused_by_name() -> TestResult {
     Ok(())
 }
 
+/// A real authorization, begun by the service from a provider button, whose
+/// valid answer a browser follows to `/callback`: it is sent on to the
+/// screens, signed in, and the same answer is never taken twice.
 #[tokio::test]
 async fn a_browser_coming_back_from_sign_in_is_taken_to_the_screens_signed_in() -> TestResult {
     let service = Service::start().await?;
@@ -91,6 +94,9 @@ async fn a_browser_coming_back_from_sign_in_is_taken_to_the_screens_signed_in() 
     assert_eq!(status, 303, "a browser is sent on, never shown the JSON");
     assert_eq!(to.as_deref(), Some("/#/me"), "it lands on its own screen");
     assert!(cookie, "and it arrives signed in");
+    let (status, body) = service.get(&back, None).await?;
+    assert_eq!(status, 400, "an answer is used once: {body}");
+    assert_eq!(body["refusal"], "SignInStateUnknown");
     Ok(())
 }
 

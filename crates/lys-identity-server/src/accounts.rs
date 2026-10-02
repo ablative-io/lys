@@ -15,11 +15,13 @@
 //! and enables or disables their sign-in. A person's account is the login
 //! the directory binds them to at this service's issuer, never an email.
 //!
-//! The password policy is the issuer's own shipped policy, which no install
-//! changes: at least 14 and at most 128 characters, with a lower-case
-//! letter, an upper-case letter and a digit. It is checked here first so a
-//! person is told in Lys's words before anything is sent; the issuer checks
-//! it again and its refusal is answered in Lys's words too.
+//! The password policy is Lys's own, [`PasswordPolicy`], as the service's
+//! configuration states it: the install writes the same policy to the
+//! issuer, which enforces it on every password set, and the issuer is never
+//! asked for its own. The screens show it before a password is sent, it is
+//! checked here first so a person is told in Lys's words, and the issuer's
+//! refusal is answered in Lys's words too. A configuration that names no
+//! policy leaves the issuer's check alone, and the screens show none.
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -32,7 +34,7 @@ use axum::http::{Extensions, HeaderMap, Request};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{Actor, IdentityId, PersonId};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::error::ServerError;
@@ -40,24 +42,151 @@ use crate::routes::{AppState, signed_in, with_directory};
 use crate::sign_in::{Attempt, person_address};
 use crate::sign_in_providers::{SignInProviders, api};
 
-/// The fewest characters a password has, as the issuer's policy says.
-pub const PASSWORD_MIN: usize = 14;
-/// The most characters a password has.
-pub const PASSWORD_MAX: usize = 128;
+/// Lys's password policy, as the service's configuration states it and the
+/// install wrote it to the issuer. A length is counted as the issuer counts
+/// it, in bytes of UTF-8, and each kind of character as the issuer sorts it,
+/// so the check here and the issuer's never disagree.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PasswordPolicy {
+    /// The fewest characters a password has.
+    pub length_min: u16,
+    /// The most characters a password has.
+    pub length_max: u16,
+    /// The fewest lower-case letters, when any are asked for.
+    #[serde(default)]
+    pub lower_case: Option<u16>,
+    /// The fewest upper-case letters, when any are asked for.
+    #[serde(default)]
+    pub upper_case: Option<u16>,
+    /// The fewest digits, when any are asked for.
+    #[serde(default)]
+    pub digits: Option<u16>,
+    /// The fewest characters that are neither letters nor digits, when any
+    /// are asked for.
+    #[serde(default)]
+    pub special: Option<u16>,
+    /// How many of a person's last passwords a new one may not be, when any
+    /// are refused.
+    #[serde(default)]
+    pub not_recently_used: Option<u16>,
+}
 
-/// The password policy as the setup and account screens show it before a
-/// password is sent.
-pub fn password_policy() -> Value {
-    json!({
-        "length_min": PASSWORD_MIN,
-        "length_max": PASSWORD_MAX,
-        "lower_case": 1,
-        "upper_case": 1,
-        "digits": 1,
-        "words": format!(
-            "At least {PASSWORD_MIN} characters, with a lower-case letter, an upper-case letter and a digit."
+/// Each kind of character a policy may ask for: its field, its words, and
+/// how many of it `password` holds.
+fn kinds(policy: &PasswordPolicy, password: &str) -> [(Option<u16>, &'static str, usize); 4] {
+    let (mut lower, mut upper, mut digits, mut special) = (0, 0, 0, 0);
+    for c in password.chars() {
+        if c.is_lowercase() {
+            lower += 1;
+        } else if c.is_uppercase() {
+            upper += 1;
+        } else if c.is_ascii_digit() {
+            digits += 1;
+        } else if !c.is_alphanumeric() {
+            special += 1;
+        }
+    }
+    [
+        (policy.lower_case, "lower-case letter", lower),
+        (policy.upper_case, "upper-case letter", upper),
+        (policy.digits, "digit", digits),
+        (
+            policy.special,
+            "character that is not a letter or a digit",
+            special,
         ),
-    })
+    ]
+}
+
+impl PasswordPolicy {
+    /// The bounds the configuration's policy must keep, the ones the issuer
+    /// holds, each refusal naming its field.
+    pub fn validate(&self) -> Result<(), String> {
+        if !(8..=128).contains(&self.length_min) {
+            return Err("length_min is not 8 to 128".to_owned());
+        }
+        if !(self.length_min..=128).contains(&self.length_max) {
+            return Err("length_max is not length_min to 128".to_owned());
+        }
+        let counts = [
+            ("lower_case", self.lower_case, 32),
+            ("upper_case", self.upper_case, 32),
+            ("digits", self.digits, 32),
+            ("special", self.special, 32),
+            ("not_recently_used", self.not_recently_used, 10),
+        ];
+        match counts
+            .iter()
+            .find(|(_, value, most)| value.is_some_and(|value| !(1..=*most).contains(&value)))
+        {
+            Some((name, _, most)) => Err(format!("{name} is not 1 to {most}")),
+            None => Ok(()),
+        }
+    }
+
+    /// The policy in the words the screens show before a password is sent.
+    pub fn words(&self) -> String {
+        let mut words = format!(
+            "At least {} and at most {} characters",
+            self.length_min, self.length_max
+        );
+        let asked: Vec<String> = kinds(self, "")
+            .into_iter()
+            .filter_map(|(fewest, kind, _)| {
+                fewest.map(|fewest| match fewest {
+                    1 => format!("a {kind}"),
+                    more => format!("{more} of the kind: {kind}"),
+                })
+            })
+            .collect();
+        if !asked.is_empty() {
+            words.push_str(", with ");
+            words.push_str(&asked.join(", "));
+        }
+        words.push('.');
+        if let Some(last) = self.not_recently_used {
+            words.push_str(" A new password is not one of your last ");
+            words.push_str(&last.to_string());
+            words.push('.');
+        }
+        words
+    }
+
+    /// The policy as the setup and account screens read it.
+    pub fn view(&self) -> Value {
+        json!({
+            "length_min": self.length_min,
+            "length_max": self.length_max,
+            "lower_case": self.lower_case,
+            "upper_case": self.upper_case,
+            "digits": self.digits,
+            "special": self.special,
+            "not_recently_used": self.not_recently_used,
+            "words": self.words(),
+        })
+    }
+
+    /// Refuse `password` when this policy does not take it, in Lys's words.
+    pub fn check(&self, password: &str) -> Result<(), ServerError> {
+        let lengths = usize::from(self.length_min)..=usize::from(self.length_max);
+        if !lengths.contains(&password.len()) {
+            return Err(refused(format!(
+                "a password has {} to {} characters",
+                self.length_min, self.length_max
+            )));
+        }
+        for (fewest, kind, held) in kinds(self, password) {
+            if let Some(fewest) = fewest
+                && held < usize::from(fewest)
+            {
+                return Err(refused(format!(
+                    "a password has at least {fewest} of the kind: {kind}"
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 fn refused(reason: impl Into<String>) -> ServerError {
@@ -66,23 +195,15 @@ fn refused(reason: impl Into<String>) -> ServerError {
     }
 }
 
-/// Refuse a password the policy does not take, in Lys's words.
-pub fn check_password(password: &str) -> Result<(), ServerError> {
-    let length = password.chars().count();
-    if !(PASSWORD_MIN..=PASSWORD_MAX).contains(&length) {
-        return Err(refused(format!(
-            "a password has {PASSWORD_MIN} to {PASSWORD_MAX} characters"
-        )));
+/// Refuse a password `policy` does not take, in Lys's words. With no policy
+/// configured only an empty password is refused here, and the issuer checks
+/// the rest.
+pub fn check_password(policy: Option<&PasswordPolicy>, password: &str) -> Result<(), ServerError> {
+    match policy {
+        Some(policy) => policy.check(password),
+        None if password.is_empty() => Err(refused("a password is not empty")),
+        None => Ok(()),
     }
-    let has = |test: fn(&char) -> bool| password.chars().any(|c| test(&c));
-    let mixed =
-        has(char::is_ascii_lowercase) && has(char::is_ascii_uppercase) && has(char::is_ascii_digit);
-    if !mixed {
-        return Err(refused(
-            "a password has a lower-case letter, an upper-case letter and a digit",
-        ));
-    }
-    Ok(())
 }
 
 /// Refuse what is not an email address: one `@` with text on each side, a
@@ -250,13 +371,14 @@ pub async fn change(
 }
 
 /// Set account `id`'s password, enabled and its email taken as verified,
-/// after the policy has taken it.
+/// after `policy` has taken it.
 pub async fn set_password(
     api: &SignInProviders,
+    policy: Option<&PasswordPolicy>,
     id: &str,
     password: &str,
 ) -> Result<(), ServerError> {
-    check_password(password)?;
+    check_password(policy, password)?;
     change(api, id, |update| {
         update["password"] = Value::String(password.to_owned());
         update["enabled"] = Value::Bool(true);
@@ -418,7 +540,8 @@ async fn own_password(
     let actor = signed_in(&state, &headers)?;
     let id = own_id(&state, &actor)?;
     let body = body_of(body)?;
-    check_password(&body.password)?;
+    let policy = state.password_policy.as_ref();
+    check_password(policy, &body.password)?;
     confirm(&state, &extensions, &id, &body.current).await?;
     let api = api(&state)?;
     change(api, &id, |update| {
@@ -483,7 +606,8 @@ async fn reset_password(
     crate::routes::administrator(&state, &actor)?;
     let id = account_id(&state, &person)?;
     let api = api(&state)?;
-    set_password(api, &id, &body_of(body)?.password).await?;
+    let policy = state.password_policy.as_ref();
+    set_password(api, policy, &id, &body_of(body)?.password).await?;
     shown(api, &id).await
 }
 

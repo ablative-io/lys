@@ -559,3 +559,34 @@ fn an_earlier_shipped_model_is_replaced_by_this_builds_and_a_current_one_is_kept
     assert_eq!(std::fs::read_to_string(layout.grant_model())?, later);
     Ok(())
 }
+
+#[test]
+fn the_service_is_given_the_password_policy_the_deployment_states() -> Result<(), Box<dyn Error>> {
+    let root = PathBuf::from("/srv/lys");
+    let layout = Layout::at(root.clone());
+    let text = format!(
+        "{}\n[password_policy]\nlength_min = 12\nlength_max = 48\ndigits = 2\n",
+        render_deployment(None)
+    );
+    let config = DeploymentConfig::parse(&text, root)?;
+    let rendered =
+        server_config::render(&layout, &config, &server_config::Carried::default(), true);
+    assert_eq!(
+        rendered["password_policy"],
+        serde_json::json!({
+            "length_min": 12,
+            "length_max": 48,
+            "lower_case": null,
+            "upper_case": null,
+            "digits": 2,
+            "special": null,
+            "not_recently_used": null,
+        }),
+        "the screens are given the policy the install writes to the sign-in service"
+    );
+    assert_eq!(
+        crate::identity::configure::issuer_policy(&config.password_policy)["include_digits"],
+        2
+    );
+    Ok(())
+}

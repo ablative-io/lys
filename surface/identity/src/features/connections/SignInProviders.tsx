@@ -1,4 +1,9 @@
-/** The sign-in providers set at the issuer from here: Google, Microsoft and GitHub. */
+/**
+ * The sign-in providers set from here: Google, Microsoft and GitHub, every
+ * step shown. The redirect address to paste is the one the service answers,
+ * Lys's own; saving proves the client id at the provider, and a provider
+ * that refuses it is named with its own words.
+ */
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Refused, request, useLoad } from '../../api';

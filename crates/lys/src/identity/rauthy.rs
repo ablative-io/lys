@@ -281,6 +281,87 @@ impl RauthyApi {
         Self::json(&answer, id)
     }
 
+    /// `PUT /auth/v1/password_policy`: the sign-in service's password
+    /// policy set to `policy` whole, answering the policy it stored. The
+    /// sign-in service answers the stored policy to this call alone, so the
+    /// answer is the read-back.
+    pub fn put_password_policy(&self, policy: &Value) -> IdentityResult<Value> {
+        let answer = self.call(
+            "PUT",
+            "/auth/v1/password_policy",
+            Some(policy),
+            "password_policy",
+        )?;
+        Self::json(&answer, "password_policy")
+    }
+
+    /// `GET /auth/v1/api_keys`: every API key, by name and rights. Rauthy
+    /// never answers a key's secret here.
+    pub fn list_api_keys(&self) -> IdentityResult<Vec<Value>> {
+        let answer = self.call("GET", "/auth/v1/api_keys", None, "api_keys")?;
+        let listed: Value = Self::json(&answer, "api_keys")?;
+        listed
+            .get("keys")
+            .and_then(Value::as_array)
+            .cloned()
+            .ok_or_else(|| {
+                IdentityError::new(
+                    ErrorKind::RauthyUnexpected,
+                    "read API keys",
+                    "api_keys",
+                    "the answer lists no keys",
+                )
+            })
+    }
+
+    /// `POST /auth/v1/api_keys`: a new key made from `request`, answering
+    /// its token, the key's name, a dollar sign and its secret.
+    pub fn create_api_key(&self, name: &str, request: &Value) -> IdentityResult<Credential> {
+        let answer = self.call("POST", "/auth/v1/api_keys", Some(request), name)?;
+        Self::token(&answer, name)
+    }
+
+    /// `PUT /auth/v1/api_keys/{name}`: the key's rights set to `request`'s.
+    /// What was stored is for the caller to read back.
+    pub fn update_api_key(&self, name: &str, request: &Value) -> IdentityResult<()> {
+        let path = format!("/auth/v1/api_keys/{name}");
+        self.call("PUT", &path, Some(request), name).map(drop)
+    }
+
+    /// `PUT /auth/v1/api_keys/{name}/secret`: a new secret for the key,
+    /// answering its token. The old secret stops working.
+    pub fn renew_api_key_secret(&self, name: &str) -> IdentityResult<Credential> {
+        let path = format!("/auth/v1/api_keys/{name}/secret");
+        let answer = self.call("PUT", &path, None, name)?;
+        Self::token(&answer, name)
+    }
+
+    /// An API key's token from an answer's plain body, checked to name
+    /// the key it was asked for.
+    fn token(answer: &Response, name: &str) -> IdentityResult<Credential> {
+        let text = std::str::from_utf8(&answer.body).map_err(|error| {
+            IdentityError::new(
+                ErrorKind::RauthyUnexpected,
+                "read API key",
+                name,
+                error.to_string(),
+            )
+        })?;
+        let token = Zeroizing::new(text.trim().to_owned());
+        if !token
+            .strip_prefix(name)
+            .is_some_and(|rest| rest.len() > 1 && rest.starts_with('$'))
+        {
+            return Err(IdentityError::new(
+                ErrorKind::RauthyUnexpected,
+                "read API key",
+                name,
+                "the answer is not this key's token",
+            ));
+        }
+        Ok(Credential::received(&format!("{name}-api-key"), token))
+    }
+
     /// `PUT /auth/v1/theme/{id}`, confirmed by reading the theme back.
     pub fn put_theme(&self, theme: &Theme) -> IdentityResult<Theme> {
         let path = format!("/auth/v1/theme/{}", theme.client_id);

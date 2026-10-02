@@ -294,7 +294,8 @@ pub(crate) struct Opened {
 }
 
 /// What the setup page shows for `code`: its purpose, the email it is for
-/// when that is fixed, and the password policy.
+/// when that is fixed, and Lys's password policy as the configuration states
+/// it, never one read from the issuer.
 async fn open(
     State(state): State<Arc<AppState>>,
     extensions: Extensions,
@@ -320,7 +321,7 @@ async fn open(
     Ok(Json(json!({
         "purpose": purpose,
         "email": email,
-        "policy": accounts::password_policy(),
+        "policy": state.password_policy.as_ref().map(accounts::PasswordPolicy::view),
     })))
 }
 
@@ -359,7 +360,8 @@ async fn make_administrator(
     }
     let operation = OperationId::from_str(&body.operation)?;
     let profile = Profile::new(&body.display_name)?;
-    accounts::check_password(&body.password)?;
+    let policy = state.password_policy.as_ref();
+    accounts::check_password(policy, &body.password)?;
     let address = state.sign_in.address(&extensions, &headers)?;
     let api = crate::sign_in_providers::api(&state)?;
     let (id, made) = accounts::make(api, email, &body.display_name).await?;
@@ -383,7 +385,7 @@ async fn make_administrator(
     let actor = if let Some(actor) = held {
         actor
     } else {
-        accounts::set_password(api, &id, &body.password).await?;
+        accounts::set_password(api, policy, &id, &body.password).await?;
         state.sign_in.password(&state.oidc, &attempt).await?
     };
     if actor.binding().subject() != id {
@@ -435,7 +437,8 @@ async fn new_password(
         .ok_or(ServerError::SetupCodeRefused)?;
     let address = state.sign_in.address(&extensions, &headers)?;
     let api = crate::sign_in_providers::api(&state)?;
-    accounts::set_password(api, login.subject(), &body.password).await?;
+    let policy = state.password_policy.as_ref();
+    accounts::set_password(api, policy, login.subject(), &body.password).await?;
     let email = accounts::email_of(api, login.subject()).await?;
     let attempt = Attempt {
         email: &email,

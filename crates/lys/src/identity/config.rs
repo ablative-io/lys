@@ -9,7 +9,7 @@
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 
@@ -39,6 +39,9 @@ pub struct DeploymentConfig {
     pub credentials: Credentials,
     /// The two OIDC clients `lys identity configure` manages.
     pub clients: Clients,
+    /// The passwords Lys takes; Lys's own policy when the table is absent.
+    #[serde(default)]
+    pub password_policy: PasswordPolicy,
     #[serde(skip)]
     base: PathBuf,
 }
@@ -164,6 +167,94 @@ pub struct Client {
     pub challenges: Vec<String>,
 }
 
+/// The `[password_policy]` table: the passwords Lys takes.
+///
+/// Lys owns this policy. The install writes it to the sign-in service, which
+/// enforces it on every password set, and hands the same values to the
+/// directory service, whose setup and account screens show them before a
+/// password is sent. The sign-in service is never asked for its own. A
+/// length is counted as the sign-in service counts it, in bytes of UTF-8.
+/// Each bound is one the sign-in service can hold, and a value outside it is
+/// refused by name before anything is written.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PasswordPolicy {
+    /// The fewest characters a password has, 8 to 128.
+    pub length_min: u16,
+    /// The most characters a password has, `length_min` to 128.
+    pub length_max: u16,
+    /// The fewest lower-case letters, 1 to 32, when any are asked for.
+    #[serde(default)]
+    pub lower_case: Option<u16>,
+    /// The fewest upper-case letters, 1 to 32, when any are asked for.
+    #[serde(default)]
+    pub upper_case: Option<u16>,
+    /// The fewest digits, 1 to 32, when any are asked for.
+    #[serde(default)]
+    pub digits: Option<u16>,
+    /// The fewest other characters, 1 to 32, when any are asked for.
+    #[serde(default)]
+    pub special: Option<u16>,
+    /// How many of a person's last passwords a new one may not be, 1 to 10,
+    /// when any are refused.
+    #[serde(default)]
+    pub not_recently_used: Option<u16>,
+}
+
+impl Default for PasswordPolicy {
+    /// Lys's own policy, from NIST SP 800-63B-4 section 3.1.1.2 for a
+    /// password that is the only factor: at least 15 characters, up to 64
+    /// allowed, and no rule on which kinds of character it holds.
+    fn default() -> Self {
+        Self {
+            length_min: 15,
+            length_max: 64,
+            lower_case: None,
+            upper_case: None,
+            digits: None,
+            special: None,
+            not_recently_used: None,
+        }
+    }
+}
+
+impl PasswordPolicy {
+    fn validate(&self) -> IdentityResult<()> {
+        let field = |name: &str| format!("password_policy.{name}");
+        if !(8..=128).contains(&self.length_min) {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                &field("length_min"),
+                "expected 8 to 128",
+            ));
+        }
+        if !(self.length_min..=128).contains(&self.length_max) {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                &field("length_max"),
+                "expected length_min to 128",
+            ));
+        }
+        let counts = [
+            ("lower_case", self.lower_case, 32),
+            ("upper_case", self.upper_case, 32),
+            ("digits", self.digits, 32),
+            ("special", self.special, 32),
+            ("not_recently_used", self.not_recently_used, 10),
+        ];
+        for (name, value, most) in counts {
+            if value.is_some_and(|value| !(1..=most).contains(&value)) {
+                return Err(refuse(
+                    ErrorKind::ConfigInvalid,
+                    &field(name),
+                    format!("expected 1 to {most}, or the field left out"),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 const TOKEN_ALGORITHMS: [&str; 4] = ["RS256", "RS384", "RS512", "EdDSA"];
 const TLS_MODES: [&str; 3] = ["disable", "prefer", "require"];
 const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "[::1]"];
@@ -283,6 +374,7 @@ impl DeploymentConfig {
 
     fn validate(&self) -> IdentityResult<()> {
         self.validate_deployment()?;
+        self.password_policy.validate()?;
         validate_origin(&self.issuer.public_origin)?;
         if self.public_tls() && self.issuer.trusted_proxies.is_empty() {
             return Err(refuse(

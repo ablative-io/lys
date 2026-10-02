@@ -149,7 +149,7 @@ fn the_rendered_environment_names_the_configured_database_host() -> Result<(), B
 }
 
 #[test]
-fn the_bootstrap_api_key_grants_clients_users_providers_and_reads_of_secrets()
+fn the_install_key_grants_clients_users_providers_keys_and_the_policy_write()
 -> Result<(), Box<dyn Error>> {
     let decoded = base64::engine::general_purpose::STANDARD.decode(bootstrap_api_key())?;
     let request: serde_json::Value = serde_json::from_slice(&decoded)?;
@@ -160,15 +160,24 @@ fn the_bootstrap_api_key_grants_clients_users_providers_and_reads_of_secrets()
         .iter()
         .filter_map(|entry| entry["group"].as_str())
         .collect();
-    assert_eq!(groups, ["Clients", "Secrets", "Users", "AuthProviders"]);
+    assert_eq!(
+        groups,
+        ["Clients", "Secrets", "Users", "AuthProviders", "ApiKeys"]
+    );
     assert_eq!(
         request["access"][1]["access_rights"],
-        serde_json::json!(["read"])
+        serde_json::json!(["read", "update"]),
+        "the install writes Lys's password policy, which the issuer keeps under secrets"
     );
     assert_eq!(
         request["access"][2]["access_rights"],
         serde_json::json!(["read", "create", "update"]),
         "the directory service makes and changes accounts"
+    );
+    assert_eq!(
+        request["access"][4]["access_rights"],
+        serde_json::json!(["read", "create", "update"]),
+        "the install makes the directory service's own, narrower key"
     );
     Ok(())
 }

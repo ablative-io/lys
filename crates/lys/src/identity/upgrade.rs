@@ -488,6 +488,8 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     require_install(&layout)?;
     let config = DeploymentConfig::load_install(&layout.deployment_config())?;
     install::server_state(&layout, &config)?;
+    crate::identity::configure::apply_password_policy(&config)?;
+    install::directory_key::provide(&config)?;
     let templates = render::Templates {
         messages: options
             .message_service
