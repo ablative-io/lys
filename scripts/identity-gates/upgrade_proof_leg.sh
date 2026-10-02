@@ -1,7 +1,8 @@
 #!/bin/sh
 # The real old-install upgrade proof, as a gate leg. For each old release the
 # proof is required against (the HOME-037 and DIRECTORY-069 baseline, an
-# earlier install, and the release Tom's install is on now), it builds that release clean from its own
+# earlier install, the 2 October 14:35 release, and the 2 October 16:20
+# release that was live before the evening's install), it builds that release clean from its own
 # commit, packages its screens, builds this tree's candidate the same way, and
 # runs upgrade_live.py: preparation first, then the real upgrade of a private
 # disposable install. Every build and fixture lives under one private folder
@@ -9,7 +10,7 @@
 # run is copied to the gate's log first.
 set -eu
 
-baselines="1b568cd90578f5ed5d7d438e628b23724eef7f12 8c064b62a0c77f0874c203189a2ed3238b7ba57a cced4195169ff5b458278dd0eb6dae607fde63a2"
+baselines="1b568cd90578f5ed5d7d438e628b23724eef7f12 8c064b62a0c77f0874c203189a2ed3238b7ba57a cced4195169ff5b458278dd0eb6dae607fde63a2 255a3bca78995cc31e26f9e3107b2e494fe5bc3a"
 root=$(git rev-parse --show-toplevel)
 candidate_commit=$(git -C "$root" rev-parse HEAD)
 if [ -n "$(git -C "$root" status --porcelain)" ]; then
