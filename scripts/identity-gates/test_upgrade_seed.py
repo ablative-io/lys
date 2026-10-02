@@ -11,11 +11,12 @@ LIMITS = {"budgets": "limits", "teams": "guarded", "zones": "organisation"}
 
 
 class OldApi:
-    def __init__(self, state="active", responsible="owner"):
+    def __init__(self, state="active", responsible="owner", policy=None):
         self.state = state
         self.responsible = responsible
         self.calls = []
         self.active = False
+        self.policy = policy
 
     def ask(self, method, path, body=None):
         self.calls.append((method, path, body))
@@ -31,6 +32,14 @@ class OldApi:
             return {"id": "member", "state": "active" if self.active else "registered"}
         if path == "/agents":
             return {"agent": "agent", "responsible": self.responsible}
+        if path == "/agents/agent/policy" and method == "GET":
+            return {"agent": "agent", "policy": self.policy, "digest": None, "applies": "next"}
+        if path == "/agents/agent/policy" and method == "POST":
+            held = 0 if self.policy is None else self.policy["version"]
+            if body["version"] != held:
+                raise RuntimeError(f"PolicyVersionConflict: the policy is at version {held}, not {body['version']}")
+            self.policy = {"version": held + 1, "rules": body["rules"]}
+            return {}
         if path == "/grants/roots":
             if not self.active:
                 raise RuntimeError("grant holder is not active")
@@ -66,6 +75,15 @@ class SeedTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "budget model"):
             self.exercise(browser, {"budgets": "unknown", "teams": "guarded"})
         self.assertNotIn("/budgets/agent/agent", [path for method, path, body in browser.calls])
+
+    def test_the_first_policy_change_is_sent_on_the_version_the_release_holds(self):
+        for held, sent in [(None, 0), ({"version": 1, "rules": []}, 1)]:
+            browser = OldApi(policy=held)
+            self.exercise(browser)
+            posted = [body["version"] for method, path, body in browser.calls
+                      if path == "/agents/agent/policy" and method == "POST"]
+            self.assertEqual(posted, [sent])
+            self.assertEqual(browser.policy["version"], sent + 1)
 
     def test_supported_setup_and_holder_activation(self):
         browser = OldApi()

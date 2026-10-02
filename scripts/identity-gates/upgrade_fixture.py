@@ -159,11 +159,14 @@ def populate(browser, root, release):
             "reminders": [],
         },
     )
+    # A release may record a policy for the agent before this first change;
+    # the change is sent on the version read, as the route asks.
+    held = browser.ask("GET", f"/agents/{agent}/policy")["policy"]
     browser.ask(
         "POST",
         f"/agents/{agent}/policy",
         {
-            "version": 0,
+            "version": 0 if held is None else held["version"],
             "rules": [
                 {
                     "id": "preserve-denial",
