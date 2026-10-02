@@ -39,11 +39,11 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     : builds.find((entry) => entry.program + '\n' + entry.package === build);
   let refusal = '';
   if (choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
-  else if (!program) refusal = choices.programs.length ? 'Choose the program this agent will use.' : 'ProgramUnavailable: Lys lists no startable programs.';
-  else if (!selected) refusal = build === 'another' ? 'ProgramPathInvalid: enter an absolute program path.' : builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
-  else if (!program.models.some((entry) => entry.id === model)) refusal = 'ModelUnavailable: choose a model this program lists.';
-  else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? 'WorkspaceOnlyUnavailable: this program does not list a setting that confines changes to its own folder with command internet access off.' : 'ModeUnavailable: choose a mode this program lists.';
-  else if (!supported.some((entry) => entry === prompt)) refusal = 'PromptReplacementUnavailable: this program does not list that prompt choice.';
+  else if (!program) refusal = choices.programs.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
+  else if (!selected) refusal = build === 'another' ? 'Enter the program’s full path, starting with /.' : builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
+  else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
+  else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? 'This program has no setting that keeps it to its own folder with internet off.' : 'Choose a mode this program lists.';
+  else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';
   const permissions = { ...profile?.permissions, default_mode: mode };
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],

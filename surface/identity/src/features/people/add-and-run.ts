@@ -119,7 +119,10 @@ export function addAndRunStep(current: AddAndRun): string {
 export class AddAndRunFailure extends Error {
   constructor(readonly step: string, readonly problem: unknown) {
     const code = problem instanceof Refused ? problem.refusal.refusal : problem instanceof Error ? problem.message.split(':', 1)[0] : '';
-    super('Lys could not confirm ' + step + '.' + (code === 'RunnerStartUnconfirmed' || code === 'RunnerDidNotRun' ? ' Lys admitted the start, but no runner ran it.' : code === 'RunnerStartEnded' ? ' The runner confirmed this session already ended.' : ''));
+    // A refusal is a definite answer, so its own sentence is shown; only an
+    // unknown outcome is "could not confirm".
+    const refusedWith = problem instanceof Refused && problem.status >= 400 && problem.status < 500 ? problem.refusal.reason : '';
+    super((refusedWith ? 'Lys refused ' + step + ': ' + refusedWith : 'Lys could not confirm ' + step + '.') + (code === 'RunnerStartUnconfirmed' || code === 'RunnerDidNotRun' ? ' Lys admitted the start, but no runner ran it.' : code === 'RunnerStartEnded' ? ' The runner confirmed this session already ended.' : ''));
   }
 }
 export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: AddAndRun) => void): Promise<string> {
