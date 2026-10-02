@@ -10,7 +10,10 @@ use std::os::unix::fs::PermissionsExt;
 use identity_contract::apps::{Auth, get, ok, op, post, workspace_schema};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
-use lys_identity_server::dev_seed::seed_configured;
+use lys_identity::{
+    Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
+};
+use lys_identity_server::routes::open_directory;
 use lys_log_store::{FileLeafStore, LeafStore};
 use serde_json::{Value, json};
 
@@ -22,11 +25,88 @@ fn credential() -> String {
     format!("lys-registrar.{ACCOUNT}.{}", "ab".repeat(32))
 }
 
-async fn upgraded() -> Result<Service, Box<dyn Error>> {
-    let (mut service, _) = Service::start_judging(MODEL, None, |config| {
-        Ok(seed_configured(config, [ADMINISTRATOR, "second-person"])?)
-    })
-    .await?;
+enum Seed {
+    Administrator,
+    SecondPerson,
+    ActiveAgent,
+}
+
+fn prepare(config: &lys_identity_server::Config, seed: Seed) -> Outcome {
+    let actor = Actor::new(
+        LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+        Provenance::new(AuthMethod::Oidc, 1),
+    );
+    let mut directory = open_directory(config)?;
+    let (owner, _) = directory.register_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Administrator")?,
+        1,
+    )?;
+    directory.bind_login(
+        actor.clone(),
+        OperationId::generate()?,
+        owner,
+        LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+        2,
+    )?;
+    directory.transition(
+        actor.clone(),
+        OperationId::generate()?,
+        IdentityId::Person(owner),
+        Transition::Activate,
+        "",
+        3,
+    )?;
+    match seed {
+        Seed::Administrator => {}
+        Seed::SecondPerson => {
+            let (other, _) = directory.register_person(
+                actor.clone(),
+                OperationId::generate()?,
+                Profile::new("Other")?,
+                4,
+            )?;
+            directory.bind_login(
+                actor.clone(),
+                OperationId::generate()?,
+                other,
+                LoginBinding::new(&config.issuer, "second-person")?,
+                5,
+            )?;
+            directory.transition(
+                actor,
+                OperationId::generate()?,
+                IdentityId::Person(other),
+                Transition::Activate,
+                "",
+                6,
+            )?;
+        }
+        Seed::ActiveAgent => {
+            let (agent, _) = directory.register_agent(
+                actor.clone(),
+                OperationId::generate()?,
+                owner,
+                Profile::new("Agent")?,
+                4,
+            )?;
+            directory.transition(
+                actor,
+                OperationId::generate()?,
+                IdentityId::Agent(agent),
+                Transition::Activate,
+                "",
+                5,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+async fn upgraded(seed: Seed) -> Result<Service, Box<dyn Error>> {
+    let (mut service, ()) =
+        Service::start_judging(MODEL, None, move |config| prepare(config, seed)).await?;
     let path = service.dir.path().join("loader.credential");
     fs::write(&path, credential())?;
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
@@ -50,7 +130,7 @@ fn document() -> Value {
 
 #[tokio::test]
 async fn old_install_gains_loader_and_reimport_after_restart_writes_nothing() -> Outcome {
-    let mut service = upgraded().await?;
+    let mut service = upgraded(Seed::Administrator).await?;
     let credential = credential();
     let first = ok(post(
         &service,
@@ -90,7 +170,7 @@ async fn old_install_gains_loader_and_reimport_after_restart_writes_nothing() ->
 
 #[tokio::test]
 async fn refused_credential_and_revoked_grant_never_mutate_the_directory() -> Outcome {
-    let mut service = upgraded().await?;
+    let mut service = upgraded(Seed::Administrator).await?;
     let before = extents(&service)?;
     let bad = format!("lys-registrar.{ACCOUNT}.{}", "cd".repeat(32));
     let refused = post(
@@ -147,7 +227,7 @@ async fn refused_credential_and_revoked_grant_never_mutate_the_directory() -> Ou
 
 #[tokio::test]
 async fn root_entry_never_uses_the_service_accounts_owner_as_caller() -> Outcome {
-    let service = upgraded().await?;
+    let service = upgraded(Seed::Administrator).await?;
     let before = extents(&service)?;
     let document = json!({"root_grants":[{"name":"forged-root","route":"api","holder":"@owner", "resource":{"kind":"directory","id":"agents"},"relation":"editor","pass_on":{"kind":"use_only"},"window":{"starts_at":0,"ends_at":null}}]});
     let refused = post(
@@ -171,7 +251,7 @@ async fn root_entry_never_uses_the_service_accounts_owner_as_caller() -> Outcome
 
 #[tokio::test]
 async fn refusal_receipt_is_readable_after_restart_and_repeat_adds_no_audit_leaf() -> Outcome {
-    let mut service = upgraded().await?;
+    let mut service = upgraded(Seed::Administrator).await?;
     let document = json!({"root_grants":[{"name":"refused","route":"api","holder":"@owner","resource":{"kind":"directory","id":"agents"},"relation":"editor","pass_on":{"kind":"use_only"},"window":{"starts_at":0,"ends_at":null}}]});
     let first = post(
         &service,
@@ -214,7 +294,7 @@ async fn refusal_receipt_is_readable_after_restart_and_repeat_adds_no_audit_leaf
 
 #[tokio::test]
 async fn installed_estate_flow_is_admin_only_and_runs_as_real_loader() -> Outcome {
-    let service = upgraded().await?;
+    let service = upgraded(Seed::SecondPerson).await?;
     fs::write(
         service.dir.path().join("estate-approval.json"),
         br#"{"version":1,"agents":[],"resources":[]}"#,
@@ -271,7 +351,7 @@ async fn installed_estate_flow_is_admin_only_and_runs_as_real_loader() -> Outcom
 
 #[tokio::test]
 async fn estate_without_installed_plan_names_configuration_refusal() -> Outcome {
-    let service = upgraded().await?;
+    let service = upgraded(Seed::Administrator).await?;
     let admin = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
         .await?;
@@ -285,7 +365,7 @@ async fn estate_without_installed_plan_names_configuration_refusal() -> Outcome 
 
 #[tokio::test]
 async fn import_preserves_named_action_and_recipient_refusals_without_grant_writes() -> Outcome {
-    let service = upgraded().await?;
+    let service = upgraded(Seed::ActiveAgent).await?;
     let admin = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
         .await?;
@@ -333,7 +413,7 @@ async fn on_the_shipped_model(service: &mut Service) -> Outcome {
 
 #[tokio::test]
 async fn an_upgraded_install_replays_its_loader_grants_and_issues_none() -> Outcome {
-    let mut service = upgraded().await?;
+    let mut service = upgraded(Seed::Administrator).await?;
     let before = extents(&service)?;
     on_the_shipped_model(&mut service).await?;
     let after = extents(&service)?;
@@ -359,7 +439,7 @@ async fn an_upgraded_install_replays_its_loader_grants_and_issues_none() -> Outc
 
 #[tokio::test]
 async fn a_revoked_loader_grant_stays_revoked_through_the_upgrade() -> Outcome {
-    let mut service = upgraded().await?;
+    let mut service = upgraded(Seed::Administrator).await?;
     let token = credential();
     let grants = ok(get(&service, "/grants", Auth::Bearer(&token)).await?)?;
     let id = grants["grants"]
