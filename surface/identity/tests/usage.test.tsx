@@ -144,6 +144,27 @@ describe('Usage', () => {
     expect(sent).toEqual({ limits: [...limits, { unit: 'tokens', amount: 600, period: 'day', act: 'tell' }], warn_at: 80, version: 7 });
   });
 
+  it('removes one limit and keeps the others with their acts and the warning', async () => {
+    const limits = [{ unit: 'tokens' as const, amount: 400, period: 'week' as const, act: 'tell' as const },
+      { unit: 'tokens' as const, amount: 500, period: 'week' as const, act: 'stop' as const }];
+    const kept = { ...budgetsView(holder), limits, warn_at: 80, version: 7 };
+    let sent: BudgetBody | null = null;
+    await mount(file, { ...keeping(), [budgets]: ok(kept), ['PUT ' + budgets]: (body) => {
+      sent = body as BudgetBody;
+      return ok({ ...kept, ...sent, version: 8 });
+    } });
+    await click($('button[aria-label="Remove 400 tokens a week"]'));
+    expect(sent).toEqual({ limits: [limits[1]], warn_at: 80, version: 7 });
+    expect(text()).toContain('Budget kept as version 8.');
+  });
+
+  it('offers only the units Lys has a figure for, and says why the others are not offered', async () => {
+    await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [], { unavailable: [{ unit: 'dollars', reason: 'no dollar spend is reported for this agent' }] })) });
+    expect(document.querySelector<HTMLOptionElement>('form[aria-label="Set a budget"] select[aria-label="Unit"] option[value="dollars"]')?.disabled).toBe(true);
+    expect(document.querySelector<HTMLOptionElement>('form[aria-label="Set a budget"] select[aria-label="Unit"] option[value="tokens"]')?.disabled).toBe(false);
+    expect(text()).toContain('dollars: no dollar spend is reported for this agent');
+  });
+
   it('names an unavailable figure without displaying it as a measured zero', async () => {
     await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens], {
       used: [{ unit: 'tokens', period: 'day', figure: null, since_ms: 0, unavailable: 'runner token report is missing' }],

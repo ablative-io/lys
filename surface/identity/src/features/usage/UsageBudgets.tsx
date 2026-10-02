@@ -55,6 +55,10 @@ function EditBudgets({ budgets, busy, save }: FormProps) {
   const valid = rows.every((row, index) => validAmount(budgets.limits[index].unit, row.amount))
     && (warning === '' || validAmount('context_percent', warning));
   const edit = (index: number, next: Partial<(typeof rows)[number]>) => setRows((all) => all.map((row, at) => at === index ? { ...row, ...next } : row));
+  const remove = (index: number) => {
+    if (busy) return;
+    void save({ limits: budgets.limits.slice(0, index).concat(budgets.limits.slice(index + 1)), warn_at: budgets.warn_at, version: budgets.version });
+  };
   const submit = () => {
     if (busy || !valid) return;
     const limits = budgets.limits.map((limit, index) => ({ ...limit,
@@ -66,6 +70,7 @@ function EditBudgets({ budgets, busy, save }: FormProps) {
       <label className="field">Spend at most, in {UNITS[limit.unit]}{limit.period ? ' per ' + PERIOD_WORDS[limit.period] : ''}
         <input name={'amount-' + index} type="number" min={0} max={limit.unit.includes('percent') ? 100 : undefined} step="any" required value={rows[index].amount} onChange={(event) => edit(index, { amount: event.target.value })} /></label>
       <label className="field">When it's hit<select name={'act-' + index} value={rows[index].act} onChange={(event) => edit(index, { act: event.target.value as BudgetAct })}>{Object.entries(ACT_WORDS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select></label>
+      <button className="btn" type="button" aria-label={'Remove ' + limitWords(limit)} onClick={() => remove(index)}>Remove this limit</button>
     </fieldset>)}
     <label className="field">Warn me at this % of a limit (leave blank for no warning)<input name="warn_at" type="number" min={0} max={100} step="any" value={warning} disabled={busy} onChange={(event) => setWarning(event.target.value)} /></label>
     <button className="btn primary" type="submit" disabled={busy || !valid}>Save these limits</button>
