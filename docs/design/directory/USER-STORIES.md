@@ -321,3 +321,7 @@
 **S175.** As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings.
 
 **S176.** As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me.
+
+## Person running Lys's tests on a shared machine — Runs the test suites on a laptop other seats also build on
+
+**S260.** As a person running Lys's tests on a shared machine, I want every process and folder a test makes to be gone when it ends, however it ends, so a killed or failing test never leaves work running for days.

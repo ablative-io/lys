@@ -1865,6 +1865,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The upgrade tests' fake services end with their test on every path, and a killed test's folder is swept by name (DIRECTORY-078)",
+      "items": [
+        {
+          "id": "C483",
+          "text": "A test's fake services end when its process ends, including SIGKILL. (DIRECTORY-078 R1).",
+          "done": false
+        },
+        {
+          "id": "C484",
+          "text": "A fake service the fixture cannot stop fails its test by name. (DIRECTORY-078 R1).",
+          "done": false
+        },
+        {
+          "id": "C485",
+          "text": "The folder a killed test leaves is swept and named the next time a Scratch is made. (DIRECTORY-078 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

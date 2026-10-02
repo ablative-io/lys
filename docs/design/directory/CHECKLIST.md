@@ -490,3 +490,9 @@
 - [ ] **C480** — An agent asks that person, and they answer once, for a while, ongoing or no. (DIRECTORY-077 R5).
 - [ ] **C481** — Grants can be one-time, and can be transferred and returned. (DIRECTORY-077 R6).
 - [ ] **C482** — Proven on Tom's live install with an agent Lys starts. (DIRECTORY-077 R7).
+
+## The upgrade tests' fake services end with their test on every path, and a killed test's folder is swept by name (DIRECTORY-078)
+
+- [ ] **C483** — A test's fake services end when its process ends, including SIGKILL. (DIRECTORY-078 R1).
+- [ ] **C484** — A fake service the fixture cannot stop fails its test by name. (DIRECTORY-078 R1).
+- [ ] **C485** — The folder a killed test leaves is swept and named the next time a Scratch is made. (DIRECTORY-078 R2).

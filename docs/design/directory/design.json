@@ -5384,6 +5384,21 @@
       "path": "docs/design/directory/briefs/DIRECTORY-077.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-077"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/scratch_hold_tests.rs",
+      "note": "the upgrade tests' hold: the FIFO a Scratch keeps open for its life, the owner it records, the sweep that names each folder it removes, and the tests that kill a Scratch's process",
+      "brief": "DIRECTORY-078"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-078.json",
+      "note": "the brief",
+      "brief": "DIRECTORY-078"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-078.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-078"
     }
   ],
   "inventory": [

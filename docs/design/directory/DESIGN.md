@@ -1176,6 +1176,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `docs/design/directory/DIRECTORY-077-PROOF.md` | created by DIRECTORY-077 R7 | DIRECTORY-077 |
 | `docs/design/directory/briefs/DIRECTORY-077.json` | the brief | DIRECTORY-077 |
 | `docs/design/directory/briefs/DIRECTORY-077.md` | rendered markdown | DIRECTORY-077 |
+| `crates/lys/src/identity/upgrade/scratch_hold_tests.rs` | the upgrade tests' hold: the FIFO a Scratch keeps open for its life, the owner it records, the sweep that names each folder it removes, and the tests that kill a Scratch's process | DIRECTORY-078 |
+| `docs/design/directory/briefs/DIRECTORY-078.json` | the brief | DIRECTORY-078 |
+| `docs/design/directory/briefs/DIRECTORY-078.md` | rendered markdown | DIRECTORY-078 |
 
 ## Inventory
 
