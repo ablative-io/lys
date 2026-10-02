@@ -142,8 +142,28 @@ fn an_agent_signed_event_round_trips_and_keeps_the_agent() -> TestResult {
         AuthMethod::AgentSignature(agent())
     );
     assert_eq!(actor.provenance().agent(), Some(agent()));
-    assert_eq!(actor.provenance().authenticated_at(), AUTHENTICATED_AT);
+    assert_eq!(
+        actor.provenance().authenticated_at(),
+        Some(AUTHENTICATED_AT)
+    );
     assert_ne!(decoded, by_oidc()?, "the method is part of the event");
+    Ok(())
+}
+
+#[test]
+fn a_pass_event_signs_and_keeps_the_run_without_a_time() -> TestResult {
+    let original = observed(Provenance::by_pass(agent(), "launch", "run")?)?;
+    let body = encode_body(&original);
+    assert_eq!(decode_body(&body)?, original);
+    let (key, _dir) = service_key(11)?;
+    let signed = sign_event(original.clone(), &key)?;
+    let read = verify_event(signed.bytes(), &key.public_key_bytes())?;
+    assert_eq!(read.event()?, &original);
+    assert_eq!(read.event()?.actor().provenance().authenticated_at(), None);
+    assert_eq!(
+        read.event()?.actor().provenance().run(),
+        Some(("launch", "run"))
+    );
     Ok(())
 }
 
@@ -164,7 +184,7 @@ fn an_oidc_method_that_names_an_agent_is_refused() -> TestResult {
 #[test]
 fn an_unassigned_method_is_refused() -> TestResult {
     for body in [encode_body(&by_oidc()?), encode_body(&by_agent()?)] {
-        refused_as_malformed(&with_method(body, 4)?, "method code");
+        refused_as_malformed(&with_method(body, 5)?, "method code");
     }
     Ok(())
 }

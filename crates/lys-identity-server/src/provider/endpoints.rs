@@ -100,6 +100,11 @@ pub(super) async fn authorize(
     let person = with_directory(&state, |directory| {
         crate::read_api::own_person(directory.projection()?, &session.actor)
     })?;
+    let authenticated_at = session
+        .actor
+        .provenance()
+        .authenticated_at()
+        .ok_or(ServerError::NotSignedIn)?;
     let code = random::<32>()?;
     let at = now();
     {
@@ -114,7 +119,7 @@ pub(super) async fn authorize(
                 challenge,
                 nonce: asked.nonce,
                 subject: person.to_string(),
-                authenticated_at: session.actor.provenance().authenticated_at(),
+                authenticated_at,
                 expires_at: at.saturating_add(provider.code_seconds),
                 sign_in_ends_at: session.ends_at,
                 used: false,

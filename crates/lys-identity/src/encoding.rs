@@ -176,7 +176,18 @@ pub(crate) fn actor(out: &mut Vec<u8>, value: &Actor) {
     uint(out, 3);
     uint(out, wire::method(provenance.method()));
     uint(out, 4);
-    uint(out, provenance.authenticated_at());
+    match provenance {
+        Provenance::Authenticated {
+            authenticated_at, ..
+        } => uint(out, *authenticated_at),
+        Provenance::AgentPass {
+            launch, session, ..
+        } => {
+            head(out, MAJOR_ARRAY, 2);
+            text(out, launch);
+            text(out, session);
+        }
+    }
     if let Some(principal) = principal {
         uint(out, 5);
         bytes(out, &principal);
@@ -382,15 +393,25 @@ pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, Identity
         ));
     }
     let method = wire::method_from(code, agent).map_err(malformed)?;
+    let provenance = match authenticated_at {
+        Value::Array(run) if code == 4 => {
+            let Ok([launch, session]) = <[Value; 2]>::try_from(run) else {
+                return Err(malformed("pass provenance is a launch and session pair"));
+            };
+            Provenance::by_pass(
+                agent.ok_or_else(|| malformed("pass provenance requires an agent"))?,
+                &as_text(launch, "a launch is text")?,
+                &as_text(session, "a session is text")?,
+            )?
+        }
+        time => Provenance::new(method, as_uint(&time, "an authentication time is seconds")?),
+    };
     Ok(Actor::new(
         LoginBinding::new(
             &as_text(issuer, "an actor's issuer is text")?,
             &as_text(subject, "an actor's subject is text")?,
         )?,
-        Provenance::new(
-            method,
-            as_uint(&authenticated_at, "an authentication time is seconds")?,
-        ),
+        provenance,
     ))
 }
 
