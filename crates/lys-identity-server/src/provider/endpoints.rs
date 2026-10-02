@@ -201,6 +201,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::AccountRefused { .. }
         | ServerError::SignInFailed { .. }
         | ServerError::ConfigInvalid { .. }
+        | ServerError::BootstrapInterrupted { .. }
         | ServerError::SecretsUnavailable { .. }
         | ServerError::SecretsRefused { .. }
         | ServerError::RequestsUnavailable { .. }

@@ -125,6 +125,12 @@ pub enum ServerError {
         /// What is wrong with it.
         reason: String,
     },
+    /// Recorded bootstrap authority requires an explicit administrator recovery.
+    #[error("BootstrapInterrupted: {reason}")]
+    BootstrapInterrupted {
+        /// The interruption and exact recovery requests.
+        reason: String,
+    },
     /// A request body or path is not one the route takes.
     #[error("RequestMalformed: {reason}")]
     RequestMalformed {

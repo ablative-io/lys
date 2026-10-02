@@ -7,7 +7,7 @@ use std::fs;
 use std::str::FromStr;
 
 use lys_identity::grants::{
-    Action, DelegateRequest, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window,
+    DelegateRequest, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window,
 };
 use lys_identity::{IdentityId, OperationId, ServiceAccountId};
 use sha2::{Digest, Sha256};
@@ -28,11 +28,7 @@ fn unavailable() -> ServerError {
     }
 }
 
-/// What the first model's `editor` carried, which the root recorded under
-/// it passes on.
-const FIRST_EDITOR: [&str; 2] = ["view", "edit"];
-
-fn operation(account: &str, label: &str) -> OperationId {
+pub(crate) fn operation(account: &str, label: &str) -> OperationId {
     let hash = Sha256::digest(format!("lys/import-bootstrap/v1/{account}/{label}"));
     let mut id = [0; 16];
     id.copy_from_slice(&hash[..16]);
@@ -137,32 +133,18 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
         })?;
     let Some(owner) = owner else { return Ok(()) };
     crate::grants::with_grants(state, |judged| {
+        if crate::import_bootstrap_state::recorded(&judged, account, owner, id)? {
+            return Ok(());
+        }
         let editor = Relation::new("editor")?;
         for collection in ["apps", "agents"] {
             let resource = Resource::new("directory", collection)?;
-            // An install first brought forward under the first model replays
-            // exactly what it recorded then: the same operations and the
-            // same pass_on, so every grant it holds, or had revoked, stands
-            // as recorded and nothing new is issued. A later install's root
-            // passes on what its model's `editor` carries, under operations
-            // of their own.
-            let first = operation(account, &format!("{collection}/root"));
-            let (version, carried) = if judged.grants.book().operation(first).is_some() {
-                (
-                    String::new(),
-                    FIRST_EDITOR
-                        .iter()
-                        .map(|action| Action::new(action))
-                        .collect::<Result<_, _>>()?,
-                )
-            } else {
-                let model = judged.grants.model();
-                let version = match model.version() {
-                    1 => String::new(),
-                    later => format!("/v{later}"),
-                };
-                (version, model.actions(&editor)?.clone())
+            let model = judged.grants.model();
+            let version = match model.version() {
+                1 => String::new(),
+                later => format!("/v{later}"),
             };
+            let carried = model.actions(&editor)?.clone();
             let root = judged
                 .grants
                 .issue_root(
