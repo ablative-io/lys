@@ -111,6 +111,7 @@ pub mod launch_template;
 pub mod link_audit_api;
 pub mod list_page;
 mod mcp_approval_sight;
+mod mcp_callers;
 mod mcp_endpoint;
 mod mcp_oauth;
 mod mcp_oauth_store;

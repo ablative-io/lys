@@ -246,11 +246,11 @@ async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Res
             )
         };
     }
-    let signer = match signer(&endpoint, &parts, &bytes) {
+    let signer = match crate::mcp_callers::signer(endpoint.state.as_ref(), &parts, &bytes) {
         Ok(signer) => signer,
         Err(error) => return error.into_response(),
     };
-    let app = match connected_app(&endpoint, &parts) {
+    let app = match crate::mcp_callers::connected_app(endpoint.apps.as_deref(), &parts) {
         Ok(app) => app,
         Err(error) => return error.into_response(),
     };
@@ -341,72 +341,11 @@ struct Arguments {
     body: Option<Value>,
 }
 
-/// The agent that signed this MCP message, verified once over the message
-/// exactly as it arrived; none when it carries no signature.
-fn signer(
-    endpoint: &Endpoint,
-    parts: &axum::http::request::Parts,
-    bytes: &[u8],
-) -> Result<Option<lys_identity::AgentId>, ServerError> {
-    if !parts.headers.contains_key(crate::agent_signature::HEADER) {
-        return Ok(None);
-    }
-    let state = endpoint
-        .state
-        .as_ref()
-        .ok_or(ServerError::AgentSignatureRefused {
-            reason: "MCP has no signature authority state",
-        })?;
-    let path = parts.uri.path();
-    let path = path.strip_prefix("/api").unwrap_or(path);
-    crate::routes::with_directory(state, |directory| {
-        crate::agent_signature::signed_agent(
-            state,
-            directory.projection()?,
-            &parts.headers,
-            ("POST", path, bytes),
-        )
-    })
-}
-
-/// The agent and app a connected app's bearer token names, refused when the
-/// token travels with any other credential.
-fn connected_app(
-    endpoint: &Endpoint,
-    parts: &axum::http::request::Parts,
-) -> Result<Option<(lys_identity::AgentId, String)>, ServerError> {
-    let Some(apps) = endpoint.apps.as_deref() else {
-        return Ok(None);
-    };
-    let Some(app) = apps.bearer(&parts.headers)? else {
-        return Ok(None);
-    };
-    if [
-        header::COOKIE,
-        header::HeaderName::from_static(crate::agent_signature::HEADER),
-        header::HeaderName::from_static(crate::agent_pass::HEADER),
-        header::HeaderName::from_static(crate::grant_tokens::HEADER),
-    ]
-    .iter()
-    .any(|name| parts.headers.contains_key(name))
-    {
-        return Err(ServerError::AgentSignatureRefused {
-            reason: "a connected app's token cannot carry another credential",
-        });
-    }
-    Ok(Some(app))
-}
-
-type Callers = (
-    Option<lys_identity::AgentId>,
-    Option<(lys_identity::AgentId, String)>,
-);
-
 async fn call(
     endpoint: &Endpoint,
     mut parts: axum::http::request::Parts,
     params: &Value,
-    (signer, app): Callers,
+    (signer, app): crate::mcp_callers::Callers,
 ) -> ResultValue {
     let call: Call = serde_json::from_value(params.clone())
         .map_err(|error| (-32602, format!("invalid tool call: {error}")))?;
