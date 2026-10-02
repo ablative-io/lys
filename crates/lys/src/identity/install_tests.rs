@@ -11,6 +11,7 @@ use super::log_wait;
 use super::server_config;
 use super::services;
 use super::surface;
+use super::{Profile, operator_token};
 use crate::identity::config::DeploymentConfig;
 use crate::identity::error::ErrorKind;
 use crate::identity::private_files;
@@ -587,6 +588,139 @@ fn the_service_is_given_the_password_policy_the_deployment_states() -> Result<()
     assert_eq!(
         crate::identity::configure::issuer_policy(&config.password_policy)["include_digits"],
         2
+    );
+    Ok(())
+}
+
+#[test]
+fn the_profile_decides_whether_the_configuration_names_an_operator_token()
+-> Result<(), Box<dyn Error>> {
+    let home = tempfile::tempdir()?;
+    let root = home.path().join("lys");
+    let layout = Layout::at(root.clone());
+    let config = DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root)?;
+    let service =
+        server_config::render(&layout, &config, &server_config::Carried::default(), false);
+    assert_eq!(service["profile"], "service");
+    assert!(service["operator_token_file"].is_null(), "{service}");
+    let carried = server_config::Carried {
+        profile: Some(Profile::Development),
+        ..server_config::Carried::default()
+    };
+    let development = server_config::render(&layout, &config, &carried, false);
+    assert_eq!(development["profile"], "development");
+    let token = development["operator_token_file"]
+        .as_str()
+        .ok_or("no operator token path")?;
+    assert!(Path::new(token).starts_with(home.path()), "{token}");
+    assert!(token.ends_with(server_config::OPERATOR_TOKEN_FILE));
+    assert_eq!(
+        Profile::from_word("development"),
+        Some(Profile::Development)
+    );
+    assert_eq!(Profile::from_word("service"), Some(Profile::Service));
+    assert_eq!(Profile::from_word("dev"), None);
+    Ok(())
+}
+
+#[test]
+fn an_earlier_configuration_is_read_as_the_profile_it_has_been() -> Result<(), Box<dyn Error>> {
+    let home = tempfile::tempdir()?;
+    let layout = Layout::at(home.path().join("lys"));
+    std::fs::create_dir_all(layout.service_config().parent().ok_or("no parent")?)?;
+    let token = home.path().join("operator-token");
+    let write = |configuration: serde_json::Value| -> Result<(), Box<dyn Error>> {
+        private_files::write(
+            &layout.service_config(),
+            &serde_json::to_vec(&configuration)?,
+        )?;
+        Ok(())
+    };
+    let named = |file: &Path| serde_json::json!({"listen": "127.0.0.1:1", "operator_token_file": file.display().to_string()});
+
+    assert!(
+        server_config::carried(&layout)?.is_none(),
+        "no configuration yet"
+    );
+    std::fs::write(&token, "operator-token-fixture-0123456789abcdef")?;
+    write(named(&token))?;
+    let carried = server_config::carried(&layout)?.ok_or("no carried")?;
+    assert_eq!(
+        carried.profile,
+        Some(Profile::Development),
+        "a standing token: development"
+    );
+
+    std::fs::remove_file(&token)?;
+    write(named(&token))?;
+    let carried = server_config::carried(&layout)?.ok_or("no carried")?;
+    assert_eq!(
+        carried.profile,
+        Some(Profile::Service),
+        "no token stands: service"
+    );
+
+    write(
+        serde_json::json!({"listen": "127.0.0.1:1", "profile": "service", "operator_token_file": null}),
+    )?;
+    assert_eq!(
+        server_config::carried(&layout)?
+            .ok_or("no carried")?
+            .profile,
+        Some(Profile::Service)
+    );
+    write(serde_json::json!({"listen": "127.0.0.1:1", "profile": "development"}))?;
+    assert_eq!(
+        server_config::carried(&layout)?
+            .ok_or("no carried")?
+            .profile,
+        Some(Profile::Development)
+    );
+
+    write(serde_json::json!({"listen": "127.0.0.1:1", "profile": "dev"}))?;
+    let refused = server_config::carried(&layout)
+        .err()
+        .ok_or("an unknown profile word was read")?;
+    assert_eq!(refused.kind(), ErrorKind::ConfigInvalid);
+    assert!(refused.to_string().contains("dev"), "{refused}");
+    Ok(())
+}
+
+#[test]
+fn the_operator_token_follows_the_profile_and_says_what_it_did() -> Result<(), Box<dyn Error>> {
+    let home = tempfile::tempdir()?;
+    let root = home.path().join("lys");
+    let config = DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root)?;
+    std::fs::create_dir_all(config.state_dir())?;
+    let path = config.state_dir().join(server_config::OPERATOR_TOKEN_FILE);
+    let mut said = Vec::new();
+    let mut say = |line: &str| said.push(line.to_owned());
+
+    operator_token(&config, Profile::Service, &mut say)?;
+    assert!(!path.exists(), "a service install makes no token");
+    operator_token(&config, Profile::Development, &mut say)?;
+    assert!(path.is_file(), "a development install makes one");
+    assert_eq!(
+        std::fs::metadata(&path)?.permissions().mode() & 0o777,
+        0o600
+    );
+    let made = std::fs::read(&path)?;
+    operator_token(&config, Profile::Development, &mut say)?;
+    assert_eq!(
+        std::fs::read(&path)?,
+        made,
+        "a standing token is kept, not remade"
+    );
+    operator_token(&config, Profile::Service, &mut say)?;
+    assert!(!path.exists(), "a service install removes a standing token");
+    operator_token(&config, Profile::Service, &mut say)?;
+    assert_eq!(
+        said,
+        [
+            "operator token made: development profile",
+            "operator token removed: a service install keeps none"
+        ],
+        "said once for each change and never otherwise"
     );
     Ok(())
 }

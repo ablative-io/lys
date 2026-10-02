@@ -434,6 +434,7 @@ impl Service {
             redirect_url: format!("{base}/callback"),
             sign_in_api: Some(issuer.api().to_owned()),
             trusted_proxies: Vec::new(),
+            profile: lys_identity_server::config::Profile::Service,
             operator_token_file: None,
             operator_upgrade_file: None,
             administrator: Some(configured(ADMINISTRATOR)),

@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 
+use super::install::Profile;
+
 /// `lys identity` subcommands: install the standalone identity product's
 /// dependencies for development and check them.
 #[derive(Debug, Subcommand)]
@@ -75,6 +77,12 @@ pub enum IdentityCommand {
         /// every later install and upgrade until another file replaces it.
         #[arg(long)]
         message_service: Option<PathBuf>,
+        /// Which kind of install this is: `service`, which keeps no operator
+        /// token, so nothing on disk can act as the administrator; or
+        /// `development`, which keeps one for the person developing on it.
+        /// Absent, an earlier install's profile is kept, else service.
+        #[arg(long, value_enum)]
+        profile: Option<Profile>,
     },
 
     /// Upgrade a running install to the binaries in a folder, run with the

@@ -26,12 +26,31 @@ pub struct ConfiguredLogin {
     pub subject: String,
 }
 
+/// What kind of install this is. A service install keeps no standing
+/// credential on disk: nothing under the owning account's login can act as
+/// the administrator without signing in. A development install keeps the
+/// operator token (Tom, 3 Oct 2026: "not just like a dev install, but like
+/// a particular profile"), and every act made with it is recorded as made
+/// with the operator token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Profile {
+    /// The install people depend on: no operator token.
+    #[default]
+    Service,
+    /// An install being developed on: the operator token is kept and read.
+    Development,
+}
+
 /// Everything the service is started with.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     /// Where the service listens.
     pub listen: SocketAddr,
+    /// Which kind of install this is; a service install when unsaid.
+    #[serde(default)]
+    pub profile: Profile,
     /// The directory the event log is kept in.
     pub log_dir: PathBuf,
     /// The log's origin, used when the log is created.
@@ -59,9 +78,10 @@ pub struct Config {
     /// socket peers alone. These are distinct from the issuer's proxies.
     #[serde(default)]
     pub trusted_proxies: Vec<std::net::IpAddr>,
-    /// The file holding the install's operator token. A request carrying it
-    /// in the `lys-operator` header acts as the administrator, recorded as
-    /// authenticated by the operator token. Without it no request may.
+    /// The file holding the install's operator token, read only under the
+    /// development profile; a service install that names one is refused at
+    /// start. A request carrying it in the `lys-operator` header acts as the
+    /// administrator, recorded as authenticated by the operator token.
     #[serde(default)]
     pub operator_token_file: Option<PathBuf>,
     /// An installer upgrade intent blocks operator authority until rollback is

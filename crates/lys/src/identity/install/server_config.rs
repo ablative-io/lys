@@ -71,6 +71,10 @@ pub struct Carried {
     pub issuer: Option<String>,
     /// The issuer move an earlier configuration handed over.
     pub issuer_moved_from: Option<String>,
+    /// The profile an earlier configuration named; one from before profiles
+    /// existed is read as what it has been: development when it names an
+    /// operator token that stands, else service.
+    pub profile: Option<super::Profile>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -101,7 +105,11 @@ pub fn render(
         "log_dir": dir("directory-log"),
         "log_origin": LOG_ORIGIN,
         "event_key_file": layout.service_key().display().to_string(),
-        "operator_token_file": state.join(OPERATOR_TOKEN_FILE).display().to_string(),
+        "profile": carried.profile.unwrap_or_default().word(),
+        "operator_token_file": match carried.profile.unwrap_or_default() {
+            super::Profile::Development => Value::String(state.join(OPERATOR_TOKEN_FILE).display().to_string()),
+            super::Profile::Service => Value::Null,
+        },
         "operator_upgrade_file": layout.upgrade_intent().display().to_string(),
         "import_credential_file": super::super::import::credential_path(layout).display().to_string(),
         "issuer": issuer,
@@ -225,6 +233,26 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
         issuer: named(earlier.get("issuer")).and_then(|issuer| issuer.as_str().map(str::to_owned)),
         issuer_moved_from: named(earlier.get("issuer_moved_from"))
             .and_then(|issuer| issuer.as_str().map(str::to_owned)),
+        profile: Some(if let Some(word) = named(earlier.get("profile")) {
+            word.as_str()
+                .and_then(super::Profile::from_word)
+                .ok_or_else(|| {
+                    IdentityError::new(
+                        ErrorKind::ConfigInvalid,
+                        "read",
+                        "identity.json",
+                        format!("profile {word} is neither service nor development"),
+                    )
+                    .at(&path)
+                })?
+        } else if named(earlier.get("operator_token_file"))
+            .and_then(|file| file.as_str().map(|file| Path::new(file).is_file()))
+            .unwrap_or(false)
+        {
+            super::Profile::Development
+        } else {
+            super::Profile::Service
+        }),
     }))
 }
 

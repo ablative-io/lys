@@ -93,7 +93,8 @@ export interface Refusal {
 export interface Receipt {
   version: number;
   operation: string;
-  actor: { issuer: string; subject: string; authenticated_at: number };
+  /** `ReceiptActorView`: `authentication` says how the actor authenticated when it was not their own sign-in, e.g. `operator`. */
+  actor: { issuer: string; subject: string; authenticated_at: number; authentication?: string };
   identity: IdentityId;
   change_kind: number;
   payload_commitment: string;

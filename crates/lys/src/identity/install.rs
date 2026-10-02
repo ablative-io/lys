@@ -55,11 +55,46 @@ pub mod surface;
 
 use layout::{BINARIES, Layout};
 
+/// Which kind of install this is. A service install keeps no operator token:
+/// nothing on disk can act as the administrator. A development install keeps
+/// one for the person developing on it (Tom, 3 Oct 2026: "not just like a
+/// dev install, but like a particular profile").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+pub enum Profile {
+    /// The install people depend on.
+    #[default]
+    Service,
+    /// An install being developed on.
+    Development,
+}
+
+impl Profile {
+    /// The word the service's configuration carries.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Service => "service",
+            Self::Development => "development",
+        }
+    }
+
+    /// The profile a configuration's word names; none for any other word.
+    pub fn from_word(word: &str) -> Option<Self> {
+        match word {
+            "service" => Some(Self::Service),
+            "development" => Some(Self::Development),
+            _ => None,
+        }
+    }
+}
+
 /// What the operator chose.
 #[derive(Debug)]
 pub struct Options {
     /// The data root; the platform's application data path when absent.
     pub root: Option<PathBuf>,
+    /// Which kind of install this is; absent, an earlier install's profile
+    /// is kept, else service.
+    pub profile: Option<Profile>,
     /// For an unattended install, the administrator's email: the only one
     /// the setup page then takes. Never read from the machine.
     pub admin_email: Option<String>,
@@ -214,20 +249,41 @@ pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResul
 pub fn server_keys(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     provider_key(config)?;
     service_key(layout)?;
-    operator_token(config)?;
     super::import::prepare_credential(layout)?;
     Ok(())
 }
 
-/// The install's operator token, made once and kept owner-only.
-fn operator_token(config: &DeploymentConfig) -> IdentityResult<()> {
+/// The install's operator token: under the development profile, made once
+/// and kept owner-only; under the service profile, removed if one stands,
+/// so nothing on disk can act as the administrator. Says what it did.
+fn operator_token(
+    config: &DeploymentConfig,
+    profile: Profile,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<()> {
     let path = config.state_dir().join(server_config::OPERATOR_TOKEN_FILE);
-    if path.exists() {
-        return Ok(());
+    match (profile, path.exists()) {
+        (Profile::Development, true) | (Profile::Service, false) => Ok(()),
+        (Profile::Development, false) => {
+            let token = setup_code::generate();
+            private_files::write(&path, token.expose().as_bytes())?;
+            say("operator token made: development profile");
+            Ok(())
+        }
+        (Profile::Service, true) => {
+            std::fs::remove_file(&path).map_err(|error| {
+                IdentityError::new(
+                    ErrorKind::PrivateFileIo,
+                    "remove",
+                    "operator token",
+                    error.to_string(),
+                )
+                .at(&path)
+            })?;
+            say("operator token removed: a service install keeps none");
+            Ok(())
+        }
     }
-    let token = setup_code::generate();
-    private_files::write(&path, token.expose().as_bytes())?;
-    Ok(())
 }
 
 /// Runs `lys identity install`. A failure is said in Lys's words, because
@@ -313,6 +369,10 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     )?;
     let mut carried = server_config::carried(&layout)?.unwrap_or_default();
     carried.ports = ports;
+    let profile = options.profile.or(carried.profile).unwrap_or_default();
+    carried.profile = Some(profile);
+    emitter.note(&format!("profile: {}", profile.word()));
+    operator_token(&config, profile, &mut |line| emitter.note(line))?;
     if let Some(path) = &options.message_service {
         carried.message_service = Some(server_config::messages_from(path)?);
         emitter.note("message service connection kept");

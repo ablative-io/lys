@@ -1,9 +1,11 @@
 //! The install's operator token: a secret in the install's state folder,
-//! readable only by the account that owns the install, which already holds
-//! every credential the administrator's power rests on. A request carrying
-//! it in the `lys-operator` header acts as the administrator, and every
-//! record it writes names the operator token as how it was authenticated,
-//! so the log never says a sign-in took place when none did.
+//! readable by every process under the account that owns the install. A
+//! request carrying it in the `lys-operator` header acts as the
+//! administrator, and every record it writes names the operator token as
+//! how it was authenticated, so the log never says a sign-in took place
+//! when none did. Only a development install keeps one: on a service
+//! install nothing on disk may act as the administrator, so a configured
+//! token is refused at start rather than read.
 
 use std::path::Path;
 
@@ -11,7 +13,7 @@ use axum::http::HeaderMap;
 use lys_identity::{Actor, AuthMethod, Provenance};
 use zeroize::Zeroizing;
 
-use crate::config::Config;
+use crate::config::{Config, Profile};
 use crate::error::ServerError;
 use crate::routes::AppState;
 use crate::session::now;
@@ -23,16 +25,35 @@ pub const HEADER: &str = "lys-operator";
 const TOKEN_MIN: usize = 32;
 
 /// The token the configuration names, read once at start; none when it
-/// names no file.
+/// names no file. A service install that names one is refused: it keeps no
+/// standing credential.
 pub fn token(
     config: &Config,
     say: &dyn Fn(&str),
 ) -> Result<Option<Zeroizing<String>>, ServerError> {
-    config
-        .operator_token_file
-        .as_deref()
-        .map(|path| read(path, say))
-        .transpose()
+    token_at(config.profile, config.operator_token_file.as_deref(), say)
+}
+
+/// The token at `path` under `profile`: read under development; refused
+/// under service, which keeps no standing credential; none without a path.
+fn token_at(
+    profile: Profile,
+    path: Option<&Path>,
+    say: &dyn Fn(&str),
+) -> Result<Option<Zeroizing<String>>, ServerError> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    match profile {
+        Profile::Development => read(path, say).map(Some),
+        Profile::Service => Err(ServerError::ConfigInvalid {
+            reason: format!(
+                "a service install keeps no operator token, and the configuration names {}: \
+                 remove operator_token_file, or set profile to development",
+                path.display()
+            ),
+        }),
+    }
 }
 
 fn read(path: &Path, say: &dyn Fn(&str)) -> Result<Zeroizing<String>, ServerError> {

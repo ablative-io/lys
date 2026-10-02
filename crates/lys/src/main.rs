@@ -75,9 +75,11 @@ fn main() -> ExitCode {
                 admin_email,
                 surface,
                 message_service,
+                profile,
             } => identity::install::run(
                 &identity::install::Options {
                     root,
+                    profile,
                     admin_email,
                     surface,
                     message_service,

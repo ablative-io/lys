@@ -93,6 +93,10 @@ pub(crate) fn receipt_view(receipt: &Receipt) -> DirectoryReceiptView {
                         .provenance()
                         .service_account()
                         .map(|_| "service_account_bearer".to_owned())
+                })
+                .or_else(|| {
+                    (actor.provenance().method() == lys_identity::AuthMethod::Operator)
+                        .then(|| "operator".to_owned())
                 }),
             service_account: actor
                 .provenance()

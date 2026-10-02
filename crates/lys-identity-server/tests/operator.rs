@@ -37,6 +37,8 @@ async fn service_with_broker(
                     service: "identity".to_owned(),
                     service_key_file: config.event_key_file.clone(),
                 });
+            // A token is only read on a development install.
+            config.profile = lys_identity_server::config::Profile::Development;
             config.operator_token_file = Some(config.log_dir.with_file_name("operator.token"));
             config.operator_upgrade_file = Some(config.log_dir.with_file_name("upgrade.json"));
             if !administrator {

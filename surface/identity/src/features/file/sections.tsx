@@ -167,7 +167,7 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
                   <div className="when">{clock(r.receipt.actor.authenticated_at)}</div>
                   <div>
                     {CHANGE_KINDS[r.receipt.change_kind] ?? 'change ' + r.receipt.change_kind}
-                    <span className="note"> · by {r.receipt.actor.subject}</span>
+                    <span className="note"> · by {r.receipt.actor.subject}{r.receipt.actor.authentication === 'operator' ? ', with the operator token' : ''}</span>
                   </div>
                 </div>
               ))}

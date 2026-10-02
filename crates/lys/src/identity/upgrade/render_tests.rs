@@ -168,6 +168,7 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
         trusted_proxies: None,
         issuer: None,
         issuer_moved_from: None,
+        profile: None,
     };
     let expected = server_config::render(&layout, &config, &carried, true);
     let service = file("identity.json")?;
