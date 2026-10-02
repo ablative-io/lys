@@ -5,23 +5,6 @@ import { operationId, Refused, request } from '../../api';
 import { confirmRunner, matchesMachine, savedMachine } from './contract';
 import type { Machine, PendingMachine } from './contract';
 
-export async function recordComputer(initial: PendingMachine, person: string, keep: (next: PendingMachine) => void): Promise<Machine> {
-  let current = initial;
-  keep(current);
-  if (current.phase === 'machine') {
-    const result = await request<unknown>('/network/machines', current.body);
-    if (!matchesMachine(result, current.body, person)) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The answer did not confirm this computer was added. What you entered is kept.' });
-    current = { ...current, machine: result, phase: current.legacy ? 'read-runner' : 'runner' }; keep(current);
-  }
-  const path = '/network/machines/' + encodeURIComponent(current.body.operation) + '/runner';
-  const runner = await request<unknown>(path, current.phase === 'runner' ? { runner: { kind: 'lys' } } : undefined);
-  confirmRunner(runner, current.body.operation, !current.legacy);
-  if (!current.machine) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The recorded computer is missing from this pending addition.' });
-  return current.machine;
-}
-
-export const validComputerName = (name: string): boolean => Boolean(name) && name.length <= 100 && !/[\u0000-\u001f\u007f]/.test(name);
-
 export function AddMachine({ person, agent, changed, cancel }: {
   person: string; agent?: string; changed: (message: string, machine: Machine) => void; cancel: () => void;
 }) {
@@ -40,9 +23,18 @@ export function AddMachine({ person, agent, changed, cancel }: {
     working.current = true; setBusy(true); setFailure('');
     let current = initial;
     try {
-      const machine = await recordComputer(initial, person, (next) => { current = next; keep(next); });
+      keep(current);
+      if (current.phase === 'machine') {
+        const result = await request<unknown>('/network/machines', current.body);
+        if (!matchesMachine(result, current.body, person)) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The answer did not confirm this computer was added. What you entered is kept.' });
+        current = { ...current, machine: result, phase: current.legacy ? 'read-runner' : 'runner' }; keep(current);
+      }
+      const path = '/network/machines/' + encodeURIComponent(current.body.operation) + '/runner';
+      const runner = await request<unknown>(path, current.phase === 'runner' ? { runner: { kind: 'lys' } } : undefined);
+      confirmRunner(runner, current.body.operation, !current.legacy);
+      if (!current.machine) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The recorded computer is missing from this pending addition.' });
       sessionStorage.removeItem(key); setPending(null);
-      changed(current.body.name + ' was added. Its runner is recorded.', machine);
+      changed(current.body.name + ' was added. Its runner is recorded.', current.machine);
     } catch (error) {
       if (!retry && current.phase === 'machine' && error instanceof Refused && error.status >= 400 && error.status < 500 && error.refusal.refusal !== 'Unanswered') {
         sessionStorage.removeItem(key); setPending(null);
@@ -54,7 +46,7 @@ export function AddMachine({ person, agent, changed, cancel }: {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (pending || working.current || restored.error) return;
     const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
-    if (!validComputerName(name)) { setFailure('Give this computer a name of 1 to 100 characters without control characters.'); return; }
+    if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) { setFailure('Give this computer a name of 1 to 100 characters without control characters.'); return; }
     if (agent !== undefined && !/^agent-[0-9a-f]{32}$/.test(agent)) { setFailure('AgentIdentifierMalformed: the agent for this addition could not be read.'); return; }
     void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null });
   };

@@ -34,10 +34,7 @@ export function confirmAdmission(value: unknown, machine: string, body: MachineA
 }
 
 export async function machineAdmissionServed(): Promise<boolean> {
-  return machineAdmissionOf(await request<unknown>('/openapi.json'));
-}
-
-export function machineAdmissionOf(document: unknown): boolean {
+  const document = await request<unknown>('/openapi.json');
   if (!isRecord(document) || !isRecord(document.paths)) return refused('MachineAdmissionSchemaUnreadable', 'The served route descriptions could not be read.');
   const route = document.paths['/network/machines/{id}/agents'];
   if (route === undefined) return false;

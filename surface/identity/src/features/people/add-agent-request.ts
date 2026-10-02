@@ -13,10 +13,7 @@ function mismatch(words: string): never { throw new Refused(200, { refusal: 'Unc
 export function readAgentRequest(key: string): PendingAgent | null {
   const saved = sessionStorage.getItem(key);
   if (saved === null) return null;
-  return agentRequestOf(JSON.parse(saved));
-}
-
-export function agentRequestOf(value: unknown): PendingAgent {
+  const value: unknown = JSON.parse(saved);
   if (!object(value) || typeof value.name !== 'string' || !value.name.trim()
     || !operation(value.register) || !operation(value.activate)
     || !(value.agent === null || (typeof value.agent === 'string' && /^agent-[0-9a-f]{32}$/.test(value.agent)))) {

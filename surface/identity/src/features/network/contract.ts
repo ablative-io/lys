@@ -35,17 +35,13 @@ function machineBody(value: unknown): NameMachine {
     || !(value.runtime === null || typeof value.runtime === 'string') || typeof value.slots !== 'number' || !Number.isInteger(value.slots) || value.slots < 0
     || !strings(value.may_run) || !strings(value.may_reach) || (value.may_run_roles !== undefined && !strings(value.may_run_roles))) return unreadable();
   return { operation: value.operation, name: value.name, kind: value.kind, runtime: value.runtime, slots: value.slots,
-    may_run: value.may_run, ...(value.may_run_roles !== undefined ? { may_run_roles: value.may_run_roles } : {}), may_reach: value.may_reach };
+    may_run: value.may_run, may_reach: value.may_reach, ...(value.may_run_roles !== undefined ? { may_run_roles: value.may_run_roles } : {}) };
 }
 export function savedMachine(key: string): PendingMachine | null {
   const raw = sessionStorage.getItem(key);
   if (raw === null) return null;
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return unreadable(); }
-  return pendingMachineOf(value);
-}
-
-export function pendingMachineOf(value: unknown): PendingMachine | null {
   if (isRecord(value) && 'body' in value) {
     if (value.version !== 1 || !['machine', 'runner', 'read-runner'].includes(String(value.phase)) || typeof value.legacy !== 'boolean'
       || (value.phase === 'runner' && value.legacy) || (value.phase === 'read-runner' && !value.legacy)) return unreadable();
