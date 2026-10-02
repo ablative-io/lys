@@ -74,11 +74,58 @@ fn absent(path: &Path) -> std::io::Result<bool> {
 }
 
 fn missing_targets(paths: Vec<(&str, PathBuf)>) -> std::io::Result<Vec<(&str, PathBuf)>> {
-    let mut missing = false;
-    for (_, target) in &paths {
-        missing |= absent(target)?;
+    let mut missing = Vec::with_capacity(paths.len());
+    for (name, target) in paths {
+        if absent(&target)? {
+            missing.push((name, target));
+        }
     }
-    if missing { Ok(paths) } else { Ok(Vec::new()) }
+    Ok(missing)
+}
+
+fn build_stores(paths: &[(&str, PathBuf)], stores: &Path, config: &Config) -> Result<(), Failure> {
+    let lanes = paths.len().min(4);
+    let mut failures = Vec::new();
+    std::thread::scope(|scope| {
+        let mut workers = Vec::with_capacity(lanes);
+        for lane in 0..lanes {
+            let worker = std::thread::Builder::new()
+                .name(format!("fixture-store-{lane}"))
+                .spawn_scoped(scope, move || {
+                    let mut failures = Vec::new();
+                    for (name, _) in paths.iter().skip(lane).step_by(lanes) {
+                        if let Err(error) = template_stores::build(name, &stores.join(name), config)
+                        {
+                            failures.push(format!("service_template_store_failed {name}: {error}"));
+                        }
+                    }
+                    failures
+                });
+            match worker {
+                Ok(worker) => {
+                    workers.push(worker);
+                }
+                Err(error) => {
+                    failures.push(format!("service_template_worker_start_failed: {error}"));
+                }
+            }
+        }
+        for worker in workers {
+            match worker.join() {
+                Ok(errors) => {
+                    failures.extend(errors);
+                }
+                Err(error) => {
+                    failures.push(format!("service_template_worker_panicked: {error:?}"));
+                }
+            }
+        }
+    });
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("; ").into())
+    }
 }
 
 pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
@@ -111,9 +158,7 @@ pub(crate) fn restore(config: &Config) -> Result<(), Failure> {
             .tempdir_in(&cache)?;
         let stores = stage.path().join("stores");
         fs::create_dir(&stores)?;
-        for (name, _) in &paths {
-            template_stores::build(name, &stores.join(name), config)?;
-        }
+        build_stores(&paths, &stores, config)?;
         let files = template_files::inventory(&stores)?;
         fs::write(
             stage.path().join("manifest.json"),
