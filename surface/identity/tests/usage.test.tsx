@@ -101,7 +101,9 @@ describe('Usage', () => {
     expect(requests).toContain('PUT ' + budgets);
     expect(text()).toContain('Budget kept as version 1.');
     await reload(routes);
-    expect($('section[aria-label="Budgets"] table')?.textContent).toContain('5000');
+    expect($('section[aria-label="Budgets"] table')?.textContent).toContain('5,000 tokens a day');
+    expect($('.usage-summary')?.textContent).toBe('Tells you at 5,000 tokens a day.');
+    expect(text()).not.toMatch(/time zone|Measure|Counted each/);
   });
 
   it('keeps a goal entered in the screen across a reload', async () => {
@@ -146,7 +148,7 @@ describe('Usage', () => {
     await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens], {
       used: [{ unit: 'tokens', period: 'day', figure: null, since_ms: 0, unavailable: 'runner token report is missing' }],
     })) });
-    expect($('section[aria-label="Budgets"] tbody tr')?.children[4]?.textContent).toBe('Unavailable: runner token report is missing');
+    expect($('section[aria-label="Budgets"] tbody tr')?.children[3]?.textContent).toBe('Unavailable: runner token report is missing');
   });
 
   it('matches a receipt to its own limit and excludes warning receipts', async () => {
@@ -158,8 +160,8 @@ describe('Usage', () => {
       used: limits.map(() => ({ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null })),
     })) });
     const rows = document.querySelectorAll('section[aria-label="Budgets"] tbody tr');
-    expect(rows[0]?.children[4]?.textContent).toContain('Its act was confirmed');
-    expect(rows[1]?.children[4]?.textContent).toBe('Held: not reached.');
+    expect(rows[0]?.children[3]?.textContent).toContain('Its act was confirmed');
+    expect(rows[1]?.children[3]?.textContent).toBe('Held: not reached.');
   });
 
   it('says in plain words that a budget was reached and its act confirmed', async () => {
