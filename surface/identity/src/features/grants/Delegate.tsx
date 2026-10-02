@@ -1,5 +1,7 @@
+import { ActionPicker, singleActionCarriers } from './ActionPicker';
+import { agentOffer } from './agent-actions';
 import { actionWords } from './action-words';
-import { pendingGrantKey, readPendingGrant } from './pendingGrant';
+import { pendingGrantKey, readPendingGrant, readPendingRest, restKey } from './pendingGrant';
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
 import type { DelegateBody, Grant, PassOn } from '../../generated/grants';
@@ -44,13 +46,23 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
   const [recipient, setRecipient] = useState(to ?? agents[0]?.[0] ?? '');
   const [relation, setRelation] = useState(fits.find(([r]) => r === 'viewer')?.[0] ?? fits.at(-1)?.[0] ?? '');
+  const [picked, setPicked] = useState<string[]>([]);
   const [lasts, setLasts] = useState('7 days');
   const [pass, setPass] = useState('no');
   const [outcome, setOutcome] = useState<Outcome>({ at: 'editing' });
   const key = pendingGrantKey(me, source.id);
   const [pending, setPending] = useState(() => readPendingGrant(key, me, source.id));
+  const [rest, setRest] = useState(() => readPendingRest(key, me, source.id));
   const working = useRef(false);
+  const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const locked = pending.kind !== 'empty' || outcome.at === 'sending';
+  const toAgent = w.who.get(recipient)?.kind !== 'person';
+  // An agent is offered one action at a time, never a wider relation: what the source may pass on, less what the service withholds from agents.
+  const passable = source.pass_on.kind === 'to' ? source.actions.filter((action) => (source.pass_on as { actions: string[] }).actions.includes(action)) : [];
+  const offer = agentOffer(w.model, source.resource.kind, passable);
+  // The relation that carries one action alone, as the picker itself names it; an action with no such carrier is never offered.
+  const carriers = singleActionCarriers(w.model);
+  const carried = offer.offered.filter((action) => carriers.has(action));
   const actions = relations.find(([r]) => r === relation)?.[1] ?? [];
   const onward = source.pass_on.kind === 'to' && source.pass_on.recipients.includes('agent');
   const ends = source.window.ends_at;
@@ -66,15 +78,21 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
     return ends;
   };
 
-  const give = async () => {
-    if (working.current || pending.kind === 'damaged') return;
-    working.current = true;
-    const retry = pending.kind === 'held';
-    const passOn: PassOn = pass === 'no' ? { kind: 'use_only' } : { kind: 'to', actions, recipients: ['agent'] };
-    const body: DelegateBody = pending.kind === 'held' ? pending.body : {
+  /** The body for one relation, as this form fills it now. */
+  const bodyFor = (chosen: string, carried: string[]): DelegateBody => {
+    const passOn: PassOn = pass === 'no' ? { kind: 'use_only' } : { kind: 'to', actions: carried, recipients: ['agent'] };
+    return {
       operation: operationId(), route: 'browser', source: source.id, recipient, responsible: w.who.get(recipient)?.kind === 'person' ? recipient : me,
-      resource: source.resource, relation, pass_on: passOn, window: { starts_at: now, ends_at: endFor(lasts) },
+      resource: source.resource, relation: chosen, pass_on: passOn, window: { starts_at: now, ends_at: endFor(lasts) },
     };
+  };
+
+  /**
+   * One grant request, retained under the source's key before it is sent and
+   * released only on the service's confirmation. Returns whether it is confirmed;
+   * a refusal or an uncertain answer is shown and ends the run.
+   */
+  const sendOne = async (body: DelegateBody, retry: boolean): Promise<boolean> => {
     setOutcome({ at: 'sending' });
     let submitted = false;
     try {
@@ -88,10 +106,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       }
       sessionStorage.removeItem(key);
       setPending({ kind: 'empty' });
-      shell.closeAll();
-      const grantedActions = relations.find(([name]) => name === body.relation)?.[1] ?? [];
-      shell.toast(`Given. ${nameOf(w, body.recipient)} can now ${grantedActions.join(', ')} ${onText(source)}, through you.`);
-      done();
+      return true;
     } catch (error) {
       const refused = error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
       if (!submitted && !retry) {
@@ -104,6 +119,68 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         setPending({ kind: 'empty' });
         setOutcome({ at: 'refused', refused });
       }
+      return false;
+    }
+  };
+
+  /** The requests still to send after the retained one, written whole so a reload finishes the run exactly as it was ticked, never twice. */
+  const keepRest = (left: DelegateBody[]) => {
+    setRest(left.length ? { kind: 'held', bodies: left } : { kind: 'empty' });
+    if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
+  };
+
+  /** The words for what a body grants, as the model says them. */
+  const grantedWords = (bodies: DelegateBody[]): string =>
+    actionWords(w.model, source.resource, bodies.flatMap((body) => relations.find(([name]) => name === body.relation)?.[1] ?? [body.relation]));
+
+  const give = async () => {
+    if (working.current || damaged) return;
+    working.current = true;
+    try {
+      // The retained request first, exactly as sent, then the rest exactly as ticked; or a fresh run, every body fixed now.
+      let first: DelegateBody;
+      let queue: DelegateBody[];
+      let retry = false;
+      if (pending.kind === 'held') {
+        first = pending.body; queue = rest.kind === 'held' ? rest.bodies : []; retry = true;
+      } else if (toAgent) {
+        const bodies: DelegateBody[] = [];
+        for (const action of picked) {
+          const carrier = carriers.get(action);
+          if (carrier === undefined) {
+            setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'NoSingleActionRelation', reason: `The permission model has no relation carrying ${action} alone; nothing was sent.` }) });
+            return;
+          }
+          bodies.push(bodyFor(carrier, [action]));
+        }
+        if (!bodies.length) return;
+        [first, ...queue] = bodies;
+      } else {
+        first = bodyFor(relation, actions); queue = [];
+      }
+      const given: DelegateBody[] = [];
+      keepRest(queue);
+      let current: DelegateBody | undefined = first;
+      while (current !== undefined) {
+        const confirmed = await sendOne(current, retry);
+        retry = false;
+        if (!confirmed) {
+          // An uncertain answer keeps the rest for the retry; a definite refusal ends the run and names what did and did not happen.
+          if (outcome.at !== 'pending' && sessionStorage.getItem(key) === null) {
+            keepRest([]);
+            if (given.length || queue.length) {
+              shell.toast(`${given.length ? `Given before the refusal: ${grantedWords(given)} ${onText(source)}. ` : ''}${queue.length ? `Not sent: ${grantedWords(queue)}.` : ''}`);
+            }
+          }
+          return;
+        }
+        given.push(current);
+        current = queue.shift();
+        keepRest(queue);
+      }
+      shell.closeAll();
+      shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${onText(source)}, through you.`);
+      done();
     } finally { working.current = false; }
   };
 
@@ -128,7 +205,13 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
           ) : null}
         </select>
       </div>
-      <div className="field">
+      {toAgent ? <div className="field">
+        <label>Actions</label>
+        {!offer.known ? <div className="note">The service has not said which actions an agent may hold, so none are offered yet.</div>
+          : !carried.length ? <div className="note">{source.resource.kind.includes('.') ? "An agent cannot be given access to an app's resource until that app allows it." : 'Nothing you may pass on here can be held by an agent.'}</div>
+          : <ActionPicker model={w.model} resource={source.resource} actions={carried} value={picked} onChange={setPicked} disabled={locked} />}
+        <div className="note">Each ticked action is given on its own; an agent is never given a wider relation.</div>
+      </div> : <div className="field">
         <label>Relation</label>
         <div>
           {relations.map(([r, acts]) =>
@@ -142,7 +225,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
           )}
         </div>
         <div className="note">Greyed: more than you hold.</div>
-      </div>
+      </div>}
       <div className="field">
         <label htmlFor="dLease">Lasts</label>
         <select id="dLease" value={lasts} onChange={(e) => setLasts(e.target.value)}>
@@ -176,12 +259,12 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <div className="why-not" id="dAnswer" style={{ color: 'var(--warn)' }}>
           <b>pending</b>
           {pending.kind === 'held' ? <p>{nameOf(w, pending.body.recipient)} · {pending.body.relation} of {pending.body.resource.kind}:{pending.body.resource.id}. Original start {new Date(pending.body.window.starts_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })}; end {pending.body.window.ends_at === null ? 'none' : new Date(pending.body.window.ends_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })}.</p> : null}
-          <div className="note">Sent as {pending.kind === 'held' ? pending.body.operation : ''}; the service has not confirmed it{outcome.at === 'pending' ? ' (' + outcome.reason + ')' : ''}. Check original grant sends exactly the same request and operation.</div>
+          <div className="note">Sent as {pending.kind === 'held' ? pending.body.operation : ''}; the service has not confirmed it{outcome.at === 'pending' ? ' (' + outcome.reason + ')' : ''}. Check original grant sends exactly the same request and operation{rest.kind === 'held' ? `, then gives the ${rest.bodies.length} remaining` : ''}.</div>
         </div>
       ) : null}
-      {pending.kind === 'damaged' ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
+      {damaged ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || pending.kind === 'damaged' || !recipient || !relation || !leaseKnown} onClick={give}>
+        <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || damaged || !recipient || !leaseKnown || (pending.kind !== 'held' && (toAgent ? picked.length === 0 : !relation))} onClick={give}>
           {pending.kind === 'held' ? 'Check original grant' : 'Give'}
         </button>
         <button className="btn" data-act="close" onClick={shell.closeAll}>Cancel</button>

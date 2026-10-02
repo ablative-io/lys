@@ -19,11 +19,11 @@ const form = () => {
 };
 async function prepare() {
   await choose(form().querySelector('select'), '0');
-  await choose(form().querySelector('[name="relation"]'), 'reader');
+  await click(form().querySelector('input[name="action"][value="read"]'));
   const why = form().querySelector('textarea');
   if (!why) throw new Error('Why field missing');
   why.value = 'Review the release';
-  await click(form().querySelector('input[type="checkbox"]'));
+  await click(form().querySelector('input[name="no-expiry"]'));
 }
 async function submit() {
   await act(async () => { form().dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
@@ -39,6 +39,42 @@ describe('Requests', () => {
     expect(text()).toContain('Access is granted only after approval');
     expect(sessionStorage.getItem('lys.pending.request.' + ADA)).toBeNull();
     expect(unreachable()).toEqual([]);
+  });
+
+  it('asks for each ticked action on its own, one request per action, and names a refusal mid-run without re-sending', async () => {
+    const wide = { ...model, action_sentences: { read: 'Read this resource', write: 'Write to this resource' }, relations: { ...model.relations, 'only.write': ['write'] } };
+    const mounted = await mount('#/requests', { ...routes, '/grants/model': ok(wide), 'POST /requests': (body) => ok(kept(body as Ask)) });
+    await choose(form().querySelector('select'), '0');
+    await click(form().querySelector('input[name="action"][value="read"]'));
+    await click(form().querySelector('input[name="action"][value="write"]'));
+    const why = form().querySelector('textarea');
+    if (!why) throw new Error('Why field missing');
+    why.value = 'Review the release';
+    await click(form().querySelector('input[name="no-expiry"]'));
+    await submit();
+    const asked = mounted.posted.filter((p) => p.path === '/requests').map((p) => p.body as Ask);
+    expect(asked.map((a) => a.relation)).toEqual(['reader', 'only.write']);
+    expect(new Set(asked.map((a) => a.operation)).size).toBe(2);
+    expect(asked.every((a) => a.why === 'Review the release' && a.resource.id === 'Lys')).toBe(true);
+    expect(form().querySelector('[role="status"]')?.textContent).toContain('2 requests recorded, one per action');
+    expect(sessionStorage.getItem('lys.pending.request.' + ADA + '.rest')).toBeNull();
+
+    unmountAll();
+    sessionStorage.clear();
+    let calls = 0;
+    const second = await mount('#/requests', { ...routes, '/grants/model': ok(wide), 'POST /requests': (body) => (++calls === 1 ? ok(kept(body as Ask)) : refused(409, 'Expired', 'Expiry passed')) });
+    await choose(form().querySelector('select'), '0');
+    await click(form().querySelector('input[name="action"][value="read"]'));
+    await click(form().querySelector('input[name="action"][value="write"]'));
+    const why2 = form().querySelector('textarea');
+    if (!why2) throw new Error('Why field missing');
+    why2.value = 'Review the release';
+    await click(form().querySelector('input[name="no-expiry"]'));
+    await submit();
+    expect(second.posted.filter((p) => p.path === '/requests')).toHaveLength(2);
+    expect(form().querySelector('[role="status"]')?.textContent).toContain('1 recorded before the refusal; not sent: only.write');
+    expect(sessionStorage.getItem('lys.pending.request.' + ADA + '.rest')).toBeNull();
+    expect(sessionStorage.getItem('lys.pending.request.' + ADA)).toBeNull();
   });
 
   it('recovers a committed request by read-back after remount without sending it again', async () => {
