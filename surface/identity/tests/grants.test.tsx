@@ -460,7 +460,7 @@ describe('Who can reach this? (conformance 8.2)', () => {
 
   it('lists every grant, with where it derives from, and keeps every control reachable', async () => {
     await mount('#/access/reach/' + SCRIBE);
-    expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project identitybuilt inView this resource']);
+    expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project identityView this resource']);
     const grants = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[4].textContent);
     expect(grants).toEqual(['root', 'root', `G/${ROOT_G.slice(6, 14)} · Ada (test person)`]);
     const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[7].textContent);
