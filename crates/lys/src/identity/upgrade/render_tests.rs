@@ -127,7 +127,7 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
     let files = Templates::default().render(&layout, &own_build(), true)?;
     let by_name: BTreeMap<&str, &RenderedFile> =
         files.iter().map(|file| (file.name, file)).collect();
-    assert_eq!(by_name.len(), 5);
+    assert_eq!(by_name.len(), 6);
     let file = |name: &str| by_name.get(name).copied().ok_or(format!("no {name}"));
     let estate = file("estate-approval.json")?;
     assert_eq!(estate.bytes.as_slice(), layout::ESTATE_PLAN.as_bytes());
@@ -140,6 +140,13 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
     assert_eq!(compose.bytes.as_slice(), layout::COMPOSE_YAML.as_bytes());
     assert_eq!(compose.target, layout.deploy_dir().join("compose.yaml"));
     assert!(compose.compose && !compose.private);
+    let model = file("model.json")?;
+    assert_eq!(
+        model.bytes.as_slice(),
+        lys_identity::grants::shipped_model().as_bytes()
+    );
+    assert_eq!(model.target, layout.grant_model());
+    assert!(!model.private && !model.compose);
     let init = file("postgres-init.sql")?;
     assert_eq!(init.bytes.as_slice(), layout::POSTGRES_INIT_SQL.as_bytes());
     let environment = file(COMPOSE_ENV)?;
@@ -341,5 +348,36 @@ fn a_given_cambium_message_connection_is_written_with_the_recorded_choices_and_o
         carried.get("cambium_messages").is_none(),
         "none given, none recorded"
     );
+    Ok(())
+}
+
+/// An upgrade replaces an older permission model as one of the files it
+/// records, so a put-back by any installer, older ones included, returns the
+/// model the previous build read; a current model is left where it is.
+#[test]
+fn an_older_permission_model_is_replaced_as_a_recorded_file_and_a_current_one_is_left() -> TestResult
+{
+    let dir = tempfile::tempdir()?;
+    let layout = installed_root(dir.path())?;
+    let older = r#"{"version": 1, "relations": {"owner": ["view", "edit", "grant"]}}"#;
+    std::fs::write(layout.grant_model(), older)?;
+    let files = Templates::default().render(&layout, &own_build(), true)?;
+    let model = files
+        .iter()
+        .find(|file| file.name == "model.json")
+        .ok_or("an older model is not replaced")?;
+    assert_eq!(
+        model.bytes.as_slice(),
+        lys_identity::grants::shipped_model().as_bytes()
+    );
+    assert_eq!(
+        std::fs::read_to_string(layout.grant_model())?,
+        older,
+        "rendering writes nothing"
+    );
+
+    std::fs::write(layout.grant_model(), lys_identity::grants::shipped_model())?;
+    let files = Templates::default().render(&layout, &own_build(), true)?;
+    assert!(files.iter().all(|file| file.name != "model.json"));
     Ok(())
 }

@@ -2,7 +2,8 @@
 //! new build from the install's recorded choices.
 //!
 //! The files are the compose definition and its database initialisation,
-//! the compose environment, and the directory service's configuration. The
+//! the compose environment, the directory service's configuration, and the
+//! shipped permission model when the one held is older. The
 //! recorded choices are `deployment.toml`, the credentials under its state
 //! directory and the administrator the service's configuration names; the
 //! templates are the ones compiled into the `lys` that runs the upgrade,
@@ -23,7 +24,7 @@ use zeroize::Zeroizing;
 use super::super::config::DeploymentConfig;
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::super::install::layout::{self, Layout};
-use super::super::install::server_config;
+use super::super::install::{self, server_config};
 use super::super::prepare::{self, COMPOSE_ENV, SECRETS, read_secret};
 
 /// The build of the `lys` running now, as its `--version` names it.
@@ -142,7 +143,16 @@ impl Render for Templates {
             compose,
         };
         let deploy = layout.deploy_dir();
-        Ok(vec![
+        let model = install::model_replacement(&layout.grant_model()).map(|shipped| {
+            file(
+                "model.json",
+                layout.grant_model(),
+                shipped.as_bytes(),
+                false,
+                false,
+            )
+        });
+        let mut files = vec![
             file(
                 "estate-approval.json",
                 layout.data_dir().join("estate-approval.json"),
@@ -178,7 +188,9 @@ impl Render for Templates {
                 true,
                 false,
             ),
-        ])
+        ];
+        files.extend(model);
+        Ok(files)
     }
 }
 

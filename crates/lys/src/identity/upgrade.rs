@@ -488,7 +488,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let units = units(&layout)?;
     require_install(&layout)?;
     let config = DeploymentConfig::load_install(&layout.deployment_config())?;
-    install::server_state(&layout, &config)?;
+    install::server_keys(&layout, &config)?;
     let templates = render::Templates {
         messages: options
             .message_service
