@@ -23,12 +23,14 @@ describe('Per action agent grants', () => {
     const options = grantOptions({ ...choices, grants: [app] }, ADA, ADA, 'Ada');
     expect(options).toHaveLength(1);
     expect(options[0].reason).toBe("Lys can't give an agent this app's actions until the app allows it.");
-    expect(() => newAgentGrants(options, [grantOptionKey(options[0])])).toThrow('GrantChoiceUnavailable');
+    let refusal: unknown;
+    try { newAgentGrants(options, [grantOptionKey(options[0])]); } catch (problem) { refusal = problem; }
+    expect(refusal).toMatchObject({ status: 0, refusal: { refusal: 'GrantChoiceUnavailable' } });
   });
   it('refuses a retained app grant before issuing its original request', async () => {
     const options = grantOptions(choices, ADA, ADA, 'Ada');
     const [entry] = newAgentGrants(options, [grantOptionKey(options[0])]);
-    await expect(delegateAgentGrant({ ...entry, resource: { kind: 'fixture.doc', id: 'doc7' } }, ADA)).rejects.toThrow('WithheldFromAgents');
+    await expect(delegateAgentGrant({ ...entry, resource: { kind: 'fixture.doc', id: 'doc7' } }, ADA)).rejects.toMatchObject({ status: 0, refusal: { refusal: 'WithheldFromAgents' } });
   });
   it('records each selected act as its own operation and retains both from one source', () => {
     const options = grantOptions(choices, ADA, ADA, 'Ada');
