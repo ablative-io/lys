@@ -1,98 +1,95 @@
-#![cfg(test)]
-
 use std::error::Error;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+use std::time::Instant;
 
-use lys_log_store::{FileLeafStore, LeafStore};
-use lys_secrets::{Broker, LocalGrants, StoreKey, to_hex};
+use lys_secrets::{Broker, LocalGrants};
+use sha2::{Digest, Sha256};
 
-use super::{AT_MS, Folders, LINES};
+use super::{AT_MS, Folders, LINES, OUTCOME, build, copy_tree, paths_in};
 
-#[path = "log_window_pack.rs"]
-mod pack;
-
-type Result<T> = std::result::Result<T, Box<dyn Error>>;
-
-fn write_new(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
-    OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(mode)
-        .open(path)
-        .map_err(|error| format!("FixtureCreateFailed: {}: {error}", path.display()))?
-        .write_all(bytes)
-        .map_err(|error| format!("FixtureWriteFailed: {}: {error}", path.display()))?;
-    Ok(())
+// The executable includes the linked storage implementation; the source and
+// line parameters also bind the cache to the fixture's definition.
+fn key() -> Result<String, Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    digest.update(include_bytes!("../log_window.rs"));
+    digest.update(include_bytes!("log_window_fixture.rs"));
+    digest.update(LINES.to_le_bytes());
+    digest.update(AT_MS.to_le_bytes());
+    digest.update(OUTCOME.as_bytes());
+    let mut executable = File::open(std::env::current_exe()?)?;
+    let mut buffer = [0; 8192];
+    loop {
+        let read = executable.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", digest.finalize()))
 }
 
-pub(super) fn copy() -> Result<Folders> {
-    let (archive, manifest) = pack::read()?;
-    let (manifest, frames) = pack::validate(&archive, &manifest)?;
-    if u64::try_from(pack::RECORDS)? != LINES {
-        return Err("FixtureCountMismatch: test and recorded history differ".into());
+fn prepare() -> Result<PathBuf, Box<dyn Error>> {
+    let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("log-window-cache");
+    fs::create_dir_all(&cache)?;
+    let key = key()?;
+    let locked = File::options()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(cache.join(format!("{key}.lock")))?;
+    let waiting = Instant::now();
+    rustix::fs::fcntl_lock(&locked, rustix::fs::FlockOperation::LockExclusive)?;
+    let waited = waiting.elapsed();
+    let started = Instant::now();
+    let ready = cache.join(key);
+    if ready.try_exists()? {
+        let paths = paths_in(&ready.join("broker"), &ready.join("keys"));
+        let broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| AT_MS))?;
+        if broker.audit().len() != LINES {
+            return Err("the cached fixture does not hold the required line count".into());
+        }
+        eprintln!(
+            "log_window fixture reused: {:?}; cache wait: {waited:?}",
+            started.elapsed()
+        );
+    } else {
+        let folders = Folders {
+            dir: tempfile::Builder::new()
+                .prefix("building-")
+                .tempdir_in(&cache)?,
+        };
+        build(&folders)?;
+        // Readers see the whole closed fixture or no fixture. A failed build
+        // never publishes its temporary directory.
+        fs::rename(folders.dir.path(), &ready)?;
+        eprintln!(
+            "log_window fixture built: {:?}; cache wait: {waited:?}",
+            started.elapsed()
+        );
     }
-    let folders = Folders {
+    Ok(ready)
+}
+
+fn built() -> Result<&'static Path, Box<dyn Error>> {
+    static BUILT: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+    BUILT
+        .get_or_init(|| prepare().map_err(|error| format!("preparing log fixture: {error}")))
+        .as_ref()
+        .map(PathBuf::as_path)
+        .map_err(|error| error.as_str().into())
+}
+
+pub(super) fn copy() -> Result<Folders, Box<dyn Error>> {
+    let built = built()?;
+    let started = Instant::now();
+    let copy = Folders {
         dir: tempfile::tempdir()?,
     };
-    fs::create_dir(folders.root())
-        .map_err(|error| format!("FixtureCreateFailed: broker directory: {error}"))?;
-    fs::create_dir(folders.keys())
-        .map_err(|error| format!("FixtureCreateFailed: keys directory: {error}"))?;
-    let paths = folders.paths();
-    drop(Broker::create(
-        &paths,
-        LocalGrants::new(),
-        Box::new(|| AT_MS),
-    )?);
-    // Only the fresh empty audit files are replaced; each test keeps its own store.
-    fs::remove_dir_all(&paths.log_dir)
-        .map_err(|error| format!("FixtureReplaceFailed: empty audit log: {error}"))?;
-    fs::remove_file(&paths.audit_key)
-        .map_err(|error| format!("FixtureReplaceFailed: fresh audit key: {error}"))?;
-    fs::remove_file(&paths.anchor)
-        .map_err(|error| format!("FixtureReplaceFailed: empty anchor: {error}"))?;
-    fs::create_dir(&paths.log_dir)
-        .map_err(|error| format!("FixtureCreateFailed: audit log directory: {error}"))?;
-    fs::create_dir(paths.log_dir.join("leaves"))
-        .map_err(|error| format!("FixtureCreateFailed: leaves directory: {error}"))?;
-    write_new(
-        &paths.audit_key,
-        include_bytes!("../fixtures/log-window.key"),
-        0o600,
-    )?;
-    let guarded = [paths.store_dir.as_path(), paths.log_dir.as_path()];
-    let key = StoreKey::load(&paths.audit_key, &guarded)?;
-    if key.id().as_str() != manifest.audit_key_fingerprint {
-        return Err("FixtureKeyMismatch: manifest names another audit key".into());
-    }
-    for (path, bytes) in [
-        paths.log_dir.join("log.json"),
-        paths.log_dir.join("state.json"),
-        paths.log_dir.join("snapshot.bin"),
-        paths.anchor.clone(),
-    ]
-    .iter()
-    .zip(&frames[..4])
-    {
-        write_new(path, bytes, 0o600)?;
-    }
-    for (index, bytes) in frames[4..].iter().enumerate() {
-        write_new(
-            &paths.log_dir.join("leaves").join(format!("{index:020}")),
-            bytes,
-            0o400,
-        )?;
-    }
-    let store = FileLeafStore::open_read_only(&paths.log_dir)?;
-    let pin = store.pinned();
-    if store.origin() != "lys.local/secrets-audit"
-        || pin.tree_size != LINES
-        || to_hex(&pin.root) != manifest.root
-    {
-        return Err("FixturePinMismatch: manifest and recorded log differ".into());
-    }
-    Ok(folders)
+    copy_tree(&built.join("broker"), &copy.root())?;
+    copy_tree(&built.join("keys"), &copy.keys())?;
+    eprintln!("log_window fixture copied: {:?}", started.elapsed());
+    Ok(copy)
 }
