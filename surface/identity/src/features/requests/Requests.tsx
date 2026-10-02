@@ -1,3 +1,5 @@
+import { actionWords } from '../grants/action-words';
+import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
 /** Requests use the service's visibility and approval decisions, never an inferred permission. A queue, oldest first, grouped by the asker's team; one request opens beside it. */
 import { useState } from 'react';
@@ -93,18 +95,18 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
         </>} />
       <div className="detail">
         {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm {...each} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }} />} />
-          : open ? <Detail entry={open} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : <p className="dim">Nothing is waiting.</p>}
+          : open ? <Detail model={choices.status === 'ok' ? choices.data.model : null} entry={open} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : <p className="dim">Nothing is waiting.</p>}
       </div>
     </div>
   </>;
 }
 
-function Detail({ entry, person, mayDecide, changed }: { entry: AccessRequest; person: string; mayDecide: boolean; changed: (answer: AccessRequest) => void }) {
+function Detail({ model, entry, person, mayDecide, changed }: { model: GrantModel | null; entry: AccessRequest; person: string; mayDecide: boolean; changed: (answer: AccessRequest) => void }) {
   return <article className="card" aria-label="Request">
     <h2>{entry.asked_by_name ?? 'Name unavailable'} · {entry.relation} on {entry.resource.id}</h2>
     <p><strong>{entry.state === 'waiting' ? 'Awaiting a decision' : entry.state === 'approved' ? 'Approved' : 'Declined'}</strong> · Asked {clock(entry.asked_at)}</p>
     <p>{entry.why}</p>
-    <p className="note">Allows {entry.actions.join(', ')}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>
+    <p className="note">Allows {model ? actionWords(model, entry.resource, entry.actions) : 'permission descriptions are unavailable'}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>
     {entry.decision ? <p>{entry.decision.note}{entry.decision.grant ? <> · <Link to={'/file/' + encodeURIComponent(entry.asked_by) + '/access'}>View granted access</Link></> : null}</p>
       : <p className="note">Can be reviewed by {entry.approvers.map((each) => each.display_name).join(', ') || 'no currently eligible person'}.</p>}
     {entry.state === 'waiting' && entry.held_by ? <HeldApproval entry={entry} changed={changed} /> : null}

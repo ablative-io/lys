@@ -1,6 +1,6 @@
+import { actionWords, resourceWords } from '../grants/action-words';
 /** Canvas connections are recorded membership and grants, never inferred message delivery or authority. */
 import { Refused, request } from '../../api';
-import { resourceText } from '../../generated/grants';
 import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import type { Team } from '../teams/contract';
@@ -52,12 +52,13 @@ export function graphFromRecords(sessions: RuntimeSession[], teams: Team[], worl
       nodes.set(teamId, { id: teamId, column: 'teams', title: team.name, detail: team.state === 'active' ? 'Team membership' : 'Retired team' });
       edges.push({ id: teamId + ':' + id, from: teamId, to: id, label: team.state === 'active' ? 'Member; no permission implied' : 'Recorded member of retired team', kind: 'membership', stands: team.state === 'active' });
     }
-    for (const grant of world?.list.grants ?? []) {
+    if (!world) continue;
+    for (const grant of world.list.grants) {
       if (grant.holder !== session.agent) continue;
       const resourceId = 'resource:' + JSON.stringify([grant.resource.kind, grant.resource.id]);
       nodes.set(resourceId, { id: resourceId, column: 'resources', title: grant.resource.id, detail: grant.resource.kind });
       edges.push({ id: grant.id + ':' + id, from: id, to: resourceId,
-        label: grant.actions.join(', ') + ' on ' + resourceText(grant.resource) + (grant.standing.stands ? '' : ' — ' + grant.standing.refusal + ': ' + grant.standing.reason),
+        label: actionWords(world.model, grant.resource, grant.actions) + ' on ' + resourceWords(grant.resource) + (grant.standing.stands ? '' : ' — ' + grant.standing.refusal + ': ' + grant.standing.reason),
         kind: 'grant', stands: grant.standing.stands,
       });
     }

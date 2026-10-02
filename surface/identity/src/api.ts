@@ -82,7 +82,14 @@ export const api = {
   identity: (id: string) => get<DirectoryRecord>('/identities/' + encodeURIComponent(id)),
   receipt: (index: number) => get<ReceiptAnswer>('/receipts/' + index),
   grants: () => get<GrantList>('/grants'),
-  model: () => get<GrantModel>('/grants/model'),
+  model: async () => {
+    const model = await get<GrantModel>('/grants/model');
+    if (!model.action_sentences || typeof model.action_sentences !== 'object'
+      || Object.values(model.action_sentences).some((sentence) => typeof sentence !== 'string' || !sentence.trim())) {
+      throw new Error('PermissionDescriptionsMissing: the service did not return valid action sentences.');
+    }
+    return model;
+  },
   grant: (id: string) => get<Grant>('/grants/' + encodeURIComponent(id)),
   delegate: (body: DelegateBody) => get<Recorded>('/grants', body),
   why: (body: ActionBody) => get<Permit>('/grants/why', body),
