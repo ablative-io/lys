@@ -61,6 +61,18 @@ describe('Add-agent reporting and permissions', () => {
     expect(form.textContent).not.toContain('GrantsUnreadable');
     expect([...form.querySelectorAll<HTMLInputElement>('input[name="action"]')].map((entry) => entry.value)).toEqual([editChoice, viewChoice, ledgerChoice]);
   });
+  it('disables a passable fixture.doc grant and never posts that access for an agent', async () => {
+    const app = { ...source, resource: { kind: 'fixture.doc', id: 'doc7' }, relation: 'reader', actions: ['read'],
+      pass_on: { kind: 'to', actions: ['read'], recipients: ['agent'] } };
+    const { form, posted } = await open({ '/grants': ok({ grants: [app], revision: 7 }) });
+    const checkbox = form.querySelector<HTMLInputElement>('input[name="action"]');
+    expect(checkbox?.disabled).toBe(true);
+    expect(form.textContent).toContain("Lys can't give an agent this app's actions until the app allows it.");
+    await act(async () => { checkbox?.click(); });
+    expect(posted).toEqual([]);
+    await submit(form);
+    expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + COURIER + '/transitions']);
+  });
   it('offers a live named default and only the chosen boss grants, with nothing checked', async () => {
     const { form, posted } = await open();
     expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
