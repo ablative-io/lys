@@ -293,7 +293,7 @@ fn a_readable_setup_file_is_reported_by_its_absolute_path() -> TestResult {
         .env("SSH_CONNECTION", "127.0.0.1 12345 127.0.0.1 22")
         .output()?;
     assert!(output.status.success(), "setup-code failed");
-    let path = root.path().join("setup-code");
+    let path = root.path().canonicalize()?.join("setup-code");
     let named = format!("the setup code is in {}", path.display());
     assert!(
         String::from_utf8_lossy(&output.stdout).contains(&named),
