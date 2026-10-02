@@ -127,11 +127,10 @@ export const CANNOT_GIVE_ROOT_SCRIBE: CannotGiveAnswer = {
 };
 
 /** GET /grants/model: the relations the service's model defines. */
-export const MODEL: GrantModel = {
-  action_sentences: { view: 'View this resource', edit: 'Edit this resource', grant: 'Give access to this resource' }, version: 3,
-  relations: { editor: ['edit', 'view'], owner: ['edit', 'grant', 'view'], viewer: ['view'], 'only.edit': ['edit'] },
-  withheld_from_agents: ['grant'],
-};
+export const MODEL: GrantModel = { action_sentences: { view: 'View this resource', edit: 'Edit this resource', grant: 'Give access to this resource' }, version: 3, relations: { editor: ['edit', 'view'], owner: ['edit', 'grant', 'view'], viewer: ['view'] }, withheld_from_agents: [] };
+
+/** The same model as an agent-giving service serves it: one single-action relation, and grant withheld from agents. */
+export const AGENT_MODEL: GrantModel = { ...MODEL, relations: { ...MODEL.relations, 'only.edit': ['edit'] }, withheld_from_agents: ['grant'] };
 
 const permit = (path: string[], scope: string[]): Permit => ({ permitted: true, grant: path[path.length - 1], path, responsible: ADA, scope, model_version: 1, revision: 7 });
 

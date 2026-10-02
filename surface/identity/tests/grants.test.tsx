@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, choose, click, mount, press, text, unmountAll, unreachable, settle } from './harness';
 import {
-  ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE, DIRECTORY, GRANTS, LEDGER_G, MODEL,
-  ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused,
+  ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE as BEA_BASE, DIRECTORY, GRANTS, LEDGER_G,
+  AGENT_MODEL as MODEL, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused,
 } from './fixtures';
 import type { DelegateBody, LastUse } from '../src/generated/grants';
 
 beforeEach(() => sessionStorage.clear());
+
+const SERVICE = { ...BASE, '/grants/model': ok(MODEL) };
+const BEA_SERVICE = { ...BEA_BASE, '/grants/model': ok(MODEL) };
 
 const holdRows = () => $$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr');
 
