@@ -1,10 +1,11 @@
-//! Every change an agent makes through MCP is kept as a leaf of the
-//! directory log, and the agent is answered with the receipt it was kept
-//! under. The agent is the one the MCP message's signature or the run's pass
+//! Every change an agent asks for through MCP is kept as a leaf of the
+//! directory log before it is made, and the agent is answered with the
+//! receipt it was kept under; a change whose leaf cannot be kept is not
+//! made. The agent is the one the MCP message's signature or the run's pass
 //! names; a signed message's signature is kept with the leaf as it was sent.
 
+use axum::http::Method;
 use axum::http::request::Parts;
-use axum::http::{Method, StatusCode};
 use lys_identity::agent_call::AgentCall;
 use lys_identity::projection::Record;
 use lys_identity::{Actor, AgentId, IdentityId, Provenance};
@@ -88,9 +89,18 @@ pub(crate) fn witness(
     )
 }
 
-/// Whether a route's answer is a change that is kept.
-pub(crate) fn kept(method: &Method, status: StatusCode) -> bool {
-    status.is_success() && !matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
+/// Whether a call asks for a change, and so is kept before it is made.
+pub(crate) fn changing(method: &Method) -> bool {
+    !matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
+}
+
+/// The route's path as the log keeps it: a query is kept only as its
+/// SHA-256, so nothing a query carries ever sits in the log.
+pub(crate) fn recorded_path(uri: &axum::http::Uri) -> String {
+    match uri.query() {
+        Some(query) => format!("{}?sha256={}", uri.path(), digest(query.as_bytes())),
+        None => uri.path().to_owned(),
+    }
 }
 
 /// The SHA-256 of the body the route was given, in lowercase hex.
@@ -98,19 +108,14 @@ pub(crate) fn digest(body: &[u8]) -> String {
     crate::routes::hex(&Sha256::digest(body))
 }
 
-/// Keep the change as a leaf and answer the receipt it was kept under.
+/// Keep the asked change as a leaf before it is made and answer the
+/// receipt it was kept under.
 pub(crate) fn keep(
     state: &AppState,
     witness: Witness,
-    (method, path, body_sha256, status): (&Method, &str, &str, StatusCode),
+    (method, path, body_sha256): (&Method, &str, &str),
 ) -> Result<Value, ServerError> {
-    let call = AgentCall::new(
-        method.as_str(),
-        path,
-        body_sha256,
-        status.as_u16(),
-        &witness.signature,
-    )?;
+    let call = AgentCall::new(method.as_str(), path, body_sha256, &witness.signature)?;
     crate::routes::with_directory(state, |directory| {
         let projection = directory.projection()?;
         let binding = projection

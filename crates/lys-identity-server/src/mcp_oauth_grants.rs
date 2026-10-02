@@ -5,7 +5,7 @@
 //! app's agent as their own delegation, use only, so the app holds exactly
 //! what was chosen and never the person's own authority.
 
-use lys_identity::grants::{PassOn, RecipientKind};
+use lys_identity::grants::{GrantId, PassOn, RecipientKind, RevokeRequest, Route};
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde_json::json;
 
@@ -22,12 +22,20 @@ pub(crate) struct Offer {
     pub(crate) kind: String,
     pub(crate) id: String,
     pub(crate) relation: String,
+    /// What the app may then do, each action's name read as words.
+    pub(crate) actions: Vec<String>,
 }
 
 impl Offer {
-    /// The words the approval page shows for it.
+    /// The words the approval page shows for it: what the app may do, and
+    /// to which thing, so a person reads the effect rather than a code.
     pub(crate) fn words(&self) -> String {
-        format!("{} {} {}", self.relation, self.kind, self.id)
+        let doing = match self.actions.as_slice() {
+            [] => "nothing".to_owned(),
+            [only] => only.clone(),
+            [first @ .., last] => format!("{} and {last}", first.join(", ")),
+        };
+        format!("Let it {doing} the {} called {}", self.kind, self.id)
     }
 }
 
@@ -65,6 +73,10 @@ pub(crate) fn offers(state: &AppState, person: PersonId) -> Result<Vec<Offer>, S
                         kind: resource.kind().to_owned(),
                         id: resource.id().to_owned(),
                         relation: relation.as_str().to_owned(),
+                        actions: allowed
+                            .iter()
+                            .map(|action| action.as_str().replace(['.', '_', '-'], " "))
+                            .collect(),
                     });
                 }
             }
@@ -99,34 +111,123 @@ pub(crate) fn chosen(
         .collect()
 }
 
-/// Pass each chosen offer on from `person` to `agent`, use only.
+/// Pass every chosen offer on from `person` to `agent`, use only, or none:
+/// every delegation is formed before any is made, all are made under one
+/// hold of the grants, and when one is refused those already made are
+/// revoked before the refusal is answered.
 pub(crate) fn pass_on(
     state: &AppState,
     person: PersonId,
     agent: &str,
     picked: &[Offer],
 ) -> Result<(), ServerError> {
-    for offer in picked {
-        let body: DelegateBody = serde_json::from_value(json!({
-            "operation": OperationId::generate()?.to_string(),
-            "route": "browser",
-            "source": offer.source,
-            "recipient": agent,
-            "responsible": person.to_string(),
-            "resource": {"kind": offer.kind, "id": offer.id},
-            "relation": offer.relation,
-            "pass_on": {"kind": "use_only"},
-            "window": {"starts_at": 0, "ends_at": null},
-        }))
-        .map_err(|error| ServerError::RequestMalformed {
-            reason: format!("a chosen permission does not form a delegation: {error}"),
-        })?;
-        with_grants(state, |judged| {
-            let request = body.request(IdentityId::Person(person))?;
-            judged.apps.admit_kind(None, &offer.kind)?;
-            judged.grants.delegate(judged.directory, &request, now())?;
-            Ok(())
-        })?;
+    let caller = IdentityId::Person(person);
+    let requests = picked
+        .iter()
+        .map(|offer| {
+            let body: DelegateBody = serde_json::from_value(json!({
+                "operation": OperationId::generate()?.to_string(),
+                "route": "browser",
+                "source": offer.source,
+                "recipient": agent,
+                "responsible": person.to_string(),
+                "resource": {"kind": offer.kind, "id": offer.id},
+                "relation": offer.relation,
+                "pass_on": {"kind": "use_only"},
+                "window": {"starts_at": 0, "ends_at": null},
+            }))
+            .map_err(|error| ServerError::RequestMalformed {
+                reason: format!("a chosen permission does not form a delegation: {error}"),
+            })?;
+            Ok((offer.kind.as_str(), body.request(caller)?))
+        })
+        .collect::<Result<Vec<_>, ServerError>>()?;
+    with_grants(state, |judged| {
+        let mut made = Vec::new();
+        for (kind, request) in &requests {
+            let passed = judged
+                .apps
+                .admit_kind(None, kind)
+                .map_err(ServerError::from)
+                .and_then(|()| {
+                    judged
+                        .grants
+                        .delegate(judged.directory, request, now())
+                        .map_err(ServerError::from)
+                });
+            match passed {
+                Ok(recorded) => made.push(recorded.event.grant()),
+                Err(refused) => return withdrawn(judged.grants, caller, &made, refused),
+            }
+        }
+        Ok(())
+    })
+}
+
+/// Revoke each grant `made` so far and answer `refused`, or a refusal
+/// naming the grants still standing when a revocation is itself refused.
+fn withdrawn(
+    grants: &mut crate::grants::GrantState,
+    caller: IdentityId,
+    made: &[GrantId],
+    refused: ServerError,
+) -> Result<(), ServerError> {
+    let mut standing = Vec::new();
+    for grant in made {
+        let revoked = OperationId::generate().map_err(ServerError::from).and_then(|operation| {
+            grants
+                .revoke(
+                    &RevokeRequest {
+                        operation,
+                        caller,
+                        route: Route::Browser,
+                        grant: *grant,
+                        reason: "the app's approval was refused: every chosen permission is passed on or none".to_owned(),
+                    },
+                    now(),
+                )
+                .map_err(ServerError::from)
+        });
+        if let Err(error) = revoked {
+            standing.push(format!("{grant} ({error})"));
+        }
     }
-    Ok(())
+    if standing.is_empty() {
+        return Err(refused);
+    }
+    Err(ServerError::ConfigInvalid {
+        reason: format!(
+            "the app's approval was refused ({refused}) and these permissions it was given could not be taken back: {}",
+            standing.join(", ")
+        ),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Offer;
+
+    fn offer(actions: &[&str]) -> Offer {
+        Offer {
+            key: "g:viewer".to_owned(),
+            source: "g".to_owned(),
+            kind: "project".to_owned(),
+            id: "lys".to_owned(),
+            relation: "viewer".to_owned(),
+            actions: actions.iter().map(|action| (*action).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn an_offer_reads_as_what_the_app_may_do_to_which_thing() {
+        assert_eq!(
+            offer(&["read"]).words(),
+            "Let it read the project called lys"
+        );
+        assert_eq!(
+            offer(&["read", "write", "grant revoke"]).words(),
+            "Let it read, write and grant revoke the project called lys"
+        );
+        assert!(!offer(&["read"]).words().contains("viewer"));
+    }
 }

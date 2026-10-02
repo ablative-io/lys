@@ -487,3 +487,29 @@ async fn mcp_transport_rejects_foreign_origins_versions_and_external_routes()
     assert_eq!(response["result"]["structuredContent"]["status"], 404);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_signed_message_cannot_also_carry_a_grant_token() -> Result<(), Box<dyn Error>> {
+    let (service, _cookie, agent, key) = certified_agent().await?;
+    let bytes = tree_call(14)?;
+    let signature = signed(&agent, &key, &bytes)?;
+    let response = reqwest::Client::new()
+        .post(format!("{}/mcp", service.base))
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header(crate::agent_signature::HEADER, signature)
+        .header(crate::grant_tokens::HEADER, "another-agents-token")
+        .body(bytes)
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let refused: Value = response.json().await?;
+    assert_eq!(refused["refusal"], "AgentSignatureRefused", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("a grant token cannot carry another credential")
+    );
+    Ok(())
+}

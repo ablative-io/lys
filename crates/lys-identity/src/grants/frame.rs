@@ -113,6 +113,17 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         request: &ExerciseRequest,
         at: u64,
     ) -> Result<Permit, GrantError> {
+        self.explain_only(frame, request, None, at)
+    }
+
+    /// [`Grants::explain_in`] resting only on `only` when it names a grant.
+    pub(super) fn explain_only(
+        &self,
+        frame: &Frame<'_>,
+        request: &ExerciseRequest,
+        only: Option<GrantId>,
+        at: u64,
+    ) -> Result<Permit, GrantError> {
         if frame.folded != self.folded {
             return Err(GrantError::StaleDecision {
                 required: self.folded,
@@ -120,7 +131,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             });
         }
         self.unresolved_issue(request)?;
-        self.decide_in(frame, request, at)
+        self.decide_in(frame, request, only, at)
     }
 
     /// Refuse by the held operation's name while the issue of the grant the
@@ -143,12 +154,14 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         &self,
         frame: &Frame<'_>,
         request: &ExerciseRequest,
+        only: Option<GrantId>,
         at: u64,
     ) -> Result<Permit, GrantError> {
         let mut refusal = None;
         let candidates = self.book.on_resource(&request.resource).filter(|record| {
             record.grant().holder() == request.caller
                 && record.grant().actions().contains(&request.action)
+                && only.is_none_or(|grant| record.grant().id() == grant)
         });
         for record in candidates {
             let grant = record.grant();

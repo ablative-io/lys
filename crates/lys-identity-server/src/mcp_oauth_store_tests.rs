@@ -1,7 +1,22 @@
 //! The connected-apps store keeps apps, approvals and token digests across
 //! a reopen, and answers only live tokens of the kind asked for.
 
-use super::{App, Issued, Kind, Store};
+use super::{App, Issued, Kind, Limits, Store};
+use crate::error::ServerError;
+
+const LIMITS: Limits = Limits {
+    most: 3,
+    per_minute: 2,
+    unapproved_seconds: 1000,
+};
+
+fn app(registered_at: u64) -> App {
+    App {
+        name: "Notes".to_owned(),
+        redirect_uris: vec!["https://app.example/callback".to_owned()],
+        registered_at,
+    }
+}
 
 fn issued(kind: Kind, expires_at: u64) -> Issued {
     Issued {
@@ -17,14 +32,7 @@ fn what_is_kept_is_read_back_after_a_reopen() -> Result<(), Box<dyn std::error::
     let dir = tempfile::TempDir::new()?;
     let path = dir.path().join("connected-apps.json");
     let mut store = Store::open(&path)?;
-    store.register(
-        "client".to_owned(),
-        App {
-            name: "Notes".to_owned(),
-            redirect_uris: vec!["https://app.example/callback".to_owned()],
-            registered_at: 1,
-        },
-    )?;
+    store.register("client".to_owned(), app(1), LIMITS)?;
     store.connect("client", "person", "agent".to_owned())?;
     store.issue(
         vec![
@@ -76,5 +84,33 @@ fn a_store_file_that_does_not_read_is_refused_by_name() -> Result<(), Box<dyn st
         return Err("a torn store opened".into());
     };
     assert!(refused.to_string().contains("connected-apps store"));
+    Ok(())
+}
+
+#[test]
+fn registrations_are_throttled_held_to_a_most_and_let_go_unapproved()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let mut store = Store::open(&dir.path().join("connected-apps.json"))?;
+    store.register("first".to_owned(), app(0), LIMITS)?;
+    store.register("second".to_owned(), app(10), LIMITS)?;
+    assert!(matches!(
+        store.register("third".to_owned(), app(20), LIMITS),
+        Err(ServerError::RegistrationThrottled)
+    ));
+    assert!(store.app("third").is_none(), "a throttled app is not kept");
+    store.connect("first", "person", "agent".to_owned())?;
+    store.register("third".to_owned(), app(70), LIMITS)?;
+    assert!(matches!(
+        store.register("fourth".to_owned(), app(200), LIMITS),
+        Err(ServerError::RequestMalformed { .. })
+    ));
+    store.register("fourth".to_owned(), app(1010), LIMITS)?;
+    assert!(store.app("first").is_some(), "an approved app is kept");
+    assert!(
+        store.app("second").is_none(),
+        "an app no one approved within its window is let go"
+    );
+    assert!(store.app("third").is_some() && store.app("fourth").is_some());
     Ok(())
 }

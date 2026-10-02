@@ -94,3 +94,6 @@ pub fn restore(layout: &Layout, intent: &Intent, say: &mut dyn FnMut(&str)) -> I
     say("the data the previous build last ran on is back");
     Ok(())
 }
+
+#[path = "data_kept_tests.rs"]
+mod tests;

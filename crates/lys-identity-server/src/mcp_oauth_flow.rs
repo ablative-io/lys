@@ -14,7 +14,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use super::{
-    APPROVAL_SECONDS, APPS_MAX, Apps, Asking, CODE_SECONDS, Code, NAME_MAX, UNNAMED, back_to,
+    APPROVAL_SECONDS, Apps, Asking, CODE_SECONDS, Code, NAME_MAX, REGISTRATION, UNNAMED, back_to,
     digest, encoded, escaped, held, malformed, random, redirect_allowed,
 };
 use crate::error::ServerError;
@@ -54,19 +54,14 @@ pub(super) async fn register(
     let client_id = random()?;
     let issued_at = now();
     {
-        let mut store = held(&apps.store)?;
-        if store.apps_held() >= APPS_MAX {
-            return Err(malformed(
-                "this install holds as many connected apps as it keeps",
-            ));
-        }
-        store.register(
+        held(&apps.store)?.register(
             client_id.clone(),
             App {
                 name: name.clone(),
                 redirect_uris: asked.redirect_uris.clone(),
                 registered_at: issued_at,
             },
+            REGISTRATION,
         )?;
     }
     Ok((

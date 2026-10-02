@@ -26,7 +26,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
-use crate::mcp_oauth_store::{Issued, Kind, Store};
+use crate::mcp_oauth_store::{Issued, Kind, Limits, Store};
 use crate::routes::{AppState, with_directory};
 use crate::session::now;
 
@@ -34,7 +34,13 @@ const ACCESS_SECONDS: u64 = 3600;
 const REFRESH_SECONDS: u64 = 30 * 24 * 3600;
 const CODE_SECONDS: u64 = 120;
 const APPROVAL_SECONDS: u64 = 600;
-const APPS_MAX: usize = 1000;
+/// At most 1000 apps held, 10 registrations a minute, and a day for a
+/// person to approve an app before its registration is let go.
+const REGISTRATION: Limits = Limits {
+    most: 1000,
+    per_minute: 10,
+    unapproved_seconds: 24 * 60 * 60,
+};
 const NAME_MAX: usize = 64;
 /// The words a connected app is known by when it gave no name.
 const UNNAMED: &str = "Connected app";
