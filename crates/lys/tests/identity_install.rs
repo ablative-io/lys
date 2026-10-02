@@ -16,6 +16,8 @@
 //! siblings, so the CLI and services come from the same build without
 //! compiling them again inside a running test.
 
+#[path = "identity_install/cleanup_tests.rs"]
+mod cleanup_tests;
 pub mod identity_support;
 #[path = "identity_install/product.rs"]
 mod product;
