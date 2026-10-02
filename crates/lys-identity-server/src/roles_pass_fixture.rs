@@ -249,11 +249,11 @@ impl Table {
             "window":{"starts_at":0,"ends_at":null}
         })).await?;
         assert_eq!(status, 200, "{root}");
-        Ok(self.service.post("/grants", Some(&self.cookie), &json!({
+        self.service.post("/grants", Some(&self.cookie), &json!({
             "operation":operation()?, "route":"api", "source":root["grant"], "recipient":self.agent,
             "responsible":self.person, "resource":resource, "relation":relation,
             "pass_on":{"kind":"use_only"}, "window":{"starts_at":0,"ends_at":null}
-        })).await?)
+        })).await
     }
 
     pub(super) async fn role_view(&self, id: &str) -> TestResult<Value> {
