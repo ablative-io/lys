@@ -56,7 +56,9 @@ fn file(path: &str, text: String) -> File {
 /// Rebuild a fresh launch without inspecting any machine settings.
 ///
 /// # Errors
-/// Refuses unknown contracts, invalid templates and invalid declared programs.
+/// Refuses unknown contracts, invalid templates, invalid declared programs,
+/// and a Claude template that does not say how the agent is confined: it is
+/// never rendered unconfined, and the operator's file is never rewritten.
 pub fn render(
     contract: &str,
     program: &str,
@@ -73,6 +75,18 @@ pub fn render(
         return super::codex::launch::render(program, text, instructions_mode);
     }
     let template = parse_template(text.as_bytes()).map_err(|error| error.to_string())?;
+    if template
+        .permissions
+        .as_ref()
+        .and_then(|permissions| permissions.get("defaultMode"))
+        .and_then(serde_json::Value::as_str)
+        .is_none_or(str::is_empty)
+    {
+        return Err(
+            "slots.permissions.defaultMode names no mode: choose how this agent is confined"
+                .to_owned(),
+        );
+    }
     let settings = String::from_utf8(env_settings(&template).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?;
     let mcp =
