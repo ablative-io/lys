@@ -9,9 +9,10 @@ use std::error::Error;
 
 use lys_identity::IdentityId;
 use lys_identity::grants::{
-    Action, ExerciseRequest, GrantChange, GrantError, GrantId, PassOn, RecipientKind, Route,
+    Action, ExerciseRequest, GrantChange, GrantError, GrantId, LastUse, MemoryRelationships,
+    PassOn, RecipientKind, Route,
 };
-use support::{World, alpha, pass};
+use support::{T0, World, actions, alpha, pass};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -44,6 +45,7 @@ fn read(world: &World) -> Result<ExerciseRequest, Box<dyn Error>> {
 #[test]
 fn a_decision_held_to_one_grant_exercises_that_grant_and_no_other() -> TestResult {
     let mut world = World::new()?;
+    assert_eq!(world.now, T0);
     let (_, first) = lent(&mut world)?;
     let (dana_root, second) = lent(&mut world)?;
     let request = read(&world)?;
@@ -56,6 +58,7 @@ fn a_decision_held_to_one_grant_exercises_that_grant_and_no_other() -> TestResul
         .grants
         .check_by(directory, &request, Some(other), world.now, None)?;
     assert_eq!(held.grant, other, "the named grant is the one exercised");
+    assert_eq!(held.actions, actions(&["read"])?);
     let index = held.use_event.ok_or("check records a use")??;
     let (signed, _) = &world.grants.events()?[usize::try_from(index)?];
     assert_eq!(
@@ -85,5 +88,22 @@ fn a_decision_held_to_one_grant_exercises_that_grant_and_no_other() -> TestResul
         "{explained:?}"
     );
     assert_eq!(world.events(), before, "a refusal records no use");
+
+    world.reopen(MemoryRelationships::default())?;
+    let kept = world
+        .grants
+        .book()
+        .record(other)
+        .ok_or("the named grant is not held after a reopen")?
+        .last_use();
+    assert_eq!(
+        kept,
+        LastUse::Seen {
+            at: world.now,
+            route: Route::Tool,
+            index
+        },
+        "the use against the named grant is read back from the log"
+    );
     Ok(())
 }
