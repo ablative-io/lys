@@ -94,9 +94,12 @@ async fn a_browser_coming_back_from_sign_in_is_taken_to_the_screens_signed_in() 
     assert_eq!(status, 303, "a browser is sent on, never shown the JSON");
     assert_eq!(to.as_deref(), Some("/#/me"), "it lands on its own screen");
     assert!(cookie, "and it arrives signed in");
-    let (status, body) = service.get(&back, None).await?;
-    assert_eq!(status, 400, "an answer is used once: {body}");
-    assert_eq!(body["refusal"], "SignInStateUnknown");
+    for again in [binding.as_str(), ""] {
+        let (status, to, cookie) = service.get_page(&back, again).await?;
+        assert_eq!(status, 303, "an answer is used once");
+        assert_eq!(to.as_deref(), Some("/#/sign-in?refused=SignInStateUnknown"));
+        assert!(!cookie, "and a second use signs nobody in");
+    }
     Ok(())
 }
 
