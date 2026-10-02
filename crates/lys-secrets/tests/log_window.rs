@@ -94,6 +94,16 @@ fn the_large_fixture_requires_no_runtime_store_appends() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn the_large_fixture_requires_no_runtime_store_appends() -> TestResult {
+    let seed = built()?;
+    assert_eq!(
+        seed.appends, 0,
+        "the large fixture must load recorded bytes without appending to the store"
+    );
+    Ok(())
+}
+
 /// One printed page: each row's index and the index its outcome names,
 /// and the line printed after the rows.
 struct Printed {
