@@ -8,8 +8,8 @@ import type { DelegateBody, LastUse } from '../src/generated/grants';
 
 beforeEach(() => sessionStorage.clear());
 
-const SERVICE = { ...BASE, '/grants/model': ok(MODEL) };
-const BEA_SERVICE = { ...BEA_BASE, '/grants/model': ok(MODEL) };
+const SERVICE: typeof BASE = { ...BASE, '/grants/model': ok(MODEL) };
+const BEA_SERVICE: typeof BEA_BASE = { ...BEA_BASE, '/grants/model': ok(MODEL) };
 
 const holdRows = () => $$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr');
 
