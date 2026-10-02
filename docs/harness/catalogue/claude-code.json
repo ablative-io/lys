@@ -66,13 +66,13 @@
     },
     "permissions": {
       "modes": [
-        "workspace-only",
         "default",
         "acceptEdits",
         "plan",
         "auto",
         "dontAsk",
-        "bypassPermissions"
+        "bypassPermissions",
+        "workspace-only"
       ],
       "rule_forms": [
         "tool_specifier"
