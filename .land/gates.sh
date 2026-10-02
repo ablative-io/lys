@@ -30,7 +30,10 @@ identity_leg() {
     echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
     return 1
   fi
-  cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail
+  identity_status=0
+  cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail || identity_status=1
+  python3 -B scripts/identity-gates/spicedb_fixture.py -- cargo nextest run --locked -p lys-identity-server --all-features --test identity_spicedb --no-fail-fast --retries 0 --no-tests fail || identity_status=1
+  return "$identity_status"
 }
 # The interpreter is named first, so a run here that differs from a run
 # elsewhere says which python3 each one used.

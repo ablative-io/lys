@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::grants::{
     Action, Model, ObjectRef, Relation, Relationship, RelationshipStore, Resource,
 };
@@ -24,8 +24,6 @@ use serde_json::json;
 mod bench;
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
-
-const MODEL: &str = r#"{"version":1,"relations":{"owner":["view","edit","grant"],"editor":["view","edit"],"viewer":["view"]}}"#;
 
 const BEA: &str = "bea-subject";
 
@@ -40,7 +38,8 @@ fn settings(mirror: &str) -> Result<SpiceDbSettings, Box<dyn std::error::Error>>
 /// The live engine, on the shipped model: every live test writes the same
 /// schema, so none takes away a relation another is checking.
 fn engine() -> Result<SpiceDb, Box<dyn std::error::Error>> {
-    Ok(SpiceDb::open(&settings("proof_live")?, &shipped()?)?)
+    let mirror = OperationId::generate()?.to_string().replace('-', "_");
+    Ok(SpiceDb::open(&settings(&mirror)?, &shipped()?)?)
 }
 
 fn login(subject: &str) -> Login {
@@ -147,10 +146,12 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let run = format!("{}_{now}", std::process::id());
     let mirror = settings(&format!("proof_service_{run}"))?;
-    let (service, seeded) = Service::start_judging(MODEL, Some(mirror.clone()), |config| {
-        Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
-    })
-    .await?;
+    drop(SpiceDb::open(&mirror, &shipped()?)?);
+    let (service, seeded) =
+        Service::start_judging(&live_model()?, Some(mirror.clone()), |config| {
+            Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
+        })
+        .await?;
     let bea = seeded.people[1].id;
     let ada_cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea_cookie = service.sign_in(login(BEA)).await?;
@@ -162,6 +163,7 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
         .post("/grants/check", Some(&bea_cookie), &question)
         .await?;
     assert_eq!(status, 403, "nothing is granted yet: {refused}");
+    full_schema(&mirror).await?;
 
     let (status, issued) = service
         .post(
@@ -251,14 +253,22 @@ async fn held_schema(settings: &SpiceDbSettings) -> Result<String, Box<dyn std::
     Ok(answer["schemaText"].as_str().unwrap_or_default().to_owned())
 }
 
+async fn full_schema(settings: &SpiceDbSettings) -> Outcome {
+    let schema = held_schema(settings).await?;
+    assert!(schema.contains("permission x0_person_dprofile_dset"));
+    assert!(schema.contains("relation x0_only_dperson_dprofile_dset"));
+    Ok(())
+}
+
 #[tokio::test]
 async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -> Outcome {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let run = format!("{}_{now}", std::process::id());
     let engine = settings(&format!("proof_bench_{run}"))?;
+    drop(SpiceDb::open(&engine, &shipped()?)?);
     let broker = identity_contract::app_custody::start().await?;
     let (service, seeded) = Service::start_adjusted(
-        GRANT_MODEL,
+        &live_model()?,
         Some(engine.clone()),
         None,
         None,
@@ -280,6 +290,7 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
     let bea = seeded.people[1].id.to_string();
 
     bench::answers_as_saved(&service, &admin, &bea).await?;
+    full_schema(&engine).await?;
 
     let after = held_schema(&engine).await?;
     assert!(
@@ -297,9 +308,16 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
     Ok(())
 }
 
-/// The model Lys ships, every dotted action and `only.` relation in it.
+fn live_model() -> Result<String, Box<dyn std::error::Error>> {
+    let mut file: serde_json::Value = serde_json::from_str(&lys_identity::grants::shipped_model())?;
+    file["relations"]["alpha"] = json!(["read", "write"]);
+    file["relations"]["beta"] = json!(["read"]);
+    Ok(serde_json::to_string(&file)?)
+}
+
+/// The full model, including the relations the bench fixtures use.
 fn shipped() -> Result<Model, Box<dyn std::error::Error>> {
-    let file: serde_json::Value = serde_json::from_str(&lys_identity::grants::shipped_model())?;
+    let file: serde_json::Value = serde_json::from_str(&live_model()?)?;
     let mut relations = Vec::new();
     for (relation, actions) in file["relations"].as_object().ok_or("no relations")? {
         let actions = actions
