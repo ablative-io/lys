@@ -106,8 +106,28 @@ fn prepare(config: &lys_identity_server::Config, seed: Seed) -> Outcome {
 }
 
 async fn upgraded(seed: Seed) -> Result<Service, Box<dyn Error>> {
-    let (mut service, ()) =
-        Service::start_judging(MODEL, None, move |config| prepare(config, seed)).await?;
+    let (mut service, ()) = Service::start_adjusted(
+        MODEL,
+        None,
+        None,
+        None,
+        |config| {
+            config.requests_dir = None;
+            config.certificates_dir = None;
+            config.network_file = None;
+            config.roles_file = None;
+            config.provisioning_file = None;
+            config.homes_dir = None;
+            config.runtime_dir = None;
+            config.teams_dir = None;
+            config.stops_dir = None;
+            config.budgets_dir = None;
+            config.goals_dir = None;
+            config.reviews_dir = None;
+        },
+        move |config| prepare(config, seed),
+    )
+    .await?;
     let path = service.dir.path().join("loader.credential");
     fs::write(&path, credential())?;
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
