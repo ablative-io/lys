@@ -136,7 +136,8 @@ fn redirect_allowed(uri: &str) -> bool {
 }
 
 fn back_to(redirect_uri: &str, pairs: &[(&str, &str)]) -> Result<Response, ServerError> {
-    let mut url = reqwest::Url::parse(redirect_uri).map_err(|_unread| ServerError::RedirectUnregistered)?;
+    let mut url =
+        reqwest::Url::parse(redirect_uri).map_err(|_unread| ServerError::RedirectUnregistered)?;
     {
         let mut query = url.query_pairs_mut();
         for (name, value) in pairs {
@@ -176,11 +177,16 @@ impl Apps {
     /// The agent and app a connected app's bearer token names; none when the
     /// request carries no bearer token. A bearer token that is not a live
     /// connected-app access token is refused.
-    pub(crate) fn bearer(&self, headers: &HeaderMap) -> Result<Option<(AgentId, String)>, ServerError> {
+    pub(crate) fn bearer(
+        &self,
+        headers: &HeaderMap,
+    ) -> Result<Option<(AgentId, String)>, ServerError> {
         let Some(value) = headers.get(header::AUTHORIZATION) else {
             return Ok(None);
         };
-        let text = value.to_str().map_err(|_unread| ServerError::TokenUnknown)?;
+        let text = value
+            .to_str()
+            .map_err(|_unread| ServerError::TokenUnknown)?;
         let Some(token) = text.strip_prefix("Bearer ") else {
             return Ok(None);
         };
@@ -188,7 +194,8 @@ impl Apps {
         let issued = store
             .token(&digest(token.trim()), Kind::Access, now())
             .ok_or(ServerError::TokenUnknown)?;
-        let agent = AgentId::from_str(&issued.agent).map_err(|_unread| ServerError::TokenUnknown)?;
+        let agent =
+            AgentId::from_str(&issued.agent).map_err(|_unread| ServerError::TokenUnknown)?;
         Ok(Some((agent, issued.client_id.clone())))
     }
 
@@ -229,7 +236,12 @@ impl Apps {
 
     /// The agent an approval makes for the app, or the one an earlier
     /// approval by the same person made.
-    fn agent_for(&self, client_id: &str, name: &str, actor: &lys_identity::Actor) -> Result<String, ServerError> {
+    fn agent_for(
+        &self,
+        client_id: &str,
+        name: &str,
+        actor: &lys_identity::Actor,
+    ) -> Result<String, ServerError> {
         let person = with_directory(&self.state, |directory| {
             crate::read_api::own_person(directory.projection()?, actor)
         })?;
@@ -266,7 +278,10 @@ pub(crate) fn routes(apps: Arc<Apps>) -> Router {
     Router::new()
         .route("/.well-known/oauth-protected-resource", get(resource))
         .route("/.well-known/oauth-protected-resource/mcp", get(resource))
-        .route("/.well-known/oauth-protected-resource/api/mcp", get(resource))
+        .route(
+            "/.well-known/oauth-protected-resource/api/mcp",
+            get(resource),
+        )
         .route("/.well-known/oauth-authorization-server", get(server))
         .route("/oauth/mcp/register", post(register))
         .route("/oauth/mcp/authorize", get(authorize))
@@ -278,17 +293,21 @@ pub(crate) fn routes(apps: Arc<Apps>) -> Router {
 /// `router` with every refusal to an unauthenticated caller naming where
 /// the door's protected-resource document is.
 pub(crate) fn challenged(router: Router, metadata: String) -> Router {
-    router.layer(axum::middleware::map_response(move |mut response: Response| {
-        let metadata = metadata.clone();
-        async move {
-            if response.status() == StatusCode::UNAUTHORIZED
-                && let Ok(value) = format!("Bearer resource_metadata=\"{metadata}\"").parse()
-            {
-                response.headers_mut().insert(header::WWW_AUTHENTICATE, value);
+    router.layer(axum::middleware::map_response(
+        move |mut response: Response| {
+            let metadata = metadata.clone();
+            async move {
+                if response.status() == StatusCode::UNAUTHORIZED
+                    && let Ok(value) = format!("Bearer resource_metadata=\"{metadata}\"").parse()
+                {
+                    response
+                        .headers_mut()
+                        .insert(header::WWW_AUTHENTICATE, value);
+                }
+                response
             }
-            response
-        }
-    }))
+        },
+    ))
 }
 
 async fn resource(State(apps): State<Arc<Apps>>) -> Json<serde_json::Value> {

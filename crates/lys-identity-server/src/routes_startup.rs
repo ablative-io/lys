@@ -213,7 +213,8 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     } else {
         "/mcp"
     };
-    let apps = crate::mcp_oauth::Apps::open(Arc::clone(&state), &config.log_dir, &origin, mcp_path)?;
+    let apps =
+        crate::mcp_oauth::Apps::open(Arc::clone(&state), &config.log_dir, &origin, mcp_path)?;
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)))
         .merge(crate::mcp_oauth::routes(Arc::clone(&apps)));

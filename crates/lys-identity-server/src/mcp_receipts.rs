@@ -61,11 +61,13 @@ pub(crate) fn witness(
     let Some(state) = state else {
         return Ok(None);
     };
-    Ok(crate::agent_pass::verified(state, &parts.headers)?.map(|(agent, provenance)| Witness {
-        agent,
-        provenance,
-        signature: String::new(),
-    }))
+    Ok(
+        crate::agent_pass::verified(state, &parts.headers)?.map(|(agent, provenance)| Witness {
+            agent,
+            provenance,
+            signature: String::new(),
+        }),
+    )
 }
 
 /// Whether a route's answer is a change that is kept.

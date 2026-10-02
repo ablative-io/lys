@@ -140,9 +140,8 @@ fn signed(
             .as_bytes(),
     ));
     let payload = crate::agent_signature::payload("POST", "/mcp", bytes, at, &nonce);
-    let signature = crate::routes::hex(
-        &lys_core::attestation::sign_attestation(&payload, key).to_cose_bytes(),
-    );
+    let signature =
+        crate::routes::hex(&lys_core::attestation::sign_attestation(&payload, key).to_cose_bytes());
     Ok(format!("{agent} {at} {nonce} {signature}"))
 }
 

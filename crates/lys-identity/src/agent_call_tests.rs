@@ -6,7 +6,13 @@ const DIGEST: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 #[test]
 fn a_change_a_route_made_is_recorded_as_given() -> Result<(), crate::IdentityError> {
-    let call = AgentCall::new("POST", "/agents/a/goals?x=1", DIGEST, 200, "agent 1 nonce sig")?;
+    let call = AgentCall::new(
+        "POST",
+        "/agents/a/goals?x=1",
+        DIGEST,
+        200,
+        "agent 1 nonce sig",
+    )?;
     assert_eq!(call.method(), "POST");
     assert_eq!(call.path(), "/agents/a/goals?x=1");
     assert_eq!(call.body_sha256(), DIGEST);

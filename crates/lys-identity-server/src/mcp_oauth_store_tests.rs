@@ -35,7 +35,10 @@ fn what_is_kept_is_read_back_after_a_reopen() -> Result<(), Box<dyn std::error::
         10,
     )?;
     let store = Store::open(&path)?;
-    assert_eq!(store.app("client").map(|app| app.name.as_str()), Some("Notes"));
+    assert_eq!(
+        store.app("client").map(|app| app.name.as_str()),
+        Some("Notes")
+    );
     assert_eq!(store.connection("client", "person"), Some("agent"));
     assert!(store.token("access", Kind::Access, 50).is_some());
     assert!(store.token("access", Kind::Refresh, 50).is_none());

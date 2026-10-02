@@ -3,10 +3,10 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
-use axum::Json;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Deserialize;
@@ -56,7 +56,9 @@ pub(super) async fn register(
     {
         let mut store = held(&apps.store)?;
         if store.apps_held() >= APPS_MAX {
-            return Err(malformed("this install holds as many connected apps as it keeps"));
+            return Err(malformed(
+                "this install holds as many connected apps as it keeps",
+            ));
         }
         store.register(
             client_id.clone(),
@@ -102,7 +104,9 @@ pub(super) async fn authorize(
     let Query(asked) = asked.map_err(|refused| malformed(&refused.body_text()))?;
     let name = {
         let store = held(&apps.store)?;
-        let app = store.app(&asked.client_id).ok_or(ServerError::RedirectUnregistered)?;
+        let app = store
+            .app(&asked.client_id)
+            .ok_or(ServerError::RedirectUnregistered)?;
         if !app.redirect_uris.contains(&asked.redirect_uri) {
             return Err(ServerError::RedirectUnregistered);
         }
@@ -111,7 +115,11 @@ pub(super) async fn authorize(
     if asked.response_type != "code" {
         return Err(malformed("an app asks for a code"));
     }
-    if asked.resource.as_ref().is_some_and(|resource| *resource != apps.resource) {
+    if asked
+        .resource
+        .as_ref()
+        .is_some_and(|resource| *resource != apps.resource)
+    {
         return Err(malformed("an app asks only for this install's MCP door"));
     }
     let challenge = match (asked.code_challenge, asked.code_challenge_method.as_deref()) {
@@ -122,7 +130,11 @@ pub(super) async fn authorize(
         Ok(session) => session,
         Err(ServerError::NotSignedIn) => {
             let back = format!("/oauth/mcp/authorize?{}", query.unwrap_or_default());
-            let location = format!("{}?continue={}", crate::sign_in::SIGN_IN_SCREEN, encoded(&back));
+            let location = format!(
+                "{}?continue={}",
+                crate::sign_in::SIGN_IN_SCREEN,
+                encoded(&back)
+            );
             return Ok((StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response());
         }
         Err(error) => return Err(error),
@@ -238,7 +250,10 @@ pub(super) async fn consent(
         }
         _ => return Err(malformed("an approval is answered approve or refuse")),
     };
-    let pairs: Vec<(&str, &str)> = pairs.iter().map(|(name, value)| (*name, value.as_str())).collect();
+    let pairs: Vec<(&str, &str)> = pairs
+        .iter()
+        .map(|(name, value)| (*name, value.as_str()))
+        .collect();
     back_to(&asking.redirect_uri, &pairs)
 }
 
@@ -272,7 +287,12 @@ pub(super) async fn token(
     let issued = match asked.grant_type.as_str() {
         "authorization_code" => exchange(&apps, &asked),
         "refresh_token" => refresh(&apps, &asked),
-        _ => return refused("unsupported_grant_type", "authorization_code or refresh_token"),
+        _ => {
+            return refused(
+                "unsupported_grant_type",
+                "authorization_code or refresh_token",
+            );
+        }
     };
     match issued {
         Ok(response) => response,
@@ -299,7 +319,9 @@ fn exchange(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
     let (Some(code), Some(verifier), Some(redirect_uri)) =
         (&asked.code, &asked.code_verifier, &asked.redirect_uri)
     else {
-        return Err(Refusal::Grant("a code exchange carries its code, verifier and redirect address"));
+        return Err(Refusal::Grant(
+            "a code exchange carries its code, verifier and redirect address",
+        ));
     };
     let held_code = held(&apps.codes)?
         .remove(code)
@@ -308,7 +330,9 @@ fn exchange(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
         return Err(Refusal::Grant("the code is past its instant"));
     }
     if held_code.client_id != asked.client_id || held_code.redirect_uri != *redirect_uri {
-        return Err(Refusal::Grant("the code was not given to this app at this address"));
+        return Err(Refusal::Grant(
+            "the code was not given to this app at this address",
+        ));
     }
     if URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes())) != held_code.challenge {
         return Err(Refusal::Grant("the verifier does not answer the challenge"));
@@ -325,9 +349,13 @@ fn refresh(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
         let store = held(&apps.store)?;
         let issued = store
             .token(&spent, Kind::Refresh, now())
-            .ok_or(Refusal::Grant("the refresh token is unknown, used or past its instant"))?;
+            .ok_or(Refusal::Grant(
+                "the refresh token is unknown, used or past its instant",
+            ))?;
         if issued.client_id != asked.client_id {
-            return Err(Refusal::Grant("the refresh token was not given to this app"));
+            return Err(Refusal::Grant(
+                "the refresh token was not given to this app",
+            ));
         }
         issued.agent.clone()
     };

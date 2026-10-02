@@ -74,16 +74,31 @@ fn an_agent_call_is_kept_with_a_receipt_and_read_back_on_reopen() -> TestResult 
             .is_err(),
         "a call is kept only against the agent that made it"
     );
-    let before = directory.projection()?.record(IdentityId::Agent(agent)).ok_or("no agent")?.events().len();
+    let before = directory
+        .projection()?
+        .record(IdentityId::Agent(agent))
+        .ok_or("no agent")?
+        .events()
+        .len();
     directory.record_agent_call(actor, agent, call, 14)?;
-    let after = directory.projection()?.record(IdentityId::Agent(agent)).ok_or("no agent")?.events().len();
+    let after = directory
+        .projection()?
+        .record(IdentityId::Agent(agent))
+        .ok_or("no agent")?
+        .events()
+        .len();
     assert_eq!(after, before + 1);
     drop(directory);
     let mut again = Directory::open(
         Box::new(move || FileLeafStore::open(&log)),
         Ed25519Identity::load(&key)?,
     )?;
-    let replayed = again.projection()?.record(IdentityId::Agent(agent)).ok_or("no agent")?.events().len();
+    let replayed = again
+        .projection()?
+        .record(IdentityId::Agent(agent))
+        .ok_or("no agent")?
+        .events()
+        .len();
     assert_eq!(replayed, after);
     Ok(())
 }

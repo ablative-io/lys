@@ -16,14 +16,21 @@ const REDIRECT: &str = "https://app.example/callback";
 const VERIFIER: &str = "a-verifier-of-at-least-forty-three-characters-long";
 
 async fn service() -> Result<(Service, String), Box<dyn Error>> {
-    use lys_identity::{Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance};
+    use lys_identity::{
+        Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance,
+    };
     let (service, ()) = Service::start_with(|config| {
         lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
         let path = config.log_dir.clone();
         let key = lys_identity::signer::load_service_key(&config.event_key_file)?;
-        lys_identity::directory_migration::migrate(lys_log_store::FileLeafStore::open(&path)?, &key)?;
-        let mut directory =
-            Directory::open(Box::new(move || lys_log_store::FileLeafStore::open(&path)), key)?;
+        lys_identity::directory_migration::migrate(
+            lys_log_store::FileLeafStore::open(&path)?,
+            &key,
+        )?;
+        let mut directory = Directory::open(
+            Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+            key,
+        )?;
         directory.setup_person(
             Actor::new(
                 LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
@@ -36,12 +43,16 @@ async fn service() -> Result<(Service, String), Box<dyn Error>> {
         Ok(())
     })
     .await?;
-    let cookie = service.sign_in(identity_contract::apps::login(ADMINISTRATOR)).await?;
+    let cookie = service
+        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
+        .await?;
     Ok((service, cookie))
 }
 
 fn client() -> Result<reqwest::Client, Box<dyn Error>> {
-    Ok(reqwest::Client::builder().redirect(Policy::none()).build()?)
+    Ok(reqwest::Client::builder()
+        .redirect(Policy::none())
+        .build()?)
 }
 
 fn located(response: &reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
@@ -69,7 +80,10 @@ async fn connected(service: &Service, cookie: &str) -> Result<(String, Value), B
         .await?
         .json()
         .await?;
-    let client_id = registered["client_id"].as_str().ok_or("no client id")?.to_owned();
+    let client_id = registered["client_id"]
+        .as_str()
+        .ok_or("no client id")?
+        .to_owned();
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
     let page = client
         .get(format!("{}/oauth/mcp/authorize", service.base))
@@ -125,9 +139,11 @@ async fn tree(service: &Service, token: &str) -> Result<reqwest::Response, Box<d
         .header("accept", "application/json, text/event-stream")
         .header("mcp-protocol-version", "2025-11-25")
         .header("authorization", format!("Bearer {token}"))
-        .json(&json!({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{
-            "name":"read", "arguments":{"method":"GET","path":"/tree"}
-        }}))
+        .json(
+            &json!({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{
+                "name":"read", "arguments":{"method":"GET","path":"/tree"}
+            }}),
+        )
         .send()
         .await?)
 }
@@ -139,7 +155,10 @@ async fn an_approved_app_acts_as_its_own_agent_never_as_the_person() -> Result<(
     assert_eq!(tokens["token_type"], "Bearer", "{tokens}");
     let access = tokens["access_token"].as_str().ok_or("no access token")?;
     let called: Value = tree(&service, access).await?.json().await?;
-    assert_eq!(called["result"]["structuredContent"]["status"], 200, "{called}");
+    assert_eq!(
+        called["result"]["structuredContent"]["status"], 200,
+        "{called}"
+    );
     let root = &called["result"]["structuredContent"]["body"]["root"];
     assert_eq!(root["name"], "Notes", "{called}");
     let (_, own) = service.get("/tree", Some(&cookie)).await?;
@@ -217,17 +236,25 @@ async fn an_unknown_bearer_token_is_refused_and_told_where_to_authorize()
         "{challenge}"
     );
     let metadata: Value = client()?
-        .get(format!("{}/.well-known/oauth-protected-resource", service.base))
+        .get(format!(
+            "{}/.well-known/oauth-protected-resource",
+            service.base
+        ))
         .send()
         .await?
         .json()
         .await?;
     assert!(
-        metadata["resource"].as_str().is_some_and(|resource| resource.ends_with("/mcp")),
+        metadata["resource"]
+            .as_str()
+            .is_some_and(|resource| resource.ends_with("/mcp")),
         "{metadata}"
     );
     let server: Value = client()?
-        .get(format!("{}/.well-known/oauth-authorization-server", service.base))
+        .get(format!(
+            "{}/.well-known/oauth-authorization-server",
+            service.base
+        ))
         .send()
         .await?
         .json()
@@ -265,6 +292,9 @@ async fn an_app_asking_while_signed_out_is_sent_to_sign_in_first() -> Result<(),
         .get("location")
         .ok_or("no location")?
         .to_str()?;
-    assert!(location.starts_with("/#/sign-in?continue=%2Foauth%2Fmcp%2Fauthorize%3F"), "{location}");
+    assert!(
+        location.starts_with("/#/sign-in?continue=%2Foauth%2Fmcp%2Fauthorize%3F"),
+        "{location}"
+    );
     Ok(())
 }

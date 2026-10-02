@@ -416,13 +416,14 @@ async fn call(
     } else {
         Vec::new()
     };
-    let witness = crate::mcp_receipts::witness(
-        endpoint.state.as_deref(),
-        &parts,
-        signer,
-        app.as_ref(),
-    )
-    .map_err(|error| (-32603, format!("the call's agent could not be named: {error}")))?;
+    let witness =
+        crate::mcp_receipts::witness(endpoint.state.as_deref(), &parts, signer, app.as_ref())
+            .map_err(|error| {
+                (
+                    -32603,
+                    format!("the call's agent could not be named: {error}"),
+                )
+            })?;
     let relayed = signer.or_else(|| app.as_ref().map(|(agent, _)| *agent));
     let kept = (
         parts.method.clone(),

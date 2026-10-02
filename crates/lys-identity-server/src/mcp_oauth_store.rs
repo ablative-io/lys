@@ -62,8 +62,9 @@ impl Store {
     /// Open the store at `path`, empty when no file is there yet.
     pub(crate) fn open(path: &Path) -> Result<Self, ServerError> {
         let held = match std::fs::read(path) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())))?,
+            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
+                unavailable(format!("{} does not read: {error}", path.display()))
+            })?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Held::default(),
             Err(error) => return Err(unavailable(format!("{}: {error}", path.display()))),
         };
