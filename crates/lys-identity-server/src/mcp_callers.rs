@@ -66,3 +66,31 @@ pub(crate) fn connected_app(
     }
     Ok(Some(app))
 }
+
+/// A route's answer as an MCP tool result, its status and body kept.
+pub(crate) async fn rendered(
+    response: axum::response::Response,
+) -> Result<serde_json::Value, (i32, String)> {
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), crate::mcp_endpoint::BODY_LIMIT)
+        .await
+        .map_err(|error| {
+            (
+                -32603,
+                format!("the HTTP route response exceeded the MCP limit or failed: {error}"),
+            )
+        })?;
+    let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
+        Ok(body) => body,
+        Err(_) => serde_json::Value::String(String::from_utf8(bytes.to_vec()).map_err(|error| {
+            (
+                -32603,
+                format!("the HTTP route response is not JSON or text: {error}"),
+            )
+        })?),
+    };
+    let answer = serde_json::json!({"status":status.as_u16(),"body":body});
+    Ok(
+        serde_json::json!({"isError":!status.is_success(),"content":[{"type":"text","text":answer.to_string()}],"structuredContent":answer}),
+    )
+}

@@ -15,7 +15,7 @@ use crate::error::ServerError;
 #[path = "mcp_endpoint_tests.rs"]
 mod tests;
 
-const BODY_LIMIT: usize = 2 * 1024 * 1024;
+pub(crate) const BODY_LIMIT: usize = 2 * 1024 * 1024;
 
 #[derive(Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(transparent)]
@@ -393,7 +393,7 @@ async fn call(
             Ok(principal) => {
                 parts.extensions.insert(principal);
             }
-            Err(error) => return rendered(error.into_response()).await,
+            Err(error) => return crate::mcp_callers::rendered(error.into_response()).await,
         }
     }
     parts.method = Method::from_bytes(call.arguments.method.as_bytes())
@@ -457,7 +457,7 @@ async fn call(
         Err(error) => match error {},
     };
     let status = response.status();
-    let mut result = rendered(response).await?;
+    let mut result = crate::mcp_callers::rendered(response).await?;
     let (Some(state), Some(witness)) = (endpoint.state.as_deref(), witness) else {
         return Ok(result);
     };
@@ -478,29 +478,4 @@ async fn call(
             ))
         }
     }
-}
-
-async fn rendered(response: Response) -> ResultValue {
-    let status = response.status();
-    let bytes = to_bytes(response.into_body(), BODY_LIMIT)
-        .await
-        .map_err(|error| {
-            (
-                -32603,
-                format!("the HTTP route response exceeded the MCP limit or failed: {error}"),
-            )
-        })?;
-    let body = match serde_json::from_slice::<Value>(&bytes) {
-        Ok(body) => body,
-        Err(_) => Value::String(String::from_utf8(bytes.to_vec()).map_err(|error| {
-            (
-                -32603,
-                format!("the HTTP route response is not JSON or text: {error}"),
-            )
-        })?),
-    };
-    let answer = json!({"status":status.as_u16(),"body":body});
-    Ok(
-        json!({"isError":!status.is_success(),"content":[{"type":"text","text":answer.to_string()}],"structuredContent":answer}),
-    )
 }
