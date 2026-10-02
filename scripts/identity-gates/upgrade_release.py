@@ -9,6 +9,7 @@ import re
 BUDGETS_API = "crates/lys-identity-server/src/budgets_api.rs"
 TEAMS_API = "crates/lys-identity-server/src/teams_api.rs"
 INTENT = "crates/lys/src/identity/upgrade/intent.rs"
+REFUSALS = "crates/lys-identity-server/src/openapi_refusals.rs"
 
 # `PUT /budgets/{kind}/{id}`: one measure per request, or the holder's whole collection.
 PER_MEASURE_BODY = frozenset({"version", "measure", "limit", "period", "act"})
@@ -61,12 +62,31 @@ def put_back_model(text, path=INTENT):
     return "keeps_data" if re.search(r"^\s*DataKept\b", match.group(1), re.M) else "no_data"
 
 
+def zone_model(text):
+    """`organisation` when the release's published refusals name BudgetZoneRefused, else `explicit`.
+
+    Such a release counts every new limit in the organisation zone and keeps an
+    explicit zone only on a limit migrated with one.
+    """
+    return "organisation" if "BudgetZoneRefused" in text else "explicit"
+
+
+def zoned(limits, zones):
+    """`limits` as a release with the `zones` model accepts them as new."""
+    if zones == "explicit":
+        return [dict(limit) for limit in limits]
+    if zones != "organisation":
+        raise RuntimeError(f"no limits for a release whose zones are {zones!r}")
+    return [{key: value for key, value in limit.items() if key != "zone"} for limit in limits]
+
+
 def old_release(read):
     """The old release's request and answer shapes; `read` returns a source file's text."""
     return {
         "budgets": budget_model(read(BUDGETS_API)),
         "teams": team_model(read(TEAMS_API)),
         "put_back": put_back_model(read(INTENT)),
+        "zones": zone_model(read(REFUSALS)),
     }
 
 

@@ -6,8 +6,8 @@ from pathlib import Path
 
 from upgrade_fixture import populate
 
-PER_MEASURE = {"budgets": "per_measure", "teams": "unguarded"}
-LIMITS = {"budgets": "limits", "teams": "guarded"}
+PER_MEASURE = {"budgets": "per_measure", "teams": "unguarded", "zones": "explicit"}
+LIMITS = {"budgets": "limits", "teams": "guarded", "zones": "organisation"}
 
 
 class OldApi:
@@ -59,8 +59,7 @@ class SeedTests(unittest.TestCase):
     def test_a_limits_release_is_sent_the_same_limit_as_its_whole_collection(self):
         self.assertEqual(self.budget_request(LIMITS), [("PUT", {
             "version": 0, "warn_at": None,
-            "limits": [{"unit": "tokens", "amount": 100, "period": "day",
-                        "zone": "Australia/Melbourne", "act": "tell"}]})])
+            "limits": [{"unit": "tokens", "amount": 100, "period": "day", "act": "tell"}]})])
 
     def test_an_unknown_budget_model_is_refused_before_any_budget_is_sent(self):
         browser = OldApi()

@@ -121,21 +121,27 @@ such a release the old installer must refuse the record by its unknown
 `bin.previous/` standing; the candidate's installer then finishes the recovery,
 putting the kept data back, and every check that follows is the same.
 An install on such a release that is interrupted mid-upgrade is recovered with
-the new `lys`, never the old one. A second reversible window independently exercises the candidate recovery path, with the same byte and record checks. It finally runs the normal candidate CLI upgrade separately.
+the new `lys`, never the old one. A release whose published refusals name
+`BudgetZoneRefused` (cced4195 and 255a3bca) counts every new limit in the
+organisation zone, so the seed gives it the same limits without a zone of their
+own; older releases take the limits with their explicit zones. A second reversible window independently exercises the candidate recovery path, with the same byte and record checks. It finally runs the normal candidate CLI upgrade separately.
 
 The old loader also creates an agent through the real bearer import endpoint. Its original signed receipt, service public key and digest are recorded as a historical vector and must stay identical during both reversible windows, after both recoveries and after the final upgrade. The fixture never re-encodes or signs that vector itself.
 
 The negative leg creates its own fresh old install. At the same interruption
 point the driver stops only that install using the production unit lifecycle,
 then deliberately appends one team leaf the old release cannot read through
-the actual log store. Against an unguarded release (one whose team answer has
-no `held`) that leaf is the candidate's own `held` line. A guarded release
-already reads every team line the candidate writes, so no candidate record is
-unreadable to it; the leaf is then the `upgrade_proof_undefined` line, which no
-release defines, and the receipt records `candidate_format: false`. The byte
-checker must name that record and the real old installer's recovery must fail
-with that exact leaf's unknown variant. A generic boot failure does not count.
-The private receipt records the path, the line and the decoder refusal.
+the actual log store, after the upgrade kept the data it started from. Against
+an unguarded release (one whose team answer has no `held`) that leaf is the
+candidate's own `held` line; a guarded release already reads every team line
+the candidate writes, so the leaf is then the `upgrade_proof_undefined` line,
+which no release defines, and the receipt records `candidate_format: false`.
+The byte checker must name that record. Then the put-back each release can
+make runs: the old installer's own for a release that keeps data, or, for one
+that does not, the old installer's refusal of the record and the candidate's
+installer after it. The old binaries must be back, the record gone and every
+file of the team log byte for byte as before the upgrade. The private receipt
+records the path, the line and who put the install back.
 
 After the positive normal upgrade clears its intent, the proof checks that the
 old family bytes still stand, crashes only its own identity process, and waits

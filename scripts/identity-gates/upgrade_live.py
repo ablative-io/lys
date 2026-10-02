@@ -13,10 +13,12 @@ import socket
 import subprocess
 import sys
 
-from upgrade_fixture import Browser, admitted_after_upgrade, observe, populate, same_records
+from upgrade_fixture import (
+    Browser, admitted_after_upgrade, observe, populate, restored_records, same_records,
+)
 from upgrade_legacy import seed as seed_legacy, verify as verify_legacy
 from upgrade_window import MARKER, legacy_files, pending, profile_file, unchanged
-from upgrade_negative import exercise as exercise_negative
+from upgrade_negative import exercise as exercise_negative, put_back as release_put_back
 from upgrade_restart import settle as settle_restart
 from upgrade_provenance import seed as seed_provenance, verify as verify_provenance
 
@@ -35,26 +37,6 @@ def run(command, log, env=None, expected=0):
         raise RuntimeError(
             f"{command[0]} exited {completed.returncode}, expected {expected}; evidence: {log}"
         )
-
-
-def refuse_old_put_back(installed, log, env, root):
-    """An old installer that keeps no data must refuse the record by name and touch nothing.
-
-    It cannot put back the data the candidate wrote, which its own build cannot
-    read, so it must refuse the record on the step it does not know before it
-    stops or moves anything: the record and the kept binaries stand for the
-    candidate's installer, which puts the kept data back, to finish.
-    """
-    with log.open("wb") as output:
-        completed = subprocess.run(installed, stdout=output, stderr=subprocess.STDOUT, env=env)
-    if completed.returncode == 0:
-        raise RuntimeError(f"old installer reported a put-back it cannot make; evidence: {log}")
-    if "unknown variant `data_kept`" not in log.read_text(errors="replace"):
-        raise RuntimeError(f"old installer did not refuse the record by its kept-data step; evidence: {log}")
-    if not (root / "install/upgrade.json").is_file():
-        raise RuntimeError(f"old installer's refusal removed the upgrade record; evidence: {log}")
-    if not (root / "bin.previous").is_dir():
-        raise RuntimeError(f"old installer moved the kept binaries before refusing; evidence: {log}")
 
 
 def stamp(directory, expected, programs=PROGRAMS):
@@ -633,7 +615,7 @@ def exercise(args):
         if args.negative_control:
             receipt = exercise_negative(
                 root, evidence, driver, installed, env, files, run, installed_stamp, args.old_commit,
-                args.prepared["release"]["teams"],
+                args.prepared["release"]["teams"], args.prepared["release"]["put_back"],
             )
         else:
             # Re-enter the real old installer. Its existing recovery runs before installation.
@@ -642,12 +624,7 @@ def exercise(args):
             if (root / "config.previous/identity.json").read_bytes() != original_config:
                 raise RuntimeError("candidate backup differs from old original config")
             put_back = args.prepared["release"]["put_back"]
-            if put_back == "keeps_data":
-                run(installed, evidence / "recover-old.log", env)
-            else:
-                refuse_old_put_back(installed, evidence / "recover-old.log", env, root)
-                run([str(driver), "--root", str(root), "recover"],
-                    evidence / "recover-after-old.log", env)
+            recovered_by = release_put_back(root, evidence, driver, installed, env, run, put_back, "")
             if config_file.read_bytes() != original_config:
                 raise RuntimeError("old installer did not restore exact original config")
             verify_provenance(browser, provenance)
@@ -656,8 +633,8 @@ def exercise(args):
                     {
                         "reader_commit": args.old_commit,
                         "intent_sha256": hashlib.sha256(intent_bytes).hexdigest(),
-                        "old_installer_recovered": put_back == "keeps_data",
-                        "recovered_by": "old" if put_back == "keeps_data" else "candidate",
+                        "old_installer_recovered": recovered_by == "old",
+                        "recovered_by": recovered_by,
                         "configuration_restored_byte_for_byte": True,
                     },
                     indent=2,
@@ -666,7 +643,7 @@ def exercise(args):
             if (root / "install/upgrade.json").exists():
                 raise RuntimeError("old installer recovery left the upgrade intent standing")
             installed_stamp(root / "bin", args.old_commit)
-            same_records(before, observe(browser, ids))
+            restored_records(before, observe(browser, ids))
             for path, expected in [
                 (f"/teams/{legacy['team']}", legacy["team_before"]),
                 (f"/budgets/person/{legacy['person']}", legacy["budgets_before"]),
@@ -717,7 +694,7 @@ def exercise(args):
             if config_file.read_bytes() != original_config:
                 raise RuntimeError("candidate back path did not restore original config bytes")
             installed_stamp(root / "bin", args.old_commit)
-            same_records(before, observe(browser, ids))
+            restored_records(before, observe(browser, ids))
             verify_provenance(browser, provenance)
             (evidence / "candidate-back.json").write_text(
                 json.dumps(

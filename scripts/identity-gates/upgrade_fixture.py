@@ -4,7 +4,7 @@ import http.client
 import json
 import secrets
 
-from upgrade_release import limits_body, per_measure_body
+from upgrade_release import limits_body, per_measure_body, zoned
 
 
 def operation():
@@ -47,7 +47,7 @@ AGENT_LIMIT = {"unit": "tokens", "amount": 100, "period": "day", "zone": "Austra
 def agent_budget_body(release):
     """The agent's one budget, in the request shape the old release accepts."""
     if release["budgets"] == "limits":
-        return limits_body([AGENT_LIMIT], 0)
+        return limits_body(zoned([AGENT_LIMIT], release["zones"]), 0)
     if release["budgets"] == "per_measure":
         return per_measure_body(AGENT_LIMIT, 0)
     raise RuntimeError(f"no agent budget request for the {release['budgets']} budget model")
@@ -465,6 +465,16 @@ def same_records(before, after):
             continue
         if before[name] != value:
             raise RuntimeError(f"upgrade changed the {name} readback")
+
+
+def restored_records(before, after):
+    """After a put-back the previous build runs on the data it last ran on: every
+    domain reads back exactly as it did before the upgrade, with nothing migrated."""
+    if before.keys() != after.keys():
+        raise RuntimeError("put-back readback domains differ")
+    for name in sorted(before):
+        if before[name] != after[name]:
+            raise RuntimeError(f"put-back changed the {name} readback")
 
 
 def admitted_after_upgrade(browser, administrator):

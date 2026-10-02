@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from upgrade_fixture import same_records
+from upgrade_fixture import restored_records, same_records
 from upgrade_live import app_leaves, installation, network_subnets, preserve_leaves, stamp
 
 
@@ -185,13 +185,21 @@ class UpgradeProofTests(unittest.TestCase):
             self.assertEqual((root / "deployment.toml").read_text(),
                              'project = "fixture"\nsubnet = "172.29.49.0/24"\n')
 
-    def test_rollback_readback_accepts_the_actual_old_budget_shape(self):
+    def test_a_put_back_reads_back_exactly_what_the_old_build_read_before(self):
         before, after = records()
-        rolled_back = copy.deepcopy(before)
-        rolled_back["configuration"]["permissions"]["model_version"] = 2
-        same_records(before, rolled_back)
-        with self.assertRaisesRegex(RuntimeError, "model version is not 2"):
-            same_records(before, copy.deepcopy(before))
+        restored_records(before, copy.deepcopy(before))
+        migrated = copy.deepcopy(before)
+        migrated["configuration"]["permissions"]["model_version"] = 2
+        with self.assertRaisesRegex(RuntimeError, "put-back changed the configuration readback"):
+            restored_records(before, migrated)
+        for name in before:
+            changed = copy.deepcopy(before)
+            changed[name] = {"changed": name}
+            with self.subTest(domain=name), \
+                    self.assertRaisesRegex(RuntimeError, f"put-back changed the {name} readback"):
+                restored_records(before, changed)
+        with self.assertRaisesRegex(RuntimeError, "domains differ"):
+            restored_records(before, {})
 
     def test_realistic_old_and_candidate_readbacks_agree(self):
         before, after = records()

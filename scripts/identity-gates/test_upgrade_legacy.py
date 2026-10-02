@@ -225,7 +225,8 @@ class OldRelease:
             with patch("upgrade_legacy.issuer_person", return_value="legacy-member-subject"), \
                     patch("upgrade_legacy.Browser", return_value=self.caller("member")):
                 return seed(self.caller("admin"), root, ids,
-                            {"budgets": self.budgets, "teams": self.teams})[0]
+                            {"budgets": self.budgets, "teams": self.teams,
+                             "zones": "organisation" if self.budgets == "limits" else "explicit"})[0]
 
     def sent(self, method, path):
         return [(who, body, status) for who, verb, at, body, status in self.calls
@@ -249,17 +250,18 @@ class SeedShapeTests(unittest.TestCase):
         ])
         self.assertEqual([who for who, body, status in release.sent("POST", f"/teams/{TEAM}/members")],
                          ["member"] * 3)
-        self.assertEqual(fixture["release"], {"budgets": "per_measure", "teams": "unguarded"})
+        self.assertEqual(fixture["release"], {"budgets": "per_measure", "teams": "unguarded",
+                                              "zones": "explicit"})
         self.assertEqual(fixture["refusals"], {})
         self.assertEqual(set(fixture["original"]), {"tokens", "running_ms"})
 
     def test_a_limits_release_is_sent_the_same_limits_once_and_refuses_the_self_edit(self):
         release = OldRelease("limits", "guarded")
         fixture = release.seed()
+        # An organisation-zone release takes new limits without a zone of their own.
         limits = [{"unit": "context_percent", "amount": 60, "period": None, "act": "tell"},
-                  {"unit": "tokens", "amount": 100, "period": "week", "zone": "UTC", "act": "stop"},
-                  {"unit": "running_ms", "amount": 1000, "period": "week", "zone": "UTC",
-                   "act": "stop"}]
+                  {"unit": "tokens", "amount": 100, "period": "week", "act": "stop"},
+                  {"unit": "running_ms", "amount": 1000, "period": "week", "act": "stop"}]
         edit = [limits[0], dict(limits[1], amount=200), dict(limits[2], period="day")]
         self.assertEqual(release.sent("PUT", f"/budgets/person/{PERSON}"), [
             ("admin", {"version": 0, "limits": limits, "warn_at": None}, 200),
@@ -310,7 +312,7 @@ def limits_fixture():
         "unavailable": [{"unit": "dollars", "reason": "no source reports dollars"}],
         "within": [], "unconfirmed": [],
     }
-    before = {"release": {"budgets": "limits", "teams": "guarded"}, "team": TEAM, "person": PERSON,
+    before = {"release": {"budgets": "limits", "teams": "guarded", "zones": "organisation"}, "team": TEAM, "person": PERSON,
               "foreign": [AGENT, OWNER], "added": {}, "limits": copy.deepcopy(PERSON_LIMITS),
               "refusals": {"agent": "not_permitted", "person": "NotAdmitted",
                            "self_edit": "not_permitted"},

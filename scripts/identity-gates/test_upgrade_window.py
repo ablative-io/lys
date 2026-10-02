@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from upgrade_negative import UNDEFINED_LINE, poison_line, require_old_refusal
+from upgrade_negative import UNDEFINED_LINE, poison_line, put_back, team_log_restored
 from upgrade_window import family_files, pending, profile_file, refuse_operator, refused_writes, unchanged
 
 
@@ -122,15 +122,32 @@ class WindowProofTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "reversible window"):
                     pending(root)
 
-    def test_negative_control_requires_its_exact_leaf_decoder_refusal(self):
-        path = Path("/fixture/teams/leaves/00000000000000000012")
-        for line in ("held", UNDEFINED_LINE):
-            require_old_refusal(f"leaf 12 is not a team line: unknown variant `{line}`", path, line)
-            for text in ("port busy", f"leaf 11 is not a team line: unknown variant `{line}`",
-                         "leaf 12 is not a team line: malformed json",
-                         "leaf 12 is not a team line: unknown variant `other`"):
-                with self.subTest(line=line, text=text), self.assertRaisesRegex(RuntimeError, str(path)):
-                    require_old_refusal(text, path, line)
+    def test_a_put_back_returns_the_team_log_without_the_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = root / "data/teams/leaves/00000000000000000004"
+            files = {"data/teams/leaves/00000000000000000003": "a", "data/budgets/b": "b"}
+            team_log_restored(root, files, dict(files), record)
+            record.parent.mkdir(parents=True)
+            record.write_text("{}")
+            with self.assertRaisesRegex(RuntimeError, "left the record"):
+                team_log_restored(root, files, dict(files), record)
+            record.unlink()
+            changed = dict(files, **{"data/teams/leaves/00000000000000000003": "z"})
+            with self.assertRaisesRegex(RuntimeError, "leaves/00000000000000000003"):
+                team_log_restored(root, files, changed, record)
+            with self.assertRaisesRegex(RuntimeError, "no legacy file"):
+                team_log_restored(root, {"data/budgets/b": "b"}, {"data/budgets/b": "b"}, record)
+
+    def test_each_release_puts_back_through_the_installer_that_can(self):
+        ran = []
+        run = lambda command, log, env=None, expected=0: ran.append((command, log.name))
+        evidence = Path("/evidence")
+        self.assertEqual(put_back(Path("/root"), evidence, Path("/driver"), ["old"], {}, run,
+                                  "keeps_data", "negative-"), "old")
+        self.assertEqual(ran, [(["old"], "negative-recover-old.log")])
+        with self.assertRaisesRegex(RuntimeError, "no put-back"):
+            put_back(Path("/root"), evidence, Path("/driver"), ["old"], {}, run, "other", "")
 
     def test_negative_control_writes_a_line_each_release_cannot_read(self):
         self.assertEqual(poison_line("unguarded"), "held")

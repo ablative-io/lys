@@ -8,7 +8,7 @@ import secrets
 from urllib.parse import urlsplit
 
 from upgrade_fixture import Browser, migrated_budgets, operation
-from upgrade_release import limits_body, per_measure_body
+from upgrade_release import limits_body, per_measure_body, zoned
 
 
 def issuer_person(root, config, email):
@@ -98,11 +98,12 @@ def seed_budgets(admin, member, release, person):
         return {"first": first, "original": original}
     if release["budgets"] != "limits":
         raise RuntimeError(f"no personal budget seed for the {release['budgets']} budget model")
-    set_answer = admin.ask("PUT", path, limits_body(PERSON_LIMITS, 0))
-    if set_answer["limits"] != PERSON_LIMITS or set_answer["unconfirmed"]:
+    given = zoned(PERSON_LIMITS, release["zones"])
+    set_answer = admin.ask("PUT", path, limits_body(given, 0))
+    if set_answer["limits"] != given or set_answer["unconfirmed"]:
         raise RuntimeError("old release did not hold the personal limits it was given")
-    own_edit = limits_body([edited(limit) for limit in PERSON_LIMITS], set_answer["version"])
-    return {"limits": PERSON_LIMITS,
+    own_edit = limits_body([edited(limit) for limit in given], set_answer["version"])
+    return {"limits": given,
             "refusals": {"self_edit": refused(member, "PUT", path, own_edit, 403, "not_permitted")}}
 
 
