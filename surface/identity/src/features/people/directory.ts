@@ -37,6 +37,9 @@ export const fileNo = (id: string): string => {
 /** The first word of a name, exactly as the mock-up writes `x.name.split(' ')[0]`. */
 export const firstName = (name: string): string => name.split(' ')[0];
 
+/** How a sentence names someone: a person by their first word, an agent by its whole name, since "Walk" is not "Walk Helper". */
+export const calledBy = (id: string, name: string): string => (kindOf(id) === 'agent' ? name : firstName(name));
+
 /** An agent still standing whose person is not active needs a new person (conformance 3.1). */
 export const needsNewPerson = (x: Entry): boolean =>
   x.kind === 'agent' && x.state !== 'retired' && x.person !== null && x.person.state !== 'active';
