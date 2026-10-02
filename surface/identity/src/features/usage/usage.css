@@ -1,31 +1,15 @@
-/* An agent's budget and goals: short lines, each aligned on one row. No charts: analytics stay with the monitoring app. */
-.usage { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
-.usage > [role="status"], .usage > .usage-tracking { grid-column: 1 / -1; margin: 0; }
-.usage-tracking { color: var(--warn); }
-.usage h3 { margin: 0 0 10px; }
-.usage-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.usage-lines li { padding: 6px 0; border-bottom: 1px solid var(--border-default); }
-.usage-lines li[data-reached="true"] .usage-reached { color: var(--warn); }
-.usage form { margin: 0; }
-.usage .usage-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.usage form .usage-name { min-width: 11em; }
-.usage input[type="number"] { width: 8em; }
-.usage input, .usage select, .usage textarea { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 10px; font: inherit; }
-.usage .usage-add { margin-top: 10px; }
-.usage form [role="status"], .usage form [role="alert"], .usage li > p { flex-basis: 100%; margin: 4px 0 0; }
+/* Plain budget and goal controls, drawn from the shared tokens. No charts: analytics stay with the monitoring app. */
+.usage { display: flex; flex-direction: column; gap: 16px; }
+.usage-tracking { margin: 0; color: var(--text-secondary); }
+.usage-tracking[data-complete="false"] { color: var(--warn); }
+.usage-list { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.usage-list th,
+.usage-list td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-default); vertical-align: top; }
+.usage-list tr[data-reached="true"] td:last-child { color: var(--warn); }
+.usage form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 12px; }
+.usage form h4 { flex-basis: 100%; margin: 0; }
+.usage .usage-what { flex-basis: 100%; }
+.usage .usage-what textarea { width: 100%; min-height: 6em; resize: vertical; field-sizing: content; font: inherit; }
+.usage form [role="status"],
+.usage form [role="alert"] { flex-basis: 100%; margin: 0; }
 .usage .why-not { color: var(--danger); }
-.usage-limit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-bottom: 0 !important; }
-.usage-used { color: var(--text-secondary); margin-left: auto; }
-.usage-summary { margin: 10px 0; font-weight: 600; }
-.usage-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-.usage-row label { display: inline-flex; align-items: center; gap: 6px; }
-.usage-row input[type="number"] { width: 4.5em; }
-.usage-note { color: var(--text-secondary); margin: 0 0 8px; }
-.usage-event { color: var(--warn); margin: 8px 0 0; }
-.usage-goal { display: flex; align-items: center; gap: 10px; }
-.usage-goal[data-active="false"] .usage-words { color: var(--text-secondary); }
-.usage-words { flex: 1; min-width: 0; }
-.usage-deadline { color: var(--text-secondary); white-space: nowrap; }
-.usage-add .usage-words { flex: 1 1 60%; }
-.usage-inactive { margin-top: 10px; }
-.usage-inactive summary { cursor: pointer; color: var(--text-secondary); }
