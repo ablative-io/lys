@@ -1,8 +1,6 @@
-use std::error::Error;
 use std::fs::{self, File};
 use std::path::Path;
 use std::process::Command;
-use std::time::Instant;
 
 use sha2::{Digest, Sha256};
 
@@ -11,77 +9,51 @@ fn field(hash: &mut Sha256, bytes: &[u8]) {
     hash.update(bytes);
 }
 
-/// A cache failure retains the operation's named reason.
-pub type CacheResult<T> = Result<T, Box<dyn Error>>;
-
-fn sources(hash: &mut Sha256, root: &Path, dir: &Path) -> CacheResult<()> {
+fn sources(hash: &mut Sha256, root: &Path, dir: &Path) {
     let mut entries: Vec<_> = fs::read_dir(dir)
-        .map_err(|error| format!("go_cache_sources_unreadable: {}: {error}", dir.display()))?
-        .collect::<Result<_, _>>()
-        .map_err(|error| {
-            format!(
-                "go_cache_directory_entry_unreadable: {}: {error}",
-                dir.display()
-            )
-        })?;
+        .expect("cannot list Go scaffold sources")
+        .map(|entry| entry.expect("cannot read Go scaffold directory entry"))
+        .collect();
     entries.sort_by_key(std::fs::DirEntry::file_name);
     for entry in entries {
         let path = entry.path();
-        let kind = entry.file_type().map_err(|error| {
-            format!(
-                "go_cache_source_type_unreadable: {}: {error}",
-                path.display()
-            )
-        })?;
-        if kind.is_symlink() {
-            return Err(format!("go_cache_source_symlink: {}", path.display()).into());
-        }
+        let kind = entry
+            .file_type()
+            .expect("cannot inspect Go scaffold source");
+        assert!(
+            !kind.is_symlink(),
+            "Go scaffold source must not be a symlink"
+        );
         if kind.is_dir() {
-            sources(hash, root, &path)?;
+            sources(hash, root, &path);
         } else {
-            if !kind.is_file() {
-                return Err(format!("go_cache_source_not_regular: {}", path.display()).into());
-            }
+            assert!(kind.is_file(), "Go scaffold source must be a regular file");
             field(
                 hash,
                 path.strip_prefix(root)
-                    .map_err(|error| {
-                        format!(
-                            "go_cache_source_outside_scaffold: {}: {error}",
-                            path.display()
-                        )
-                    })?
+                    .expect("Go source is outside its scaffold")
                     .as_os_str()
                     .as_encoded_bytes(),
             );
             field(
                 hash,
-                &fs::read(&path).map_err(|error| {
-                    format!("go_cache_source_unreadable: {}: {error}", path.display())
-                })?,
+                &fs::read(path).expect("cannot read Go scaffold source"),
             );
         }
     }
-    Ok(())
 }
 
-fn source_hash(scaffold: &Path) -> CacheResult<Vec<u8>> {
+fn source_hash(scaffold: &Path) -> Vec<u8> {
     let mut hash = Sha256::new();
-    sources(&mut hash, scaffold, scaffold)?;
-    Ok(hash.finalize().to_vec())
+    sources(&mut hash, scaffold, scaffold);
+    hash.finalize().to_vec()
 }
 
-fn executable_hash(path: &Path) -> CacheResult<Vec<u8>> {
-    let bytes = fs::read(path).map_err(|error| {
-        format!(
-            "go_cache_executable_unreadable: {}: {error}",
-            path.display()
-        )
-    })?;
-    Ok(Sha256::digest(bytes).to_vec())
+fn executable_hash(path: &Path) -> Vec<u8> {
+    Sha256::digest(fs::read(path).expect("cannot read cached Go executable")).to_vec()
 }
 
-fn environment(go: &Path, scaffold: &Path, gocache: &Path) -> CacheResult<Vec<u8>> {
+fn environment(go: &Path, scaffold: &Path, gocache: &Path) -> Vec<u8> {
     let result = Command::new(go)
         .arg("env")
         .args([
@@ -115,42 +87,27 @@ fn environment(go: &Path, scaffold: &Path, gocache: &Path) -> CacheResult<Vec<u8
         .env("GOWORK", "off")
         .env("GOCACHE", gocache)
         .output()
-        .map_err(|error| format!("go_cache_toolchain_spawn_failed: {}: {error}", go.display()))?;
-    if !result.status.success() {
-        return Err(format!(
-            "go_cache_toolchain_environment_failed: {}: {}",
-            result.status,
-            String::from_utf8_lossy(&result.stderr)
-        )
-        .into());
-    }
-    Ok(result.stdout)
+        .expect("cannot inspect Go toolchain for the conformance cache");
+    assert!(
+        result.status.success(),
+        "Go toolchain environment failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    result.stdout
 }
 
 /// Reuses a source-addressed executable without sharing a test's mutable files.
 ///
-/// # Errors
+/// # Panics
 ///
-/// Returns a named error on a broken toolchain, changed inputs, corrupt cache or I/O
+/// Fails on a broken toolchain, changed build inputs, corrupt cache or any I/O
 /// error. The lock covers publication and copying, so readers see a full build.
-pub fn build(
-    go: &Path,
-    scaffold: &Path,
-    out: &Path,
-    target_tmp: &Path,
-    compile: impl FnOnce(&Path, &Path) -> CacheResult<()>,
-) -> CacheResult<()> {
-    let started = Instant::now();
-    let root = target_tmp.join("lys-go-conformance-v1");
+pub fn build(go: &Path, scaffold: &Path, out: &Path, compile: impl FnOnce(&Path, &Path)) {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("lys-go-conformance-v1");
     let gocache = root.join("gocache");
-    fs::create_dir_all(&gocache).map_err(|error| {
-        format!(
-            "go_cache_directory_create_failed: {}: {error}",
-            gocache.display()
-        )
-    })?;
-    let environment = environment(go, scaffold, &gocache)?;
-    let source = source_hash(scaffold)?;
+    fs::create_dir_all(&gocache).expect("cannot create shared Go compiler cache");
+    let environment = environment(go, scaffold, &gocache);
+    let source = source_hash(scaffold);
     let mut hash = Sha256::new();
     field(&mut hash, b"offline-vendor-build-v1");
     field(&mut hash, &source);
@@ -162,64 +119,35 @@ pub fn build(
         .truncate(false)
         .write(true)
         .open(root.join(format!("{key}.lock")))
-        .map_err(|error| format!("go_cache_lock_open_failed: {error}"))?;
-    let waiting = Instant::now();
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)
-        .map_err(|error| format!("go_cache_lock_failed: {error}"))?;
-    profile("lock", waiting);
+        .expect("cannot open Go executable cache lock");
+    lock.lock().expect("cannot lock Go executable cache");
     let entry = root.join(key);
     if !entry
         .try_exists()
-        .map_err(|error| format!("go_cache_entry_unreadable: {}: {error}", entry.display()))?
+        .expect("cannot inspect Go executable cache")
     {
-        let staging = tempfile::tempdir_in(&root)
-            .map_err(|error| format!("go_cache_staging_create_failed: {error}"))?;
-        let published: CacheResult<()> = (|| {
-            let executable = staging.path().join("tool");
-            let compiling = Instant::now();
-            compile(&executable, &gocache)?;
-            profile("build", compiling);
-            if source_hash(scaffold)? != source {
-                return Err("go_cache_source_changed_during_build".into());
-            }
-            fs::write(staging.path().join("sha256"), executable_hash(&executable)?)
-                .map_err(|error| format!("go_cache_checksum_write_failed: {error}"))?;
-            fs::rename(staging.path(), &entry).map_err(|error| {
-                format!("go_cache_publish_failed: {}: {error}", entry.display())
-            })?;
-            Ok(())
-        })();
-        match published {
-            Ok(()) => drop(staging.keep()),
-            Err(failure) => {
-                staging.close().map_err(|error| {
-                    format!("{failure}; go_cache_staging_cleanup_failed: {error}")
-                })?;
-                return Err(failure);
-            }
-        }
+        let staging = tempfile::tempdir_in(&root).expect("cannot stage Go executable cache");
+        let executable = staging.path().join("tool");
+        compile(&executable, &gocache);
+        assert_eq!(
+            source_hash(scaffold),
+            source,
+            "Go scaffold source changed while its executable was built"
+        );
+        fs::write(staging.path().join("sha256"), executable_hash(&executable))
+            .expect("cannot write Go executable cache checksum");
+        fs::rename(staging.path(), &entry).expect("cannot publish Go executable cache");
     }
     let executable = entry.join("tool");
-    let held = fs::read(entry.join("sha256"))
-        .map_err(|error| format!("go_cache_checksum_unreadable: {error}"))?;
-    if executable_hash(&executable)? != held {
-        return Err(format!("go_cache_checksum_mismatch: {}", executable.display()).into());
-    }
-    if source_hash(scaffold)? != source {
-        return Err("go_cache_source_changed_before_use".into());
-    }
-    fs::copy(&executable, out)
-        .map_err(|error| format!("go_cache_copy_failed: {}: {error}", out.display()))?;
-    profile("cache", started);
-    Ok(())
-}
-
-/// Prints phase costs only when the diagnostic explicitly requests them.
-pub fn profile(phase: &str, started: Instant) {
-    if std::env::var_os("LYS_GO_PROFILE").is_some() {
-        eprintln!(
-            "go_fixture phase={phase} elapsed_us={}",
-            started.elapsed().as_micros()
-        );
-    }
+    assert_eq!(
+        executable_hash(&executable),
+        fs::read(entry.join("sha256")).expect("cannot read Go executable cache checksum"),
+        "cached Go executable checksum does not match"
+    );
+    assert_eq!(
+        source_hash(scaffold),
+        source,
+        "Go scaffold source changed before using its cached executable"
+    );
+    fs::copy(executable, out).expect("cannot copy cached Go executable into the test");
 }
