@@ -11,6 +11,7 @@ use support::{PLANTED, Table, operation};
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
+use identity_contract::harness::StageTimer;
 use lys_home::harness::claude_code::template::parse_template;
 use lys_identity::AgentId;
 use serde_json::{Value, json};
@@ -92,7 +93,11 @@ impl Table {
 
 #[tokio::test]
 async fn each_refusal_is_by_name() -> TestResult {
+    let timing = StageTimer::new("scenario.total");
+    let stage = StageTimer::new("scenario.table_open");
     let table = Table::unprofiled_with(true, Some(BEA)).await?;
+    drop(stage);
+    let driver = StageTimer::new("scenario.driver");
     let bea = table
         .service
         .sign_in(Login {
@@ -161,12 +166,21 @@ async fn each_refusal_is_by_name() -> TestResult {
         .await?;
     assert_eq!(status, 400, "{none}");
     assert_eq!(none["refusal"], "RequestMalformed");
-    table.close()
+    drop(driver);
+    let stage = StageTimer::new("scenario.table_close");
+    let result = table.close();
+    drop(stage);
+    drop(timing);
+    result
 }
 
 #[tokio::test]
 async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> TestResult {
+    let timing = StageTimer::new("scenario.total");
+    let stage = StageTimer::new("scenario.table_open");
     let table = Table::unprofiled_with(true, None).await?;
+    drop(stage);
+    let driver = StageTimer::new("scenario.driver");
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -231,12 +245,21 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
         again["session"], start["session"],
         "each start is its own session"
     );
-    table.close()
+    drop(driver);
+    let stage = StageTimer::new("scenario.table_close");
+    let result = table.close();
+    drop(stage);
+    drop(timing);
+    result
 }
 
 #[tokio::test]
 async fn a_start_is_kept_once_under_its_operation() -> TestResult {
+    let timing = StageTimer::new("scenario.total");
+    let stage = StageTimer::new("scenario.table_open");
     let table = Table::unprofiled_with(true, None).await?;
+    drop(stage);
+    let driver = StageTimer::new("scenario.driver");
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -268,12 +291,21 @@ async fn a_start_is_kept_once_under_its_operation() -> TestResult {
     assert_eq!(again["runner"]["session"], first["session"]);
     assert_eq!(first["runner"]["state"], "running");
     assert_eq!(again["runner"]["state"], "running");
-    table.close()
+    drop(driver);
+    let stage = StageTimer::new("scenario.table_close");
+    let result = table.close();
+    drop(stage);
+    drop(timing);
+    result
 }
 
 #[tokio::test]
 async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
+    let timing = StageTimer::new("scenario.total");
+    let stage = StageTimer::new("scenario.table_open");
     let table = Table::unprofiled_with(true, None).await?;
+    drop(stage);
+    let driver = StageTimer::new("scenario.driver");
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = operation()?;
@@ -291,5 +323,10 @@ async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
         409,
         "MachineCannotReach",
     );
-    table.close()
+    drop(driver);
+    let stage = StageTimer::new("scenario.table_close");
+    let result = table.close();
+    drop(stage);
+    drop(timing);
+    result
 }
