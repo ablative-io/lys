@@ -116,9 +116,10 @@ recovery, and requires the old binaries to read all the original records and
 sessions. It saves the exact candidate intent bytes consumed by that old parser and requires the original configuration restored byte for byte. A release whose upgrade record has no `DataKept` step (`no_data`, read from its own
 `intent.rs`: 1b568cd9 and 8c064b62) puts back binaries and files but never the
 data the candidate wrote, and its own build cannot start on that data. Against
-such a release the old installer must fail its put-back as `upgrade_failed` and
-leave `upgrade.json` standing; the candidate's installer then finishes the
-recovery, putting the kept data back, and every check that follows is the same.
+such a release the old installer must refuse the record by its unknown
+`data_kept` step before it stops or moves anything, leaving `upgrade.json` and
+`bin.previous/` standing; the candidate's installer then finishes the recovery,
+putting the kept data back, and every check that follows is the same.
 An install on such a release that is interrupted mid-upgrade is recovered with
 the new `lys`, never the old one. A second reversible window independently exercises the candidate recovery path, with the same byte and record checks. It finally runs the normal candidate CLI upgrade separately.
 

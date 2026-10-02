@@ -38,20 +38,23 @@ def run(command, log, env=None, expected=0):
 
 
 def refuse_old_put_back(installed, log, env, root):
-    """An old installer that keeps no data must fail its put-back by name and leave the record.
+    """An old installer that keeps no data must refuse the record by name and touch nothing.
 
-    It returns binaries and files but not the data the candidate wrote, which
-    its own build cannot read; the record must stand so the candidate's
-    installer, which puts the kept data back, can finish the recovery.
+    It cannot put back the data the candidate wrote, which its own build cannot
+    read, so it must refuse the record on the step it does not know before it
+    stops or moves anything: the record and the kept binaries stand for the
+    candidate's installer, which puts the kept data back, to finish.
     """
     with log.open("wb") as output:
         completed = subprocess.run(installed, stdout=output, stderr=subprocess.STDOUT, env=env)
     if completed.returncode == 0:
         raise RuntimeError(f"old installer reported a put-back it cannot make; evidence: {log}")
-    if "upgrade_failed" not in log.read_text(errors="replace"):
-        raise RuntimeError(f"old installer did not refuse its put-back by name; evidence: {log}")
+    if "unknown variant `data_kept`" not in log.read_text(errors="replace"):
+        raise RuntimeError(f"old installer did not refuse the record by its kept-data step; evidence: {log}")
     if not (root / "install/upgrade.json").is_file():
-        raise RuntimeError(f"old installer's failed put-back removed the upgrade record; evidence: {log}")
+        raise RuntimeError(f"old installer's refusal removed the upgrade record; evidence: {log}")
+    if not (root / "bin.previous").is_dir():
+        raise RuntimeError(f"old installer moved the kept binaries before refusing; evidence: {log}")
 
 
 def stamp(directory, expected, programs=PROGRAMS):

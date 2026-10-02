@@ -425,7 +425,6 @@ pub fn upgrade(
         compose_changed: files.iter().any(|file| file.compose && !file.in_place()),
         steps: Vec::new(),
     };
-    data_kept::forget(layout)?;
     intent.write(layout)?;
     let plan = swap::Plan {
         from,

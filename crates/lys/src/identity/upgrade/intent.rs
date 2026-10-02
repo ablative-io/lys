@@ -13,7 +13,7 @@
 //! before doing anything else. A step is recorded only after it completed.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -27,9 +27,7 @@ use super::super::private_files;
 pub enum Step {
     /// The service and then the broker were stopped.
     Stopped,
-    /// `data/` was copied whole to `data.previous/`. Read from records
-    /// written before the marker beside the record carried it; never
-    /// written, since a release that knows no such step refuses the record.
+    /// `data/` was copied whole to `data.previous/`.
     DataKept,
     /// `bin/` was moved to `bin.previous/`.
     BinariesKept,
@@ -146,31 +144,25 @@ impl Intent {
         self.steps.contains(&step)
     }
 
-    /// Removes the record: the upgrade has ended. The marker that the
-    /// upgrade kept data goes first, so it never outlives its record.
+    /// Removes the record: the upgrade has ended.
     pub fn clear(layout: &Layout) -> IdentityResult<()> {
-        remove(&layout.upgrade_data_kept())?;
-        remove(&layout.upgrade_intent())
+        let path = layout.upgrade_intent();
+        match std::fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(IdentityError::new(
+                ErrorKind::PrivateFileIo,
+                "remove upgrade record",
+                "upgrade.json",
+                error.to_string(),
+            )
+            .at(&path)),
+        }
     }
 
     /// The upgrade named by its builds: `from A to B`.
     pub fn describe(&self) -> String {
         format!("from {} to {}", commits(&self.from), commits(&self.to))
-    }
-}
-
-/// Removes the upgrade's file at `path`, which may already be gone.
-pub(super) fn remove(path: &Path) -> IdentityResult<()> {
-    match std::fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(IdentityError::new(
-            ErrorKind::PrivateFileIo,
-            "remove upgrade record",
-            "upgrade",
-            error.to_string(),
-        )
-        .at(path)),
     }
 }
 

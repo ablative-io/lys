@@ -126,13 +126,6 @@ impl Layout {
         self.install_dir().join("upgrade.json")
     }
 
-    /// Present while the upgrade under way has kept `data/` in
-    /// `data.previous/`. It sits beside the record rather than in it, so a
-    /// release that reads the record and knows no such step still reads it.
-    pub fn upgrade_data_kept(&self) -> PathBuf {
-        self.install_dir().join("upgrade-data-kept")
-    }
-
     /// The configuration and compose files an upgrade replaced, kept to
     /// return to.
     pub fn config_previous_dir(&self) -> PathBuf {

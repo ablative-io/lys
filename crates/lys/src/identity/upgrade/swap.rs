@@ -291,7 +291,7 @@ fn swap_in(
 ) -> IdentityResult<()> {
     stop_all(units, say)?;
     intent.done(layout, Step::Stopped)?;
-    data_kept::keep(layout)?;
+    data_kept::keep(layout, intent)?;
     keep_binaries(layout, intent)?;
     place_binaries(layout, plan.from, plan.names, intent)?;
     keep_configuration(layout, intent)?;
