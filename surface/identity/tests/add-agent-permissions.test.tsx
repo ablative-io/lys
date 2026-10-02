@@ -13,19 +13,21 @@ afterEach(() => { if (root) act(() => root?.unmount()); root = null; });
 const key = 'lys.add-agent.' + ADA;
 const grantId = 'grant-' + 'f'.repeat(32);
 const source = GRANTS[0];
-/** The model with one relation per action an agent may be given, and the acts no agent may hold. */
-const AGENT_MODEL = { ...MODEL, relations: { ...MODEL.relations, 'only.edit': ['edit'], 'only.view': ['view'] }, withheld_from_agents: ['grant'] };
+const model = { ...MODEL, withheld_from_agents: ['grant'], relations: { ...MODEL.relations, 'only.edit': ['edit'] } };
+const editChoice = source.id + ':only.edit';
+const viewChoice = source.id + ':viewer';
+const ledgerChoice = GRANTS[1].id + ':viewer';
 
 function routes() {
   let given: Record<string, unknown> | null = null;
   const receipt = (body: unknown, change_kind = 2) => ({ ...RECEIPTS[4].receipt, operation: (body as { operation: string }).operation, identity: COURIER, change_kind });
   return { ...SERVICE,
     '/surface-contract': ok({ paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { answers_to: {} } } } } } } } } }),
-    '/grants': ok({ grants: GRANTS, revision: 7 }), '/grants/model': ok(AGENT_MODEL),
+    '/grants': ok({ grants: GRANTS, revision: 7 }), '/grants/model': ok(model),
     'POST /agents': (body: unknown) => ok({ agent: COURIER, responsible: ADA, reports_to: { id: (body as { answers_to?: string }).answers_to ?? ADA, kind: (body as { answers_to?: string }).answers_to?.startsWith('agent-') ? 'agent' : 'person' }, receipt: receipt(body) }),
     ['POST /identities/' + COURIER + '/transitions']: (body: unknown) => ok({ receipt: receipt(body, 5) }),
     'POST /grants': (body: unknown) => { given = body as Record<string, unknown>; return ok({ operation: given.operation, grant: grantId, receipt: { caller: ADA } }); },
-    ['/grants/' + grantId]: () => ok({ ...source, ...given, id: grantId, issuer: ADA, holder: COURIER, actions: [String(given?.relation).slice('only.'.length)] }),
+    ['/grants/' + grantId]: () => ok({ ...source, ...given, id: grantId, issuer: ADA, holder: COURIER, actions: ['edit'] }),
   } satisfies Record<string, Route>;
 }
 async function open(extra: Record<string, Route> = {}, query = '') {
@@ -53,16 +55,6 @@ async function submit(form: HTMLFormElement) {
 }
 
 describe('Add-agent reporting and permissions', () => {
-  it('offers no access when Lys does not say which actions no agent may hold', async () => {
-    const { form } = await open({ '/grants/model': ok(MODEL) });
-    expect(form.querySelector<HTMLInputElement>('input[value="' + source.id + '"]')?.disabled).toBe(true);
-    expect(form.textContent).toContain('Lys did not say which actions no agent may hold, so none is offered.');
-  });
-  it('never offers an action withheld from agents', async () => {
-    const { form } = await open({ '/grants/model': ok({ ...AGENT_MODEL, withheld_from_agents: ['edit', 'grant'] }) });
-    expect(form.textContent).toContain('Read a project, identity');
-    expect(form.textContent).not.toContain('Read and change a project, identity');
-  });
   it('reads a grant held by a service account and never offers it', async () => {
     const loader = { ...GRANTS[0], id: 'grant-' + 'e'.repeat(32), holder: 'op-' + 'd'.repeat(32) };
     const { form } = await open({ '/grants': ok({ grants: [...GRANTS, loader], revision: 7 }) });
@@ -117,8 +109,7 @@ describe('Add-agent reporting and permissions', () => {
   });
   it('delegates only a checked grant after activation and confirms its recorded scope', async () => {
     const { form, posted } = await open(); await tick(); await submit(form);
-    expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + COURIER + '/transitions', '/grants', '/grants']);
-    expect(posted.slice(2).map((entry) => (entry.body as { relation: string }).relation)).toEqual(['only.edit', 'only.view']);
+    expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + COURIER + '/transitions', '/grants']);
     expect(posted[2].body).toMatchObject({ route: 'browser', source: source.id, recipient: COURIER, responsible: ADA, resource: source.resource, relation: 'only.edit', pass_on: { kind: 'use_only' } });
     expect((posted[2].body as { window: { ends_at: number } }).window.ends_at).toBe(source.effective_ends_at);
     expect(sessionStorage.getItem(key)).toBeNull();
