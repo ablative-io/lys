@@ -16,7 +16,7 @@ const CODE: &str = "Zq81mTn4Rw0pLk7Hs2Vb6Xc3Yd9Fg5Aj";
 
 #[test]
 fn the_code_rides_only_in_the_fragment_of_the_address() {
-    let address = address_with(CODE);
+    let address = address_with(CODE, &super::super::ports::Ports::default().setup_url());
     assert_eq!(address, format!("http://localhost:8490/setup#code={CODE}"));
     let (before, after) = address.split_once('#').unwrap_or_default();
     assert!(!before.contains(CODE), "the code never reaches a server");
@@ -33,7 +33,13 @@ fn a_browser_that_takes_the_address_leaves_no_file() -> TestResult {
         true
     };
     hand_over(&layout, CODE, &open, &mut Emitter::new(true))?;
-    assert_eq!(handed.borrow().as_slice(), [address_with(CODE)]);
+    assert_eq!(
+        handed.borrow().as_slice(),
+        [address_with(
+            CODE,
+            &super::super::ports::Ports::default().setup_url()
+        )]
+    );
     assert!(!layout.headless_setup_code().exists());
     Ok(())
 }

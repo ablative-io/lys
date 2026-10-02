@@ -69,12 +69,16 @@ fn main() -> ExitCode {
                 identity::install::setup_code::run(root, json)
             }
             identity::IdentityCommand::Install {
+                service_port,
+                broker_port,
                 root,
                 admin_email,
                 surface,
                 message_service,
             } => identity::install::run(
                 &identity::install::Options {
+                    service_port,
+                    broker_port,
                     root,
                     admin_email,
                     surface,

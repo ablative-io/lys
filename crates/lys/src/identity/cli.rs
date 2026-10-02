@@ -51,6 +51,12 @@ pub enum IdentityCommand {
     /// rotated, and a build other than the one placed is refused: that is an
     /// upgrade.
     Install {
+        /// The local identity listener; absent, keep the installed port or use 8490.
+        #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
+        service_port: Option<u16>,
+        /// The local broker listener; absent, keep the installed port or use 8472.
+        #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
+        broker_port: Option<u16>,
         /// The data root; the platform's application data path when absent.
         #[arg(long)]
         root: Option<PathBuf>,

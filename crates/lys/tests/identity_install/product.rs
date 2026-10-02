@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::identity_support::fixtures::{TestResult, succeeded};
-use super::{EMAIL, Heard, ORIGIN, PASSWORD, ask, hex, send};
+use super::{EMAIL, Heard, PASSWORD, ask, hex, send};
 
 /// The fixture product's client id.
 const PRODUCT: &str = "fixture-product";
@@ -30,6 +30,8 @@ const VERIFIER: &str = "a-fixture-product-verifier-of-enough-length-0123456789";
 
 /// The install the product is registered with.
 pub struct Installed<'a> {
+    pub service_port: u16,
+    pub broker_port: u16,
     /// The install root.
     pub root: &'a Path,
     /// The `lys` binary.
@@ -74,6 +76,10 @@ fn register(installed: &Installed<'_>, read: &mut Heard) -> TestResult {
     let again = Command::new(installed.lys)
         .args(["identity", "install", "--root"])
         .arg(installed.root)
+        .arg("--service-port")
+        .arg(installed.service_port.to_string())
+        .arg("--broker-port")
+        .arg(installed.broker_port.to_string())
         .arg("--surface")
         .arg(installed.package)
         .env("PATH", installed.path)
@@ -89,17 +95,30 @@ fn register(installed: &Installed<'_>, read: &mut Heard) -> TestResult {
 /// install wrote.
 pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> TestResult {
     register(installed, read)?;
+    let origin = format!("http://localhost:{}", installed.service_port);
     let credentials = json!({ "email": EMAIL, "password": PASSWORD }).to_string();
-    let signed_in = ask("POST", "/api/sign-in", None, Some(&credentials))?;
+    let signed_in = ask(
+        installed.service_port,
+        "POST",
+        "/api/sign-in",
+        None,
+        Some(&credentials),
+    )?;
     assert_eq!(signed_in.status, 200, "{}", signed_in.body);
     read.answer("a sign-in after the restart", &signed_in);
     let cookie = signed_in.cookie.ok_or("the sign-in began a session")?;
 
-    let found = ask("GET", "/.well-known/openid-configuration", None, None)?;
+    let found = ask(
+        installed.service_port,
+        "GET",
+        "/.well-known/openid-configuration",
+        None,
+        None,
+    )?;
     assert_eq!(found.status, 200, "{}", found.body);
     read.answer("the product's discovery", &found);
     let discovery: Value = serde_json::from_str(&found.body)?;
-    assert_eq!(discovery["issuer"], ORIGIN);
+    assert_eq!(discovery["issuer"], origin);
     for endpoint in [
         "authorization_endpoint",
         "token_endpoint",
@@ -107,17 +126,23 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
         "jwks_uri",
     ] {
         let address = discovery[endpoint].as_str().ok_or(endpoint)?;
-        assert!(address.starts_with(ORIGIN), "{endpoint} is {address}");
+        assert!(address.starts_with(&origin), "{endpoint} is {address}");
     }
 
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
     let authorize = format!(
         "/oauth/authorize?client_id={PRODUCT}&redirect_uri=http%3A%2F%2Fproduct.example.test%2Fauth%2Fcallback&response_type=code&scope=openid&state=product-state&nonce=product-nonce&code_challenge={challenge}&code_challenge_method=S256"
     );
-    let unsigned = ask("GET", &authorize, None, None)?;
+    let unsigned = ask(installed.service_port, "GET", &authorize, None, None)?;
     assert_eq!(unsigned.status, 303, "{}", unsigned.body);
     read.answer("a product's person not yet signed in", &unsigned);
-    let handed = ask("GET", &authorize, Some(&cookie), None)?;
+    let handed = ask(
+        installed.service_port,
+        "GET",
+        &authorize,
+        Some(&cookie),
+        None,
+    )?;
     assert_eq!(handed.status, 303, "{}", handed.body);
     read.handed_back("a code handed to the product", &handed);
     let back = handed.location.ok_or("the code is handed back")?;
@@ -132,6 +157,7 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
     );
     let basic = STANDARD.encode(format!("{PRODUCT}:{SECRET}"));
     let exchanged = send(
+        installed.service_port,
         "POST",
         "/oauth/token",
         &[format!("Authorization: Basic {basic}")],
@@ -143,12 +169,13 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
     let id_token = tokens["id_token"].as_str().ok_or("an ID token")?;
     let payload = id_token.split('.').nth(1).ok_or("an ID token's claims")?;
     let claims: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload)?)?;
-    assert_eq!(claims["iss"], ORIGIN);
+    assert_eq!(claims["iss"], origin);
     assert_eq!(claims["aud"], PRODUCT);
     assert_eq!(claims["nonce"], "product-nonce");
     let access = tokens["access_token"].as_str().ok_or("an access token")?;
 
     let info = send(
+        installed.service_port,
         "GET",
         "/oauth/userinfo",
         &[format!("Authorization: Bearer {access}")],
@@ -162,7 +189,7 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
         claims["sub"], EMAIL,
         "the subject is the person's directory id"
     );
-    let keys = ask("GET", "/oauth/jwks", None, None)?;
+    let keys = ask(installed.service_port, "GET", "/oauth/jwks", None, None)?;
     assert_eq!(keys.status, 200, "{}", keys.body);
     read.answer("the product's keys", &keys);
     Ok(())

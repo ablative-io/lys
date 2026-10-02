@@ -54,6 +54,8 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
             root,
             project: "cleanup-fixture".to_owned(),
             rauthy_port: 1,
+            service_port: 2,
+            broker_port: 3,
         };
         let guard = estate;
         std::panic::panic_any(guard.root.path().to_path_buf());

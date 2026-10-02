@@ -167,16 +167,6 @@ impl Layout {
         self.root.join("data.previous")
     }
 
-    /// The URL a person opens.
-    pub fn service_url() -> String {
-        format!("http://localhost:{SERVICE_PORT}")
-    }
-
-    /// The setup page's address, without its code.
-    pub fn setup_url() -> String {
-        format!("{}/setup", Self::service_url())
-    }
-
     /// The file the administrator first-run setup made is recorded in.
     pub fn administrator_file(&self) -> PathBuf {
         self.data_dir().join("administrator.json")
@@ -218,11 +208,16 @@ pub fn data_root(
 /// unattended install was given one and no administrator otherwise, with
 /// the state directory beside it.
 pub fn render_deployment(admin_email: Option<&str>) -> String {
+    render_deployment_at(admin_email, SERVICE_PORT)
+}
+
+/// The deployment for an explicitly selected identity listener.
+pub fn render_deployment_at(admin_email: Option<&str>, service_port: u16) -> String {
     let line = admin_email.map_or_else(String::new, |email| format!("admin_email = \"{email}\"\n"));
     DEPLOYMENT_TEMPLATE
         .replace("{{admin_email_line}}", &line)
         .replace("{{rauthy_port}}", &RAUTHY_PORT.to_string())
-        .replace("{{service_port}}", &SERVICE_PORT.to_string())
+        .replace("{{service_port}}", &service_port.to_string())
 }
 
 /// The sourced estate plan shipped with this build.
