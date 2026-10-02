@@ -23,7 +23,8 @@ use lys_identity_server::{Config, Say};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
 
 use crate::fake_issuer::{CLIENT_ID, CLIENT_SECRET, FakeIssuer, Login};
-use crate::harness_serve::serve;
+pub use crate::harness_serve::StageTimer;
+use crate::harness_serve::{DropMarker, serve};
 
 /// Where the next append fails, if anywhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -208,17 +209,23 @@ pub const LINK_AUDIT_SOURCE: &str = "link-audit-source-subject";
 
 /// A started directory service on a local port, signing in through a fake issuer.
 pub struct Service {
+    drop_start: DropMarker,
     /// The service's base URL.
     pub base: String,
     /// Process-wide log-store flush attempts during startup; exact in an isolated test.
     pub startup_flushes: u64,
     /// The issuer people sign in through.
     pub issuer: FakeIssuer,
+    drop_issuer: DropMarker,
     client: reqwest::Client,
+    drop_client: DropMarker,
     /// Holds the log, keys and secret file for the service's life.
     pub dir: tempfile::TempDir,
+    drop_dir: DropMarker,
     config: Config,
+    drop_config: DropMarker,
     server: crate::harness_serve::Serving,
+    drop_server: DropMarker,
 }
 
 impl Drop for Service {
@@ -226,6 +233,12 @@ impl Drop for Service {
         if let Err(error) = self.close() {
             eprintln!("identity_service_shutdown_failed: {error}");
         }
+        self.drop_start.arm();
+        self.drop_issuer.arm();
+        self.drop_client.arm();
+        self.drop_dir.arm();
+        self.drop_config.arm();
+        self.drop_server.arm();
     }
 }
 
@@ -240,6 +253,7 @@ pub const HARNESS_PASSWORD: &str = "Harness-Password-2026";
 
 /// The session cookie an answer began, or its refusal as an error.
 pub async fn session_cookie(signed_in: reqwest::Response) -> Result<String, Box<dyn Error>> {
+    let timing = StageTimer::new("http.session_cookie");
     let cookie = signed_in
         .headers()
         .get(reqwest::header::SET_COOKIE)
@@ -248,11 +262,13 @@ pub async fn session_cookie(signed_in: reqwest::Response) -> Result<String, Box<
     let Some(cookie) = cookie else {
         return Err(format!("sign-in answered {status} without a session: {body}").into());
     };
-    Ok(cookie?
+    let result = Ok(cookie?
         .split(';')
         .next()
         .ok_or("the session cookie is empty")?
-        .to_owned())
+        .to_owned());
+    drop(timing);
+    result
 }
 
 fn location(answer: &reqwest::Response) -> Result<String, Box<dyn Error>> {
@@ -268,9 +284,12 @@ fn location(answer: &reqwest::Response) -> Result<String, Box<dyn Error>> {
 pub type Answer = (u16, serde_json::Value);
 
 async fn answer(response: reqwest::Response) -> Result<Answer, Box<dyn Error>> {
+    let timing = StageTimer::new("http.answer_body");
     let status = response.status().as_u16();
     let text = response.text().await?;
-    Ok((status, serde_json::from_str(&text)?))
+    let answer = Ok((status, serde_json::from_str(&text)?));
+    drop(timing);
+    answer
 }
 
 impl Service {
@@ -279,13 +298,17 @@ impl Service {
     /// # Errors
     /// Returns the named worker, task or state-lock failure during shutdown.
     pub fn close(&mut self) -> std::io::Result<()> {
+        let timing = StageTimer::new("fixture.close");
         let mut failures = Vec::new();
         if let Err(error) = self.server.stop() {
             failures.push(format!("service_shutdown_failed: {error}"));
         }
+        let issuer_timing = StageTimer::new("fixture.issuer_shutdown");
         if let Err(error) = self.issuer.shutdown() {
             failures.push(format!("issuer_shutdown_failed: {error}"));
         }
+        drop(issuer_timing);
+        drop(timing);
         if failures.is_empty() {
             Ok(())
         } else {
@@ -379,6 +402,8 @@ impl Service {
         say: Option<Say>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        let timing = StageTimer::new("fixture.start");
+        let stage = StageTimer::new("fixture.bootstrap");
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -386,8 +411,12 @@ impl Service {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let listen = listener.local_addr()?;
         let base = format!("http://{listen}");
+        drop(stage);
+        let stage = StageTimer::new("fixture.issuer_start");
         let issuer = FakeIssuer::start_behind(&base, &dir.path().join("issuer.key")).await?;
         issuer.set_public_callback(&format!("{base}/auth/v1/providers/callback"))?;
+        drop(stage);
+        let stage = StageTimer::new("fixture.configure_and_adjust");
         let configured = |subject: &str| ConfiguredLogin {
             issuer: issuer.issuer().to_owned(),
             subject: subject.to_owned(),
@@ -446,20 +475,32 @@ impl Service {
         adjust(&mut config);
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
+        drop(stage);
+        let stage = StageTimer::new("fixture.prepare_callback");
         let prepared = prepare(&config)?;
+        drop(stage);
+        let stage = StageTimer::new("fixture.restore");
         crate::service_template::restore(&config)?;
+        drop(stage);
         let before = lys_log_store::process_flush_count();
         let (server, client) = serve(listener, &config, say).await?;
         let startup_flushes = lys_log_store::process_flush_count() - before;
+        drop(timing);
         Ok((
             Self {
+                drop_start: DropMarker::new("service.fields_start"),
                 base,
                 startup_flushes,
                 issuer,
+                drop_issuer: DropMarker::new("service.issuer_dropped"),
                 client,
+                drop_client: DropMarker::new("service.client_dropped"),
                 dir,
+                drop_dir: DropMarker::new("service.tempdir_dropped"),
                 config,
+                drop_config: DropMarker::new("service.config_dropped"),
                 server,
+                drop_server: DropMarker::new("service.fields_end"),
             },
             prepared,
         ))
@@ -470,15 +511,19 @@ impl Service {
     /// connection of the stopped service carries over. Signed-in sessions are
     /// among what is opened from disk: a cookie from before still answers.
     pub async fn restart(&mut self) -> Result<(), Box<dyn Error>> {
+        let timing = StageTimer::new("fixture.restart");
         self.server.stop()?;
+        let stage = StageTimer::new("fixture.restart_rebind");
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let listen = listener.local_addr()?;
         self.base = format!("http://{listen}");
         self.config.listen = listen;
         self.config.redirect_url = format!("{}/callback", self.base);
+        drop(stage);
         let (server, client) = serve(listener, &self.config, None).await?;
         self.server = server;
         self.client = client;
+        drop(timing);
         Ok(())
     }
 
@@ -496,6 +541,7 @@ impl Service {
     /// `login`, answering the callback path and the initiating browser's
     /// binding cookie. The browser must return that cookie on the callback.
     pub async fn issuer_answer(&self, login: Login) -> Result<(String, String), Box<dyn Error>> {
+        let timing = StageTimer::new("http.issuer_answer");
         self.issuer.sign_in_as(login)?;
         let to_issuer = self
             .client
@@ -518,15 +564,19 @@ impl Service {
             .strip_prefix(&self.base)
             .ok_or_else(|| format!("the issuer sent the browser to {url}"))?
             .to_owned();
+        drop(timing);
         Ok((path, binding))
     }
 
     /// Sign in on Lys's own sign-in route as `login`, which the issuer
     /// signs whatever password is typed, answering the session cookie.
     pub async fn sign_in(&self, login: Login) -> Result<String, Box<dyn Error>> {
+        let timing = StageTimer::new("http.sign_in");
         let email = login.email.clone();
         self.issuer.sign_in_as(login)?;
-        self.sign_in_with(&email, HARNESS_PASSWORD).await
+        let answer = self.sign_in_with(&email, HARNESS_PASSWORD).await;
+        drop(timing);
+        answer
     }
 
     /// Sign in on Lys's own sign-in route with `email` and `password`,
@@ -536,6 +586,7 @@ impl Service {
         email: &str,
         password: &str,
     ) -> Result<String, Box<dyn Error>> {
+        let timing = StageTimer::new("http.sign_in_request");
         let body = serde_json::json!({ "email": email, "password": password });
         let signed_in = self
             .client
@@ -544,16 +595,21 @@ impl Service {
             .body(body.to_string())
             .send()
             .await?;
-        session_cookie(signed_in).await
+        let answer = session_cookie(signed_in).await;
+        drop(timing);
+        answer
     }
 
     /// GET `path`, with the session `cookie` when one is given.
     pub async fn get(&self, path: &str, cookie: Option<&str>) -> Result<Answer, Box<dyn Error>> {
+        let timing = StageTimer::new("http.get");
         let mut request = self.client.get(format!("{}{path}", self.base));
         if let Some(cookie) = cookie {
             request = request.header(reqwest::header::COOKIE, cookie);
         }
-        answer(request.send().await?).await
+        let answer = answer(request.send().await?).await;
+        drop(timing);
+        answer
     }
 
     /// GET `path` with the initiating browser's cookie, asking for a page: the
@@ -563,6 +619,7 @@ impl Service {
         path: &str,
         binding: &str,
     ) -> Result<(u16, Option<String>, bool), Box<dyn Error>> {
+        let timing = StageTimer::new("http.get_page");
         let response = self
             .client
             .get(format!("{}{path}", self.base))
@@ -573,6 +630,7 @@ impl Service {
         let status = response.status().as_u16();
         let to = location(&response).ok();
         let cookie = response.headers().contains_key(reqwest::header::SET_COOKIE);
+        drop(timing);
         Ok((status, to, cookie))
     }
 
@@ -583,6 +641,7 @@ impl Service {
         cookie: Option<&str>,
         body: &serde_json::Value,
     ) -> Result<Answer, Box<dyn Error>> {
+        let timing = StageTimer::new("http.post");
         let mut request = self
             .client
             .post(format!("{}{path}", self.base))
@@ -591,20 +650,25 @@ impl Service {
         if let Some(cookie) = cookie {
             request = request.header(reqwest::header::COOKIE, cookie);
         }
-        answer(request.send().await?).await
+        let answer = answer(request.send().await?).await;
+        drop(timing);
+        answer
     }
 
     /// The directory log's size as the public receipt route's checkpoint
     /// names it, so a test can prove a refused call logged nothing without
     /// a session. The checkpoint counts every leaf, an install event's too.
     pub async fn log_size(&self) -> Result<u64, Box<dyn Error>> {
+        let timing = StageTimer::new("http.log_size");
         let (status, first) = self.get("/receipts/0", None).await?;
         if status != 200 {
             return Ok(0);
         }
-        first["checkpoint"]["tree_size"]
+        let size = first["checkpoint"]["tree_size"]
             .as_u64()
-            .ok_or_else(|| format!("the first receipt names no tree size: {first}").into())
+            .ok_or_else(|| format!("the first receipt names no tree size: {first}").into());
+        drop(timing);
+        size
     }
 
     /// POST the JSON `body` bytes to `path` carrying the header `name: value`
@@ -616,13 +680,16 @@ impl Service {
         (name, value): (&str, &str),
         body: Vec<u8>,
     ) -> Result<Answer, Box<dyn Error>> {
+        let timing = StageTimer::new("http.post_signed");
         let request = self
             .client
             .post(format!("{}{path}", self.base))
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .header(name, value)
             .body(body);
-        answer(request.send().await?).await
+        let answer = answer(request.send().await?).await;
+        drop(timing);
+        answer
     }
 
     /// POST the JSON `body` bytes to `path` carrying every header of
@@ -634,6 +701,7 @@ impl Service {
         headers: &[(&str, &str)],
         body: Vec<u8>,
     ) -> Result<Answer, Box<dyn Error>> {
+        let timing = StageTimer::new("http.post_carrying");
         let mut request = self
             .client
             .post(format!("{}{path}", self.base))
@@ -642,6 +710,8 @@ impl Service {
         for (name, value) in headers {
             request = request.header(*name, *value);
         }
-        answer(request.send().await?).await
+        let answer = answer(request.send().await?).await;
+        drop(timing);
+        answer
     }
 }
