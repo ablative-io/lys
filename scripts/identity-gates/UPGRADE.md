@@ -113,7 +113,14 @@ profile-set, profile-review and skill-write routes must also answer503 naming
 of the five refusals. These require HOME037's guarded writers in the final build.
 The positive leg then re-enters the real old installer, which performs its normal
 recovery, and requires the old binaries to read all the original records and
-sessions. It saves the exact candidate intent bytes consumed by that old parser and requires the original configuration restored byte for byte. A second reversible window independently exercises the candidate recovery path, with the same byte and record checks. It finally runs the normal candidate CLI upgrade separately.
+sessions. It saves the exact candidate intent bytes consumed by that old parser and requires the original configuration restored byte for byte. A release whose upgrade record has no `DataKept` step (`no_data`, read from its own
+`intent.rs`: 1b568cd9 and 8c064b62) puts back binaries and files but never the
+data the candidate wrote, and its own build cannot start on that data. Against
+such a release the old installer must fail its put-back as `upgrade_failed` and
+leave `upgrade.json` standing; the candidate's installer then finishes the
+recovery, putting the kept data back, and every check that follows is the same.
+An install on such a release that is interrupted mid-upgrade is recovered with
+the new `lys`, never the old one. A second reversible window independently exercises the candidate recovery path, with the same byte and record checks. It finally runs the normal candidate CLI upgrade separately.
 
 The old loader also creates an agent through the real bearer import endpoint. Its original signed receipt, service public key and digest are recorded as a historical vector and must stay identical during both reversible windows, after both recoveries and after the final upgrade. The fixture never re-encodes or signs that vector itself.
 

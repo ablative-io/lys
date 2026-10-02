@@ -5,7 +5,7 @@ import subprocess
 import unittest
 
 from upgrade_release import (
-    BUDGETS_API, TEAMS_API, budget_model, limits_body, old_release, per_measure_body, struct_fields,
+    BUDGETS_API, INTENT, TEAMS_API, budget_model, put_back_model, limits_body, old_release, per_measure_body, struct_fields,
     team_model,
 )
 
@@ -79,14 +79,24 @@ class ReleaseShapeTests(unittest.TestCase):
                     ["git", "-C", str(root), "show", f"{commit}:{path}"], text=True)
             found[commit[:8]] = old_release(read)
         self.assertEqual(found, {
-            "1b568cd9": {"budgets": "per_measure", "teams": "unguarded"},
-            "8c064b62": {"budgets": "per_measure", "teams": "unguarded"},
-            "cced4195": {"budgets": "limits", "teams": "guarded"},
-            "255a3bca": {"budgets": "limits", "teams": "guarded"},
+            "1b568cd9": {"budgets": "per_measure", "teams": "unguarded", "put_back": "no_data"},
+            "8c064b62": {"budgets": "per_measure", "teams": "unguarded", "put_back": "no_data"},
+            "cced4195": {"budgets": "limits", "teams": "guarded", "put_back": "keeps_data"},
+            "255a3bca": {"budgets": "limits", "teams": "guarded", "put_back": "keeps_data"},
         })
-        self.assertEqual((BUDGETS_API, TEAMS_API), (
+        self.assertEqual((BUDGETS_API, TEAMS_API, INTENT), (
             "crates/lys-identity-server/src/budgets_api.rs",
-            "crates/lys-identity-server/src/teams_api.rs"))
+            "crates/lys-identity-server/src/teams_api.rs",
+            "crates/lys/src/identity/upgrade/intent.rs"))
+
+    def test_a_record_that_knows_the_kept_data_step_names_a_release_that_puts_data_back(self):
+        keeps = "pub enum Step {\n    /// Stopped.\n    Stopped,\n    DataKept,\n    Started,\n}\n"
+        self.assertEqual(put_back_model(keeps), "keeps_data")
+        self.assertEqual(put_back_model(keeps.replace("    DataKept,\n", "")), "no_data")
+        self.assertEqual(put_back_model(keeps.replace("    DataKept,\n", "    /// DataKept\n")),
+                         "no_data")
+        with self.assertRaisesRegex(RuntimeError, "no enum Step"):
+            put_back_model("pub struct Intent {}\n")
 
 
 class RequestBodyTests(unittest.TestCase):

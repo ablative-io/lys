@@ -8,6 +8,7 @@ import re
 
 BUDGETS_API = "crates/lys-identity-server/src/budgets_api.rs"
 TEAMS_API = "crates/lys-identity-server/src/teams_api.rs"
+INTENT = "crates/lys/src/identity/upgrade/intent.rs"
 
 # `PUT /budgets/{kind}/{id}`: one measure per request, or the holder's whole collection.
 PER_MEASURE_BODY = frozenset({"version", "measure", "limit", "period", "act"})
@@ -47,11 +48,25 @@ def team_model(text, path=TEAMS_API):
     return "guarded" if "held" in fields else "unguarded"
 
 
+def put_back_model(text, path=INTENT):
+    """`keeps_data` when the release's upgrade record knows the kept-data step, else `no_data`.
+
+    A `no_data` release's installer puts back binaries and files but never the
+    data the candidate wrote, so once the candidate has started it cannot bring
+    its own build back; that install recovers through the candidate's installer.
+    """
+    match = re.search(r"\benum Step\s*\{(.*?)\n\}", text, re.S)
+    if match is None:
+        raise RuntimeError(f"{path} declares no enum Step")
+    return "keeps_data" if re.search(r"^\s*DataKept\b", match.group(1), re.M) else "no_data"
+
+
 def old_release(read):
     """The old release's request and answer shapes; `read` returns a source file's text."""
     return {
         "budgets": budget_model(read(BUDGETS_API)),
         "teams": team_model(read(TEAMS_API)),
+        "put_back": put_back_model(read(INTENT)),
     }
 
 

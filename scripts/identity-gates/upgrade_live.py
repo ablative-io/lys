@@ -37,6 +37,23 @@ def run(command, log, env=None, expected=0):
         )
 
 
+def refuse_old_put_back(installed, log, env, root):
+    """An old installer that keeps no data must fail its put-back by name and leave the record.
+
+    It returns binaries and files but not the data the candidate wrote, which
+    its own build cannot read; the record must stand so the candidate's
+    installer, which puts the kept data back, can finish the recovery.
+    """
+    with log.open("wb") as output:
+        completed = subprocess.run(installed, stdout=output, stderr=subprocess.STDOUT, env=env)
+    if completed.returncode == 0:
+        raise RuntimeError(f"old installer reported a put-back it cannot make; evidence: {log}")
+    if "upgrade_failed" not in log.read_text(errors="replace"):
+        raise RuntimeError(f"old installer did not refuse its put-back by name; evidence: {log}")
+    if not (root / "install/upgrade.json").is_file():
+        raise RuntimeError(f"old installer's failed put-back removed the upgrade record; evidence: {log}")
+
+
 def stamp(directory, expected, programs=PROGRAMS):
     versions = {}
     for name in programs:
@@ -621,7 +638,13 @@ def exercise(args):
             (evidence / "candidate-intent-read-by-old.json").write_bytes(intent_bytes)
             if (root / "config.previous/identity.json").read_bytes() != original_config:
                 raise RuntimeError("candidate backup differs from old original config")
-            run(installed, evidence / "recover-old.log", env)
+            put_back = args.prepared["release"]["put_back"]
+            if put_back == "keeps_data":
+                run(installed, evidence / "recover-old.log", env)
+            else:
+                refuse_old_put_back(installed, evidence / "recover-old.log", env, root)
+                run([str(driver), "--root", str(root), "recover"],
+                    evidence / "recover-after-old.log", env)
             if config_file.read_bytes() != original_config:
                 raise RuntimeError("old installer did not restore exact original config")
             verify_provenance(browser, provenance)
@@ -630,7 +653,8 @@ def exercise(args):
                     {
                         "reader_commit": args.old_commit,
                         "intent_sha256": hashlib.sha256(intent_bytes).hexdigest(),
-                        "old_installer_recovered": True,
+                        "old_installer_recovered": put_back == "keeps_data",
+                        "recovered_by": "old" if put_back == "keeps_data" else "candidate",
                         "configuration_restored_byte_for_byte": True,
                     },
                     indent=2,
