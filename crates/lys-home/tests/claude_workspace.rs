@@ -43,3 +43,26 @@ fn workspace_only_renders_claude_sandbox_and_file_permissions() -> Result<(), Bo
     assert_eq!(settings["sandbox"]["network"]["strictAllowlist"], true);
     Ok(())
 }
+
+#[test]
+fn workspace_only_refuses_an_extra_allowed_tool_or_directory() -> Result<(), Box<dyn Error>> {
+    for field in ["allow", "additionalDirectories"] {
+        let mut template: Value =
+            serde_json::from_str(include_str!("fixtures/launch/template.json"))?;
+        template["slots"]["permissions"] =
+            json!({"defaultMode": "workspace-only", field: ["/elsewhere"]});
+        let error = render(
+            "claude-code/template-v1",
+            "/opt/seat/bin/claude",
+            &template.to_string(),
+            InstructionsMode::Keep,
+        )
+        .err()
+        .ok_or("wider workspace admitted")?;
+        assert!(
+            error.contains(&format!("slots.permissions.{field}")),
+            "{error}"
+        );
+    }
+    Ok(())
+}
