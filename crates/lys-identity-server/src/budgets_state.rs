@@ -314,11 +314,48 @@ struct Sealing<'a> {
     held: &'a Held,
 }
 
+impl Clone for Held {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        crate::budgets_work::visit(crate::budgets_work::Work::StateCopy);
+        Self {
+            budgets: self.budgets.clone(),
+            limit_sets: self.limit_sets.clone(),
+            unconfirmed: self.unconfirmed.clone(),
+            charged: self.charged.clone(),
+            uses: self.uses.clone(),
+            crossings: self.crossings.clone(),
+            refusals: self.refusals.clone(),
+            index: self.index.clone(),
+        }
+    }
+}
+
+impl PartialEq for Held {
+    fn eq(&self, other: &Self) -> bool {
+        self.budgets == other.budgets
+            && self.limit_sets == other.limit_sets
+            && self.unconfirmed == other.unconfirmed
+            && self.charged == other.charged
+            && self.uses == other.uses
+            && self.crossings == other.crossings
+            && self.refusals == other.refusals
+    }
+}
+
+impl Eq for Held {}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 impl Budget {
@@ -593,6 +630,7 @@ impl Held {
                 held.merge_budget(&budget, budget.version)?;
             }
         }
+        held.index = crate::budgets_index::Index::from_uses(&held.uses)?;
         Ok(held)
     }
 }
