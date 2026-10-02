@@ -122,19 +122,27 @@ pub fn figure(
     at_ms: i64,
     incoming: Option<&Usage>,
 ) -> Result<Used, String> {
-    let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
-    let uses: Vec<_> = held
-        .uses
-        .iter()
-        .chain(incoming)
-        .filter(|usage| {
-            #[cfg(test)]
-            crate::budgets_work::visit(crate::budgets_work::Work::Usage);
-            agents.contains(&usage.agent) && usage.at_ms <= at_ms
-        })
-        .collect();
-    if limit.unit == Measure::PlanPercent {
-        return plan(limit, agents, &uses, at_ms);
+    figure_with_sessions(held, limit, agents, zone, at_ms, incoming, None)
+}
+
+/// Distinguish a never-run agent from one awaiting its first usage report.
+pub(crate) fn figure_with_sessions(
+    held: &Held,
+    limit: &Limit,
+    agents: &BTreeSet<String>,
+    zone: &str,
+    at_ms: i64,
+    incoming: Option<&Usage>,
+    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
+) -> Result<Used, String> {
+    Reading {
+        held,
+        limit,
+        agents,
+        zone,
+        at_ms,
+        incoming,
+        sessions,
     }
     .figure(Purpose::Spend)
 }

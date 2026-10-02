@@ -86,8 +86,6 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
                     .sessions()
                     .iter()
                     .filter(|tracked| {
-                        #[cfg(test)]
-                        crate::budgets_work::visit(crate::budgets_work::Work::Target);
                         tracked.agent.as_deref() == Some(standing.agent.as_str())
                             && !tracked.stopped()
                     })
@@ -97,15 +95,19 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         } else {
             Vec::new()
         };
-        #[cfg(test)]
-        crate::budgets_work::visit(crate::budgets_work::Work::Settings);
-        let compact = crate::runner_api::session_settings(state, &standing.agent)?
-            .and_then(|settings| settings.compact);
-        targets.insert(standing.agent.clone(), Target { live, compact });
-    }
-    with_budgets_mut(state, |store| {
-        if store.held().charged.contains(&usage.event) {
-            return Ok(());
+        resolve_commands(state, &mut assessed.crossed)?;
+        let committed = with_budgets_mut(state, |store| {
+            commit_assessment(
+                store,
+                &mut incoming,
+                revision,
+                assessed,
+                sessions.as_ref(),
+                &agent,
+            )
+        })?;
+        if let Some(pending) = committed {
+            return crate::budgets_act::settle_crossings(state, pending).await;
         }
         let crossed = crossings(
             store.held(),
@@ -529,11 +531,12 @@ fn dispatch(
                 &identity,
                 session.as_deref().unwrap_or_default(),
             );
-            if held.crossings.crossed.iter().any(|crossing| {
-                #[cfg(test)]
-                crate::budgets_work::visit(crate::budgets_work::Work::CrossingLookup);
-                crossing.operation == operation
-            }) {
+            if held
+                .crossings
+                .crossed
+                .iter()
+                .any(|crossing| crossing.operation == operation)
+            {
                 continue;
             }
             let text = match act {
