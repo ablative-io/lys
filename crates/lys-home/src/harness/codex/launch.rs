@@ -79,7 +79,12 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         };
         servers.insert(server.name.clone(), value);
     }
-    let config = format!("mcp_servers = {}\n", native_value(&Value::Object(servers))?);
+    let mut config = format!("mcp_servers = {}\n", native_value(&Value::Object(servers))?);
+    if template.permissions.default_mode.as_deref() == Some("workspace-write") {
+        config.push_str(
+            "web_search = \"disabled\"\n[sandbox_workspace_write]\nnetwork_access = false\nwritable_roots = []\nexclude_tmpdir_env_var = true\nexclude_slash_tmp = true\n",
+        );
+    }
     let mut files = vec![file("config.toml", config)];
     for skill in &template.skills {
         let held = check(skill).map_err(|error| error.to_string())?;
@@ -94,6 +99,18 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         ".".to_owned(),
     ];
     if let Some(sandbox) = template.permissions.default_mode {
+        if sandbox == "workspace-write" {
+            // Command-line settings keep project configuration from widening the boundary.
+            for setting in [
+                "sandbox_workspace_write.network_access=false",
+                "sandbox_workspace_write.writable_roots=[]",
+                "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+                "sandbox_workspace_write.exclude_slash_tmp=true",
+                "web_search=\"disabled\"",
+            ] {
+                arguments.extend(["-c".to_owned(), setting.to_owned()]);
+            }
+        }
         arguments.extend(["--sandbox".to_owned(), sandbox]);
     }
     for path in template.permissions.additional_directories {

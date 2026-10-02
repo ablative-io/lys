@@ -244,6 +244,7 @@ impl Fixture {
                 "model_access": ["primary-model"], "tools": [], "skills": [],
                 "mcp_servers": servers, "instructions": "Keep reviewed instructions.", "note": "",
                 "harness": crate::harness_description::declared(),
+                "permissions": {"default_mode": "plan"},
             }),
             200,
         )

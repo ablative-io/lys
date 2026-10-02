@@ -31,6 +31,13 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     let mut value = json!({ "env": env });
     if let Some(permissions) = &template.permissions {
         value["permissions"] = serde_json::Value::Object(permissions.clone());
+        if permissions
+            .get("defaultMode")
+            .and_then(serde_json::Value::as_str)
+            == Some("workspace-only")
+        {
+            workspace_settings(&mut value)?;
+        }
     }
     let mut bytes = serde_json::to_vec_pretty(&value).map_err(|source| HomeError::Json {
         context: "the environment file could not be serialised",
@@ -38,6 +45,44 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     })?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+
+fn workspace_settings(value: &mut serde_json::Value) -> Result<(), HomeError> {
+    let permissions = &mut value["permissions"];
+    for field in ["allow", "additionalDirectories"] {
+        if permissions
+            .get(field)
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|items| !items.is_empty())
+        {
+            return Err(HomeError::TemplateShape {
+                field: format!("slots.permissions.{field}"),
+                reason: "workspace-only cannot carry additional allowed tools or directories",
+            });
+        }
+    }
+    let mut deny = permissions
+        .get("deny")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for tool in ["WebFetch", "WebSearch"] {
+        let rule = json!(tool);
+        if !deny.contains(&rule) {
+            deny.push(rule);
+        }
+    }
+    permissions["defaultMode"] = json!("dontAsk");
+    permissions["allow"] = json!(["Read(./**)", "Edit(./**)"]);
+    permissions["deny"] = json!(deny);
+    permissions["blockReadsOutsideWorkingDirectories"] = json!(true);
+    value["sandbox"] = json!({
+        "enabled": true, "failIfUnavailable": true,
+        "allowUnsandboxedCommands": false, "excludedCommands": [],
+        "filesystem": {"allowWrite": []},
+        "network": {"allowedDomains": [], "strictAllowlist": true, "allowLocalBinding": false, "allowAllUnixSockets": false}
+    });
+    Ok(())
 }
 
 /// The hook that sends each of the session's tool calls to the runner's

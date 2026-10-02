@@ -19,6 +19,79 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 const BEA: &str = "bea-subject";
 
+#[tokio::test]
+async fn claude_first_run_defaults_start_with_native_workspace_settings() -> TestResult {
+    let table = Table::unprofiled_with(true).await?;
+    let agent = table.agent();
+    let catalogue: Value = serde_json::from_str(include_str!(
+        "../../../docs/harness/catalogue/claude-code.json"
+    ))?;
+    let mut harness = table.harness();
+    harness["description"] = catalogue["description"].clone();
+    assert!(
+        catalogue["modes"]
+            .as_array()
+            .ok_or("modes absent")?
+            .iter()
+            .any(|mode| mode["id"] == "workspace-only")
+    );
+    let path = format!("/agents/{agent}/provisioning");
+    table.ok(&path, &json!({"operation": operation()?, "from_version": 0, "model_access": ["default"], "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": "", "harness": harness, "permissions": {"default_mode": "workspace-only"}})).await?;
+    table
+        .ok(
+            &format!("{path}/1/review"),
+            &json!({"operation": operation()?}),
+        )
+        .await?;
+    let machine = table
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
+        .await?;
+    let (status, start) = table.ask(&agent, &machine, &table.ada).await?;
+    table.close()?;
+    assert_eq!(status, 200, "{start}");
+    let launch = lys_home::harness::rendering_launch::render(
+        "claude-code/template-v1",
+        "/opt/seat/bin/claude",
+        start["template"].as_str().ok_or("template absent")?,
+        lys_home::harness::launch_fields::InstructionsMode::Keep,
+    )?;
+    let settings: Value = serde_json::from_str(
+        &launch
+            .files
+            .iter()
+            .find(|file| file.path == "settings.json")
+            .ok_or("settings absent")?
+            .text,
+    )?;
+    assert_eq!(settings["permissions"]["defaultMode"], "dontAsk");
+    assert_eq!(settings["sandbox"]["enabled"], true);
+    assert_eq!(settings["sandbox"]["network"]["strictAllowlist"], true);
+    assert_eq!(settings["sandbox"]["network"]["allowedDomains"], json!([]));
+    Ok(())
+}
+
+#[tokio::test]
+async fn claude_without_a_confinement_choice_refuses_before_rendering() -> TestResult {
+    let table = Table::unprofiled_with(true).await?;
+    table.launch_profile_mode(None).await?;
+    let agent = table.agent();
+    let machine = table
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
+        .await?;
+    let answer = table.ask(&agent, &machine, &table.ada).await?;
+    table.close()?;
+    assert_eq!(answer.0, 400, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "PolicyUnrepresentable");
+    assert!(
+        answer
+            .1
+            .to_string()
+            .contains("choose how this agent is confined")
+    );
+    assert!(answer.1.get("template").is_none());
+    Ok(())
+}
+
 fn refused(answer: &(u16, Value), status: u16, name: &str) {
     assert_eq!(answer.0, status, "{}", answer.1);
     assert_eq!(answer.1["refusal"], name, "{}", answer.1);
@@ -51,6 +124,10 @@ impl Table {
     }
 
     async fn launch_profile(&self) -> TestResult {
+        self.launch_profile_mode(Some("plan")).await
+    }
+
+    async fn launch_profile_mode(&self, mode: Option<&str>) -> TestResult {
         let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
         let (status, kept) = self
             .service
@@ -63,6 +140,7 @@ impl Table {
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
             "harness": self.harness(),
             "instructions": "Build what the brief says.", "note": "First setup.",
+            "permissions": mode.map(|mode| json!({"default_mode": mode})),
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         let (status, set) = self.service.post(&path, Some(&self.ada), &body).await?;
@@ -91,7 +169,7 @@ impl Table {
 
 #[tokio::test]
 async fn each_refusal_is_by_name() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true).await?;
     let bea = table
         .service
         .sign_in(Login {
@@ -165,7 +243,7 @@ async fn each_refusal_is_by_name() -> TestResult {
 
 #[tokio::test]
 async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -235,7 +313,7 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
 
 #[tokio::test]
 async fn a_start_is_kept_once_under_its_operation() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
@@ -272,7 +350,7 @@ async fn a_start_is_kept_once_under_its_operation() -> TestResult {
 
 #[tokio::test]
 async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
-    let table = Table::unprofiled().await?;
+    let table = Table::unprofiled_with(true).await?;
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = operation()?;

@@ -78,7 +78,25 @@ fn codex_native_launch_preserves_model_sandbox_and_instruction_text() -> TestRes
     );
     assert_eq!(launch.environment["LYS_AGENT"], "agent-fixture");
     assert_eq!(launch.environment_paths["CODEX_HOME"], "");
-    assert!(launch.files.iter().any(|file| file.path == "config.toml"));
+    let file = launch
+        .files
+        .iter()
+        .find(|file| file.path == "config.toml")
+        .ok_or("native config missing")?;
+    let config: toml::Table = file.text.parse()?;
+    assert_eq!(
+        config["sandbox_workspace_write"]["network_access"].as_bool(),
+        Some(false)
+    );
+    assert_eq!(
+        config["sandbox_workspace_write"]["exclude_tmpdir_env_var"].as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        config["sandbox_workspace_write"]["exclude_slash_tmp"].as_bool(),
+        Some(true)
+    );
+    assert_eq!(config["web_search"].as_str(), Some("disabled"));
     Ok(())
 }
 

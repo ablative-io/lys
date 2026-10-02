@@ -11,6 +11,25 @@ use lys_identity_server::provisioning_store::Version;
 use serde_json::json;
 
 #[test]
+fn a_kept_claude_template_without_a_chosen_mode_cannot_be_replayed() -> Result<(), Box<dyn Error>> {
+    let version: Version = serde_json::from_value(json!({
+        "number": 1, "operation": "record-profile", "set_by": "operator", "set_at": 1,
+        "settings": {"harness": harness_description::declared(), "model_access": ["primary-model"], "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": ""}
+    }))?;
+    let template = include_str!("../../lys-home/tests/fixtures/launch/template.json");
+    let hash = lys_home::record::blocks::Hash::of(template.as_bytes());
+    let error =
+        lys_identity_server::launch_template::from_template(&version, template, hash.as_str())
+            .err()
+            .ok_or("unchosen mode replayed")?;
+    assert!(
+        matches!(&error, lys_identity_server::error::ServerError::PolicyUnrepresentable { rule, reason } if rule == "permissions.default_mode" && reason == "choose how this agent is confined"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn the_start_command_carries_the_declared_program_and_models() -> Result<(), Box<dyn Error>> {
     let version: Version = serde_json::from_value(json!({
         "number": 1, "operation": "record-profile", "set_by": "operator", "set_at": 1,
@@ -18,6 +37,7 @@ fn the_start_command_carries_the_declared_program_and_models() -> Result<(), Box
             "harness": harness_description::declared(),
             "model_access": ["primary-model", "fallback-model"],
             "tools": [], "skills": [], "mcp_servers": [],
+            "permissions": {"default_mode": "plan"},
             "instructions": "Follow the reviewed instructions.", "note": ""
         }
     }))?;
@@ -189,6 +209,7 @@ fn instructions_mode_renders_only_the_reviewed_claude_prompt_flag() -> Result<()
             "settings": {
                 "harness": harness_description::declared(),
                 "model_access": ["primary-model"], "tools": [], "skills": [], "mcp_servers": [],
+                "permissions": {"default_mode": "plan"},
                 "instructions": "Exact reviewed instructions.\n", "instructions_mode": mode, "note": ""
             }
         }))?;

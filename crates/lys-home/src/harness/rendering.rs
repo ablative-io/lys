@@ -157,6 +157,17 @@ fn native_template(
     permissions: &Value,
     secrets: &[SecretBinding],
 ) -> Result<RenderedTemplate, RenderRefusal> {
+    if permissions
+        .get("default_mode")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
+    {
+        return Err(refused(
+            fields,
+            "permissions",
+            "choose how this agent is confined",
+        ));
+    }
     let mut servers = Map::new();
     for server in &fields.mcp_servers {
         servers.insert(server.name.clone(), server_entry(fields, server)?);

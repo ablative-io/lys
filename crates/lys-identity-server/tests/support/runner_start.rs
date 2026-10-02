@@ -14,8 +14,13 @@ use axum::response::{IntoResponse, Response};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
-use lys_identity::OperationId;
+use lys_identity::{
+    Actor, AuthMethod, IdentityId, LifecycleState, LoginBinding, OperationId, Profile, Provenance,
+    Transition,
+};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
+use lys_identity_server::dev_seed::{SeededAgent, SeededPerson};
+use lys_identity_server::routes::open_directory;
 use lys_identity_server::secrets_api::SecretsSettings;
 use lys_runner::{Options, Runner, Serving};
 use serde_json::{Value, json};
@@ -70,6 +75,11 @@ impl Table {
 
     /// Start once, leaving the scenario to record and review its own profile.
     pub async fn unprofiled() -> Result<Self, Box<dyn Error>> {
+        Self::unprofiled_with(false).await
+    }
+
+    /// Command scenarios need one active agent and the two sign-in subjects.
+    pub async fn unprofiled_with(commands_only: bool) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
@@ -89,9 +99,26 @@ impl Table {
             None,
             Some(settings),
             None,
-            move |config| config.runner_socket = Some(adjusted),
             move |config| {
-                let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
+                config.runner_socket = Some(adjusted);
+                if commands_only {
+                    config.requests_dir = None;
+                    config.certificates_dir = None;
+                    config.roles_file = None;
+                    config.service_accounts_dir = None;
+                    config.teams_dir = None;
+                    config.stops_dir = None;
+                    config.budgets_dir = None;
+                    config.goals_dir = None;
+                    config.reviews_dir = None;
+                }
+            },
+            move |config| {
+                let seeded = if commands_only {
+                    command_seed(config)?
+                } else {
+                    seed_configured(config, [ADMINISTRATOR, "bea-subject"])?
+                };
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let runner = Runner::open(&Options {
                     socket,
@@ -161,6 +188,7 @@ impl Table {
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "",
             "harness": harness,
+            "permissions": {"default_mode": "plan"},
         });
         self.ok(&path, &body).await?;
         self.ok(
@@ -204,4 +232,67 @@ impl Table {
         }
         Ok(())
     }
+}
+
+fn command_seed(config: &lys_identity_server::Config) -> Result<Seeded, Box<dyn Error>> {
+    let actor = Actor::new(
+        LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+        Provenance::new(AuthMethod::Oidc, 1),
+    );
+    let mut directory = open_directory(config)?;
+    let (owner, _) = directory.setup_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Owner")?,
+        1,
+    )?;
+    let (agent, _) = directory.register_agent(
+        actor.clone(),
+        OperationId::generate()?,
+        owner,
+        Profile::new("Agent")?,
+        2,
+    )?;
+    directory.transition(
+        actor.clone(),
+        OperationId::generate()?,
+        IdentityId::Agent(agent),
+        Transition::Activate,
+        "",
+        3,
+    )?;
+    let (other, _) = directory.register_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Other")?,
+        4,
+    )?;
+    directory.bind_login(
+        actor.clone(),
+        OperationId::generate()?,
+        other,
+        LoginBinding::new(&config.issuer, "bea-subject")?,
+        5,
+    )?;
+    directory.transition(
+        actor,
+        OperationId::generate()?,
+        IdentityId::Person(other),
+        Transition::Activate,
+        "",
+        6,
+    )?;
+    Ok(Seeded {
+        people: vec![SeededPerson {
+            id: owner,
+            display_name: "Owner".to_owned(),
+            subject: ADMINISTRATOR.to_owned(),
+            agents: vec![SeededAgent {
+                id: agent,
+                display_name: "Agent".to_owned(),
+                state: LifecycleState::Active,
+            }],
+        }],
+        tree_size: directory.log()?.head()?.0,
+    })
 }
