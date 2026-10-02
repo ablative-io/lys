@@ -5,6 +5,7 @@
     "transcript": {"fill": "resume-by-path", "canon": null},
     "mcp": {"mcpServers": {}},
     "env": {"LYS_FIXTURE_MODE": "fixture"},
+    "permissions": {"defaultMode": "plan"},
     "secrets": {
       "use_only": [{"env": "LYS_FIXTURE_TOKEN", "handle": "handle-fixture-0001"}],
       "readable": [],
