@@ -53,6 +53,7 @@ pub const ACTIONS: &[&str] = &[
     "machine.retire",
     "machine.runner.set",
     "machine.team.set",
+    "operate",
     "person.create",
     "person.email.set",
     "person.login.bind",
@@ -396,8 +397,12 @@ mod tests {
             );
         }
         for allowed in AGENT_MAY_HOLD {
+            // `operate` is the server's own act for driving an agent's
+            // sessions, given on the agent itself.
             assert!(
-                ACTIONS.contains(allowed) || FIRST_ACTIONS.contains(allowed) || *allowed == READ,
+                ACTIONS.contains(allowed)
+                    || FIRST_ACTIONS.contains(allowed)
+                    || [READ, "operate"].contains(allowed),
                 "{allowed} is not shipped"
             );
         }

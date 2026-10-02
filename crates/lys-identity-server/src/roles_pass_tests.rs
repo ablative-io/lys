@@ -41,101 +41,52 @@ async fn role_read_requires_the_named_roles_read_grant() -> TestResult {
     Ok(())
 }
 
+/// Creating, revising, assigning, moving and ending roles are withheld from
+/// agents: passing any of them to an agent is refused by name, and the
+/// agent stays refused at the route.
 #[tokio::test]
-async fn role_create_records_the_granted_agent() -> TestResult {
-    let table = Table::fresh(false).await?;
-    let mut body = version_body()?;
-    body["name"] = json!("Reviewer");
-    refused(&table, Method::POST, "/roles", Some(&body)).await?;
-    table.grant("all", "creator", "role.create").await?;
-    let (status, answer) = table.call(Method::POST, "/roles", Some(&body)).await?;
-    assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer["versions"][0]["made_by"], table.agent);
-    let id = answer["id"].as_str().ok_or("role id missing")?;
-    assert_eq!(
-        table.role_view(id).await?["versions"][0]["made_by"],
-        table.agent
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn role_revise_records_the_granted_agent_and_cannot_end_a_holding() -> TestResult {
+async fn role_changes_are_withheld_from_agents() -> TestResult {
     let table = Table::fresh(true).await?;
-    let path = format!("/roles/{}/versions", table.role);
-    let body = version_body()?;
-    refused(&table, Method::POST, &path, Some(&body)).await?;
-    table.grant(&table.role, "reviser", "role.revise").await?;
-    let (status, answer) = table.call(Method::POST, &path, Some(&body)).await?;
-    assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer["versions"][2]["made_by"], table.agent);
-    assert_eq!(
-        table.role_view(&table.role).await?["versions"][2]["made_by"],
-        table.agent
-    );
-    let end = format!("/roles/{}/holders/{}/end", table.role, table.agent);
-    refused(
-        &table,
-        Method::POST,
-        &end,
-        Some(&json!({"assignment":table.assignment})),
-    )
-    .await?;
+    let mut create = version_body()?;
+    create["name"] = json!("Reviewer");
+    let holder = format!("/roles/{}/holders/{}", table.role, table.agent);
+    let cases = [
+        ("all", "creator", "role.create", "/roles".to_owned(), create),
+        (
+            table.role.as_str(),
+            "reviser",
+            "role.revise",
+            format!("/roles/{}/versions", table.role),
+            version_body()?,
+        ),
+        (
+            table.role.as_str(),
+            "assigner",
+            "role.holder.assign",
+            format!("/roles/{}/holders", table.role),
+            json!({"operation":operation()?, "holder":table.agent, "ends_at":null}),
+        ),
+        (
+            table.role.as_str(),
+            "mover",
+            "role.holder.move",
+            format!("{holder}/move"),
+            json!({"assignment":table.assignment, "from_version":1, "to_version":2}),
+        ),
+        (
+            table.role.as_str(),
+            "ender",
+            "role.holder.end",
+            format!("{holder}/end"),
+            json!({"assignment":table.assignment}),
+        ),
+    ];
+    for (resource, relation, action, path, body) in cases {
+        let (status, answer) = table.give(resource, relation, action).await?;
+        assert_eq!(status, 403, "{action}: {answer}");
+        assert_eq!(answer["refusal"], "WithheldFromAgents", "{action}: {answer}");
+        refused(&table, Method::POST, &path, Some(&body)).await?;
+    }
     assert!(table.role_view(&table.role).await?["holders"][0]["ended_by"].is_null());
-    Ok(())
-}
-
-#[tokio::test]
-async fn role_assign_records_the_granted_agent() -> TestResult {
-    let table = Table::fresh(false).await?;
-    let path = format!("/roles/{}/holders", table.role);
-    let body = json!({"operation":operation()?, "holder":table.agent, "ends_at":null});
-    refused(&table, Method::POST, &path, Some(&body)).await?;
-    table
-        .grant(&table.role, "assigner", "role.holder.assign")
-        .await?;
-    let (status, answer) = table.call(Method::POST, &path, Some(&body)).await?;
-    assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer["holders"][0]["assigned_by"], table.agent);
-    assert_eq!(
-        table.role_view(&table.role).await?["holders"][0]["assigned_by"],
-        table.agent
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn role_move_records_the_granted_agent() -> TestResult {
-    let table = Table::fresh(true).await?;
-    let path = format!("/roles/{}/holders/{}/move", table.role, table.agent);
-    let body = json!({"assignment":table.assignment, "from_version":1, "to_version":2});
-    refused(&table, Method::POST, &path, Some(&body)).await?;
-    table
-        .grant(&table.role, "mover", "role.holder.move")
-        .await?;
-    let (status, answer) = table.call(Method::POST, &path, Some(&body)).await?;
-    assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer["holder"]["moves"][0]["by"], table.agent);
-    assert_eq!(
-        table.role_view(&table.role).await?["holders"][0]["moves"][0]["by"],
-        table.agent
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn role_end_records_the_granted_agent() -> TestResult {
-    let table = Table::fresh(true).await?;
-    let path = format!("/roles/{}/holders/{}/end", table.role, table.agent);
-    let body = json!({"assignment":table.assignment});
-    refused(&table, Method::POST, &path, Some(&body)).await?;
-    table.grant(&table.role, "ender", "role.holder.end").await?;
-    let (status, answer) = table.call(Method::POST, &path, Some(&body)).await?;
-    assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer["holders"][0]["ended_by"], table.agent);
-    assert_eq!(
-        table.role_view(&table.role).await?["holders"][0]["ended_by"],
-        table.agent
-    );
     Ok(())
 }

@@ -103,9 +103,24 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
     let use_only = json!({"kind": "use_only"});
     ok(post(&service, "/grants", auth, &give("only.agent.start", use_only.clone())?).await?)?;
 
+    // The roots pass on nothing withheld, so editor is outside them.
+    let (status, refused) = post(&service, "/grants", auth, &give("editor", use_only.clone())?).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "ActionsOutside", "{refused}");
+
+    // A root that does pass withheld acts on to agents still cannot give them.
+    let wide = ok(post(
+        &service,
+        "/grants/roots",
+        auth,
+        &json!({"operation": op()?, "route": "api", "holder": person, "resource": source["resource"], "relation": "editor", "pass_on": {"kind": "to", "actions": ["agent.stop", "grant.delegate", "request.approve", "role.create"], "recipients": ["agent"]}, "window": {"starts_at": 0, "ends_at": null}}),
+    )
+    .await?)?;
+    let give = |relation: &str, pass_on: Value| -> Result<Value, Box<dyn Error>> {
+        Ok(json!({"operation": op()?, "route": "api", "source": wide["grant"], "recipient": agent, "responsible": person, "resource": source["resource"], "relation": relation, "pass_on": pass_on, "window": {"starts_at": 0, "ends_at": null}}))
+    };
     let before = service.log_size().await?;
     for (relation, pass_on) in [
-        ("editor", use_only.clone()),
         ("only.grant.delegate", use_only.clone()),
         ("only.role.create", use_only),
         (

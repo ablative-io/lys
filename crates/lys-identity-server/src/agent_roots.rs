@@ -16,7 +16,7 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
-use serde_json::{Value, json};
+use serde::Serialize;
 
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in};
@@ -99,15 +99,24 @@ pub(crate) fn at_setup(state: &AppState) -> Result<(), ServerError> {
     Ok(())
 }
 
+/// The administrator's roots for giving people and agents access.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct AgentRoots {
+    /// The roots' grant ids, recorded now or before.
+    pub grants: Vec<String>,
+}
+
 /// `POST /grants/agent-roots`: the configured administrator records their
 /// own roots for giving people and agents access, once. This is how an
 /// install set up before them gains them; nothing else issues them.
 pub(crate) async fn reissue(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<AgentRoots>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.configured_administrator(&actor)?;
     let owner = administrator(&state)?.ok_or(ServerError::NoPerson)?;
-    Ok(Json(json!({ "grants": issue(&state, owner)? })))
+    Ok(Json(AgentRoots {
+        grants: issue(&state, owner)?,
+    }))
 }

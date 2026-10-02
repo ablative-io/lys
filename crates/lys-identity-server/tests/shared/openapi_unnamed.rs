@@ -218,6 +218,7 @@ pub(crate) const NO_BODY: &[(&str, &str)] = &[
         "takes a form-encoded body, as RFC 6749 requires",
     ),
     ("post /requests/{id}/reconcile", "takes no body"),
+    ("post /grants/agent-roots", "takes no body"),
     ("post /network/machines/{id}/retire", "takes no body"),
     ("post /sessions/{id}/end", "takes no body"),
     (

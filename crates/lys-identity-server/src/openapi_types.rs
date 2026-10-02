@@ -219,6 +219,12 @@ fn grants_and_reviews(api: &mut Api) -> Vec<Entry> {
         (POST, "/grants/roots", Some(root), Some(recorded.clone())),
         (
             POST,
+            "/grants/agent-roots",
+            None,
+            Some(api.schema::<crate::agent_roots::AgentRoots>()),
+        ),
+        (
+            POST,
             "/grants/check",
             Some(action.clone()),
             Some(permit.clone()),

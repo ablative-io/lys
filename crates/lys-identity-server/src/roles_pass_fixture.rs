@@ -229,6 +229,19 @@ impl Table {
     }
 
     pub(super) async fn grant(&self, resource: &str, relation: &str, action: &str) -> TestResult {
+        let (status, issued) = self.give(resource, relation, action).await?;
+        assert_eq!(status, 200, "{issued}");
+        Ok(())
+    }
+
+    /// Pass `action` on a role to the agent through a root of the
+    /// person's, answering the status and body of the pass on.
+    pub(super) async fn give(
+        &self,
+        resource: &str,
+        relation: &str,
+        action: &str,
+    ) -> TestResult<(u16, Value)> {
         let resource = json!({"kind":"role", "id":resource});
         let (status, root) = self.service.post("/grants/roots", Some(&self.cookie), &json!({
             "operation":operation()?, "route":"api", "holder":self.person, "resource":resource,
@@ -236,13 +249,11 @@ impl Table {
             "window":{"starts_at":0,"ends_at":null}
         })).await?;
         assert_eq!(status, 200, "{root}");
-        let (status, issued) = self.service.post("/grants", Some(&self.cookie), &json!({
+        Ok(self.service.post("/grants", Some(&self.cookie), &json!({
             "operation":operation()?, "route":"api", "source":root["grant"], "recipient":self.agent,
             "responsible":self.person, "resource":resource, "relation":relation,
             "pass_on":{"kind":"use_only"}, "window":{"starts_at":0,"ends_at":null}
-        })).await?;
-        assert_eq!(status, 200, "{issued}");
-        Ok(())
+        })).await?)
     }
 
     pub(super) async fn role_view(&self, id: &str) -> TestResult<Value> {
