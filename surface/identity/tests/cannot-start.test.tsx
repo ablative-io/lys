@@ -4,7 +4,8 @@ import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CannotStart, whyNot } from '../src/features/runtime/CannotStart';
 import type { StartRefusal } from '../src/features/runtime/CannotStart';
-import type { Machine } from '../src/features/network/contract';
+import type { Machine, NetworkView } from '../src/features/network/contract';
+import { request } from '../src/api';
 import { click, serve, settle } from './harness';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
@@ -30,7 +31,9 @@ async function shown(refusal: StartRefusal, routes: Record<string, Route> = {}) 
   document.body.append(shownIn);
   host = shownIn;
   root = createRoot(shownIn);
-  await act(async () => { root?.render(<CannotStart agent={SCRIBE} name="Scribe" refusal={refusal} again={() => { calls.again += 1; }} />); });
+  // The computers come from the start that was refused, which read them; here that read is made once, as Start makes it.
+  const { machines } = await request<NetworkView>('/network').catch(() => ({ machines: [] as NetworkView['machines'] }));
+  await act(async () => { root?.render(<CannotStart agent={SCRIBE} name="Scribe" refusal={refusal} machines={machines} again={() => { calls.again += 1; }} />); });
   await settle();
   return { host: shownIn, posted, calls };
 }

@@ -14,7 +14,7 @@
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, request, useLoad } from '../../api';
 import { allowedToRun, usable } from '../network/allowed';
-import type { NetworkView } from '../network/contract';
+import type { Machine } from '../network/contract';
 import { confirmAdmission } from '../network/machine-admission';
 import type { MachineAdmission } from '../network/machine-admission';
 import { FolderChooser } from '../provisioning/FolderChooser';
@@ -63,15 +63,16 @@ const refusalOf = (error: unknown): StartRefusal => error instanceof Refused
   ? { refusal: error.refusal.refusal, reason: error.message }
   : { refusal: 'Unexpected', reason: String(error) };
 
-export function CannotStart({ agent, name, refusal, again }: {
-  agent: string; name: string; refusal: StartRefusal; again: () => void;
+export function CannotStart({ agent, name, refusal, machines, again }: {
+  /** The computers as the start that was refused read them, so this explanation and that start never disagree. */
+  agent: string; name: string; refusal: StartRefusal; machines: Machine[]; again: () => void;
 }) {
   const { sentence, fix } = whyNot(name, refusal);
   return <div role="alert" className="cannot-start">
     <p>{sentence} <small className="refusal-name">{refusal.refusal}</small></p>
     {fix.kind === 'turn-on' ? <TurnOn agent={agent} name={name} label={fix.label} transition={fix.transition} again={again} /> : null}
-    {fix.kind === 'allow-computer' ? <AllowComputer agent={agent} name={name} again={again} /> : null}
-    {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} name={name} again={again} /> : null}
+    {fix.kind === 'allow-computer' ? <AllowComputer agent={agent} name={name} machines={machines} again={again} /> : null}
+    {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} name={name} machines={machines} again={again} /> : null}
     {fix.kind === 'try-again' ? <button type="button" className="btn primary" onClick={again}>Try again</button> : null}
   </div>;
 }
@@ -109,12 +110,12 @@ function TurnOn({ agent, name, label, transition, again }: {
  * is the thing to settle first, and that is said. The folder is then saved
  * to the agent's settings and the start follows.
  */
-function ChooseFolder({ agent, name, again }: { agent: string; name: string; again: () => void }) {
+function ChooseFolder({ agent, name, machines, again }: { agent: string; name: string; machines: Machine[]; again: () => void }) {
   const load = useLoad(async () => {
-    const [network, held, roles] = await Promise.all([request<NetworkView>('/network'), request<ProvisioningAnswer>('/agents/' + encodeURIComponent(agent) + '/provisioning'), readRoles()]);
-    const named = usable(network.machines).find((entry) => entry.id === held.profile?.runs_on);
+    const [held, roles] = await Promise.all([request<ProvisioningAnswer>('/agents/' + encodeURIComponent(agent) + '/provisioning'), readRoles()]);
+    const named = usable(machines).find((entry) => entry.id === held.profile?.runs_on);
     // Allowed by its own name or by a role it holds now: the same rule Start uses, so the two never disagree.
-    const allowed = allowedToRun(network.machines, roles.roles, agent);
+    const allowed = allowedToRun(machines, roles.roles, agent);
     return named ?? (allowed.length === 1 ? allowed[0] : null);
   }, 'cannot-start-folder:' + agent);
   const [busy, setBusy] = useState(false);
@@ -143,10 +144,10 @@ function ChooseFolder({ agent, name, again }: { agent: string; name: string; aga
   </>;
 }
 
-function AllowComputer({ agent, name, again }: { agent: string; name: string; again: () => void }) {
+function AllowComputer({ agent, name, machines, again }: { agent: string; name: string; machines: Machine[]; again: () => void }) {
   const load = useLoad(async () => {
-    const [me, network] = await Promise.all([api.me(), request<NetworkView>('/network')]);
-    return { person: me.person.id, computers: usable(network.machines) };
+    const me = await api.me();
+    return { person: me.person.id, computers: usable(machines) };
   }, 'cannot-start-computers:' + agent);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<StartRefusal | null>(null);

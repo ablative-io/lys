@@ -17,7 +17,7 @@ export function KeepGrant({ grant, person, changed }: { grant: string; person: s
   return <><button className="btn" disabled={change.blocked} onClick={() => setOpen(true)}>Keep access</button>
     {open ? <form aria-label="Keep this access" onSubmit={(event) => { event.preventDefault(); change.submit({ operation: operationId(), note: note.trim() }); }}>
       <p>Record that this access is still needed. Its permissions and expiry stay the same.</p>
-      <label className="field">Review note (optional)<textarea maxLength={500} value={note} disabled={change.blocked} onChange={(event) => setNote(event.target.value)} /></label>
+      <label className="field">Review note (optional)<textarea value={note} disabled={change.blocked} onChange={(event) => setNote(event.target.value)} /></label>
       <button className="btn primary" type="submit" disabled={change.blocked}>Confirm keep</button><button className="btn" type="button" disabled={change.busy} onClick={() => setOpen(false)}>Cancel</button>
     </form> : null}<ChangeStatus change={change} /></>;
 }

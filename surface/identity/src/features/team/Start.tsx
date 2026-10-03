@@ -1,8 +1,9 @@
 /** A stopped agent, started in place with one press. Where it runs is a saved setting: the computer its settings name, else the one computer allowed to run it; only when several are allowed and none is saved is each offered, as its own Start. What stops a start is said before the press, in one sentence with the one button that fixes it, and the button is never greyed without its reason beside it. */
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { Refused, api, operationId, request, useLoad } from '../../api';
 import { allowedToRun } from '../network/allowed';
 import type { Machine, NetworkView } from '../network/contract';
+import { NetworkRead } from '../network/shared-read';
 import type { Entry } from '../people/directory';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { readRoles } from '../roles/AssignedRoles';
@@ -32,9 +33,11 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
   const prefix = '/agents/' + encodeURIComponent(agent);
   const key = 'lys.pending.agent-start.' + me + '.' + agent;
   const [round, setRound] = useState(0);
+  const drawnWith = useContext(NetworkRead);
   const load = useLoad(async () => {
+    // The first draw shares the page's read of the computers; a later round reads again, since something has changed.
     const [identity, network, roles, provisioning] = await Promise.all([
-      api.agent(agent), request<NetworkView>('/network'), readRoles(), request<ProvisioningAnswer>(prefix + '/provisioning'),
+      api.agent(agent), round === 0 ? drawnWith() : request<NetworkView>('/network'), readRoles(), request<ProvisioningAnswer>(prefix + '/provisioning'),
     ]);
     return { state: identity.state, machines: network.machines, roles: roles.roles, profile: provisioning.profile };
   }, 'team-start:' + agent + ':' + round);
@@ -108,7 +111,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
   const stopped = refusal ?? known;
   return <div className="team-start">
     <p className="team-start-line">{name} is not running.</p>
-    {stopped ? <CannotStart agent={agent} name={name} refusal={stopped} again={again} /> : null}
+    {stopped && data ? <CannotStart agent={agent} name={name} refusal={stopped} machines={data.machines} again={again} /> : null}
     {!stopped && noProgram ? <div role="alert" className="cannot-start">
       <p>{name} has no program chosen yet.</p>
       <button type="button" className="btn primary" onClick={settings}>Choose its program</button>

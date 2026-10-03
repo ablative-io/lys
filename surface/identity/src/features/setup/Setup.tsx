@@ -213,11 +213,11 @@ export function Setup({ completed }: { completed: () => void }) {
     const name = String(new FormData(event.currentTarget).get('display_name') ?? '').trim();
     setNameError('');
     if (!pending && !name) { setNameError('Enter the name you want people to see.'); return; }
-    // Profile::new in lys-identity declares these limits; never submit an invalid pending request.
-    if (!pending && ([...name].length > 200 || [...name].some((character) => {
+    // Profile::new in lys-identity refuses control characters; never submit an invalid pending request.
+    if (!pending && ([...name].some((character) => {
       const point = character.codePointAt(0);
       return point !== undefined && (point < 32 || (point >= 127 && point <= 159));
-    }))) { setNameError('Use a name of 200 characters or fewer, without control characters.'); return; }
+    }))) { setNameError('Use a name without control characters.'); return; }
     sending.current = true;
     setBusy(true);
     setError('');

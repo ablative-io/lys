@@ -364,8 +364,8 @@ describe('Add and run on an existing computer', () => {
     expect(location.hash).toBe('#/file/' + agent);
     expect(posted[5].path).toBe(prefix + '/start-command');
     expect(readsAtStart.filter((path) => path === '/network')).toHaveLength(1);
-    // The add reads the computers once. The agent's own page it lands on reads them for its Overview, its run and why it cannot start.
-    expect(requests.filter((path) => path === '/network')).toHaveLength(4);
+    // The add reads the computers once, and the agent's own page it lands on reads them once for all its parts.
+    expect(requests.filter((path) => path === '/network')).toHaveLength(2);
   });
 
   it.each(['admission', 'start'] as const)('replays the exact saved %s on the original computer after remount', async (stage) => {

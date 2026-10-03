@@ -88,11 +88,19 @@ describe('First administrator setup', () => {
 
   it('lets someone correct an invalid name before creating an operation', async () => {
     const { posted } = await mount('#/me', { ...SERVICE, '/me': needsSetup });
-    await submit('A'.repeat(201));
+    await submit('Ada\u0007');
     expect(posted).toHaveLength(0);
     expect(sessionStorage.getItem('lys.pending.first-setup')).toBeNull();
     expect($('#setup-name')?.hasAttribute('readonly')).toBe(false);
-    expect(text()).toContain('200 characters or fewer');
+    expect(text()).toContain('without control characters');
+  });
+
+  it('sends a long name whole: no length is refused here', async () => {
+    const long = 'A'.repeat(10_000);
+    const { posted } = await mount('#/me', { ...SERVICE, '/me': needsSetup });
+    await submit(long);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toMatchObject({ path: '/setup', body: { display_name: long } });
   });
 
   it('refuses a broken saved operation without silently replacing it', async () => {

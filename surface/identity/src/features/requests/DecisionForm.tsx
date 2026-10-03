@@ -65,7 +65,7 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
     try {
       const data = new FormData(event.currentTarget);
       const note = field(data, 'note');
-      if (!note || [...note].length > 500) throw new Error('Give a reason in 1 to 500 characters.');
+      if (!note) throw new Error('Give a reason for your decision.');
       if (action === 'decline') { void send({ kind: action, note }, false); return; }
       const source = field(data, 'source');
       if (!(canIssueRoot && source === 'root') && !entry.sources.includes(source)) throw new Error('Choose an available source of access.');
@@ -83,7 +83,7 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
           {entry.sources.map((source, index) => <option key={source} value={source}>Your permission {index + 1}</option>)}
         </select></label> : null}
         {action === 'approve' && entry.sources.length ? <><p className="note">Permissions this approval draws on</p><ul>{entry.sources.map((source, index) => <li key={source}>Permission {index + 1}: {source}</li>)}</ul></> : null}
-        <label className="field">Reason for your decision<textarea name="note" required maxLength={500} /></label>
+        <label className="field">Reason for your decision<textarea name="note" required /></label>
         <button type="submit" className="btn primary" disabled={busy}>Confirm {action === 'approve' ? 'approval' : 'decline'}</button>{' '}
         <button type="button" className="btn" disabled={busy} onClick={() => setAction(null)}>Cancel</button>
       </form> : <><button type="button" className="btn primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')}>Approve access</button>{' '}

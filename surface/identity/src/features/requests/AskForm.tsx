@@ -181,7 +181,7 @@ export function AskForm({ person, resources, model, changed }: {
       const relations = offered.length ? chosen.map((action) => carriers.get(action) ?? '') : [field(data, 'relation')];
       if (!relations.length || relations.some((relation) => !relation || !model.relations[relation])) throw new Error('Choose the access you need.');
       const why = field(data, 'why');
-      if (!why || [...why].length > 500) throw new Error('Explain why you need access in 1 to 500 characters.');
+      if (!why) throw new Error('Explain why you need access.');
       const ends = noExpiry ? null : Date.parse(field(data, 'expires')) / 1000;
       if (ends !== null && (!Number.isSafeInteger(ends) || ends <= Date.now() / 1000)) throw new Error('Choose an expiry in the future, or explicitly choose no expiry.');
       const [relation, ...others] = relations;
@@ -206,7 +206,7 @@ export function AskForm({ person, resources, model, changed }: {
             <p className="note">Each ticked action is asked for on its own and approved on its own.</p></>
           : <label className="field">Access needed<select name="relation" required defaultValue=""><option value="">Choose access</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>;
       })()}
-      <label className="field">Why do you need this access?<textarea name="why" required maxLength={500} /></label>
+      <label className="field">Why do you need this access?<textarea name="why" required /></label>
       <label className="field">Access until (your local time)<input name="expires" type="datetime-local" required={!noExpiry} disabled={noExpiry} /></label>
       <label><input type="checkbox" name="no-expiry" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry requested</label>
       <p><button className="btn primary" type="submit" disabled={busy}>Request access</button></p>

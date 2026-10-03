@@ -21,7 +21,7 @@ export async function recordComputer(initial: PendingMachine, person: string, ke
   return current.machine;
 }
 
-export const validComputerName = (name: string): boolean => Boolean(name) && name.length <= 100 && !/[\u0000-\u001f\u007f]/.test(name);
+export const validComputerName = (name: string): boolean => Boolean(name) && !/[\u0000-\u001f\u007f]/.test(name);
 
 export function AddMachine({ person, agent, changed, cancel }: {
   person: string; agent?: string; changed: (message: string, machine: Machine) => void; cancel: () => void;
@@ -62,7 +62,7 @@ export function AddMachine({ person, agent, changed, cancel }: {
   return <form className="recorded-form" aria-label="Add a computer" onSubmit={submit}>
     <h2>Add this computer</h2>
     <fieldset disabled={busy || pending !== null || Boolean(restored.error)} style={{ border: 0, padding: 0, margin: 0 }}>
-      <label className="field">Name<input name="name" required maxLength={100} /></label>
+      <label className="field">Name<input name="name" required /></label>
       <p className="hint">Type a name for this computer.</p>
       <div className="chain"><button className="btn primary" type="submit">Add this computer</button><button className="btn" type="button" onClick={cancel}>Cancel</button></div>
     </fieldset>

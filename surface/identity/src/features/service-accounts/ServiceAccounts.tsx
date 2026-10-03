@@ -54,8 +54,8 @@ function Create({ person, administrator, changed }: { person: string; administra
   const change = useRoleChange<ServiceAccount>('lys.pending.service-create.' + person, '/service-accounts', (answer, body) => answer.id === body.operation && answer.owner === (body.owner ?? person) && answer.name === body.name && answer.description === body.description, changed);
   return <form className="card form-grid" aria-label="Register service account" onSubmit={(event) => { event.preventDefault(); if (name.trim()) change.submit({ operation: operationId(), name: name.trim(), description: description.trim(), ...(owner === person ? {} : { owner }) }); }}><h2>Register a service account</h2><p>You own this record unless an administrator selects another person.</p>
     {administrator ? <Gate load={people} title="Account owners" ok={(view) => <div className="field">Responsible person, if not you<Picker name="owner" label="Find a person" options={view.people.filter((entry) => entry.state !== 'retired').map((entry) => ({ id: entry.id, name: entry.display_name + (entry.id === person ? ' (you)' : '') }))} onChange={(ids) => setOwner(ids[0] ?? person)} /></div>} /> : null}
-    <label className="field">Account name<input name="name" required maxLength={100} value={name} disabled={change.blocked} onChange={(event) => setName(event.target.value)} placeholder="For example, invoice processing" /></label>
-    <label className="field">What it is for<input maxLength={500} value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
+    <label className="field">Account name<input name="name" required value={name} disabled={change.blocked} onChange={(event) => setName(event.target.value)} placeholder="For example, invoice processing" /></label>
+    <label className="field">What it is for<input value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
     <button className="btn primary" disabled={change.blocked || !name.trim()} type="submit">Register account</button><ChangeStatus change={change} />
   </form>;
 }

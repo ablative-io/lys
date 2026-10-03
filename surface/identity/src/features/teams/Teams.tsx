@@ -106,8 +106,8 @@ function Create({ person, login, changed }: { person: string; login: Login; chan
   const [name, setName] = useState(''); const [description, setDescription] = useState('');
   const change = useRoleChange<TeamChanged>('lys.pending.team-create.' + person, '/teams', (answer, body) => answer.id === body.operation && answer.owner === person && answer.name === body.name && answer.description === body.description && answer.recorded?.operation === body.operation && answer.recorded.act === 'created' && sameLogin(answer.recorded.by, login), (answer) => changed(answer, 'Your team was recorded.'));
   return <form className="card" aria-label="Create team" onSubmit={(event) => { event.preventDefault(); if (name.trim()) change.submit({ operation: operationId(), name: name.trim(), description: description.trim() }); }}><h3>Create a team</h3>
-    <label className="field">Team name<input value={name} required maxLength={100} disabled={change.blocked} onChange={(event) => setName(event.target.value)} /></label>
-    <label className="field">What the team does<textarea value={description} maxLength={500} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
+    <label className="field">Team name<input value={name} required disabled={change.blocked} onChange={(event) => setName(event.target.value)} /></label>
+    <label className="field">What the team does<textarea value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
     <button className="btn primary" type="submit" disabled={change.blocked || !name.trim()}>Create team</button><ChangeStatus change={change} />
   </form>;
 }

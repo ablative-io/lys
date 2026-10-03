@@ -4,6 +4,7 @@ import type { Load } from '../../api';
 import type { ReactNode } from 'react';
 import type { AgentView } from '../../generated';
 import type { NetworkView } from '../network/contract';
+import { NetworkRead, oneNetworkRead } from '../network/shared-read';
 import { readChoices } from '../provisioning/choices';
 import type { Program } from '../provisioning/choices';
 import { ProfileFields } from '../provisioning/ProfileEditor';
@@ -45,8 +46,8 @@ async function readTeams() {
   return answer.teams;
 }
 
-async function readNetwork() {
-  const answer = await request<NetworkView>('/network');
+async function readNetwork(read: () => Promise<NetworkView>) {
+  const answer = await read();
   if (!Array.isArray(answer.machines) || answer.machines.some((machine) => !machine || typeof machine.id !== 'string' || typeof machine.name !== 'string'
     || !['in_use', 'retired'].includes(machine.state) || !(machine.runtime === null || typeof machine.runtime === 'string')
     || !Array.isArray(machine.may_run) || machine.may_run.some((entry) => !entry || typeof entry.id !== 'string')
@@ -79,7 +80,8 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
   const [teamRevision, setTeamRevision] = useState(0);
   const me = useLoad(api.me, 'agent-about-me');
   const teams = useLoad(readTeams, 'agent-about-teams:' + agent.id + ':' + teamRevision);
-  const network = useLoad(readNetwork, 'agent-about-computers:' + agent.id);
+  const [networkRead] = useState(oneNetworkRead);
+  const network = useLoad(() => readNetwork(networkRead), 'agent-about-computers:' + agent.id);
   const programs = useLoad(readPrograms, 'agent-about-programs:' + agent.id);
   const choices = useLoad(() => readChoices(), 'agent-about-choices:' + agent.id);
   const people = useLoad(api.people, 'agent-about-people');
@@ -88,7 +90,7 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
   const saved = profile.status === 'ok' ? profile.data?.model_access ?? [] : [];
   const models = programs.status === 'ok' ? saved.map((id) => modelName(programs.data, id)).join(', ') : '';
   const problems = [profile, teams, network, programs, choices, people, me].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
-  return <><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
+  return <NetworkRead.Provider value={networkRead}><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
   <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
@@ -103,5 +105,5 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
       <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !saved.length ? 'Choose a model when you start' : programs.status !== 'ok' ? reading(programs, 'model names') : models}<p className="note">Saved choice for the next start.</p></dd>
         </>}
     </dl>
-  </section>{details(problems)}</>;
+  </section>{details(problems)}</NetworkRead.Provider>;
 }

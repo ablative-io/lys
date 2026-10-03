@@ -39,9 +39,9 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
     <h2>{role ? 'Save a new version of ' + role.name : 'Create a role'}</h2>
     <p>Describe the work and the access normally needed. Saving a version leaves existing assignments on their current version and grants no access.</p>
     <fieldset className="form-grid" disabled={change.blocked} style={{ border: 0, padding: 0 }}>
-      {!role ? <label className="field wide">Role name<input name="name" required maxLength={100} /></label> : null}
-      {(['responsibilities', 'goals', 'practice'] as const).map((name) => <label className="field wide" key={name}>{name === 'responsibilities' ? 'Responsibilities' : name === 'goals' ? 'Goals' : 'How the work is done'}<textarea name={name} rows={6} required maxLength={4000} defaultValue={current?.[name] ?? ''} /></label>)}
-      <label className="field wide">Starting instructions for an agent<textarea name="profile" rows={6} maxLength={4000} defaultValue={current?.profile ?? ''} /></label>
+      {!role ? <label className="field wide">Role name<input name="name" required /></label> : null}
+      {(['responsibilities', 'goals', 'practice'] as const).map((name) => <label className="field wide" key={name}>{name === 'responsibilities' ? 'Responsibilities' : name === 'goals' ? 'Goals' : 'How the work is done'}<textarea name={name} rows={6} required defaultValue={current?.[name] ?? ''} /></label>)}
+      <label className="field wide">Starting instructions for an agent<textarea name="profile" rows={6} defaultValue={current?.profile ?? ''} /></label>
       <table className="usage-table" aria-label="Access templates"><thead><tr><th>Type of thing</th><th>Name of the thing</th><th>Access level</th><th>Usual days</th><th>Change</th></tr></thead>
         <tbody>
           {rows.map(({ id, template }) => <tr key={id} aria-label={'Access template ' + (id + 1)}>
@@ -58,7 +58,7 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
       <datalist id="role-kinds">{[...new Set(resources.map((resource) => resource.kind))].sort().map((kind) => <option key={kind} value={kind} />)}</datalist>
       <datalist id="role-ids">{resources.map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} label={resource.kind} />)}</datalist>
       {known.status === 'refused' ? <p className="note">The things already named in grants could not be read, so a template’s kind and name are typed. <small className="refusal-name">{known.refused.refusal.refusal}</small></p> : null}
-      <label className="field wide">Reason for this version<textarea name="note" rows={2} required maxLength={500} /></label>
+      <label className="field wide">Reason for this version<textarea name="note" rows={2} required /></label>
       <p><button className="btn primary" type="submit">{role ? 'Save this version' : 'Create role'}</button></p>
     </fieldset>
     {failure ? <p role="alert">{failure}</p> : null}<ChangeStatus change={change} />
