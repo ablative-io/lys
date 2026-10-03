@@ -161,6 +161,15 @@ impl Held {
         .await
     }
 
+    /// Start in a folder named for this run, not the profile's default.
+    async fn start_in(&self, directory: &str) -> Result<Value, Box<dyn Error>> {
+        self.ok(
+            &format!("/agents/{}/start-command", self.agent()),
+            &json!({ "operation": operation()?, "machine": self.machine, "directory": directory }),
+        )
+        .await
+    }
+
     fn status(&self, session: &str) -> Result<lys_runner::protocol::SessionView, Box<dyn Error>> {
         let Answer::Status { status } = self.client().ask(&Act::Status {
             session: Some(session.to_owned()),
@@ -198,7 +207,11 @@ impl Held {
 async fn restart_ends_the_old_session_and_keeps_the_latest_reviewed_launch() -> TestResult {
     let mut held = Held::open().await?;
     held.review(1).await?;
-    let before = held.start().await?;
+    let named = held.dir.path().join("named-run");
+    std::fs::create_dir(&named)?;
+    let named = named.display().to_string();
+    let before = held.start_in(&named).await?;
+    assert_eq!(before["directory"], named, "{before}");
     let old = before["session"].as_str().ok_or("no old session")?;
     held.ready(old, before["template_sha256"].as_str().ok_or("no hash")?)
         .await?;
@@ -209,6 +222,10 @@ async fn restart_ends_the_old_session_and_keeps_the_latest_reviewed_launch() -> 
     let started = held.ok(&path, &body).await?;
     assert_eq!(started["provisioning_version"], 2, "{started}");
     assert_ne!(started["session"], before["session"]);
+    assert_eq!(
+        started["directory"], named,
+        "the restart left the folder its launch named: {started}"
+    );
     assert!(
         held.status(old)?.ended.is_some(),
         "old process still running"

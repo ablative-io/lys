@@ -1,5 +1,7 @@
 //! An operator restart ends the selected session on its exit signal before
-//! starting a new session through the existing reviewed launch path.
+//! starting a new session through the existing reviewed launch path, in the
+//! folder the ended session's own start named: a restart never moves a run
+//! back to the profile's default folder.
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -76,6 +78,14 @@ async fn restart(
     if admitted(&state, &operation, &driven.agent)?.is_some() {
         return start_for(&state, &headers, &actor, agent, &driven.machine, &operation).await;
     }
+    let directory = admitted(&state, &session, &driven.agent)?
+        .as_ref()
+        .and_then(|kept| kept.get("directory"))
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| ServerError::LaunchUnrenderable {
+            reason: format!("the kept start of session {session} names no directory"),
+        })?;
     with_directory(&state, |directory| {
         let record = directory
             .projection()?
@@ -125,7 +135,7 @@ async fn restart(
         &operation,
         Chosen {
             profile: Some(profile),
-            directory: None,
+            directory: Some(directory),
         },
     )
     .await
