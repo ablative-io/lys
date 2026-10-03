@@ -111,6 +111,7 @@ pub(super) async fn capture_whole(
     let report = harness.report()?;
     let durable_report_delay = last_byte.recv()?.elapsed();
     if sent.len() >= 64 * 1024 * 1024 {
+        super::timing::report();
         println!(
             "capture_bytes={} last_upstream_send_to_durable_report_ms={:.3}",
             sent.len(),

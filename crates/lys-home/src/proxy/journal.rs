@@ -77,6 +77,8 @@ impl Journal {
     /// Write (or rewrite) a call's record durably.
     pub fn write(&self, call: &OpenCall) -> Result<(), ProxyError> {
         use std::io::Write;
+        #[cfg(test)]
+        let started = std::time::Instant::now();
         let bytes = serde_json::to_vec(call).map_err(|source| ProxyError::JournalEncode {
             call_id: call.call_id.clone(),
             source,
@@ -92,7 +94,10 @@ impl Journal {
         file.sync_all().map_err(unwritable)?;
         drop(file);
         std::fs::rename(&tmp, &path).map_err(unwritable)?;
-        sync_dir(&self.dir).map_err(unwritable)
+        let result = sync_dir(&self.dir).map_err(unwritable);
+        #[cfg(test)]
+        super::timing::add(&super::timing::JOURNAL_WRITE, started);
+        result
     }
 
     /// Remove a call's record once its outcome is recorded.
@@ -253,6 +258,8 @@ fn run(
                 }
                 drop(job);
             }
+            #[cfg(test)]
+            super::timing::mark(&super::timing::REPORT_SENT);
             if let Err(unread) = reports.send(report) {
                 // The sink goes on recording; the report is named on stderr.
                 eprintln!(
@@ -288,7 +295,15 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
         report.held = Some(error.to_string());
         return report;
     }
-    match ingest(home, &session_id, job) {
+    #[cfg(test)]
+    let started = std::time::Instant::now();
+    let ingested = ingest(home, &session_id, job);
+    #[cfg(test)]
+    {
+        super::timing::add(&super::timing::INGEST, started);
+        super::timing::mark(&super::timing::DURABLE);
+    }
+    match ingested {
         Ok((status, ingested)) => {
             report.status = status;
             report.entry_id = Some(ingested.entry_id);

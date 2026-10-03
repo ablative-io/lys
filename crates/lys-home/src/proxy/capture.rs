@@ -51,20 +51,28 @@ impl Spool {
     }
 
     fn write(&mut self, bytes: &[u8], failed: &mut bool) {
+        #[cfg(test)]
+        let started = Instant::now();
         if let Some(file) = &mut self.file
             && file.write_all(bytes).is_err()
         {
             self.file = None;
             *failed = true;
         }
+        #[cfg(test)]
+        super::timing::add(&super::timing::SPOOL_WRITE, started);
     }
 
     fn close(&mut self, failed: &mut bool) {
+        #[cfg(test)]
+        let started = Instant::now();
         if let Some(file) = self.file.take()
             && file.sync_all().is_err()
         {
             *failed = true;
         }
+        #[cfg(test)]
+        super::timing::add(&super::timing::SPOOL_SYNC, started);
     }
 }
 
@@ -271,7 +279,11 @@ pub struct ResponseSide(Arc<Call>);
 impl Observer for ResponseSide {
     /// Gate: holds the frame for decode and spool write under the call state lock.
     fn data(&mut self, bytes: &Bytes) {
+        #[cfg(test)]
+        super::timing::arriving();
         self.0.with(|s| {
+            #[cfg(test)]
+            let started = Instant::now();
             if let Some(reader) = &mut s.reader
                 && let Err(error) = reader.feed(bytes)
             {
@@ -281,6 +293,8 @@ impl Observer for ResponseSide {
                 );
                 s.reader = None;
             }
+            #[cfg(test)]
+            super::timing::add(&super::timing::DECODE, started);
             if let Some(spool) = &mut s.response {
                 spool.write(bytes, &mut s.capture_failed);
             }
