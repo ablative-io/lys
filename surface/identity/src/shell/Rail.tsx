@@ -6,7 +6,6 @@ import { useShell } from './ShellContext';
 export function railView(pathname: string): string {
   const view = (pathname.split('/')[1] || 'me').replace(/^team$/, 'me');
   if (view === 'file') return 'people';
-  if (view === 'vault') return 'secrets';
   if (['resources', 'graph', 'requests', 'reviews', 'model'].includes(view)) return 'access';
   if (view === 'connections' || view === 'apps') return 'settings';
   return view;

@@ -35,7 +35,7 @@ export function AppRoutes() {
       <Route path="/graph/:id?" element={<Graph />} />
       <Route path="/resources" element={<Resources />} />
       <Route path="/secrets/:section?" element={<SecretsPage />} />
-      <Route path="/vault" element={<SecretsPage />} />
+      <Route path="/vault" element={<Navigate replace to="/secrets" />} />
       <Route path="/sessions" element={<Navigate replace to="/me" />} />
       <Route path="/runtime/:session?" element={<Navigate replace to="/canvas" />} />
       <Route path="/usage/:agent?" element={<UsageMoved />} />

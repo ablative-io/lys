@@ -1,3 +1,4 @@
+import { SecretControls } from './SecretControls';
 import { readTogether } from '../../reads';
 /** Metadata-only secrets listing; authentication and visibility belong to the broker adapter. */
 import type { ReactNode } from 'react';
@@ -54,10 +55,12 @@ export function SecretRows({ listing, people, teams = [], me = '', whose = { kin
     { head: 'Kind', cell: (entry) => <span className="sec">{entry.class}</span> },
     { head: 'Owner', cell: (entry) => <IdentityName id={entry.owner} people={people} /> },
     { head: 'Recorded change', cell: (entry) => <span className="sec">{entry.sequence}</span> },
+    { head: 'Change', cell: (entry) => <a className="btn" href={'#/secrets/entries?secret=' + encodeURIComponent(entry.name)}>Visibility and who may receive it</a> },
   ];
   return <>
     <p className="note">Seeing a secret here does not give permission to use it or share that permission. Its value is never shown.</p>
     {!listing.secrets.length ? <p className="note">No secrets were returned for this account.</p> : null}
+    <SecretControls listing={listing} />
     <div className="body one">
     <Listing<Secret> groups={groups} columns={columns} id={(entry) => entry.name} href={(entry) => '#/secrets/entries?secret=' + encodeURIComponent(entry.name)}
       words={(entry) => entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
