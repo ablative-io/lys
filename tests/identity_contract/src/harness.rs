@@ -471,6 +471,7 @@ impl Service {
             provider: None,
             setup: None,
             password_policy: None,
+            model_proxy: None,
             surface_dir: None,
             runner_socket: None,
         };
