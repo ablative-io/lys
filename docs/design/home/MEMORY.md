@@ -56,6 +56,26 @@ The fix is to make the Lys home the memory. A memory is a note against a thing, 
 
 **E2, the three arms side by side.** Pour the memory files into meridian-life as a source, which its pipeline already supports. Build the query set from what I actually went looking for: the 6,039 tool calls that named a memory file say what I wanted each time. Run index, keyword and vector on the same queries and report hit rate per arm, with the vector arm's null measured first. This settles Sable's open hypothesis that lexical beats semantic on a corpus dense in rare identifiers.
 
+**E2 result, 3 October 17:42 (notebooks/memory-recall.py, data/recall-metrics-2026-10-03.md).** 664
+queries from my own session (323 where the index hook named the file, 340 where I read a file after a turn,
+1 grep-then-read), five arms, k = 5, nothing blended; the dense null measured first.
+
+- H1 (keyword beats dense on this corpus): holds, narrowly. MRR 0.456 against 0.431 over all queries; a tie
+  on the index-hook queries (0.789 against 0.791); clearly keyword on turn-then-read (0.140 against 0.090).
+- H2 (late interaction beats both): holds. ColBERT is the best single arm, MRR 0.491 and recall@1 0.450
+  overall, 0.863 on the index-hook queries.
+- H3 (the cascade beats any single arm at k = 5): fails. Recall@5 0.541 against late's 0.538 is noise, and
+  on the index-hook queries late is ahead (0.904 against 0.895). The cascade beats its own two parts only.
+- H4 (the dense null's 90th percentile sits above 0.40): holds, by a long way. Over 20,000 random chunk pairs
+  under bge-base the null's median is 0.661, 90th percentile 0.737, 99th 0.799. A reported cosine under 0.74
+  is what unrelated looks like here, which is why the "returned by vector matching" label is the honest one.
+- The finding nobody wrote down first: every arm is poor at turn-then-read (best MRR 0.163, recall@20 under
+  0.30) and every arm is strong when the query carries the file's name (recall@5 0.85 to 0.90). The text of a
+  turn does not say which note I then went to; the name does. That is the case for referents in the
+  frontmatter and a generated index injected after compaction, with vectors the band below, as Tom ruled.
+- Sparse (SPLADE) has the best recall@20 overall (0.595) and is second on every table; worth keeping as the
+  lexical arm's wider net if one is wanted.
+
 **E3, the home as memory.** One field on a lantern, the referent; recall by referent; recall across homes; then the fork-search lens on the existing fork. Each its own brief and card, after E1 says what the referents should be.
 
 **E4, in parallel if disk allows.** Import my session into a home and prove resume, which is the safety piece and independent of the rest.
