@@ -391,6 +391,28 @@ pub enum StoreError {
         /// The name the v1 directory would be kept under.
         path: PathBuf,
     },
+    /// A record of a segment does not read: short, or failing its checksum
+    /// or shape. Named by segment and offset so the damage can be looked at.
+    #[error("corrupt record: {} at offset {offset}: {reason}", segment.display())]
+    CorruptRecord {
+        /// The segment file.
+        segment: PathBuf,
+        /// The record's offset in it.
+        offset: u64,
+        /// What did not hold.
+        reason: String,
+    },
+    /// The file store writes a leaf only with its pin, as one act; a leaf
+    /// alone has no record to go in.
+    #[error(
+        "leaf {index} ({bytes} bytes) was offered without its pin; the file store appends leaves with their pin as one act"
+    )]
+    LeafWithoutPin {
+        /// The leaf's index.
+        index: u64,
+        /// The leaf's length.
+        bytes: usize,
+    },
 }
 
 /// Convenience alias for `Result<T, StoreError>`.

@@ -1,154 +1,57 @@
-//! [`FileLeafStore`] — a [`LeafStore`] backed by a directory of files.
+//! [`FileLeafStore`] — a directory-backed [`LeafStore`] over segment files.
 //!
-//! # Layout
+//! # Layout (`lys/log-dir/v2`)
 //!
-//! - `log.json` — immutable identity (`format`, `origin`); written once at
-//!   creation and never rewritten.
-//! - `leaves/<20-digit zero-padded index>` — one file per leaf, raw bytes
-//!   verbatim. **The leaf file IS the RFC 6962 preimage**, so
-//!   `(printf '\x00'; cat leaf-file) | shasum -a 256` is the leaf hash. A
-//!   stranger with `shasum` can check a leaf without lys. A leaf is written
-//!   to a hidden temporary file (`leaves/.<pid>-<index>-<sequence>.tmp`),
-//!   flushed, and only then linked to its final name by an operation that
-//!   refuses to replace an existing leaf. A leaf name therefore never refers
-//!   to a torn or unflushed file, and a leftover temporary file from a crash
-//!   is never counted as a leaf.
-//! - `state.json` — the pinned `(tree_size, root)`, rewritten atomically as
-//!   the last step of every append. In this layout the leaves and the pin are
-//!   separate files, so an append is one act to its caller (nothing is
-//!   acknowledged before the pin is durable) but not yet one flush; the segment
-//!   records of LYSLOGSTORE-008 R1 make it one and retire this file.
-//! - `snapshot.bin` — the log owner's signed snapshot, if one was written,
-//!   replaced atomically in the same way.
+//! ```text
+//! <dir>/
+//!   log.json                          the format marker and the origin, written once
+//!   leaves/segments/<first>           records, the segment named by its first leaf's index
+//!   leaves/segments/<first>.offsets   one little-endian u64 per record, no flush of its own
+//!   snapshot.bin                      the one snapshot slot, replaced whole
+//! ```
 //!
-//! This layout is **local state, not a wire contract**: nothing durable is
-//! signed under it and it may change between lys versions. The format marker
-//! and the filename width are nonetheless kept byte-identical to the layout
-//! the `lys` CLI wrote before this crate existed, because gratuitously
-//! orphaning working log directories is not an improvement.
+//! A record is the leaf's length, the leaf's bytes, whether a pin follows,
+//! the pin when it does, and a CRC-32C over all of it; see [`segment`]. An
+//! append of any size is one act: every record of it, the last carrying the
+//! pin, is one write and one flush of the segment, and the offsets file is
+//! written after without a flush of its own. So the store's head is the last
+//! whole record that carries a pin, and a kill anywhere inside an act leaves
+//! records nobody acknowledged: the writable open cuts them and says so, the
+//! read-only open serves the head and says so, through
+//! [`FileLeafStore::unfinished_tail`]. Nothing is ever adopted that was not
+//! pinned. Segments roll between acts once past 64 MiB.
 //!
-//! # Durability
+//! Opening reads the marker and only the last segment's tail: entries of its
+//! offsets file past the last whole record are cut, records past the last
+//! entry are found by reading forward from it, and the head is found by
+//! reading back from the end until a record carries a pin. Earlier segments
+//! are trusted to their offsets; [`FileLeafStore::audit_leaves`] reads every
+//! record of every segment when a whole-store check is wanted.
 //!
-//! Every acknowledged write is fsynced before it returns, **and so is the
-//! containing directory** — on POSIX a freshly created or renamed file is not
-//! durable until its parent directory's entry is too, so syncing only the file
-//! would leave `Ok` meaning "probably". The trait requires durable-on-return
-//! and a storage layer that quietly means otherwise is the exact defect that
-//! makes a log unrepairable rather than merely wrong.
-//!
-//! **On macOS the claim is stronger than plain `fsync(2)`, and this was checked
-//! rather than assumed.** A bare `fsync` on Apple platforms returns once the
-//! data has reached the drive, without waiting for the drive to flush its own
-//! write cache; `fcntl(F_FULLFSYNC)` is the call that waits. Rust's
-//! `File::sync_all` dispatches to `F_FULLFSYNC` under `#[cfg(target_vendor =
-//! "apple")]` and to `libc::fsync` elsewhere, and it propagates the result
-//! through `cvt_r` — so an unsupported operation surfaces as an error rather
-//! than degrading silently into the weaker guarantee. Verified against the
-//! toolchain's own `std` source, because "cannot determine" resolving quietly to
-//! the reassuring answer is the failure mode this whole module is arranged
-//! against.
-//!
-//! **Scope of that verification, stated rather than left to be assumed:** it was
-//! established by *reading* the standard library's dispatch, on one platform. No
-//! test here observes a power-loss outcome, and nothing has run these paths on a
-//! filesystem that refuses `F_FULLFSYNC`. So the durability claim rests on the
-//! platform contract plus error propagation, not on an experiment — which is the
-//! honest strength for a property whose failure needs a crash to observe, and
-//! which is a different and weaker axis of independence than the crate's Merkle
-//! cross-checks, where two separately written implementations disagree or agree.
-//!
-//! # A named leaf is whole
-//!
-//! A file under a 20-digit leaf name is always a whole, flushed leaf. Only
-//! files whose names begin with `.` may be partial, and those are never counted
-//! as leaves and never changed by an open.
-//!
-//! - A write that fails before a successful link removes its own temporary
-//!   file, and no other.
-//! - The no-replace link is the **commit point**: once it succeeds the leaf is
-//!   this writer's and the extent advances, whatever happens after it.
-//! - A failure to flush `leaves/` after the link is
-//!   [`StoreError::LeafDurabilityUncertain`], and the handle refuses further
-//!   appends until the store is reopened.
-//! - A writable open ([`FileLeafStore::open`]) flushes `leaves/` before
-//!   counting, so a leaf named at a writable open is durable, and the open
-//!   fails when that flush fails.
-//! - A read-only open ([`FileLeafStore::open_read_only`]) counts the named
-//!   leaves without flushing, and its handle refuses to write a leaf, a pin or
-//!   a snapshot with [`StoreError::ReadOnly`].
-//! - **Open never deletes a leftover temporary file**, and neither open
-//!   deletes, renames, truncates or writes any file in the store's directory.
-//!   Clearing leftover temporary files that a crash stranded is not done here:
-//!   it is a maintenance act of its own.
-//!
-//! The directory flushes above hold on unix targets only; elsewhere the flush
-//! of a directory is a no-op, as the Durability section says.
-//!
-//! # What open does and never does
-//!
-//! [`FileLeafStore::open`] reads `log.json` and `state.json`, flushes
-//! `leaves/` (on the targets where `fsync_dir` flushes a directory; see
-//! Durability), counts the 20-digit leaf names and returns a writable handle.
-//! The count starts at the pin: the leaf just below it must be a file, each
-//! name past it is one lookup, and a name one past the last is a gap and
-//! refused as [`StoreError::Corrupt`]. When the leaf below the pin is not a
-//! file, the whole folder is listed and the names must be contiguous from 0.
-//! [`FileLeafStore::audit_leaves`] lists the whole folder on request.
-//!
-//! [`FileLeafStore::open_read_only`] performs the same checks in the same order
-//! without the flush, and creates, writes, renames, links and removes nothing.
-//! It refuses a store exactly one leaf past its pin with
-//! [`StoreError::RepairPending`], and otherwise returns a handle whose
-//! `put_leaf`, `pin` and `put_snapshot` refuse with [`StoreError::ReadOnly`].
-//!
-//! Neither open reads leaf bytes, repairs a store or advances the pin: the
-//! one-leaf repair of an interrupted append is [`Log::open`]'s, over a writable
-//! handle. Neither open counts a dot-prefixed name as a leaf. An open **never
-//! deletes**, renames or changes a leftover temporary file — it is skipped,
-//! not tidied away — and the store's own are named by
-//! [`FileLeafStore::leftover_temporaries`], which lists them when asked so
-//! that neither open pays for a listing.
-//!
-//! [`FileLeafStore::leaf`](LeafStore::leaf) serves bytes it has not checked. A
-//! leaf is proven whole only through [`Log::open`], which rebuilds the tree
-//! from every stored leaf and compares it against the pinned root, so every
-//! reader that wants a proven leaf goes through [`Log::open`].
-//!
-//! [`Log::open`]: crate::Log::open
+//! A directory still in the v1 per-leaf layout is migrated once by the first
+//! writable open ([`crate::migrate`]) and refused by name by a read-only one.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
 use lys_core::merkle::{AppendOnlyTree, RawLeaf};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::{StoreError, StoreResult};
+use crate::migrate::Migrated;
 use crate::store::{LeafStore, PinnedRoot, batch_end};
 
-mod leaves;
-
-#[cfg(test)]
-use leaves::{LEAF_TEMP_ATTEMPTS, leaf_temp_name};
-use leaves::{
-    contiguous_extent, fsync_dir, link_leaf, next_process_sequence, probed_extent, remove_file,
-    sync_dir, write_leaf_temp,
-};
-
-mod left_behind;
+mod crc32c;
+mod segment;
 mod snapshot_slot;
 pub(crate) mod v1;
 
-pub use left_behind::LeftBehind;
+use segment::{Read1, append_offsets, offsets_path, push_record, read_record, segment_path};
 
 /// Detection marker in `log.json`. A local-state version tag, not a wire
 /// contract.
-pub(crate) const LOG_DIR_FORMAT: &str = "lys/log-dir/v1";
-
-/// Width of a leaf filename: `u64::MAX` has 20 decimal digits.
-const LEAF_NAME_WIDTH: usize = 20;
+pub(crate) const LOG_DIR_FORMAT: &str = "lys/log-dir/v2";
 
 /// `log.json` — the store's immutable identity.
 #[derive(Debug, Serialize, Deserialize)]
@@ -160,58 +63,52 @@ struct LogConfig {
     origin: String,
 }
 
-/// `state.json` — the pinned `(tree_size, root)`.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LogState {
-    /// Number of leaves the pinned root covers.
-    tree_size: u64,
-    /// Standard base64 (with padding) of the 32-byte RFC 6962 root hash.
-    root_hash: String,
+/// Bytes past the store's head that no acknowledged act wrote: the records
+/// and part-records of an act a kill interrupted. A writable open cut them;
+/// a read-only open left them and serves the head.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnfinishedTail {
+    /// The segment they are in.
+    pub segment: PathBuf,
+    /// Where they begin: the end of the head's record.
+    pub offset: u64,
+    /// How many bytes they are.
+    pub bytes: u64,
 }
 
 /// A directory-backed [`LeafStore`].
 ///
-/// Holds no leaf bytes in memory: `extent` and `pinned` are established when
-/// the store opens, and leaves are read on demand. Callers that need every
-/// leaf (to rebuild a tree) hold that memory themselves, where its cost is
-/// visible.
+/// Holds no leaf bytes in memory: the segments' first indices, the extent and
+/// the pin are established when the store opens, and leaves are read on
+/// demand through their offsets file.
 pub struct FileLeafStore {
     dir: PathBuf,
     origin: String,
     extent: u64,
     pinned: PinnedRoot,
-    /// The leaf whose durability this handle could not confirm, if any: a
-    /// failed directory flush, or an append whose pin was not made durable.
-    /// While set, every write is refused until the store is reopened.
+    /// The first leaf index of every segment, ascending; appends go to the
+    /// last.
+    segments: Vec<u64>,
+    /// The length of the last segment up to its last whole record.
+    last_end: u64,
+    /// The record offsets of the last segment, as the open checked them and
+    /// appends extend them; the offsets file is written from these.
+    last_offsets: Vec<u64>,
+    /// The act whose durability this handle could not confirm, if any. While
+    /// set, every write is refused until the store is reopened.
     durability_uncertain: Option<u64>,
-    /// The temporary names this handle could not remove after a link, in the
-    /// order it met them.
-    left_behind: Vec<LeftBehind>,
     /// Set on a handle from [`FileLeafStore::open_read_only`], whose
-    /// `put_leaf`, `pin` and `put_snapshot` refuse with
-    /// [`StoreError::ReadOnly`].
+    /// `append`, `pin` and `put_snapshot` refuse with [`StoreError::ReadOnly`].
     read_only: bool,
     /// Digest of the last snapshot this handle flushed, including its name.
     durable_snapshot: Option<[u8; 32]>,
-    /// An opened or failed pin must be flushed before this handle can skip it.
-    pin_uncertain: bool,
+    /// What the open found past the head, cut or left as the open's kind says.
+    unfinished_tail: Option<UnfinishedTail>,
+    /// The migration out of v1 this open performed, when it did.
+    migrated: Option<Migrated>,
+    /// The size a segment is rolled past, between acts.
+    roll_bytes: u64,
 }
-
-/// The two steps after a leaf is linked, kept as functions so that a test can
-/// make either one fail.
-struct AfterLink {
-    /// Removes the temporary name the leaf was written under.
-    remove_temp: fn(&Path) -> std::io::Result<()>,
-    /// Flushes the leaves directory so the leaf's name is durable.
-    flush_dir: fn(&Path) -> std::io::Result<()>,
-}
-
-/// The real steps after a link.
-const AFTER_LINK: AfterLink = AfterLink {
-    remove_temp: remove_file,
-    flush_dir: sync_dir,
-};
 
 impl std::fmt::Debug for FileLeafStore {
     /// Summarizes the store without reading or dumping leaf content.
@@ -220,6 +117,7 @@ impl std::fmt::Debug for FileLeafStore {
             .field("dir", &self.dir)
             .field("origin", &self.origin)
             .field("extent", &self.extent)
+            .field("segments", &self.segments.len())
             .finish_non_exhaustive()
     }
 }
@@ -241,7 +139,8 @@ impl FileLeafStore {
                 path: dir.to_path_buf(),
             });
         }
-        std::fs::create_dir_all(dir.join("leaves")).map_err(|source| StoreError::Io {
+        let segments = segment::segments_dir(dir);
+        std::fs::create_dir_all(&segments).map_err(|source| StoreError::Io {
             context: format!("failed to create log store directory {}", dir.display()),
             source,
         })?;
@@ -250,113 +149,321 @@ impl FileLeafStore {
             origin: origin.to_string(),
         };
         write_durably(&config_path, &json_bytes(&config, "log config")?)?;
+        write_durably(&segment_path(dir, 0), &[])?;
+        write_durably(&offsets_path(dir, 0), &[])?;
+        fsync_dir(&segments)?;
+        fsync_dir(dir)?;
         // The one Merkle fact storage knows: zero leaves have exactly one
         // possible root, so computing it here cannot go wrong, whereas taking
         // it from the caller invites being handed a different one.
-        let (root, tree_size) = AppendOnlyTree::<RawLeaf>::new().root().to_parts();
-        let pinned = PinnedRoot { tree_size, root };
-        write_state(dir, pinned)?;
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
             extent: 0,
-            pinned,
+            pinned: empty_pin(),
+            segments: vec![0],
+            last_end: 0,
+            last_offsets: Vec::new(),
             durability_uncertain: None,
-            left_behind: Vec::new(),
             read_only: false,
             durable_snapshot: None,
-            pin_uncertain: false,
+            unfinished_tail: None,
+            migrated: None,
+            roll_bytes: segment::ROLL_BYTES,
         })
     }
 
-    /// Opens the store at `dir`, establishing contiguity and reading the pin.
-    ///
-    /// Leaf *contents* are not read here — that is the caller's business. The
-    /// extent is found from the pin forward, so opening costs the same however
-    /// long the log is; [`FileLeafStore::audit_leaves`] enumerates every name
-    /// when a whole-folder check is wanted.
+    /// Opens the store at `dir` for writing. A directory still in the v1
+    /// layout is migrated first, once ([`crate::migrate::migrate_v1`]), and
+    /// [`FileLeafStore::migrated`] says so. Only the last segment's tail is
+    /// read; an act a kill interrupted is cut there and named by
+    /// [`FileLeafStore::unfinished_tail`].
     ///
     /// # Errors
     ///
     /// [`StoreError::NotInitialized`] if `dir` is not a store,
     /// [`StoreError::Corrupt`] with the specific discrepancy for a malformed
-    /// `log.json`/`state.json`, an unexpected entry in `leaves/`, or a gap in
-    /// the index set, and [`StoreError::Io`] on filesystem failure.
+    /// `log.json`, an unexpected entry under `leaves/segments/`, or segments
+    /// that do not meet, [`StoreError::CorruptRecord`] for a record the head
+    /// search cannot read, the migration's errors, and [`StoreError::Io`] on
+    /// filesystem failure.
     pub fn open(dir: &Path) -> StoreResult<Self> {
-        let (config, pinned) = read_identity(dir)?;
-        // A leaf name linked just before a crash may not yet be durable; the
-        // flush makes every name counted below one that survives.
-        fsync_dir(&dir.join("leaves"))?;
-        Ok(Self {
-            dir: dir.to_path_buf(),
-            origin: config.origin,
-            extent: probed_extent(dir, pinned.tree_size)?,
-            pinned,
-            durability_uncertain: None,
-            left_behind: Vec::new(),
-            read_only: false,
-            durable_snapshot: None,
-            pin_uncertain: true,
-        })
+        let migrated = crate::migrate::migrate_v1(dir)?;
+        let mut store = Self::scan(dir, false)?;
+        store.migrated = migrated;
+        if let Some(tail) = store.unfinished_tail.clone() {
+            store.cut(&tail)?;
+        }
+        // An offsets file cut short or run past the end is repaired from the
+        // records that stand; a whole one is left as it is.
+        let last = *store.segments.last().unwrap_or(&0);
+        let offsets = offsets_path(dir, last);
+        if segment::read_offsets(&offsets)? != store.last_offsets {
+            segment::write_offsets(&offsets, &store.last_offsets)?;
+        }
+        Ok(store)
     }
 
     /// Opens the store at `dir` for a reader: the checks of
-    /// [`FileLeafStore::open`] in the same order, without flushing `leaves/`
-    /// and without creating, writing, renaming, linking or removing any file.
+    /// [`FileLeafStore::open`] without creating, writing, renaming or
+    /// removing any file. A v1 directory is refused
+    /// [`StoreError::MigrationPending`]; an unfinished act is served at the
+    /// head and named by [`FileLeafStore::unfinished_tail`].
     ///
-    /// The handle's `put_leaf`, `pin` and `put_snapshot` refuse with [`StoreError::ReadOnly`].
-    /// A store holding leaves past its pin is an interrupted append that only
-    /// a writable open repairs, so it is refused rather than served at the
-    /// pinned head, naming the cut still owed. That is decided from the count
-    /// and `state.json` alone; no leaf bytes are read. At the pin, `Log::open`
-    /// accepts a tree that matches it and refuses any other with
-    /// [`StoreError::PinMismatch`] without pinning.
+    /// The handle's `append`, `pin` and `put_snapshot` refuse with
+    /// [`StoreError::ReadOnly`].
     ///
     /// # Errors
     ///
-    /// [`StoreError::RepairPending`] if the store holds leaves past its pin,
-    /// and otherwise the errors of [`FileLeafStore::open`]:
-    /// [`StoreError::NotInitialized`], [`StoreError::Corrupt`] and
-    /// [`StoreError::Io`].
+    /// [`StoreError::MigrationPending`] for a v1 directory, and otherwise the
+    /// errors of [`FileLeafStore::open`].
     pub fn open_read_only(dir: &Path) -> StoreResult<Self> {
-        let (config, pinned) = read_identity(dir)?;
-        let extent = probed_extent(dir, pinned.tree_size)?;
-        if extent > pinned.tree_size {
-            return Err(StoreError::RepairPending {
+        if v1::present(dir)? {
+            return Err(StoreError::MigrationPending {
                 path: dir.to_path_buf(),
-                pinned_size: pinned.tree_size,
-                extent,
             });
         }
+        Self::scan(dir, true)
+    }
+
+    /// Roll segments past `bytes` instead of 64 MiB; for tests of the roll.
+    #[cfg(test)]
+    pub(crate) fn with_roll_bytes(mut self, bytes: u64) -> Self {
+        self.roll_bytes = bytes;
+        self
+    }
+
+    /// The store's directory.
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    /// What the open found past the head: cut by a writable open, left by a
+    /// read-only one. `None` when the last act was whole.
+    pub fn unfinished_tail(&self) -> Option<&UnfinishedTail> {
+        self.unfinished_tail.as_ref()
+    }
+
+    /// The migration out of the v1 layout this open performed, when it did.
+    pub fn migrated(&self) -> Option<&Migrated> {
+        self.migrated.as_ref()
+    }
+
+    /// Reads every record of every segment and checks each against its
+    /// offset and checksum, the segments against each other, and the count
+    /// against this store's extent.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::CorruptRecord`] for a record that does not read,
+    /// [`StoreError::Corrupt`] for a count or a segment boundary that does
+    /// not agree, and [`StoreError::Io`] on filesystem failure.
+    pub fn audit_leaves(&self) -> StoreResult<()> {
+        let mut counted = 0;
+        for (position, &first) in self.segments.iter().enumerate() {
+            if first != counted {
+                return Err(StoreError::Corrupt {
+                    path: self.dir.clone(),
+                    reason: format!(
+                        "segment {first} begins at {first} but {counted} leaves precede it"
+                    ),
+                });
+            }
+            let path = segment_path(&self.dir, first);
+            let expected_end = if position + 1 == self.segments.len() {
+                self.last_end
+            } else {
+                self.segment_len(first)?
+            };
+            let offsets = segment::read_offsets(&offsets_path(&self.dir, first))?;
+            let mut file = open_segment(&path)?;
+            let mut offset = 0;
+            let mut records = 0usize;
+            while offset < expected_end {
+                if offsets.get(records) != Some(&offset) {
+                    return Err(StoreError::CorruptRecord {
+                        segment: path,
+                        offset,
+                        reason: format!("the offsets file does not place record {records} here"),
+                    });
+                }
+                match read_record(&mut file, offset, expected_end)
+                    .map_err(|source| reading(&path, source))?
+                {
+                    Read1::Whole(record) => {
+                        offset += record.bytes;
+                        records += 1;
+                    }
+                    Read1::Short { bytes } => {
+                        return Err(short(&path, offset, bytes));
+                    }
+                    Read1::Damaged { reason, .. } => {
+                        return Err(StoreError::CorruptRecord {
+                            segment: path,
+                            offset,
+                            reason,
+                        });
+                    }
+                }
+            }
+            counted +=
+                u64::try_from(records).map_err(|source| StoreError::LeafCountUnrepresentable {
+                    count: self.extent,
+                    source,
+                })?;
+        }
+        if counted != self.extent {
+            return Err(StoreError::Corrupt {
+                path: self.dir.clone(),
+                reason: format!(
+                    "the segments hold {counted} leaves but this store's extent is {}",
+                    self.extent
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    /// Read the marker, list the segments, check the last one's tail and
+    /// find the head. Writes nothing.
+    fn scan(dir: &Path, read_only: bool) -> StoreResult<Self> {
+        let config = read_identity(dir)?;
+        let segments = list_segments(dir)?;
+        // Every segment but the last is sealed: its offsets file is whole and
+        // flushed by the roll, and the next segment begins where it ends.
+        for pair in segments.windows(2) {
+            let count = segment::read_offsets(&offsets_path(dir, pair[0]))?.len();
+            let count =
+                u64::try_from(count).map_err(|source| StoreError::LeafCountUnrepresentable {
+                    count: pair[0],
+                    source,
+                })?;
+            let next = pair[0]
+                .checked_add(count)
+                .ok_or_else(|| StoreError::Corrupt {
+                    path: dir.to_path_buf(),
+                    reason: format!("segment {} overflows the leaf index range", pair[0]),
+                })?;
+            if next != pair[1] {
+                return Err(StoreError::Corrupt {
+                    path: dir.to_path_buf(),
+                    reason: format!(
+                        "segment {} ends at {next} but the next segment begins at {}",
+                        pair[0], pair[1]
+                    ),
+                });
+            }
+        }
+        let last = *segments.last().ok_or_else(|| StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: "leaves/segments holds no segment".to_owned(),
+        })?;
+        let last_path = segment_path(dir, last);
+        let last_len = file_len(&last_path)?;
+        let mut checked = segment::check_tail(&last_path, &offsets_path(dir, last))?;
+        let head = segment::pins_backwards(&last_path, &mut checked)?;
+        let (extent, pinned, last_end) = match head {
+            Some((position, pin)) => {
+                let index = last
+                    + u64::try_from(position).map_err(|source| {
+                        StoreError::LeafCountUnrepresentable {
+                            count: last,
+                            source,
+                        }
+                    })?;
+                if pin.tree_size != index + 1 {
+                    return Err(StoreError::CorruptRecord {
+                        segment: last_path.clone(),
+                        offset: checked.offsets[position],
+                        reason: format!(
+                            "the record of leaf {index} carries a pin at tree size {}",
+                            pin.tree_size
+                        ),
+                    });
+                }
+                let end = checked
+                    .offsets
+                    .get(position + 1)
+                    .copied()
+                    .unwrap_or(checked.end);
+                (pin.tree_size, pin, end)
+            }
+            None if segments.len() == 1 => (0, empty_pin(), 0),
+            None => {
+                // The last segment holds no finished act: the head is the
+                // last record of the one before, which a roll sealed.
+                let previous = segments[segments.len() - 2];
+                let pin = sealed_pin(dir, previous)?;
+                if pin.tree_size != last {
+                    return Err(StoreError::Corrupt {
+                        path: dir.to_path_buf(),
+                        reason: format!(
+                            "segment {previous} ends pinned at {} but segment {last} follows it",
+                            pin.tree_size
+                        ),
+                    });
+                }
+                (pin.tree_size, pin, 0)
+            }
+        };
+        let kept = head.map_or(0, |(position, _)| position + 1);
+        let mut last_offsets = checked.offsets;
+        last_offsets.truncate(kept);
+        let unfinished_tail = (last_end < last_len).then(|| UnfinishedTail {
+            segment: last_path,
+            offset: last_end,
+            bytes: last_len - last_end,
+        });
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
             extent,
             pinned,
+            segments,
+            last_end,
+            last_offsets,
             durability_uncertain: None,
-            left_behind: Vec::new(),
-            read_only: true,
+            read_only,
             durable_snapshot: None,
-            pin_uncertain: false,
+            unfinished_tail,
+            migrated: None,
+            roll_bytes: segment::ROLL_BYTES,
         })
     }
 
-    /// The store's own leftover temporary leaf files in `leaves/`, by name in
-    /// lexical order: each a `.<pid>-<20-digit index>-<sequence>.tmp` that a
-    /// write left behind. Listed when asked, not at open, so that opening
-    /// costs the same however long the log is.
-    ///
-    /// None is counted toward the extent and none is removed, renamed or
-    /// changed. A dot-prefixed name of any other form is not reported.
-    ///
-    /// # Errors
-    ///
-    /// [`StoreError::Io`] if `leaves/` cannot be read.
-    pub fn leftover_temporaries(&self) -> StoreResult<Vec<String>> {
-        list_leftover_temporaries(&self.dir)
+    /// Cut an unfinished act: truncate the last segment at the head's end
+    /// and flush it. The offsets file is written from the kept offsets by
+    /// the open that follows.
+    fn cut(&mut self, tail: &UnfinishedTail) -> StoreResult<()> {
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&tail.segment)
+            .map_err(|source| StoreError::Io {
+                context: format!(
+                    "failed to open segment {} to cut it",
+                    tail.segment.display()
+                ),
+                source,
+            })?;
+        file.set_len(tail.offset).map_err(|source| StoreError::Io {
+            context: format!(
+                "failed to cut segment {} at {}",
+                tail.segment.display(),
+                tail.offset
+            ),
+            source,
+        })?;
+        crate::durability::sync_all(&file).map_err(|source| StoreError::Io {
+            context: format!(
+                "failed to flush segment {} after the cut",
+                tail.segment.display()
+            ),
+            source,
+        })?;
+        drop(file);
+        Ok(())
     }
 
-    /// Refuses `operation` with [`StoreError::ReadOnly`] on a read-only handle.
     fn refuse_if_read_only(&self, operation: &'static str) -> StoreResult<()> {
         if self.read_only {
             return Err(StoreError::ReadOnly {
@@ -367,40 +474,7 @@ impl FileLeafStore {
         Ok(())
     }
 
-    /// Reads every name in `leaves/` and checks it is exactly `0..extent`.
-    ///
-    /// # Errors
-    ///
-    /// [`StoreError::Corrupt`] naming the unexpected entry, the gap, or an
-    /// extent other than the one this handle holds, and [`StoreError::Io`] on
-    /// filesystem failure.
-    pub fn audit_leaves(&self) -> StoreResult<()> {
-        let listed = contiguous_extent(&self.dir)?;
-        if listed == self.extent {
-            return Ok(());
-        }
-        Err(StoreError::Corrupt {
-            path: self.dir.clone(),
-            reason: format!(
-                "the leaves folder holds {listed} leaves but this store's extent is {}",
-                self.extent
-            ),
-        })
-    }
-
-    /// The directory this store occupies.
-    pub fn dir(&self) -> &Path {
-        &self.dir
-    }
-
-    /// The temporary names this handle could not remove after linking a
-    /// leaf, each with the leaf it held and what the removal answered. Every
-    /// leaf named here is stored: only its temporary name is still there.
-    pub fn left_behind(&self) -> &[LeftBehind] {
-        &self.left_behind
-    }
-
-    /// The rules every offered pin meets before anything is written: it never
+    /// A pin the store accepts moves the size forward or holds it; it never
     /// moves the size backwards, and at the held size it is the held root.
     fn check_pin(&self, pin: PinnedRoot) -> StoreResult<()> {
         if pin.tree_size < self.pinned.tree_size {
@@ -413,78 +487,47 @@ impl FileLeafStore {
         // second root at an already-pinned size passes it. That is equivocation
         // arriving through the one operation allowed to repeat.
         if pin.tree_size == self.pinned.tree_size && pin.root != self.pinned.root {
+            use base64::Engine;
+            let standard = base64::engine::general_purpose::STANDARD;
             return Err(StoreError::PinRootChanged {
                 tree_size: pin.tree_size,
-                held: STANDARD.encode(self.pinned.root),
-                offered: STANDARD.encode(pin.root),
+                held: standard.encode(self.pinned.root),
+                offered: standard.encode(pin.root),
             });
         }
         Ok(())
     }
 
-    /// Path of the leaf file for `index`.
-    fn leaf_path(&self, index: u64) -> PathBuf {
-        self.dir
-            .join("leaves")
-            .join(format!("{index:0LEAF_NAME_WIDTH$}"))
+    fn segment_len(&self, first: u64) -> StoreResult<u64> {
+        file_len(&segment_path(&self.dir, first))
     }
 
-    /// Writes the leaf at `index` with `write_contents` supplying its bytes.
-    ///
-    /// The bytes go to a hidden temporary file in `leaves/`, which is flushed
-    /// and only then linked to the leaf's final name, so no leaf name ever
-    /// refers to a partly written or unflushed file. The link refuses to
-    /// replace an existing leaf: that is the second, independent absent-check
-    /// below the in-memory extent, catching a leaf this store never saw —
-    /// another writer appending to the same directory — which the extent cached
-    /// at open cannot know about. The directory is flushed after the link so
-    /// the name itself is durable.
-    ///
-    /// The link is the commit point: once it succeeds the extent advances
-    /// whatever happens next. A temporary name that cannot be removed is left
-    /// for open to skip, and the append still succeeds. A directory that cannot
-    /// be flushed is reported as [`StoreError::LeafDurabilityUncertain`] and
-    /// halts this handle.
-    ///
-    /// `next_sequence` supplies the sequence numbers for temporary names, so
-    /// that a test can say which names a write will try.
-    fn put_leaf_with(
-        &mut self,
-        index: u64,
-        write_contents: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
-        after_link: &AfterLink,
-        next_sequence: &mut impl FnMut() -> u64,
-    ) -> StoreResult<()> {
-        if let Some(uncertain) = self.durability_uncertain {
-            return Err(StoreError::ReopenRequired { index: uncertain });
+    /// Begin a new segment at `first` when the last one is past the roll
+    /// size: seal the last offsets file, create the new files, flush the
+    /// directory. The act that follows goes into the new segment.
+    fn roll_if_due(&mut self, first: u64) -> StoreResult<()> {
+        if self.last_end <= self.roll_bytes {
+            return Ok(());
         }
-        if index < self.extent {
-            return Err(StoreError::LeafAlreadyWritten { index });
-        }
-        if index > self.extent {
-            return Err(StoreError::LeafWouldLeaveGap {
-                index,
-                next: self.extent,
-            });
-        }
-        let leaves_dir = self.dir.join("leaves");
-        let tmp_path = write_leaf_temp(&leaves_dir, index, write_contents, next_sequence)?;
-        link_leaf(&tmp_path, &self.leaf_path(index), index)?;
-        self.extent += 1;
-        // The leaf is committed under its final name, and open skips a hidden
-        // temporary name, so a name left behind here fails no append. It is
-        // kept by name with its reason.
-        if let Err(source) = (after_link.remove_temp)(&tmp_path) {
-            self.left_behind.push(LeftBehind {
-                index,
-                path: tmp_path,
+        let last = *self.segments.last().unwrap_or(&0);
+        let sealed = std::fs::File::open(offsets_path(&self.dir, last)).map_err(|source| {
+            StoreError::Io {
+                context: format!("failed to open offsets of segment {last} to seal it"),
                 source,
-            });
-        }
-        (after_link.flush_dir)(&leaves_dir).map_err(|source| {
-            self.durability_uncertain = Some(index);
-            StoreError::LeafDurabilityUncertain { index, source }
-        })
+            }
+        })?;
+        crate::durability::sync_all(&sealed).map_err(|source| StoreError::Io {
+            context: format!("failed to flush offsets of segment {last}"),
+            source,
+        })?;
+        drop(sealed);
+        write_durably(&segment_path(&self.dir, first), &[])?;
+        write_durably(&offsets_path(&self.dir, first), &[])?;
+        fsync_dir(&segment::segments_dir(&self.dir))?;
+        self.segments.push(first);
+        self.last_end = 0;
+        self.last_offsets.clear();
+        Ok(())
     }
 }
 
@@ -501,33 +544,49 @@ impl LeafStore for FileLeafStore {
         if index >= self.extent {
             return Ok(None);
         }
-        let path = self.leaf_path(index);
-        match std::fs::read(&path) {
-            Ok(bytes) => Ok(Some(bytes)),
-            Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(source) => Err(StoreError::Io {
-                context: format!("failed to read leaf file {}", path.display()),
-                source,
+        let position = self.segments.partition_point(|&first| first <= index);
+        let first = self.segments[position.saturating_sub(1)];
+        let path = segment_path(&self.dir, first);
+        let in_last = position == self.segments.len();
+        let recorded = if in_last {
+            usize::try_from(index - first)
+                .ok()
+                .and_then(|at| self.last_offsets.get(at).copied())
+        } else {
+            read_offset_at(&offsets_path(&self.dir, first), index - first)?
+        };
+        let offset = recorded.ok_or_else(|| StoreError::CorruptRecord {
+            segment: path.clone(),
+            offset: 0,
+            reason: format!("no offset is recorded for leaf {index}"),
+        })?;
+        let len = if in_last {
+            self.last_end
+        } else {
+            self.segment_len(first)?
+        };
+        let mut file = open_segment(&path)?;
+        match read_record(&mut file, offset, len).map_err(|source| reading(&path, source))? {
+            Read1::Whole(record) => Ok(Some(record.leaf)),
+            Read1::Short { bytes } => Err(short(&path, offset, bytes)),
+            Read1::Damaged { reason, .. } => Err(StoreError::CorruptRecord {
+                segment: path,
+                offset,
+                reason,
             }),
         }
     }
 
+    /// A leaf is written only with its pin, as one act; the file store has no
+    /// leaf-alone write.
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
         self.refuse_if_read_only("write a leaf")?;
-        self.put_leaf_with(
+        Err(StoreError::LeafWithoutPin {
             index,
-            |file| file.write_all(bytes),
-            &AFTER_LINK,
-            &mut next_process_sequence,
-        )
+            bytes: bytes.len(),
+        })
     }
 
-    /// The leaves and their pin as one act to the caller: every leaf is
-    /// written and linked, the leaves directory is flushed once, then the pin
-    /// is made durable, and nothing is acknowledged before that last flush.
-    /// A failure anywhere after the first link leaves this handle refusing
-    /// every write until the store is reopened; the open then adopts the
-    /// whole leaves it finds ahead of the pin, or refuses them by name.
     fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         self.refuse_if_read_only("append leaves with their pin")?;
         if let Some(uncertain) = self.durability_uncertain {
@@ -553,32 +612,33 @@ impl LeafStore for FileLeafStore {
         if leaves.is_empty() {
             return self.pin(pin);
         }
-        let directory = self.dir.join("leaves");
-        // Nothing is acknowledged until the pin is durable: from the first
-        // link to that flush, any failure holds this handle until a fresh open.
-        self.durability_uncertain = Some(index);
-        for (index, bytes) in (index..end).zip(leaves) {
-            let temporary = write_leaf_temp(
-                &directory,
-                index,
-                |file| file.write_all(bytes),
-                &mut next_process_sequence,
-            )?;
-            link_leaf(&temporary, &self.leaf_path(index), index)?;
-            self.extent = index + 1;
-            if let Err(source) = remove_file(&temporary) {
-                self.left_behind.push(LeftBehind {
-                    index,
-                    path: temporary,
-                    source,
-                });
-            }
+        self.roll_if_due(index)?;
+        let first = *self.segments.last().unwrap_or(&0);
+        let mut buffer = Vec::new();
+        let mut offsets = Vec::with_capacity(leaves.len());
+        let last = leaves.len() - 1;
+        for (position, bytes) in leaves.iter().enumerate() {
+            offsets.push(self.last_end + bytes_len(&buffer)?);
+            push_record(&mut buffer, bytes, (position == last).then_some(pin))?;
         }
-        sync_dir(&directory)
-            .map_err(|source| StoreError::LeafDurabilityUncertain { index, source })?;
-        self.pin_uncertain = true;
-        write_state(&self.dir, pin)?;
-        self.pin_uncertain = false;
+        let written = bytes_len(&buffer)?;
+        // Nothing is acknowledged until the one flush returns: from the first
+        // byte written to that flush, any failure holds this handle until a
+        // fresh open, which cuts whatever of the act is there.
+        self.durability_uncertain = Some(index);
+        let path = segment_path(&self.dir, first);
+        let uncertain = |source| StoreError::LeafDurabilityUncertain { index, source };
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .map_err(uncertain)?;
+        file.write_all(&buffer).map_err(uncertain)?;
+        crate::durability::sync_all(&file).map_err(uncertain)?;
+        drop(file);
+        append_offsets(&offsets_path(&self.dir, first), &offsets)?;
+        self.last_offsets.extend(offsets);
+        self.last_end += written;
+        self.extent = end;
         self.pinned = pin;
         self.durability_uncertain = None;
         Ok(())
@@ -588,20 +648,22 @@ impl LeafStore for FileLeafStore {
         self.pinned
     }
 
+    /// The pin rides on the act that made it, so a pin alone can only repeat
+    /// the held one: equal is accepted and writes nothing; any other is
+    /// refused by name.
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         self.refuse_if_read_only("pin")?;
         if let Some(index) = self.durability_uncertain {
             return Err(StoreError::ReopenRequired { index });
         }
         self.check_pin(pin)?;
-        if pin == self.pinned && !self.pin_uncertain {
+        if pin == self.pinned {
             return Ok(());
         }
-        self.pin_uncertain = true;
-        write_state(&self.dir, pin)?;
-        self.pin_uncertain = false;
-        self.pinned = pin;
-        Ok(())
+        Err(StoreError::PinNotOfAppend {
+            end: self.extent,
+            tree_size: pin.tree_size,
+        })
     }
 
     fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
@@ -623,9 +685,45 @@ impl LeafStore for FileLeafStore {
     }
 }
 
-/// Reads `log.json` and `state.json` and returns the store's identity and pin:
-/// the checks both opens share, in the order they make them.
-fn read_identity(dir: &Path) -> StoreResult<(LogConfig, PinnedRoot)> {
+/// The pin of the empty tree.
+fn empty_pin() -> PinnedRoot {
+    let (root, tree_size) = AppendOnlyTree::<RawLeaf>::new().root().to_parts();
+    PinnedRoot { tree_size, root }
+}
+
+fn bytes_len(buffer: &[u8]) -> StoreResult<u64> {
+    u64::try_from(buffer.len()).map_err(|source| StoreError::LeafCountUnrepresentable {
+        count: u64::MAX,
+        source,
+    })
+}
+
+fn reading(path: &Path, source: std::io::Error) -> StoreError {
+    StoreError::Io {
+        context: format!("failed to read segment {}", path.display()),
+        source,
+    }
+}
+
+fn short(path: &Path, offset: u64, bytes: u64) -> StoreError {
+    StoreError::CorruptRecord {
+        segment: path.to_path_buf(),
+        offset,
+        reason: format!("the record is short: {bytes} bytes of it are there"),
+    }
+}
+
+fn file_len(path: &Path) -> StoreResult<u64> {
+    Ok(std::fs::metadata(path)
+        .map_err(|source| StoreError::Io {
+            context: format!("failed to read the length of {}", path.display()),
+            source,
+        })?
+        .len())
+}
+
+/// Reads `log.json` and answers the store's identity.
+fn read_identity(dir: &Path) -> StoreResult<LogConfig> {
     let config_path = dir.join("log.json");
     if !config_path.exists() {
         return Err(StoreError::NotInitialized {
@@ -642,53 +740,127 @@ fn read_identity(dir: &Path) -> StoreResult<(LogConfig, PinnedRoot)> {
             ),
         });
     }
-    let state: LogState = parse_state_file(dir, &dir.join("state.json"), "state.json")?;
-    let pinned = PinnedRoot {
-        tree_size: state.tree_size,
-        root: decode_pinned_root(dir, &state.root_hash)?,
-    };
-    Ok((config, pinned))
+    Ok(config)
 }
 
-/// The names in `leaves/` of the store's temporary-leaf form, in lexical
-/// order. Reads the directory listing only: no entry is opened, removed or
-/// renamed.
-fn list_leftover_temporaries(dir: &Path) -> StoreResult<Vec<String>> {
-    let leaves_dir = dir.join("leaves");
+/// The first indices of the segments under `dir`, ascending. A name that is
+/// neither a segment, its offsets file nor dot-prefixed is `Corrupt`.
+fn list_segments(dir: &Path) -> StoreResult<Vec<u64>> {
+    let segments_dir = segment::segments_dir(dir);
     let unreadable = |source| StoreError::Io {
-        context: format!("failed to read leaves directory {}", leaves_dir.display()),
+        context: format!(
+            "failed to read segments directory {}",
+            segments_dir.display()
+        ),
         source,
     };
-    let mut names = Vec::new();
-    for entry in std::fs::read_dir(&leaves_dir).map_err(unreadable)? {
-        let name = entry.map_err(unreadable)?.file_name();
-        if let Some(name) = name.to_str()
-            && is_leaf_temp_name(name)
-        {
-            names.push(name.to_string());
+    let entries = std::fs::read_dir(&segments_dir).map_err(unreadable)?;
+    let mut firsts = Vec::new();
+    let mut offsets = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(unreadable)?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            return Err(unexpected_entry(dir, &name.to_string_lossy()));
+        };
+        if name.starts_with('.') {
+            continue;
+        }
+        let (digits, is_offsets) = match name.strip_suffix(segment::OFFSETS_SUFFIX) {
+            Some(digits) => (digits, true),
+            None => (name, false),
+        };
+        let index = (digits.len() == segment::NAME_WIDTH
+            && digits.bytes().all(|byte| byte.is_ascii_digit()))
+        .then(|| digits.parse::<u64>().ok())
+        .flatten()
+        .ok_or_else(|| unexpected_entry(dir, name))?;
+        if is_offsets {
+            offsets.push(index);
+        } else {
+            firsts.push(index);
         }
     }
-    names.sort_unstable();
-    Ok(names)
+    firsts.sort_unstable();
+    offsets.sort_unstable();
+    for index in &offsets {
+        if firsts.binary_search(index).is_err() {
+            return Err(StoreError::Corrupt {
+                path: dir.to_path_buf(),
+                reason: format!(
+                    "offsets file {index:0width$}.offsets has no segment",
+                    width = segment::NAME_WIDTH
+                ),
+            });
+        }
+    }
+    if firsts.first() != Some(&0) {
+        return Err(StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: "no segment begins at leaf 0".to_owned(),
+        });
+    }
+    Ok(firsts)
 }
 
-/// Whether `name` has the form `leaves::leaf_temp_name` gives: a dot, decimal
-/// digits, a dash, [`LEAF_NAME_WIDTH`] decimal digits, a dash, decimal digits
-/// and `.tmp`.
-fn is_leaf_temp_name(name: &str) -> bool {
-    let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
-    let Some(inner) = name
-        .strip_prefix('.')
-        .and_then(|rest| rest.strip_suffix(".tmp"))
-    else {
-        return false;
+fn unexpected_entry(dir: &Path, name: &str) -> StoreError {
+    StoreError::Corrupt {
+        path: dir.to_path_buf(),
+        reason: format!("unexpected entry in leaves/segments: {name:?}"),
+    }
+}
+
+/// The pin on the last record of the sealed segment beginning at `first`.
+fn sealed_pin(dir: &Path, first: u64) -> StoreResult<PinnedRoot> {
+    let path = segment_path(dir, first);
+    let offsets = segment::read_offsets(&offsets_path(dir, first))?;
+    let offset = *offsets.last().ok_or_else(|| StoreError::Corrupt {
+        path: dir.to_path_buf(),
+        reason: format!("sealed segment {first} holds no record"),
+    })?;
+    let len = file_len(&path)?;
+    let mut file = open_segment(&path)?;
+    match read_record(&mut file, offset, len).map_err(|source| reading(&path, source))? {
+        Read1::Whole(record) => record.pin.ok_or_else(|| StoreError::CorruptRecord {
+            segment: path.clone(),
+            offset,
+            reason: "the last record of a sealed segment carries no pin".to_owned(),
+        }),
+        Read1::Short { bytes } => Err(short(&path, offset, bytes)),
+        Read1::Damaged { reason, .. } => Err(StoreError::CorruptRecord {
+            segment: path,
+            offset,
+            reason,
+        }),
+    }
+}
+
+fn open_segment(path: &Path) -> StoreResult<std::fs::File> {
+    std::fs::File::open(path).map_err(|source| StoreError::Io {
+        context: format!("failed to open segment {}", path.display()),
+        source,
+    })
+}
+
+/// The offset of record `position` in the offsets file at `path`, if recorded.
+fn read_offset_at(path: &Path, position: u64) -> StoreResult<Option<u64>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let io = |source| StoreError::Io {
+        context: format!("failed to read offsets file {}", path.display()),
+        source,
     };
-    let parts: Vec<&str> = inner.split('-').collect();
-    matches!(
-        parts.as_slice(),
-        &[pid, index, sequence]
-            if digits(pid) && digits(index) && index.len() == LEAF_NAME_WIDTH && digits(sequence)
-    )
+    let mut file = std::fs::File::open(path).map_err(io)?;
+    let at = position.checked_mul(8).ok_or_else(|| StoreError::Corrupt {
+        path: path.to_path_buf(),
+        reason: format!("record {position} is past the offsets file's range"),
+    })?;
+    file.seek(SeekFrom::Start(at)).map_err(io)?;
+    let mut entry = [0u8; 8];
+    match file.read_exact(&mut entry) {
+        Ok(()) => Ok(Some(u64::from_le_bytes(entry))),
+        Err(source) if source.kind() == std::io::ErrorKind::UnexpectedEof => Ok(None),
+        Err(source) => Err(io(source)),
+    }
 }
 
 /// Serializes a local-state struct as pretty JSON with a trailing newline.
@@ -715,39 +887,6 @@ fn parse_state_file<T: serde::de::DeserializeOwned>(
     })
 }
 
-/// Decodes the pinned root: canonical standard base64 of exactly 32 bytes.
-fn decode_pinned_root(dir: &Path, root_b64: &str) -> StoreResult<[u8; 32]> {
-    STANDARD
-        .decode(root_b64)
-        .ok()
-        .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
-        .ok_or_else(|| StoreError::Corrupt {
-            path: dir.to_path_buf(),
-            reason: "state.json root_hash is not standard base64 of exactly 32 bytes".to_string(),
-        })
-}
-
-/// Durably replaces `state.json`: write a sibling temp file, fsync it, rename
-/// over the target (atomic on POSIX), then fsync the directory so the rename
-/// itself survives a crash.
-pub(crate) fn write_state(dir: &Path, pin: PinnedRoot) -> StoreResult<()> {
-    let state = LogState {
-        tree_size: pin.tree_size,
-        root_hash: STANDARD.encode(pin.root),
-    };
-    let tmp_path = dir.join("state.json.tmp");
-    write_durably(&tmp_path, &json_bytes(&state, "log state")?)?;
-    let state_path = dir.join("state.json");
-    std::fs::rename(&tmp_path, &state_path).map_err(|source| StoreError::Io {
-        context: format!(
-            "failed to atomically replace log state file {}",
-            state_path.display()
-        ),
-        source,
-    })?;
-    fsync_dir(dir)
-}
-
 /// Writes `contents` to `path` and fsyncs the file before returning.
 fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
     let mut file = std::fs::File::create(path).map_err(|source| StoreError::Io {
@@ -764,8 +903,31 @@ fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
     })
 }
 
+/// Flushes a directory so the names it holds survive a crash.
+fn fsync_dir(dir: &Path) -> StoreResult<()> {
+    let opened = std::fs::File::open(dir).map_err(|source| StoreError::Io {
+        context: format!("failed to open directory {} to flush it", dir.display()),
+        source,
+    })?;
+    crate::durability::sync_all(&opened).map_err(|source| StoreError::Io {
+        context: format!("failed to flush directory {}", dir.display()),
+        source,
+    })
+}
+
+/// The segment file whose first leaf is `first`, for tests that cut or
+/// damage it.
 #[cfg(test)]
-mod left_behind_tests;
+pub(crate) fn segment_file(dir: &Path, first: u64) -> PathBuf {
+    segment_path(dir, first)
+}
+
+/// The record offsets the offsets file of segment `first` holds, for tests
+/// that cut a segment at a record boundary.
+#[cfg(test)]
+pub(crate) fn segment_offsets(dir: &Path, first: u64) -> StoreResult<Vec<u64>> {
+    segment::read_offsets(&offsets_path(dir, first))
+}
 
 #[cfg(test)]
 #[path = "file_tests.rs"]

@@ -124,8 +124,12 @@ fn append_range(
 ) -> StoreResult<()> {
     for index in from..to {
         let bytes = leaf_bytes(index);
-        store.put_leaf(index, &bytes)?;
         frontier.push(&bytes);
+        let pin = PinnedRoot {
+            tree_size: frontier.size(),
+            root: frontier.root(),
+        };
+        store.append(index, &[bytes.as_slice()], pin)?;
     }
     Ok(())
 }

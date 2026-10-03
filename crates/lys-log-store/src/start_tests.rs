@@ -7,7 +7,6 @@ use lys_core::Ed25519Identity;
 use super::*;
 use crate::file::FileLeafStore;
 use crate::snapshot::seal;
-use crate::store::PinnedRoot;
 use crate::test_store::{CountingStore, Disk, ORIGIN};
 
 const DOMAIN: &str = "example.com/lys/test-state/v1";
@@ -207,17 +206,16 @@ fn a_snapshot_one_past_the_last_whole_record_refuses_the_open_and_rewrites_nothi
     let key = key(&tmp, "key");
     let dir = tmp.path().join("log");
     file_logged(&dir, 5, &key);
-    // The acknowledged frame at index 4 is lost: its leaf and its pin.
-    std::fs::remove_file(dir.join("leaves").join(format!("{:020}", 4))).unwrap();
-    let four = Frontier::from_leaves((0..4).map(leaf));
-    crate::file::write_state(
-        &dir,
-        PinnedRoot {
-            tree_size: four.size(),
-            root: four.root(),
-        },
-    )
-    .unwrap();
+    // The acknowledged frame at index 4 is lost: its record, leaf and pin,
+    // cut from the segment's end so the last whole record pins 4.
+    let segment = crate::file::segment_file(&dir, 0);
+    let cut = crate::file::segment_offsets(&dir, 0).unwrap()[4];
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&segment)
+        .unwrap()
+        .set_len(cut)
+        .unwrap();
     let before = tree_bytes(&dir);
     for store in [
         FileLeafStore::open(&dir).unwrap(),
@@ -242,16 +240,38 @@ fn a_torn_last_leaf_alone_opens_at_the_pin_and_is_named_read_only() {
     let key = key(&tmp, "key");
     let dir = tmp.path().join("log");
     file_logged(&dir, 5, &key);
-    let torn = dir
-        .join("leaves")
-        .join(format!(".{}-{:020}-0.tmp", std::process::id() + 1, 5));
-    std::fs::write(&torn, b"leaf-5 cut sh").unwrap();
-    let started = open_with_snapshot(
-        FileLeafStore::open(&dir).unwrap(),
-        DOMAIN,
-        &key.public_key_bytes(),
-    )
-    .unwrap();
+    // In this layout a torn frame is part of a record at the segment's end
+    // that no flush acknowledged.
+    let segment = crate::file::segment_file(&dir, 0);
+    let whole = std::fs::metadata(&segment).unwrap().len();
+    {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&segment)
+            .unwrap();
+        file.write_all(b"leaf-5 cut sh").unwrap();
+    }
+    let read_only = FileLeafStore::open_read_only(&dir).unwrap();
+    assert_eq!(read_only.extent(), 5);
+    assert_eq!(
+        read_only.unfinished_tail(),
+        Some(&crate::file::UnfinishedTail {
+            segment: segment.clone(),
+            offset: whole,
+            bytes: 13,
+        }),
+        "a reader names the torn bytes and leaves them"
+    );
+    assert_eq!(std::fs::metadata(&segment).unwrap().len(), whole + 13);
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(store.unfinished_tail().map(|tail| tail.bytes), Some(13));
+    assert_eq!(
+        std::fs::metadata(&segment).unwrap().len(),
+        whole,
+        "a writable open cuts the torn bytes and nothing else"
+    );
+    let started = open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).unwrap();
     assert_eq!(
         started.start,
         Start::Resumed {
@@ -261,13 +281,6 @@ fn a_torn_last_leaf_alone_opens_at_the_pin_and_is_named_read_only() {
     );
     assert_eq!(started.log.len(), 5);
     assert_eq!(started.log.recovered_to(), None);
-    let read_only = FileLeafStore::open_read_only(&dir).unwrap();
-    assert_eq!(read_only.extent(), 5);
-    assert_eq!(
-        read_only.leftover_temporaries().unwrap(),
-        vec![torn.file_name().unwrap().to_str().unwrap().to_owned()]
-    );
-    assert_eq!(std::fs::read(&torn).unwrap(), b"leaf-5 cut sh");
 }
 
 #[test]
