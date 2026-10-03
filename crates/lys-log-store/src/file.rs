@@ -46,6 +46,8 @@ mod crc32c;
 mod open;
 mod segment;
 mod snapshot_slot;
+#[cfg(test)]
+pub(crate) mod tamper;
 pub(crate) mod v1;
 
 use segment::{Read1, append_offsets, offsets_path, push_record, read_record, segment_path};

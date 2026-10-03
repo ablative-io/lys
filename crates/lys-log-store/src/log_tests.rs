@@ -15,7 +15,7 @@
 use std::path::Path;
 
 use super::*;
-use crate::file::FileLeafStore;
+use crate::file::{FileLeafStore, tamper};
 
 const ORIGIN: &str = "example.com/lys/log-test";
 
@@ -26,10 +26,6 @@ fn open_file_log(dir: &Path) -> Log<FileLeafStore> {
 
 fn reopen(dir: &Path) -> StoreResult<Log<FileLeafStore>> {
     Log::open(FileLeafStore::open(dir)?)
-}
-
-fn leaf_path(dir: &Path, index: u64) -> std::path::PathBuf {
-    dir.join("leaves").join(format!("{index:020}"))
 }
 
 /// An in-memory [`LeafStore`] holding the same rules as the file store, plus a
@@ -167,46 +163,70 @@ fn a_tampered_leaf_byte_is_detected_at_open() {
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
     log.append(b"leaf-0").unwrap();
-    std::fs::write(leaf_path(&dir, 0), b"leaf-X").unwrap();
-    let err = reopen(&dir).unwrap_err();
-    assert!(matches!(err, StoreError::PinMismatch { .. }), "{err}");
-}
-
-#[test]
-fn a_tampered_pinned_size_is_detected_at_open() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut log = open_file_log(&dir);
-    log.append(b"leaf-0").unwrap();
-    let state = std::fs::read_to_string(dir.join("state.json")).unwrap();
-    let tampered = state.replacen("\"tree_size\": 1", "\"tree_size\": 2", 1);
-    assert_ne!(state, tampered);
-    std::fs::write(dir.join("state.json"), tampered).unwrap();
-    let err = reopen(&dir).unwrap_err();
-    assert!(matches!(err, StoreError::PinMismatch { .. }), "{err}");
-}
-
-#[test]
-fn crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut log = open_file_log(&dir);
-    log.append(b"leaf-0").unwrap();
-    let state_after_one = std::fs::read(dir.join("state.json")).unwrap();
     log.append(b"leaf-1").unwrap();
-    // A crash between storing the leaf and advancing the pin.
-    std::fs::write(dir.join("state.json"), &state_after_one).unwrap();
+    drop(log);
+    // Leaf 0 has a second act behind it, so its damaged record is not the
+    // store's tail and cannot be read as an act that never finished.
+    tamper::tamper_leaf_byte(&dir, 0);
+    let err = reopen(&dir).unwrap_err();
+    assert!(
+        matches!(err, StoreError::CorruptRecord { offset: 0, .. }),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_damaged_pin_is_never_served_and_is_named_at_open() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    log.append(b"leaf-0").unwrap();
+    log.append(b"leaf-1").unwrap();
+    drop(log);
+    let segment = tamper::segment_of(&dir, 1);
+    tamper::tamper_pin_byte(&dir, 1);
+    // The pin rides inside its act's last record, under the record's
+    // checksum: a pin that does not check is an act that is not there.
+    let read = FileLeafStore::open_read_only(&dir).unwrap();
+    assert_eq!(read.extent(), 1);
+    assert_eq!(read.pinned().tree_size, 1);
+    let tail = read.unfinished_tail().expect("the damaged act is named");
+    assert_eq!(tail.segment, segment);
+    drop(read);
+    let log = reopen(&dir).unwrap();
+    assert_eq!(log.tree().len(), 1);
+    assert_eq!(log.recovered_to(), None);
+}
+
+#[test]
+fn an_interrupted_append_is_cut_and_reported_never_adopted() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    log.append(b"leaf-0").unwrap();
+    log.append(b"leaf-1").unwrap();
+    drop(log);
+    // A crash inside the second act: three bytes of its record reached the
+    // segment and its flush never returned.
+    tamper::cut_inside_record(&dir, 1);
     let recovered = reopen(&dir).unwrap();
-    assert_eq!(recovered.tree().len(), 2);
+    assert_eq!(recovered.tree().len(), 1);
     assert_eq!(
         recovered.recovered_to(),
-        Some(2),
-        "the repair must be reportable, not silent"
+        None,
+        "nothing past the pin is adopted"
     );
-    // The pin was repaired on disk, so the next open is clean.
+    let cut = recovered
+        .store()
+        .unfinished_tail()
+        .expect("the cut must be reportable, not silent")
+        .bytes;
+    assert_eq!(cut, 3);
+    drop(recovered);
+    // The cut was made on disk, so the next open is clean.
     let reread = reopen(&dir).unwrap();
-    assert_eq!(reread.tree().len(), 2);
-    assert_eq!(reread.recovered_to(), None);
+    assert_eq!(reread.tree().len(), 1);
+    assert!(reread.store().unfinished_tail().is_none());
 }
 
 #[test]
@@ -215,13 +235,13 @@ fn crash_recovery_does_not_mask_a_tampered_prefix() {
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
     log.append(b"leaf-0").unwrap();
-    let state_after_one = std::fs::read(dir.join("state.json")).unwrap();
     log.append(b"leaf-1").unwrap();
-    // Stale pin AND a tampered leaf inside the pinned prefix. The leaf count
-    // matches the recoverable shape exactly, so only the prefix-root comparison
-    // can refuse this.
-    std::fs::write(leaf_path(&dir, 0), b"leaf-X").unwrap();
-    std::fs::write(dir.join("state.json"), &state_after_one).unwrap();
+    drop(log);
+    // An interrupted second act AND a planted leaf inside the pinned prefix,
+    // behind a checksum that holds. Cutting the unfinished act must not excuse
+    // the prefix: only the tree comparison can refuse this.
+    tamper::plant_leaf(&dir, 0, b"leaf-X");
+    tamper::cut_inside_record(&dir, 1);
     let err = reopen(&dir).unwrap_err();
     assert!(matches!(err, StoreError::PinMismatch { .. }), "{err}");
 }
@@ -248,19 +268,16 @@ fn rebuilt_root_b64(leaves: &[&[u8]]) -> String {
 }
 
 /// Replaces leaf 1 of a three-leaf store with `planted`, opens it, and returns
-/// the refusal's Display text and roots, holding `state.json` unchanged.
+/// the refusal's Display text and roots, holding every file unchanged. The
+/// leaf is planted behind a checksum that holds, so only the tree can tell.
 fn refusal_over_planted_leaf_1(planted: &[u8]) -> (String, String, String) {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let pinned_root = STANDARD.encode(three_leaf_store(&dir));
-    std::fs::write(leaf_path(&dir, 1), planted).unwrap();
-    let state_before = std::fs::read(dir.join("state.json")).unwrap();
+    tamper::plant_leaf(&dir, 1, planted);
+    let before = tree_bytes(&dir);
     let err = reopen(&dir).unwrap_err();
-    let state_after = std::fs::read(dir.join("state.json")).unwrap();
-    assert_eq!(
-        state_before, state_after,
-        "a refused open must not write the pin"
-    );
+    assert_eq!(tree_bytes(&dir), before, "a refused open must not write");
     let display = err.to_string();
     let (pinned_size, got_pinned_root, rebuilt_size, rebuilt_root) = match err {
         StoreError::PinMismatch {
@@ -307,42 +324,47 @@ fn a_one_byte_change_inside_the_pinned_prefix_is_refused_with_the_pin_and_the_re
 }
 
 #[test]
-fn a_torn_leaf_just_past_the_pin_is_adopted_pinned_and_reported() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    FileLeafStore::create(&dir, "example.com/log").unwrap();
-    let mut log = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
-    log.append(b"leaf-0").unwrap();
-    log.append(b"leaf-1").unwrap();
-    // A final leaf name holding a short write, as a store written before the
-    // temporary-name write could hold after a crash.
-    std::fs::write(leaf_path(&dir, 2), b"lea").unwrap();
-    let recovered = reopen(&dir).unwrap();
-    assert_eq!(recovered.recovered_to(), Some(3));
-    assert_eq!(recovered.tree().len(), 3);
-    let reread = reopen(&dir).unwrap();
-    assert_eq!(reread.recovered_to(), None);
-    assert_eq!(reread.tree().len(), 3);
-}
-
-#[test]
-fn recovery_refuses_a_pin_that_is_ahead_of_the_leaves() {
-    // The mirror image of an interrupted append, and deliberately NOT
-    // recoverable: a pin covering a leaf that was never stored describes a tree
-    // nobody can rebuild. Storing the leaf after pinning would produce this
-    // state, which is why append never pins first.
+fn an_act_lost_whole_leaves_the_log_at_its_earlier_pin() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
     log.append(b"leaf-0").unwrap();
     log.append(b"leaf-1").unwrap();
-    let state_after_two = std::fs::read(dir.join("state.json")).unwrap();
+    drop(log);
+    // A crash before any byte of the second act reached the segment.
+    tamper::cut_before_record(&dir, 1);
+    let reopened = reopen(&dir).unwrap();
+    assert_eq!(reopened.tree().len(), 1);
+    assert_eq!(reopened.recovered_to(), None);
+    assert!(
+        reopened.store().unfinished_tail().is_none(),
+        "nothing was there to cut"
+    );
+}
+
+#[test]
+fn recovery_refuses_a_pin_that_is_ahead_of_the_leaves() {
+    // A pin covering a leaf that was never stored describes a tree nobody can
+    // rebuild. The pin rides on its act's last record, so the only way to hold
+    // one is a record whose pin names a size past its own leaf, planted behind
+    // a checksum that holds; the open refuses it by record.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    log.append(b"leaf-0").unwrap();
+    log.append(b"leaf-1").unwrap();
+    let (root, tree_size) = log.tree().root().to_parts();
+    assert_eq!(tree_size, 2);
     let fresh = tmp.path().join("fresh");
     let mut short = open_file_log(&fresh);
     short.append(b"leaf-0").unwrap();
-    std::fs::write(fresh.join("state.json"), &state_after_two).unwrap();
+    drop(short);
+    tamper::plant_pin(&fresh, 0, PinnedRoot { tree_size, root });
     let err = reopen(&fresh).unwrap_err();
-    assert!(matches!(err, StoreError::PinMismatch { .. }), "{err}");
+    assert!(
+        matches!(err, StoreError::CorruptRecord { offset: 0, .. }),
+        "{err}"
+    );
 }
 
 #[test]
@@ -502,55 +524,42 @@ fn a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte() {
 }
 
 #[test]
-fn a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write() {
+fn a_read_only_store_with_an_unfinished_act_serves_its_pin_and_writes_nothing() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
-    let state_at_creation = std::fs::read(dir.join("state.json")).unwrap();
     log.append(b"leaf-0").unwrap();
     log.append(b"leaf-1").unwrap();
     drop(log);
-    std::fs::write(dir.join("state.json"), &state_at_creation).unwrap();
+    tamper::cut_inside_record(&dir, 1);
     let before = tree_bytes(&dir);
     let store = FileLeafStore::open_read_only(&dir).unwrap();
-    assert_eq!(store.extent(), 2);
-    let err = Log::open(store).unwrap_err();
-    assert!(
-        matches!(
-            err,
-            StoreError::PinMismatch {
-                pinned_size: 0,
-                rebuilt_size: 2,
-                ..
-            }
-        ),
-        "{err}"
-    );
-    assert_eq!(tree_bytes(&dir), before, "the refusal changed no file");
+    assert_eq!(store.extent(), 1);
+    assert_eq!(store.unfinished_tail().map(|tail| tail.bytes), Some(3));
+    let read = Log::open(store).unwrap();
+    assert_eq!(read.tree().len(), 1);
+    assert_eq!(read.recovered_to(), None);
+    assert_eq!(tree_bytes(&dir), before, "the reader changed no file");
 }
 
 #[test]
-fn a_writable_open_repairs_a_store_one_leaf_past_its_pin() {
+fn a_writable_open_cuts_an_unfinished_act_and_a_reader_then_finds_none() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
     log.append(b"leaf-0").unwrap();
-    let state_after_one = std::fs::read(dir.join("state.json")).unwrap();
     log.append(b"leaf-1").unwrap();
     drop(log);
-    // A crash between storing the leaf and advancing the pin.
-    std::fs::write(dir.join("state.json"), &state_after_one).unwrap();
+    tamper::cut_inside_record(&dir, 1);
     let store = FileLeafStore::open(&dir).unwrap();
-    assert_eq!(store.extent(), 2);
+    assert_eq!(store.extent(), 1);
     assert_eq!(store.pinned().tree_size, 1);
+    assert_eq!(store.unfinished_tail().map(|tail| tail.bytes), Some(3));
     drop(store);
-    let repaired = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
-    assert_eq!(repaired.tree().len(), 2);
-    assert_eq!(repaired.recovered_to(), Some(2));
-    drop(repaired);
     let read = FileLeafStore::open_read_only(&dir).unwrap();
-    assert_eq!(read.extent(), 2);
-    assert_eq!(read.pinned().tree_size, 2);
+    assert_eq!(read.extent(), 1);
+    assert_eq!(read.pinned().tree_size, 1);
+    assert!(read.unfinished_tail().is_none());
 }
 
 #[test]
@@ -563,8 +572,8 @@ fn a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees() {
     }
     let root_after_three = log.tree().root().to_parts().0;
     drop(log);
-    std::fs::write(leaf_path(&dir, 1), b"lea").unwrap();
-    let state_before = std::fs::read(dir.join("state.json")).unwrap();
+    tamper::plant_leaf(&dir, 1, b"lea");
+    let before = tree_bytes(&dir);
     let leaves = [b"leaf-0".to_vec(), b"lea".to_vec(), b"leaf-2".to_vec()];
     let torn_root = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&leaves)
         .root()
@@ -588,46 +597,31 @@ fn a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees() {
              is tree size 3 with root {pinned_b64}"
         )
     );
-    assert_eq!(
-        std::fs::read(dir.join("state.json")).unwrap(),
-        state_before,
-        "a refused open pins nothing"
-    );
-}
-
-#[test]
-fn a_torn_leaf_just_past_the_pin_is_repaired_and_reported() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut log = open_file_log(&dir);
-    log.append(b"leaf-0").unwrap();
-    log.append(b"leaf-1").unwrap();
-    drop(log);
-    std::fs::write(leaf_path(&dir, 2), b"lea").unwrap();
-    let repaired = reopen(&dir).unwrap();
-    assert_eq!(repaired.recovered_to(), Some(3));
-    assert_eq!(repaired.tree().len(), 3);
-    drop(repaired);
-    let reread = reopen(&dir).unwrap();
-    assert_eq!(reread.recovered_to(), None);
-    assert_eq!(reread.tree().len(), 3);
+    assert_eq!(tree_bytes(&dir), before, "a refused open writes nothing");
 }
 
 #[test]
 fn a_log_opened_at_its_pin_leaves_the_pin_and_refuses_to_append_while_a_repair_is_pending() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    FileLeafStore::create(&dir, ORIGIN).unwrap();
+    // The file store cannot hold a leaf past its pin: leaves and pin are one
+    // act there. A backend that can is what this path exists for, so the state
+    // is built in the memory store, which this module owns.
+    let ahead = || {
+        let mut frontier = Frontier::new();
+        frontier.push(b"leaf-0");
+        let mut store = MemStore::new(ORIGIN);
+        let pin = PinnedRoot {
+            tree_size: frontier.size(),
+            root: frontier.root(),
+        };
+        store.append(0, &[b"leaf-0".as_slice()], pin).unwrap();
+        // An append interrupted after storing its leaf and before its pin.
+        store
+            .leaves
+            .push(b"an append interrupted before its pin".to_vec());
+        store
+    };
     {
-        let mut log = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
-        log.append(b"leaf-0").unwrap();
-    }
-    // An append interrupted after storing its leaf and before its pin.
-    std::fs::write(leaf_path(&dir, 1), b"an append interrupted before its pin").unwrap();
-    let state_before = std::fs::read(dir.join("state.json")).unwrap();
-
-    {
-        let mut log = Log::open_at_pin(FileLeafStore::open(&dir).unwrap()).unwrap();
+        let mut log = Log::open_at_pin(ahead()).unwrap();
         assert_eq!(log.tree().len(), 1);
         assert_eq!(log.pending_repair(), Some(2));
         assert_eq!(log.recovered_to(), None);
@@ -649,17 +643,12 @@ fn a_log_opened_at_its_pin_leaves_the_pin_and_refuses_to_append_while_a_repair_i
             "refusing to append: the log has a pending repair, its store holds 2 leaves but its \
              pin is at tree size 1; a writable open must repair it before any append"
         );
+        assert_eq!(log.store().pinned().tree_size, 1, "the pin was left");
+        assert_eq!(log.store().leaves.len(), 2, "no leaf was written");
     }
-    let mut names: Vec<String> = std::fs::read_dir(dir.join("leaves"))
-        .unwrap()
-        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
-        .collect();
-    names.sort();
-    assert_eq!(names, vec![format!("{:020}", 0), format!("{:020}", 1)]);
-    assert_eq!(std::fs::read(dir.join("state.json")).unwrap(), state_before);
 
-    // Only a writable open repairs it, as it always has.
-    let mut repaired = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
+    // Only a full open repairs it, as it always has.
+    let mut repaired = Log::open(ahead()).unwrap();
     assert_eq!(repaired.recovered_to(), Some(2));
     assert_eq!(repaired.pending_repair(), None);
     assert_eq!(repaired.store().pinned().tree_size, 2);
