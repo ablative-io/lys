@@ -28,31 +28,31 @@
   "modes": [
     {
       "id": "default",
-      "meaning": "Reads freely and asks before most changes and commands."
+      "meaning": "Asks a person before each change to a file, each command and each website. Without asking it reads files in its working folder and runs Claude Code's fixed set of read-only commands."
     },
     {
       "id": "acceptEdits",
-      "meaning": "Reads and edits files without asking; other commands can require approval."
+      "meaning": "Changes files in its working folder and extra folders without asking, and runs mkdir, touch, mv and cp there without asking. Asks before other commands."
     },
     {
       "id": "plan",
-      "meaning": "Explores and plans before making changes; eligible commands can receive automatic review."
+      "meaning": "Reads files and runs read-only commands to explore, and does not change your files. Where Claude Code's automatic review is available, commands it approves also run."
     },
     {
       "id": "auto",
-      "meaning": "Reviews actions automatically before allowing them."
+      "meaning": "Asks no routine questions. Before a command or a network request runs, a background check by Claude Code decides whether it fits what was asked."
     },
     {
       "id": "dontAsk",
-      "meaning": "Uses only reads and approved tools; refuses actions that would require a prompt."
+      "meaning": "Never asks. Anything that would need a question is refused. Reads in its working folder, the fixed read-only commands and the rules under Without asking still run."
     },
     {
       "id": "bypassPermissions",
-      "meaning": "Skips permission prompts; explicit denial rules still apply."
+      "meaning": "Asks nothing and checks nothing: every action runs, including changes to protected files. Rules under Refused still block and rules under Asks first still ask. Claude Code's own page says to use it only on an isolated machine."
     },
     {
       "id": "workspace-only",
-      "meaning": "Works in its own folder with shell sandboxing and internet tools off. Shell commands can also write to the program's temporary folder."
+      "meaning": "A setting Lys makes from several of Claude Code's. Never asks. Its file tools read and change files only in its working folder. Shell commands run in Claude Code's sandbox with no network. Web fetch and web search are refused. It cannot carry rules under Without asking or extra folders."
     }
   ],
   "description": {

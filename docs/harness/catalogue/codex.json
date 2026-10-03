@@ -24,15 +24,15 @@
   "modes": [
     {
       "id": "read-only",
-      "meaning": "Reads files and runs commands within a sandbox that cannot change files."
+      "meaning": "Commands cannot change any file or use the network while they stay in Codex's sandbox. They can read every file this login can read. Lys does not turn web search off in this mode."
     },
     {
       "id": "workspace-write",
-      "meaning": "Reads files and changes the workspace; command network access is off by default."
+      "meaning": "Commands change files only in the working folder and extra folders, with no network, and web search is off. They can read every file this login can read."
     },
     {
       "id": "danger-full-access",
-      "meaning": "Runs commands without the filesystem or network sandbox; approval settings still apply."
+      "meaning": "No sandbox. Commands change files anywhere this login can and use the network."
     }
   ],
   "description": {
