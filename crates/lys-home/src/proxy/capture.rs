@@ -12,7 +12,8 @@
 //!   `cancelled` when the client went before the response ended; `partial`
 //!   when the upstream failed or its stream ended early or malformed. No
 //!   other path reports a call complete.
-//! - The spools hold body bytes only; no header is written anywhere.
+//! - The spools hold body bytes only. The only headers read are the kept
+//!   ones (`proxy::headers`), which go on the call's record and nowhere else.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -22,7 +23,6 @@ use std::time::Instant;
 use super::spool::Spool;
 use hyper::HeaderMap;
 use hyper::body::Bytes;
-use hyper::header::{GetAll, HeaderValue};
 
 use crate::proxy::decode::Reader;
 use crate::proxy::forward::{End, Observer};
@@ -30,6 +30,9 @@ use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
 use crate::proxy::link::{KeyScanner, Link};
 use crate::record::call::CallStatus;
 use crate::record::call::captured::{CaptureTiming, Seen};
+
+/// Kept headers: each name to its values in the order sent.
+type Kept = std::collections::BTreeMap<String, Vec<String>>;
 
 /// What a call knows while it passes.
 #[derive(Debug, Default)]
@@ -44,6 +47,7 @@ struct CallState {
     finished: bool,
     last_arrival: Option<Instant>,
     pending_bytes: u64,
+    seen: Seen,
 }
 
 /// One call in flight: its journal record, its capture and where it goes
@@ -107,19 +111,31 @@ impl Call {
         RequestSide(Arc::clone(self))
     }
 
+    /// Keep the request's named headers for the call's record. The headers
+    /// themselves go upstream as they came.
+    pub fn asked(self: &Arc<Self>, headers: &HeaderMap) {
+        self.enqueue(Event::RequestHead(super::headers::asked(headers)));
+    }
+
     /// The observer of the response body on its way to the client; the
     /// response head queues decoder and spool creation on the worker.
     #[must_use]
     pub fn response_side(
         self: &Arc<Self>,
         stream: bool,
-        encodings: GetAll<'_, HeaderValue>,
+        status: u16,
+        headers: &HeaderMap,
     ) -> ResponseSide {
-        let mut headers = HeaderMap::new();
-        for value in encodings {
-            headers.append(hyper::header::CONTENT_ENCODING, value.clone());
+        let mut encodings = HeaderMap::new();
+        for value in headers.get_all(hyper::header::CONTENT_ENCODING) {
+            encodings.append(hyper::header::CONTENT_ENCODING, value.clone());
         }
-        self.enqueue(Event::ResponseHead { stream, headers });
+        self.enqueue(Event::ResponseHead {
+            stream,
+            headers: encodings,
+            status,
+            kept: super::headers::answered(headers),
+        });
         ResponseSide {
             call: Arc::clone(self),
             offered: 0,
@@ -225,7 +241,10 @@ impl Call {
                 last_arrival: Some(s.last_arrival.unwrap_or(ended_at)),
                 parts,
                 timing,
-                seen: Seen { message_id },
+                seen: Seen {
+                    message_id,
+                    head: std::mem::take(&mut s.seen.head),
+                },
             })
         });
         // An interrupted capture keeps its durable open journal entry;
@@ -254,7 +273,13 @@ enum Event {
     Start,
     Request(Bytes),
     RequestEnd,
-    ResponseHead { stream: bool, headers: HeaderMap },
+    RequestHead(Kept),
+    ResponseHead {
+        stream: bool,
+        headers: HeaderMap,
+        status: u16,
+        kept: Kept,
+    },
     Response(Bytes, Instant, u64),
     End(End, Instant),
 }
@@ -278,10 +303,20 @@ impl Work {
                     }
                 });
             }
+            Event::RequestHead(kept) => {
+                call.with(|s| s.seen.head.request = kept);
+            }
             Event::RequestEnd => call.request_ended(),
-            Event::ResponseHead { stream, headers } => {
+            Event::ResponseHead {
+                stream,
+                headers,
+                status,
+                kept,
+            } => {
                 call.with(|s| {
                     s.stream = stream;
+                    s.seen.head.status = Some(status);
+                    s.seen.head.response = kept;
                     s.reader = stream.then(|| {
                         Reader::for_api(
                             call.open.api,

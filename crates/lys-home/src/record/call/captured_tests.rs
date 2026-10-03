@@ -35,6 +35,7 @@ fn prepared_stream_parts_survive_without_a_second_body_parse()
             timing: CaptureTiming::interrupted(Some(42)),
             seen: &Seen {
                 message_id: Some("msg_1".to_owned()),
+                head: Head::default(),
             },
         },
     )?;
@@ -54,6 +55,9 @@ fn prepared_stream_parts_survive_without_a_second_body_parse()
     );
     let entry = serde_json::to_value(&restored.record)?;
     assert_eq!(entry["message_id"], "msg_1");
+    // A call nothing was seen of names no head at all, not an empty one.
+    assert!(entry.get("head").is_none());
+    assert!(entry.get("request_id").is_none());
     assert!(restored.append(&mut session)?.already_recorded);
     Ok(())
 }

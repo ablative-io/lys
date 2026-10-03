@@ -11,6 +11,7 @@ use crate::record::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 #[cfg(test)]
@@ -94,6 +95,36 @@ pub struct Seen {
     /// The provider's id for the response message, from a Messages stream's
     /// `message_start`.
     pub message_id: Option<String>,
+    /// The status and the kept headers.
+    pub head: Head,
+}
+
+/// The response headers that carry the provider's id for the request, in the
+/// order they are read: Anthropic's, then `OpenAI`'s.
+const REQUEST_ID: [&str; 2] = ["request-id", "x-request-id"];
+
+/// A call's status and the few headers its record keeps of each side: each
+/// name to its values in the order sent. Which names are kept is the
+/// proxy's to say (`proxy::headers`); no credential is among them.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Head {
+    /// The upstream's HTTP status; absent when no response head arrived.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<u16>,
+    /// The kept request headers.
+    pub request: BTreeMap<String, Vec<String>>,
+    /// The kept response headers.
+    pub response: BTreeMap<String, Vec<String>>,
+}
+
+impl Head {
+    /// The provider's id for the request, from the response's own header.
+    #[must_use]
+    pub fn request_id(&self) -> Option<String> {
+        REQUEST_ID
+            .iter()
+            .find_map(|name| self.response.get(*name)?.first().cloned())
+    }
 }
 
 /// All references needed to append a call, without reading either body again.
@@ -178,6 +209,8 @@ impl PreparedCall {
                 api: meta.api,
                 model,
                 message_id: input.seen.message_id.clone(),
+                request_id: input.seen.head.request_id(),
+                head: (input.seen.head != Head::default()).then(|| input.seen.head.clone()),
                 request: Vec::new(),
                 response: Vec::new(),
                 raw_request: input.raw_request,

@@ -11,9 +11,10 @@
 //! - One header is set rather than copied: `host`, which names the
 //!   connection's target, becomes the upstream's authority, since the
 //!   provider serves its own name and the client addressed this process.
-//!   Every other header passes as it came. No header value is written or
-//!   logged here; the one read is a response's `content-type`, to know an
-//!   event stream.
+//!   Every other header passes as it came. No header value is logged here.
+//!   The reads are a response's `content-type`, to know an event stream, and
+//!   the few named headers of each side a call's record keeps
+//!   (`proxy::headers`), none of which carries a credential.
 //! - The transport is one Hyper client whose cancelled-request setting is
 //!   set explicitly to off, so a request whose connection closes under it is
 //!   answered with the failure and never sent a second time. The
@@ -451,12 +452,14 @@ impl Proxy {
         }
         open.admission_ns = Some(u64::try_from(admission.elapsed().as_nanos()).unwrap_or(u64::MAX));
         let call = Call::admit(open, &self.capture, self.journal.clone(), self.sink.clone());
+        call.asked(request.headers());
         let request = request.map(|body| Tee::new(body, call.request_side()).boxed_unsync());
         match self.upstream.send(base, &rest, request).await {
             Ok(response) => {
                 let side = call.response_side(
                     is_event_stream(response.headers()),
-                    response.headers().get_all(hyper::header::CONTENT_ENCODING),
+                    response.status().as_u16(),
+                    response.headers(),
                 );
                 response.map(|body| Tee::new(body, side).boxed_unsync())
             }

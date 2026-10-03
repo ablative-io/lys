@@ -25,6 +25,7 @@ pub mod error;
 pub mod forward;
 #[cfg(test)]
 mod forward_tests;
+mod headers;
 pub mod journal;
 #[cfg(test)]
 mod journal_tests;

@@ -18,8 +18,9 @@
 //!   ingests; a call whose record cannot be rewritten is recorded
 //!   `unrecorded`, and is held, with nothing ingested, until the journal can
 //!   be written again ([`Sink::settle`] asks the sink to look again).
-//! - The sink writes no header and no body byte anywhere but the home's block
-//!   store, and its reports carry ids, a status and counts only.
+//! - The sink writes no body byte anywhere but the home's block store, and
+//!   no header but the kept ones (`proxy::headers`) on the call's record;
+//!   its reports carry ids, a status and counts only.
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
