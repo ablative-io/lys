@@ -88,6 +88,14 @@ impl CaptureTiming {
     }
 }
 
+/// What the proxy read of a call beside its bodies, as the call passed.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Seen {
+    /// The provider's id for the response message, from a Messages stream's
+    /// `message_start`.
+    pub message_id: Option<String>,
+}
+
 /// All references needed to append a call, without reading either body again.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct PreparedCall {
@@ -105,6 +113,7 @@ pub(crate) struct Captured<'a> {
     pub raw_request: Option<String>,
     pub raw_response: Option<String>,
     pub timing: CaptureTiming,
+    pub seen: &'a Seen,
 }
 
 impl PreparedCall {
@@ -168,6 +177,7 @@ impl PreparedCall {
                 provider: meta.provider.clone(),
                 api: meta.api,
                 model,
+                message_id: input.seen.message_id.clone(),
                 request: Vec::new(),
                 response: Vec::new(),
                 raw_request: input.raw_request,

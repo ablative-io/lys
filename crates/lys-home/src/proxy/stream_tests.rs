@@ -84,6 +84,39 @@ fn read(api: Api, bytes: &[u8], step: usize) -> Option<Vec<Value>> {
 }
 
 #[test]
+fn a_messages_stream_names_its_message_whether_or_not_it_ends_whole() {
+    for (stop, whole) in [(true, true), (false, false)] {
+        let stream = messages_stream(stop);
+        for step in [1, 3, stream.len()] {
+            let mut reader = StreamReader::for_api(Api::Messages);
+            assert_eq!(reader.message_id(), None, "no id before message_start");
+            for chunk in stream.as_bytes().chunks(step) {
+                reader.feed(chunk);
+            }
+            assert_eq!(
+                reader.message_id(),
+                Some("msg_1"),
+                "stop {stop} step {step}"
+            );
+            assert_eq!(reader.finish().is_some(), whole, "stop {stop} step {step}");
+        }
+    }
+    // A message_start that names no id leaves the id absent and the stream whole.
+    let unnamed = sse(&[
+        json!({"type": "message_start", "message": {"content": []}}),
+        json!({"type": "message_stop"}),
+    ]);
+    let mut reader = StreamReader::for_api(Api::Messages);
+    reader.feed(unnamed.as_bytes());
+    assert_eq!(reader.message_id(), None);
+    assert_eq!(reader.finish(), Some(Vec::new()));
+    // The other grammars name no message here.
+    for api in [Api::ChatCompletions, Api::Responses] {
+        assert_eq!(StreamReader::for_api(api).message_id(), None);
+    }
+}
+
+#[test]
 fn a_messages_stream_assembles_to_the_content_a_json_response_holds_split_at_any_byte() {
     let stream = messages_stream(true);
     let expected = vec![

@@ -75,6 +75,14 @@ impl Reader {
         }
     }
 
+    /// The provider's id for the message, as the stream reader read it.
+    pub(super) fn message_id(&self) -> Option<&str> {
+        match &self.coding {
+            Coding::Plain(reader) => reader.message_id(),
+            Coding::Compressed(decoder) => decoder.reader.message_id(),
+        }
+    }
+
     pub(super) fn finish(self) -> io::Result<Option<Vec<Value>>> {
         match self.coding {
             Coding::Plain(reader) => Ok((*reader).finish()),

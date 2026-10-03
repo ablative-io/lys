@@ -48,6 +48,7 @@ pub(super) fn ingest(
                 raw_request: request,
                 raw_response: response,
                 timing: job.timing.clone(),
+                seen: &job.seen,
             },
         )?);
     }

@@ -172,6 +172,8 @@ pub struct Job {
     pub last_arrival: Option<std::time::Instant>,
     /// Per-call worker measurements.
     pub timing: crate::record::call::captured::CaptureTiming,
+    /// What the proxy read of the call beside its bodies.
+    pub seen: crate::record::call::captured::Seen,
 }
 
 /// What the sink reports of each call: ids, a status and counts only.
@@ -446,6 +448,8 @@ pub fn recover(
             response_hash: None,
             last_arrival: None,
             timing: crate::record::call::captured::CaptureTiming::interrupted(call.admission_ns),
+            // Nothing read in flight survives the process; a prepared record keeps its own.
+            seen: crate::record::call::captured::Seen::default(),
             call,
         };
         let report = record(home, journal, &mut job);

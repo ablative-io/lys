@@ -10,6 +10,9 @@
 //! `citations`, and the `input_json_delta` fragments, joined, are parsed as a
 //! tool call's `input`.
 //!
+//! `message_start` carries the provider's id for the message, which is kept
+//! as read: it is the id the harness writes on its assistant record.
+//!
 //! Invariants: the parts are given only for a stream that reached
 //! `message_stop` with every started block stopped, in index order, with no
 //! `error` event, no delta of a kind this grammar does not know and no input
@@ -24,6 +27,7 @@ use crate::proxy::stream_sse::SseEvent;
 #[derive(Debug, Default)]
 pub struct MessagesAssembler {
     blocks: Vec<Block>,
+    message_id: Option<String>,
     stopped: bool,
     malformed: bool,
 }
@@ -49,13 +53,31 @@ impl MessagesAssembler {
             return;
         };
         match data.get("type").and_then(Value::as_str) {
-            Some("message_start" | "message_delta" | "ping") => {}
+            Some("message_start") => self.started(&data),
+            Some("message_delta" | "ping") => {}
             Some("message_stop") => self.stopped = true,
             Some("content_block_start") => self.start(&data),
             Some("content_block_delta") => self.delta(&data),
             Some("content_block_stop") => self.stop(&data),
             _ => self.malformed = true,
         }
+    }
+
+    /// `message_start` names the message: its id is the one the harness
+    /// writes on the assistant record this call produced.
+    fn started(&mut self, data: &Value) {
+        self.message_id = data
+            .get("message")
+            .and_then(|message| message.get("id"))
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+    }
+
+    /// The provider's id for the message, once `message_start` was read;
+    /// known whether or not the stream goes on to end whole.
+    #[must_use]
+    pub fn message_id(&self) -> Option<&str> {
+        self.message_id.as_deref()
     }
 
     fn start(&mut self, data: &Value) {

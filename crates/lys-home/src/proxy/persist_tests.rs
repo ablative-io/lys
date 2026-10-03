@@ -1,6 +1,6 @@
 use super::*;
 use crate::proxy::journal::{OpenCall, recover};
-use crate::record::call::captured::CaptureTiming;
+use crate::record::call::captured::{CaptureTiming, Seen};
 use crate::record::call::{Api, call_record};
 use crate::record::entries::CUSTOM_CALL;
 
@@ -65,6 +65,7 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
             raw_request: Some(req_hash.to_string()),
             raw_response: Some(resp_hash.to_string()),
             timing: CaptureTiming::interrupted(Some(81)),
+            seen: &Seen::default(),
         },
     )?;
     let mut job = Job {
@@ -87,6 +88,7 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
         parts: Some(parts),
         last_arrival: Some(std::time::Instant::now()),
         timing: CaptureTiming::interrupted(Some(81)),
+        seen: Seen::default(),
     };
     journal.write(&job.call)?;
     if checkpoint == 3 {

@@ -29,7 +29,7 @@ use crate::proxy::forward::{End, Observer};
 use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
 use crate::proxy::link::{KeyScanner, Link};
 use crate::record::call::CallStatus;
-use crate::record::call::captured::CaptureTiming;
+use crate::record::call::captured::{CaptureTiming, Seen};
 
 /// What a call knows while it passes.
 #[derive(Debug, Default)]
@@ -181,6 +181,13 @@ impl Call {
                 timing.write_ns += spool.write_ns;
                 timing.hash_ns += spool.hash_ns;
             }
+            // Read before the reader is finished: a stream that stops short
+            // still named its message.
+            let message_id = s
+                .reader
+                .as_ref()
+                .and_then(Reader::message_id)
+                .map(str::to_owned);
             let parts = s.reader.take().and_then(|reader| {
                 if end != End::Complete {
                     return None;
@@ -218,6 +225,7 @@ impl Call {
                 last_arrival: Some(s.last_arrival.unwrap_or(ended_at)),
                 parts,
                 timing,
+                seen: Seen { message_id },
             })
         });
         // An interrupted capture keeps its durable open journal entry;

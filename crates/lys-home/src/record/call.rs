@@ -81,6 +81,11 @@ pub struct CallRecord {
     /// The model asked for; absent when the request never became readable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// The provider's id for the response message, read from a Messages
+    /// stream's `message_start`: the id on the harness's assistant record
+    /// for the same call. Absent when no `message_start` was read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
     /// The request's parts, by block hash, in order; empty when the request
     /// was not readable.
     pub request: Vec<String>,
@@ -200,6 +205,7 @@ pub fn ingest_call(
         provider: meta.provider.clone(),
         api: meta.api,
         model: Some(meta.model.clone()),
+        message_id: None,
         request: Vec::new(),
         response: Vec::new(),
         raw_request: Some(raw_req.hash.to_string()),
@@ -247,6 +253,7 @@ pub fn ingest_call_files(
         provider: meta.provider.clone(),
         api: meta.api,
         model: Some(meta.model.clone()),
+        message_id: None,
         request: Vec::new(),
         response: Vec::new(),
         raw_request: Some(raw_req.hash.to_string()),
@@ -311,6 +318,7 @@ pub fn ingest_outcome(
         provider: meta.provider.clone(),
         api: meta.api,
         model,
+        message_id: None,
         request: Vec::new(),
         response: Vec::new(),
         raw_request: raw_req.map(|p| p.hash.to_string()),

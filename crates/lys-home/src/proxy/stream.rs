@@ -72,6 +72,16 @@ impl StreamReader {
         self.events
     }
 
+    /// The provider's id for the message, once a Messages stream's
+    /// `message_start` was read. The other two grammars name none here.
+    #[must_use]
+    pub fn message_id(&self) -> Option<&str> {
+        match &self.grammar {
+            Grammar::Messages(g) => g.message_id(),
+            Grammar::Chat(_) | Grammar::Responses(_) => None,
+        }
+    }
+
     /// The response's parts, only when the stream ended whole.
     #[must_use]
     pub fn finish(self) -> Option<Vec<Value>> {

@@ -33,6 +33,9 @@ fn prepared_stream_parts_survive_without_a_second_body_parse()
             raw_request: None,
             raw_response: None,
             timing: CaptureTiming::interrupted(Some(42)),
+            seen: &Seen {
+                message_id: Some("msg_1".to_owned()),
+            },
         },
     )?;
     std::fs::remove_file(&request)?;
@@ -44,6 +47,13 @@ fn prepared_stream_parts_survive_without_a_second_body_parse()
     assert_eq!(report.request_parts, 1);
     assert_eq!(report.response_parts, 1);
     assert_eq!(restored.record.status, CallStatus::Complete);
+    assert_eq!(
+        restored.record.message_id.as_deref(),
+        Some("msg_1"),
+        "the message's id is on the record and survives the journal"
+    );
+    let entry = serde_json::to_value(&restored.record)?;
+    assert_eq!(entry["message_id"], "msg_1");
     assert!(restored.append(&mut session)?.already_recorded);
     Ok(())
 }
