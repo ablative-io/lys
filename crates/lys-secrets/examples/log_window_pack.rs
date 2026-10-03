@@ -5,10 +5,10 @@ use std::error::Error;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lys_core::Ed25519Identity;
-use lys_log_store::{FileLeafStore, FrontierLog};
+use lys_log_store::{FileLeafStore, FrontierLog, LeafStore};
 use lys_secrets::{
     AuditKind, AuditLine, AuditLog, Broker, BrokerPaths, LocalGrants, Start, StoreKey, to_hex,
 };
@@ -205,21 +205,24 @@ fn pack(paths: &BrokerPaths) -> Result<(Vec<u8>, usize)> {
     let mut pack = Vec::new();
     pack.extend_from_slice(MAGIC);
     pack.extend_from_slice(&LINES.to_be_bytes());
-    let metadata: [PathBuf; 4] = [
-        paths.log_dir.join("log.json"),
-        paths.log_dir.join("state.json"),
-        paths.log_dir.join("snapshot.bin"),
-        paths.anchor.clone(),
-    ];
-    for path in &metadata {
-        frame(&mut pack, path)?;
+    // Four metadata frames keep the pack's shape: log.json, an empty frame
+    // where the per-leaf layout's state.json stood (LYSLOGSTORE-008 R1: the
+    // pin now rides inside the last record and is not a file), the snapshot
+    // and the anchor. The reader writes only the last two.
+    frame(&mut pack, &paths.log_dir.join("log.json"))?;
+    pack.extend_from_slice(&0_u32.to_be_bytes());
+    for path in [paths.log_dir.join("snapshot.bin"), paths.anchor.clone()] {
+        frame(&mut pack, &path)?;
     }
+    let store = FileLeafStore::open_read_only(&paths.log_dir)?;
     let mut leaf_bytes = 0;
     for index in 0..LINES {
-        leaf_bytes += frame(
-            &mut pack,
-            &paths.log_dir.join("leaves").join(format!("{index:020}")),
-        )?;
+        let leaf = store
+            .leaf(index)?
+            .ok_or_else(|| format!("line {index} is within the extent but absent"))?;
+        pack.extend_from_slice(&u32::try_from(leaf.len())?.to_be_bytes());
+        pack.extend_from_slice(&leaf);
+        leaf_bytes += leaf.len();
     }
     Ok((pack, leaf_bytes))
 }

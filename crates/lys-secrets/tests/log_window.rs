@@ -11,7 +11,6 @@
 use std::error::Error;
 use std::fs;
 use std::num::NonZeroU64;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -29,6 +28,41 @@ const PAGE: u64 = 20;
 const AT_MS: i64 = 1_800_000_000_000;
 const OUTCOME: &str = "PresentationInvalid";
 const FIRST_REACHED: &str = "first line reached";
+
+/// Alters the last byte of line `index` in place, inside its segment record
+/// (LYSLOGSTORE-008 R1): the record's offset is the `index`th u64 LE entry of
+/// the first segment's offsets file, the record begins with the line's u32
+/// LE length, and the line's bytes follow. Nothing else in the file moves,
+/// so a page that does not print the line does not read it, and the audit,
+/// which reads every record, fails that record's CRC by name.
+fn flip_last_byte_of_line(log_dir: &Path, index: u64) -> TestResult {
+    let segments = log_dir.join("leaves").join("segments");
+    let segment = segments.join(format!("{:020}", 0));
+    let offsets = fs::read(segments.join(format!("{:020}.offsets", 0)))?;
+    let entry = usize::try_from(index)? * 8;
+    let offset = usize::try_from(u64::from_le_bytes(
+        offsets
+            .get(entry..entry + 8)
+            .ok_or("the offsets file holds no entry for the line")?
+            .try_into()?,
+    ))?;
+    let mut bytes = fs::read(&segment)?;
+    let length = usize::try_from(u32::from_le_bytes(
+        bytes
+            .get(offset..offset + 4)
+            .ok_or("the record's length is beyond the segment")?
+            .try_into()?,
+    ))?;
+    if length == 0 {
+        return Err(format!("line {index} is empty").into());
+    }
+    let last = bytes
+        .get_mut(offset + 4 + length - 1)
+        .ok_or("the line's bytes are beyond the segment")?;
+    *last ^= 0x01;
+    fs::write(&segment, &bytes)?;
+    Ok(())
+}
 
 /// The paths the command line lays out under `--root` and `--keys`.
 fn paths_in(root: &Path, keys: &Path) -> BrokerPaths {
@@ -157,18 +191,7 @@ fn the_log_command_prints_the_last_lines_and_reads_only_those() -> TestResult {
     // older than it is altered, the page still prints, and a page one line
     // longer is refused naming that line.
     let older = LINES - PAGE - 1;
-    let leaf = folders
-        .paths()
-        .log_dir
-        .join("leaves")
-        .join(format!("{older:020}"));
-    fs::set_permissions(&leaf, fs::Permissions::from_mode(0o600))?;
-    let mut bytes = fs::read(&leaf)?;
-    let last = bytes
-        .last_mut()
-        .ok_or("the line before the page is empty")?;
-    *last ^= 0x01;
-    fs::write(&leaf, &bytes)?;
+    flip_last_byte_of_line(&folders.paths().log_dir, older)?;
     let unread = page(&folders, &["--most", "20"])?;
     assert_eq!(unread.indexes(), (LINES - PAGE..LINES).collect::<Vec<_>>());
     let longer = folders.run("log", &["--most", "21"])?;
@@ -310,12 +333,7 @@ fn the_audit_command_names_an_altered_line_and_passes_a_sound_log() -> TestResul
         "{said}"
     );
 
-    let leaf = paths.log_dir.join("leaves").join(format!("{:020}", 1));
-    fs::set_permissions(&leaf, fs::Permissions::from_mode(0o600))?;
-    let mut bytes = fs::read(&leaf)?;
-    let last = bytes.last_mut().ok_or("line 1 is empty")?;
-    *last ^= 0x01;
-    fs::write(&leaf, &bytes)?;
+    flip_last_byte_of_line(&paths.log_dir, 1)?;
 
     let tail = folders.run("log", &["--most", "1"])?;
     assert!(
