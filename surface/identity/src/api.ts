@@ -35,27 +35,41 @@ async function refusalOf(response: Response): Promise<Refused> {
   });
 }
 
-/** Ask the service: a read without a body, else a change sent as `method`, POST unless named. */
-export async function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST', signal?: AbortSignal): Promise<T> {
+/** The one exchange with the service. An answer that is not a refusal and cannot be read is said, never passed on as nothing. */
+async function exchange<T>(method: 'GET' | 'POST' | 'PUT', path: string, body: unknown, signal: AbortSignal | undefined, emptyAnswers: boolean): Promise<T> {
   let response: Response;
-  const init: RequestInit =
-    body === undefined
-      ? { credentials: 'same-origin', headers: { accept: 'application/json' } }
-      : { method, credentials: 'same-origin', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify(body) };
+  const headers: Record<string, string> = body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' };
+  const init: RequestInit = method === 'GET'
+    ? { credentials: 'same-origin', headers }
+    : { method, credentials: 'same-origin', headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) };
   try {
     response = await fetch(API + path, { ...init, signal });
   } catch (error) {
     throw new Refused(0, { refusal: 'ServiceUnreachable', reason: `the identity service could not be reached: ${String(error)}` });
   }
   if (!response.ok) throw await refusalOf(response);
+  const unreadable = () => new Refused(response.status, {
+    refusal: 'UnreadableResponse',
+    reason: `the identity service answered ${response.status}, but its result could not be read; do not repeat a change whose outcome is unknown`,
+  });
+  let text: string;
+  try { text = await response.text(); } catch { throw unreadable(); }
+  if (text === '' && emptyAnswers) return null as T;
   try {
-    return (await response.json()) as T;
+    return JSON.parse(text) as T;
   } catch {
-    throw new Refused(response.status, {
-      refusal: 'UnreadableResponse',
-      reason: `the identity service answered ${response.status}, but its result could not be read; do not repeat a change whose outcome is unknown`,
-    });
+    throw unreadable();
   }
+}
+
+/** Ask the service: a read without a body, else a change sent as `method`, POST unless named. */
+export function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST', signal?: AbortSignal): Promise<T> {
+  return exchange<T>(body === undefined ? 'GET' : method, path, body, signal, false);
+}
+
+/** The same exchange with the method named, for routes that take a POST with no body or answer with none. */
+export function send<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {
+  return exchange<T>(method, path, body, undefined, true);
 }
 
 const get = request;

@@ -14,7 +14,7 @@
  * the API are the same record, and an uploaded schema opens here to edit.
  */
 import { useEffect, useState } from 'react';
-import { API, Refused, operationId } from '../../api';
+import { API, Refused, operationId, send } from '../../api';
 import { SchemaBench } from './SchemaBench';
 import './schema-builder.css';
 
@@ -37,25 +37,7 @@ export interface SchemaCheck {
   diff: { kinds_added: string[]; kinds_removed: string[]; relations_added: Named[]; relations_removed: Named[]; actions_added: Named[]; actions_removed: Named[]; parents_added: Named[]; parents_removed: Named[] };
 }
 
-/** Send `body` to `path` with `method`, answering the JSON or throwing the refusal by name. */
-export async function send<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {
-  let response: Response;
-  const headers: Record<string, string> = body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' };
-  try {
-    response = await fetch(API + path, { method, credentials: 'same-origin', headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch (error) {
-    throw new Refused(0, { refusal: 'ServiceUnreachable', reason: 'the identity service could not be reached: ' + String(error) });
-  }
-  const text = await response.text();
-  let answer: unknown = null;
-  try { answer = text ? JSON.parse(text) : null; } catch { answer = null; }
-  if (!response.ok) {
-    const named = answer as { refusal?: unknown; reason?: unknown } | null;
-    if (named && typeof named.refusal === 'string' && typeof named.reason === 'string') throw new Refused(response.status, { refusal: named.refusal, reason: named.reason });
-    throw new Refused(response.status, { refusal: 'Unanswered', reason: 'the service answered ' + response.status + ' without naming a refusal' });
-  }
-  return answer as T;
-}
+export { send };
 
 /** The schema JSON the draft makes, every kind under `app`'s prefix. */
 export function toSchema(app: string, draft: Draft): SchemaJson {
