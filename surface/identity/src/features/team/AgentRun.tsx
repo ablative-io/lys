@@ -13,7 +13,7 @@ const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unexpected', reason: String(error) });
 
 /** Stop ends the run on its computer and leaves the agent ready to start again. It is not the emergency stop, which pauses the agent. */
-function Stop({ entry, session, changed, done }: { entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
+export function Stop({ entry, session, changed, done }: { entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<Refused | null>(null);
   const stop = async () => {

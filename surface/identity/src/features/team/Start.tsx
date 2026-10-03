@@ -22,8 +22,10 @@ function refusalOf(error: unknown): StartRefusal {
 /** The service answered no: nothing of this request is outstanding. Anything else may have been carried out. */
 const answeredNo = (error: unknown) => error instanceof Refused && error.status >= 400 && error.status < 500;
 
-export function Start({ entry, me, admin, changed, settings }: {
+export function Start({ entry, me, admin, changed, settings, straightAway = false }: {
   entry: Entry; me: string; admin: boolean; changed: () => void; settings: () => void;
+  /** The person already pressed Start where this is shown, so it starts as soon as it has read what the agent needs. */
+  straightAway?: boolean;
 }) {
   const agent = entry.id;
   const name = entry.display_name;
@@ -40,7 +42,7 @@ export function Start({ entry, me, admin, changed, settings }: {
   const [ended, setEnded] = useState('');
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
-  const wanted = useRef(false);
+  const wanted = useRef(straightAway);
 
   const data = load.status === 'ok' ? load.data : null;
   const profile = data?.profile ?? null;

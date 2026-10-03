@@ -1,5 +1,5 @@
 /** The front page fills the screen and never scrolls as a whole: what waits for you on the top line, your agents as a tree under their teams on the left, the running ones as small live pictures on the right, and your account under a second tab. */
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { api, request, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
@@ -9,7 +9,10 @@ import type { GrantWorld } from '../grants/model';
 import { keyable } from '../../shell/keyable';
 import { pref, setPref } from '../../shell/prefs';
 import { useShell } from '../../shell/ShellContext';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
+import { Start } from '../team/Start';
+import { Stop } from '../team/AgentRun';
+import '../team/team.css';
 import { Gate } from '../signin/Gate';
 import { OwnAccount } from '../people/Account';
 import { entries } from '../people/directory';
@@ -87,9 +90,22 @@ const depth = (level: number) => ({ '--depth': level } as CSSProperties);
 /** Table rows cannot be wrapped in an element, so a keyed fragment stands in. */
 function FragmentRows({ children }: { children: React.ReactNode }) { return <>{children}</>; }
 
-function AgentRows({ branches, level, sessions, held, folded, fold, open, watching, toggleWatch }: {
+/** What the person asked of one agent from its row: start it, or stop it. Shown in a row of its own under the agent. */
+export interface Asked { agent: string; what: 'start' | 'stop'; pressed: boolean }
+
+/** Start, where the agent is listed. Whether the person may approve its settings is read here, when it is first shown. */
+function StartHere({ entry, me, pressed, changed }: { entry: Entry; me: string; pressed: boolean; changed: () => void }) {
+  const navigate = useNavigate();
+  const load = useLoad(() => api.people(), 'you-start:' + entry.id);
+  if (load.status === 'loading') return null;
+  return <Start entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed}
+    settings={() => navigate('/file/' + encodeURIComponent(entry.id) + '/provisioning')} />;
+}
+
+function AgentRows({ branches, level, sessions, held, folded, fold, open, watching, toggleWatch, me, asked, ask, changed }: {
   branches: Branch[]; level: number; sessions: RuntimeSession[]; held: (id: string) => string; folded: Set<string>; fold: (team: string) => void; open: (id: string) => void;
   watching: (session: string) => boolean; toggleWatch: (session: RuntimeSession, name: string) => void;
+  me: string; asked: Asked | null; ask: (next: Asked | null) => void; changed: () => void;
 }) {
   return <>{branches.map((branch, index) => {
     const away = branch.team ? folded.has(branch.team.id) : false;
@@ -110,9 +126,17 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
             <td style={depth(level + (branch.team ? 1 : 0))} className="you-agent"><span className={'dot ' + (session ? 's-active' : 's-retired')} aria-label={session ? 'running' : 'not running'} />{member.entry.display_name}</td>
             <td className="sec you-where">{session ? 'on ' + (session.machine_name ?? session.machine) : member.entry.state === 'active' ? 'not running' : member.entry.state}</td>
             <td className="sec you-holds" title={held(member.entry.id) || 'no access'}>{holdsWord(held(member.entry.id))}</td>
-            <td className="you-act">{session ? <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={(event) => { event.stopPropagation(); toggleWatch(session, member.entry.display_name); }}>{watching(session.session) ? 'Watching' : 'Watch'}</button> : null}</td>
+            <td className="you-act">{session ? <Fragment>
+              <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={(event) => { event.stopPropagation(); toggleWatch(session, member.entry.display_name); }}>{watching(session.session) ? 'Watching' : 'Watch'}</button>
+              <button type="button" className="you-watch" data-act="stop" onClick={(event) => { event.stopPropagation(); ask({ agent: member.entry.id, what: 'stop', pressed: true }); }}>Stop</button>
+            </Fragment> : asked?.agent === member.entry.id && asked.what === 'start' ? null : <button type="button" className="you-watch you-start" data-act="start" onClick={(event) => { event.stopPropagation(); ask({ agent: member.entry.id, what: 'start', pressed: true }); }}>Start</button>}</td>
           </tr>
-          <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} watching={watching} toggleWatch={toggleWatch} />
+          {asked?.agent === member.entry.id && (asked.what === 'stop' ? session : !session) ? <tr className="you-asked"><td colSpan={4}>
+            {asked.what === 'stop' && session
+              ? <Stop entry={member.entry} session={session} changed={changed} done={() => ask(null)} />
+              : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '')} entry={member.entry} me={me} pressed={asked.pressed} changed={() => { ask(null); changed(); }} />}
+          </td></tr> : null}
+          <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} watching={watching} toggleWatch={toggleWatch} me={me} asked={asked} ask={ask} changed={changed} />
         </FragmentRows>;
       })}
     </FragmentRows>;
@@ -191,9 +215,12 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
   </div>;
 }
 
-function Agents({ data }: { data: ActiveData }) {
+function Agents({ data, reload }: { data: ActiveData; reload: () => void }) {
   const shell = useShell();
   const navigate = useNavigate();
+  // An address that names an agent opens its Start under its row, waiting for the press.
+  const named = useParams().agent;
+  const [asked, setAsked] = useState<Asked | null>(named ? { agent: named, what: 'start', pressed: false } : null);
   const { agents, tree, sessions, w } = data;
   const held = (id: string) =>
     w.list.grants.filter((g) => g.holder === id && g.standing.stands).map((g) => `${g.relation} of ${onText(g)}`).join('; ');
@@ -215,13 +242,13 @@ function Agents({ data }: { data: ActiveData }) {
   return <div className="you-body">
     <div className="you-panel">
       <div className="section-h">
-        <span>Your agents</span>
+        <span>Your agents</span><a href="#/agents/new">Add an agent</a>
       </div>
       <div className="you-scroll">
         <table className="you-tree">
           <tbody>
             {agents.length
-              ? <AgentRows branches={tree.branches} level={0} sessions={sessions} held={held} folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} watching={watching} toggleWatch={toggleWatch} />
+              ? <AgentRows branches={tree.branches} level={0} sessions={sessions} held={held} folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} watching={watching} toggleWatch={toggleWatch} me={data.me.person.id} asked={asked} ask={setAsked} changed={reload} />
               : <tr><td className="dim">None.</td></tr>}
           </tbody>
         </table>
@@ -261,7 +288,7 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
         <a href="#/me" className={tab === 'agents' ? 'on' : undefined}>Agents</a>
         <a href="#/me?tab=account" className={tab === 'account' ? 'on' : undefined}>Account</a>
       </div>
-      {tab === 'account' ? <div className="pane"><Account data={data} reload={reload} /></div> : <Agents data={data} />}
+      {tab === 'account' ? <div className="pane"><Account data={data} reload={reload} /></div> : <Agents data={data} reload={reload} />}
     </div>
   );
 }

@@ -38,12 +38,14 @@ const stopped = { ...routes, '/teams': ok({ teams: [] }), '/runtime/live': ok({ 
 describe('An agent\'s run on People and agents', () => {
   beforeEach(() => { sessionStorage.clear(); });
 
-  it('has no page of its own: the front page is People and agents, and an agent chosen there shows its terminal beside the list', async () => {
+  it('has no page of its own: the front page is your agents, each with Start or Stop in its own row, and People and agents shows a chosen agent\'s terminal beside the list', async () => {
     await mount('#/', routes);
-    expect($('.page .head h1')?.textContent).toBe('People and agents');
+    expect(text()).toContain('Your agents');
     expect($('.team-screen')).toBeNull();
     expect($('a[href="#/team"]')).toBeNull();
-    await mount('#/team/' + SCRIBE, routes);
+    expect($$('tr[data-href]').find((row) => row.textContent?.includes('Scribe'))?.querySelector('[data-act="stop"]')).not.toBeNull();
+    expect($$('button[data-act="start"]').length).toBeGreaterThan(0);
+    await mount('#/people/' + SCRIBE, routes);
     expect($('.page .head h1')?.textContent).toBe('People and agents');
     expect($('.detail h2')?.textContent).toBe('Scribe');
     expect($('.detail .team-pane .terminal')).not.toBeNull();
@@ -51,8 +53,32 @@ describe('An agent\'s run on People and agents', () => {
     expect($$('.team-foot-act').find((el) => el.textContent === 'Settings')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
   });
 
+  it('stops a running agent from its row on the front page, after asking', async () => {
+    const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
+    await click($('button[data-act="stop"]'));
+    expect(text()).toContain('Stop Scribe? What it has not saved is lost. You can start it again afterwards.');
+    expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
+    await click(button('Stop Scribe'));
+    expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
+  });
+
+  it('starts a stopped agent from its row on the front page with one press', async () => {
+    let live = false;
+    const start = started(SCRIBE);
+    const { posted } = await mount('#/', {
+      ...stopped,
+      '/runtime/live': () => ok({ sessions: live ? [running] : [], unanswered: [] }),
+      ['POST /agents/' + SCRIBE + '/start-command']: (body) => { live = true; return start(body); },
+    });
+    await click($$('tr[data-href]').find((row) => row.textContent?.includes('Scribe'))?.querySelector('[data-act="start"]') ?? null);
+    const starts = posted.filter((entry) => entry.path.startsWith('/agents/'));
+    expect(starts).toHaveLength(1);
+    expect(starts[0]).toMatchObject({ path: '/agents/' + SCRIBE + '/start-command', body: { machine: LAB } });
+    expect($$('tr[data-href]').find((row) => row.textContent?.includes('Scribe'))?.querySelector('[data-act="stop"]')).not.toBeNull();
+  });
+
   it('restarts a running agent in place, after asking, with one request', async () => {
-    const { posted } = await mount('#/team/' + SCRIBE, { ...routes, ['POST /agents/' + SCRIBE + '/restart']: ok({}) });
+    const { posted } = await mount('#/people/' + SCRIBE, { ...routes, ['POST /agents/' + SCRIBE + '/restart']: ok({}) });
     await click($$('.team-foot-act').find((el) => el.textContent === 'Restart') ?? null);
     expect(text()).toContain('Restart Scribe? This ends the run and starts it again in the same folder, on Lab.');
     expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toEqual([]);
@@ -61,7 +87,7 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('stops a running agent by ending its run, after asking, and never by the emergency stop', async () => {
-    const { posted } = await mount('#/team/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
+    const { posted } = await mount('#/people/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
     await click($$('.team-foot-act').find((el) => el.textContent === 'Stop') ?? null);
     expect(text()).toContain('Stop Scribe? What it has not saved is lost. You can start it again afterwards.');
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
@@ -88,8 +114,7 @@ describe('An agent\'s run on People and agents', () => {
     const starts = posted.filter((entry) => entry.path.startsWith('/agents/'));
     expect(starts).toHaveLength(1);
     expect(starts[0]).toMatchObject({ path: '/agents/' + SCRIBE + '/start-command', body: { machine: LAB } });
-    expect($('.team-pane .terminal')).not.toBeNull();
-    expect($$('.team-foot-act').map((el) => el.textContent)).toContain('Stop');
+    expect($('button[data-act="stop"]')).not.toBeNull();
     expect(sessionStorage.getItem('lys.pending.agent-start.' + ADA + '.' + SCRIBE)).toBeNull();
   });
 
@@ -154,12 +179,12 @@ describe('An agent\'s run on People and agents', () => {
   it('sends the old start address to the agent\'s pane on the front page', async () => {
     await mount('#/file/' + SCRIBE + '/start', stopped);
     expect(location.hash).toBe('#/team/' + SCRIBE);
-    expect($('.page .head h1')?.textContent).toBe('People and agents');
+    expect(text()).toContain('Your agents');
     expect(text()).toContain('Scribe is not running.');
   });
 
   it('says so when it cannot read whether the agent is running, and offers no Start it cannot stand behind', async () => {
-    await mount('#/team/' + SCRIBE, { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'no reports store') });
+    await mount('#/people/' + SCRIBE, { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'no reports store') });
     expect(text()).toContain('Lys could not read whether Scribe is running');
     expect(text()).toContain('RuntimeUnavailable');
     expect(button('Start')).toBeNull();

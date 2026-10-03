@@ -47,7 +47,8 @@ export function AppRoutes() {
       <Route path="/usage/:agent?" element={<UsageMoved />} />
       <Route path="/runtime/canvas" element={<SessionCanvas />} />
       <Route path="/canvas/:agent?" element={<SessionCanvas />} />
-      <Route path="/team/:agent?" element={<People />} />
+      <Route path="/team/:agent?" element={<You />} />
+      <Route path="/people/:agent" element={<People />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/agents/new" element={<AddAgent />} />
@@ -59,7 +60,7 @@ export function AppRoutes() {
       <Route path="/account/:id" element={<AccountPage />} />
       <Route path="/settings/:sec?" element={<Settings />} />
       <Route path="/access/:mode?/:arg?" element={<Access />} />
-      <Route path="*" element={<People />} />
+      <Route path="*" element={<You />} />
     </Routes>
   );
 }

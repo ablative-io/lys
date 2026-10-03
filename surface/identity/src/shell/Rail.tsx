@@ -4,7 +4,7 @@ import { useShell } from './ShellContext';
 
 /** The view a hash path belongs to, as the rail marks it. */
 export function railView(pathname: string): string {
-  const view = (pathname.split('/')[1] || 'people').replace(/^team$/, 'people');
+  const view = (pathname.split('/')[1] || 'me').replace(/^team$/, 'me');
   if (view === 'file') return 'people';
   if (view === 'vault') return 'secrets';
   return view;

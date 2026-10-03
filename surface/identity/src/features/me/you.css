@@ -32,3 +32,8 @@
 .you-watch:hover { color: var(--text-primary); background: var(--surface-hover); }
 .you-watch[aria-pressed="true"] { color: var(--text-primary); }
 .you-tree .you-act { text-align: right; }
+
+/* Start and Stop sit in the agent's own row; what they need to say opens in a row under it. */
+.you-tree .you-act { white-space: nowrap; }
+.you-tree .you-asked td { padding: 4px 12px 14px; }
+.you-tree .you-asked .team-stopped, .you-tree .you-asked .team-start { align-items: flex-start; padding: 0; }
