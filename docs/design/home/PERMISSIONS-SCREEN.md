@@ -1,6 +1,6 @@
 # What an agent may do: the truth today, and what has to change
 
-Waffles, 3 October 2026, rewritten 20:31 by the clock; amended 20:33 from Vesper's read against her table (six sentences that said more than their rows) and Archie's observation of the tools a real run was offered. The first version of this page (068c7c51) is
+Waffles, 3 October 2026, rewritten 20:31 by the clock; amended 20:32 from Vesper's read against her table (six sentences that said more than their rows) and Archie's observation of the tools a real run was offered. The first version of this page (068c7c51) is
 withdrawn: it had claims from memory that the sources contradict. Nothing is built from this page until
 Tom has read it.
 

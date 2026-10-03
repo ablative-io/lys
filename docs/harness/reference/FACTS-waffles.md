@@ -67,7 +67,7 @@ started 10:57:16, 11:54:34, 14:46:48 and 19:55:07 on 3 October; my installs fini
 record, and each install is followed by my readback script, which starts a run and ends it. So those are my readbacks ending
 their own runs, not an agent failing to start. The 11:54 run has no install beside it in my record: **open**.
 
-## Two of my open rows closed by Archie's observation, 20:33 by the clock
+## Two of my open rows closed by Archie's observation, 20:32 by the clock
 
 Archie read the proxy's kept request bodies on the installed Lys (`data/proxy/home/blocks`, the block under `raw_request`;
 his script prints tool names and nothing else) and reported in the room at 20:31.
