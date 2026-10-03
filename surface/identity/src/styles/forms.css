@@ -27,10 +27,6 @@ select {
 }
 select option { background: var(--surface-default); color: var(--text-primary); }
 input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; padding: 0; }
-.field .action-choice { display: flex; align-items: center; gap: 6px; }
-.field .action-choice input[type=checkbox] { width: 15px; min-width: 15px; padding: 0; flex: none; }
-.field .action-rest { margin: 4px 0 8px; }
-.field .action-rest summary { cursor: pointer; color: var(--text-secondary); font-size: 12px; }
 .btn { cursor: pointer; min-height: 32px; transition: background .12s ease, border-color .12s ease, transform .08s ease; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -72,3 +68,5 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; p
 .permissions .locked td { color: var(--text-secondary); }
 .permissions tfoot td { border-bottom: 0; }
 .permissions .rule-row p, .permissions .add-rule p { margin: 4px 0 0; }
+.action-table td:first-child, .action-table th:first-child { text-align: center; }
+.add-agent-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 28px; align-items: start; }

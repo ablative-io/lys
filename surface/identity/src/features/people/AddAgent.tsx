@@ -165,8 +165,12 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   </>;
   const renderForm = (fields: ReactNode, settings?: Record<string, unknown>, profileProblem = '') => <form className="add-agent" aria-label="Add an agent" onSubmit={(event) => { void submit(event, settings, profileProblem); }}>
     <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
-      {registrationFields}{fields}
-      {onePress ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? runOptions.computers.length === 1 ? <p>Computer: {selectedComputer?.name}</p> : <label className="field">Computer<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required maxLength={100} autoComplete="off" onChange={(event) => setComputerName(event.target.value)} /><span className="hint">Type a name for this computer.</span></label> : null}
+      <div className={fields ? 'add-agent-two' : undefined}>
+        <div>{registrationFields}
+        {onePress ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? runOptions.computers.length === 1 ? <p>Computer: {selectedComputer?.name}</p> : <label className="field">Computer<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required maxLength={100} autoComplete="off" onChange={(event) => setComputerName(event.target.value)} /><span className="hint">Type a name for this computer.</span></label> : null}
+        </div>
+        {fields ? <div>{fields}</div> : null}
+      </div>
     </fieldset>
     {!walk && capability.machineAdmission === false ? inUse.map((machine) => <p key={machine.id}>{machine.may_run_roles?.length
       ? "Lys cannot confirm what " + machine.name + "'s roles grant, so it won't give one to " + (name.trim() || 'this agent') + '. Add the agent here, then start it from its page once it is admitted to ' + machine.name + '.'

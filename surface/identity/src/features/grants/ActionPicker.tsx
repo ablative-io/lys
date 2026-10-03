@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { useId } from 'react';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import { actionWords } from './action-words';
 
@@ -32,6 +32,7 @@ export function singleActionCarriers(model: GrantModel): Map<string, string> {
 function GroupedActionPicker({ model, groups, selected, change, disabled = false, agents = true }: {
   model: GrantModel; groups: ActionGroup[]; selected: string[]; change: (selected: string[]) => void; disabled?: boolean; agents?: boolean;
 }) {
+  const base = useId();
   const withheld = withheldFromAgents(model);
   if (agents && withheld === null) return <p>Agent access choices are unavailable until Lys declares which actions are withheld from agents. Nothing is selected.</p>;
   const excluded = new Set(withheld ?? []);
@@ -51,21 +52,23 @@ function GroupedActionPicker({ model, groups, selected, change, disabled = false
     const choiceIds = new Set(choices.map((choice) => choice.id));
     const allIds = new Set(all);
     const refusedChoices = choices.filter((choice) => choice.reason);
-    const row = (choice: ActionChoice) => <Fragment key={choice.id}><label className={'action-choice' + (choice.reason ? ' dim' : '')}>
-      <input type="checkbox" name="action" value={choice.id} disabled={Boolean(choice.reason)} checked={held.has(choice.id)}
-        onChange={(event) => { if (everything) change(event.target.checked ? [...selected.filter((id) => id !== everything.id), choice.id] : selected.filter((id) => id !== choice.id)); else toggle([choice.id], event.target.checked); }} /> {actionWords(model, choice.resource, choice.actions)}
-    </label>{choice.reason ? <p className="hint">{choice.reason}</p> : null}</Fragment>;
+    const row = (choice: ActionChoice) => <tr key={choice.id} className={choice.reason ? 'dim' : undefined}>
+      <td><input type="checkbox" id={base + choice.id} name="action" value={choice.id} disabled={Boolean(choice.reason)} checked={held.has(choice.id)}
+        onChange={(event) => { if (everything) change(event.target.checked ? [...selected.filter((id) => id !== everything.id), choice.id] : selected.filter((id) => id !== choice.id)); else toggle([choice.id], event.target.checked); }} /></td>
+      <td><label htmlFor={base + choice.id}>{actionWords(model, choice.resource, choice.actions)}</label>{choice.reason ? <div className="hint">{choice.reason}</div> : null}</td>
+    </tr>;
     return <fieldset key={group.id} disabled={disabled} style={{ border: 0, padding: 0 }}>
       <legend>{group.href ? <a href={group.href}>{group.title}</a> : group.title}</legend>
-      {available.length ? <label className="action-choice"><input type="checkbox" name="all_actions" checked={all.every((id) => held.has(id))}
-        onChange={(event) => change(event.target.checked ? [...selected.filter((id) => !choiceIds.has(id)), ...all] : selected.filter((id) => !allIds.has(id)))} /> Everything here</label> : null}
-      {/* Each label sits directly in the fieldset, as "Everything here" does, so one rule sets every checkbox beside its words. */}
-      {available.map(row)}
-      {/* What cannot be ticked is kept, with its reason, under what can: the form shows what can be done first. */}
-      {refusedChoices.length ? <div className="action-rest">
-        <p className="note">{refusedChoices.length === 1 ? '1 more cannot be given' : refusedChoices.length + ' more cannot be given'}</p>
-        {refusedChoices.map(row)}
-      </div> : null}
+      <table className="usage-table action-table"><colgroup><col style={{ width: 56 }} /><col /></colgroup>
+        <thead><tr><th>Give</th><th>What it may do</th></tr></thead>
+        <tbody>
+          {available.length ? <tr><td><input type="checkbox" id={base + group.id + ':all'} name="all_actions" checked={all.every((id) => held.has(id))}
+            onChange={(event) => change(event.target.checked ? [...selected.filter((id) => !choiceIds.has(id)), ...all] : selected.filter((id) => !allIds.has(id)))} /></td><td><label htmlFor={base + group.id + ':all'}>Everything here</label></td></tr> : null}
+          {available.map(row)}
+          {/* What cannot be ticked is kept, with its reason, under what can. */}
+          {refusedChoices.map(row)}
+        </tbody>
+      </table>
     </fieldset>;
   })}</>;
 }

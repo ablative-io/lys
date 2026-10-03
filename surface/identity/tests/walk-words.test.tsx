@@ -77,7 +77,7 @@ describe('Walk words', () => {
     expect(checkboxes).toHaveLength(3);
     expect([...form?.querySelectorAll('legend') ?? []].map((legend) => legend.textContent)).toEqual(['Access needed']);
     expect([...form?.querySelectorAll('.field > label') ?? []].map((label) => label.textContent)).not.toContain('Access needed');
-    expect(checkboxes.map((input) => input.closest('label')?.textContent?.trim())).toEqual(['Everything here', 'Start this agent', 'Stop this agent']);
+    expect(checkboxes.map((input) => input.closest('tr')?.querySelector('label')?.textContent?.trim())).toEqual(['Everything here', 'Start this agent', 'Stop this agent']);
     for (const input of checkboxes) {
       const label = input.closest('label');
       expect(label).not.toBeNull();
