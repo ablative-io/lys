@@ -190,6 +190,8 @@ pub struct CallReport {
 enum Message {
     Job(Box<Job>),
     Settle,
+    #[cfg(test)]
+    Pause(mpsc::Sender<()>, mpsc::Receiver<()>),
 }
 
 /// The handle through which calls reach the sink thread.
@@ -205,6 +207,15 @@ impl Sink {
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || run(&home, &journal, &rx, &reports));
         Self { tx }
+    }
+
+    #[cfg(test)]
+    pub(super) fn pause(&self) -> Result<mpsc::Sender<()>, Box<dyn std::error::Error + Send + Sync>> {
+        let (ready, arrived) = mpsc::channel();
+        let (release, resume) = mpsc::channel();
+        self.tx.send(Message::Pause(ready, resume))?;
+        arrived.recv()?;
+        Ok(release)
     }
 
     /// Hand a finished call to the sink.
@@ -231,6 +242,8 @@ impl Message {
         match self {
             Self::Job(job) => format!("call {}", job.call.call_id),
             Self::Settle => String::from("a settle request"),
+            #[cfg(test)]
+            Self::Pause(..) => String::from("a worker barrier"),
         }
     }
 }
@@ -244,6 +257,13 @@ fn run(
     let mut held: Vec<Job> = Vec::new();
     let mut unretired: Vec<String> = Vec::new();
     for message in rx {
+        #[cfg(test)]
+        if let Message::Pause(ready, resume) = message {
+            if ready.send(()).is_ok() {
+                drop(resume.recv());
+            }
+            continue;
+        }
         if let Message::Job(job) = message {
             held.push(*job);
         }

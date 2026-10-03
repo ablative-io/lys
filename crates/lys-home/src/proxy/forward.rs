@@ -252,7 +252,7 @@ pub fn refusal(status: StatusCode, reason: &str) -> Response<ProxyBody> {
     response
 }
 
-/// Gate: accepts and serves each connection without a proxy admission limit.
+/// Accepts and serves each connection without a proxy admission limit.
 /// The connection tasks are reaped when they finish.
 pub async fn serve<H, F>(listener: TcpListener, handle: H) -> Result<(), ProxyError>
 where

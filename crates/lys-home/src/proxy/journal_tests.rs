@@ -277,3 +277,20 @@ async fn a_whole_large_response_stays_complete_after_journal_recovery() -> Res {
     assert_eq!(bytes, sent);
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_stalled_capture_worker_does_not_hold_or_spool_the_client_response() -> Res {
+    let (upstream, _) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
+    let harness = Harness::start(upstream).await?;
+    let release = harness.proxy.sink().pause()?;
+    let (response, connection) = send(harness.addr, messages_request(Some(KEY), false)?).await?;
+    let received = response.into_body().collect().await?.to_bytes();
+    let spools = std::fs::read_dir(harness.state("capture"))?.count();
+    drop(release);
+    let report = harness.report()?;
+    drop(connection);
+    assert_eq!(received, hyper::body::Bytes::from(message_response().to_string()));
+    assert_eq!(spools, 0, "forwarding must do no spool work while the worker is stopped");
+    assert_eq!(report.status, CallStatus::Complete);
+    Ok(())
+}

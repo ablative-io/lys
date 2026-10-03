@@ -8,7 +8,7 @@ use hyper::{Request, Response, StatusCode};
 
 use super::{Base, ProxyBody, Upstream, refusal};
 
-/// Gate: forward `request` to `base` unchanged and return the
+/// Forward `request` to `base` unchanged and return the
 /// response unchanged. One line per call is written on stderr, when the
 /// response head arrives (or the upstream fails): its method, its path
 /// (never its query), its status and the milliseconds until the head, and

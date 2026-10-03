@@ -124,7 +124,7 @@ impl KeyScanner {
         Self::default()
     }
 
-    /// Gate: scans the request frame until the complete metadata value is kept.
+    /// Inline work: scans the request frame until the complete metadata value is kept.
     pub fn feed(&mut self, bytes: &[u8]) {
         for &b in bytes {
             if self.done {
@@ -213,7 +213,7 @@ impl KeyScanner {
         self.done = true;
     }
 
-    /// Gate: parses a completed metadata value once, keeping only its link.
+    /// Inline work: parses a completed metadata value once, keeping only its link.
     #[must_use]
     pub fn link(&mut self) -> Link {
         if !self.done {
