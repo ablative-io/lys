@@ -18,6 +18,7 @@ import { confirmAdmission } from '../network/machine-admission';
 import type { MachineAdmission } from '../network/machine-admission';
 import { FolderChooser } from '../provisioning/FolderChooser';
 import { saveFolder } from '../provisioning/working-folder';
+import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 
 /** What refused a start: the refusal's name and its reason, as answered. */
 export interface StartRefusal { refusal: string; reason: string }
@@ -68,7 +69,7 @@ export function CannotStart({ agent, name, refusal, again }: {
     <p>{sentence} <small className="refusal-name">{refusal.refusal}</small></p>
     {fix.kind === 'turn-on' ? <TurnOn agent={agent} name={name} label={fix.label} transition={fix.transition} again={again} /> : null}
     {fix.kind === 'allow-computer' ? <AllowComputer agent={agent} name={name} again={again} /> : null}
-    {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} again={again} /> : null}
+    {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} name={name} again={again} /> : null}
     {fix.kind === 'try-again' ? <button type="button" className="btn primary" onClick={again}>Try again</button> : null}
   </div>;
 }
@@ -102,9 +103,21 @@ function TurnOn({ agent, name, label, transition, again }: {
 /** The computers that could run the agent: in use, with Lys running on them. */
 const usable = (machines: Machine[]): Machine[] => machines.filter((machine) => machine.state === 'in_use' && machine.runtime !== null);
 
-/** The folder is chosen on a computer Lys knows, saved to the agent's settings, and the start follows. */
-function ChooseFolder({ agent, again }: { agent: string; again: () => void }) {
-  const load = useLoad(async () => usable((await request<NetworkView>('/network')).machines), 'cannot-start-folder:' + agent);
+/**
+ * The folder is a path on one computer, so it is chosen on the computer the
+ * start will use: the one the agent's settings name, or else the one
+ * computer that is allowed to run it. When neither settles it, the computer
+ * is the thing to settle first, and that is said. The folder is then saved
+ * to the agent's settings and the start follows.
+ */
+function ChooseFolder({ agent, name, again }: { agent: string; name: string; again: () => void }) {
+  const load = useLoad(async () => {
+    const [network, held] = await Promise.all([request<NetworkView>('/network'), request<ProvisioningAnswer>('/agents/' + encodeURIComponent(agent) + '/provisioning')]);
+    const computers = usable(network.machines);
+    const named = computers.find((entry) => entry.id === held.profile?.runs_on);
+    const allowed = computers.filter((entry) => entry.may_run.some((one) => one.id === agent));
+    return named ?? (allowed.length === 1 ? allowed[0] : null);
+  }, 'cannot-start-folder:' + agent);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<StartRefusal | null>(null);
   const working = useRef(false);
@@ -112,6 +125,7 @@ function ChooseFolder({ agent, again }: { agent: string; again: () => void }) {
   const asked = useRef(new Map<string, string>());
   if (load.status === 'loading') return <p role="status">Looking for a computer…</p>;
   if (load.status === 'refused') return <Failed refusal={{ refusal: load.refused.refusal.refusal, reason: load.refused.message }} />;
+  if (!load.data) return <p>Lys does not know yet which computer {name} runs on. Its folder is chosen on that computer, so the computer comes first.</p>;
   const save = async (folder: string) => {
     if (working.current) return;
     working.current = true; setBusy(true); setFailed(null);
@@ -124,7 +138,7 @@ function ChooseFolder({ agent, again }: { agent: string; again: () => void }) {
     finally { working.current = false; setBusy(false); }
   };
   return <>
-    <FolderChooser computers={load.data} chosen="" disabled={busy} choose={(folder) => { void save(folder); }} />
+    <FolderChooser computers={[load.data]} chosen="" disabled={busy} choose={(folder) => { void save(folder); }} />
     {busy ? <p role="status">Saving the folder…</p> : null}
     <Failed refusal={failed} />
   </>;

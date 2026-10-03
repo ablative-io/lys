@@ -167,6 +167,11 @@ describe('an agent with no folder to work in', () => {
     await click(button(host, 'Choose a folder'));
     await settle();
     await settle();
+    expect(host.textContent).toContain('On Ada’s laptop, in /Users/ada');
+    expect(buttons(host)).toEqual(expect.arrayContaining(['Developer', 'Music']));
+    expect(buttons(host)).not.toContain('.cache');
+    await click(button(host, 'Developer'));
+    await settle();
     expect(host.textContent).toContain('On Ada’s laptop, in /Users/ada/Developer');
     expect(buttons(host)).toContain('receipts');
     expect(buttons(host)).not.toContain('.git');
@@ -189,7 +194,7 @@ describe('an agent with no folder to work in', () => {
   it('says so when the computer cannot be looked in, and saves nothing', async () => {
     const { host, posted, calls } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
       '/network': ok({ machines: [machine(computer, 'Ada’s laptop')], reports_served: true }),
-      [folders]: refused(409, 'runner_absent', 'machine names no runner'),
+      [folders]: refused(409, 'runner_absent', 'machine names no runner'), [provisioning]: ok({ agent: SCRIBE, profile, versions: [], enforced: false }),
     });
     await click(button(host, 'Choose a folder'));
     await settle();
@@ -199,9 +204,54 @@ describe('an agent with no folder to work in', () => {
     expect(calls.again).toBe(0);
   });
 
-  it('says a computer is needed first when none has Lys running on it', async () => {
-    const { host } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, { '/network': ok({ machines: [], reports_served: true }) });
-    expect(host.textContent).toContain('You choose its folder once a computer with Lys running on it is added.');
+  it('settles the computer first when neither the settings nor the allowances name one', async () => {
+    const other = 'op-' + '2'.repeat(32);
+    const { host, posted } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
+      '/network': ok({ machines: [machine(computer, 'Ada’s laptop'), machine(other, 'Ward desk')], reports_served: true }),
+      [provisioning]: ok({ agent: SCRIBE, profile: { ...profile, runs_on: undefined }, versions: [], enforced: false }),
+    });
+    expect(host.textContent).toContain('Lys does not know yet which computer Scribe runs on.');
     expect(button(host, 'Choose a folder')).toBeNull();
+    expect(host.querySelector('select')).toBeNull();
+    expect(posted).toEqual([]);
+  });
+
+  it('looks on the one computer allowed to run the agent when the settings name none', async () => {
+    const other = 'op-' + '2'.repeat(32);
+    const allowed = { ...machine(other, 'Ward desk'), may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] };
+    const { host, posted } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
+      '/network': ok({ machines: [machine(computer, 'Ada’s laptop'), allowed], reports_served: true }),
+      [provisioning]: ok({ agent: SCRIBE, profile: { ...profile, runs_on: undefined }, versions: [], enforced: false }),
+      ['POST /network/machines/' + other + '/folders']: ok({ machine: other, under: '/home/ward', folders: ['notes'] }),
+    });
+    await click(button(host, 'Choose a folder'));
+    await settle();
+    expect(host.textContent).toContain('On Ward desk, in /home/ward');
+    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + other + '/folders']);
+  });
+
+  it('sends every setting it read back unchanged, with the folder, when it saves', async () => {
+    const full = { ...profile, tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Cambium', url: 'http://localhost:6010', channel: 'wake' }],
+      instructions: 'Check every receipt', instructions_mode: 'append', session: { compact: 'compact' }, writable: '/srv/out',
+      harness: { name: 'Claude Code', program: '/usr/local/bin/claude', package: 'claude-code', description: { rendering_contract: 'claude-code/template-v1' } },
+      permissions: { allow: ['Read'], deny: ['Bash(rm:*)'], ask: ['Edit'], default_mode: 'acceptEdits', additional_directories: ['/srv/a', '/srv/b'] } };
+    const { host, posted } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
+      '/network': ok({ machines: [machine(computer, 'Ada’s laptop')], reports_served: true }),
+      [folders]: looked, [provisioning]: ok({ agent: SCRIBE, profile: full, versions: [], enforced: false }),
+      ['POST ' + provisioning]: (body) => ok({ agent: SCRIBE, profile: { ...full, ...(body as object), version: 3 }, recorded: { operation: (body as { operation: string }).operation, version: 3 }, versions: [], enforced: false }),
+    });
+    await click(button(host, 'Choose a folder'));
+    await settle();
+    await click(button(host, 'Work in ada'));
+    await settle();
+    await settle();
+    const saved = posted.find((entry) => entry.path === provisioning)?.body as Record<string, unknown>;
+    const { operation, from_version, note, working_folder, ...kept } = saved;
+    expect(working_folder).toBe('/Users/ada');
+    expect(from_version).toBe(2);
+    expect(typeof operation).toBe('string');
+    expect(note).toBe('Choose the folder this agent works in');
+    const own = ['version', 'operation', 'note', 'set_by', 'set_at'];
+    expect(kept).toEqual(Object.fromEntries(Object.entries(full).filter(([member]) => !own.includes(member))));
   });
 });

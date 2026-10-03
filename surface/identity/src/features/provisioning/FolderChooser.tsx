@@ -5,7 +5,9 @@
  *
  * Nothing is asked until the person presses the button. The first look is
  * in the folder already chosen, or else in the home folder of whoever runs
- * Lys on that computer, opening its Developer folder when there is one.
+ * Lys on that computer; nothing else is assumed about any computer. When
+ * the folder chosen before cannot be read, that is said, with the
+ * computer's reason, and the home folder is shown.
  * Folders whose names begin with a dot are the computer's own and are not
  * offered. With several computers and none preferred, the person says which
  * computer first, from the ones Lys knows.
@@ -42,16 +44,21 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ refusal: string; reason: string } | null>(null);
+  const [gone, setGone] = useState<{ folder: string; refusal: string; reason: string } | null>(null);
   const working = useRef(false);
   const look = async (machine: string, under?: string, first = false) => {
     if (working.current) return;
     working.current = true; setBusy(true); setProblem(null);
     try {
       let next: FolderList;
-      // A folder chosen earlier may be gone; the first look then starts from the home folder.
+      if (first) setGone(null);
       try { next = await foldersIn(machine, under); }
-      catch (error) { if (!first || !under) throw error; next = await foldersIn(machine); }
-      if (first && !under && next.folders.includes('Developer')) next = await foldersIn(machine, inside(next.under, 'Developer'));
+      catch (error) {
+        // Only a folder that is gone or unreadable falls back to the home folder, and it is said; any other failure is shown as itself.
+        if (!first || !under || !(error instanceof Refused) || !['folder_unreadable', 'folder_invalid'].includes(error.refusal.refusal)) throw error;
+        setGone({ folder: under, refusal: error.refusal.refusal, reason: error.refusal.reason });
+        next = await foldersIn(machine);
+      }
       setList(next);
     } catch (error) {
       setProblem(error instanceof Refused ? { refusal: error.refusal.refusal, reason: error.refusal.reason } : { refusal: 'Unexpected', reason: String(error) });
@@ -70,6 +77,7 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
       {computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
     </select></label> : null}
     {busy && !list ? <p role="status">Looking at the folders on {name}…</p> : null}
+    {gone ? <p role="alert">The folder chosen before, <code>{gone.folder}</code>, could not be read. {gone.reason} <small className="refusal-name">{gone.refusal}</small></p> : null}
     {list ? <>
       <p>On {name}, in <code>{list.under}</code></p>
       {parent ? <p><button type="button" className="btn" disabled={busy} onClick={() => { void look(list.machine, parent); }}>Back to {nameOf(parent)}</button></p> : null}

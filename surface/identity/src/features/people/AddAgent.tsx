@@ -129,6 +129,8 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       // saved request is over and the team screen asks for the folder where Start is.
       let added: string | null = null;
       if (problem instanceof AddAndRunFailure && problem.problem instanceof Refused && problem.problem.refusal.refusal === 'WorkingFolderUnnamed') {
+        // Deliberate: when the saved request cannot be read back, nothing is assumed about
+        // which agent was added, and the refusal itself is shown below instead.
         try { added = readAddAndRun(runKey, me.person.id)?.registration.agent ?? null; } catch { added = null; }
       }
       if (added) { sessionStorage.removeItem(runKey); navigate('/team/' + encodeURIComponent(added), { replace: true }); return; }
