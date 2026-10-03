@@ -385,6 +385,7 @@ fn version(operation: &str, note: &str) -> Version {
             permissions: None,
             runs_on: None,
             writable: None,
+            working_folder: None,
         },
         set_by: "person-a".to_owned(),
         set_at: 10,
