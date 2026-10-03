@@ -53,7 +53,7 @@ every row is **open** on that leg.
 | C9 | In workspace write, `.git`, `.agents` and `.codex` under a writable root stay read-only | agent-approvals-security 291-298 | n/a | none | **open** |
 | C10 | Lys's runner can render a Codex permissions profile named `lys-bound` from a containment plan; its own comment calls it "a config fragment ... not an enforcement receipt" | permission profiles exist: permissions 45-200 (headings only read) | `lys-runner/src/codex_policy.rs:1-16` | none | **open**: whether any start made through the server uses it is unread |
 
-## Reconciled with Vesper's and Archie's tables, 20:32 by the clock
+## Reconciled with Vesper's and Archie's tables, 20:30 by the clock
 
 Read after mine was written. No row of mine contradicts one of theirs. Vesper's rows 1, 3, 5, 8, 9, 11, 13, 15 are my 11, 16, 12, 5,
 4, 9, 10, 13. What theirs add that mine lacked: Vesper 4 (nobody chose pancake's policy: Lys seeded it for agents added between
