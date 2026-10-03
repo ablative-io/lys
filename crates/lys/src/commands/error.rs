@@ -46,6 +46,10 @@ pub enum CliError {
     #[error(transparent)]
     Runner(#[from] lys_runner::RunnerError),
 
+    /// The model proxy refused by name.
+    #[error(transparent)]
+    Proxy(#[from] lys_home::proxy::error::ProxyError),
+
     /// A JSON file carrying a `lys-core` wire type (sealed envelope, log
     /// proof artifact) could not be parsed. Attestations are not JSON — a
     /// malformed attestation artifact collapses into the relevant command's

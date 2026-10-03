@@ -173,6 +173,7 @@ pub fn render(
         "goals_dir": dir("goals"),
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),
+        "model_proxy": carried.ports.proxy_url(),
     });
     // When the issuer an earlier configuration named is not this one, the
     // sign-in service moved: the service is handed the earlier issuer and

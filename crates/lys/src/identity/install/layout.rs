@@ -28,6 +28,9 @@ pub const SERVICE_PORT: u16 = 8490;
 /// The loopback port the secrets broker answers on.
 pub const BROKER_PORT: u16 = 8472;
 
+/// The loopback port Lys's model proxy answers on.
+pub const PROXY_PORT: u16 = 8484;
+
 /// The loopback port Rauthy is published on.
 pub const RAUTHY_PORT: u16 = 18080;
 

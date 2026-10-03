@@ -1,6 +1,9 @@
 //! The runner is stopped only after its live sessions have been ruled out.
 //! A replacement is ready only when its own process holds the exit lock,
-//! has said it listens and answers with Status.
+//! has said it listens and answers with Status. The model proxy runs from
+//! the same `lys` and moves with it: stopped after the runner, before
+//! anything is placed, and started after it, once the services are up. A
+//! call the proxy held at the stop is recorded `lost` when it next starts.
 
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom};
@@ -15,7 +18,8 @@ use super::super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::super::install::exit_wait::{self, ExitWatch};
 use super::super::install::layout::Layout;
 use super::super::install::log_wait::{self, LogCursor};
-use super::super::install::login;
+use super::super::install::ports::Ports;
+use super::super::install::{login, proxy, services};
 use super::super::private_files;
 use super::{Ready, Unit};
 
@@ -64,6 +68,9 @@ fn status(client: &Client, socket: &Path) -> IdentityResult<lys_runner::protocol
 pub struct Restart {
     /// The runner as a binary in the install.
     pub unit: Unit,
+    /// The model proxy, which runs from the same binary.
+    pub proxy: Unit,
+    proxy_url: String,
     client: Client,
     socket: std::path::PathBuf,
     exit: ExitWatch,
@@ -131,7 +138,10 @@ impl Restart {
             "--server-key".into(),
             public.display().to_string(),
         ];
+        let ports = Ports::load(layout)?;
         Ok(Self {
+            proxy: proxy::unit(layout, ports),
+            proxy_url: ports.proxy_url(),
             unit: Unit {
                 binary: "lys",
                 args,
@@ -201,6 +211,9 @@ impl Restart {
             child
                 .wait()
                 .map_err(|error| refuse("runner_exit_unreadable", error, &self.unit.pid))?;
+        }
+        if services::stop(&self.proxy.pid)? {
+            say("model proxy stopped through its exit lock");
         }
         Ok(())
     }
@@ -308,6 +321,8 @@ impl Restart {
             ));
         }
         say(&format!("runner {word} on {}", self.socket.display()));
+        super::launch(layout, &self.proxy, true)?;
+        say(&format!("model proxy {word} on {}", self.proxy_url));
         Ok(())
     }
 

@@ -149,3 +149,43 @@ fn an_interrupted_proxied_install_keeps_the_local_default_listener()
     }
     Ok(())
 }
+
+#[test]
+fn the_model_proxy_keeps_its_recorded_listener_and_is_written_for_the_service()
+-> Result<(), Box<dyn std::error::Error>> {
+    let earlier = Ports::from_value(&serde_json::json!({}))?;
+    assert_eq!(earlier.proxy, 8484);
+    assert_eq!(earlier.proxy_url(), "http://127.0.0.1:8484/anthropic");
+    let recorded =
+        Ports::from_value(&serde_json::json!({"model_proxy": "http://127.0.0.1:19484/anthropic"}))?;
+    assert_eq!(recorded.proxy, 19484);
+    for bad in [
+        "https://127.0.0.1:19484/anthropic",
+        "http://127.0.0.1:19484",
+        "http://127.0.0.1:0/anthropic",
+    ] {
+        let Err(refusal) = Ports::from_value(&serde_json::json!({"model_proxy": bad})) else {
+            panic!("invalid model proxy accepted: {bad}");
+        };
+        assert!(refusal.to_string().contains("model_proxy"), "{refusal}");
+    }
+    let clash =
+        Ports::from_value(&serde_json::json!({"model_proxy": "http://127.0.0.1:8490/anthropic"}));
+    assert!(
+        clash.is_err(),
+        "a model proxy on the service's port was accepted"
+    );
+    let root = tempfile::tempdir()?;
+    let layout = Layout::at(root.path().to_path_buf());
+    let config = crate::identity::config::DeploymentConfig::parse(
+        &crate::identity::install::layout::render_deployment(None),
+        root.path().to_path_buf(),
+    )?;
+    let carried = server_config::Carried {
+        ports: recorded,
+        ..server_config::Carried::default()
+    };
+    let rendered = server_config::render(&layout, &config, &carried, false);
+    assert_eq!(rendered["model_proxy"], "http://127.0.0.1:19484/anthropic");
+    Ok(())
+}

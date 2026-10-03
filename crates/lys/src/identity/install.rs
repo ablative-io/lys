@@ -23,7 +23,8 @@
 //! code and hands it to the browser in the setup page's address
 //! (`setup_code`), where the person makes the administrator. Everything it
 //! says names Lys and its parts by what they do, never the issuer.
-//! The runner starts beside the service and is not restarted by reinstall.
+//! The runner starts beside the service and is not restarted by reinstall;
+//! nor is the model proxy, which starts after it (`proxy`).
 //!
 //! The password policy is Lys's, from the deployment configuration: the
 //! install writes it to the sign-in service and into the directory service's
@@ -49,6 +50,7 @@ pub mod layout;
 pub mod log_wait;
 pub mod login;
 pub mod ports;
+pub mod proxy;
 pub mod server_config;
 pub mod services;
 pub mod setup_code;
@@ -419,6 +421,9 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         emitter.field("build", "build", build);
     }
     start_runner(&layout, &key, &services::sibling("lys")?, &mut |line| {
+        emitter.note(line);
+    })?;
+    proxy::start(&layout, ports, &services::sibling("lys")?, &mut |line| {
         emitter.note(line);
     })?;
     emitter.field("open", "url", ports.service_url());

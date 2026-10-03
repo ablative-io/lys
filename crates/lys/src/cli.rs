@@ -13,9 +13,11 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 mod log;
+mod proxy;
 mod runner;
 
 pub use log::{LogCommand, LogProveCommand, LogVerifyCommand};
+pub use proxy::ProxyCommand;
 pub use runner::{JudgeHarness, RunnerCommand};
 
 /// Cryptographic trust infrastructure for AI agents — identity, attestation,
@@ -72,6 +74,11 @@ pub enum Command {
     /// bridge a runner on another machine dials the server through.
     #[command(subcommand)]
     Runner(RunnerCommand),
+
+    /// Lys's model proxy: every model call a Lys-started run makes goes
+    /// through it to the provider unchanged, and is recorded under its run.
+    #[command(subcommand)]
+    Proxy(ProxyCommand),
 
     /// Sign an attestation over a payload file and write the `COSE_Sign1`
     /// artifact.

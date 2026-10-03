@@ -2,17 +2,19 @@
 
 use serde_json::Value;
 
-use super::layout::{BROKER_PORT, Layout, SERVICE_PORT};
+use super::layout::{BROKER_PORT, Layout, PROXY_PORT, SERVICE_PORT};
 use super::server_config;
 use crate::identity::error::{ErrorKind, IdentityError, IdentityResult};
 
-/// The two local listeners, retained in the service's existing configuration.
+/// The local listeners, retained in the service's existing configuration.
 #[derive(Debug, Clone, Copy)]
 pub struct Ports {
     /// The directory service listener.
     pub service: u16,
     /// The local secrets broker listener.
     pub broker: u16,
+    /// Lys's model proxy listener.
+    pub proxy: u16,
     service_recorded: bool,
     broker_recorded: bool,
 }
@@ -22,11 +24,15 @@ impl Default for Ports {
         Self {
             service: SERVICE_PORT,
             broker: BROKER_PORT,
+            proxy: PROXY_PORT,
             service_recorded: false,
             broker_recorded: false,
         }
     }
 }
+
+/// The path under the model proxy's listener that reaches Anthropic.
+const PROXY_PATH: &str = "/anthropic";
 
 fn refused(field: &str) -> IdentityError {
     IdentityError::new(
@@ -39,12 +45,15 @@ fn refused(field: &str) -> IdentityError {
 
 fn port(value: &Value, field: &str) -> IdentityResult<u16> {
     let address = value.as_str().ok_or_else(|| refused(field))?;
-    let authority = if field == "secrets.broker" {
-        address
+    let authority = match field {
+        "secrets.broker" => address
             .strip_prefix("http://")
-            .ok_or_else(|| refused(field))?
-    } else {
-        address
+            .ok_or_else(|| refused(field))?,
+        "model_proxy" => address
+            .strip_prefix("http://")
+            .and_then(|rest| rest.strip_suffix(PROXY_PATH))
+            .ok_or_else(|| refused(field))?,
+        _ => address,
     };
     let socket: std::net::SocketAddr =
         authority.trim_end_matches('/').parse().map_err(|error| {
@@ -75,6 +84,9 @@ impl Ports {
         }
         if let Some(broker) = value.pointer("/secrets/broker") {
             ports.broker = port(broker, "secrets.broker")?;
+        }
+        if let Some(proxy) = value.get("model_proxy") {
+            ports.proxy = port(proxy, "model_proxy")?;
         }
         ports.chosen(None, None)
     }
@@ -168,12 +180,29 @@ impl Ports {
                 "service and broker need distinct nonzero ports",
             ));
         }
+        if ports.proxy == ports.service || ports.proxy == ports.broker {
+            return Err(IdentityError::new(
+                ErrorKind::ConfigInvalid,
+                "choose listeners",
+                "ports",
+                format!(
+                    "the model proxy listens on {}; the service and broker need ports of their own",
+                    ports.proxy
+                ),
+            ));
+        }
         Ok(ports)
     }
 
     /// The browser origin for this listener.
     pub fn service_url(self) -> String {
         format!("http://localhost:{}", self.service)
+    }
+
+    /// The Anthropic address of the model proxy, which a Claude Code run
+    /// Lys starts is given as its base URL.
+    pub fn proxy_url(self) -> String {
+        format!("http://127.0.0.1:{}{PROXY_PATH}", self.proxy)
     }
 
     /// The setup page on this listener.

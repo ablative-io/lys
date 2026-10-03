@@ -136,7 +136,13 @@ pub fn files_for(layout: &Layout, commit: &str, screens: bool) -> Vec<RenderedFi
     } else {
         (String::new(), String::new())
     };
-    let service = format!("{{\"built_for\": \"{commit}\", \"screens\": {screens}{key}}}\n");
+    // The scratch's model proxy listener, carried as a real render carries it.
+    let proxy = std::fs::read(layout.service_config())
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|config| config.get("model_proxy").cloned())
+        .map_or_else(String::new, |proxy| format!(", \"model_proxy\": {proxy}"));
+    let service = format!("{{\"built_for\": \"{commit}\", \"screens\": {screens}{key}{proxy}}}\n");
     vec![
         file(
             "compose.yaml",
@@ -223,6 +229,11 @@ impl Scratch {
         std::fs::write(layout.deployment_config(), "[deployment]\nadmin = 1\n")?;
         std::fs::write(state(&layout).join("rauthy-admin-password"), "test-only-1")?;
         std::fs::write(state(&layout).join("spicedb-preshared-key"), "test-only-2")?;
+        let free = std::net::TcpListener::bind("127.0.0.1:0")?
+            .local_addr()?
+            .port();
+        let proxy = format!("{{\"model_proxy\": \"http://127.0.0.1:{free}/anthropic\"}}");
+        std::fs::write(layout.service_config(), proxy)?;
         std::fs::write(layout.data_dir().join("directory").join("log"), [7_u8; 64])?;
         for rendered in files_for(&layout, A, true) {
             std::fs::write(&rendered.target, rendered.bytes.as_slice())?;
@@ -375,6 +386,9 @@ impl Drop for Scratch {
             if let Err(error) = adopt::stop(unit, &mut |_| {}) {
                 eprintln!("stopping {} after the test: {error}", unit.binary);
             }
+        }
+        if let Err(error) = services::stop(&self.layout.run_dir().join("proxy.pid")) {
+            eprintln!("stopping the model proxy after the test: {error}");
         }
     }
 }
