@@ -88,7 +88,7 @@ function Due({ model, view, me, people, teams, w, confirmed, kept, reload }: { w
         <p className="note">{actionWords(model, open.grant.resource, open.grant.actions)}</p>
         <p className="sec">Responsible: {open.reviewer.display_name}</p>
         {last(open) ? <p>Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} /> on {clock(last(open)?.at ?? 0)}. {last(open)?.note}</p> : null}
-        {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p>Keep decisions are unavailable here.</p>}
+        {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p>This service does not record keep decisions.</p>}
       </section> : null}</div>
     </div> : <p className="note">No current agent grants need your review.</p>}
   </>;

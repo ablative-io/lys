@@ -11,7 +11,6 @@
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: all .3s var(--spring); background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 999px; padding: 6px 14px; font-size: 12px; box-shadow: var(--shadow-lg); z-index: 40; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .open-q { color: var(--accent); font: 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .08em; border: 1px dashed rgba(212,151,90,.45); border-radius: 3px; padding: 0 5px; }
-.set-grid { display: grid; grid-template-columns: 200px 1fr; gap: 24px; }
 .set-nav a { display: block; padding: 6px 10px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-size: 12.5px; }
 .set-nav a.on { background: var(--surface-hover); color: var(--text-primary); }
 .set-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; }

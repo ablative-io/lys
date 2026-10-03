@@ -54,7 +54,7 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
         {pending[machine.id] ? <div><p>This computer permission has no confirmed answer. Its original request is kept.</p>{retry(machine.id)}</div> : null}
       </div>;
     })}
-    {!served ? <p className="hint">Changing existing computer permissions is coming.</p> : null}
+    {!served ? <p className="hint">This service does not serve changes to a computer’s permissions.</p> : null}
     {!admin ? <p className="hint">An administrator changes computer permissions.</p> : null}
     {capability.status === 'refused' ? <><p role="alert">Lys could not read the computer permission route.</p><p><small className="refusal-name">{capability.refused.refusal.refusal}: {capability.refused.message}</small></p></> : null}
     {failure ? <><p role="alert">{initial.error ? 'Lys could not read the saved computer permission.' : 'Lys could not confirm this computer permission.'}</p><p><small className="refusal-name">{failure}</small></p></> : null}

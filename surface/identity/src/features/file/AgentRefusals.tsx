@@ -25,7 +25,7 @@ export function AgentRefusals({ id }: { id: string }) {
         <section className="card">
           <p className="note" data-coverage>
             {view.read_from.length
-              ? 'Read from runners ' + view.read_from.join(', ') + '. Refusals on any other runner are not yet covered here.'
+              ? 'Read from runners ' + view.read_from.join(', ') + '. Refusals on any other runner are not read here.'
               : 'No runner’s refusals have been read yet, so this list may be incomplete.'}
           </p>
           {view.refusals.length ? view.refusals.map((refusal) => (

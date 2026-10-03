@@ -26,7 +26,7 @@ describe('Agent refused tool calls', () => {
     expect(shown[0]).toContain('secrets-dir');
     expect(shown[0]).toContain('grantable by a grant of read on secret vault');
     expect(shown[1]).toContain('not grantable');
-    expect(text()).toContain('Refusals on any other runner are not yet covered here');
+    expect(text()).toContain('Refusals on any other runner are not read here');
     expect(text()).not.toMatch(/sandbox/i);
   });
 
