@@ -149,7 +149,7 @@ async fn walk(table: &Table, mode: Option<&str>) -> Result<Evidence, Box<dyn Err
         "../../../docs/harness/catalogue/claude-code.json"
     ))?;
     let mut profile = json!({
-        "operation": op()?, "from_version": 0,
+        "operation": op()?, "from_version": 0, "working_folder": "/tmp",
         "model_access": ["default"], "tools": [], "skills": [], "mcp_servers": [],
         "instructions": "", "instructions_mode": "keep", "note": "Start this agent",
         "harness": {"name": "Claude Code", "description": catalogue["description"],

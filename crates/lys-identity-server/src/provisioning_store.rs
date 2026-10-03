@@ -186,6 +186,11 @@ pub struct Settings {
     /// The single folder the reviewed version permits the seat to write.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub writable: Option<String>,
+    /// The folder the agent's runs start in when a launch names none: this
+    /// agent's own default, never one folder for every agent (Tom, 3 October
+    /// 2026). Absent, a launch that names no folder is refused by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_folder: Option<String>,
 }
 
 /// How an agent's sessions are driven through a runner.

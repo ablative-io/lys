@@ -32,7 +32,9 @@ pub struct Spawn<'a> {
     pub program: &'a str,
     /// Its arguments.
     pub arguments: &'a [String],
-    /// The directory it runs in; the runner's own when empty.
+    /// The directory it runs in. Never empty: a launch that names none is
+    /// refused by name, and neither the runner's folder nor the login's home
+    /// stands in for it.
     pub directory: &'a str,
     /// Variables set beside the runner's own environment.
     pub environment: &'a BTreeMap<String, String>,
@@ -98,18 +100,16 @@ pub fn spawn_isolated(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
 }
 
 fn spawn_with_environment(spawn: &Spawn<'_>, isolated: bool) -> Result<Spawned, RunnerError> {
-    // A run that names no directory starts where the login's own shell
-    // starts: its home. Never the runner's folder, never a folder of Lys's.
-    let requested_directory = if spawn.directory.is_empty() {
-        std::env::var_os("HOME")
-            .map(std::path::PathBuf::from)
-            .filter(|home| home.is_absolute())
-            .ok_or_else(|| {
-                RunnerError::refused("spawn_failed", "the runner has no HOME to start the run in")
-            })?
-    } else {
-        std::path::PathBuf::from(spawn.directory)
-    };
+    // Runs go where the launch says they go. A launch that names no
+    // directory is refused by name: never the runner's folder, never the
+    // login's home, never a folder of Lys's (Tom, 3 October 2026).
+    if spawn.directory.is_empty() {
+        return Err(RunnerError::refused(
+            "launch_without_directory",
+            "the launch names no working directory to start the run in",
+        ));
+    }
+    let requested_directory = std::path::PathBuf::from(spawn.directory);
     if !requested_directory.is_absolute() {
         return Err(RunnerError::refused(
             "spawn_failed",

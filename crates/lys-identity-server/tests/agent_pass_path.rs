@@ -112,7 +112,7 @@ impl Held {
         let path = format!("/agents/{}/provisioning", held.agent());
         let mut harness = harness_description::declared();
         harness["program"] = json!(program.display().to_string());
-        held.ok(&path, &json!({ "operation": operation()?, "from_version": 0,
+        held.ok(&path, &json!({ "operation": operation()?, "from_version": 0, "working_folder": "/tmp",
             "model_access": ["model-1"], "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": "", "permissions": {"default_mode": "plan"}, "harness": harness, "session": { "compact": "compact" } })).await?;
         held.ok(
             &format!("/agents/{}/provisioning/1/review", held.agent()),

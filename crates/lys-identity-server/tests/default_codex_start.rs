@@ -140,7 +140,7 @@ async fn walk(table: &Table) -> Outcome {
     let catalogue: Value =
         serde_json::from_str(include_str!("../../../docs/harness/catalogue/codex.json"))?;
     table.post(&format!("/agents/{agent}/provisioning"), &json!({
-        "operation": op()?, "from_version": 0,
+        "operation": op()?, "from_version": 0, "working_folder": "/tmp",
         "model_access": ["gpt-6.1-sol"], "tools": [], "skills": [], "mcp_servers": [],
         "instructions": "", "instructions_mode": "keep", "note": "Start this agent",
         "harness": {"name": "Codex", "description": catalogue["description"],

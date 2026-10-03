@@ -105,7 +105,7 @@ async fn a_start_on_a_machine_with_the_runner_runs_and_is_listed_running() -> Te
         .ok(
             &path,
             &json!({
-                "operation": operation()?, "from_version": 1,
+                "operation": operation()?, "from_version": 1, "working_folder": "/tmp",
                 "model_access": ["claude-fable-5-1"], "tools": [], "skills": [], "mcp_servers": [],
                 "instructions": "The next profile has not run.", "note": "",
                 "harness": provisioning["profile"]["harness"],

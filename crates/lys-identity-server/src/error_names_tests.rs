@@ -327,6 +327,7 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         (ServerError::MachineRetired, "MachineRetired"),
         (ServerError::MachineNotForAgent, "MachineNotForAgent"),
         (ServerError::MachineWithoutRuntime, "MachineWithoutRuntime"),
+        (ServerError::WorkingFolderUnnamed, "WorkingFolderUnnamed"),
         (ServerError::MachineWithoutRunner, "MachineWithoutRunner"),
         (
             ServerError::SkillUnknown {

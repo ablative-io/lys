@@ -15,7 +15,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::error::ServerError;
-use crate::launch_api::{admitted, start_caller, start_for, start_profile};
+use crate::launch_api::{Chosen, admitted, start_caller, start_for, start_profile};
 use crate::provisioning_api::with_provisioning;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runner_api::{Carried, perform};
@@ -123,7 +123,10 @@ async fn restart(
         agent,
         &driven.machine,
         &operation,
-        Some(profile),
+        Chosen {
+            profile: Some(profile),
+            directory: None,
+        },
     )
     .await
 }

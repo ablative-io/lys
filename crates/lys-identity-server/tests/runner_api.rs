@@ -202,7 +202,7 @@ impl Table {
         let mut harness = harness_description::declared();
         harness["program"] = json!(program);
         let body = json!({
-            "operation": operation()?, "from_version": 0,
+            "operation": operation()?, "from_version": 0, "working_folder": "/tmp",
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": [],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
             "permissions": {"default_mode": "plan"}, "harness": harness,

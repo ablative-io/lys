@@ -59,7 +59,10 @@ pub struct Launch {
     pub program: String,
     /// Its arguments.
     pub arguments: Vec<String>,
-    /// The directory it runs in.
+    /// The directory it runs in: the launch's named folder, else the agent's
+    /// own default from its profile. Never empty; a runner refuses an empty
+    /// one by name (`launch_without_directory`) rather than starting the run
+    /// in its own folder or the login's home.
     pub directory: String,
     /// The variables set in its environment, beside the runner's own. A
     /// credential never rides here: only a handle's id does.

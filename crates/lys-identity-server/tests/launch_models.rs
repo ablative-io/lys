@@ -23,7 +23,7 @@ impl Table {
         models: &Value,
     ) -> Result<(u16, Value), Box<dyn Error>> {
         let body = json!({
-            "operation": operation()?, "from_version": from,
+            "operation": operation()?, "from_version": from, "working_folder": "/tmp",
             "model_access": models, "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "", "permissions": {"default_mode": "plan"}, "harness": harness,
         });

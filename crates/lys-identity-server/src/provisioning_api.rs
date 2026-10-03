@@ -83,6 +83,10 @@ pub struct VersionView {
     /// The reviewed writable folder, absent for an unconfined launch.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub writable: Option<String>,
+    /// The folder this agent's runs start in when a launch names none;
+    /// absent when every launch must name one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_folder: Option<String>,
     /// The person who set it.
     pub set_by: String,
     /// When it was set, in seconds since the Unix epoch.
@@ -166,6 +170,8 @@ pub(crate) struct SetBody {
     runs_on: Option<String>,
     #[serde(default)]
     writable: Option<String>,
+    #[serde(default)]
+    working_folder: Option<String>,
 }
 
 fn instructions_mode_schema() -> utoipa::openapi::schema::Object {
@@ -255,7 +261,14 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
                     .map_err(|error| malformed(format!("runs_on is not a machine id: {error}")))
             })
             .transpose()?,
-        writable: body.writable.map(writable).transpose()?,
+        writable: body
+            .writable
+            .map(|given| folder("writable", given))
+            .transpose()?,
+        working_folder: body
+            .working_folder
+            .map(|given| folder("working_folder", given))
+            .transpose()?,
     };
     if let Some(declared) = &settings.harness {
         crate::launch_fields::models(declared, &settings.model_access)?;
@@ -264,23 +277,27 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
     Ok(settings)
 }
 
-fn writable(folder: String) -> Result<String, ServerError> {
+/// `given`, the folder named under `name`, when it is an absolute plain path:
+/// no relative part, no doubled or trailing separator, no `.` or `..`.
+pub(crate) fn folder(name: &str, given: String) -> Result<String, ServerError> {
     use std::path::{Component, Path};
-    let path = Path::new(&folder);
+    let path = Path::new(&given);
     if !path.is_absolute()
         || path.parent().is_none()
-        || folder.contains('\0')
-        || folder.contains("//")
-        || folder.contains("/./")
-        || folder.ends_with("/.")
-        || folder.ends_with('/')
+        || given.contains('\0')
+        || given.contains("//")
+        || given.contains("/./")
+        || given.ends_with("/.")
+        || given.ends_with('/')
         || path
             .components()
             .any(|part| !matches!(part, Component::RootDir | Component::Normal(_)))
     {
-        return Err(malformed("writable is not an absolute plain folder path"));
+        return Err(malformed(format!(
+            "{name} is not an absolute plain folder path"
+        )));
     }
-    Ok(folder)
+    Ok(given)
 }
 
 /// The declared build, refused when its program is not an absolute path or
@@ -387,6 +404,7 @@ fn view(
             permissions: version.settings.permissions.clone(),
             runs_on: version.settings.runs_on.clone(),
             writable: version.settings.writable.clone(),
+            working_folder: version.settings.working_folder.clone(),
             set_by: version.set_by.clone(),
             set_at: version.set_at,
             reviewed_by: version.reviewed.as_ref().map(|review| review.by.clone()),

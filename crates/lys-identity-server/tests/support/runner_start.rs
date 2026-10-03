@@ -192,6 +192,7 @@ impl Table {
             "mcp_servers": [], "instructions": "", "note": "",
             "harness": harness,
             "permissions": {"default_mode": "plan"},
+            "working_folder": self.dir.path(),
         });
         self.ok(&path, &body).await?;
         self.ok(

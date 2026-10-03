@@ -203,6 +203,7 @@ impl ServerError {
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
             | Self::MachineWithoutRunner
+            | Self::WorkingFolderUnnamed
             | Self::LaunchUnrenderable { .. }
             | Self::HarnessUndeclared { .. }
             | Self::McpHandleUnsupported { .. }

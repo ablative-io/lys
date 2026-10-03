@@ -182,6 +182,7 @@ pub(crate) const RESTART: &[&str] = &[
     "MachineUnknown",
     "MachineWithoutRuntime",
     "MachineWithoutRunner",
+    "WorkingFolderUnnamed",
     "HarnessUndeclared",
     "LaunchUnrenderable",
     "McpHandleUnsupported",

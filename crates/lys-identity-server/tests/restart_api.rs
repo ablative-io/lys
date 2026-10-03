@@ -136,7 +136,7 @@ impl Held {
         let path = format!("/agents/{}/provisioning", self.agent());
         let mut harness = harness_description::declared();
         harness["program"] = json!(self.dir.path().join("seat").display().to_string());
-        self.ok(&path, &json!({ "operation": operation()?, "from_version": from,
+        self.ok(&path, &json!({ "operation": operation()?, "from_version": from, "working_folder": "/tmp",
             "model_access": [format!("model-{}", from + 1)], "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": "", "permissions": {"default_mode": "plan"}, "harness": harness })).await?;
         if reviewed {
             self.review(from + 1).await?;

@@ -246,7 +246,7 @@ async fn an_exhausted_cap_refuses_both_routes_without_a_runner_request() -> Test
     )
     .await?;
     let profile = format!("/agents/{agent}/provisioning");
-    post(&service, &cookie, &profile, &json!({"operation": operation()?, "from_version": 0, "model_access": ["claude-fable-5-1"], "tools": [], "skills": [], "mcp_servers": [], "harness": harness_description::declared(), "instructions": "", "note": ""})).await?;
+    post(&service, &cookie, &profile, &json!({"operation": operation()?, "from_version": 0, "working_folder": "/tmp", "model_access": ["claude-fable-5-1"], "tools": [], "skills": [], "mcp_servers": [], "harness": harness_description::declared(), "instructions": "", "note": ""})).await?;
     post(
         &service,
         &cookie,

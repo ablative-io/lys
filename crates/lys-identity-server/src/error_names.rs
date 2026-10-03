@@ -93,6 +93,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::MachineRetired => "MachineRetired",
         ServerError::MachineNotForAgent => "MachineNotForAgent",
         ServerError::MachineWithoutRuntime => "MachineWithoutRuntime",
+        ServerError::WorkingFolderUnnamed => "WorkingFolderUnnamed",
         ServerError::MachineWithoutRunner => "MachineWithoutRunner",
         ServerError::SkillUnknown { .. } => "SkillUnknown",
         ServerError::PolicyUnrepresentable { .. } => "PolicyUnrepresentable",

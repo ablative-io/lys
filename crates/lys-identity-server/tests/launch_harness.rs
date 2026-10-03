@@ -17,7 +17,7 @@ impl Table {
     /// Record a profile declaring `harness`, or none when it is null, from `from`.
     async fn record(&self, from: u32, harness: &Value) -> Result<(u16, Value), Box<dyn Error>> {
         let mut body = json!({
-            "operation": operation()?, "from_version": from,
+            "operation": operation()?, "from_version": from, "working_folder": "/tmp",
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "",
         });

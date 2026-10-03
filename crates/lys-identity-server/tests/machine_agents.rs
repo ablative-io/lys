@@ -181,7 +181,7 @@ impl Table {
         self.sent(
             &path,
             &json!({
-                "operation": operation()?, "from_version": 0, "model_access": ["claude-fable-5-1"],
+                "operation": operation()?, "from_version": 0, "working_folder": "/tmp", "model_access": ["claude-fable-5-1"],
                 "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": "",
                 "harness": harness_description::declared(),
             }),

@@ -413,6 +413,13 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
+    /// The launch names no working folder and the agent's profile has no
+    /// default of its own, so there is nowhere to start the harness: the
+    /// runner's home is never used in its place.
+    #[error(
+        "WorkingFolderUnnamed: the launch names no working folder and the agent's profile has no working_folder; name one on the launch or set the agent's default"
+    )]
+    WorkingFolderUnnamed,
     /// The machine cannot execute a start without a recorded runner.
     #[error("MachineWithoutRunner: the machine has no recorded runner to start the agent with")]
     MachineWithoutRunner,

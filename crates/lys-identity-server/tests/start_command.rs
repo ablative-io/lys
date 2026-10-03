@@ -65,6 +65,7 @@ impl Table {
             "harness": self.harness(),
             "instructions": "Build what the brief says.", "note": "First setup.",
             "permissions": {"default_mode": "plan"},
+            "working_folder": "/tmp",
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         let (status, set) = self.service.post(&path, Some(&self.ada), &body).await?;
@@ -166,6 +167,16 @@ async fn each_refusal_is_by_name() -> TestResult {
         .await?;
     assert_eq!(status, 400, "{none}");
     assert_eq!(none["refusal"], "RequestMalformed");
+    let (status, elsewhere) = table
+        .service
+        .post(
+            &format!("/agents/{agent}/start-command"),
+            Some(&table.ada),
+            &json!({ "machine": open, "operation": operation()?, "directory": "relative/folder" }),
+        )
+        .await?;
+    assert_eq!(status, 400, "{elsewhere}");
+    assert_eq!(elsewhere["refusal"], "RequestMalformed", "{elsewhere}");
     drop(driver);
     let stage = StageTimer::new("scenario.table_close");
     let result = table.close();

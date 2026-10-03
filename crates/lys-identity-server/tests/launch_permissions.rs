@@ -26,7 +26,7 @@ impl Table {
         permissions: &Value,
     ) -> Result<(u16, Value), Box<dyn Error>> {
         let body = json!({
-            "operation": operation()?, "from_version": from,
+            "operation": operation()?, "from_version": from, "working_folder": "/tmp",
             "model_access": ["claude-fable-5-1"], "tools": tools, "skills": [],
             "mcp_servers": [], "instructions": "", "note": "", "permissions": permissions,
             "harness": self.harness(),

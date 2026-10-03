@@ -19,8 +19,16 @@
 //!
 //! The administrator and the person responsible for the agent are given
 //! the command. Each refusal is by name: an agent the directory does not
-//! hold, a caller who does not answer for it, an agent with no profile, and
-//! a machine unknown, retired, without a runtime or not listing the agent.
+//! hold, a caller who does not answer for it, an agent with no profile, a
+//! machine unknown, retired, without a runtime or not listing the agent, and
+//! a launch that names no working folder when the profile has no default.
+//!
+//! Runs go where the launch says they go (Tom, 3 October 2026): the launch
+//! may name the folder the harness starts in; else the agent's own default
+//! from its profile is used; else the start is refused by name. There is no
+//! folder for every agent and the runner's home is never used. The folder
+//! is kept on the start's record and handed to the runner as the directory
+//! the harness is started in.
 //!
 //! On a machine whose record names a runner, the kept start is then run by
 //! that runner, using signed process inputs and config files, and the answer carries the
@@ -80,6 +88,9 @@ pub struct StartCommandView {
     pub template_sha256: String,
     /// The command, as text.
     pub command: String,
+    /// The folder the harness is started in: the launch's, else the
+    /// profile's default.
+    pub directory: String,
     /// What of the profile the template does not carry.
     pub left_out: Vec<String>,
     /// Whether the service ran it: never. A runner may have; its word is
@@ -93,6 +104,10 @@ pub struct StartCommandView {
 pub(crate) struct Launch {
     machine: String,
     operation: String,
+    /// The folder the harness starts in for this run; absent, the profile's
+    /// own default, and with neither the start is refused by name.
+    #[serde(default)]
+    directory: Option<String>,
 }
 
 /// The start-command route.
@@ -108,11 +123,31 @@ async fn start_command(
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
-    let Json(Launch { machine, operation }) =
-        body.map_err(|refused| ServerError::RequestMalformed {
-            reason: refused.body_text(),
-        })?;
-    start_for(&state, &headers, &actor, agent, &machine, &operation).await
+    let Json(Launch {
+        machine,
+        operation,
+        directory,
+    }) = body.map_err(|refused| ServerError::RequestMalformed {
+        reason: refused.body_text(),
+    })?;
+    let chosen = Chosen {
+        profile: None,
+        directory,
+    };
+    start_profile(
+        &state, &headers, &actor, agent, &machine, &operation, chosen,
+    )
+    .await
+}
+
+/// What a start may choose beyond its agent and machine: an exact reviewed
+/// profile, and the folder the harness starts in for this run.
+#[derive(Debug, Default)]
+pub(crate) struct Chosen {
+    /// The exact profile version; absent, the latest reviewed one.
+    pub(crate) profile: Option<Version>,
+    /// The run's folder; absent, the profile's own default.
+    pub(crate) directory: Option<String>,
 }
 
 /// Give every admitted start the same checks, kept report and runner call.
@@ -124,10 +159,20 @@ pub(crate) async fn start_for(
     machine: &str,
     operation: &str,
 ) -> Result<Json<Value>, ServerError> {
-    start_profile(state, headers, actor, agent, machine, operation, None).await
+    start_profile(
+        state,
+        headers,
+        actor,
+        agent,
+        machine,
+        operation,
+        Chosen::default(),
+    )
+    .await
 }
 
-/// Start an exact reviewed profile through the same admission and launch path.
+/// Start through the same admission and launch path, from the exact profile
+/// and in the folder `chosen` names when it names them.
 pub(crate) async fn start_profile(
     state: &Arc<AppState>,
     headers: &HeaderMap,
@@ -135,8 +180,9 @@ pub(crate) async fn start_profile(
     agent: AgentId,
     machine: &str,
     operation: &str,
-    profile: Option<Version>,
+    chosen: Chosen,
 ) -> Result<Json<Value>, ServerError> {
+    let Chosen { profile, directory } = chosen;
     let session = OperationId::from_str(operation)?.to_string();
     let agent = agent.to_string();
     let admitted_by = start_caller(state, headers, actor, &agent)?;
@@ -177,6 +223,14 @@ pub(crate) async fn start_profile(
         }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
+    let directory = match directory {
+        Some(given) => crate::provisioning_api::folder("directory", given)?,
+        None => version
+            .settings
+            .working_folder
+            .clone()
+            .ok_or(ServerError::WorkingFolderUnnamed)?,
+    };
     let handles = handles(state, headers, &agent).await?;
     let skills = with_provisioning(state, |store| skill_files(store, &version))?;
     let policy = match state.policies {
@@ -207,6 +261,7 @@ pub(crate) async fn start_profile(
         template: rendered.template,
         template_sha256: rendered.template_sha256.clone(),
         command: rendered.command,
+        directory,
         left_out: Vec::new(),
         executed: false,
     })
@@ -414,7 +469,7 @@ pub fn kept_launch(
         session: text("session")?.to_owned(),
         program: native.program,
         arguments: native.arguments,
-        directory: String::new(),
+        directory: text("directory")?.to_owned(),
         environment: native.environment,
         config: Some(lys_runner::launch_config::Config {
             files,

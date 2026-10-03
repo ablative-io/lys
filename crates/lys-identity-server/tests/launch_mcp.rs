@@ -23,7 +23,7 @@ impl Table {
     /// Record `servers` as the agent's profile, from `from`.
     async fn record(&self, from: u32, servers: &Value) -> Result<(u16, Value), Box<dyn Error>> {
         let body = json!({
-            "operation": operation()?, "from_version": from,
+            "operation": operation()?, "from_version": from, "working_folder": "/tmp",
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": servers, "instructions": "", "note": "",
             "permissions": {"default_mode": "plan"}, "harness": self.harness(),
