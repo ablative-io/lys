@@ -38,11 +38,11 @@ describe('An agent\'s run on People and agents', () => {
 
   it('has no page of its own: the front page is People and agents, and an agent chosen there shows its terminal beside the list', async () => {
     await mount('#/', routes);
-    expect($('h1')?.textContent).toBe('People and agents');
+    expect($('.page .head h1')?.textContent).toBe('People and agents');
     expect($('.team-screen')).toBeNull();
     expect($('a[href="#/team"]')).toBeNull();
     await mount('#/team/' + SCRIBE, routes);
-    expect($('h1')?.textContent).toBe('People and agents');
+    expect($('.page .head h1')?.textContent).toBe('People and agents');
     expect($('.detail h2')?.textContent).toBe('Scribe');
     expect($('.detail .team-pane .terminal')).not.toBeNull();
     expect($('.team-foot')?.textContent).toContain('Lab');
@@ -152,7 +152,7 @@ describe('An agent\'s run on People and agents', () => {
   it('sends the old start address to the agent\'s pane on the front page', async () => {
     await mount('#/file/' + SCRIBE + '/start', stopped);
     expect(location.hash).toBe('#/team/' + SCRIBE);
-    expect($('h1')?.textContent).toBe('People and agents');
+    expect($('.page .head h1')?.textContent).toBe('People and agents');
     expect(text()).toContain('Scribe is not running.');
   });
 
