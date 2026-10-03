@@ -140,3 +140,68 @@ describe('why an agent cannot start', () => {
     expect(calls.again).toBe(1);
   });
 });
+
+describe('an agent with no folder to work in', () => {
+  const folders = 'POST /network/machines/' + computer + '/folders';
+  const provisioning = '/agents/' + SCRIBE + '/provisioning';
+  const profile = { version: 2, operation: 'op-' + 'a'.repeat(32), model_access: ['model-one'], tools: [], skills: [], mcp_servers: [], instructions: '', note: 'Start this agent', set_by: ADA, set_at: 1, runs_on: computer, permissions: { default_mode: 'default' } };
+  const held = (under: string, names: string[]) => ok({ machine: computer, under, folders: names });
+  const looked: Route = (body) => {
+    const under = (body as { under?: string }).under;
+    if (!under) return held('/Users/ada', ['.cache', 'Developer', 'Music']);
+    if (under === '/Users/ada/Developer') return held(under, ['.git', 'receipts']);
+    if (under === '/Users/ada/Developer/receipts') return held(under, []);
+    return refused(409, 'folder_unreadable', under + ' could not be read');
+  };
+  const button = (scope: HTMLElement, label: string) => [...scope.querySelectorAll('button')].find((entry) => entry.textContent?.trim() === label) ?? null;
+
+  it('is chosen from the computer’s own folders, saved, and the start follows without a second press', async () => {
+    const { host, posted, calls } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
+      '/network': ok({ machines: [machine(computer, 'Ada’s laptop')], reports_served: true }),
+      [folders]: looked, [provisioning]: ok({ agent: SCRIBE, profile, versions: [], enforced: false }),
+      ['POST ' + provisioning]: (body) => ok({ agent: SCRIBE, profile: { ...profile, ...(body as object), version: 3 }, recorded: { operation: (body as { operation: string }).operation, version: 3 }, versions: [], enforced: false }),
+    });
+    expect(host.textContent).toContain('Scribe has no folder to work in.');
+    expect(host.querySelector('input')).toBeNull();
+    expect(posted).toEqual([]);
+    await click(button(host, 'Choose a folder'));
+    await settle();
+    await settle();
+    expect(host.textContent).toContain('On Ada’s laptop, in /Users/ada/Developer');
+    expect(buttons(host)).toContain('receipts');
+    expect(buttons(host)).not.toContain('.git');
+    expect(buttons(host)).toContain('Back to ada');
+    await click(button(host, 'receipts'));
+    await settle();
+    expect(host.textContent).toContain('There are no folders inside this one.');
+    await click(button(host, 'Work in receipts'));
+    await settle();
+    await settle();
+    const saved = posted.find((entry) => entry.path === provisioning)?.body as Record<string, unknown>;
+    expect(saved.working_folder).toBe('/Users/ada/Developer/receipts');
+    expect(saved.from_version).toBe(2);
+    expect(saved.runs_on).toBe(computer);
+    expect(saved.model_access).toEqual(['model-one']);
+    expect(calls.again).toBe(1);
+    expect(host.querySelector('input')).toBeNull();
+  });
+
+  it('says so when the computer cannot be looked in, and saves nothing', async () => {
+    const { host, posted, calls } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
+      '/network': ok({ machines: [machine(computer, 'Ada’s laptop')], reports_served: true }),
+      [folders]: refused(409, 'runner_absent', 'machine names no runner'),
+    });
+    await click(button(host, 'Choose a folder'));
+    await settle();
+    expect(host.textContent).toContain('Lys could not look at the folders there.');
+    expect(host.textContent).toContain('runner_absent');
+    expect(posted.some((entry) => entry.path === provisioning)).toBe(false);
+    expect(calls.again).toBe(0);
+  });
+
+  it('says a computer is needed first when none has Lys running on it', async () => {
+    const { host } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, { '/network': ok({ machines: [], reports_served: true }) });
+    expect(host.textContent).toContain('You choose its folder once a computer with Lys running on it is added.');
+    expect(button(host, 'Choose a folder')).toBeNull();
+  });
+});

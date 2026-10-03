@@ -2,19 +2,22 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Choices } from './choices';
 import type { ProvisioningProfile } from './Provisioning';
+import { FolderChooser } from './FolderChooser';
 import { StartAgent } from '../runtime/StartAgent';
 import type { PeopleView } from '../../generated';
 
 export function ProfileEditor({ id, profile, choices, people, readOnly = false }: {
   id: string; profile: ProvisioningProfile | null; choices: Choices; people: PeopleView; readOnly?: boolean;
 }) {
-  return <ProfileFields profile={profile} choices={choices} render={(fields, settings, refusal) => <section className="card" aria-label="Start this agent">
+  return <ProfileFields profile={profile} choices={choices} canChoose={!readOnly} render={(fields, settings, refusal) => <section className="card" aria-label="Start this agent">
     {fields}<StartAgent agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} known={{ people, machines: choices.machines }} />
   </section>} />;
 }
 
-export function ProfileFields({ profile, choices, strict = false, firstRun = false, render }: {
+export function ProfileFields({ profile, choices, strict = false, firstRun = false, computer, canChoose = true, render }: {
   profile: ProvisioningProfile | null; choices: Choices; strict?: boolean; firstRun?: boolean;
+  /** The computer the agent is to run on, when the screen already knows it; the folder is chosen there. */
+  computer?: string; canChoose?: boolean;
   render: (fields: ReactNode, settings: Record<string, unknown>, refusal: string) => ReactNode;
 }) {
   const available = choices.programs ?? [];
@@ -28,6 +31,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [mode, setMode] = useState(profile?.permissions?.default_mode ?? firstMode(program));
   const [prompt, setPrompt] = useState(firstRun ? profile?.instructions_mode ?? firstPrompt(program) : strict ? profile?.instructions_mode ?? (program?.instructions_modes?.length === 1 ? program.instructions_modes[0] : '') : profile?.instructions ? profile.instructions_mode ?? 'append' : 'keep');
   const [promptChanged, setPromptChanged] = useState(false);
+  const [folder, setFolder] = useState(profile?.working_folder ?? '');
   const [instructions, setInstructions] = useState(profile?.instructions ?? '');
   const builds = program?.builds ?? [];
   const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
@@ -53,7 +57,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
     ...(profile?.runs_on ? { runs_on: profile.runs_on } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
-    ...(profile?.working_folder ? { working_folder: profile.working_folder } : {}),
+    ...(folder ? { working_folder: folder } : {}),
     ...(profile?.session ? { session: profile.session } : {}),
   };
   const fields = <>
@@ -72,7 +76,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {firstRun ? mode === 'workspace-only' ? <p>Works in its own folder; internet tools are off. Shell commands can also write to the program’s temporary folder.</p> : mode === 'workspace-write' ? <p>Works in its own folder; no internet.</p> : profile ? <p>The saved program settings are kept for this request.</p> : null : <label className="field">What this agent may do<select name="mode" value={mode} onChange={(event) => setMode(event.target.value)}>{!program?.modes.some((entry) => entry.id === mode) ? <option value={mode}>{mode || 'Choose a mode'}</option> : null}{program?.modes.map((entry) => <option key={entry.id} value={entry.id}>{entry.meaning}</option>)}</select></label>}
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
     {prompt && prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
-    {profile?.working_folder ? <p className="works-in">Works in <code>{profile.working_folder}</code></p> : <p className="works-in">No folder chosen yet.</p>}
+    {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun ? ' Choose one now, or when you start this agent.' : ''}</p>}
+    {canChoose ? <FolderChooser computers={choices.machines} preferred={computer ?? profile?.runs_on ?? ''} chosen={folder} choose={setFolder} /> : null}
   </>;
   return render(fields, settings, refusal);
 }

@@ -219,7 +219,7 @@ describe('Add and run on the first computer', () => {
     expect(posted[6].body).toMatchObject({ machine: computer });
     expect(server.applied.size).toBe(7);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
     expect(document.body.textContent).toContain('Running, as its runner last reported');
     expect($('a[href="#/runtime/' + (posted[6].body as { operation: string }).operation + '"]')).not.toBeNull();
   });
@@ -236,7 +236,7 @@ describe('Add and run on the first computer', () => {
     expect(next.posted).toHaveLength(7 - index);
     expect(server.applied.size).toBe(7);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
     expect(document.body.textContent).toContain('Running, as its runner last reported');
   });
 
@@ -342,7 +342,7 @@ describe('Add and run on an existing computer', () => {
     expect(posted[4].body).toEqual({ ...old.machine.body, may_run: [agent] });
     expect(server.applied.size).toBe(7);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
   });
 
   it('migrates an earlier pending start and resends its exact body on the recorded computer', async () => {
@@ -361,7 +361,7 @@ describe('Add and run on an existing computer', () => {
     await submit();
     expect(posted).toEqual([{ path: prefix + '/start-command', body }]);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
   });
 
   it('migrates a version-two allowance and preserves its exact start and allowance requests', async () => {
@@ -379,7 +379,7 @@ describe('Add and run on an existing computer', () => {
     expect(posted).toEqual([]);
     await submit();
     expect(posted).toEqual([{ path: '/network/machines/' + computer.id + '/agents', body: allowance }, { path: prefix + '/start-command', body }]);
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
   });
   it('keeps an older envelope intact when its migration cannot be saved', () => {
     const old = { version: 2, person: ADA, step: 'registration', pending: null,
@@ -437,7 +437,7 @@ describe('Add and run on an existing computer', () => {
     expect(posted[5].body).toMatchObject({ machine: computer.id });
     expect(server.applied.size).toBe(6);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
     expect(document.body.textContent).toContain('Running, as its runner last reported');
     expect($('a[href="#/runtime/' + (posted[5].body as { operation: string }).operation + '"]')).not.toBeNull();
     expect(readsAtStart.filter((path) => path === '/network')).toHaveLength(1);
@@ -460,7 +460,7 @@ describe('Add and run on an existing computer', () => {
     expect(next.posted[next.posted.length - 1].body).toMatchObject({ machine: computer.id });
     expect(server.applied.size).toBe(6);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
     expect(document.body.textContent).toContain('Running, as its runner last reported');
   });
 
@@ -506,7 +506,7 @@ describe('Add and run on an existing computer', () => {
     expect(posted).toHaveLength(6);
     expect(posted[4].path).toBe('/network/machines/' + second.id + '/agents');
     expect(posted[5].body).toMatchObject({ machine: second.id });
-    expect(location.hash).toBe('#/file/' + agent);
+    expect(location.hash).toBe('#/team/' + agent);
   });
 
   it.each([

@@ -73,7 +73,7 @@ describe('Add-agent retry safety', () => {
       entry.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
     expect(posted.map((call) => call.path)).toEqual(['/agents', '/identities/' + COURIER + '/transitions']);
-    expect(location.hash).toBe('#/file/' + COURIER);
+    expect(location.hash).toBe('#/team/' + COURIER);
     expect(sessionStorage.getItem('lys.add-agent.' + ADA)).toBeNull();
   });
   it('retains the chosen person and team through an uncertain membership and reload', async () => {
@@ -103,7 +103,7 @@ describe('Add-agent retry safety', () => {
     expect(second.posted).toEqual([]);
     await submit(second.entry);
     expect(second.posted).toEqual([first.posted[2]]);
-    expect(location.hash).toBe('#/file/' + COURIER);
+    expect(location.hash).toBe('#/team/' + COURIER);
     expect(sessionStorage.getItem('lys.add-agent.' + ADA)).toBeNull();
   });
 
@@ -117,7 +117,7 @@ describe('Add-agent retry safety', () => {
     await submit(entry);
     expect(posted[0]).toEqual({ path: '/agents', body: { operation: register, display_name: 'Earlier helper' } });
     expect(posted).toHaveLength(2);
-    expect(location.hash).toBe('#/file/' + COURIER);
+    expect(location.hash).toBe('#/team/' + COURIER);
     expect(sessionStorage.getItem('lys.add-agent.' + ADA)).toBeNull();
   });
 
@@ -140,7 +140,7 @@ describe('Add-agent retry safety', () => {
     await submit(entry);
     expect(posted).toHaveLength(2);
     expect(posted[0].body).not.toHaveProperty('answers_to');
-    expect(location.hash).toBe('#/file/' + COURIER);
+    expect(location.hash).toBe('#/team/' + COURIER);
   });
 
   it('keeps a saved other-person request unsent when that field is not served', async () => {

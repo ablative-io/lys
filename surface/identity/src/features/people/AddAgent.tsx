@@ -123,8 +123,17 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
         agent = await addAgent(registration, me.person.id, keep, me.signed_in);
         sessionStorage.removeItem(key);
       }
-      navigate('/file/' + encodeURIComponent(agent), { replace: true });
-    } catch (problem) { setRefusal(problem); }
+      navigate('/team/' + encodeURIComponent(agent), { replace: true });
+    } catch (problem) {
+      // The agent is added and only its folder is missing: a definite answer, so the
+      // saved request is over and the team screen asks for the folder where Start is.
+      let added: string | null = null;
+      if (problem instanceof AddAndRunFailure && problem.problem instanceof Refused && problem.problem.refusal.refusal === 'WorkingFolderUnnamed') {
+        try { added = readAddAndRun(runKey, me.person.id)?.registration.agent ?? null; } catch { added = null; }
+      }
+      if (added) { sessionStorage.removeItem(runKey); navigate('/team/' + encodeURIComponent(added), { replace: true }); return; }
+      setRefusal(problem);
+    }
     finally { working.current = false; setSending(false); }
   };
   const locked = sending || pending !== null || walk !== null || Boolean(saved.error);
@@ -172,7 +181,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     {pending ? <p role="status">{pending.activated ? 'Your agent was added. Its team membership still needs confirmation.' : pending.agent ? 'Your agent was registered. Activation still needs confirmation.' : 'The registration has no confirmed answer yet.'} The original request is saved. Try that same request again without adding another agent.</p> : null}
     <p><button className="btn primary" type="submit" disabled={sending || Boolean(hold) || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))}>{hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'}</button></p>
   </form>;
-  return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun render={renderForm} /> : renderForm(null);
+  return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun computer={walk ? placementComputer(walk.placement).id : selectedComputer?.id ?? ''} render={renderForm} /> : renderForm(null);
 }
 
 export function AddAgent() {

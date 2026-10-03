@@ -40,10 +40,12 @@ export function profileFromSettings(value: Record<string, unknown>): Provisionin
     || typeof harness.package !== 'string' || !description(harness.description) || !strings(value.model_access) || !value.model_access.length
     || !strings(value.tools) || value.tools.length || !strings(value.skills) || value.skills.length || !Array.isArray(value.mcp_servers) || value.mcp_servers.length
     || typeof value.instructions !== 'string' || typeof value.note !== 'string' || !isRecord(permissions) || typeof permissions.default_mode !== 'string'
-    || (value.instructions_mode !== undefined && value.instructions_mode !== 'keep' && value.instructions_mode !== 'append' && value.instructions_mode !== 'replace')) return unreadable();
+    || (value.instructions_mode !== undefined && value.instructions_mode !== 'keep' && value.instructions_mode !== 'append' && value.instructions_mode !== 'replace')
+    || (value.working_folder !== undefined && (typeof value.working_folder !== 'string' || !value.working_folder.startsWith('/')))) return unreadable();
   return { version: 0, operation: '', harness: { name: harness.name, program: harness.program, package: harness.package, description: harness.description },
     model_access: value.model_access, permissions: { default_mode: permissions.default_mode }, tools: [], skills: [], mcp_servers: [],
-    instructions: value.instructions, instructions_mode: value.instructions_mode ?? (value.instructions ? 'append' : 'keep'), note: value.note, set_by: '', set_at: 0, session: null };
+    instructions: value.instructions, instructions_mode: value.instructions_mode ?? (value.instructions ? 'append' : 'keep'), note: value.note, set_by: '', set_at: 0, session: null,
+    ...(typeof value.working_folder === 'string' ? { working_folder: value.working_folder } : {}) };
 }
 function placementOf(value: unknown, registration: PendingAgent, step: AddAndRun['step']): Placement {
   if (!isRecord(value)) return unreadable();

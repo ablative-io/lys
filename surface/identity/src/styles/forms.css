@@ -46,3 +46,6 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; p
 .cannot-start p { margin: 0 0 8px; }
 .cannot-start .btn { margin-right: 8px; }
 .refusal-name { color: var(--text-secondary); font-family: "JetBrains Mono"; font-size: 10.5px; }
+.folder-chooser { margin: 8px 0; }
+.folder-chooser .folders { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.works-in code { font-family: "JetBrains Mono"; }

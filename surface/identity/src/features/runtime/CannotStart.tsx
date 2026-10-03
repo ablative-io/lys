@@ -16,6 +16,8 @@ import { Refused, api, operationId, request, useLoad } from '../../api';
 import type { Machine, NetworkView } from '../network/contract';
 import { confirmAdmission } from '../network/machine-admission';
 import type { MachineAdmission } from '../network/machine-admission';
+import { FolderChooser } from '../provisioning/FolderChooser';
+import { saveFolder } from '../provisioning/working-folder';
 
 /** What refused a start: the refusal's name and its reason, as answered. */
 export interface StartRefusal { refusal: string; reason: string }
@@ -66,7 +68,7 @@ export function CannotStart({ agent, name, refusal, again }: {
     <p>{sentence} <small className="refusal-name">{refusal.refusal}</small></p>
     {fix.kind === 'turn-on' ? <TurnOn agent={agent} name={name} label={fix.label} transition={fix.transition} again={again} /> : null}
     {fix.kind === 'allow-computer' ? <AllowComputer agent={agent} name={name} again={again} /> : null}
-    {fix.kind === 'choose-folder' ? <a className="btn primary" href={'#/file/' + encodeURIComponent(agent) + '/provisioning'}>Choose a folder</a> : null}
+    {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} again={again} /> : null}
     {fix.kind === 'try-again' ? <button type="button" className="btn primary" onClick={again}>Try again</button> : null}
   </div>;
 }
@@ -99,6 +101,34 @@ function TurnOn({ agent, name, label, transition, again }: {
 
 /** The computers that could run the agent: in use, with Lys running on them. */
 const usable = (machines: Machine[]): Machine[] => machines.filter((machine) => machine.state === 'in_use' && machine.runtime !== null);
+
+/** The folder is chosen on a computer Lys knows, saved to the agent's settings, and the start follows. */
+function ChooseFolder({ agent, again }: { agent: string; again: () => void }) {
+  const load = useLoad(async () => usable((await request<NetworkView>('/network')).machines), 'cannot-start-folder:' + agent);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<StartRefusal | null>(null);
+  const working = useRef(false);
+  // One save per folder, kept while this is shown, so a second press sends the same one.
+  const asked = useRef(new Map<string, string>());
+  if (load.status === 'loading') return <p role="status">Looking for a computer…</p>;
+  if (load.status === 'refused') return <Failed refusal={{ refusal: load.refused.refusal.refusal, reason: load.refused.message }} />;
+  const save = async (folder: string) => {
+    if (working.current) return;
+    working.current = true; setBusy(true); setFailed(null);
+    try {
+      const operation = asked.current.get(folder) ?? operationId();
+      asked.current.set(folder, operation);
+      await saveFolder(agent, folder, operation);
+      again();
+    } catch (error) { setFailed(refusalOf(error)); }
+    finally { working.current = false; setBusy(false); }
+  };
+  return <>
+    <FolderChooser computers={load.data} chosen="" disabled={busy} choose={(folder) => { void save(folder); }} />
+    {busy ? <p role="status">Saving the folder…</p> : null}
+    <Failed refusal={failed} />
+  </>;
+}
 
 function AllowComputer({ agent, name, again }: { agent: string; name: string; again: () => void }) {
   const load = useLoad(async () => {
