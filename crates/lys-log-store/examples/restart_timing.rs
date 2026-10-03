@@ -73,8 +73,8 @@ impl<S: LeafStore> LeafStore for Counting<S> {
         self.inner.leaf(index)
     }
 
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        self.inner.put_leaf(index, bytes)
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
+        self.inner.append(index, leaves, pin)
     }
 
     fn pinned(&self) -> PinnedRoot {

@@ -84,7 +84,11 @@ impl LeafStore for FaultStore {
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>> {
         self.inner.leaf(index)
     }
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
+    // The store writes leaves and pin as one act, so the boundaries a fault
+    // can sit at are: before the act (nothing stored), and after the act's
+    // flush with the answer lost (stored whole, the caller told it failed).
+    // A leaf stored without its pin is not a state this store produces.
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         match get(&self.plan) {
             LogFault::BeforeLeaf => {
                 set(&self.plan, LogFault::None);
@@ -92,12 +96,19 @@ impl LeafStore for FaultStore {
             }
             LogFault::LeafStoredWriteFailed => {
                 set(&self.plan, LogFault::None);
-                self.inner.put_leaf(index, bytes)?;
+                self.inner.append(index, leaves, pin)?;
                 Err(injected("leaf durability"))
             }
-            LogFault::None | LogFault::AfterLeaf | LogFault::AfterLeafUnreadable => {
-                self.inner.put_leaf(index, bytes)
+            LogFault::AfterLeaf => {
+                set(&self.plan, LogFault::None);
+                self.inner.append(index, leaves, pin)?;
+                Err(injected("pin write"))
             }
+            LogFault::AfterLeafUnreadable => {
+                self.inner.append(index, leaves, pin)?;
+                Err(injected("pin write"))
+            }
+            LogFault::None => self.inner.append(index, leaves, pin),
         }
     }
     fn pinned(&self) -> PinnedRoot {
@@ -105,14 +116,11 @@ impl LeafStore for FaultStore {
     }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         match get(&self.plan) {
-            LogFault::AfterLeaf => {
-                set(&self.plan, LogFault::None);
-                Err(injected("pin write"))
-            }
             LogFault::AfterLeafUnreadable => Err(injected("pin write")),
-            LogFault::None | LogFault::BeforeLeaf | LogFault::LeafStoredWriteFailed => {
-                self.inner.pin(pin)
-            }
+            LogFault::None
+            | LogFault::BeforeLeaf
+            | LogFault::LeafStoredWriteFailed
+            | LogFault::AfterLeaf => self.inner.pin(pin),
         }
     }
     fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {

@@ -26,7 +26,7 @@
 //!
 //! # The index is a cross-check, not a convenience
 //!
-//! [`LeafStore::put_leaf`] takes the index to write *and* refuses anything but
+//! [`LeafStore::append`] takes the index to write *and* refuses anything but
 //! the next free one — which looks redundant, since the store already knows its
 //! own [`extent`](LeafStore::extent) and could simply append.
 //!
@@ -52,9 +52,9 @@
 //! # `LeafAlreadyWritten` is a conflict, not a resume signal
 //!
 //! Worth stating because the opposite reading is reasonable and would be a
-//! serious bug. Consider a crash between a durable `put_leaf(N)` and whatever
+//! serious bug. Consider a crash between a durable `append` at `N` and whatever
 //! the caller does next. If the caller had to *resume* by re-attempting
-//! `put_leaf(N)` and treating the refusal as "already fine, carry on", then a
+//! the append at `N` and treating the refusal as "already fine, carry on", then a
 //! terminal refusal would turn an ordinary crash into an unrecoverable store.
 //!
 //! That situation cannot arise here, because **catching up happens when the log
@@ -62,7 +62,7 @@
 //! persist its own tree length; it rebuilds the tree from stored leaves at open
 //! and reconciles it with the pin, adopting a verified tail a backend that
 //! writes leaves before its pin may have left ahead of it. By the time a caller
-//! can call `put_leaf` again, its tree already covers leaf `N`.
+//! can append again, its tree already covers leaf `N`.
 //!
 //! So a refusal at `N` means something else entirely: **another writer holds
 //! that position.** It is terminal for that call and it is not a state to
@@ -106,8 +106,8 @@ pub struct PinnedRoot {
 ///
 /// # Contract an implementation must honour
 ///
-/// 1. **Durable on return.** When [`append`](Self::append),
-///    [`put_leaf`](Self::put_leaf) or [`pin`](Self::pin) returns `Ok`, the
+/// 1. **Durable on return.** When [`append`](Self::append)
+///    or [`pin`](Self::pin) returns `Ok`, the
 ///    bytes have reached stable storage.
 ///    Returning `Ok` for a write still sitting in a buffer is the defect this
 ///    contract exists to forbid: a caller that is told a leaf is durable will
@@ -148,50 +148,35 @@ pub trait LeafStore {
     /// so the store must not frame, pad, or re-encode them.
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>>;
 
-    /// Stores `bytes` at `index`, durably, refusing anything but the next free
-    /// index (see the module docs on why the index is passed at all).
-    ///
-    /// # Errors
-    ///
-    /// [`StoreError::LeafAlreadyWritten`] if `index < extent()`,
-    /// [`StoreError::LeafWouldLeaveGap`] if `index > extent()`, and
-    /// [`StoreError::Io`] if the write cannot be made durable.
-    /// [`StoreError::LeafDurabilityUncertain`] if the leaf was stored but its
-    /// durability could not be confirmed.
-    ///
-    /// [`StoreError::LeafAlreadyWritten`]: crate::StoreError::LeafAlreadyWritten
-    /// [`StoreError::LeafDurabilityUncertain`]: crate::StoreError::LeafDurabilityUncertain
-    /// [`StoreError::LeafWouldLeaveGap`]: crate::StoreError::LeafWouldLeaveGap
-    /// [`StoreError::Io`]: crate::StoreError::Io
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()>;
-
     /// Stores `leaves` at `index..` and `pin`, the frontier they make, as one
     /// durable act (LYSLOGSTORE-008 R2 and R3): nothing is acknowledged before
     /// the one flush that covers all of it, leaves and pin together, so after a
     /// crash they are all there or none are, and no leaf is durable without
-    /// its pin. `index` is refused unless it is the next free one, as
-    /// [`Self::put_leaf`] refuses it; `pin.tree_size` is the index after the
-    /// last leaf given. An empty batch writes only the pin, which is then the
-    /// identical re-pin and a no-op.
+    /// its pin. `index` is refused unless it is the next free one;
+    /// `pin.tree_size` is the index after the last leaf given. An empty batch
+    /// writes only the pin, which is then the identical re-pin and a no-op.
     ///
-    /// The default stores the leaves and then the pin as two acts, each durable
-    /// on its own: the per-leaf layout's cost, kept only for a backend that has
-    /// no one-frame write. Every backend that can write both in one frame
-    /// overrides it.
+    /// This is the one write a store offers. There is no leaf-by-leaf write:
+    /// a leaf alone has no act to ride in, so a backend that cannot write the
+    /// leaves and their pin in one frame cannot be a store.
     ///
     /// # Errors
     ///
-    /// The errors of [`Self::put_leaf`] and [`Self::pin`], and
-    /// [`StoreError::BatchSizeOverflow`] before any write.
+    /// [`StoreError::LeafAlreadyWritten`] if `index < extent()`,
+    /// [`StoreError::LeafWouldLeaveGap`] if `index > extent()`,
+    /// [`StoreError::PinNotOfAppend`] if `pin.tree_size` is not the index
+    /// after the last leaf, the errors of [`Self::pin`] for the pin itself,
+    /// [`StoreError::BatchSizeOverflow`] before any write, and
+    /// [`StoreError::Io`] or [`StoreError::LeafDurabilityUncertain`] when the
+    /// one flush fails, after which nothing of the act is acknowledged.
     ///
     /// [`StoreError::BatchSizeOverflow`]: crate::StoreError::BatchSizeOverflow
-    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
-        let end = batch_end(index, leaves.len())?;
-        for (index, bytes) in (index..end).zip(leaves) {
-            self.put_leaf(index, bytes)?;
-        }
-        self.pin(pin)
-    }
+    /// [`StoreError::LeafAlreadyWritten`]: crate::StoreError::LeafAlreadyWritten
+    /// [`StoreError::LeafWouldLeaveGap`]: crate::StoreError::LeafWouldLeaveGap
+    /// [`StoreError::PinNotOfAppend`]: crate::StoreError::PinNotOfAppend
+    /// [`StoreError::LeafDurabilityUncertain`]: crate::StoreError::LeafDurabilityUncertain
+    /// [`StoreError::Io`]: crate::StoreError::Io
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()>;
 
     /// The currently pinned `(tree_size, root)`.
     ///

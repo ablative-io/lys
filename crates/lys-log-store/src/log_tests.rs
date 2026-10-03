@@ -74,7 +74,7 @@ impl LeafStore for MemStore {
             .cloned())
     }
 
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         if index < self.extent() {
             return Err(StoreError::LeafAlreadyWritten { index });
         }
@@ -84,7 +84,10 @@ impl LeafStore for MemStore {
                 next: self.extent(),
             });
         }
-        self.leaves.push(bytes.to_vec());
+        // One act: a pin that fails stores none of its leaves.
+        self.pin(pin)?;
+        self.leaves
+            .extend(leaves.iter().map(|bytes| bytes.to_vec()));
         Ok(())
     }
 
@@ -408,7 +411,7 @@ fn a_store_that_breaks_its_contiguity_promise_is_named_as_the_culprit() {
         fn leaf(&self, _index: u64) -> StoreResult<Option<Vec<u8>>> {
             Ok(None)
         }
-        fn put_leaf(&mut self, _index: u64, _bytes: &[u8]) -> StoreResult<()> {
+        fn append(&mut self, _index: u64, _leaves: &[&[u8]], _pin: PinnedRoot) -> StoreResult<()> {
             Ok(())
         }
         fn pinned(&self) -> PinnedRoot {

@@ -39,14 +39,14 @@ impl LeafStore for Refusing {
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>> {
         self.inner.leaf(index)
     }
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         if self.refuse.load(Ordering::SeqCst) {
             return Err(StoreError::Io {
                 context: "leaf write".to_owned(),
                 source: std::io::Error::other("injected"),
             });
         }
-        self.inner.put_leaf(index, bytes)
+        self.inner.append(index, leaves, pin)
     }
     fn pinned(&self) -> PinnedRoot {
         self.inner.pinned()

@@ -182,9 +182,6 @@ impl LeafStore for Partial {
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>> {
         self.store.leaf(index)
     }
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        self.store.put_leaf(index, bytes)
-    }
     fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         if self.fail.swap(false, std::sync::atomic::Ordering::SeqCst) {
             // The one flush that would have covered the batch fails: nothing

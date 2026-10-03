@@ -1,7 +1,7 @@
 //! Appending issuance, revocation and attestation-entry leaves.
 //!
 //! Every leaf goes through lys-log-store's `Log::append`, which writes with
-//! `LeafStore::put_leaf` at the store's extent and refuses any other index. A
+//! `LeafStore::append` at the store's extent, with its pin, and refuses any other index. A
 //! revocation adds exactly one leaf and removes, rewrites, truncates or
 //! replaces nothing: the store trait has no operation that could.
 //!

@@ -216,6 +216,14 @@ fn a_snapshot_one_past_the_last_whole_record_refuses_the_open_and_rewrites_nothi
         .unwrap()
         .set_len(cut)
         .unwrap();
+    // The offsets file loses the entry with it: an offset is appended after
+    // its record is flushed, so no crash leaves an offset without a record.
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(crate::file::segment_file(&dir, 0).with_extension("offsets"))
+        .unwrap()
+        .set_len(4 * 8)
+        .unwrap();
     let before = tree_bytes(&dir);
     for store in [
         FileLeafStore::open(&dir).unwrap(),

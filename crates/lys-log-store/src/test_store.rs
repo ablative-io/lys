@@ -79,17 +79,6 @@ impl LeafStore for CountingStore {
             .cloned())
     }
 
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        if index != self.extent() {
-            return Err(StoreError::LeafWouldLeaveGap {
-                index,
-                next: self.extent(),
-            });
-        }
-        self.disk.leaves.push(bytes.to_vec());
-        Ok(())
-    }
-
     /// The leaves and their pin land together or not at all: the parts are
     /// changed only after every check has passed and the flush has not been
     /// made to fail.

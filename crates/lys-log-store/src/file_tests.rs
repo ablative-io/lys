@@ -80,7 +80,9 @@ fn every_leaf_reads_back_byte_for_byte_across_rolled_segments() {
         let dir = tmp.path().join("store");
         let mut store = create(&dir).with_roll_bytes(4 * 1024);
         let mut frontier = Frontier::new();
-        fill(&mut store, &mut frontier, count, 1_000);
+        // Segments roll between acts, so the acts are kept small enough for
+        // a thousand leaves to cross the roll size several times.
+        fill(&mut store, &mut frontier, count, 100);
         assert_eq!(store.extent(), count);
         assert_eq!(store.pinned().tree_size, count);
         assert_eq!(store.pinned().root, frontier.root());
@@ -229,7 +231,6 @@ fn the_read_only_refusals_name_the_store_and_the_refused_act() {
             read_only.put_snapshot(b"s").unwrap_err(),
             "write a snapshot",
         ),
-        (read_only.put_leaf(2, &leaf(2)).unwrap_err(), "write a leaf"),
     ] {
         match err {
             StoreError::ReadOnly { path, operation } => {
@@ -243,16 +244,12 @@ fn the_read_only_refusals_name_the_store_and_the_refused_act() {
 }
 
 #[test]
-fn a_leaf_without_its_pin_is_refused_and_a_lone_pin_only_repeats() {
+fn a_lone_pin_only_repeats_the_held_one() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("store");
     let mut store = create(&dir);
     let mut frontier = Frontier::new();
     fill(&mut store, &mut frontier, 3, 3);
-    assert!(matches!(
-        store.put_leaf(3, b"alone").unwrap_err(),
-        StoreError::LeafWithoutPin { index: 3, bytes: 5 }
-    ));
     store.pin(store.pinned()).unwrap();
     let mut ahead = frontier.clone();
     ahead.push(&leaf(3));

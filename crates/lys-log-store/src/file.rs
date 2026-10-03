@@ -454,14 +454,6 @@ impl LeafStore for FileLeafStore {
 
     /// A leaf is written only with its pin, as one act; the file store has no
     /// leaf-alone write.
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        self.refuse_if_read_only("write a leaf")?;
-        Err(StoreError::LeafWithoutPin {
-            index,
-            bytes: bytes.len(),
-        })
-    }
-
     fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         self.refuse_if_read_only("append leaves with their pin")?;
         if let Some(uncertain) = self.durability_uncertain {

@@ -31,14 +31,20 @@ use crate::harness_serve::{DropMarker, serve};
 pub enum Fault {
     /// Nothing fails.
     None,
-    /// The leaf write fails before any byte is stored.
+    /// The append fails before any byte is stored.
     BeforeLeaf,
-    /// The leaf is stored and the store still answers the write failed, as a
-    /// store does when the leaf is named but its durability is uncertain.
+    /// The act is stored whole, leaves and pin, and the store still answers
+    /// the write failed, as a store does when its one flush returned but the
+    /// answer was lost.
     LeafStoredWriteFailed,
-    /// The leaf is stored and the pin write fails.
+    /// The act is stored whole and the answer names the pin as what failed;
+    /// the store writes leaves and pin as one act, so this is the same lost
+    /// answer under the other name, kept so every caller's handling of it is
+    /// exercised. A leaf stored without its pin is not a state the store
+    /// produces.
     AfterLeaf,
-    /// The leaf is stored, the pin write fails, and the store cannot be opened again until cleared.
+    /// The act is stored whole, the answer is lost, and the store cannot be
+    /// read again until cleared.
     AfterLeafUnreadable,
 }
 
@@ -86,7 +92,7 @@ impl LeafStore for FaultStore {
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>> {
         self.inner.leaf(index)
     }
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         match fault(&self.plan)? {
             Fault::BeforeLeaf => {
                 set(&self.plan, Fault::None)?;
@@ -94,12 +100,19 @@ impl LeafStore for FaultStore {
             }
             Fault::LeafStoredWriteFailed => {
                 set(&self.plan, Fault::None)?;
-                self.inner.put_leaf(index, bytes)?;
+                self.inner.append(index, leaves, pin)?;
                 Err(injected("leaf durability"))
             }
-            Fault::None | Fault::AfterLeaf | Fault::AfterLeafUnreadable => {
-                self.inner.put_leaf(index, bytes)
+            Fault::AfterLeaf => {
+                set(&self.plan, Fault::None)?;
+                self.inner.append(index, leaves, pin)?;
+                Err(injected("pin write"))
             }
+            Fault::AfterLeafUnreadable => {
+                self.inner.append(index, leaves, pin)?;
+                Err(injected("pin write"))
+            }
+            Fault::None => self.inner.append(index, leaves, pin),
         }
     }
     fn pinned(&self) -> PinnedRoot {
@@ -107,10 +120,7 @@ impl LeafStore for FaultStore {
     }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         match fault(&self.plan)? {
-            Fault::AfterLeaf => {
-                set(&self.plan, Fault::None)?;
-                Err(injected("pin write"))
-            }
+            Fault::AfterLeaf => self.inner.pin(pin),
             Fault::AfterLeafUnreadable => Err(injected("pin write")),
             Fault::None | Fault::BeforeLeaf | Fault::LeafStoredWriteFailed => self.inner.pin(pin),
         }

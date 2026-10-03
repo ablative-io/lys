@@ -159,7 +159,7 @@ impl LeafStore for FailingStore {
             .and_then(|index| self.leaves.get(index).cloned()))
     }
 
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         if index == 1 {
             return Err(StoreError::Io {
                 context: "writing leaf 1 to the failing store".to_owned(),
@@ -167,7 +167,8 @@ impl LeafStore for FailingStore {
             });
         }
         assert_eq!(index, self.extent(), "a write lands only at the extent");
-        self.leaves.push(bytes.to_vec());
+        self.leaves.extend(leaves.iter().map(|bytes| bytes.to_vec()));
+        self.pinned = pin;
         Ok(())
     }
 
