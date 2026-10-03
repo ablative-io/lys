@@ -1,13 +1,11 @@
 //! Writing a log: `lys log init`, `checkpoint` and `append`, an interrupted
 //! append recovered, and a corrupted directory refused.
 
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
 use lys_core::merkle::raw_leaf_hash;
 
 use super::{
-    EMPTY_ROOT_HEX, GOLDEN_SEED, ProvenLog, assert_success, build_proven_log, field, hex_lower,
-    load_json, path_str, run_lys, stderr_of, stdout_of,
+    EMPTY_ROOT_HEX, GOLDEN_SEED, assert_success, build_proven_log, field, hex_lower, load_json,
+    path_str, run_lys, stderr_of, stdout_of,
 };
 
 // ------------------------------------------------------------------ log init
@@ -221,17 +219,27 @@ fn empty_leaf_appends_proves_and_verifies() {
 
 // ------------------------------------------------- crash recovery / corruption
 
+/// The first segment file of the log at `dir` (LYSLOGSTORE-008 R1): a record
+/// is its u32 LE length, the leaf bytes, the pin and a CRC, so byte 4 is the
+/// first byte of leaf 0.
+fn first_segment(dir: &std::path::Path) -> std::path::PathBuf {
+    dir.join("leaves")
+        .join("segments")
+        .join(format!("{:020}", 0))
+}
+
 #[test]
-fn interrupted_append_is_recovered_with_a_notice() {
+fn an_unfinished_append_is_cut_with_a_notice() {
+    use std::io::Write;
     let log = build_proven_log("example.com/lys/recovery", None);
-    // Roll state.json back one append: exactly the crash window between the
-    // leaf write and the state write.
-    let state_path = log.dir.join("state.json");
-    let stale = serde_json::json!({
-        "tree_size": 2,
-        "root_hash": STANDARD.encode(prefix_root_of(&log, 2)),
-    });
-    std::fs::write(&state_path, serde_json::to_string_pretty(&stale).unwrap()).unwrap();
+    // Exactly the crash window: bytes of a record that never reached its
+    // flush, after the last whole record.
+    let mut segment = std::fs::OpenOptions::new()
+        .append(true)
+        .open(first_segment(&log.dir))
+        .unwrap();
+    segment.write_all(&[7, 0, 0, 0, b'l', b'e', b'a']).unwrap();
+    drop(segment);
 
     let leaf = log.dir.join("../next-leaf.bin");
     std::fs::write(&leaf, b"leaf-3").unwrap();
@@ -246,32 +254,21 @@ fn interrupted_append_is_recovered_with_a_notice() {
     assert_success(&append);
     let stderr = stderr_of(&append);
     assert!(
-        stderr.contains("recovered interrupted append: state advanced to 3"),
+        stderr.contains("cut an unfinished append: 7 bytes after offset"),
         "{stderr}"
     );
     assert_eq!(field(&stdout_of(&append), "tree size:"), "4");
 }
 
-/// Recomputes the root over the first `n` golden-style leaves of a log by
-/// reading its leaf files directly (test-side cross-check only).
-fn prefix_root_of(log: &ProvenLog, n: usize) -> [u8; 32] {
-    let mut leaves = Vec::new();
-    for i in 0..n {
-        leaves.push(std::fs::read(log.dir.join("leaves").join(format!("{i:020}"))).unwrap());
-    }
-    let tree =
-        lys_core::merkle::AppendOnlyTree::<lys_core::merkle::RawLeaf>::reconstruct_from_raw_leaves(
-            &leaves,
-        );
-    let (root, _size) = tree.root().to_parts();
-    root
-}
-
 #[test]
 fn corrupted_log_directories_are_refused() {
-    // Modified leaf byte.
+    // Modified leaf byte: byte 4 of the first segment is the first byte of
+    // leaf 0, inside the pinned prefix.
     let log = build_proven_log("example.com/lys/corrupt-a", None);
-    std::fs::write(log.dir.join("leaves").join(format!("{:020}", 0)), b"leaf-X").unwrap();
+    let segment = first_segment(&log.dir);
+    let mut bytes = std::fs::read(&segment).unwrap();
+    bytes[4] ^= 0x01;
+    std::fs::write(&segment, bytes).unwrap();
     let leaf = log.dir.join("../again.bin");
     std::fs::write(&leaf, b"more").unwrap();
     let output = run_lys(&[
@@ -289,27 +286,13 @@ fn corrupted_log_directories_are_refused() {
         stderr_of(&output)
     );
 
-    // Gap: a missing middle leaf.
-    let log = build_proven_log("example.com/lys/corrupt-b", None);
-    std::fs::remove_file(log.dir.join("leaves").join(format!("{:020}", 1))).unwrap();
-    let output = run_lys(&[
-        "log",
-        "append",
-        "--dir",
-        path_str(&log.dir),
-        "--leaf",
-        path_str(&leaf),
-    ]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(
-        stderr_of(&output).contains("log directory invalid"),
-        "{}",
-        stderr_of(&output)
-    );
-
-    // Extra non-dot entry in leaves/.
+    // Extra non-dot entry in leaves/segments/.
     let log = build_proven_log("example.com/lys/corrupt-c", None);
-    std::fs::write(log.dir.join("leaves").join("stray.txt"), b"junk").unwrap();
+    std::fs::write(
+        log.dir.join("leaves").join("segments").join("stray.txt"),
+        b"junk",
+    )
+    .unwrap();
     let output = run_lys(&[
         "log",
         "append",
@@ -327,7 +310,11 @@ fn corrupted_log_directories_are_refused() {
 
     // Dotfiles (e.g. .DS_Store) are ignored, not corruption.
     let log = build_proven_log("example.com/lys/corrupt-d", None);
-    std::fs::write(log.dir.join("leaves").join(".DS_Store"), b"junk").unwrap();
+    std::fs::write(
+        log.dir.join("leaves").join("segments").join(".DS_Store"),
+        b"junk",
+    )
+    .unwrap();
     let output = run_lys(&[
         "log",
         "append",
