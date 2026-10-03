@@ -59,10 +59,11 @@ describe('An agent page explains the agent before its controls', () => {
     expect(overview?.textContent).not.toContain('model-one');
     expect(overview?.textContent).toContain('Running, as its runner last reported');
     const actions = $$('[aria-label="Next steps"] a');
-    expect(actions.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Start', 'Set limits', 'Give access']);
-    expect(actions.map((entry) => entry.getAttribute('href'))).toEqual(['#/team/' + SCRIBE, '#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']);
+    expect(actions.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Watch', 'Set limits', 'Give access']);
+    expect(actions.map((entry) => entry.getAttribute('href'))).toEqual(['#/runtime/' + session.session, '#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']);
     expect(actions.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
-    expect(actions[0]?.textContent).toContain('Start Scribe on Ward computer with Model One.');
+    expect(actions[0]?.textContent).toContain('Scribe is running on Ward computer.');
+    expect($('[data-act="start"]')).toBeNull();
     expect(actions[0]?.textContent).not.toContain('Choose its computer and model');
     expect($('.file .head')?.textContent).not.toContain('Edit name');
     expect($('.file .head [data-act="suspend"]')).toBeNull();
@@ -79,7 +80,7 @@ describe('An agent page explains the agent before its controls', () => {
   });
 
   it('names an unreadable model list instead of showing the saved id', async () => {
-    await open({ '/harnesses': refused(503, 'HarnessesUnavailable', 'The program list could not be read') });
+    await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), '/harnesses': refused(503, 'HarnessesUnavailable', 'The program list could not be read') });
     const overview = $('[aria-label="About this agent"]');
     expect(overview?.textContent).toContain('Lys could not read model names just now');
     expect(overview?.textContent).not.toContain('model-one');
@@ -88,7 +89,7 @@ describe('An agent page explains the agent before its controls', () => {
   });
 
   it('asks for a computer and model when none is saved', async () => {
-    await open({ [prefix + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: null }) });
+    await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), [prefix + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: null }) });
     expect($('[aria-label="About this agent"]')?.textContent).toContain('Choose a model when you start');
     expect($('[aria-label="Next steps"]')?.textContent).toContain('Choose its computer and model, then start this agent.');
   });
@@ -134,8 +135,9 @@ describe('An agent page explains the agent before its controls', () => {
   });
 
   it('names the missing computer permission without presenting activation as readiness', async () => {
-    const { posted } = await open({ '/network': ok({ machines: [{ id: 'computer-one', name: 'Ward computer', state: 'in_use', runtime: 'runner', may_run: [], may_run_roles: [] }], reports_served: true }) });
-    expect($('.file .head')?.textContent).toContain('Scribe is added. Choose Start to finish setting it up.');
+    const { posted } = await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), '/network': ok({ machines: [{ id: 'computer-one', name: 'Ward computer', state: 'in_use', runtime: 'runner', may_run: [], may_run_roles: [] }], reports_served: true }) });
+    expect($('.file .head')?.textContent).toContain('Scribe is added.');
+    expect($('.file .head')?.textContent).not.toContain('finish setting it up');
     expect($('.file .head')?.textContent).not.toContain('Scribe is ready');
     expect($('[aria-label="Next steps"]')?.textContent).toContain('No computer lets Scribe run yet');
     expect($('[aria-label="Next steps"] a')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
@@ -146,7 +148,7 @@ describe('An agent page explains the agent before its controls', () => {
     { name: 'no computers', machines: [] },
     { name: 'only a retired computer', machines: [{ id: 'computer-one', name: 'Ward computer', state: 'retired', runtime: 'runner', may_run: [{ id: SCRIBE }], may_run_roles: [] }] },
   ])('opens the existing add form when Lys has $name', async ({ machines }) => {
-    const { posted } = await open({ '/network': ok({ machines, reports_served: true }), '/network/machines/computer-one/runner': ok({ runner: null }) });
+    const { posted } = await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), '/network': ok({ machines, reports_served: true }), '/network/machines/computer-one/runner': ok({ runner: null }) });
     expect($('[aria-label="Next steps"]')?.textContent).toContain('Lys has no computer to run Scribe on yet.');
     const add = $$('[aria-label="Next steps"] a').find((link) => link.textContent === 'Add this computer') ?? null;
     expect(add?.getAttribute('href')).toBe('#/network?add=computer');

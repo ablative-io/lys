@@ -12,7 +12,7 @@ describe("An agent's file", () => {
     expect($('#state')?.textContent).toBe('Active');
     expect($('[aria-label="About this agent"] .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
     expect($('.agent-details')?.textContent).toContain('since 22 Sep');
-    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access1', 'Start', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Tool policy', 'Record2', 'Budgets and goals']);
+    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access1', 'Settings', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Tool policy', 'Record2', 'Budgets and goals']);
   });
 
   it('explains three next steps, keeps lifecycle controls in Details and preserves Emergency stop', async () => {

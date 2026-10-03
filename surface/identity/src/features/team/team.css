@@ -14,9 +14,6 @@
 .team-pane .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; gap: 0; background: none; border: 0; border-radius: 0; }
 .team-pane .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .team-pane .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
-.team-pane .terminal-line { padding: 6px 8px 0; }
-.team-pane .terminal-line input { border-color: transparent; }
-.team-pane .terminal-keys { padding: 6px 8px 8px; }
 .team-pane .terminal .why-not { padding: 0 8px; }
 .team-stopped { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 32px; }
 .team-start { display: flex; flex-direction: column; gap: 14px; width: min(100%, 480px); }

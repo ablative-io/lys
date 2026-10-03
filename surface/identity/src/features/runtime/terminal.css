@@ -8,11 +8,6 @@
 .terminal-state { color: var(--text-secondary); }
 .terminal-state[data-ended="true"] { color: var(--warn); }
 .terminal-screen { margin: 0; min-height: 280px; max-height: 60vh; overflow: auto; padding: 12px 14px; background: var(--surface-code); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.terminal-line { display: flex; gap: 8px; }
-.terminal-line input { flex: 1; padding: 8px 10px; color: var(--text-primary); background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-sm); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; outline: none; }
-.terminal-line input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent-glow); }
-.terminal-keys { display: flex; flex-wrap: wrap; gap: 6px; }
-.terminal-keys .btn { padding: 4px 10px; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; }
 .terminal-stop { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-md); background: var(--surface-default); }
 .terminal-stop .actions { display: flex; gap: 8px; }
 .terminal .why-not { color: var(--danger); }

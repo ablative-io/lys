@@ -36,15 +36,6 @@ function readOnce(first: string): Route {
   };
 }
 
-async function submitLine(value: string) {
-  const form = $('form[aria-label="Type to the session"]');
-  const input = form?.querySelector<HTMLInputElement>('input[name="line"]');
-  if (!form || !input) throw new Error('no line to type into');
-  input.value = value;
-  await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
-  await settle();
-}
-
 describe('Running sessions', () => {
   it('switches permitted sessions, disposes the old view, and does not stop either process', async () => {
     const second = 'op-' + '6'.repeat(32);
@@ -135,18 +126,19 @@ describe('Running sessions', () => {
     expect($('.terminal-renderer')?.textContent).toBe('This browser is not offering WebGPU, so the terminal is drawn with Canvas 2D instead.');
   });
 
-  it('types a line and sends keys to the session', async () => {
+  it('shows the terminal alone: no line to type into and no key buttons, since the screen takes typing itself', async () => {
     const { posted } = await mount('#/runtime/' + ID, {
       ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }),
       ['POST ' + base + '/read-bytes']: readOnce('$ '),
-      ['POST ' + base + '/input']: ok({ session: ID, answer: { kind: 'delivered', session: ID }, receipt: { index: 2 } }),
-      ['POST ' + base + '/keys']: ok({ session: ID, answer: { kind: 'delivered', session: ID }, receipt: { index: 3 } }),
     });
-    await submitLine('ls -l');
-    expect(posted).toContainEqual({ path: base + '/input', body: { text: 'ls -l', enter: true } });
-    await click($('button[data-key="ctrl_c"]'));
-    expect(posted).toContainEqual({ path: base + '/keys', body: { keys: ['ctrl_c'] } });
-    expect($$('button[data-key]').map((button) => button.getAttribute('data-key'))).toEqual(['enter', 'tab', 'escape', 'up', 'down', 'ctrl_c', 'ctrl_d']);
+    expect($('.terminal')).not.toBeNull();
+    expect($('.terminal form')).toBeNull();
+    expect($('.terminal input')).toBeNull();
+    expect($$('button[data-key]')).toEqual([]);
+    expect($('.terminal-head')?.textContent).toContain('Scribe');
+    expect($('.terminal-head')?.textContent).toContain('on Dean laptop');
+    expect($('.terminal-head')?.textContent).not.toContain(ID);
+    expect(posted.filter((entry) => entry.path.endsWith('/input') || entry.path.endsWith('/keys'))).toEqual([]);
   });
 
   it('asks before Stop by naming the agent, then ends the session', async () => {
@@ -162,17 +154,6 @@ describe('Running sessions', () => {
     await click($('button[data-act="confirm-stop"]'));
     expect(posted).toContainEqual({ path: base + '/end', body: {} });
     expect(text()).toContain('The process exited, Killed: 9');
-    expect($('form[aria-label="Type to the session"]')).toBeNull();
-  });
-
-  it('names a refusal to type, by name', async () => {
-    await mount('#/runtime/' + ID, {
-      ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }),
-      ['POST ' + base + '/read-bytes']: readOnce('$ '),
-      ['POST ' + base + '/input']: refused(403, 'not_permitted', 'person-b does not hold operate on the agent'),
-    });
-    await submitLine('whoami');
-    expect($('[role="alert"]')?.textContent).toBe('not_permitted: person-b does not hold operate on the agent');
   });
 
   it('preserves escape and invalid bytes instead of cleaning terminal output', () => {

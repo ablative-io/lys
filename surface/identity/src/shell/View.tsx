@@ -1,5 +1,6 @@
-/** The terminals the person is watching, kept in the corner of every page: one small live picture at a time with the others as tabs, dragged by its corner to any size, and opened into a multiplexer of real terminals that fills the screen. Hiding it keeps the set; the sessions keep running either way. */
+/** The terminals the person is watching, kept in the corner of every page but Running, which shows them itself: one small live picture at a time with the others as tabs, dragged by its corner to any size, and opened into a multiplexer of real terminals that fills the screen. Hiding it keeps the set; the sessions keep running either way. */
 import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { PEEK } from '../features/runtime/GpuTerminal';
 import { Peek } from '../features/runtime/Peek';
@@ -88,8 +89,11 @@ function Hidden() {
 
 export function View() {
   const shell = useShell();
+  const { pathname } = useLocation();
   if (!shell.watched.length) return null;
   if (shell.viewState === 'open') return <Open />;
+  // The Running page shows the terminals itself; the corner picture would sit on top of the one that is open.
+  if (pathname === '/runtime' || pathname.startsWith('/runtime/')) return null;
   if (shell.viewState === 'hidden') return <Hidden />;
   return <Small />;
 }

@@ -52,7 +52,8 @@ function Running({ sessions, unanswered, people, me, teams, session }: Awaited<R
   const held = (entry: RuntimeSession): Held => ({ id: entry.agent ?? entry.session, person: entry.agent ? agents.get(entry.agent)?.person ?? null : null });
   const scoped = sessions.filter((entry) => inWhose(whose, teams.list, me.person.id, held(entry)));
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => names.get(id) ?? 'someone outside your view');
-  const open = sessions.find((entry) => entry.session === session);
+  // With one running agent and none named in the address, that one is open: there is nothing to choose between.
+  const open = sessions.find((entry) => entry.session === session) ?? (!session && sessions.length === 1 ? sessions[0] : undefined);
   const silent = (entry: RuntimeSession) => unanswered.some((each) => each.session === entry.session);
   const name = (entry: RuntimeSession) => entry.agent ? names.get(entry.agent) ?? 'An agent outside your view' : 'Unattached session';
   const columns: Column<RuntimeSession>[] = [
@@ -71,7 +72,7 @@ function Running({ sessions, unanswered, people, me, teams, session }: Awaited<R
         holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' running' : ' running')}
         selected={open?.session ?? null} select={() => undefined} open={(entry) => navigate('/runtime/' + encodeURIComponent(entry.session))}
         tools={<WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />} />
-      <div className="detail">{open ? <Terminal key={open.session} session={open.session} agent={open.agent} />
+      <div className="detail">{open ? <Terminal key={open.session} session={open.session} agent={open.agent} machine={open.machine_name ?? open.machine} />
         : <div className="card"><h2>{session ? 'Session not returned' : sessions.length ? 'Choose a running agent' : 'No running session was returned.'}</h2><p className="sec">{session ? 'This session is not in the current list. Ask the runners again to refresh it.' : 'Its terminal opens here. Your input and controls use your existing permissions.'}</p></div>}</div>
     </div>
   </>;

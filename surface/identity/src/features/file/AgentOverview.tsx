@@ -126,14 +126,17 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
       <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !saved.length ? 'Choose a model when you start' : programs.status !== 'ok' ? reading(programs, 'model names') : models}<p className="note">Saved choice for the next start.</p></dd>
       <dt>Running</dt><dd><Running load={sessions} /></dd>
     </dl>
-  </section><AgentNextSteps id={agent.id} name={agent.display_name} noComputer={noComputer} noInUseComputer={noInUseComputer} chosen={machine && models ? { computer: machine.name, models } : null} />{details(problems)}</>;
+  </section><AgentNextSteps id={agent.id} name={agent.display_name} noComputer={noComputer} noInUseComputer={noInUseComputer} chosen={machine && models ? { computer: machine.name, models } : null} running={sessions.status === 'ok' ? sessions.data.filter((session) => session.shown === 'running').sort((a, b) => b.last_report_at - a.last_report_at)[0] : undefined} />{details(problems)}</>;
 }
 
 /** Each next act opens the existing form and never makes a change just by visiting. */
-export function AgentNextSteps({ id, name, noComputer, noInUseComputer, chosen = null }: { id: string; name: string; noComputer: boolean; noInUseComputer: boolean; chosen?: { computer: string; models: string } | null }) {
+export function AgentNextSteps({ id, name, noComputer, noInUseComputer, chosen = null, running }: { id: string; name: string; noComputer: boolean; noInUseComputer: boolean; chosen?: { computer: string; models: string } | null;
+  /** The run its runner last reported running, when there is one: the first card then opens its terminal. */
+  running?: RuntimeSession }) {
   const base = '#/file/' + encodeURIComponent(id) + '/';
   return <nav className="agent-next" aria-label="Next steps">
-    <div className="agent-next-step"><a data-act="start" href={'#/team/' + encodeURIComponent(id)}><strong>Start</strong><span>{noInUseComputer ? 'Lys has no computer to run ' + name + ' on yet.' : noComputer ? 'No computer lets ' + name + ' run yet. Ask for it to be allowed on a computer before starting.' : chosen ? 'Start ' + name + ' on ' + chosen.computer + ' with ' + chosen.models + '.' : 'Choose its computer and model, then start this agent.'}</span></a>{noInUseComputer ? <a className="agent-add-computer" href="#/network?add=computer">Add this computer</a> : null}</div>
+    {running ? <div className="agent-next-step"><a data-act="watch" href={'#/runtime/' + encodeURIComponent(running.session)}><strong>Watch</strong><span>{name} is running{running.machine_name ? ' on ' + running.machine_name : ''}. Open its terminal to watch it, type to it or stop it.</span></a></div> :
+    <div className="agent-next-step"><a data-act="start" href={'#/team/' + encodeURIComponent(id)}><strong>Start</strong><span>{noInUseComputer ? 'Lys has no computer to run ' + name + ' on yet.' : noComputer ? 'No computer lets ' + name + ' run yet. Ask for it to be allowed on a computer before starting.' : chosen ? 'Start ' + name + ' on ' + chosen.computer + ' with ' + chosen.models + '.' : 'Choose its computer and model, then start this agent.'}</span></a>{noInUseComputer ? <a className="agent-add-computer" href="#/network?add=computer">Add this computer</a> : null}</div>}
     <div className="agent-next-step"><a href={base + 'budgets'}><strong>Set limits</strong><span>Set how much this agent may use and when it must stop.</span></a></div>
     <div className="agent-next-step"><a href={base + 'access'}><strong>Give access</strong><span>Choose what this agent may reach from access you can give.</span></a></div>
   </nav>;
