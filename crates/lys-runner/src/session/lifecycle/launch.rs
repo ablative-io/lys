@@ -105,6 +105,26 @@ pub(crate) fn tracking_started(
     append(table, id, vec![Body::Coverage(coverage)], None)
 }
 
+/// Say, in the feed, that session `id`'s folder was recorded as trusted in
+/// the harness's own configuration before the spawn, or found there already.
+pub(crate) fn trust_recorded(
+    table: &mut Table,
+    id: &str,
+    trust: &crate::trust::Trust,
+) -> Result<(), RunnerError> {
+    let coverage = Coverage {
+        state: "trust_recorded".to_owned(),
+        source: None,
+        generation: 0,
+        offset: None,
+        words: trust.words(),
+        executable: None,
+        harness_version: None,
+        adapter: None,
+    };
+    append(table, id, vec![Body::Coverage(coverage)], None)
+}
+
 pub(crate) fn window_limit(table: &mut Table, id: &str, bodies: &[Body]) -> Option<Leader> {
     let session = table.sessions.get_mut(id)?;
     if session.ending {

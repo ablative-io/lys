@@ -190,9 +190,9 @@ pub struct Commit {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Coverage {
-    /// The state, by name: `tracking_started`, `source_bound`,
-    /// `source_generation`, `record_unreadable`, `source_refused`,
-    /// `coverage_incomplete` or `audit_incomplete`.
+    /// The state, by name: `tracking_started`, `trust_recorded`,
+    /// `source_bound`, `source_generation`, `record_unreadable`,
+    /// `source_refused`, `coverage_incomplete` or `audit_incomplete`.
     pub state: String,
     /// The stream it concerns, when it concerns one.
     pub source: Option<String>,

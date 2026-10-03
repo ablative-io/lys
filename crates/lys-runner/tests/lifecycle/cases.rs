@@ -222,3 +222,81 @@ fn a_full_live_status_window_trips_the_declared_rotation() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_claude_code_launch_records_its_folder_as_trusted_before_the_spawn_and_only_once() -> TestResult
+{
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir()?;
+    let home = dir.path().join("home");
+    let work = dir.path().join("work");
+    std::fs::create_dir_all(&work)?;
+    // A harness that answers its version as the adapter measured it, and at
+    // its start prints the trust file it is handed, so the output proves the
+    // row was there when the process began.
+    let harness = dir.path().join("claude");
+    std::fs::write(
+        &harness,
+        "#!/bin/sh\nif [ \"$1\" = --version ]; then echo '2.1.285 (Claude Code)'; exit 0; fi\ncat \"$TRUST\"\nprintf 'ready\\n'\nexec cat\n",
+    )?;
+    std::fs::set_permissions(&harness, std::fs::Permissions::from_mode(0o755))?;
+    let trust_file = home.join(crate::trust::FILE);
+    let tracking = Tracking {
+        harness: Harness::ClaudeCode,
+        adapter: CLAUDE_ADAPTER.to_owned(),
+        version: "2.1.285".to_owned(),
+        config_home: home.display().to_string(),
+        context_window: 200_000,
+        profile_version: 1,
+        account: None,
+        requires_pre_tool: false,
+    };
+    let launch = |session: &str| Launch {
+        session: session.to_owned(),
+        program: harness.display().to_string(),
+        arguments: Vec::new(),
+        directory: work.display().to_string(),
+        environment: BTreeMap::from([("TRUST".to_owned(), trust_file.display().to_string())]),
+        config: None,
+        columns: 80,
+        rows: 24,
+        rotation: None,
+        policy: None,
+    };
+    let ready = |session: &mut crate::session::output::OutputState, _: &str| {
+        let bytes = session.scrollback().from(0).ok()?;
+        bytes
+            .windows(7)
+            .any(|word| word == b"ready\r\n")
+            .then_some(Ok(bytes))
+    };
+    let sessions = Sessions::open(&dir.path().join("state"), 4096)?;
+    assert!(
+        !trust_file.exists(),
+        "nothing is trusted before the first launch"
+    );
+    sessions.begin(launch("first"), None, Some(tracking.clone()))?;
+    let output = sessions.until("first", &AtomicBool::new(false), ready)?;
+    let bytes = std::fs::read(&trust_file)?;
+    let root: serde_json::Value = serde_json::from_slice(&bytes)?;
+    let canonical = std::fs::canonicalize(&work)?.display().to_string();
+    assert_eq!(
+        root["projects"][canonical.as_str()][crate::trust::ROW],
+        serde_json::Value::Bool(true),
+        "the run's canonical folder has its trust row"
+    );
+    let printed = String::from_utf8_lossy(&output).replace("\r\n", "\n");
+    assert!(
+        printed.contains(crate::trust::ROW) && printed.contains(&canonical),
+        "the harness read the row at its start: {printed}"
+    );
+    sessions.begin(launch("second"), None, Some(tracking))?;
+    sessions.until("second", &AtomicBool::new(false), ready)?;
+    assert_eq!(
+        std::fs::read(&trust_file)?,
+        bytes,
+        "a second launch into a trusted folder leaves the file byte-identical"
+    );
+    sessions.stop_all()?;
+    Ok(())
+}

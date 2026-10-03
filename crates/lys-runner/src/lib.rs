@@ -78,6 +78,9 @@ pub mod tracking;
 pub mod tracking_budget;
 mod tracking_fields;
 pub mod tracking_store;
+pub mod trust;
+#[cfg(test)]
+mod trust_tests;
 
 pub use client::{Client, Closer, Connection, GrantChannel, connect};
 pub use error::RunnerError;
