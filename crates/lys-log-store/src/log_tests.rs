@@ -400,22 +400,22 @@ fn a_log_runs_over_a_store_that_is_not_a_directory() {
 }
 
 #[test]
-fn a_failed_pin_poisons_the_handle_instead_of_compounding_the_damage() {
+fn a_failed_act_stores_nothing_and_poisons_the_handle() {
     let mut log = Log::open(MemStore::new(ORIGIN)).unwrap();
     log.append(b"leaf-0").unwrap();
     log.store().fail_next_pin.set(true);
     let err = log.append(b"leaf-1").unwrap_err();
     assert!(matches!(err, StoreError::Io { .. }), "{err}");
-    // The leaf IS stored — that is the recoverable one-ahead state.
-    assert_eq!(log.store().extent(), 2);
+    // Leaves and pin are one act: the act that failed stored neither.
+    assert_eq!(log.store().extent(), 1);
     assert_eq!(log.store().pinned().tree_size, 1);
-    // A further append would put storage two ahead of the pin, past what
-    // recovery repairs. The handle refuses instead.
+    // The handle cannot know what a failed act left behind, so it stops
+    // instead of building on a guess, though this store would now accept.
     let err = log.append(b"leaf-2").unwrap_err();
     assert!(matches!(err, StoreError::Poisoned), "{err}");
     assert_eq!(
         log.store().extent(),
-        2,
+        1,
         "the poisoned handle stored nothing"
     );
 }
