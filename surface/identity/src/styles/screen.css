@@ -96,6 +96,8 @@ ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
 /* A page's list and its detail each scroll on their own. */
 .fill > .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; }
 .fill > .body.one { grid-template-columns: minmax(0, 1fr); }
+.fill > .body.halves { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.review-row > td { background: var(--surface-2, transparent); }
 /* Where the pane beside the list is where the work is done, it gets the larger share. */
 .fill > .body.work { grid-template-columns: minmax(0, 2fr) minmax(360px, 3fr); }
 .fill .listing { display: flex; flex-direction: column; min-height: 0; }

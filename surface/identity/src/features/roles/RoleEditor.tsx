@@ -35,23 +35,25 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
   return <form className="card recorded-form" aria-label={role ? 'Publish role version' : 'Create role'} onSubmit={submit}>
     <h2>{role ? 'Save a new version of ' + role.name : 'Create a role'}</h2>
     <p>Describe the work and the access normally needed. Saving a version leaves existing assignments on their current version and grants no access.</p>
-    <fieldset disabled={change.blocked} style={{ border: 0, padding: 0 }}>
-      {!role ? <label className="field">Role name<input name="name" required maxLength={100} /></label> : null}
-      {(['responsibilities', 'goals', 'practice'] as const).map((name) => <label className="field" key={name}>{name === 'responsibilities' ? 'Responsibilities' : name === 'goals' ? 'Goals' : 'How the work is done'}<textarea name={name} required maxLength={4000} defaultValue={current?.[name] ?? ''} /></label>)}
-      <h3>Starting instructions and suggested access</h3>
-        <label className="field">Starting instructions for an agent<textarea name="profile" maxLength={4000} defaultValue={current?.profile ?? ''} /></label>
-        {rows.map(({ id, template }) => <fieldset key={id}><legend>Access template {id + 1}</legend>
-          <label className="field">Type of thing this access covers<input name={'kind-' + id} required defaultValue={template.resource.kind} /></label>
-          <label className="field">Name of the thing this access covers<input name={'resource-' + id} required defaultValue={template.resource.id} /></label>
-          <label className="field">Access level<select name={'relation-' + id} required defaultValue={template.relation}><option value="">Choose access</option>{Object.entries(model.relations).map(([name, actions]) => <option key={name} value={name}>{name} · {actions.join(', ')}</option>)}</select></label>
-          <label className="field">Usual duration in days<input name={'days-' + id} type="number" min={1} step={1} defaultValue={template.days ?? ''} /></label>
-          <p className="note">An empty duration records no expiry of its own. A template grants nothing by itself.</p>
-          <button className="btn" type="button" onClick={() => setRows((values) => values.filter((row) => row.id !== id))}>Remove template</button>
-        </fieldset>)}
-        <button className="btn" type="button" onClick={() => setRows((values) => [...values, { id: Math.max(-1, ...values.map((value) => value.id)) + 1, template: { resource: { kind: '', id: '' }, relation: '', days: null } }])}>Add access template</button>
-      
-      <label className="field">Reason for this version<textarea name="note" required maxLength={500} /></label>
-      <button className="btn primary" type="submit">{role ? 'Save this version' : 'Create role'}</button>
+    <fieldset className="form-grid" disabled={change.blocked} style={{ border: 0, padding: 0 }}>
+      {!role ? <label className="field wide">Role name<input name="name" required maxLength={100} /></label> : null}
+      {(['responsibilities', 'goals', 'practice'] as const).map((name) => <label className="field wide" key={name}>{name === 'responsibilities' ? 'Responsibilities' : name === 'goals' ? 'Goals' : 'How the work is done'}<textarea name={name} rows={6} required maxLength={4000} defaultValue={current?.[name] ?? ''} /></label>)}
+      <label className="field wide">Starting instructions for an agent<textarea name="profile" rows={6} maxLength={4000} defaultValue={current?.profile ?? ''} /></label>
+      <table className="usage-table" aria-label="Access templates"><thead><tr><th>Type of thing</th><th>Name of the thing</th><th>Access level</th><th>Usual days</th><th>Change</th></tr></thead>
+        <tbody>
+          {rows.map(({ id, template }) => <tr key={id} aria-label={'Access template ' + (id + 1)}>
+            <td><input name={'kind-' + id} aria-label="Type of thing this access covers" required defaultValue={template.resource.kind} /></td>
+            <td><input name={'resource-' + id} aria-label="Name of the thing this access covers" required defaultValue={template.resource.id} /></td>
+            <td><select name={'relation-' + id} aria-label="Access level" required defaultValue={template.relation}><option value="">Choose access</option>{Object.entries(model.relations).map(([name, actions]) => <option key={name} value={name}>{name} · {actions.join(', ')}</option>)}</select></td>
+            <td><input name={'days-' + id} aria-label="Usual duration in days, empty for no expiry of its own" type="number" min={1} step={1} defaultValue={template.days ?? ''} /></td>
+            <td><button className="btn" type="button" onClick={() => setRows((values) => values.filter((row) => row.id !== id))}>Remove template</button></td>
+          </tr>)}
+          {rows.length ? null : <tr><td colSpan={5} className="dim">No access template. A template grants nothing by itself.</td></tr>}
+        </tbody>
+        <tfoot><tr><td colSpan={5} className="usage-add"><button className="btn" type="button" onClick={() => setRows((values) => [...values, { id: Math.max(-1, ...values.map((value) => value.id)) + 1, template: { resource: { kind: '', id: '' }, relation: '', days: null } }])}>Add access template</button></td></tr></tfoot>
+      </table>
+      <label className="field wide">Reason for this version<textarea name="note" rows={2} required maxLength={500} /></label>
+      <p><button className="btn primary" type="submit">{role ? 'Save this version' : 'Create role'}</button></p>
     </fieldset>
     {failure ? <p role="alert">{failure}</p> : null}<ChangeStatus change={change} />
   </form>;
