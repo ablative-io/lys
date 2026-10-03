@@ -8,7 +8,7 @@ pub enum ProxyCommand {
     /// Forward each model call unchanged and record it under its run.
     ///
     /// A call to `http://<listen>/anthropic/...` goes to the Anthropic
-    /// upstream, one to `/openai/...` to the OpenAI upstream, with its
+    /// upstream, one to `/openai/...` to the `--openai` upstream, with its
     /// method, path, query, headers and body as sent. Each call is recorded
     /// as one `lys.call` entry in --home, under the session its request body
     /// names (`metadata.user_id`) or the day's `unlinked` session. The
