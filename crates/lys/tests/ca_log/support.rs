@@ -203,20 +203,47 @@ pub(crate) fn missing_required(output: &Output) -> Vec<String> {
         .collect()
 }
 
-/// Replaces the pinned root in `log_dir`'s `state.json` with 32 zero bytes,
-/// so the log fails its integrity check when it is opened.
-pub(crate) fn zero_pinned_root(log_dir: &Path) {
-    let state_path = log_dir.join("state.json");
-    let bytes = std::fs::read(&state_path).unwrap();
-    let mut state: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    state["root_hash"] = serde_json::Value::String(STANDARD.encode([0_u8; 32]));
-    let text = serde_json::to_vec(&state).unwrap();
-    std::fs::write(&state_path, text).unwrap();
+/// Damages the first leaf of the log at `log_dir` in place: one byte of the
+/// leaf's own bytes inside the first segment record is flipped, so the record
+/// fails its CRC and the log fails its integrity check when it is opened
+/// (LYSLOGSTORE-008 R1: a record is its u32 length, the leaf bytes, the pin
+/// and a CRC, so byte 4 of the first segment is the first byte of leaf 0).
+pub(crate) fn corrupt_first_leaf(log_dir: &Path) {
+    let segment = log_dir
+        .join("leaves")
+        .join("segments")
+        .join(format!("{:020}", 0));
+    let mut bytes = std::fs::read(&segment).unwrap();
+    assert!(bytes.len() > 4, "the first segment holds no leaf to damage");
+    bytes[4] ^= 0x01;
+    std::fs::write(&segment, bytes).unwrap();
 }
 
-/// The number of files in `log_dir`'s leaves directory.
+/// Every file under `dir` with its bytes, so a test can say an act changed
+/// nothing in a directory it may no longer be able to open as a store.
+pub(crate) fn dir_bytes(dir: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
+    let mut files = std::collections::BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for entry in std::fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                let bytes = std::fs::read(&path).unwrap();
+                files.insert(path, bytes);
+            }
+        }
+    }
+    files
+}
+
+/// The number of leaves in the log at `log_dir`, read through the store
+/// itself (its extent), never from the files under the directory.
 pub(crate) fn leaf_files(log_dir: &Path) -> usize {
-    std::fs::read_dir(log_dir.join("leaves")).unwrap().count()
+    use lys_log_store::LeafStore;
+    let store = lys_log_store::FileLeafStore::open_read_only(log_dir).unwrap();
+    usize::try_from(store.extent()).unwrap()
 }
 
 /// `openssl verify -CAfile <issuer> <cert>`, run where both files are.

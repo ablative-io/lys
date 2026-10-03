@@ -14,8 +14,8 @@ use std::net::TcpListener;
 use std::path::Path;
 
 use crate::support::{
-    Bench, Stranger, assert_success, copy_verify_inclusion, leaf_files, missing_required, path_str,
-    pem_to_der, report, run_lys, said, zero_pinned_root,
+    Bench, Stranger, assert_success, copy_verify_inclusion, corrupt_first_leaf, dir_bytes,
+    leaf_files, missing_required, path_str, pem_to_der, report, run_lys, said,
 };
 
 /// What `lys ca issue` reported for one certificate.
@@ -266,8 +266,9 @@ fn a_log_that_fails_its_integrity_check_stops_the_issuance_with_nothing_written(
     assert_success(&run_lys(&first));
     let key = bench.path("issuer4.key");
     assert_success(&run_lys(&["key", "generate", "--out", path_str(&key)]));
-    zero_pinned_root(&bench.log_dir);
     let before = leaf_files(&bench.log_dir);
+    corrupt_first_leaf(&bench.log_dir);
+    let damaged = dir_bytes(&bench.log_dir);
 
     let refused = run_lys(&[
         "ca",
@@ -299,5 +300,10 @@ fn a_log_that_fails_its_integrity_check_stops_the_issuance_with_nothing_written(
     ] {
         assert!(!bench.path(name).exists(), "{name} was written");
     }
-    assert_eq!(leaf_files(&bench.log_dir), before);
+    assert_eq!(
+        dir_bytes(&bench.log_dir),
+        damaged,
+        "a refused issuance writes nothing to the log"
+    );
+    assert_eq!(before, 1);
 }

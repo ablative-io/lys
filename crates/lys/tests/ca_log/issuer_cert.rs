@@ -10,8 +10,8 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::support::{
-    Bench, assert_success, leaf_files, openssl, path_str, pem_to_der, report, run_lys, said,
-    zero_pinned_root,
+    Bench, assert_success, corrupt_first_leaf, dir_bytes, leaf_files, openssl, path_str,
+    pem_to_der, report, run_lys, said,
 };
 
 /// Long enough that a certificate built again carries another second.
@@ -246,8 +246,20 @@ fn a_log_that_refuses_the_entry_leaves_no_stored_issuer_certificate() {
         "--origin",
         "example.com/lys/issuance",
     ]));
-    zero_pinned_root(&badlog);
+    // A leaf to damage: an empty log has no record to corrupt.
+    let seed_leaf = bench.path("badlog-seed.leaf");
+    std::fs::write(&seed_leaf, b"a leaf the bad log held before it was damaged").unwrap();
+    assert_success(&run_lys(&[
+        "log",
+        "append",
+        "--dir",
+        path_str(&badlog),
+        "--leaf",
+        path_str(&seed_leaf),
+    ]));
     let leaves = leaf_files(&badlog);
+    corrupt_first_leaf(&badlog);
+    let damaged = dir_bytes(&badlog);
 
     let issuer_out = bench.path("issuer5.pem");
     let refused = issue_with_issuer_out(&bench, &key, &badlog, "agent-z", &issuer_out);
@@ -260,5 +272,10 @@ fn a_log_that_refuses_the_entry_leaves_no_stored_issuer_certificate() {
     ] {
         assert!(!bench.path(name).exists(), "{name} was written");
     }
-    assert_eq!(leaf_files(&badlog), leaves);
+    assert_eq!(
+        dir_bytes(&badlog),
+        damaged,
+        "a refused issuance writes nothing to the log"
+    );
+    assert_eq!(leaves, 1);
 }
