@@ -94,14 +94,16 @@ describe('Team', () => {
     expect(location.hash).toBe('#/team/' + SCRIBE);
     expect(text()).toContain('Scribe is not running.');
     expect(text()).toContain('On Lab, in the folder ' + FOLDER + '.');
-    expect($('select')).toBeNull();
+    expect($('.team-start select')).toBeNull();
     expect((button('Start') as HTMLButtonElement).disabled).toBe(false);
     await click(button('Start'));
-    expect(posted).toHaveLength(1);
-    expect(posted[0]).toMatchObject({ path: '/agents/' + SCRIBE + '/start-command', body: { machine: LAB } });
+    // The terminal that opens afterwards sends its own requests; the start itself is one request.
+    const starts = posted.filter((entry) => entry.path.startsWith('/agents/'));
+    expect(starts).toHaveLength(1);
+    expect(starts[0]).toMatchObject({ path: '/agents/' + SCRIBE + '/start-command', body: { machine: LAB } });
     expect($('.team-pane .terminal')).not.toBeNull();
     expect($$('.team-foot-act').map((el) => el.textContent)).toContain('Stop');
-    expect(sessionStorage.length).toBe(0);
+    expect(sessionStorage.getItem('lys.pending.agent-start.' + ADA + '.' + SCRIBE)).toBeNull();
   });
 
   it('approves unapproved settings as the person and starts, in the same one press', async () => {
@@ -159,7 +161,7 @@ describe('Team', () => {
     expect(text()).toContain('SecretsUnavailable');
     expect((button('Try again') as HTMLButtonElement).disabled).toBe(false);
     expect($$('button').filter((el) => (el as HTMLButtonElement).disabled && el.closest('.team-start'))).toEqual([]);
-    expect($('details')).toBeNull();
+    expect($('.team-start details')).toBeNull();
   });
 
   it('sends the old start address to the agent\'s pane on the front page', async () => {
