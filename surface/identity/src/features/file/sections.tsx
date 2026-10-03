@@ -5,7 +5,6 @@ import { StopHistory } from './StopHistory';
 import { TeamsOf } from './TeamsOf';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { AgentMemory } from './AgentMemory';
-import { AgentPolicy } from './AgentPolicy';
 import { AgentRefusals } from './AgentRefusals';
 import { AgentCredentials } from './AgentCredentials';
 import { Provisioning } from '../provisioning/Provisioning';
@@ -202,7 +201,7 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':
-      return person ? <Profile data={data} /> : <><Provisioning id={data.x.id} /><AgentPolicy key={data.x.id} id={data.x.id} /><AgentRefusals key={'r' + data.x.id} id={data.x.id} /></>;
+      return person ? <Profile data={data} /> : <><Provisioning id={data.x.id} /><AgentRefusals key={'r' + data.x.id} id={data.x.id} /></>;
     case 'credentials':
       return person ? <PersonCredentials id={data.x.id} /> : <><AgentCredentials id={data.x.id} /><AgentCertificates id={data.x.id} /></>;
     case 'sessions':

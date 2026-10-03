@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Teams } from '../src/features/teams/Teams';
 import { ServiceAccounts } from '../src/features/service-accounts/ServiceAccounts';
 import { PersonalBudgets } from '../src/features/file/PersonalBudgets';
-import { AgentPolicy } from '../src/features/file/AgentPolicy';
 import { AgentCredentials } from '../src/features/file/AgentCredentials';
 import { StopReceipt } from '../src/features/file/EmergencyStop';
 import { RecordedForm, TextField } from '../src/features/people/RecordedForm';
@@ -95,17 +94,6 @@ describe('Directory words and write answers', () => {
     expect(document.querySelector('[aria-label="Pending context_percent"]')).not.toBeNull();
     expect(visibleWords()).toContain('200');
     expect(visibleWords()).toContain('Enforced budget');
-  });
-
-  it('shows the saved policy response without a second read', async () => {
-    const path = '/agents/' + SCRIBE + '/policy';
-    const initial = { agent: SCRIBE, policy: null, digest: null, applies: 'applies on the agent’s next launch' };
-    const world = await show(<AgentPolicy id={SCRIBE} />, { [path]: ok(initial), ['POST ' + path]: ok({ ...initial, policy: { agent: SCRIBE, version: 1, rules: [] }, digest: 'digest-1' }) });
-    await click('Save rules for the next start');
-    expect(world.posted).toEqual([{ path, body: { version: 0, rules: [] } }]);
-    expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
-    expect(visibleWords()).toContain('Version 1');
-    expect(visibleWords()).not.toContain('digest-1');
   });
 
   it('explains a suspended identity without calling its process stopped or displaying identifiers', async () => {

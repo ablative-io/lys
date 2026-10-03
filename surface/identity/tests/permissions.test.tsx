@@ -151,12 +151,24 @@ describe('The rules', () => {
     expect(element.querySelector('.rules-summary')?.textContent).toContain('No extra rules. This agent’s policy refuses 3 things.');
     expect(table(element, 'Rules')?.querySelector('tbody')?.textContent).not.toContain('Nothing.');
   });
-  it('shows the rules the policy forces as rows of the same table, refused, locked and said to be the policy’s', async () => {
+  it('shows the rules of the policy as rows of the same table, refused and said to be the policy’s, each written as the start writes it', async () => {
     const { element } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf(seeded));
     await settle();
     const locked = ruleRows(element).filter((row) => row.classList.contains('locked'));
-    expect(locked.map((entry) => entry.querySelector('code')?.textContent)).toEqual(['Read', 'Read(//srv/x)', 'Read(//srv/x/**)']);
-    expect(locked.every((entry) => entry.children[2]?.textContent === 'Refused' && entry.textContent?.includes('from this agent’s policy') && entry.querySelector('button') === null && entry.querySelector('select') === null)).toBe(true);
+    expect(locked.map((entry) => entry.dataset.policy)).toEqual(['deny-Read', 'deny-top', 'liftable']);
+    expect(locked.map((entry) => [...entry.querySelectorAll('code')].map((code) => code.textContent))).toEqual([['Read'], ['Read(//srv/x)', 'Read(//srv/x/**)'], []]);
+    expect(locked[2]?.children[1]?.textContent).toBe('Judged by Lys at each call');
+    expect(locked.every((entry) => entry.children[2]?.textContent === 'Refused' && entry.textContent?.includes('from this agent’s policy') && entry.querySelector('select') === null)).toBe(true);
+    expect(locked[0]?.textContent).toContain('Nobody: no grant can lift it');
+    expect(locked[2]?.textContent).toContain('A grant of read on agent ' + SCRIBE);
+  });
+  it('offers the policy as who enforces a new rule only for an agent whose policy was read', async () => {
+    const without = await shown(claude, { default_mode: 'default' });
+    expect(addRow(without.element).querySelector('select[name="rule-enforcer"]')).toBeNull();
+    act(() => root?.unmount()); root = null; host?.remove(); host = null;
+    const { element } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf(seeded));
+    await settle();
+    expect(options(addRow(element).querySelector('select[name="rule-enforcer"]'))).toEqual(['program', 'policy']);
   });
   it('says when the policy cannot be read, above the table and in it, and still shows the agent’s own rules', async () => {
     const { element } = await shown(claude, { default_mode: 'default', deny: ['WebSearch'] }, SCRIBE);
@@ -175,8 +187,9 @@ describe('The rules', () => {
   it('says a Codex agent whose policy has rules will not start, and where to remove them', async () => {
     const { element } = await shown(codex, { default_mode: 'workspace-write' }, SCRIBE, policyOf(seeded));
     await settle();
-    expect(element.textContent).toContain('This agent’s policy has 2 rules. Codex cannot carry them, so this agent will not start until they are removed from its policy.');
-    expect(element.querySelector('a[href="#/file/' + SCRIBE + '/policy"]')).not.toBeNull();
+    expect(element.textContent).toContain('This agent’s policy has 2 rules. Codex cannot carry them, so this agent will not start until they are removed from its policy, in the table above.');
+    expect(ruleRows(element).map((row) => row.dataset.policy)).toEqual(['deny-Read', 'deny-top', 'liftable']);
+    expect(element.querySelector('button[aria-label="Remove policy rule deny-Read"]')).not.toBeNull();
   });
   it('says nothing of a policy to a Codex agent whose policy has no hard rule', async () => {
     const { element } = await shown(codex, { default_mode: 'workspace-write' }, SCRIBE, policyOf([seeded[2]]));
