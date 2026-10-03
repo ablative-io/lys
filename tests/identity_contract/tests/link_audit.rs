@@ -55,29 +55,37 @@ fn a_redelivered_source_operation_is_answered_once_and_survives_a_restart() -> T
 }
 
 #[test]
-fn an_observer_longer_than_an_issuer_is_refused_before_it_is_signed() -> TestResult {
+fn a_long_observer_and_source_operation_id_are_signed_logged_and_read_back_whole() -> TestResult {
     let binding = LoginBinding::new("https://accounts.test", "ada-elsewhere")?;
-    let observer = format!("https://{}", "o".repeat(2048));
-    let refused = LinkObservation::new("op-1", LinkChange::Linked, binding, &observer, 1);
+    let refused = LinkObservation::new("op-1", LinkChange::Linked, binding.clone(), "", 1);
+    assert!(matches!(refused, Err(IdentityError::ChangeMismatch { .. })));
+    let refused = LinkObservation::new("", LinkChange::Linked, binding.clone(), "https://o", 1);
     assert!(matches!(refused, Err(IdentityError::ChangeMismatch { .. })));
     let harness = Harness::new(7)?;
     let mut directory = harness.open()?;
     let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-    let widest = format!("https://{}", "o".repeat(2040));
-    let observation = LinkObservation::new(
-        "op-1",
-        LinkChange::Linked,
-        LoginBinding::new("https://accounts.test", "ada-elsewhere")?,
-        &widest,
-        1,
-    )?;
-    directory.accept_link_audit(source()?, person, observation, 20)?;
+    let observer = format!("https://{}", "o".repeat(10_000));
+    let source_operation = "s".repeat(10_000);
+    let observation =
+        LinkObservation::new(&source_operation, LinkChange::Linked, binding, &observer, 1)?;
+    let receipt = directory.accept_link_audit(source()?, person, observation, 20)?;
     drop(directory);
+    let mut reopened = harness.open()?;
     assert_eq!(
-        harness.open()?.log()?.len()?,
+        reopened.log()?.len()?,
         2,
-        "the widest observer allowed is signed, logged and read back"
+        "the long observation is signed, logged and read back"
     );
+    let leaf = reopened
+        .log()?
+        .leaf(receipt.coordinate().index)?
+        .ok_or("leaf missing")?;
+    let event = lys_identity::verify_event(&leaf, &reopened.service_key())?;
+    let Change::LinkAudit(kept) = event.event()?.change() else {
+        return Err("the leaf is not a link observation".into());
+    };
+    assert_eq!(kept.observer(), observer);
+    assert_eq!(kept.source_operation_id(), source_operation);
     Ok(())
 }
 

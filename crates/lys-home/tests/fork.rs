@@ -93,20 +93,20 @@ fn assistant(id: &str, parent: Option<&str>, parts: &[Value]) -> Entry {
     }
 }
 
-fn event(id: &str, parent: &str, kind: &str, record: &Hash) -> Result<Entry, Box<dyn Error>> {
+fn event(id: &str, parent: &str, kind: &str, record: &Hash) -> Entry {
     let event = HarnessEvent {
         kind: kind.to_owned(),
         source_uuid: None,
         record: Some(record.as_str().to_owned()),
         detail: Map::new(),
     };
-    Ok(Entry {
+    Entry {
         base: base(id, Some(parent)),
         body: EntryBody::Custom {
             custom_type: "lys.harness_event".to_owned(),
-            data: Some(event.data()?),
+            data: Some(event.data()),
         },
-    })
+    }
 }
 
 /// A `lys.lantern` entry written by hand at `point` as an older record:
@@ -195,7 +195,7 @@ fn fixture_home(dir: &Path) -> Result<(PathBuf, Lanterns), Box<dyn Error>> {
         let mut session = home.create_session(PARENT, "/fixture", None)?;
         session.append_entry(&user("e1", None, &[text_part(1)]))?;
         session.append_entry(&assistant("e2", Some("e1"), &[text_part(2)]))?;
-        session.append_entry(&event("s2", "e2", KIND_PERMISSION_MODE, &s2_record)?)?;
+        session.append_entry(&event("s2", "e2", KIND_PERMISSION_MODE, &s2_record))?;
         session.move_head(Some("e2"))?;
     }
     let home_arg = root.to_str().ok_or("a UTF-8 path")?;
@@ -204,7 +204,7 @@ fn fixture_home(dir: &Path) -> Result<(PathBuf, Lanterns), Box<dyn Error>> {
         let mut session = home.open_session(PARENT)?;
         // An older record with no `lit_in`: the light act cannot produce it.
         session.append_entry(&lantern_entry("O2", &l2, "e2"))?;
-        session.append_entry(&event("e3", "O2", KIND_ATTACHMENT, &e3_record)?)?;
+        session.append_entry(&event("e3", "O2", KIND_ATTACHMENT, &e3_record))?;
         session.append_entry(&user("e4", Some("e3"), &[text_part(4)]))?;
         session.append_entry(&assistant("e5", Some("e4"), &[text_part(5)]))?;
         let image = json!({"type": "image", "data": "aWdub3JlZA==", "mimeType": "image/png"});

@@ -10,6 +10,7 @@ use crate::error::RunnerError;
 mod bound_tests;
 
 type Work = Box<dyn FnOnce() + Send>;
+/// Machine guard: the most worker threads ordinary dial requests hold at once.
 const ORDINARY: usize = 31;
 
 struct Worker {

@@ -54,8 +54,10 @@ pub(crate) fn route(
             named.push(refusal);
         }
     }
-    // The ingress guard judges credentials before the route.
+    // The ingress guard judges credentials before the route, and reads no
+    // more of an unverified caller's body than `signed_first.rs` allows.
     for refusal in [
+        "BodyTooLarge",
         "OperatorRefused",
         "AgentSignatureRefused",
         "AgentPassRefused",

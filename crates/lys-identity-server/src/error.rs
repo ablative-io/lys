@@ -142,6 +142,10 @@ pub enum ServerError {
         /// What is wrong with it.
         reason: String,
     },
+    /// A body longer than is read before its caller is verified:
+    /// `signed_first::UNVERIFIED_BODY_LIMIT` bytes.
+    #[error("BodyTooLarge: the body is longer than is read before its caller is verified")]
+    BodyTooLarge,
     /// The secrets broker is not configured, or could not be reached or read.
     #[error("SecretsUnavailable: {reason}")]
     SecretsUnavailable {

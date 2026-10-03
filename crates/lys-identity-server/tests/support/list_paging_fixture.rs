@@ -111,12 +111,7 @@ fn cached<T: Serialize + DeserializeOwned>(
         fs::rename(stage.path(), &ready)?;
         eprintln!("list_paging {kind} fixture built: {:?}", started.elapsed());
     }
-    let metadata = File::open(ready.join("fixture.json"))?;
-    let mut bytes = Vec::new();
-    metadata.take(1_048_577).read_to_end(&mut bytes)?;
-    if bytes.len() > 1_048_576 {
-        return Err("the paging fixture metadata exceeds its bound".into());
-    }
+    let bytes = fs::read(ready.join("fixture.json"))?;
     let fixture = serde_json::from_slice(&bytes)?;
     copy_tree(&ready.join("log"), &config.log_dir)?;
     copy_tree(

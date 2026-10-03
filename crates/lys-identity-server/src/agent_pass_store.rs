@@ -1,4 +1,4 @@
-//! Bounded run-pass digests; admission reads cached state and endings are durable.
+//! Run-pass digests; admission reads cached state and endings are durable.
 use crate::error::ServerError;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use lys_identity::{AgentId, Provenance};
@@ -6,13 +6,11 @@ use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use zeroize::Zeroizing;
 
-const LIMIT: usize = 1024;
-const BYTE_LIMIT: u64 = 2 * 1024 * 1024;
 const FORMAT: &str = "lys-agent-passes/v1";
 
 #[derive(Serialize, Deserialize)]
@@ -31,7 +29,7 @@ struct Stored {
     passes: HashMap<String, Entry>,
 }
 
-/// One install's bounded table; admission never reads the filesystem.
+/// One install's table; admission never reads the filesystem.
 pub struct Passes {
     file: PathBuf,
     stored: Stored,
@@ -52,7 +50,7 @@ fn unique_entries<'de, D: serde::Deserializer<'de>>(
     impl<'de> serde::de::Visitor<'de> for Entries {
         type Value = HashMap<String, Entry>;
         fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            formatter.write_str("a bounded map of unique token digests")
+            formatter.write_str("a map of unique token digests")
         }
         fn visit_map<M: serde::de::MapAccess<'de>>(
             self,
@@ -60,10 +58,8 @@ fn unique_entries<'de, D: serde::Deserializer<'de>>(
         ) -> Result<Self::Value, M::Error> {
             let mut entries = HashMap::new();
             while let Some((key, entry)) = map.next_entry::<String, Entry>()? {
-                if entries.len() >= LIMIT || entries.insert(key, entry).is_some() {
-                    return Err(serde::de::Error::custom(
-                        "duplicate digest or agent pass capacity exceeded",
-                    ));
+                if entries.insert(key, entry).is_some() {
+                    return Err(serde::de::Error::custom("duplicate agent pass digest"));
                 }
             }
             Ok(entries)
@@ -88,16 +84,8 @@ fn digest(token: &str) -> String {
 impl Passes {
     /// Open an existing table, or begin an empty table on an old install.
     pub fn open(file: PathBuf) -> Result<Self, ServerError> {
-        let stored = match std::fs::File::open(&file) {
-            Ok(input) => {
-                let mut bytes = Vec::new();
-                input
-                    .take(BYTE_LIMIT + 1)
-                    .read_to_end(&mut bytes)
-                    .map_err(unavailable)?;
-                if u64::try_from(bytes.len()).map_or(true, |n| n > BYTE_LIMIT) {
-                    return Err(unavailable("agent pass table exceeds its byte limit"));
-                }
+        let stored = match std::fs::read(&file) {
+            Ok(bytes) => {
                 let stored: Stored = serde_json::from_slice(&bytes).map_err(|error| {
                     unavailable(format!(
                         "malformed agent pass table at line {}, column {}",
@@ -105,8 +93,8 @@ impl Passes {
                         error.column()
                     ))
                 })?;
-                if stored.format != FORMAT || stored.passes.len() > LIMIT {
-                    return Err(unavailable("invalid agent pass table format or capacity"));
+                if stored.format != FORMAT {
+                    return Err(unavailable("invalid agent pass table format"));
                 }
                 for (key, entry) in &stored.passes {
                     if key.len() != 64
@@ -116,8 +104,6 @@ impl Passes {
                         || entry.agent.parse::<AgentId>().is_err()
                         || entry.launch.is_empty()
                         || entry.session.is_empty()
-                        || entry.launch.len() > 128
-                        || entry.session.len() > 128
                     {
                         return Err(unavailable("invalid agent pass digest or binding"));
                     }
@@ -228,11 +214,8 @@ impl Passes {
         session: &str,
     ) -> Result<Zeroizing<String>, ServerError> {
         self.ready()?;
-        if launch.is_empty() || session.is_empty() || launch.len() > 128 || session.len() > 128 {
+        if launch.is_empty() || session.is_empty() {
             return Err(unavailable("invalid launch or session identifier"));
-        }
-        if self.stored.passes.len() >= LIMIT {
-            return Err(unavailable("agent pass capacity exceeded"));
         }
         let mut random = Zeroizing::new([0; 32]);
         OsRng

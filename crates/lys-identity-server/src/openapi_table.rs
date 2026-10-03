@@ -137,10 +137,10 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]] scope("person", "person.create", []);
     POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]] scope("agent", "agent.create", []);
-    POST "/drafts" "Record an agent's immutable draft" G [SIGNED_BODY, AGENT, &["NoPerson", "NotAdmitted", "DraftChangeInvalid", "OperationReused", "EventTooLarge"]];
+    POST "/drafts" "Record an agent's immutable draft" G [SIGNED_BODY, AGENT, &["NoPerson", "NotAdmitted", "DraftChangeInvalid", "OperationReused"]];
     POST "/drafts/{id}/approve" "Record approval without applying the action" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
     POST "/drafts/{id}/refuse" "Refuse one immutable draft" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
-    POST "/drafts/{id}/correct" "Refuse and save the responsible person's correction" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed", "EventTooLarge"]];
+    POST "/drafts/{id}/correct" "Refuse and save the responsible person's correction" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
     POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING] scope("agent", "agent.reports-to.set", ["id"]);
     GET "/identities" "Every identity the directory holds" S [ADMIN] scope("identity", "read", []);
     GET "/identities/{id}" "One identity" S [ADMIN] scope("identity", "read", ["id"]);
@@ -152,7 +152,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}" "An agent the caller answers for" S [PERSON, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     GET "/directory/people" "Every person, for the administrator" S [ADMIN, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("person", "read", []);
     GET "/directory/agents/{id}" "Any agent, for the administrator" S [ADMIN, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
-    POST "/grants/{id}/tokens" "Issue a credential for one grant" C [SIGNED_BODY, &["GrantTokenResponsibleRequired", "GrantTokenExpiryInvalid", "GrantTokenStoreFull", "GrantTokenUnavailable", "GrantTokenUnknown"]];
+    POST "/grants/{id}/tokens" "Issue a credential for one grant" C [SIGNED_BODY, &["GrantTokenResponsibleRequired", "GrantTokenExpiryInvalid", "GrantTokenUnavailable", "GrantTokenUnknown"]];
     POST "/grants/{id}/tokens/{token_id}/revoke" "Revoke one grant credential" C [SIGNED, &["GrantTokenResponsibleRequired", "GrantTokenUnavailable", "GrantTokenUnknown"]] scope("grant", "grant.revoke", ["id"]);
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]] scope("grant", "read", []);
     GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];

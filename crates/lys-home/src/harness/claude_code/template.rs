@@ -29,8 +29,6 @@ pub const SLOTS: [&str; 5] = ["transcript", "mcp", "env", "secrets", "instructio
 pub const OPTIONAL_SLOTS: [&str; 2] = ["skills", "permissions"];
 /// The three members of a template.
 pub const MEMBERS: [&str; 3] = ["harness", "flags", "slots"];
-/// The most characters of a refused value an error repeats.
-const VALUE_CUT: usize = 80;
 
 /// One secret named by the variable it fills and the handle that stands for it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -200,7 +198,7 @@ fn expect_value(field: &str, value: &Value, expected: &str) -> Result<(), HomeEr
         Value::String(s) if s == expected => Ok(()),
         Value::String(s) => Err(HomeError::TemplateValue {
             field: field.to_owned(),
-            value: s.chars().take(VALUE_CUT).collect(),
+            value: s.clone(),
         }),
         _ => Err(shape(field, "must be a string")),
     }

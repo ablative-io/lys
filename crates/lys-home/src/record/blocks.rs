@@ -29,7 +29,7 @@ impl Hash {
             Ok(Self(text.to_owned()))
         } else {
             Err(HomeError::NotAHash {
-                hash: text.chars().take(80).collect(),
+                hash: text.to_owned(),
             })
         }
     }

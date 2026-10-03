@@ -197,13 +197,6 @@ pub(crate) const KEY_LEN: usize = 32;
 /// is a visible change here rather than a silent one on the wire.
 pub(crate) const PROTECTED_LEN: usize = 79;
 
-/// Hard input cap for [`decode_fields`]. A canonical delegation is the 79-byte
-/// protected bucket, a payload of roughly 55 bytes plus the subject value, a
-/// 64-byte signature and a handful of heads. This bound is far above that and
-/// rejects oversize input before parsing; it is also the only bound on the
-/// subject value, which this format otherwise treats as opaque text.
-pub(crate) const MAX_ARTIFACT_LEN: usize = 4096;
-
 /// CBOR tag number for `COSE_Sign1` (RFC 9052 §2). The artifact is always
 /// tagged — byte 0 is `0xd2` — and the verifier requires the tag.
 const COSE_SIGN1_TAG: u64 = 18;
@@ -326,9 +319,9 @@ pub(crate) fn payload_bytes(claim: &DelegationClaim) -> Vec<u8> {
 ///
 /// Encode and decode were allowed to disagree once, and the shape of the
 /// resulting defect is worth keeping in front of anyone who edits either side.
-/// The artifact cap was enforced at decode only, so a subject value of 3884
-/// bytes signed and verified while 3885 signed *successfully* and then failed
-/// every verification afterwards. That is exactly the "file that fails verification at
+/// A size cap, since removed, was once enforced at decode only, so a subject
+/// value of 3884 bytes signed and verified while 3885 signed *successfully*
+/// and then failed every verification afterwards. That is exactly the "file that fails verification at
 /// some later, less debuggable moment" that
 /// [`super::sign::assemble_delegation`]'s signature check exists to prevent,
 /// arriving through the one door that check does not cover.
@@ -347,11 +340,6 @@ pub(crate) fn payload_bytes(claim: &DelegationClaim) -> Vec<u8> {
 /// [`decode_payload`]. Deleting either call site leaves the other, so the
 /// isolating tests are written at each site directly rather than through an
 /// entry point that passes both.
-///
-/// The size bound is *derived* from the encoded artifact rather than from a
-/// precomputed subject-value length, because the derived limit moves whenever a payload
-/// field is added — `sequence` moved it — and a hardcoded bound would have gone
-/// stale silently.
 ///
 /// # Errors
 ///
@@ -406,17 +394,6 @@ pub(crate) fn check_encodable(
                  increase — issuing here would leave no successor and permanently disable \
                  rotation for this subject; the largest issuable value is {MAX_SEQUENCE}",
                 claim.sequence
-            ),
-        });
-    }
-    // Derived, never hardcoded: the bound shifts whenever the payload gains a
-    // field, and the last time one was added it shifted by nine bytes.
-    let encoded_len = artifact_bytes(root_public_key, claim, &[0u8; 64]).len();
-    if encoded_len > MAX_ARTIFACT_LEN {
-        return Err(TrustError::DelegationEncoding {
-            reason: format!(
-                "the encoded artifact would be {encoded_len} bytes, over the \
-                 {MAX_ARTIFACT_LEN}-byte cap the decoder enforces — shorten the subject value"
             ),
         });
     }

@@ -38,7 +38,7 @@ use crate::handle::{HandleId, new_operation_id};
 use crate::permission::PermissionCheck;
 use crate::store::{Recipients, Scope};
 
-use super::lineage::{MAX_DEPTH, chain};
+use super::lineage::chain;
 use super::owner::checked;
 use super::scope::with_via;
 use super::{Broker, Handles, LeaseView, Work};
@@ -566,8 +566,8 @@ impl<P: PermissionCheck> Broker<P> {
     /// The line of handles from `root` down to each handle at or below it
     /// that still stands, `root` first and the nearest before the deeper.
     /// It walks down from `root` through each handle's children, so it
-    /// visits the handles at or below `root` and no other, and no deeper
-    /// than a line of handles is counted.
+    /// visits the handles at or below `root` and no other, however deep the
+    /// line goes; a handle already on a path is never walked into again.
     pub(super) fn standing_below(&self, root: &str) -> Vec<Vec<String>> {
         let mut paths: Vec<Vec<String>> = Vec::new();
         let mut walk: Vec<Vec<String>> = Vec::new();
@@ -579,13 +579,11 @@ impl<P: PermissionCheck> Broker<P> {
             let Some(at) = path.last() else {
                 continue;
             };
-            if path.len() < MAX_DEPTH {
-                for child in self.handles.children(at) {
-                    if !path.iter().any(|above| above == child) {
-                        let mut below = path.clone();
-                        below.push(child.to_owned());
-                        walk.push(below);
-                    }
+            for child in self.handles.children(at) {
+                if !path.iter().any(|above| above == child) {
+                    let mut below = path.clone();
+                    below.push(child.to_owned());
+                    walk.push(below);
                 }
             }
             if !self.line_dropped(at) {

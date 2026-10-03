@@ -391,7 +391,7 @@ fn draft_routes_advertise_their_request_and_response_schemas() -> Result {
 }
 
 #[tokio::test]
-async fn an_unknown_a_decided_an_invalid_and_an_oversized_draft_are_refused_by_name() -> Result {
+async fn an_unknown_a_decided_and_an_invalid_draft_are_refused_and_a_large_one_kept() -> Result {
     let table = Table::start().await?;
     let owner = &table;
     let approve = |draft: String, hash: Value| async move {
@@ -428,27 +428,39 @@ async fn an_unknown_a_decided_an_invalid_and_an_oversized_draft_are_refused_by_n
 
     let mut invalid = table.body(OperationId::generate()?);
     invalid["target"]["action"] = json!("");
-    // A draft just inside the request bound whose leaf, holding the request
-    // and the prepared body both, is over the event bound.
-    let mut large = table.body(OperationId::generate()?);
-    large["body"] = json!(format!(
-        "{{ \"display_name\": \"{}\" }}",
-        "x".repeat(35_000)
-    ));
-    for (draft, refusal) in [(invalid, "DraftChangeInvalid"), (large, "EventTooLarge")] {
-        let body = draft.to_string().into_bytes();
-        let (header, _) = table.header(&body)?;
-        let (status, answer) = table
-            .service
-            .post_signed("/drafts", (crate::agent_signature::HEADER, &header), body)
-            .await?;
-        assert_eq!(
-            (status, answer["refusal"].clone()),
-            (409, json!(refusal)),
-            "{answer}"
-        );
-        assert_eq!(table.service.log_size().await?, decided);
-    }
+    let body = invalid.to_string().into_bytes();
+    let (header, _) = table.header(&body)?;
+    let (status, answer) = table
+        .service
+        .post_signed("/drafts", (crate::agent_signature::HEADER, &header), body)
+        .await?;
+    assert_eq!(
+        (status, answer["refusal"].clone()),
+        (409, json!("DraftChangeInvalid")),
+        "{answer}"
+    );
+    assert_eq!(table.service.log_size().await?, decided);
+
+    // A draft whose leaf, holding the request and the prepared body both, is
+    // over 64 KiB is kept, and its prepared body comes back whole.
+    let large_draft = OperationId::generate()?;
+    let mut large = table.body(large_draft);
+    let prepared = format!("{{ \"display_name\": \"{}\" }}", "x".repeat(35_000));
+    large["body"] = json!(prepared);
+    let body = large.to_string().into_bytes();
+    let (header, _) = table.header(&body)?;
+    let (status, answer) = table
+        .service
+        .post_signed("/drafts", (crate::agent_signature::HEADER, &header), body)
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(table.service.log_size().await?, decided + 1);
+    let mut directory = table.directory()?;
+    let projection = directory.projection()?;
+    let held = projection
+        .draft(large_draft)
+        .ok_or("large draft not kept")?;
+    assert_eq!(held.created.body, prepared.as_bytes());
     Ok(())
 }
 

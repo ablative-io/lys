@@ -160,3 +160,26 @@ fn reused_delivery_and_mark_ids_keep_the_first_item_location() -> Result<(), Box
     assert_eq!(restored.marked("mark"), held.marked("mark"));
     Ok(())
 }
+
+#[test]
+fn ten_thousand_character_words_are_kept_and_reloaded_whole() -> Result<(), Box<dyn Error>> {
+    let change = Change::Words {
+        words: "a".repeat(10_000),
+    };
+    change.check()?;
+    let mut held = Held::default();
+    held.hold(Line::Set(goal("long")))?;
+    held.hold(Line::Changed(Changed {
+        operation: "reworded".to_owned(),
+        goal: "long".to_owned(),
+        change: change.clone(),
+        by: "person".to_owned(),
+        at: 2,
+    }))?;
+    let restored = Held::decode(&held.encode()?)?;
+    assert_eq!(
+        restored.changed("reworded").map(|changed| &changed.change),
+        Some(&change)
+    );
+    Ok(())
+}

@@ -75,11 +75,11 @@ impl Provenance {
     /// Authentication by a pass bound to this agent's launch and session.
     ///
     /// # Errors
-    /// Refuses an empty or oversized run identifier.
+    /// Refuses an empty run identifier.
     pub fn by_pass(agent: AgentId, launch: &str, session: &str) -> Result<Self, IdentityError> {
-        if launch.is_empty() || session.is_empty() || launch.len() > 128 || session.len() > 128 {
+        if launch.is_empty() || session.is_empty() {
             return Err(IdentityError::EventMalformed {
-                reason: "pass provenance requires bounded nonempty launch and session identifiers",
+                reason: "pass provenance requires nonempty launch and session identifiers",
             });
         }
         Ok(Self::AgentPass {

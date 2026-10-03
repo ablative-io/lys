@@ -283,7 +283,6 @@ async fn a_request_the_route_does_not_take_is_refused_by_name_and_kept_nowhere()
     for (member, value, status, name) in [
         ("holder", json!("someone-else"), 400, "RequestMalformed"),
         ("why", json!("   "), 400, "RequestMalformed"),
-        ("why", json!("a".repeat(501)), 400, "RequestMalformed"),
         ("ends_at", json!(1), 400, "RequestMalformed"),
         ("relation", json!("omega"), 403, "RelationUnknown"),
     ] {
@@ -296,7 +295,7 @@ async fn a_request_the_route_does_not_take_is_refused_by_name_and_kept_nowhere()
         refused(&answer, status, name);
         refusals += 1;
     }
-    assert_eq!(refusals, 5);
+    assert_eq!(refusals, 4);
     assert_eq!(table.listed(&table.ada).await?, Vec::<String>::new());
 
     let (status, first) = table
@@ -318,6 +317,16 @@ async fn a_request_the_route_does_not_take_is_refused_by_name_and_kept_nowhere()
         .post("/requests", Some(&table.bea), &other)
         .await?;
     refused(&reused, 409, "RequestReused");
+
+    let mut long = Table::ask_body("5", "beta")?;
+    long["why"] = json!("a".repeat(10_000));
+    let (status, kept) = table
+        .service
+        .post("/requests", Some(&table.bea), &long)
+        .await?;
+    assert_eq!(status, 200, "{kept}");
+    assert_eq!(kept["why"], json!("a".repeat(10_000)));
+    assert_eq!(table.listed(&table.bea).await?.len(), 2);
     Ok(())
 }
 

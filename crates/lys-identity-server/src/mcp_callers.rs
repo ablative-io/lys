@@ -72,14 +72,9 @@ pub(crate) async fn rendered(
     response: axum::response::Response,
 ) -> Result<serde_json::Value, (i32, String)> {
     let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), crate::mcp_endpoint::BODY_LIMIT)
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
-        .map_err(|error| {
-            (
-                -32603,
-                format!("the HTTP route response exceeded the MCP limit or failed: {error}"),
-            )
-        })?;
+        .map_err(|error| (-32603, format!("the HTTP route response failed: {error}")))?;
     let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
         Ok(body) => body,
         Err(_) => {

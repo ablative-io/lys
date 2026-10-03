@@ -153,11 +153,8 @@ impl Limit {
 impl Limits {
     /// Refuse malformed collections as a whole, before writing any leaf.
     pub fn checked(self) -> Result<Self, Refused> {
-        if self.holder.id.is_empty() || self.limits.len() > 64 {
-            return Err(refused(
-                "BudgetLimitsRefused",
-                "a holder is named and has at most 64 limits",
-            ));
+        if self.holder.id.is_empty() {
+            return Err(refused("BudgetLimitsRefused", "a holder is named"));
         }
         for (index, limit) in self.limits.iter().enumerate() {
             limit.checked(&self.holder)?;

@@ -119,8 +119,8 @@ a later ship from the target carries the arrivals onward.
   record, detail}`. `kind` is `hook`, `attachment`, `system`,
   `permission_mode`, `tool_completed`, `template_render` or `arrival`; `record` is the
   whole source record as a block, by hash; `detail` holds names, ids, exit
-  codes and counts only, never output or a body, and the serialised data is
-  at most 512 bytes. A record that carries a uuid (`attachment`, `system`)
+  codes and counts only, never output or a body, and the serialised data has
+  no size bound: every name and id is kept whole. A record that carries a uuid (`attachment`, `system`)
   sits at its exact place on the file's chain under that uuid, since a
   message's parentUuid may name it; a `permission-mode` record (no uuid) and
   each `tool_completed` (one per tool result) hang under the entry they
@@ -133,7 +133,7 @@ a later ship from the target carries the arrivals onward.
   the block store, is `{template, session_head, head, uuid, files}` with
   `head` the head entry id (or null), `uuid` the rendered session id and
   `files` a list of `{path, sha256}` in write order, so the paths never sit
-  in the event and it stays under the cap. The event hangs beside the context
+  in the event. The event hangs beside the context
   path as a side leaf under the head (`append_beside`): the head does not
   move, the render walker never sees it, and a second render of the same
   session records the same session head hash in a second event.
@@ -147,8 +147,7 @@ a later ship from the target carries the arrivals onward.
   arrived session is a distinct execution with its ancestry on the record.
   It hangs beside the head as `template_render` does (`append_beside`): it
   moves no head, and the arrived head file is byte-identical to the source's.
-  A remote whose path would carry the data over the 512-byte cap is refused
-  before fetch writes anything.
+  The remote is kept whole in `detail`, however long its path is.
 - `lys.given` (HOME-003 R3): the context record, what a rendered session was
   given, as hashes only. Data is exactly `{harness, harness_version, kinds,
   config_dir, documents, environment}`. `harness` is `claude-code` and

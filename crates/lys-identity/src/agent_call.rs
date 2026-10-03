@@ -15,9 +15,6 @@ use crate::operation::OperationId;
 use crate::provenance::Actor;
 use crate::receipt::Receipt;
 
-/// The most bytes an agent call's path or signature carries.
-const TEXT_MAX: usize = 4096;
-
 /// One change an agent asked for through MCP.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AgentCall {
@@ -41,9 +38,9 @@ impl AgentCall {
                 reason: "an agent call records a changing method",
             });
         }
-        if !path.starts_with('/') || path.starts_with("//") || path.len() > TEXT_MAX {
+        if !path.starts_with('/') || path.starts_with("//") {
             return Err(IdentityError::ChangeMismatch {
-                reason: "an agent call names a local route of at most 4096 bytes",
+                reason: "an agent call names a local route",
             });
         }
         if body_sha256.len() != 64
@@ -53,11 +50,6 @@ impl AgentCall {
         {
             return Err(IdentityError::ChangeMismatch {
                 reason: "an agent call's body digest is SHA-256 in lowercase hex",
-            });
-        }
-        if signature.len() > TEXT_MAX {
-            return Err(IdentityError::ChangeMismatch {
-                reason: "an agent call's signature is at most 4096 bytes",
             });
         }
         Ok(Self {

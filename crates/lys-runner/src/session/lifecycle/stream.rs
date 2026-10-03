@@ -2,7 +2,7 @@
 //! woken by change notices and never a timer, read from its saved offset to
 //! its last whole line and kept with its coverage.
 
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
@@ -304,22 +304,13 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
     let mut at = source.offset;
     loop {
         let mut line = Vec::new();
-        let read = reader.by_ref().take(1_048_577).read_until(b'\n', &mut line);
+        let read = reader.read_until(b'\n', &mut line);
         if let Err(error) = read {
             bodies.push(Body::Coverage(Coverage::of(
                 "source_refused",
                 source,
                 Some(at),
                 error.to_string(),
-            )));
-            return false;
-        }
-        if line.len() > 1_048_576 {
-            bodies.push(Body::Coverage(Coverage::of(
-                "record_too_large",
-                source,
-                Some(at),
-                "a transcript record exceeds 1048576 bytes".to_owned(),
             )));
             return false;
         }
@@ -340,6 +331,8 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
         }
         at += line.len() as u64;
         source.offset = at;
+        // A slice of one pass, not a bound: the caller commits what was read
+        // and reads on from here, so every record is read whole.
         if at - beginning >= 1_048_576 {
             return true;
         }

@@ -275,7 +275,6 @@ impl Held {
                     || record.version.set_by != record.by
                     || record.version.set_at != record.at
                     || record.note.trim() != record.note
-                    || record.note.chars().count() > 500
                     || !record
                         .version
                         .settings

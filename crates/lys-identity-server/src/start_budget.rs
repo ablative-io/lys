@@ -66,8 +66,10 @@ async fn check(
         return error.into_response();
     }
     let start_command = path == Some("/agents/{id}/start-command");
+    // Read whole: `signed_first.rs`, outside this guard, has already held
+    // an unverified caller's body to `UNVERIFIED_BODY_LIMIT`.
     let (parts, body) = request.into_parts();
-    let bytes = match to_bytes(body, 2 * 1024 * 1024).await {
+    let bytes = match to_bytes(body, usize::MAX).await {
         Ok(bytes) => bytes,
         Err(error) => {
             return ServerError::RequestMalformed {

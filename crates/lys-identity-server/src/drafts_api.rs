@@ -124,7 +124,7 @@ fn malformed(reason: impl Into<String>) -> ServerError {
     }
 }
 
-fn signature_boundary(headers: &HeaderMap, bytes: &[u8]) -> Result<(), ServerError> {
+fn signature_boundary(headers: &HeaderMap) -> Result<(), ServerError> {
     if headers.contains_key(crate::agent_signature::HEADER)
         && (headers.contains_key(header::COOKIE)
             || headers
@@ -136,13 +136,6 @@ fn signature_boundary(headers: &HeaderMap, bytes: &[u8]) -> Result<(), ServerErr
         return Err(ServerError::AgentSignatureRefused {
             reason: "a signature must occur once and cannot accompany a cookie",
         });
-    }
-    if bytes.len() > lys_identity::signer::MAX_EVENT_BYTES
-        || headers
-            .get(crate::agent_signature::HEADER)
-            .is_some_and(|value| value.as_bytes().len() > lys_identity::signer::MAX_EVENT_BYTES)
-    {
-        return Err(malformed("the draft request exceeds the evidence bound"));
     }
     Ok(())
 }
@@ -236,7 +229,7 @@ async fn create(
     uri: Uri,
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
-    signature_boundary(&headers, &bytes)?;
+    signature_boundary(&headers)?;
     let body: DraftBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let path = uri
         .path_and_query()
@@ -324,8 +317,8 @@ async fn create(
     })
 }
 
-fn personal(state: &AppState, headers: &HeaderMap, bytes: &[u8]) -> Result<Actor, ServerError> {
-    signature_boundary(headers, bytes)?;
+fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
+    signature_boundary(headers)?;
     if headers.contains_key(crate::agent_signature::HEADER) {
         return Err(ServerError::AgentSignatureRefused {
             reason: "only the responsible person's session may decide a draft",
@@ -387,7 +380,7 @@ async fn approve(
     Path(id): Path<String>,
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
-    let actor = personal(&state, &headers, &bytes)?;
+    let actor = personal(&state, &headers)?;
     let body: DraftApproveBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
@@ -412,7 +405,7 @@ async fn refuse(
     Path(id): Path<String>,
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
-    let actor = personal(&state, &headers, &bytes)?;
+    let actor = personal(&state, &headers)?;
     let body: DraftRefuseBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
@@ -437,7 +430,7 @@ async fn correct(
     Path(id): Path<String>,
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
-    let actor = personal(&state, &headers, &bytes)?;
+    let actor = personal(&state, &headers)?;
     let body: DraftCorrectBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;

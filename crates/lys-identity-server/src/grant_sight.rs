@@ -2,11 +2,10 @@
 //! for, a grant derived from one of those, or any grant as the root
 //! authority, and the refusals it may read whole.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 use lys_identity::grants::admission::effective;
-use lys_identity::grants::lineage::MAX_DEPTH;
 use lys_identity::grants::{GrantError, GrantId, GrantRecord, Source};
 use lys_identity::{IdentityError, IdentityId, PersonId};
 
@@ -36,7 +35,7 @@ pub(crate) fn sees_with(
         return true;
     }
     let book = judged.grants.book();
-    let mut walked = Vec::new();
+    let mut walked = HashSet::new();
     let mut next = Some(record.grant());
     let mut seen = false;
     while let Some(grant) = next {
@@ -44,7 +43,10 @@ pub(crate) fn sees_with(
             seen = *answer;
             break;
         }
-        walked.push(grant.id());
+        // A grant met twice on one walk is a cycle, which reaches no one new.
+        if !walked.insert(grant.id()) {
+            break;
+        }
         let parts = grant.parts();
         if parts.holder == caller
             || parts.issuer == caller
@@ -54,8 +56,8 @@ pub(crate) fn sees_with(
             break;
         }
         next = match parts.source {
-            Source::Grant(id) if walked.len() <= MAX_DEPTH => book.grant(id),
-            Source::Grant(_) | Source::Root => None,
+            Source::Grant(id) => book.grant(id),
+            Source::Root => None,
         };
     }
     for id in walked {
@@ -81,15 +83,18 @@ pub(crate) fn on_callers_path(judged: &Judged<'_>, caller: IdentityId, id: Grant
     let book = judged.grants.book();
     book.held_by(caller).any(|record| {
         let mut next = Some(record.grant());
-        let mut hops = 0;
+        let mut visited = HashSet::new();
         while let Some(grant) = next {
             if grant.id() == id {
                 return true;
             }
-            hops += 1;
+            // A grant met twice on one walk is a cycle: the path ends there.
+            if !visited.insert(grant.id()) {
+                break;
+            }
             next = match grant.source() {
-                Source::Grant(source) if hops <= MAX_DEPTH => book.grant(source),
-                Source::Grant(_) | Source::Root => None,
+                Source::Grant(source) => book.grant(source),
+                Source::Root => None,
             };
         }
         false

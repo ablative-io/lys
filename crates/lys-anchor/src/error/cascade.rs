@@ -9,31 +9,6 @@
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum CascadeError {
-    /// A cascade was handed to bundle assembly with more links than
-    /// `lys-core`'s `MAX_LINKS` cap allows.
-    ///
-    /// Refused at assembly rather than emitted, because the workspace already
-    /// knows the answer: `verify_bundle` rejects a bundle past the cap, so
-    /// producing one would hand a caller an artifact nothing can accept. The
-    /// cap exists so an untrusted bundle cannot ask a verifier for unbounded
-    /// work, and a chain this deep is pathological on its own terms — each link
-    /// is one anchor notarizing the one below it.
-    ///
-    /// **`max` is carried as a field rather than written into the text as a
-    /// literal**, so the message reports the cap the code actually enforced
-    /// instead of the one this sentence remembers.
-    #[error(
-        "refusing to assemble a verification bundle for {origin} from a cascade of {links} links: a verifier accepts at most {max}, so a deeper chain would produce an artifact nothing can check"
-    )]
-    CascadeTooDeep {
-        /// The origin of the log the bundle was being assembled for.
-        origin: String,
-        /// The number of links the cascade held.
-        links: usize,
-        /// The cap, as read from `lys-core` at the point of refusal.
-        max: usize,
-    },
-
     /// The first link of the cascade does not notarize the checkpoint the
     /// freshly built inclusion artifact carries.
     ///

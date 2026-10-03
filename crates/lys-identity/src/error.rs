@@ -141,14 +141,6 @@ pub enum IdentityError {
         "InstallEntry: the leaf records a change to the install as a whole, not a change to an identity"
     )]
     InstallEntry,
-    /// An event is larger than any event this directory writes.
-    #[error("EventTooLarge: {len} bytes, over the limit of {limit}")]
-    EventTooLarge {
-        /// The event's length in bytes.
-        len: usize,
-        /// The largest event this directory reads.
-        limit: usize,
-    },
     /// An event names an envelope version this directory does not read.
     #[error("VersionUnsupported: event version {version} is not one this directory reads")]
     VersionUnsupported {

@@ -153,14 +153,8 @@ fn a_change_without_a_well_shaped_id_is_refused() -> TestResult {
     let world = world()?;
     let mut broker = sealed(&world)?;
     let len = broker.audit().len();
-    let long = "a".repeat(65);
 
-    for operation in [
-        None,
-        Some("short-id"),
-        Some(long.as_str()),
-        Some("has a space in it"),
-    ] {
+    for operation in [None, Some("short-id"), Some("has a space in it")] {
         assert_eq!(
             refusal(scope(&mut broker, "team:accounts", operation)),
             "OperationMissing",
@@ -186,14 +180,21 @@ fn a_change_without_a_well_shaped_id_is_refused() -> TestResult {
     );
 
     let shortest = "a".repeat(16);
-    let longest = "Z_-9".repeat(16);
+    let long = "Z_-9".repeat(2_500);
     assert_eq!(
         scope(&mut broker, "team:accounts", Some(&shortest))?,
         OwnerChanged::Applied
     );
     assert_eq!(
-        recipients(&mut broker, Recipients::PeopleOnly, Some(&longest))?,
+        recipients(&mut broker, Recipients::PeopleOnly, Some(&long))?,
         OwnerChanged::Applied
+    );
+    assert!(
+        matches!(
+            recipients(&mut broker, Recipients::PeopleOnly, Some(&long))?,
+            OwnerChanged::Repeated { .. }
+        ),
+        "a 10,000-character id is kept whole and answers its repeat"
     );
     Ok(())
 }

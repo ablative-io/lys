@@ -15,11 +15,6 @@ use serde_json::Value;
 use crate::error::ServerError;
 use crate::provisioning_store::{McpCommand, McpServer, Setting};
 
-/// The most servers a profile names.
-const SERVERS_MAX: usize = 64;
-/// The most arguments or settings a command takes.
-const PARTS_MAX: usize = 128;
-
 /// An MCP server as a profile is set with it.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -213,11 +208,6 @@ fn command(name: &str, given: CommandBody) -> Result<McpCommand, ServerError> {
     if credential_shaped(&program) {
         return Err(inline(name, "its program".to_owned()));
     }
-    if given.args.len() > PARTS_MAX || given.env.len() > PARTS_MAX {
-        return Err(malformed(format!(
-            "MCP server `{name}` has more than {PARTS_MAX} arguments or settings"
-        )));
-    }
     let mut env = BTreeMap::new();
     for (variable, value) in given.env {
         let valid = !variable.is_empty()
@@ -244,11 +234,6 @@ fn command(name: &str, given: CommandBody) -> Result<McpCommand, ServerError> {
 
 /// The servers `given` names, each checked, in order.
 pub(crate) fn servers(given: Vec<McpServerBody>) -> Result<Vec<McpServer>, ServerError> {
-    if given.len() > SERVERS_MAX {
-        return Err(malformed(format!(
-            "mcp_servers holds more than {SERVERS_MAX} servers"
-        )));
-    }
     let mut kept: Vec<McpServer> = Vec::new();
     for server in given {
         let name = server.name.trim().to_owned();

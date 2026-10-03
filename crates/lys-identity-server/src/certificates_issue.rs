@@ -47,8 +47,6 @@ use crate::session::now;
 pub(crate) const VALID_FOR: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 /// The sub-component of the lys arc the capability claims are carried under.
 const CLAIMS_COMPONENT: u64 = 1;
-/// The most characters a reason carries.
-const REASON_MAX: usize = 500;
 
 /// A certificate to issue. Every member is required.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -259,11 +257,6 @@ pub(crate) async fn withdraw(
     let reason = body.reason.trim().to_owned();
     if reason.is_empty() {
         return Err(malformed("reason is empty: say why it is withdrawn"));
-    }
-    if reason.chars().count() > REASON_MAX {
-        return Err(malformed(format!(
-            "reason is longer than {REASON_MAX} characters"
-        )));
     }
     let by = with_directory(&state, |directory| {
         Ok(own_person(directory.projection()?, &actor)?.to_string())

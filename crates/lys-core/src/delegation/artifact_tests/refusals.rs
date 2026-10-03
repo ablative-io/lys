@@ -278,15 +278,18 @@ fn a_receipt_content_type_in_the_protected_bucket_is_refused_by_the_parser() {
 }
 
 #[test]
-fn an_oversize_artifact_is_refused() {
+fn a_ten_thousand_character_subject_parses_whole() {
+    let subject = "o".repeat(10_000);
     let delegation = Delegation {
         root_public_key: ROOT_KEY,
-        claim: claim_for(&"o".repeat(MAX_ARTIFACT_LEN), 0, 0),
+        claim: claim_for(&subject, 0, 0),
         signature: SIGNATURE,
     };
     let bytes = delegation.to_cose_bytes();
-    assert!(bytes.len() > MAX_ARTIFACT_LEN);
-    assert!(Delegation::from_cose_bytes(&bytes).is_err());
+    assert!(bytes.len() > 10_000);
+    let parsed = Delegation::from_cose_bytes(&bytes).unwrap();
+    assert_eq!(parsed.claim.subject_value, subject);
+    assert_eq!(parsed, delegation);
 }
 
 #[test]

@@ -49,9 +49,6 @@ pub enum TokenError {
     /// An expiry must be future and at most 24 hours from issue.
     #[error("GrantTokenExpiryInvalid")]
     Expiry,
-    /// Live and retained records have reached the install limit.
-    #[error("GrantTokenStoreFull")]
-    Full,
     /// Durable state is unavailable; admission fails closed.
     #[error("GrantTokenUnavailable: {0}")]
     Unavailable(String),
@@ -75,13 +72,11 @@ impl IntoResponse for TokenError {
             Self::Responsible => "GrantTokenResponsibleRequired",
             Self::CookieConflict(_) => "GrantTokenCookieConflict",
             Self::Expiry => "GrantTokenExpiryInvalid",
-            Self::Full => "GrantTokenStoreFull",
             Self::Unavailable(_) => "GrantTokenUnavailable",
             Self::Authority(_) => "GrantTokenAuthorityRefused",
         };
         let status = match &self {
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
-            Self::Full => StatusCode::CONFLICT,
             Self::Expiry | Self::CookieConflict(_) => StatusCode::BAD_REQUEST,
             Self::Responsible
             | Self::Scope
@@ -264,6 +259,7 @@ async fn revoke(
         .sessions
         .actor(crate::routes::cookie_header(&headers))?;
     let id = crate::grant_contract::grant_id(&id)?;
+    let at = crate::session::now();
     crate::grants::with_grants(&state, |judged| {
         Ok((|| {
             let caller = crate::caller_admission::active_caller(judged.directory, &actor)?;
@@ -273,7 +269,7 @@ async fn revoke(
                 .grant_tokens
                 .lock()
                 .map_err(|e| TokenError::Unavailable(format!("grant token lock poisoned: {e}")))?;
-            tokens.revoke(id, &token_id)?;
+            tokens.revoke(id, &token_id, at)?;
             Ok(Json(Revoked {
                 id: token_id,
                 revoked: true,

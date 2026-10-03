@@ -122,7 +122,7 @@ fn agent_pass_failed_end_does_not_revive_on_reopen() -> Result<(), Box<dyn Error
 }
 
 #[test]
-fn agent_pass_full_capacity_refuses_before_dropping_an_existing_binding()
+fn agent_pass_table_of_two_thousand_opens_and_takes_another_without_dropping_one()
 -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let file = dir.path().join("passes.json");
@@ -130,7 +130,7 @@ fn agent_pass_full_capacity_refuses_before_dropping_an_existing_binding()
     let pass = "a".repeat(43);
     let key = format!("{:x}", Sha256::digest(pass.as_bytes()));
     let mut entries = serde_json::Map::new();
-    for index in 0..1024 {
+    for index in 0..2000 {
         let digest = if index == 0 {
             key.clone()
         } else {
@@ -142,16 +142,16 @@ fn agent_pass_full_capacity_refuses_before_dropping_an_existing_binding()
         &file,
         serde_json::to_vec(&serde_json::json!({"format":"lys-agent-passes/v1", "passes":entries}))?,
     )?;
-    let before = std::fs::read(&file)?;
     let mut passes = Passes::open(file.clone())?;
     passes.reconcile(|_, _, _| true)?;
-    assert!(
-        passes
-            .issue(agent, "launch-0", "session-replacement")
-            .is_err()
-    );
+    let fresh = passes.issue(agent, "launch-new", "session-new")?;
     assert_eq!(passes.lookup(&pass)?, agent);
-    assert_eq!(std::fs::read(file)?, before);
+    assert_eq!(passes.lookup(&fresh)?, agent);
+    let mut reopened = Passes::open(file)?;
+    reopened.reconcile(|_, _, _| true)?;
+    assert_eq!(reopened.lookup(&pass)?, agent);
+    assert_eq!(reopened.lookup(&fresh)?, agent);
+    assert_eq!(reopened.launches().len(), 2001);
     Ok(())
 }
 

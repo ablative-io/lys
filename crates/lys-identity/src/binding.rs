@@ -10,11 +10,9 @@
 
 use crate::error::IdentityError;
 
-/// The longest subject accepted, in bytes: OIDC caps `sub` at 255 ASCII characters.
+/// The longest subject accepted, in bytes: `OpenID` Connect Core 1.0 section 2
+/// says `sub` must not exceed 255 ASCII characters.
 pub const SUBJECT_MAX_BYTES: usize = 255;
-
-/// The longest issuer accepted, in bytes.
-pub const ISSUER_MAX_BYTES: usize = 2048;
 
 /// An issuer and subject pair, exactly as the issuer's token names them.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -23,19 +21,14 @@ pub struct LoginBinding {
     subject: String,
 }
 
-/// Refuse a value that is empty, too long, padded with whitespace or carries a control character.
+/// Refuse a value that is empty, padded with whitespace or carries a control character.
 fn check_exact(
     value: &str,
-    max: usize,
     empty: &'static str,
-    long: &'static str,
     padded: &'static str,
 ) -> Result<(), IdentityError> {
     if value.is_empty() {
         return Err(IdentityError::BindingMalformed { reason: empty });
-    }
-    if value.len() > max {
-        return Err(IdentityError::BindingMalformed { reason: long });
     }
     if value.trim() != value || value.chars().any(char::is_control) {
         return Err(IdentityError::BindingMalformed { reason: padded });
@@ -48,9 +41,7 @@ impl LoginBinding {
     pub fn new(issuer: &str, subject: &str) -> Result<Self, IdentityError> {
         check_exact(
             issuer,
-            ISSUER_MAX_BYTES,
             "the issuer is empty",
-            "the issuer is longer than any issuer this directory records",
             "the issuer carries surrounding whitespace or a control character",
         )?;
         if !(issuer.starts_with("https://") || issuer.starts_with("http://")) {
@@ -58,11 +49,14 @@ impl LoginBinding {
                 reason: "the issuer is not an http or https URL",
             });
         }
+        if subject.len() > SUBJECT_MAX_BYTES {
+            return Err(IdentityError::BindingMalformed {
+                reason: "the subject is longer than 255 bytes",
+            });
+        }
         check_exact(
             subject,
-            SUBJECT_MAX_BYTES,
             "the subject is empty",
-            "the subject is longer than 255 bytes",
             "the subject carries surrounding whitespace or a control character",
         )?;
         Ok(Self {

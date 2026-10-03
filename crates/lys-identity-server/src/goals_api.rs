@@ -46,15 +46,6 @@ use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_api::with_runtime;
 use crate::session::now;
 
-/// The most characters an item's words carry.
-const WORDS_MAX: usize = 500;
-
-/// The most reminders one item carries.
-const REMINDERS_MAX: usize = 16;
-
-/// The fewest seconds between interval reminders.
-const EVERY_MIN: u64 = 60;
-
 /// An item to set.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[schema(as = GoalSetBody)]
@@ -242,10 +233,8 @@ async fn set_team_goal(
 
 pub(crate) fn checked_words(words: &str) -> Result<String, ServerError> {
     let words = words.trim();
-    if words.is_empty() || words.chars().count() > WORDS_MAX {
-        return Err(malformed(format!(
-            "words carry between 1 and {WORDS_MAX} characters"
-        )));
+    if words.is_empty() {
+        return Err(malformed("words are empty"));
     }
     if words.chars().any(char::is_control) {
         return Err(malformed(
@@ -257,11 +246,6 @@ pub(crate) fn checked_words(words: &str) -> Result<String, ServerError> {
 
 fn checked(body: &SetBody) -> Result<(), ServerError> {
     checked_words(&body.words)?;
-    if body.reminders.len() > REMINDERS_MAX {
-        return Err(malformed(format!(
-            "an item carries at most {REMINDERS_MAX} reminders"
-        )));
-    }
     for remind in &body.reminders {
         match remind {
             Remind::Before { .. } if body.deadline.is_none() => {
@@ -272,10 +256,10 @@ fn checked(body: &SetBody) -> Result<(), ServerError> {
                     "a reminder before the deadline is at least 1 second before it",
                 ));
             }
-            Remind::Every { seconds } if *seconds < EVERY_MIN => {
-                return Err(malformed(format!(
-                    "interval reminders are at least {EVERY_MIN} seconds apart"
-                )));
+            Remind::Every { seconds: 0 } => {
+                return Err(malformed(
+                    "interval reminders are at least 1 second apart: a zero interval never ends",
+                ));
             }
             _ => {}
         }
@@ -408,10 +392,8 @@ async fn mark(
         return Err(malformed("a mark is met, missed or dropped"));
     }
     let words = body.words.trim();
-    if words.is_empty() || words.chars().count() > WORDS_MAX {
-        return Err(malformed(format!(
-            "words carry between 1 and {WORDS_MAX} characters"
-        )));
+    if words.is_empty() {
+        return Err(malformed("words are empty"));
     }
     let asker = asker(&state, &headers, &uri, &bytes)?;
     let goals = goals(&state)?;

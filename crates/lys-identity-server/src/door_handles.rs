@@ -35,10 +35,9 @@ pub const HANDLES_PATH: &str = "/secrets/handles";
 const VALID: &str = "active";
 
 /// Whether `text` is a credential id this client admits onto a command line:
-/// one to 128 ASCII letters, digits, `-`, `_` and `.`.
+/// one or more ASCII letters, digits, `-`, `_` and `.`.
 pub fn credential_id(text: &str) -> bool {
     !text.is_empty()
-        && text.len() <= 128
         && text
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))

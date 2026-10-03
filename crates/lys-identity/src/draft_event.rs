@@ -153,17 +153,15 @@ fn invalid(reason: &'static str) -> IdentityError {
 
 fn token(value: &str) -> bool {
     !value.is_empty()
-        && value.len() <= 256
         && value.bytes().all(|byte| {
             byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-' | b'.')
         })
 }
 
-fn request(method: &str, path: &str, body: &[u8]) -> Result<(), IdentityError> {
+fn request(method: &str, path: &str) -> Result<(), IdentityError> {
     if !matches!(method, "POST" | "PUT" | "PATCH" | "DELETE")
         || !path.starts_with('/')
         || path.starts_with("//")
-        || path.len() > 2048
         || !path.is_ascii()
         || path
             .bytes()
@@ -174,9 +172,6 @@ fn request(method: &str, path: &str, body: &[u8]) -> Result<(), IdentityError> {
             "the request must name a local mutation method and path",
         ));
     }
-    if body.len() > crate::signer::MAX_EVENT_BYTES {
-        return Err(invalid("the request body exceeds the leaf bound"));
-    }
     Ok(())
 }
 
@@ -184,12 +179,10 @@ fn evidence(actor: &Actor, proof: Option<&RequestEvidence>) -> Result<(), Identi
     match (actor.provenance().agent(), proof) {
         (None, None) => Ok(()),
         (Some(agent), Some(proof)) if agent == proof.agent => {
-            request(&proof.method, &proof.path, &proof.body)?;
+            request(&proof.method, &proof.path)?;
             if proof.nonce.len() < 32
-                || proof.nonce.len() > 128
                 || !proof.nonce.bytes().all(|byte| byte.is_ascii_hexdigit())
                 || proof.cose_sign1.is_empty()
-                || proof.cose_sign1.len() > crate::signer::MAX_EVENT_BYTES
             {
                 return Err(invalid(
                     "agent evidence needs its original nonce and COSE attestation",
@@ -219,14 +212,13 @@ impl DraftEvent {
                 if !token(&event.target.kind)
                     || !token(&event.target.id)
                     || !token(&event.target.action)
-                    || event.note.chars().count() > 500
                     || event.corrects == Some(event.operation)
                 {
                     return Err(invalid(
-                        "the draft needs a valid resource, bounded note and distinct correction link",
+                        "the draft needs a valid resource and a distinct correction link",
                     ));
                 }
-                request(&event.method, &event.path, &event.body)?;
+                request(&event.method, &event.path)?;
                 evidence(&event.actor, event.evidence.as_ref())?;
                 if let Some(signature) = &event.request_signature {
                     let proof = event
@@ -249,13 +241,8 @@ impl DraftEvent {
                 evidence(&event.actor, event.evidence.as_ref())
             }
             Self::Refused(event) => {
-                if event.operation == event.draft
-                    || event.reason.trim().is_empty()
-                    || event.reason.chars().count() > 500
-                {
-                    return Err(invalid(
-                        "a refusal needs a distinct operation and bounded reason",
-                    ));
+                if event.operation == event.draft || event.reason.trim().is_empty() {
+                    return Err(invalid("a refusal needs a distinct operation and a reason"));
                 }
                 evidence(&event.actor, event.evidence.as_ref())
             }
@@ -264,7 +251,6 @@ impl DraftEvent {
                     || event.operation == event.corrected.operation
                     || event.corrected.operation == event.draft
                     || event.reason.trim().is_empty()
-                    || event.reason.chars().count() > 500
                     || event.corrected.actor != event.actor
                     || event.corrected.recorded_at != event.recorded_at
                     || event.corrected.corrects != Some(event.draft)
@@ -323,17 +309,13 @@ impl DraftEvent {
 
 impl RequestSignature {
     fn check(&self, proof: &RequestEvidence) -> Result<(), IdentityError> {
-        if self.header.len() > crate::signer::MAX_EVENT_BYTES
-            || self.payload.len() > crate::signer::MAX_EVENT_BYTES
-            || !self.header.is_ascii()
+        if !self.header.is_ascii()
             || self
                 .header
                 .iter()
                 .any(|byte| byte.is_ascii_control() && *byte != b'\t')
         {
-            return Err(invalid(
-                "the original signature header must be bounded ASCII",
-            ));
+            return Err(invalid("the original signature header must be ASCII"));
         }
         let header = std::str::from_utf8(&self.header)
             .ok()

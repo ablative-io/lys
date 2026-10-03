@@ -32,7 +32,6 @@ pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
         | IdentityError::EventMalformed { .. }
         | IdentityError::EventNotCanonical
         | IdentityError::InstallEntry
-        | IdentityError::EventTooLarge { .. }
         | IdentityError::VersionUnsupported { .. }
         | IdentityError::SignerMismatch
         | IdentityError::SignatureInvalid
@@ -66,7 +65,6 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::GrantNotCanonical
         | GrantError::EventMalformed { .. }
         | GrantError::EventNotCanonical
-        | GrantError::EventTooLarge { .. }
         | GrantError::ResourceKindUnheld { .. } => StatusCode::BAD_REQUEST,
         GrantError::SourceUnknown { .. } | GrantError::GrantUnknown { .. } => StatusCode::NOT_FOUND,
         GrantError::ModelInvalid { .. }
@@ -158,6 +156,7 @@ impl ServerError {
             | Self::DialRefused { .. }
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled | Self::RegistrationThrottled => StatusCode::TOO_MANY_REQUESTS,
+            Self::BodyTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::Inactive { .. }
             | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }

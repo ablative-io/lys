@@ -270,8 +270,11 @@ impl Runner {
     }
 }
 
+/// Machine guard: the most connections held open at once on the socket.
 const CONNECTION_MAX: usize = 64;
+/// Machine guard: the blocking threads acts run on, one held for control.
 const DISPATCH_MAX: usize = 32;
+/// Transport guard: the most bytes of one request line read before parsing.
 const LINE_MAX: usize = 1_048_576;
 
 fn connection_result(result: Option<Result<Result<(), RunnerError>, tokio::task::JoinError>>) {

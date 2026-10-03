@@ -18,9 +18,7 @@ use crate::provisioning_api::{with_provisioning, write_provisioning};
 use crate::provisioning_store::SkillText;
 use crate::routes::{AppState, hex, signed_in};
 
-/// The longest skill text kept, in bytes.
-const TEXT_MAX: usize = 256 * 1024;
-/// The longest skill name.
+/// The longest skill name: the Agent Skills format caps `name` at 64 characters.
 const NAME_MAX: usize = 64;
 
 /// A skill's text to keep under its name.
@@ -106,10 +104,8 @@ async fn keep(
     crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let name = name(&body.name)?;
-    if body.text.trim().is_empty() || body.text.len() > TEXT_MAX || body.text.contains('\0') {
-        return Err(malformed(format!(
-            "a skill's text is not empty, holds no NUL and is at most {TEXT_MAX} bytes"
-        )));
+    if body.text.trim().is_empty() || body.text.contains('\0') {
+        return Err(malformed("a skill's text is not empty and holds no NUL"));
     }
     let skill = SkillText {
         name,

@@ -167,22 +167,13 @@ pub enum HomeError {
 
     /// A name that must be one safe path component is not.
     #[error(
-        "{what} `{name}` is not a safe name: letters, digits, `.`, `_` and `-`, not beginning with `.`, at most 200 bytes"
+        "{what} `{name}` is not a safe name: letters, digits, `.`, `_` and `-`, not beginning with `.`"
     )]
     BadName {
         /// What was being named.
         what: &'static str,
         /// The name offered.
         name: String,
-    },
-
-    /// A harness event's data would exceed the size an event may carry.
-    #[error("harness event from record `{uuid}` would be {len} bytes of data, over the limit")]
-    EventTooLarge {
-        /// The source record's uuid, empty when it had none.
-        uuid: String,
-        /// The serialised size.
-        len: usize,
     },
 
     /// A forked file repeats tool actions of the file it was forked from.
@@ -216,7 +207,7 @@ pub enum HomeError {
     TemplateValue {
         /// The field, dotted from the top of the template.
         field: String,
-        /// The value given, cut to 80 characters.
+        /// The value given, whole.
         value: String,
     },
 

@@ -80,7 +80,8 @@ pub struct SignInProviders {
     changes: account_changes::Changes,
 }
 
-/// The most characters a client secret carries, the issuer's own limit.
+/// The most characters a client id or secret carries: the issuer's own limit,
+/// which its provider API refuses beyond, so it is refused here first by name.
 const SECRET_MAX: usize = 256;
 
 /// The sign-in providers this installation offers.
@@ -391,8 +392,8 @@ impl SignInProviders {
 }
 
 /// The issuer's message from a refusal body, or its first line of text,
-/// bounded so a refusal never carries a page, with the issuer's product name
-/// said as Lys's sign-in service: nothing a person reads names the issuer.
+/// whole, with the issuer's product name said as Lys's sign-in service:
+/// nothing a person reads names the issuer.
 fn message(text: &str) -> String {
     let message = serde_json::from_str::<Value>(text)
         .ok()
@@ -402,8 +403,7 @@ fn message(text: &str) -> String {
                 .map(str::to_owned)
         })
         .unwrap_or_else(|| text.lines().next().unwrap_or_default().to_owned());
-    let bounded: String = message.chars().take(300).collect();
-    unnamed(&bounded)
+    unnamed(&message)
 }
 
 /// `text` with every spelling of the issuer's product name said as Lys's

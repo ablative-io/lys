@@ -35,9 +35,8 @@ use crate::session::now;
 use crate::teams_api::{team_id, with_teams};
 use crate::teams_state::Team;
 
-/// The most characters a machine's name, kind or runtime carries.
-const WORDS_MAX: usize = 100;
-/// The most characters a host name carries.
+/// The most characters a host name carries: DNS caps a name at 255 octets on
+/// the wire (RFC 1035, section 2.3.4), which is 253 characters as text.
 const HOST_MAX: usize = 253;
 
 /// One machine.
@@ -166,11 +165,6 @@ fn words(name: &str, text: &str) -> Result<String, ServerError> {
     let text = text.trim();
     if text.is_empty() {
         return Err(malformed(format!("{name} is empty")));
-    }
-    if text.chars().count() > WORDS_MAX {
-        return Err(malformed(format!(
-            "{name} is longer than {WORDS_MAX} characters"
-        )));
     }
     Ok(text.to_owned())
 }

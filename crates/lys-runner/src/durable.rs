@@ -109,6 +109,7 @@ impl Drop for Inner {
 
 fn run(receiver: &mpsc::Receiver<Command>, fault: &Mutex<Option<String>>) {
     while let Ok(first) = receiver.recv() {
+        // A batch of at most 32 is one flush; the rest wait for the next pass.
         let mut commands = std::iter::once(first)
             .chain(receiver.try_iter().take(31))
             .collect::<Vec<_>>();

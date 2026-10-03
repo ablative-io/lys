@@ -182,6 +182,7 @@ pub fn check_email(email: &str) -> Result<&str, ServerError> {
     let clean = !email
         .chars()
         .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '/' | '?' | '#' | '%'));
+    // 254 octets is the longest forward path RFC 5321 section 4.5.3.1.3 lets a mailbox take.
     if shaped && clean && email.len() <= 254 {
         Ok(email)
     } else {

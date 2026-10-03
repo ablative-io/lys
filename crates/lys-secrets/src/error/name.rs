@@ -63,7 +63,6 @@ impl SecretsError {
             Self::Grants(_) => "Grants",
             Self::Identity(_) => "Identity",
             Self::Random { .. } => "Random",
-            Self::AnswerTooLarge { .. } => "AnswerTooLarge",
             Self::Encoding { .. } => "Encoding",
             Self::Io { .. } => "Io",
             Self::IndexUnresolved { .. } => "IndexUnresolved",

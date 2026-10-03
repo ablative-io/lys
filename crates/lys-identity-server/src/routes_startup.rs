@@ -219,8 +219,10 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)))
         .merge(crate::mcp_oauth::routes(Arc::clone(&apps)));
-    // Authenticate the inner API/provider routes before body extraction. Static
-    // screens remain public; the API fallback cannot reach their wildcard.
+    // Authenticate the inner API/provider routes before body extraction, and
+    // read a body whole only for a caller judged before it (`signed_first`).
+    // Static screens remain public and read no body; the API fallback cannot
+    // reach their wildcard.
     let guarded = |routes| {
         crate::session_admission::guarded(
             crate::signed_first::guarded(routes, Arc::clone(&state)),

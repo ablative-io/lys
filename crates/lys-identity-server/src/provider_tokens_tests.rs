@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 
 use serde_json::json;
 
-use super::{Access, FORMAT, LIMIT, Tokens};
+use super::{Access, FORMAT, Tokens};
 use crate::error::ServerError;
 
 fn access(ends: u64) -> Access {
@@ -43,10 +43,11 @@ fn an_old_key_only_install_gains_private_persistent_access_and_durable_revocatio
 }
 
 #[test]
-fn capacity_is_bounded_and_expiry_frees_space_without_waiting() -> Result<(), Box<dyn Error>> {
+fn a_large_table_takes_another_and_expiry_frees_space_without_waiting() -> Result<(), Box<dyn Error>>
+{
     let dir = tempfile::TempDir::new()?;
     let file = dir.path().join("access.json");
-    let entries: Vec<_> = (0..LIMIT)
+    let entries: Vec<_> = (0..5000)
         .map(|index| json!({ "key": format!("{index:064x}"), "access": access(20) }))
         .collect();
     std::fs::write(
@@ -54,12 +55,16 @@ fn capacity_is_bounded_and_expiry_frees_space_without_waiting() -> Result<(), Bo
         serde_json::to_vec(&json!({"format": FORMAT, "tokens": entries}))?,
     )?;
     let mut tokens = Tokens::open(file.clone(), 10)?;
+    assert_eq!(tokens.live.len(), 5000);
+    tokens.insert("e".repeat(64), access(40), 10)?;
+    assert_eq!(tokens.live.len(), 5001);
+    assert_eq!(Tokens::open(file.clone(), 10)?.live.len(), 5001);
     assert!(matches!(
-        tokens.insert("f".repeat(64), access(40), 10),
+        tokens.insert("e".repeat(64), access(40), 10),
         Err(ServerError::ProviderUnavailable { .. })
     ));
     tokens.insert("f".repeat(64), access(40), 20)?;
-    assert_eq!(tokens.live.len(), 1);
+    assert_eq!(tokens.live.len(), 2);
     assert!(matches!(
         tokens.get(&"f".repeat(64), 40),
         Err(ServerError::TokenUnknown)

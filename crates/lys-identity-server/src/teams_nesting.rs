@@ -17,9 +17,7 @@ use crate::read_api::{login, own_person};
 use crate::read_views::Login;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
-use crate::teams_api::{
-    DESCRIPTION_MAX, NAME_MAX, TeamChanged, change, kept, malformed, team_id, with_teams, words,
-};
+use crate::teams_api::{TeamChanged, change, kept, malformed, team_id, with_teams, words};
 use crate::teams_state::{Created, Held, Line, Refused};
 
 /// A creation whose event version carries the tree position.
@@ -143,11 +141,11 @@ pub(crate) async fn create(
         crate::teams_api::giving::actor(&state, &headers, ("POST", uri.path(), &bytes), None)?;
     let body: CreateBody = crate::teams_api::giving::json(headers, bytes).await?;
     let id = OperationId::from_str(&body.operation)?.to_string();
-    let name = words("name", &body.name, NAME_MAX)?;
+    let name = words("name", &body.name)?;
     if name.is_empty() {
         return Err(malformed("a team has a name"));
     }
-    let description = words("description", &body.description, DESCRIPTION_MAX)?;
+    let description = words("description", &body.description)?;
     let (parent, lead) = position(body.parent.as_deref(), body.lead)?;
     if parent.is_some() || lead.is_some() {
         crate::teams_migration::require_committed(&state)?;

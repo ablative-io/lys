@@ -44,9 +44,6 @@ fn content_type(event: &IdentityEvent) -> &'static str {
     }
 }
 
-/// The largest event this directory reads or writes, in bytes.
-pub const MAX_EVENT_BYTES: usize = 64 * 1024;
-
 const COSE_SIGN1_TAG: u64 = 18;
 const SIGNATURE_LEN: usize = 64;
 const KEY_LEN: usize = 32;
@@ -133,16 +130,16 @@ impl SignedEvent {
     }
 }
 
-/// Sign `event` with the directory service's key, refusing an event larger
-/// than any event this directory reads back, so nothing is logged that
-/// [`verify_event`] would refuse for ever.
+/// Sign `event` with the directory service's key. Every event is signed
+/// whole, however large: the message is CBOR, whose every part carries its
+/// own length, so no size is refused here or when [`verify_event`] reads it.
 pub fn sign_event(
     event: IdentityEvent,
     service_key: &Ed25519Identity,
 ) -> Result<SignedEvent, IdentityError> {
     let body = encode_body(&event);
     let media_type = content_type(&event);
-    seal(&body, media_type, Entry::Identity(event), service_key)
+    Ok(seal(&body, media_type, Entry::Identity(event), service_key))
 }
 
 /// Sign the install event `event` with the directory service's key, as
@@ -152,34 +149,23 @@ pub fn sign_install_event(
     service_key: &Ed25519Identity,
 ) -> Result<SignedEvent, IdentityError> {
     let body = install_event::encode(&event);
-    seal(
+    Ok(seal(
         &body,
         INSTALL_CONTENT_TYPE,
         Entry::Install(event),
         service_key,
-    )
+    ))
 }
 
-fn seal(
-    body: &[u8],
-    media_type: &str,
-    entry: Entry,
-    service_key: &Ed25519Identity,
-) -> Result<SignedEvent, IdentityError> {
+fn seal(body: &[u8], media_type: &str, entry: Entry, service_key: &Ed25519Identity) -> SignedEvent {
     let protected = protected_header(&service_key.public_key_bytes(), media_type);
     let signature = service_key.sign(&sig_structure(&protected, body));
     let bytes = cose_sign1(&protected, body, &signature);
-    if bytes.len() > MAX_EVENT_BYTES {
-        return Err(IdentityError::EventTooLarge {
-            len: bytes.len(),
-            limit: MAX_EVENT_BYTES,
-        });
-    }
-    Ok(SignedEvent {
+    SignedEvent {
         bytes,
         commitment: payload_commitment(body),
         entry,
-    })
+    }
 }
 
 /// Validate and sign a canonical draft payload with the directory service key.
@@ -194,12 +180,12 @@ pub fn sign_draft_event(
     } else {
         DRAFT_CONTENT_TYPE
     };
-    seal(
+    Ok(seal(
         &body,
         media_type,
         Entry::Draft(Box::new(event)),
         service_key,
-    )
+    ))
 }
 
 /// Verify `message` against the directory service's public key and return the event it carries.
@@ -207,12 +193,6 @@ pub fn verify_event(
     message: &[u8],
     service_key: &[u8; KEY_LEN],
 ) -> Result<SignedEvent, IdentityError> {
-    if message.len() > MAX_EVENT_BYTES {
-        return Err(IdentityError::EventTooLarge {
-            len: message.len(),
-            limit: MAX_EVENT_BYTES,
-        });
-    }
     let parts = decode_message(message)?;
     let Ok(kid) = <[u8; KEY_LEN]>::try_from(decode_kid(&parts.protected)?.as_slice()) else {
         return Err(IdentityError::EventMalformed {

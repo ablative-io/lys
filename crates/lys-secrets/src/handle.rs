@@ -14,7 +14,8 @@ use crate::secret::Secret;
 
 /// The domain every presentation payload opens with.
 pub const PRESENTATION_DOMAIN: &str = "lys-secrets/presentation/v2";
-/// The shortest operation id the broker takes.
+/// The shortest operation id the broker takes: a floor so ids made once do
+/// not collide, not a bound on length.
 pub const MIN_OPERATION_ID: usize = 16;
 /// The domain a request digest opens with.
 pub const REQUEST_DOMAIN: &str = "lys-secrets/request/v1";

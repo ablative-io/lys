@@ -12,23 +12,22 @@
 //! An event's data is `{kind, harness, source_uuid, record, detail}`: `record`
 //! is the whole source record stored as a block, by hash, so nothing of the
 //! original is lost; `detail` carries only names, ids, exit codes and counts,
-//! never hook output or a tool result's body, and the serialised data is
-//! refused when it would exceed [`MAX_DATA_BYTES`].
+//! never hook output or a tool result's body. The data has no size bound:
+//! every name and id is kept whole.
 //!
 //! The sixth kind, `template_render` (HOME-002 R5), is not imported from a
 //! transcript: `render-launch` appends it beside the context path as a side
 //! leaf, so the head does not move. Its `record` names a [`RenderManifest`]
 //! block by hash, which carries the written paths; its `detail` holds the
 //! template hash, the session head hash and the count of files, never a path,
-//! a flag, an environment value, a handle or the instructions text, so the
-//! event stays under the cap whatever the paths are.
+//! a flag, an environment value, a handle or the instructions text.
 //!
 //! The seventh kind, `arrival` (HOME-019 R4), is not imported either: fetch
 //! appends one beside each arriving session's head, so the head does not
 //! move. It stores no block, so `source_uuid` and `record` are both null;
 //! its `detail` holds exactly the source commit, the remote's absolute path,
-//! the ref and the session's fresh execution id. A remote long enough to
-//! carry the data over the cap is refused like any other event.
+//! the ref and the session's fresh execution id, the remote kept whole
+//! however long its path is.
 
 use std::path::PathBuf;
 
@@ -53,8 +52,6 @@ pub const KIND_SYSTEM: &str = "system";
 pub const KIND_TEMPLATE_RENDER: &str = "template_render";
 /// A session's arrival in a home by fetch (HOME-019 R4).
 pub const KIND_ARRIVAL: &str = "arrival";
-/// The most an event's serialised data may be.
-pub const MAX_DATA_BYTES: usize = 512;
 
 /// One file a render wrote: its path and the SHA-256 of its bytes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,27 +143,15 @@ pub struct HarnessEvent {
 
 impl HarnessEvent {
     /// The event's data as it rides in a `lys.harness_event` entry.
-    pub fn data(&self) -> Result<Value, HomeError> {
-        let data = json!({
+    #[must_use]
+    pub fn data(&self) -> Value {
+        json!({
             "kind": self.kind,
             "harness": HARNESS,
             "source_uuid": self.source_uuid,
             "record": self.record,
             "detail": self.detail,
-        });
-        let len = serde_json::to_vec(&data)
-            .map_err(|source| HomeError::Json {
-                context: "an event could not be serialised",
-                source,
-            })?
-            .len();
-        if len > MAX_DATA_BYTES {
-            return Err(HomeError::EventTooLarge {
-                uuid: self.source_uuid.clone().unwrap_or_default(),
-                len,
-            });
-        }
-        Ok(data)
+        })
     }
 }
 

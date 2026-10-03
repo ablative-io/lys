@@ -7,8 +7,6 @@ use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::error::ServerError;
 
-const LIMIT: usize = 4096;
-
 #[derive(Default)]
 pub(super) struct Changes {
     table: Mutex<Table>,
@@ -45,9 +43,6 @@ impl Changes {
                     "the account-change index lock is poisoned: {error}"
                 ))
             })?;
-            if table.active >= LIMIT {
-                return Err(unavailable("the active account-change limit is reached"));
-            }
             let entry = table
                 .accounts
                 .entry(id.to_owned())

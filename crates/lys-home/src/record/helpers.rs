@@ -1,5 +1,5 @@
-//! The helpers and constants the record's files share: the name check and
-//! its limit, the format version written, the clock, fresh entry ids, a JSON
+//! The helpers and constants the record's files share: the name check, the
+//! format version written, the clock, fresh entry ids, a JSON
 //! value's size, the durable line append and an entry's custom type.
 
 use std::io::Write;
@@ -12,16 +12,13 @@ use crate::record::blocks;
 use crate::record::entries::{Entry, EntryBody};
 use crate::record::io_counts::IoCounter;
 
-/// The most bytes a session or block name may have.
-pub const MAX_NAME_BYTES: usize = 200;
-
 /// Check that a name is one safe path component: letters, digits, `.`, `_`
-/// and `-`, not beginning with `.`, non-empty and at most [`MAX_NAME_BYTES`].
+/// and `-`, not beginning with `.` and non-empty. No length is set here; a
+/// name longer than the file system takes is refused by the file system.
 /// Every name that is joined onto a directory passes through here, so `..`,
 /// `/` and an absolute path can never leave the directory chosen.
 pub fn safe_component(what: &'static str, name: &str) -> Result<(), HomeError> {
     let ok = !name.is_empty()
-        && name.len() <= MAX_NAME_BYTES
         && !name.starts_with('.')
         && name
             .bytes()

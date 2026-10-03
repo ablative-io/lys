@@ -265,7 +265,7 @@ pub(crate) fn typed(api: &mut Api) {
             (
                 POST,
                 "/grants/check/batch",
-                "Up to 500 checks, answered in order at one revision",
+                "Any number of checks, answered in order at one revision",
             ),
             A,
             Some(api.schema::<BatchBody>()),

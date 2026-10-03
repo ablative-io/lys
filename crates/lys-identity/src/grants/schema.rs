@@ -40,9 +40,12 @@ pub const ANY_KIND: &str = "*";
 /// What the permission engine names a relation from a child to its parent.
 pub const PARENT_RELATION: &str = "parent_";
 
-// The app id's length is the brief's (R1, 3 to 40); a relation's, action's or
-// kind's name length is the permission engine's own identifier rule, so a
-// name the engine would refuse is refused here first, at its pointer.
+// Every length here is the permission engine's (SpiceDB's) own naming rule, so
+// a name the engine would refuse is refused here first, at its pointer. A
+// relation's, action's or kind's name is an engine identifier of 3 to 64. An
+// app id is the prefix of an engine object type, which is at most 128 bytes:
+// the longest is a test bench's scratch scope (22), `/`, the app id, `/` and a
+// 64-byte kind, which leaves the app id 40.
 const APP_MIN: usize = 3;
 const APP_MAX: usize = 40;
 const NAME_MIN: usize = 3;

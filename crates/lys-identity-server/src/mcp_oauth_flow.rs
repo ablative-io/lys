@@ -14,8 +14,8 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use super::{
-    APPROVAL_SECONDS, Apps, Asking, CODE_SECONDS, Code, NAME_MAX, REGISTRATION, UNNAMED, back_to,
-    digest, encoded, escaped, held, malformed, random, redirect_allowed,
+    APPROVAL_SECONDS, Apps, Asking, CODE_SECONDS, Code, REGISTRATION, UNNAMED, back_to, digest,
+    encoded, escaped, held, malformed, random, redirect_allowed,
 };
 use crate::error::ServerError;
 use crate::mcp_oauth_store::{App, Kind};
@@ -34,11 +34,10 @@ pub(super) async fn register(
 ) -> Result<Response, ServerError> {
     let Json(asked) = body.map_err(|refused| malformed(&refused.body_text()))?;
     if asked.redirect_uris.is_empty()
-        || asked.redirect_uris.len() > 10
         || !asked.redirect_uris.iter().all(|uri| redirect_allowed(uri))
     {
         return Err(malformed(
-            "an app registers 1 to 10 redirect addresses, https or http on this machine",
+            "an app registers at least one redirect address, https or http on this machine",
         ));
     }
     let name: String = asked
@@ -49,7 +48,6 @@ pub(super) async fn register(
         .unwrap_or(UNNAMED)
         .chars()
         .filter(|character| !character.is_control())
-        .take(NAME_MAX)
         .collect();
     let client_id = random()?;
     let issued_at = now();

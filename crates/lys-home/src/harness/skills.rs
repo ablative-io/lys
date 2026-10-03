@@ -21,7 +21,8 @@ use crate::error::HomeError;
 use crate::harness::launch_fields::KeptSkill;
 use crate::record::blocks::Hash;
 
-/// The longest skill name.
+/// The longest skill name: 64 is the Agent Skills specification's bound on a
+/// skill's `name`, which Claude Code reads from `skills/<name>/SKILL.md`.
 const NAME_MAX: usize = 64;
 
 /// A skill as a launch carries it: its name, its text and the hash it is

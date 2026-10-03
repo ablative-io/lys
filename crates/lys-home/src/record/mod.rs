@@ -102,7 +102,7 @@ pub mod verify;
 #[cfg(test)]
 mod verify_tests;
 
-pub use helpers::{MAX_NAME_BYTES, PI_FORMAT_VERSION, fresh_id, json_len, now, safe_component};
+pub use helpers::{PI_FORMAT_VERSION, fresh_id, json_len, now, safe_component};
 pub use home::Home;
 pub use io_counts::IoCounts;
 pub use session::Session;

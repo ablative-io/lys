@@ -97,15 +97,17 @@ async fn grant_token_routes_refuse_other_administrators_and_durable_failure() ->
 }
 
 #[tokio::test]
-async fn grant_token_routes_refuse_issue_when_retained_records_fill_the_store() -> TestResult {
+async fn grant_token_routes_issue_over_two_thousand_retained_records() -> TestResult {
     let (service, seeded) = Service::start_with(|config| {
         let seeded = seed_configured(config, [ADMINISTRATOR, "owner"])?;
         let grant = lys_identity::grants::GrantId::from_bytes([1; 16]).to_string();
-        let entries: serde_json::Map<String, Value> = (0..1024u32)
+        // Revoked but not yet expired, so opening the table keeps every one.
+        let ends = lys_identity_server::session::now() + 86_400;
+        let entries: serde_json::Map<String, Value> = (0..2000u32)
             .map(|n| {
                 (
                     format!("{n:064x}"),
-                    json!({"grant":grant,"expires_at":1,"revoked":true}),
+                    json!({"grant":grant,"expires_at":ends,"revoked":true}),
                 )
             })
             .collect();
@@ -126,16 +128,15 @@ async fn grant_token_routes_refuse_issue_when_retained_records_fill_the_store() 
         .await?;
     assert_eq!(answer.0, 200);
     let grant = answer.1["grant"].as_str().ok_or("missing grant")?;
-    refused(
-        &service
-            .post(
-                &format!("/grants/{grant}/tokens"),
-                Some(&admin),
-                &json!({"expires_at":lys_identity_server::session::now()+300}),
-            )
-            .await?,
-        409,
-        "GrantTokenStoreFull",
-    );
+    let issued = service
+        .post(
+            &format!("/grants/{grant}/tokens"),
+            Some(&admin),
+            &json!({"expires_at":lys_identity_server::session::now()+300}),
+        )
+        .await?;
+    assert_eq!(issued.0, 200, "{}", issued.1);
+    assert!(issued.1["id"].as_str().is_some(), "{}", issued.1);
+    assert!(issued.1["token"].as_str().is_some(), "{}", issued.1);
     Ok(())
 }

@@ -29,6 +29,7 @@ type Answer = Result<Json<Value>, (StatusCode, String)>;
 pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (parts, body) = request.into_parts();
     let preparing = parts.uri.path() == "/_lys/apps/prepare";
+    // Guarded: read before the caller is known, as the caller's signature covers it.
     let body: Bytes = axum::body::to_bytes(body, MAX_BODY)
         .await
         .map_err(|_error| {

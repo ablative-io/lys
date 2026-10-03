@@ -27,6 +27,9 @@ mod lock;
 mod policy;
 mod scope;
 
+#[cfg(test)]
+mod name_tests;
+
 pub use accounts::AccountView;
 pub use policy::Recipients;
 pub use scope::Scope;
@@ -36,7 +39,6 @@ const ENTRIES: &str = "entries";
 const ENVELOPE_DOMAIN: &str = "lys-secrets/entry-envelope/v1";
 const PLAIN_DOMAIN: &str = "lys-secrets/entry/v1";
 const NONCE_LEN: usize = 12;
-const MAX_NAME: usize = 128;
 
 /// What an entry holds, which decides how it may be used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -435,8 +437,6 @@ fn decode_envelope(bytes: &[u8]) -> Result<SealedEnvelope, SecretsError> {
 pub(crate) fn check_name(what: &'static str, name: &str) -> Result<(), SecretsError> {
     let reason = if name.is_empty() {
         Some("is empty")
-    } else if name.len() > MAX_NAME {
-        Some("is longer than 128 bytes")
     } else if name.chars().any(char::is_control) {
         Some("holds a control character")
     } else {

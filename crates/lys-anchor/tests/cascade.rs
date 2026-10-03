@@ -18,8 +18,8 @@
 //!
 //! Only the public surface, from outside the crate, exactly as an integration
 //! would: `Anchor`, `pin`, `bundle_for`, and `lys-core`'s verifiers. The
-//! producer's own two refusals — the link cap and the first-link join it can
-//! break by appending — are `upward::bundle`'s unit tests', reached through
+//! producer's own refusal — the first-link join it can break by appending —
+//! is `upward::bundle`'s unit tests', reached through
 //! `bundle_for` and asserted as `AnchorError` variants `verify_bundle` cannot
 //! produce. **Every bundle this file refuses is assembled by hand**, through
 //! `lys-core`'s own constructors and never through `bundle_for`, so the judge's

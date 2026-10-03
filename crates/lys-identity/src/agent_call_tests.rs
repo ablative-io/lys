@@ -21,5 +21,14 @@ fn a_read_or_a_foreign_route_is_not_a_call() {
     assert!(AgentCall::new("POST", "//foreign.invalid/x", DIGEST, "").is_err());
     assert!(AgentCall::new("POST", "/tree", "E3B0", "").is_err());
     assert!(AgentCall::new("POST", "/tree", &DIGEST.to_uppercase(), "").is_err());
-    assert!(AgentCall::new("POST", "/tree", DIGEST, &"s".repeat(4097)).is_err());
+}
+
+#[test]
+fn a_long_route_and_signature_are_recorded_whole() -> Result<(), crate::IdentityError> {
+    let path = format!("/{}", "p".repeat(10_000));
+    let signature = "s".repeat(10_000);
+    let call = AgentCall::new("POST", &path, DIGEST, &signature)?;
+    assert_eq!(call.path(), path);
+    assert_eq!(call.signature(), signature);
+    Ok(())
 }

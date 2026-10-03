@@ -36,6 +36,7 @@ async fn sign_request(
     let internal = |error| (StatusCode::INTERNAL_SERVER_ERROR, error);
     let bad = |error| (StatusCode::BAD_REQUEST, error);
     let (parts, body) = request.into_parts();
+    // Guarded: read before the caller is known, as the caller's signature covers it.
     let payload = axum::body::to_bytes(body, MAX_BODY)
         .await
         .map_err(|error| {

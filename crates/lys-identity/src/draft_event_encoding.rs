@@ -217,12 +217,6 @@ fn approved(value: Value) -> Result<DraftEvent, IdentityError> {
 
 /// Read only the canonical encoding of a validated draft payload.
 pub fn decode(body: &[u8]) -> Result<DraftEvent, IdentityError> {
-    if body.len() > crate::signer::MAX_EVENT_BYTES {
-        return Err(IdentityError::EventTooLarge {
-            len: body.len(),
-            limit: crate::signer::MAX_EVENT_BYTES,
-        });
-    }
     let value = cbor(body, "a draft payload is a definite array")?;
     let Value::Array(items) = &value else {
         return Err(malformed("a draft payload is a definite array"));

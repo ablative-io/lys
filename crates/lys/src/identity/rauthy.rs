@@ -408,7 +408,6 @@ pub(super) fn status_error(status: u16, body: &[u8], resource: &str) -> Option<I
                 .and_then(Value::as_str)
                 .map(str::to_string)
         })
-        .map(|text| text.chars().take(200).collect::<String>())
         .unwrap_or_default();
     Some(IdentityError::new(
         kind,

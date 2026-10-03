@@ -35,13 +35,13 @@ const REFRESH_SECONDS: u64 = 30 * 24 * 3600;
 const CODE_SECONDS: u64 = 120;
 const APPROVAL_SECONDS: u64 = 600;
 /// At most 1000 apps held, 10 registrations a minute, and a day for a
-/// person to approve an app before its registration is let go.
+/// person to approve an app before its registration is let go: a bound on
+/// what an unauthenticated caller may make the service keep.
 const REGISTRATION: Limits = Limits {
     most: 1000,
     per_minute: 10,
     unapproved_seconds: 24 * 60 * 60,
 };
-const NAME_MAX: usize = 64;
 /// The words a connected app is known by when it gave no name.
 const UNNAMED: &str = "Connected app";
 /// How a connected app's acts are told apart from a run Lys started.
@@ -131,7 +131,7 @@ fn redirect_allowed(uri: &str) -> bool {
     let Ok(url) = reqwest::Url::parse(uri) else {
         return false;
     };
-    if url.fragment().is_some() || uri.len() > 2048 {
+    if url.fragment().is_some() {
         return false;
     }
     match url.scheme() {

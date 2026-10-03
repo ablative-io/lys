@@ -7,7 +7,7 @@
 //! handle issued on its own is no one's descendant, so dropping another
 //! handle never touches it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::audit::AuditKind;
 use crate::encoding::hex;
@@ -19,15 +19,15 @@ use super::inflight::CANCELLED_AT_BOUNDARY;
 use super::owner::{Admission, Call, OwnerChanged, RECIPIENTS};
 use super::{Broker, HandleRecord, Handles};
 
-/// The deepest a line of derived handles goes.
-pub(super) const MAX_DEPTH: usize = 16;
-
-/// `id` and every handle above it, nearest first, borrowed.
+/// `id` and every handle above it, nearest first, borrowed. A line has no
+/// depth bound; a handle met a second time ends the walk, so a cycle in a
+/// damaged record is walked once and never loops.
 pub(super) fn chain<'a>(handles: &'a Handles, id: &'a str) -> Vec<&'a str> {
     let mut line: Vec<&'a str> = Vec::new();
+    let mut seen: BTreeSet<&'a str> = BTreeSet::new();
     let mut at = Some(id);
     while let Some(current) = at {
-        if line.len() >= MAX_DEPTH || line.contains(&current) {
+        if !seen.insert(current) {
             break;
         }
         at = handles
@@ -226,8 +226,8 @@ impl<P: PermissionCheck> Broker<P> {
     /// when the holder neither owns the secret nor holds the right to lend
     /// it, `PermissionDenied` when `child` may not use it, `LeaseBeyondGrant`
     /// when `not_after_ms` is past the window of the grant `child` uses it
-    /// under, `BeyondAncestry` when a bound reaches past the handle above,
-    /// and `LendingTooDeep` below the deepest line the broker counts.
+    /// under, and `BeyondAncestry` when a bound reaches past the handle
+    /// above. A line of derived handles may go as deep as its holders lend.
     pub fn derive(
         &mut self,
         token: &HandleToken,
@@ -240,13 +240,6 @@ impl<P: PermissionCheck> Broker<P> {
         self.live(parent, presentation)?;
         self.permitted(parent, None)?;
         self.ancestry_admits(parent, None)?;
-        let depth = chain(&self.handles, &parent.id).len();
-        if depth >= MAX_DEPTH {
-            return Err(SecretsError::from(LendingRefusal::TooDeep {
-                handle: parent.id.clone(),
-                depth,
-            }));
-        }
         let owner = self
             .store
             .entry(&parent.secret)

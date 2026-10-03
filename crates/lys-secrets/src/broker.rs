@@ -333,10 +333,7 @@ impl<P: PermissionCheck> Broker<P> {
         let now = (self.clock)();
         if not_after_ms <= now || max_uses == 0 {
             let asked = u128::try_from(not_after_ms.saturating_sub(now)).unwrap_or(0);
-            return Err(SecretsError::InvalidLifetime {
-                asked_ms: asked,
-                max_ms: u128::from(u32::MAX),
-            });
+            return Err(SecretsError::InvalidLifetime { asked_ms: asked });
         }
         self.recipient_admitted(&holder.identity, secret)?;
         match self.permissions.may_use(&holder.identity, secret) {

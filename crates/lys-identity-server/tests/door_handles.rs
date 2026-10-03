@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use lys_identity::start::credentials::{HandleAnswer, HandleRecords, HeldCredential, check};
-use lys_identity_server::routes::door_handles::DoorHandles;
+use lys_identity_server::routes::door_handles::{DoorHandles, credential_id};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -189,4 +189,16 @@ fn a_client_with_no_door_reads_no_record() {
         DoorHandles::unconfigured().handles("agent-fixture-1"),
         HandleAnswer::RecordMissing
     );
+}
+
+#[test]
+fn a_credential_id_of_any_length_is_admitted_and_its_characters_are_checked() {
+    let long = "vc-".repeat(400);
+    assert!(long.len() > 1_000);
+    assert!(credential_id(&long));
+    assert!(credential_id("vc.fixture_1-A"));
+    assert!(!credential_id(""));
+    assert!(!credential_id("vc fixture"));
+    assert!(!credential_id("vc,fixture"));
+    assert!(!credential_id(&format!("{long}/")));
 }

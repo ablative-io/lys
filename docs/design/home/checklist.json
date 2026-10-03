@@ -266,7 +266,7 @@
         },
         {
           "id": "C29",
-          "text": "Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.",
+          "text": "Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, each kept whole.",
           "done": false
         },
         {
@@ -296,7 +296,7 @@
         },
         {
           "id": "C172",
-          "text": "An arrival is a seventh lys.harness_event kind, `arrival`, whose detail carries the source commit, the remote, the ref and a fresh execution id, under the 512-byte data cap; the six existing kinds do not change.",
+          "text": "An arrival is a seventh lys.harness_event kind, `arrival`, whose detail carries the source commit, the remote, the ref and a fresh execution id, each kept whole with no size bound on the data; the six existing kinds do not change.",
           "done": false
         },
         {

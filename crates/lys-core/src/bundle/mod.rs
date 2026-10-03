@@ -55,5 +55,5 @@
 pub mod artifact;
 pub mod verify;
 
-pub use artifact::{BundleLink, MAX_LINKS, VERIFICATION_BUNDLE_FORMAT, VerificationBundle};
+pub use artifact::{BundleLink, VERIFICATION_BUNDLE_FORMAT, VerificationBundle};
 pub use verify::{Notarization, VerifiedBundle, verify_bundle};

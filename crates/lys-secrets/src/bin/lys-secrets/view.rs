@@ -189,7 +189,8 @@ fn grants_seen(broker: &Broker<Grants>, identity: &str) -> Answer {
     Ok(Json(json!({ "grants": grants })))
 }
 
-/// The most lines one audit read answers.
+/// The most lines one audit read answers: a page size, and `older` is the
+/// cursor that reads the rest, so no line is lost.
 const AUDIT_WINDOW: u64 = 200;
 
 /// The query of an audit read: the index the window ends before. Without

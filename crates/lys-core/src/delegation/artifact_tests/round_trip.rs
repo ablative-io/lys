@@ -24,8 +24,8 @@ fn round_trip_is_identity_on_the_bytes() {
 
 #[test]
 fn round_trip_holds_across_the_interesting_shapes() {
-    // The subject-value lengths straddle every CBOR text head width the artifact
-    // cap permits, and both integers straddle every unsigned head width. The empty
+    // The subject-value lengths straddle every CBOR text head width up to the
+    // four-byte one, and both integers straddle every unsigned head width. The empty
     // value is absent deliberately — it is refused now, and
     // `encoding_tests::decode_refuses_an_empty_subject_value_*` is where that
     // lives.
@@ -36,6 +36,8 @@ fn round_trip_holds_across_the_interesting_shapes() {
         ("d".repeat(255), 65_535, 255),
         ("e".repeat(256), 1_700_000_000_000, 300),
         ("f".repeat(3000), u64::MAX, MAX_SEQUENCE),
+        ("g".repeat(10_000), 1, 1),
+        ("h".repeat(70_000), 2, 2),
     ];
     let mut checked = 0;
     for (origin, not_before_unix_ms, sequence) in cases {
@@ -45,11 +47,10 @@ fn round_trip_holds_across_the_interesting_shapes() {
             signature: SIGNATURE,
         };
         let bytes = delegation.to_cose_bytes();
-        assert!(bytes.len() <= MAX_ARTIFACT_LEN, "fixture within the cap");
         assert_eq!(Delegation::from_cose_bytes(&bytes).unwrap(), delegation);
         checked += 1;
     }
-    assert_eq!(checked, 6, "every shape must have been exercised");
+    assert_eq!(checked, 8, "every shape must have been exercised");
 }
 
 #[test]
@@ -64,13 +65,6 @@ fn to_cose_bytes_stays_infallible_which_is_why_the_round_trip_claim_is_qualified
     //
     // Every issuing entry point in `sign` refuses these up front; the only way
     // here is to build the struct literal yourself.
-    let over_cap = Delegation {
-        root_public_key: ROOT_KEY,
-        claim: claim_for(&"o".repeat(MAX_ARTIFACT_LEN), 0, 0),
-        signature: SIGNATURE,
-    };
-    assert!(Delegation::from_cose_bytes(&over_cap.to_cose_bytes()).is_err());
-
     let empty_subject = Delegation {
         root_public_key: ROOT_KEY,
         claim: claim_for("", 0, 0),

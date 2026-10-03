@@ -327,7 +327,7 @@ impl<S: LeafStore> LaunchRecords<S> {
                 record.id
             )));
         }
-        let message = LaunchEvent::Launch(record.clone()).seal(&self.key)?;
+        let message = LaunchEvent::Launch(record.clone()).seal(&self.key);
         self.append(&message)
     }
 
@@ -339,7 +339,7 @@ impl<S: LeafStore> LaunchRecords<S> {
                 launch_record: withdrawal.launch_record.clone(),
             });
         }
-        let message = LaunchEvent::Withdrawal(withdrawal.clone()).seal(&self.key)?;
+        let message = LaunchEvent::Withdrawal(withdrawal.clone()).seal(&self.key);
         self.append(&message)
     }
 }

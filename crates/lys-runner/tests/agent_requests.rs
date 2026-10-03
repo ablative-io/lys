@@ -613,23 +613,61 @@ mod tests {
                 .name(),
             "McpRequestInvalid"
         );
-        let body = json!("x".repeat(2 * 1024 * 1024));
+        Ok(())
+    }
+
+    /// Keeps the payload it was asked to sign and stops the request there.
+    struct Witness(Mutex<Option<String>>);
+    impl LeaseProof for Witness {
+        fn present(&self, payload: &[u8]) -> Result<Proof, lys_runner::error::RunnerError> {
+            *self.0.lock().expect("witness lock") = Some(String::from_utf8_lossy(payload).into());
+            Err(lys_runner::error::RunnerError::refused(
+                "WitnessStopped",
+                "the fixture stops at signing",
+            ))
+        }
+    }
+    #[test]
+    fn mcp_a_body_past_the_old_two_mebibyte_bound_is_signed_whole() -> TestResult {
+        use sha2::{Digest, Sha256};
+        let client = McpClient::new(AgentClient::new(
+            "http://127.0.0.1:9",
+            "http://127.0.0.1:9",
+            None,
+        )?);
+        let witness = Witness(Mutex::new(None));
+        let lease = AgentLease {
+            agent: "agent.test",
+            secret: "agent-key",
+            proof: &witness,
+        };
+        let text = "x".repeat(4 * 1024 * 1024);
+        let body = json!(text);
+        let call = ToolCall {
+            name: "change",
+            method: "POST",
+            path: "/agents",
+            body: Some(&body),
+        };
+        let stopped = client
+            .tools_call(&lease, 1, &call, &[])
+            .expect_err("witness");
+        assert_eq!(stopped.name(), "WitnessStopped");
+        let expected = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"change","arguments":{{"method":"POST","path":"/agents","body":"{text}"}}}}}}"#
+        );
+        let digest = lys_runner::protocol::hex(&Sha256::digest(expected.as_bytes()));
+        let signed = witness.0.lock().expect("witness lock").clone();
+        let signed = signed.ok_or("the request reached signing")?;
+        let lines: Vec<&str> = signed.split('\n').collect();
         assert_eq!(
-            client
-                .tools_call(
-                    &lease,
-                    1,
-                    &ToolCall {
-                        name: "change",
-                        method: "POST",
-                        path: "/agents",
-                        body: Some(&body)
-                    },
-                    &[]
-                )
-                .expect_err("bounded")
-                .name(),
-            "McpRequestInvalid"
+            lines[..4],
+            [
+                "lys-identity/agent-request/v1",
+                "POST",
+                "/mcp",
+                digest.as_str()
+            ]
         );
         Ok(())
     }

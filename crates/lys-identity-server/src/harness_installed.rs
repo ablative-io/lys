@@ -107,10 +107,10 @@ pub(super) fn version(
     let version = String::from_utf8(output.stdout)
         .map_err(|error| refused("VersionOutputUnreadable", error))?;
     let version = version.trim();
-    if version.is_empty() || version.len() > 256 || version.chars().any(char::is_control) {
+    if version.is_empty() || version.chars().any(char::is_control) {
         return Err(refused(
             "VersionOutputUnreadable",
-            "the version is not one short nonempty line",
+            "the version is not one nonempty line",
         ));
     }
     let program = executable

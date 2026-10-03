@@ -1,12 +1,12 @@
 #![cfg(test)]
 //! Counting gates on the upstream answer (SECRETS-005 R5). Five hidden
 //! values in a mebibyte answer are hidden in one pass, exactly as one pass
-//! per value hid them; and an answer past the cap is refused by name, never
-//! cut short.
+//! per value hid them; and an answer of any size is carried back whole,
+//! never cut short, with every hidden value hidden.
 
 use lys_secrets::Secret;
 
-use crate::redact::{REDACTED, Redactor, capped};
+use crate::redact::{REDACTED, Redactor, redacted_answer};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -99,12 +99,22 @@ fn five_hidden_values_in_a_mebibyte_answer_are_hidden_in_one_pass() {
 }
 
 #[tokio::test]
-async fn an_answer_past_the_cap_is_refused_by_name_and_never_cut_short() -> TestResult {
-    let redactor = Redactor::new(&[]);
-    let over = reqwest::Response::from(axum::http::Response::new(vec![b'a'; 1025]));
-    let refused = capped(over, 1024, &redactor).await.err();
-    assert_eq!(refused.map(|error| error.name()), Some("AnswerTooLarge"));
-    let whole = reqwest::Response::from(axum::http::Response::new(vec![b'a'; 1024]));
-    assert_eq!(capped(whole, 1024, &redactor).await?.len(), 1024);
+async fn an_answer_past_the_old_cap_comes_back_whole_and_redacted() -> TestResult {
+    const HIDDEN: &[u8] = b"hidden-credential";
+    let secret = Secret::from_slice(HIDDEN);
+    let redactor = Redactor::new(&[&secret]);
+    let filler = vec![b'a'; 17 * MIB / 2];
+    let filler = filler.as_slice();
+    let answer = [HIDDEN, filler, HIDDEN, filler, HIDDEN].concat();
+    let expected = [REDACTED, filler, REDACTED, filler, REDACTED].concat();
+    assert!(answer.len() > 16 * MIB, "larger than 16 MiB");
+    let upstream = reqwest::Response::from(axum::http::Response::new(answer));
+    let carried = redacted_answer(upstream, &redactor).await?;
+    assert_eq!(carried.len(), expected.len(), "the answer comes back whole");
+    assert!(
+        carried == expected,
+        "every byte carried, every hidden value hidden"
+    );
+    assert!(!redactor.contains(&carried));
     Ok(())
 }

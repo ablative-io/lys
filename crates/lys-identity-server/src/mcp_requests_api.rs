@@ -299,11 +299,6 @@ async fn approve(
         })?
         .to_string();
     let note = body.note.trim().to_owned();
-    if note.chars().count() > 500 {
-        return Err(ServerError::RequestMalformed {
-            reason: "note must carry at most 500 characters".to_owned(),
-        });
-    }
     with_requests(&state, |requests| {
         let asked = requests
             .held()
@@ -342,11 +337,6 @@ async fn approve(
             {
                 return Err(ServerError::McpServerHeld {
                     server: server.name,
-                });
-            }
-            if version.settings.mcp_servers.len() >= 64 {
-                return Err(ServerError::RequestMalformed {
-                    reason: "mcp_servers already holds 64 servers".to_owned(),
                 });
             }
             version.settings.mcp_servers.push(server);

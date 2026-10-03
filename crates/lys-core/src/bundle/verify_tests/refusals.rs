@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! Refusals on the anchor key, the format, the counter anchor, tampered
-//! contents, the anchor count and the link cap, and the single error every
-//! failure produces.
+//! contents and the anchor count, a chain of any depth verified whole, and
+//! the single error every failure produces.
 
 use super::*;
 
@@ -128,15 +128,42 @@ fn the_anchor_count_must_match_the_link_count_exactly() {
 }
 
 #[test]
-fn a_chain_beyond_the_link_cap_is_refused_before_any_work() {
-    let s = one_link();
-    let mut bundle = s.bundle.clone();
-    let link = bundle.links[0].clone();
-    while bundle.links.len() <= MAX_LINKS {
-        bundle.links.push(link.clone());
+fn a_chain_a_thousand_links_deep_verifies_whole() {
+    // Each anchor past the first notarizes the checkpoint of the one below it,
+    // as `two_link` builds its second rung; the old cap was 32 links.
+    let OneLink {
+        child,
+        anchor: first,
+        bundle: base,
+    } = one_link();
+    let mut links = base.links.clone();
+    let mut anchors = vec![first.verifier()];
+    let mut roots = vec![first.tree.root().to_parts().0];
+    let mut below = first.checkpoint();
+    for rung in 1..1_000_u32 {
+        let seed: [u8; 32] = format!("lys-bundle-test-chain-seed-{rung:05}")
+            .into_bytes()
+            .try_into()
+            .unwrap();
+        let anchor = anchor_over(&format!("anchor-{rung}.example"), &seed, below.as_bytes());
+        links.push(BundleLink::new(
+            &below,
+            &anchor.receipt_over(below.as_bytes(), 1),
+        ));
+        anchors.push(anchor.verifier());
+        roots.push(anchor.tree.root().to_parts().0);
+        below = anchor.checkpoint();
     }
-    let anchors = vec![s.anchor.verifier(); bundle.links.len()];
-    assert!(verify_bundle(&bundle, &s.child.verifier(), &anchors).is_err());
+    let bundle = VerificationBundle::new(CHILD_LEAF, base.inclusion_proof, links);
+    assert_eq!(bundle.links.len(), 1_000);
+    let verified = verify_bundle(&bundle, &child.verifier(), &anchors).unwrap();
+    assert_eq!(verified.leaf(), CHILD_LEAF);
+    let found: Vec<[u8; 32]> = verified
+        .notarizations()
+        .iter()
+        .map(Notarization::anchor_root)
+        .collect();
+    assert_eq!(found, roots, "every rung is reported, in order");
 }
 
 #[test]

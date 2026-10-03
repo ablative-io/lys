@@ -80,20 +80,10 @@ impl Page {
             return Err(malformed("limit must be greater than zero"));
         }
         query.q = query.q.map(|words| words.to_lowercase());
-        if query
-            .q
-            .as_ref()
-            .is_some_and(|words| words.chars().count() > 500)
-        {
-            return Err(malformed("q is longer than 500 characters"));
-        }
         let last = query
             .after
             .as_deref()
             .map(|encoded| {
-                if encoded.len() > 16_384 {
-                    return Err(malformed("after is longer than a paging cursor"));
-                }
                 let bytes = URL_SAFE_NO_PAD
                     .decode(encoded)
                     .map_err(|error| malformed(format!("after is not a paging cursor: {error}")))?;

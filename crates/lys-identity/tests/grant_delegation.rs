@@ -175,6 +175,55 @@ fn cycle() -> Result<HashMap<GrantId, Grant>, Box<dyn Error>> {
     ]))
 }
 
+/// A chain of `length` grants, each passed on from the one before it to the
+/// same person, the first a root: an ancestry far longer than any bound.
+fn chain(length: u128) -> Result<HashMap<GrantId, Grant>, Box<dyn Error>> {
+    let person = lys_identity::PersonId::from_bytes([9; 16]);
+    let id = |n: u128| GrantId::from_bytes((n + 1).to_be_bytes());
+    let mut grants = HashMap::new();
+    for n in 0..length {
+        let source = if n == 0 {
+            Source::Root
+        } else {
+            Source::Grant(id(n - 1))
+        };
+        let grant = Grant::new(GrantParts {
+            id: id(n),
+            issuer: IdentityId::Person(person),
+            holder: IdentityId::Person(person),
+            responsible: person,
+            resource: alpha()?,
+            relation: Relation::new("tern")?,
+            actions: actions(&["read"])?,
+            pass_on: pass(&["read"], &BOTH)?,
+            source,
+            window: Window::new(T0, None)?,
+            model_version: 1,
+            operation: OperationId::from_bytes([3; 16]),
+        })?;
+        grants.insert(id(n), grant);
+    }
+    Ok(grants)
+}
+
+#[test]
+fn an_ancestry_of_any_length_resolves_to_its_root() -> TestResult {
+    let chain = chain(1000)?;
+    let last = GrantId::from_bytes(1000_u128.to_be_bytes());
+    let lineage = resolve(last, |id| chain.get(&id))?;
+    assert_eq!(lineage.path.len(), 1000);
+    assert_eq!(lineage.path.first(), Some(&last));
+    assert_eq!(
+        lineage.path.last(),
+        Some(&GrantId::from_bytes(1_u128.to_be_bytes()))
+    );
+    assert_eq!(
+        lineage.root_person,
+        lys_identity::PersonId::from_bytes([9; 16])
+    );
+    Ok(())
+}
+
 #[test]
 fn row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain()
 -> TestResult {

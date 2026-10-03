@@ -18,8 +18,15 @@ use super::error::GrantError;
 use crate::id::{ID_LEN, IdentityId, PersonId, from_hex, random_bytes, to_hex};
 use crate::operation::OperationId;
 
-/// The longest action, relation, resource kind or resource id, in bytes.
-pub const TOKEN_MAX_BYTES: usize = 128;
+// Each bound is the permission engine's (`SpiceDB`'s) own for what the field becomes there.
+/// The longest action: `SpiceDB` names a permission `[a-z][a-z0-9_]{1,62}[a-z0-9]`, 64 bytes.
+pub const ACTION_MAX_BYTES: usize = 64;
+/// The longest relation: `SpiceDB` names a relation `[a-z][a-z0-9_]{1,62}[a-z0-9]`, 64 bytes.
+pub const RELATION_MAX_BYTES: usize = 64;
+/// The longest resource kind: a `SpiceDB` object type is at most 128 bytes.
+pub const RESOURCE_KIND_MAX_BYTES: usize = 128;
+/// The longest resource id: a `SpiceDB` object id is `[a-zA-Z0-9/_|\-=+]{1,1024}`.
+pub const RESOURCE_ID_MAX_BYTES: usize = 1024;
 
 /// A grant's enduring identifier. Its text form is `grant-` and 32 hex digits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -63,14 +70,15 @@ impl FromStr for GrantId {
     }
 }
 
-/// Refuse `text` unless it is a token: 1 to 128 bytes of `a-z`, `0-9`, `_`, `-` and `.`.
-fn token(kind: &'static str, text: &str) -> Result<String, GrantError> {
+/// Refuse `text` unless it is a token: 1 to `max` bytes of `a-z`, `0-9`, `_`, `-` and `.`.
+fn token(kind: &'static str, text: &str, max: usize) -> Result<String, GrantError> {
     let allowed =
         |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"_-.".contains(&byte);
-    if text.is_empty() || text.len() > TOKEN_MAX_BYTES || !text.bytes().all(allowed) {
+    if text.is_empty() || text.len() > max || !text.bytes().all(allowed) {
         return Err(GrantError::TokenInvalid {
             kind,
             text: text.to_owned(),
+            max,
         });
     }
     Ok(text.to_owned())
@@ -83,7 +91,7 @@ pub struct Action(String);
 impl Action {
     /// The action `name`, refused unless it is a token.
     pub fn new(name: &str) -> Result<Self, GrantError> {
-        token("action", name).map(Self)
+        token("action", name, ACTION_MAX_BYTES).map(Self)
     }
 
     /// The action's name.
@@ -106,7 +114,7 @@ pub struct Relation(String);
 impl Relation {
     /// The relation `name`, refused unless it is a token.
     pub fn new(name: &str) -> Result<Self, GrantError> {
-        token("relation", name).map(Self)
+        token("relation", name, RELATION_MAX_BYTES).map(Self)
     }
 
     /// The relation's name.
@@ -132,8 +140,8 @@ impl Resource {
     /// The resource `id` of `kind`, each refused unless it is a token.
     pub fn new(kind: &str, id: &str) -> Result<Self, GrantError> {
         Ok(Self {
-            kind: token("resource kind", kind)?,
-            id: token("resource id", id)?,
+            kind: token("resource kind", kind, RESOURCE_KIND_MAX_BYTES)?,
+            id: token("resource id", id, RESOURCE_ID_MAX_BYTES)?,
         })
     }
 

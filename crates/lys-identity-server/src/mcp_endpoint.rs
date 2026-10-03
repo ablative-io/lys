@@ -15,8 +15,6 @@ use crate::error::ServerError;
 #[path = "mcp_endpoint_tests.rs"]
 mod tests;
 
-pub(crate) const BODY_LIMIT: usize = 2 * 1024 * 1024;
-
 #[derive(Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(transparent)]
 #[schema(value_type = Object)]
@@ -209,15 +207,17 @@ async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Res
             "MCP requires Content-Type: application/json",
         );
     }
+    // Read whole: `signed_first.rs` has already held an unverified caller's
+    // body to `UNVERIFIED_BODY_LIMIT`, and a judged caller has none.
     let (parts, body) = request.into_parts();
-    let bytes = match to_bytes(body, BODY_LIMIT).await {
+    let bytes = match to_bytes(body, usize::MAX).await {
         Ok(bytes) => bytes,
         Err(error) => {
             return fault(
                 &Value::Null,
-                StatusCode::PAYLOAD_TOO_LARGE,
+                StatusCode::BAD_REQUEST,
                 -32600,
-                format!("the MCP body could not be read within its limit: {error}"),
+                format!("the MCP body could not be read: {error}"),
             );
         }
     };

@@ -186,7 +186,7 @@ fn a_people_only_secret_is_never_handed_to_an_agent() -> TestResult {
 }
 
 #[test]
-fn a_line_of_derived_handles_is_refused_past_the_depth_it_is_counted() -> TestResult {
+fn a_line_of_derived_handles_two_hundred_deep_is_lent_and_used_whole() -> TestResult {
     let root = tempfile::tempdir()?;
     let keys = root.path().join("keys");
     std::fs::create_dir_all(&keys)?;
@@ -205,7 +205,8 @@ fn a_line_of_derived_handles_is_refused_past_the_depth_it_is_counted() -> TestRe
     broker.seal("token", "person:dana", &Secret::from_slice(b"value"))?;
     let dana = party(&keys, "person:dana")?;
     let mut at = broker.issue(&dana.holder, "token", 20, 50_000)?;
-    for _ in 1..16 {
+    let mut derived = 0;
+    for _ in 1..200 {
         at = broker.derive(
             &at.token,
             &sign(&at, &dana)?,
@@ -213,17 +214,16 @@ fn a_line_of_derived_handles_is_refused_past_the_depth_it_is_counted() -> TestRe
             (20, 40_000),
             None,
         )?;
+        derived += 1;
     }
-    assert_eq!(
-        refusal(broker.derive(
-            &at.token,
-            &sign(&at, &dana)?,
-            &dana.holder,
-            (1, 40_000),
-            None
-        )),
-        "LendingTooDeep"
-    );
+    assert_eq!(derived, 199, "the old depth of 16 is long passed");
+    at = broker.derive(
+        &at.token,
+        &sign(&at, &dana)?,
+        &dana.holder,
+        (1, 40_000),
+        None,
+    )?;
     broker.use_handle(&at.token, &sign(&at, &dana)?, Secret::len)?;
     Ok(())
 }

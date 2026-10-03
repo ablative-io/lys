@@ -48,9 +48,6 @@ use crate::reviews_store::ReviewStore;
 use crate::routes::{AppState, signed_in};
 use crate::session::now;
 
-/// The most characters a reviewer's note carries.
-const NOTE_MAX: usize = 500;
-
 /// The review routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -252,17 +249,6 @@ async fn reviews(
     })
 }
 
-/// The note `text` carries, trimmed, refused when it is too long.
-fn note(text: &str) -> Result<String, ServerError> {
-    let text = text.trim();
-    if text.chars().count() > NOTE_MAX {
-        return Err(ServerError::RequestMalformed {
-            reason: format!("note is longer than {NOTE_MAX} characters"),
-        });
-    }
-    Ok(text.to_owned())
-}
-
 /// Keep the grant `grant`: only its reviewer or the root authority, and only
 /// while it stands. Asked again in the same words it answers what was
 /// recorded and writes nothing.
@@ -278,7 +264,7 @@ async fn keep(
     })?;
     let grant = grant_id(&grant)?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    let note = note(&body.note)?;
+    let note = body.note.trim().to_owned();
     with_grants(&state, |judged| {
         let caller = crate::caller_admission::active_caller(judged.directory, &actor)?;
         let pass = crate::routes::admitted_agent(judged.directory, &actor)?;

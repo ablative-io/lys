@@ -1,7 +1,7 @@
 #![cfg(test)]
-//! The pair table, the size boundary and the sequence ceiling, checked at
-//! both ends: `check_encodable` on the issuing side and the decoder on the
-//! verifying side.
+//! The pair table, a long subject value carried whole, and the sequence
+//! ceiling, checked at both ends: `check_encodable` on the issuing side and
+//! the decoder on the verifying side.
 
 use super::*;
 
@@ -48,61 +48,43 @@ fn decoding_a_canonical_artifact_recovers_every_field() {
 }
 
 #[test]
-fn an_oversize_input_is_refused_before_parsing() {
-    let mut bytes = artifact_bytes(&ROOT_KEY, &claim(), &SIGNATURE);
-    bytes.resize(MAX_ARTIFACT_LEN + 1, 0x00);
-    assert!(matches!(
-        decode_fields(&bytes),
-        Err(TrustError::DelegationVerification)
-    ));
+fn a_ten_thousand_byte_subject_decodes_whole() {
+    let mut long = claim();
+    long.subject_value = "o".repeat(10_000);
+    let bytes = artifact_bytes(&ROOT_KEY, &long, &SIGNATURE);
+    assert!(bytes.len() > 10_000);
+    let fields = decode_fields(&bytes).unwrap();
+    assert_eq!(fields.claim, long);
+    assert_eq!(fields.claim.subject_value.len(), 10_000);
 }
 
 // ---------------------------------------------------------------------------
 // The encode side refuses everything the decode side refuses.
 //
-// The two were allowed to disagree once: the size cap was enforced at decode
-// only, so a 3885-byte origin signed successfully and then failed every
-// verification afterwards. These tests key on the *derived* boundary rather
-// than on a literal, because the boundary moved when `sequence` was added.
+// The two were allowed to disagree once: a size cap, since removed, was
+// enforced at decode only, so a 3885-byte origin signed successfully and then
+// failed every verification afterwards. Neither end sets a size now, and the
+// two must agree on every length, including the old boundary.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn check_encodable_agrees_with_the_decoder_at_the_size_boundary() {
-    // Find the longest subject value that fits, by construction rather than by a
-    // hardcoded number. A literal here would have been correct before `sequence`
-    // landed and silently wrong after it, and the typed subject moved it again.
-    let mut longest_ok = None;
-    let mut shortest_refused = None;
-    for len in 3800..3900usize {
+fn check_encodable_agrees_with_the_decoder_on_every_subject_length() {
+    let mut checked = 0;
+    for len in (3800..3900usize).chain([10_000, 70_000]) {
         let mut c = claim();
         c.subject_value = "o".repeat(len);
-        let encoded_len = artifact_bytes(&ROOT_KEY, &c, &SIGNATURE).len();
         let accepted = check_encodable(&ROOT_KEY, &c).is_ok();
+        let decoded = decode_fields(&artifact_bytes(&ROOT_KEY, &c, &SIGNATURE));
+        assert!(accepted, "the issuing side refused subject length {len}");
         assert_eq!(
-            accepted,
-            encoded_len <= MAX_ARTIFACT_LEN,
-            "encode-side acceptance disagrees with the cap at subject length {len}"
-        );
-        // The decoder must reach the same verdict on the same claim.
-        let decoded_ok = decode_fields(&artifact_bytes(&ROOT_KEY, &c, &SIGNATURE)).is_ok();
-        assert_eq!(
-            accepted, decoded_ok,
+            decoded.map(|fields| fields.claim).ok(),
+            Some(c),
             "encode and decode disagree at subject length {len} — this is the \
              defect class the encode-side check exists to close"
         );
-        if accepted {
-            longest_ok = Some(len);
-        } else if shortest_refused.is_none() {
-            shortest_refused = Some(len);
-        }
+        checked += 1;
     }
-    let longest_ok = longest_ok.expect("some subject length must fit");
-    let shortest_refused = shortest_refused.expect("some subject length must not fit");
-    assert_eq!(
-        shortest_refused,
-        longest_ok + 1,
-        "the boundary must be a single step, not a region"
-    );
+    assert_eq!(checked, 102, "every length must have been exercised");
 }
 
 #[test]

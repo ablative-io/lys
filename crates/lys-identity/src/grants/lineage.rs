@@ -15,9 +15,6 @@ use super::error::GrantError;
 use super::types::{Grant, GrantId, PassOn, RecipientKind, Source};
 use crate::id::{IdentityId, PersonId};
 
-/// The longest ancestry walked before it is refused as a cycle.
-pub const MAX_DEPTH: usize = 64;
-
 /// A grant's checked ancestry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lineage {
@@ -105,7 +102,8 @@ pub fn check_end(requested: Option<u64>, source: &Grant) -> Result<(), GrantErro
     Ok(())
 }
 
-/// Walk `start` to its root through `lookup`, checking every hop.
+/// Walk `start` to its root through `lookup`, checking every hop. An
+/// ancestry of any length is walked; a grant met twice is a cycle.
 pub fn resolve<'a>(
     start: GrantId,
     lookup: impl Fn(GrantId) -> Option<&'a Grant>,
@@ -133,7 +131,7 @@ pub fn resolve<'a>(
             }
             Source::Grant(source_id) => source_id,
         };
-        if !seen.insert(source_id) || path.len() >= MAX_DEPTH {
+        if !seen.insert(source_id) {
             return Err(GrantError::LineageCycle {
                 grant: source_id.to_string(),
             });

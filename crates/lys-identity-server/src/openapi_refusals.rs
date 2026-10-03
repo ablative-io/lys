@@ -117,7 +117,6 @@ pub(crate) const PLACE: &[&str] = &[
 pub(crate) const BATCH: &[&str] = &[
     "NotAdmitted",
     "RequestMalformed",
-    "batch_too_large",
     "credential_refused",
     "ServiceAccountsUnavailable",
 ];

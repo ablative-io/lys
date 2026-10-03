@@ -86,14 +86,14 @@
 //! stranger-driven path — it was that no *variant* was a function of the
 //! stranger's bytes. Exactly one now is, and it is the one carrying nothing.
 //!
-//! # The two federation variants, judged against the same constraint
+//! # The federation variant, judged against the same constraint
 //!
-//! `CascadeTooDeep` and `CascadeJoinMismatch` — named in plain text here rather
-//! than linked, because a link from these ungated docs to a gated item resolves
-//! under `--all-features` and breaks the default `cargo doc`, which is a gate —
-//! exist only with the `federation` feature, and both are detailed. They were
-//! put to the rule above rather than pattern-matched onto the variants beside
-//! them, and they pass it for a reason that is about *who drives the path*
+//! `CascadeJoinMismatch` — named in plain text here rather than linked, because
+//! a link from these ungated docs to a gated item resolves under
+//! `--all-features` and breaks the default `cargo doc`, which is a gate —
+//! exists only with the `federation` feature, and is detailed. It was put to
+//! the rule above rather than pattern-matched onto the variants beside them,
+//! and it passes it for a reason that is about *who drives the path*
 //! rather than about how interesting the numbers are: **bundle assembly is a
 //! producer-side operation on the operator's own artifacts.** A stranger cannot
 //! reach `bundle_for` — it takes the operator's anchor, an index into the
@@ -104,12 +104,12 @@
 //! The reader who checks bundles is a stranger, and *their* refusal is
 //! `lys-core`'s single non-oracle `BundleVerification` — deliberately
 //! indistinguishable across a malformed container, a bad receipt and a chain
-//! that does not join. These two variants do not soften that. They are what the
+//! that does not join. This variant does not soften that. It is what the
 //! operator is told about a bundle their own code declined to emit; a bundle
 //! that reaches a verifier gets the one collapsed answer, unchanged.
 //!
-//! They are `#[cfg(feature = "federation")]` because the default build cannot
-//! produce them: with federation off there is no `upward` module and no call
+//! It is `#[cfg(feature = "federation")]` because the default build cannot
+//! produce it: with federation off there is no `upward` module and no call
 //! site, and a variant nothing can construct is a promise in the error surface
 //! consumers actually get.
 

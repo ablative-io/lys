@@ -36,7 +36,7 @@ A canonical CBOR map (RFC 8949 section 4.2) with integer keys 1 to 12. Every key
 | 11 | model version | the model version it was judged under, 1 or more |
 | 12 | authorising operation | the operation id of the signed event that authorised it, 16 bytes |
 
-A token is 1 to 128 bytes of `a-z`, `0-9`, `_`, `-` and `.`.
+A token is one or more bytes of `a-z`, `0-9`, `_`, `-` and `.`, and at most the permission engine's (SpiceDB's) own bound for what it becomes there: an action (a permission) and a relation 64 bytes, a resource kind (an object type) 128 bytes, a resource id (an object id) 1024 bytes.
 
 Exercising and passing on are separate members. Pass-on is stated affirmatively: `0` is written out for use-only, and an absent key 8 is refused, never read as permission. Recipient kinds are a closed set, and an unknown code is refused `RecipientKindUnknown`.
 
@@ -50,7 +50,7 @@ A model is versioned, and resolves each relation to the actions it carries. A re
 
 ## Grant events
 
-A grant change is recorded only as one signed grant event, committed as one leaf of the grant log (lys-log-store) before it is answered. The event body is a canonical CBOR map: `1` version (`1`), `2` operation id (16 bytes), `3` caller (identity map), `4` recorded-at (seconds), `5` change kind (`1` issue, `2` revoke, `3` use) and `6` the change: the grant's own map; for a revocation a map of `1` grant id and `2` reason (1 to 1024 bytes); for a use a map of `1` grant id and `2` route (`1` browser, `2` api, `3` tool). The signed message is a `COSE_Sign1` (tag 18) whose protected header is `1: -8` (EdDSA), `3:` the grant envelope, `4:` the service's 32-byte Ed25519 key. A message naming another envelope is refused `EnvelopeMismatch`.
+A grant change is recorded only as one signed grant event, committed as one leaf of the grant log (lys-log-store) before it is answered. The event body is a canonical CBOR map: `1` version (`1`), `2` operation id (16 bytes), `3` caller (identity map), `4` recorded-at (seconds), `5` change kind (`1` issue, `2` revoke, `3` use) and `6` the change: the grant's own map; for a revocation a map of `1` grant id and `2` reason (any length, not blank); for a use a map of `1` grant id and `2` route (`1` browser, `2` api, `3` tool). The signed message is a `COSE_Sign1` (tag 18) whose protected header is `1: -8` (EdDSA), `3:` the grant envelope, `4:` the service's 32-byte Ed25519 key. A message naming another envelope is refused `EnvelopeMismatch`.
 
 The grant book and the permission relationships are both derived from these events and from nothing else. The same operation id with the same request answers the first receipt again; with a different request it is refused `OperationReused`. An append whose outcome is unknown is held and named `OperationUnresolved` until the log is read back; a committed event not yet in the relationships is named `ProjectionPending`. Neither is answered as success, and neither mints a fresh operation.
 

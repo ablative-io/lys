@@ -235,7 +235,7 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     let given = GivenRecord::claude_code(resolution, environment_names(&template));
     let event_id = session.append_beside(EntryBody::Custom {
         custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
-        data: Some(event.data()?),
+        data: Some(event.data()),
     })?;
     let given_id = given.append_under(&mut session, &event_id)?;
     let canonical = given.canonical_bytes()?;

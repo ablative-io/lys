@@ -1,7 +1,7 @@
 //! Many questions at once: the batch check and the question of which
 //! resources a subject may act on.
 //!
-//! `POST /grants/check/batch` takes up to [`BATCH_MAX`] checks and answers
+//! `POST /grants/check/batch` takes any number of checks and answers
 //! each allowed or refused with its reason, in the order sent, every one at
 //! the one revision the answer names, since all are decided under one hold
 //! of the grants. `POST /grants/which` answers, a page at a time after a
@@ -27,14 +27,10 @@ use lys_identity::grants::{Action, ExerciseRequest, GrantError, Resource, Route}
 use serde::{Deserialize, Serialize};
 
 use crate::apps_binding::{Acting, acting};
-use crate::apps_error::AppError;
 use crate::error::ServerError;
 use crate::grants::{Decision, Judged, decide, with_grants};
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
-
-/// The most checks one batch takes.
-pub const BATCH_MAX: usize = 500;
 
 /// One check of a batch.
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -211,13 +207,6 @@ pub async fn batch(
     body: Result<Json<BatchBody>, JsonRejection>,
 ) -> Result<Json<BatchAnswer>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    if body.checks.len() > BATCH_MAX {
-        return Err(AppError::BatchTooLarge {
-            count: body.checks.len(),
-            most: BATCH_MAX,
-        }
-        .into());
-    }
     let acting_for = asker(&state, &headers)?;
     let at = now();
     with_grants(&state, |mut judged| {

@@ -139,15 +139,16 @@ pub fn delegation_preimage(root_public_key: &[u8; KEY_LEN], claim: &DelegationCl
 ///
 /// The signature check above was written to stop this function emitting an
 /// artifact that fails verification later — and then a *second* route to that
-/// same outcome was found, going around it. The artifact size cap was enforced
-/// on the decode side only, so a subject value of 3884 bytes signed and verified
-/// while 3885 signed **successfully** and failed every verification afterwards.
+/// same outcome was found, going around it. A size cap, since removed, was
+/// enforced on the decode side only, so a subject value of 3884 bytes signed and
+/// verified while 3885 signed **successfully** and failed every verification
+/// afterwards.
 /// An empty subject value and an unusable delegated key had the same shape.
 ///
 /// So the encode side now mirrors the decode side in full, through
 /// `encoding::check_encodable`: a non-empty subject value, a
 /// `(subject_kind, role)` pair this version defines, a delegated key strict
-/// Ed25519 could accept, and an encoded length within the cap. "Verify before
+/// Ed25519 could accept. "Verify before
 /// returning" is the *principle*; the signature was only ever one instance of
 /// it.
 ///
@@ -186,8 +187,7 @@ pub fn assemble_delegation(
 ///
 /// - [`TrustError::DelegationEncoding`] if the claim is one the decoder would
 ///   reject — an empty subject value, a `(subject_kind, role)` pair this version
-///   does not define, an unusable delegated key, or a subject value long enough
-///   to push the artifact past the size cap. Reached through
+///   does not define, or an unusable delegated key. Reached through
 ///   [`assemble_delegation`], and the reason names the constraint.
 /// - [`TrustError::DelegationVerification`] if the signature this function just
 ///   produced does not verify against the key that produced it. That is

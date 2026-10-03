@@ -29,12 +29,6 @@ use crate::service_accounts_state::{Account, Created, Retired};
 use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::now;
 
-/// The most characters a service account's name carries.
-const NAME_MAX: usize = 100;
-
-/// The most characters a service account's description carries.
-const DESCRIPTION_MAX: usize = 500;
-
 /// A service account as its creator sends it.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -130,13 +124,8 @@ fn view(account: &Account) -> ServiceAccountView {
     }
 }
 
-fn words(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
+fn words(name: &str, text: &str) -> Result<String, ServerError> {
     let text = text.trim();
-    if text.chars().count() > most {
-        return Err(malformed(format!(
-            "{name} is longer than {most} characters"
-        )));
-    }
     if text.chars().any(char::is_control) {
         return Err(malformed(format!("{name} carries a control character")));
     }
@@ -152,11 +141,11 @@ async fn create(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let administrator = crate::routes::is_administrator(&state, &actor)?;
     let id = OperationId::from_str(&body.operation)?.to_string();
-    let name = words("name", &body.name, NAME_MAX)?;
+    let name = words("name", &body.name)?;
     if name.is_empty() {
         return Err(malformed("a service account has a name"));
     }
-    let description = words("description", &body.description, DESCRIPTION_MAX)?;
+    let description = words("description", &body.description)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let owner = match body.owner.as_deref() {

@@ -20,13 +20,15 @@ pub enum GrantError {
     },
     /// An action, relation or resource name is not a token this contract records.
     #[error(
-        "TokenInvalid: the {kind} `{text}` is not a token of 1 to 128 bytes of a-z, 0-9, `_`, `-` and `.`"
+        "TokenInvalid: the {kind} `{text}` is not a token of 1 to {max} bytes of a-z, 0-9, `_`, `-` and `.`"
     )]
     TokenInvalid {
         /// What the token names.
         kind: &'static str,
         /// The text that was given.
         text: String,
+        /// The most bytes the permission engine takes for it.
+        max: usize,
     },
     /// A model is not one a decision can be made against.
     #[error("ModelInvalid: {reason}")]
@@ -301,14 +303,6 @@ pub enum GrantError {
         "EventNotCanonical: the grant event's bytes are not the canonical encoding of what they decode to"
     )]
     EventNotCanonical,
-    /// A grant event is larger than any event the grants write.
-    #[error("EventTooLarge: {len} bytes, over the limit of {limit}")]
-    EventTooLarge {
-        /// The event's length in bytes.
-        len: usize,
-        /// The largest event read.
-        limit: usize,
-    },
     /// A grant event names a version the grants do not read.
     #[error("VersionUnsupported: grant event version {version} is not one the grants read")]
     VersionUnsupported {

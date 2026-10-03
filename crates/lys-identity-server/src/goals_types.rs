@@ -42,7 +42,7 @@ pub enum GoalError {
     /// A reminder before the deadline has no deadline to refer to.
     #[error("reminder_needs_deadline: a reminder before the deadline needs a deadline")]
     ReminderNeedsDeadline,
-    /// New reminder words are empty, too long or contain control characters.
+    /// New reminder words are empty or contain control characters.
     #[error("goal_words_malformed: {why}")]
     WordsMalformed {
         /// Why the words cannot be reminded.
@@ -198,9 +198,9 @@ impl Change {
     /// Refuse new words that cannot be reminded as one line.
     pub fn check(&self) -> Result<(), GoalError> {
         if let Self::Words { words } = self {
-            if words.trim().is_empty() || words.chars().count() > 500 {
+            if words.trim().is_empty() {
                 return Err(GoalError::WordsMalformed {
-                    why: "words carry between 1 and 500 characters",
+                    why: "words are empty",
                 });
             }
             if words.chars().any(char::is_control) {

@@ -275,6 +275,8 @@ fn one_owner_at_a_time_and_a_duplicate_or_unsafe_id_is_refused_by_name() {
             "{bad}: {err}"
         );
     }
+    let long = "a".repeat(10_000);
+    assert!(crate::record::safe_component("session id", &long).is_ok());
     assert!(
         !home
             .root()

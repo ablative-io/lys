@@ -6,9 +6,9 @@ use ciborium::value::Value;
 
 use super::{
     ALG_EDDSA, CONTENT_TYPE, COSE_SIGN1_TAG, HEADER_LABEL_ALG, HEADER_LABEL_CONTENT_TYPE,
-    HEADER_LABEL_KID, KEY_LEN, MAX_ARTIFACT_LEN, MAX_SEQUENCE, PAYLOAD_LABEL_DELEGATED_KEY,
-    PAYLOAD_LABEL_NOT_BEFORE, PAYLOAD_LABEL_ROLE, PAYLOAD_LABEL_SEQUENCE,
-    PAYLOAD_LABEL_SUBJECT_KIND, PAYLOAD_LABEL_SUBJECT_VALUE,
+    HEADER_LABEL_KID, KEY_LEN, MAX_SEQUENCE, PAYLOAD_LABEL_DELEGATED_KEY, PAYLOAD_LABEL_NOT_BEFORE,
+    PAYLOAD_LABEL_ROLE, PAYLOAD_LABEL_SEQUENCE, PAYLOAD_LABEL_SUBJECT_KIND,
+    PAYLOAD_LABEL_SUBJECT_VALUE,
 };
 use crate::delegation::artifact::{DelegationClaim, DelegationRole, DelegationSubjectKind};
 use crate::error::{TrustError, TrustResult};
@@ -232,7 +232,7 @@ pub(super) fn decode_payload(payload_raw: &[u8]) -> TrustResult<DelegationClaim>
 }
 
 /// Decode a delegation into its fields, enforcing the exact
-/// `lys/delegation/v1` shape: the input cap; tag 18 over a 4-array; the
+/// `lys/delegation/v1` shape: tag 18 over a 4-array; the
 /// protected map pinned to `{1: -8, 3: CONTENT_TYPE, 4: usable bstr(32) key}`;
 /// an
 /// **empty** unprotected map; an embedded `bstr` payload pinned to
@@ -246,9 +246,6 @@ pub(super) fn decode_payload(payload_raw: &[u8]) -> TrustResult<DelegationClaim>
 ///
 /// Every failure collapses to [`TrustError::DelegationVerification`].
 pub(crate) fn decode_fields(bytes: &[u8]) -> TrustResult<DecodedFields> {
-    if bytes.len() > MAX_ARTIFACT_LEN {
-        return Err(reject());
-    }
     // The tag is mandatory. RFC 9052 §4.2 permits an untagged `COSE_Sign1`
     // "depending on the context"; this context says tagged, because accepting
     // both would give one statement two valid encodings.

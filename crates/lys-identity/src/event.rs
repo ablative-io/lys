@@ -12,7 +12,7 @@
 //! through it as well, so an event read back from the log obeys the same rules
 //! as one written today.
 
-use crate::binding::{ISSUER_MAX_BYTES, LoginBinding};
+use crate::binding::LoginBinding;
 use crate::error::IdentityError;
 use crate::id::{AgentId, IdentityId, PersonId};
 use crate::lifecycle::{LifecycleState, Transition};
@@ -22,12 +22,6 @@ use crate::provenance::{Actor, AuthMethod};
 
 /// The envelope version this crate writes and reads.
 pub const EVENT_VERSION: u64 = 1;
-
-/// The longest source operation id a link-audit observation may carry, in bytes.
-pub const SOURCE_OPERATION_ID_MAX_BYTES: usize = 128;
-
-/// The longest reason a lifecycle transition may give, in bytes.
-pub const REASON_MAX_BYTES: usize = 1024;
 
 /// Whether an issuer observed a login being linked to or unlinked from a person.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -61,16 +55,14 @@ impl LinkObservation {
         observer: &str,
         observed_at: u64,
     ) -> Result<Self, IdentityError> {
-        if source_operation_id.is_empty()
-            || source_operation_id.len() > SOURCE_OPERATION_ID_MAX_BYTES
-        {
+        if source_operation_id.is_empty() {
             return Err(IdentityError::ChangeMismatch {
-                reason: "a source operation id is between 1 and 128 bytes",
+                reason: "a source operation id is not empty",
             });
         }
-        if observer.is_empty() || observer.len() > ISSUER_MAX_BYTES {
+        if observer.is_empty() {
             return Err(IdentityError::ChangeMismatch {
-                reason: "an observation names the issuer that observed it, in 1 to 2048 bytes",
+                reason: "an observation names the issuer that observed it",
             });
         }
         Ok(Self {
@@ -248,11 +240,6 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
             if transition.requires_reason() && reason.trim().is_empty() {
                 return Err(IdentityError::ReasonRequired {
                     transition: *transition,
-                });
-            }
-            if reason.len() > REASON_MAX_BYTES {
-                return Err(IdentityError::ChangeMismatch {
-                    reason: "a transition's reason is longer than 1024 bytes",
                 });
             }
             Ok(())

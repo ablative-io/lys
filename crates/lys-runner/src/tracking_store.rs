@@ -35,7 +35,8 @@ mod cursor;
 /// The feed's format.
 pub const FEED_FORMAT: &str = "lys-runner-feed/v1";
 
-/// The most entries one page of the feed carries.
+/// The most entries one page of the feed carries: a page size, and the
+/// page's cursor reads the rest, so no entry is lost.
 pub const PAGE_MAX: usize = 256;
 
 /// A Claude Code response seen, kept until the next record shows it whole.
@@ -406,14 +407,7 @@ impl Feed {
         let mut after = self.index.committed;
         loop {
             let mut line = Vec::new();
-            let read = reader
-                .by_ref()
-                .take(1_048_577)
-                .read_until(b'\n', &mut line)
-                .map_err(failed)?;
-            if line.len() > 1_048_576 {
-                return Err(failed("feed_record_too_large"));
-            }
+            let read = reader.read_until(b'\n', &mut line).map_err(failed)?;
             if read == 0 || line.last() != Some(&b'\n') {
                 break;
             }
@@ -455,14 +449,7 @@ impl Feed {
             if entries.len() == limit {
                 return Ok((entries, at, None));
             }
-            let read = reader
-                .by_ref()
-                .take(1_048_577)
-                .read_until(b'\n', &mut line)
-                .map_err(failed)?;
-            if line.len() > 1_048_576 {
-                return Err(failed("feed_record_too_large"));
-            }
+            let read = reader.read_until(b'\n', &mut line).map_err(failed)?;
             if read == 0 || line.last() != Some(&b'\n') {
                 return Ok((entries, at, None));
             }
@@ -547,9 +534,6 @@ impl Feed {
                 body,
             };
             let line = serde_json::to_string(&entry).map_err(failed)?;
-            if line.len() >= 1_048_576 {
-                return Err(failed("feed_record_too_large"));
-            }
             text.push_str(&line);
             text.push('\n');
             seq += 1;

@@ -70,11 +70,6 @@ pub(crate) async fn plan(
             reason: "the installed estate plan is absent or unreadable; upgrade the installation"
                 .to_owned(),
         })?;
-    if bytes.len() > 2_000_000 {
-        return Err(ServerError::RequestMalformed {
-            reason: "installed estate plan is too large".to_owned(),
-        });
-    }
     let plan: Value =
         serde_json::from_slice(&bytes).map_err(|_error| ServerError::ConfigInvalid {
             reason: "the installed estate plan is not JSON".to_owned(),

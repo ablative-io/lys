@@ -20,30 +20,24 @@
 //!   vouched for — all of that is the judge's, and it is mandatory there rather
 //!   than advisory. A producer that re-implemented those checks would be a
 //!   second copy of the verifier, agreeing with itself.
-//! - **This module refuses exactly the two things it is in a position to have
-//!   caused**, both of them local to assembly and neither of them a
-//!   relationship between links.
+//! - **This module refuses exactly the one thing it is in a position to have
+//!   caused**, local to assembly and not a relationship between links. A
+//!   cascade of any depth is assembled: neither this crate nor `verify_bundle`
+//!   sets a link count.
 //!
-//! # The two refusals, and why they are the producer's and not the judge's
+//! # The refusal, and why it is the producer's and not the judge's
 //!
-//! 1. **A cascade deeper than `MAX_LINKS`** (32, `lys-core`'s cap so an
-//!    untrusted bundle cannot ask a verifier for unbounded work). `verify_bundle`
-//!    rejects such a bundle, so emitting one would be handing a caller an
-//!    artifact this workspace already knows nothing can accept. Refused at
-//!    assembly with the depth named, which is a fact about the operator's own
-//!    chain.
-//! 2. **A first link whose checkpoint is not the one the freshly built
-//!    inclusion artifact carries.** This is a race *this crate creates*: an
-//!    inclusion artifact embeds a checkpoint signed over the tree **at the
-//!    moment it is built**, so an append between [`pin()`](super::pin::pin()) and
-//!    this call yields an artifact at a later size, and the join `verify_bundle`
-//!    requires — `links[0].checkpoint` byte-identical to
-//!    `inclusion_proof.checkpoint` — no longer holds. The judge would reject it
-//!    as [one indistinguishable failure][non-oracle]; the operator would learn
-//!    only "bundle verification failed" about a bundle their own anchor moved
-//!    underneath them. So it is named here, where the caller can act on it, and
-//!    the judge still checks it for the stranger, who is the only reader whose
-//!    check counts.
+//! **A first link whose checkpoint is not the one the freshly built inclusion
+//! artifact carries.** This is a race *this crate creates*: an inclusion
+//! artifact embeds a checkpoint signed over the tree **at the moment it is
+//! built**, so an append between [`pin()`](super::pin::pin()) and this call
+//! yields an artifact at a later size, and the join `verify_bundle` requires —
+//! `links[0].checkpoint` byte-identical to `inclusion_proof.checkpoint` — no
+//! longer holds. The judge would reject it as [one indistinguishable
+//! failure][non-oracle]; the operator would learn only "bundle verification
+//! failed" about a bundle their own anchor moved underneath them. So it is
+//! named here, where the caller can act on it, and the judge still checks it
+//! for the stranger, who is the only reader whose check counts.
 //!
 //! [non-oracle]: crate::CascadeError::CascadeJoinMismatch
 //!
@@ -66,7 +60,7 @@
 //! likewise left empty, because `verify_bundle` **refuses** a populated one
 //! until something exists that can check a time attestation.
 
-use lys_core::bundle::{BundleLink, MAX_LINKS, VerificationBundle};
+use lys_core::bundle::{BundleLink, VerificationBundle};
 use lys_log_store::LeafStore;
 
 use crate::admission::AdmissionPolicy;
@@ -109,7 +103,6 @@ impl UpwardPin {
 ///
 /// # Errors
 ///
-/// - [`CascadeError::CascadeTooDeep`] if `chain` is longer than `MAX_LINKS`.
 /// - [`ProofError::NoSuchLeaf`] if `leaf_index` is not in the log — propagated
 ///   from [`Anchor::inclusion_artifact`], which is the one place that refusal is
 ///   made. A second guard here would be a check no drift could distinguish from
@@ -129,14 +122,6 @@ where
     K: InProcessSigner,
     P: AdmissionPolicy,
 {
-    if chain.len() > MAX_LINKS {
-        return Err(AnchorError::Cascade(CascadeError::CascadeTooDeep {
-            origin: anchor.origin().to_string(),
-            links: chain.len(),
-            max: MAX_LINKS,
-        }));
-    }
-
     // Refuses a missing index; the artifact self-verifies before it is returned.
     let artifact = anchor.inclusion_artifact(leaf_index)?;
 

@@ -1,5 +1,4 @@
-//! Hiding credentials in what an upstream answers, and bounding how much of
-//! it is carried back.
+//! Hiding credentials in what an upstream answers.
 //!
 //! Every hidden secret is found in one pass over the answer: at each place
 //! the scan stands, a table says whether any secret starts with that byte,
@@ -10,9 +9,9 @@
 //! leftmost place is hidden whole, so no secret is left partly shown by an
 //! order of passes.
 //!
-//! An answer is read whole before any of it returns, so a secret is never
-//! split between two pieces of it, and it is refused by name,
-//! `AnswerTooLarge`, when it passes the cap: it is never cut short.
+//! An answer is read whole, whatever its size, before any of it returns, so
+//! a secret is never split between two pieces of it, and it is never cut
+//! short.
 
 use lys_secrets::{Secret, SecretsError};
 
@@ -94,35 +93,18 @@ impl<'s> Redactor<'s> {
     }
 }
 
-/// The refusal of an answer past `limit` bytes.
-fn too_large(limit: usize) -> SecretsError {
-    SecretsError::AnswerTooLarge { limit }
-}
-
-/// The upstream's answer, whole, or `AnswerTooLarge` when it passes `limit`
-/// bytes. A failure to read it is named with its words hidden.
-pub(crate) async fn capped(
-    mut upstream: reqwest::Response,
-    limit: usize,
+/// The upstream's answer, read whole at any size, with every secret hidden.
+/// A failure to read it is named with its words hidden.
+pub(crate) async fn redacted_answer(
+    upstream: reqwest::Response,
     redactor: &Redactor<'_>,
 ) -> Result<Vec<u8>, SecretsError> {
-    let most = u64::try_from(limit).unwrap_or(u64::MAX);
-    if upstream.content_length().is_some_and(|len| len > most) {
-        return Err(too_large(limit));
-    }
-    let mut answer = Vec::new();
-    while let Some(piece) = upstream
-        .chunk()
+    let answer = upstream
+        .bytes()
         .await
         .map_err(|error| SecretsError::Encoding {
             context: "upstream answer",
             reason: redactor.redact_text(&error.to_string()),
-        })?
-    {
-        if answer.len().saturating_add(piece.len()) > limit {
-            return Err(too_large(limit));
-        }
-        answer.extend_from_slice(&piece);
-    }
-    Ok(answer)
+        })?;
+    Ok(redactor.redact(&answer))
 }

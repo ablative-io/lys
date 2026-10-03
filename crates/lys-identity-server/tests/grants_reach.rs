@@ -1,7 +1,8 @@
 //! Who may act on many resources at once: `/grants/reach` answers each
 //! resource's holders and their actions exactly as `/grants/who` answers
 //! each resource and action, hides what the caller may not see as `who`
-//! does, and answers twenty resources in one request under a second.
+//! does, answers twenty resources in one request under a second, and
+//! answers a thousand resources whole and in order.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
@@ -150,18 +151,23 @@ async fn reach_answers_twenty_resources_exactly_as_who_does() -> TestResult {
 }
 
 #[tokio::test]
-async fn reach_names_one_to_five_hundred_resources() -> TestResult {
+async fn reach_refuses_no_resources_and_answers_a_thousand_whole() -> TestResult {
     let (service, _) =
         Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
-    let many: Vec<Value> = (0..501)
+    let none = json!({ "route": "browser", "resources": [] });
+    let (status, answer) = service.post("/grants/reach", Some(&ada), &none).await?;
+    assert_eq!(status, 400, "{answer}");
+    assert_eq!(answer["refusal"], "RequestMalformed", "{answer}");
+    let many: Vec<Value> = (0..1000)
         .map(|n| json!({ "kind": "doc", "id": n.to_string(), "actions": ["read"] }))
         .collect();
-    for resources in [Vec::new(), many] {
-        let ask = json!({ "route": "browser", "resources": resources });
-        let (status, answer) = service.post("/grants/reach", Some(&ada), &ask).await?;
-        assert_eq!(status, 400, "{answer}");
-        assert_eq!(answer["refusal"], "RequestMalformed", "{answer}");
+    let ask = json!({ "route": "browser", "resources": many });
+    let answer = post_ok(&service, "/grants/reach", &ada, &ask).await?;
+    let answered = answer["resources"].as_array().ok_or("no resources")?;
+    assert_eq!(answered.len(), 1000, "every resource asked about");
+    for (n, resource) in answered.iter().enumerate() {
+        assert_eq!(resource["id"], n.to_string(), "{resource}");
     }
     Ok(())
 }

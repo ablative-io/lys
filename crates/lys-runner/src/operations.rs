@@ -19,7 +19,7 @@
 //! never the text itself.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
@@ -240,16 +240,9 @@ impl Operations {
         let mut committed = 0;
         loop {
             let mut line = Vec::new();
-            let read = reader
-                .by_ref()
-                .take(1_048_577)
-                .read_until(b'\n', &mut line)
-                .map_err(unavailable)?;
+            let read = reader.read_until(b'\n', &mut line).map_err(unavailable)?;
             if read == 0 {
                 break;
-            }
-            if line.len() > 1_048_576 {
-                return Err(unavailable("operation_record_too_large"));
             }
             if line.last() != Some(&b'\n') {
                 break;

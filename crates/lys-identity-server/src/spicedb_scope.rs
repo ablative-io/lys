@@ -28,8 +28,8 @@ use crate::spicedb_http::post_json;
 pub(crate) const SCRATCH: &str = "lys/";
 
 /// The longest a scope's prefix may be: a kind name reaches 105 bytes (an
-/// app id of forty, a slash and a kind of sixty-four), and the engine takes
-/// a name of at most 128.
+/// app id of forty, a slash and a kind of sixty-four), and `SpiceDB` takes an
+/// object type of at most 128 bytes.
 const SCOPE_MAX: usize = 22;
 
 /// The scope's prefix for `random`: `lys/b` and sixteen of its characters.

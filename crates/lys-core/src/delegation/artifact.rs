@@ -10,8 +10,8 @@
 //! - **Round-trip identity:** `from_cose_bytes(x.to_cose_bytes()) == x` for
 //!   every `Delegation` whose fields satisfy the format's constraints —
 //!   a non-empty subject value, a delegated key strict Ed25519 could accept,
-//!   a `(subject_kind, role)` pair this version defines, and an
-//!   encoded length within the artifact cap — and `to_cose_bytes` of a parsed
+//!   and a `(subject_kind, role)` pair this version defines — and
+//!   `to_cose_bytes` of a parsed
 //!   delegation reproduces the input bytes exactly.
 //!
 //!   **The qualification is not decoration and was added after it was
@@ -311,8 +311,7 @@ impl Delegation {
 
     /// Parse a tagged `COSE_Sign1` `lys/delegation/v1` artifact.
     ///
-    /// Enforces the full structural algorithm: the input cap, the required tag
-    /// 18, the exact protected header pin (`alg = -8`, the v1 delegation content
+    /// Enforces the full structural algorithm: the required tag 18, the exact protected header pin (`alg = -8`, the v1 delegation content
     /// type, a 32-byte `kid`), the **empty** unprotected bucket, the embedded
     /// payload pin including a known role, the 64-byte signature — and then
     /// **canonical-encoding strictness**: the input must be byte-identical to
@@ -338,7 +337,7 @@ impl Delegation {
     /// # Errors
     ///
     /// Returns [`TrustError::DelegationVerification`] for every rejected input —
-    /// oversize, malformed CBOR, wrong shape, wrong header pins, unknown role,
+    /// malformed CBOR, wrong shape, wrong header pins, unknown role,
     /// an empty subject value, an unknown subject kind, an invalid
     /// `(subject_kind, role)` pair, an unusable delegated key, a non-empty
     /// unprotected
@@ -347,8 +346,8 @@ impl Delegation {
     /// **"Same error value" is not the same as "indistinguishable", and the
     /// distinction is not hedging** — it was measured elsewhere in this module
     /// and the docs that conflated the two were wrong. Parsing deliberately does
-    /// *not* equalise the work done: the length cap rejects before any CBOR is
-    /// touched, and a shape failure returns before the payload is examined. That
+    /// *not* equalise the work done: a shape failure returns before the
+    /// payload is examined. That
     /// is acceptable here in a way it is not in
     /// [`super::sign::verify_delegation`], because what a parse failure reveals
     /// is a property of the **input**, which whoever supplied it already knows —

@@ -170,14 +170,6 @@ pub enum AppError {
         /// The app.
         app: String,
     },
-    /// A batch holds more checks than one call takes.
-    #[error("batch_too_large: a batch holds {count} checks and one call takes at most {most}")]
-    BatchTooLarge {
-        /// The checks sent.
-        count: usize,
-        /// The most one call takes.
-        most: usize,
-    },
     /// A redirect address is not one a sign-in client takes.
     #[error("redirect_invalid: `{address}` {reason}")]
     RedirectInvalid {
@@ -224,7 +216,6 @@ impl AppError {
         match self {
             Self::AppIdInvalid { .. }
             | Self::SchemaInvalid { .. }
-            | Self::BatchTooLarge { .. }
             | Self::RedirectInvalid { .. }
             | Self::ActionNotDeclared { .. }
             | Self::PlacementInvalid { .. } => StatusCode::BAD_REQUEST,
@@ -254,10 +245,6 @@ impl AppError {
             Self::AppIdInvalid { .. } => vec![at("/id".to_owned())],
             Self::SchemaInvalid { pointer, .. } => vec![at(format!("/schema{pointer}"))],
             Self::SchemaVersionMoved { .. } => vec![at("/replaces".to_owned())],
-            Self::BatchTooLarge { count, .. } => vec![Field {
-                at: "/checks".to_owned(),
-                count: u64::try_from(*count).ok(),
-            }],
             Self::RedirectInvalid { .. } => vec![at("/redirects".to_owned())],
             Self::SchemaChangeStrandsGrants { stranded } => stranded
                 .iter()

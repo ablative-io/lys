@@ -1,6 +1,6 @@
 #![cfg(test)]
 //! Many questions at once: a batch answers each check in the order sent at
-//! one named revision, refuses more than it takes by name, `which` lists
+//! one named revision, answers a batch of any size whole, `which` lists
 //! exactly the ids the batch allows across its pages, and a question naming
 //! the revision a caller last wrote sees that write while one naming a later
 //! revision is refused rather than answered early.
@@ -65,21 +65,32 @@ async fn a_mixed_batch_is_answered_in_order_at_one_named_revision() -> TestResul
 }
 
 #[tokio::test]
-async fn five_hundred_and_one_checks_are_refused_batch_too_large() -> TestResult {
+async fn a_thousand_checks_are_answered_whole_and_in_order() -> TestResult {
     let (service, seeded) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea = seeded.people[1].id.to_string();
-    let one = check(&bea, "doc", "1", "read");
-    let most = json!({"checks": vec![one.clone(); 500]});
-    let answer = ok(post(&service, "/grants/check/batch", Auth::Cookie(&admin), &most).await?)?;
-    assert_eq!(answer["results"].as_array().map(Vec::len), Some(500));
-    let over = json!({"checks": vec![one; 501]});
-    let refusal = post(&service, "/grants/check/batch", Auth::Cookie(&admin), &over).await?;
-    refused(&refusal, 400, "batch_too_large")?;
+    registered(&service, &admin, NOTES).await?;
+    let doc = format!("{NOTES}.doc");
+    ok(root(&service, &admin, &bea, (&doc, "777"), "reader").await?)?;
+    let checks: Vec<Value> = (0..1000)
+        .map(|n| check(&bea, &doc, &n.to_string(), "read"))
+        .collect();
+    let many = json!({"checks": checks});
+    let answer = ok(post(&service, "/grants/check/batch", Auth::Cookie(&admin), &many).await?)?;
+    let allowed: Vec<usize> = answer["results"]
+        .as_array()
+        .ok_or("no results")?
+        .iter()
+        .enumerate()
+        .filter(|(_, result)| result["allowed"] == json!(true))
+        .map(|(at, _)| at)
+        .collect();
     assert_eq!(
-        refusal.1["fields"][0],
-        json!({"at": "/checks", "count": 501})
+        answer["results"].as_array().map(Vec::len),
+        Some(1000),
+        "{answer}"
     );
+    assert_eq!(allowed, vec![777], "{answer}");
     let bea_cookie = service.sign_in(login(identity_contract::apps::BEA)).await?;
     let small = json!({"checks": [check(&bea, "doc", "1", "read")]});
     refused(

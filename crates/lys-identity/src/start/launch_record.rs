@@ -28,9 +28,6 @@ pub const LAUNCH_RECORD_CONTENT_TYPE: &str = "application/vnd.lys.launch-record.
 /// The content type of a withdrawal's protected header.
 pub const WITHDRAWAL_CONTENT_TYPE: &str = "application/vnd.lys.launch-withdrawal.v1+cbor";
 
-/// The largest event the launch-record log writes or reads, in bytes.
-pub const MAX_EVENT_BYTES: usize = 64 * 1024;
-
 /// The version both kinds' bodies carry at key 1.
 pub(crate) const VERSION: u64 = 1;
 
@@ -248,24 +245,15 @@ pub enum LaunchEvent {
 
 impl LaunchEvent {
     /// Sign the event with the directory service's key: the whole message is
-    /// the log leaf.
-    pub(crate) fn seal(&self, key: &Ed25519Identity) -> Result<Vec<u8>, StartError> {
+    /// the log leaf, however large.
+    pub(crate) fn seal(&self, key: &Ed25519Identity) -> Vec<u8> {
         let (content_type, body) = match self {
             Self::Launch(record) => (LAUNCH_RECORD_CONTENT_TYPE, record.encode()),
             Self::Withdrawal(withdrawal) => (WITHDRAWAL_CONTENT_TYPE, withdrawal.encode()),
         };
         let protected = protected_header(content_type, &key.public_key_bytes());
         let signature = key.sign(&sig_structure(&protected, &body));
-        let message = cose_sign1(&protected, &body, &signature);
-        if message.len() > MAX_EVENT_BYTES {
-            return Err(StartError::Unavailable {
-                reason: format!(
-                    "the event is {} bytes, over the {MAX_EVENT_BYTES} the launch-record log reads",
-                    message.len()
-                ),
-            });
-        }
-        Ok(message)
+        cose_sign1(&protected, &body, &signature)
     }
 }
 
@@ -273,9 +261,6 @@ impl LaunchEvent {
 /// event it carries. Every failure is the one refusal, whatever it was.
 pub fn verify_launch_event(message: &[u8], service_key: &[u8; 32]) -> Result<LaunchEvent, String> {
     let refused = || REFUSED.to_owned();
-    if message.len() > MAX_EVENT_BYTES {
-        return Err(refused());
-    }
     let Value::Tag(COSE_SIGN1_TAG, inner) = cbor(message)? else {
         return Err(refused());
     };

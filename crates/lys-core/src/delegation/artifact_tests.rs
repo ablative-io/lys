@@ -31,7 +31,7 @@
 
 use super::*;
 use crate::delegation::artifact::DelegationSubjectKind;
-use crate::delegation::encoding::{CONTENT_TYPE, MAX_ARTIFACT_LEN, MAX_SEQUENCE, PROTECTED_LEN};
+use crate::delegation::encoding::{CONTENT_TYPE, MAX_SEQUENCE, PROTECTED_LEN};
 
 #[path = "artifact_tests/refusals.rs"]
 mod refusals;

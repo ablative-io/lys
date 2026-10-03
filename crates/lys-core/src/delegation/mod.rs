@@ -175,8 +175,9 @@
 //!   [`DelegationRole`] and [`DelegationSubjectKind`].
 //! - **Every constraint the decoder enforces is refused at encode too** — a
 //!   non-empty subject value, a `(subject_kind, role)` pair this version defines,
-//!   a delegated key strict Ed25519 could accept, and the artifact size cap. An issuing path that can emit what the verifying path
-//!   refuses is a defect, and it was one.
+//!   and a delegated key strict Ed25519 could accept. No size is set on the
+//!   artifact or its subject value. An issuing path that can emit what the
+//!   verifying path refuses is a defect, and it was one.
 //!
 //! # Why the payload is embedded, when a receipt's is detached
 //!

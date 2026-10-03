@@ -512,17 +512,14 @@ fn rollout_metadata(
     path: std::path::PathBuf,
     thread: &str,
 ) -> Result<std::path::PathBuf, RunnerError> {
-    use std::io::{BufRead, Read};
+    use std::io::BufRead;
     let file = std::fs::File::open(&path).map_err(|error| rollout_unreadable(&path, &error))?;
     let mut first = String::new();
-    std::io::BufReader::new(file.take(1_048_577))
+    std::io::BufReader::new(file)
         .read_line(&mut first)
         .map_err(|error| rollout_unreadable(&path, &error))?;
-    if first.len() > 1_048_576 || !first.ends_with('\n') {
-        return Err(rollout_unreadable(
-            &path,
-            &"the first line exceeds its limit or is incomplete",
-        ));
+    if !first.ends_with('\n') {
+        return Err(rollout_unreadable(&path, &"the first line is incomplete"));
     }
     let meta: Value = serde_json::from_str(first.trim_end()).map_err(|error| {
         rollout_unreadable(&path, &format!("the first line is not JSON: {error}"))

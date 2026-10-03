@@ -1,4 +1,6 @@
-//! Cached, bounded grant token digests with durable revocation tombstones.
+//! Cached grant token digests with durable revocation tombstones. An entry
+//! past its expiry can never admit again, revoked or not, so it is removed:
+//! on open and with each change, in the one durable write that change makes.
 use crate::grant_tokens::{Issued, TokenError};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use lys_identity::grants::GrantId;
@@ -6,12 +8,10 @@ use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
-const LIMIT: usize = 1024;
-const BYTE_LIMIT: u64 = 2 * 1024 * 1024;
 const FORMAT: &str = "lys-grant-tokens/v1";
 
 #[derive(Serialize, Deserialize)]
@@ -30,7 +30,7 @@ struct Stored {
     tokens: HashMap<String, Entry>,
 }
 
-/// One install's bounded table; admission never reads the filesystem.
+/// One install's table; admission never reads the filesystem.
 pub struct Tokens {
     file: PathBuf,
     stored: Stored,
@@ -48,7 +48,7 @@ fn unique_entries<'de, D: serde::Deserializer<'de>>(
     impl<'de> serde::de::Visitor<'de> for Entries {
         type Value = HashMap<String, Entry>;
         fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            formatter.write_str("a bounded map of unique token digests")
+            formatter.write_str("a map of unique token digests")
         }
         fn visit_map<M: serde::de::MapAccess<'de>>(
             self,
@@ -56,10 +56,8 @@ fn unique_entries<'de, D: serde::Deserializer<'de>>(
         ) -> Result<Self::Value, M::Error> {
             let mut entries = HashMap::new();
             while let Some((key, entry)) = map.next_entry::<String, Entry>()? {
-                if entries.len() >= LIMIT || entries.insert(key, entry).is_some() {
-                    return Err(serde::de::Error::custom(
-                        "duplicate digest or grant token capacity exceeded",
-                    ));
+                if entries.insert(key, entry).is_some() {
+                    return Err(serde::de::Error::custom("duplicate grant token digest"));
                 }
             }
             Ok(entries)
@@ -84,16 +82,14 @@ fn digest(token: &str) -> String {
 impl Tokens {
     /// Open an existing table, or begin an empty table on an old install.
     pub fn open(file: PathBuf) -> Result<Self, TokenError> {
-        let stored = match std::fs::File::open(&file) {
-            Ok(input) => {
-                let mut bytes = Vec::new();
-                input
-                    .take(BYTE_LIMIT + 1)
-                    .read_to_end(&mut bytes)
-                    .map_err(unavailable)?;
-                if u64::try_from(bytes.len()).map_or(true, |n| n > BYTE_LIMIT) {
-                    return Err(unavailable("grant token table exceeds its byte limit"));
-                }
+        Self::open_at(file, crate::session::now())
+    }
+
+    /// As [`Tokens::open`], at `at`: entries expired by then are removed,
+    /// and the table is written once when any was.
+    pub(crate) fn open_at(file: PathBuf, at: u64) -> Result<Self, TokenError> {
+        let stored = match std::fs::read(&file) {
+            Ok(bytes) => {
                 let stored: Stored = serde_json::from_slice(&bytes).map_err(|error| {
                     unavailable(format!(
                         "malformed grant token table at line {}, column {}",
@@ -101,8 +97,8 @@ impl Tokens {
                         error.column()
                     ))
                 })?;
-                if stored.format != FORMAT || stored.tokens.len() > LIMIT {
-                    return Err(unavailable("invalid grant token table format or capacity"));
+                if stored.format != FORMAT {
+                    return Err(unavailable("invalid grant token table format"));
                 }
                 for (key, entry) in &stored.tokens {
                     if key.len() != 64
@@ -122,11 +118,24 @@ impl Tokens {
             },
             Err(error) => return Err(unavailable(error)),
         };
-        Ok(Self {
+        let mut tokens = Self {
             file,
             stored,
             failed: false,
-        })
+        };
+        if tokens.prune(at) {
+            tokens.save()?;
+        }
+        Ok(tokens)
+    }
+
+    /// Removes every entry expired at `at`, revoked or not: none can admit
+    /// again. A revoked entry stays until then, answering revoked. Answers
+    /// whether any was removed; the caller makes the one write.
+    fn prune(&mut self, at: u64) -> bool {
+        let before = self.stored.tokens.len();
+        self.stored.tokens.retain(|_, entry| entry.expires_at > at);
+        before != self.stored.tokens.len()
     }
 
     fn ready(&self) -> Result<(), TokenError> {
@@ -168,9 +177,7 @@ impl Tokens {
         if expires_at <= at || expires_at.saturating_sub(at) > 86_400 {
             return Err(TokenError::Expiry);
         }
-        if self.stored.tokens.len() >= LIMIT {
-            return Err(TokenError::Full);
-        }
+        self.prune(at);
         let mut random = [0; 32];
         OsRng.try_fill_bytes(&mut random).map_err(unavailable)?;
         let token = URL_SAFE_NO_PAD.encode(random);
@@ -194,19 +201,25 @@ impl Tokens {
         })
     }
 
-    pub(crate) fn revoke(&mut self, grant: GrantId, id: &str) -> Result<(), TokenError> {
+    /// Revokes token `id` of `grant` at `at`, removing expired entries in
+    /// the same write. A token already expired and removed is unknown.
+    pub(crate) fn revoke(&mut self, grant: GrantId, id: &str, at: u64) -> Result<(), TokenError> {
         self.ready()?;
-        let entry = self
+        let pruned = self.prune(at);
+        let grant = grant.to_string();
+        let newly = self
             .stored
             .tokens
             .get_mut(id)
-            .filter(|entry| entry.grant == grant.to_string())
-            .ok_or(TokenError::Unknown)?;
-        if entry.revoked {
-            return Ok(());
+            .filter(|entry| entry.grant == grant)
+            .map(|entry| !std::mem::replace(&mut entry.revoked, true));
+        if pruned || newly == Some(true) {
+            self.save()?;
         }
-        entry.revoked = true;
-        self.save()
+        if newly.is_none() {
+            return Err(TokenError::Unknown);
+        }
+        Ok(())
     }
 
     fn save(&mut self) -> Result<(), TokenError> {

@@ -25,9 +25,11 @@ use lys_secrets::{
 };
 
 use crate::files::{Layout, Route};
-use crate::redact::{Redactor, capped};
+use crate::redact::{Redactor, redacted_answer};
 use crate::spice::Grants;
 
+/// Transport guard: the most bytes of a request body read from the socket
+/// before its signature names the caller (the signature covers the body).
 pub(crate) const MAX_BODY: usize = 16 * 1024 * 1024;
 
 /// A refusal and the status it answers with.
@@ -245,6 +247,7 @@ pub(crate) fn signed_for(
 async fn next_account(State(shared): State<Arc<Shared>>, request: Request) -> Response {
     let (parts, body) = request.into_parts();
     let asked = async {
+        // Guarded: read before the caller is known, as the caller's signature covers it.
         let body = axum::body::to_bytes(body, MAX_BODY)
             .await
             .map_err(|error| {
@@ -290,6 +293,7 @@ pub(crate) async fn forward(shared: &Arc<Shared>, request: Request) -> Result<Re
                 },
             )
         })?;
+    // Guarded: read before the caller is known, as the caller's signature covers it.
     let body = axum::body::to_bytes(body, MAX_BODY)
         .await
         .map_err(|error| {
@@ -403,8 +407,8 @@ pub(crate) async fn forward(shared: &Arc<Shared>, request: Request) -> Result<Re
 
 /// Sends the request upstream with the credential in the route's header,
 /// and answers the redacted response and the spend the upstream reported in
-/// the route's spend header, when it names one. An answer past
-/// [`MAX_BODY`] is refused `AnswerTooLarge`.
+/// the route's spend header, when it names one. The answer is read whole,
+/// at any size, and redacted whole.
 async fn call_upstream(
     shared: &Shared,
     route: &Route,
@@ -485,10 +489,10 @@ async fn call_upstream(
     }
     headers.remove("content-length");
     headers.remove("transfer-encoding");
-    let answer = capped(upstream, MAX_BODY, &redactor)
+    let answer = redacted_answer(upstream, &redactor)
         .await
         .map_err(|error| (StatusCode::BAD_GATEWAY, error))?;
-    let mut response = Response::new(Body::from(redactor.redact(&answer)));
+    let mut response = Response::new(Body::from(answer));
     *response.status_mut() = status;
     *response.headers_mut() = headers;
     Ok((response, reported))

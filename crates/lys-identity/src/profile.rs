@@ -7,9 +7,6 @@
 
 use crate::error::IdentityError;
 
-/// The longest display name accepted, in characters.
-pub const DISPLAY_NAME_MAX_CHARS: usize = 200;
-
 /// How an identity is shown.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Profile {
@@ -27,11 +24,6 @@ impl Profile {
         if display_name.trim() != display_name {
             return Err(IdentityError::ProfileInvalid {
                 reason: "the display name carries surrounding whitespace",
-            });
-        }
-        if display_name.chars().count() > DISPLAY_NAME_MAX_CHARS {
-            return Err(IdentityError::ProfileInvalid {
-                reason: "the display name is longer than 200 characters",
             });
         }
         if display_name.chars().any(char::is_control) {

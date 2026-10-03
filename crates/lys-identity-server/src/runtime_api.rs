@@ -40,9 +40,6 @@ use crate::runtime_state::{Report, Reported, Tracked};
 use crate::runtime_store::{RuntimeStore, SessionActivity};
 use crate::session::now;
 
-/// The most characters a runtime's words carry.
-const WORDS_MAX: usize = 500;
-
 /// A confirmed stop.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(as = RuntimeStopView)]
@@ -164,16 +161,6 @@ pub(crate) fn last_reports(state: &AppState) -> Result<Arc<BTreeMap<String, u64>
     with_runtime(state, |store| Ok(store.last_reports()))
 }
 
-fn words(name: &str, text: &str) -> Result<String, ServerError> {
-    let text = text.trim();
-    if text.chars().count() > WORDS_MAX {
-        return Err(malformed(format!(
-            "{name} is longer than {WORDS_MAX} characters"
-        )));
-    }
-    Ok(text.to_owned())
-}
-
 /// The report `body` makes on `session`, checked, for `agent` or found.
 fn report(
     body: ReportBody,
@@ -183,7 +170,7 @@ fn report(
 ) -> Result<Report, ServerError> {
     let session = OperationId::from_str(session)
         .map_err(|_unread| malformed("a session is named `op-` and 32 hex digits"))?;
-    let confirmation = words("confirmation", &body.confirmation)?;
+    let confirmation = body.confirmation.trim().to_owned();
     match body.state {
         Reported::StopAsked => {
             return Err(malformed(
@@ -206,7 +193,7 @@ fn report(
         agent,
         machine: body.machine,
         state: body.state,
-        what: words("what", &body.what)?,
+        what: body.what.trim().to_owned(),
         confirmation,
         reported_by,
         at: now(),

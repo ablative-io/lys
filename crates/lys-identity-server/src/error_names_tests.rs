@@ -120,6 +120,7 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             },
             "RequestMalformed",
         ),
+        (ServerError::BodyTooLarge, "BodyTooLarge"),
         (
             ServerError::SecretsUnavailable {
                 reason: detail.to_owned(),
@@ -658,10 +659,6 @@ fn identity_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "EventNotCanonical",
         ),
         (
-            ServerError::Identity(IdentityError::EventTooLarge { len: 7, limit: 7 }),
-            "EventTooLarge",
-        ),
-        (
             ServerError::Identity(IdentityError::VersionUnsupported { version: 7 }),
             "VersionUnsupported",
         ),
@@ -761,6 +758,7 @@ fn grant_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             ServerError::Grant(GrantError::TokenInvalid {
                 kind: detail,
                 text: detail.to_owned(),
+                max: 64,
             }),
             "TokenInvalid",
         ),
@@ -985,10 +983,6 @@ fn grant_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "EventNotCanonical",
         ),
         (
-            ServerError::Grant(GrantError::EventTooLarge { len: 7, limit: 7 }),
-            "EventTooLarge",
-        ),
-        (
             ServerError::Grant(GrantError::VersionUnsupported { version: 7 }),
             "VersionUnsupported",
         ),
@@ -1173,10 +1167,6 @@ fn app_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
                 app: detail.to_owned(),
             }),
             "schema_change_pending",
-        ),
-        (
-            ServerError::App(AppError::BatchTooLarge { count: 7, most: 7 }),
-            "batch_too_large",
         ),
         (
             ServerError::App(AppError::RedirectInvalid {

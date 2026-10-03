@@ -210,10 +210,10 @@
     {
       "id": "R5",
       "title": "Apps check many permissions at once and list what a subject may act on",
-      "spec": "Behavioural. POST /grants/check/batch takes up to 500 checks (subject, kind, id, action) and answers each allowed or refused with its reason, in order, at one permission store revision named in the answer. POST /grants/which takes a subject, a kind and an action and answers the ids that subject may act on, paged by cursor. Both require a signed-in administrator or the app's authenticated application connector with an explicit ordinary grant for the act, limited to that app's own kinds. The connector identity, never a service-account or agent identity, is the caller judged by the grant engine; owning the prefix confers no permission. A caller may pass the revision it last wrote (at_least) to read its own write.",
+      "spec": "Behavioural. POST /grants/check/batch takes any number of checks (subject, kind, id, action) and answers each allowed or refused with its reason, in order, at one permission store revision named in the answer. POST /grants/which takes a subject, a kind and an action and answers the ids that subject may act on, paged by cursor. Both require a signed-in administrator or the app's authenticated application connector with an explicit ordinary grant for the act, limited to that app's own kinds. The connector identity, never a service-account or agent identity, is the caller judged by the grant engine; owning the prefix confers no permission. A caller may pass the revision it last wrote (at_least) to read its own write.",
       "acceptance": [
         "A batch of mixed allowed and refused checks answers each in order at one named revision.",
-        "501 checks are refused batch_too_large.",
+        "A batch of any number of checks is answered whole, each check in order.",
         "which lists exactly the ids the batch would allow, across pages.",
         "A check with at_least of a just-made grant sees it.",
         "An authenticated connector with no grant is refused even on its own kinds; an explicit grant with a standing chain to the super administrator permits the act, and revocation refuses it; another app's kinds remain not_your_app regardless of that grant."

@@ -1,10 +1,10 @@
-//! Cancellation and completed changes release every bounded lock reservation.
+//! Cancellation and completed changes release every lock reservation.
 
 use std::error::Error;
 use std::future::{Future, poll_fn};
 use std::task::Poll;
 
-use super::{Changes, LIMIT};
+use super::Changes;
 
 #[tokio::test]
 async fn cancelled_account_waiters_release_their_lock_reservation() -> Result<(), Box<dyn Error>> {
@@ -41,17 +41,22 @@ async fn cancelled_account_waiters_release_their_lock_reservation() -> Result<()
 }
 
 #[tokio::test]
-async fn active_account_changes_are_bounded_and_completed_ids_leave_no_history()
+async fn five_thousand_active_account_changes_are_held_and_completed_ids_leave_no_history()
 -> Result<(), Box<dyn Error>> {
     let changes = Changes::default();
     let mut held = Vec::new();
-    for index in 0..LIMIT {
+    for index in 0..5000 {
         held.push(changes.lock(&format!("account-{index}")).await?);
     }
-    assert!(matches!(
-        changes.lock("one-too-many").await,
-        Err(crate::error::ServerError::SignInProvidersUnavailable { .. })
-    ));
+    held.push(changes.lock("one-more").await?);
+    assert_eq!(
+        changes
+            .table
+            .lock()
+            .map_err(|error| error.to_string())?
+            .active,
+        5001
+    );
     drop(held);
     {
         let table = changes.table.lock().map_err(|error| error.to_string())?;

@@ -17,7 +17,8 @@ use serde::{Deserialize, Deserializer};
 use crate::error::ServerError;
 use crate::routes::identity_id;
 
-/// The most holders one page of a who-can answer carries.
+/// The most holders one page of a who-can answer carries: a page size, and
+/// the `after` cursor returns every later holder, so nothing is left out.
 pub const PAGE_MAX: usize = 100;
 
 fn nullable<'de, D: Deserializer<'de>, T: Deserialize<'de>>(

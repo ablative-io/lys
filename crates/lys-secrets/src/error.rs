@@ -165,10 +165,8 @@ pub enum SecretsError {
     /// No account of the secret can serve.
     #[error(transparent)]
     Accounts(#[from] AccountsRefusal),
-    /// A name is empty, too long, or holds a control character.
-    #[error(
-        "InvalidName: {what} {name:?} {reason} (act: use a non-empty printable name of at most 128 bytes)"
-    )]
+    /// A name is empty or holds a control character.
+    #[error("InvalidName: {what} {name:?} {reason} (act: use a non-empty printable name)")]
     InvalidName {
         /// What was being named.
         what: &'static str,
@@ -177,15 +175,13 @@ pub enum SecretsError {
         /// What is wrong with it.
         reason: &'static str,
     },
-    /// A handle's lifetime is zero or longer than the broker allows.
+    /// A handle's lifetime is zero or already over, or it allows no use.
     #[error(
-        "InvalidLifetime: a handle lives more than 0 and at most {max_ms} ms, and {asked_ms} ms was asked (act: ask for a lifetime within the limit)"
+        "InvalidLifetime: a handle lives more than 0 ms and allows at least one use, and {asked_ms} ms was asked (act: ask for a lifetime ending after now and at least one use)"
     )]
     InvalidLifetime {
         /// The lifetime asked for, in milliseconds.
         asked_ms: u128,
-        /// The longest lifetime allowed, in milliseconds.
-        max_ms: u128,
     },
     /// No issued handle matches the one presented.
     #[error(
@@ -458,15 +454,6 @@ pub enum SecretsError {
     Random {
         /// Its report.
         reason: String,
-    },
-    /// An upstream answered more than the proxy carries back. Nothing of
-    /// it is returned: an answer is never cut short.
-    #[error(
-        "AnswerTooLarge: the upstream answered more than {limit} bytes (act: ask the upstream for less, or page the answer)"
-    )]
-    AnswerTooLarge {
-        /// The most the proxy carries back, in bytes.
-        limit: usize,
     },
     /// Bytes could not be encoded or decoded.
     #[error("Encoding: {context}: {reason}")]

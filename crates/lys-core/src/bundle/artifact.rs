@@ -31,11 +31,6 @@ use serde::{Deserialize, Serialize};
 /// `format` value of every verification bundle. FROZEN.
 pub const VERIFICATION_BUNDLE_FORMAT: &str = "lys/verification-bundle/v1";
 
-/// Hard cap on chain links, so an untrusted bundle cannot ask a verifier to do
-/// unbounded work. A chain this deep would already be pathological: each link
-/// is one anchor notarizing the one below it.
-pub const MAX_LINKS: usize = 32;
-
 /// A self-contained provenance chain: the artifacts a stranger needs to check
 /// that a leaf was logged and that the log's checkpoint was notarized.
 ///

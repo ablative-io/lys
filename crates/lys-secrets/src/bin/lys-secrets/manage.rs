@@ -45,6 +45,7 @@ async fn change<T: DeserializeOwned>(
     request: Request,
 ) -> Result<(Caller, T), (StatusCode, String)> {
     let (parts, body) = request.into_parts();
+    // Guarded: read before the caller is known, as the caller's signature covers it.
     let body: Bytes = axum::body::to_bytes(body, MAX_BODY)
         .await
         .map_err(|error| malformed("request body", error.to_string()))?;
@@ -308,6 +309,7 @@ pub async fn lease(
 /// The caller of a signed lease act, whose body the signature covers.
 async fn lease_caller(shared: &Arc<Shared>, request: Request) -> Result<Caller, Response> {
     let (parts, body) = request.into_parts();
+    // Guarded: read before the caller is known, as the caller's signature covers it.
     let body: Bytes = axum::body::to_bytes(body, MAX_BODY)
         .await
         .map_err(|error| malformed("request body", error.to_string()).into_response())?;

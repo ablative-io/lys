@@ -10,7 +10,7 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use super::{
-    Gate, STAGE_THREE, copy_home, fetch, fixture_home, git_bytes, is_empty_dir, listing,
+    Gate, STAGE_THREE, copy_home, fetch, fixture_home, git_bytes, is_empty_dir, last_line, listing,
     lys_home_with, ship, text,
 };
 
@@ -196,23 +196,32 @@ fn a_stale_index_pushed_with_plain_git_fails_verification_and_nothing_is_left() 
 }
 
 #[test]
-fn a_remote_whose_path_would_carry_the_arrival_over_the_cap_is_refused_first() -> Gate {
+fn a_remote_whose_long_path_once_crossed_the_event_cap_arrives_whole() -> Gate {
     let dir = tempfile::tempdir()?;
+    let source = fixture_home(dir.path(), "source")?;
     let mut remote = dir.path().to_path_buf();
-    while 400 - remote.as_os_str().len() > 202 {
+    while 800 - remote.as_os_str().len() > 202 {
         remote.push("r".repeat(200));
     }
-    let last = 400 - remote.as_os_str().len() - 1;
+    let last = 800 - remote.as_os_str().len() - 1;
     remote.push("r".repeat(last));
-    assert_eq!(remote.as_os_str().len(), 400);
+    assert_eq!(remote.as_os_str().len(), 800);
     assert!(remote.is_absolute());
-    std::fs::create_dir_all(&remote)?;
-    git_bytes(&["init", "--quiet", "--bare", text(&remote)?])?;
+    let commit = ship(dir.path(), &source, &remote)?;
     let target = dir.path().join("target");
     let output = fetch(dir.path(), text(&remote)?, &target)?;
-    let stderr = String::from_utf8(output.stderr)?;
-    assert_eq!(output.status.code(), Some(1));
-    assert!(stderr.contains("over the limit"), "{stderr}");
-    assert!(!target.exists());
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let file = std::fs::read(target.join("sessions").join("fixture.jsonl"))?;
+    let arrived = last_line(&file)?;
+    assert_eq!(arrived["data"]["kind"], "arrival");
+    assert_eq!(arrived["data"]["detail"]["remote"], json!(text(&remote)?));
+    assert_eq!(arrived["data"]["detail"]["source_commit"], commit.as_str());
+    let len = serde_json::to_vec(&arrived["data"])?.len();
+    assert!(len > 800, "{len}");
     Ok(())
 }

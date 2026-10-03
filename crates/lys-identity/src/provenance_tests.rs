@@ -29,7 +29,20 @@ fn pass_run_provenance_is_stable_distinct_and_has_no_authentication_time() {
         actor
     );
     assert!(super::Provenance::by_pass(agent, "", "session").is_err());
-    assert!(super::Provenance::by_pass(agent, "launch", &"s".repeat(129)).is_err());
+    assert!(super::Provenance::by_pass(agent, "launch", "").is_err());
+    let (launch, session) = ("l".repeat(10_000), "s".repeat(10_000));
+    let long = super::Actor::new(
+        crate::LoginBinding::new("https://issuer.test", "agent").expect("binding"),
+        super::Provenance::by_pass(agent, &launch, &session).expect("long identifiers"),
+    );
+    let mut encoded = Vec::new();
+    crate::encoding::actor(&mut encoded, &long);
+    assert_eq!(
+        crate::encoding::decode_actor(crate::encoding::cbor(&encoded, "actor").expect("CBOR"), 2)
+            .expect("actor"),
+        long,
+        "long run identifiers come back whole"
+    );
 }
 
 #[test]

@@ -8,11 +8,11 @@ A person's id is `person-` and 32 lowercase hex digits. An agent's id is `agent-
 
 ## Logins
 
-A login binding is an issuer and a subject, exactly as the issuer's token names them. The issuer is an http or https URL of at most 2048 bytes. The subject is at most 255 bytes. Neither may be empty, carry surrounding whitespace or a control character, and neither is rewritten. One binding names at most one person. A second binding of a login already bound is refused `BindingTaken`, naming the person it is bound to.
+A login binding is an issuer and a subject, exactly as the issuer's token names them. The issuer is an http or https URL. The subject is at most 255 bytes, the bound OpenID Connect Core 1.0 section 2 sets on `sub`. Neither may be empty, carry surrounding whitespace or a control character, and neither is rewritten. One binding names at most one person. A second binding of a login already bound is refused `BindingTaken`, naming the person it is bound to.
 
 ## Profiles
 
-A profile is a display name of 1 to 200 characters, with no surrounding whitespace and no control character. It shows an identity and never establishes one. It carries no email.
+A profile is a display name that is not empty, with no surrounding whitespace and no control character. It shows an identity and never establishes one. It carries no email.
 
 ## Provenance
 
@@ -35,7 +35,7 @@ An agent's responsible person must be registered, or the call is refused `Identi
 | `Directory::projection()` then `records()` | every identity, in id order |
 | `Record::profile()`, `state()`, `responsible()`, `reports_to()`, `reporting_gap()`, `bindings()`, `registered_by()`, `events()` | the record's parts, and the log indices of its events |
 
-A read answers only once any uncertain append is resolved. While one is held, every read and every change is refused `AppendUncertain` or `LogUnavailable`. Resolving it applies every leaf the log holds from that index on, whoever wrote it, before anything is answered. A leaf past the pin that is not a whole event this directory signed is refused `LeafNotAnEvent` before it is pinned, so it can be removed without equivocating. An event larger than the directory reads back is refused `EventTooLarge` before it is signed.
+A read answers only once any uncertain append is resolved. While one is held, every read and every change is refused `AppendUncertain` or `LogUnavailable`. Resolving it applies every leaf the log holds from that index on, whoever wrote it, before anything is answered. A leaf past the pin that is not a whole event this directory signed is refused `LeafNotAnEvent` before it is pinned, so it can be removed without equivocating. An event of any size is signed, and is read back whole.
 
 ## Changes
 

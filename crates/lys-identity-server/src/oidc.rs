@@ -23,7 +23,8 @@ use openidconnect::{
 use crate::config::Config;
 use crate::error::ServerError;
 
-/// The most sign-ins held in flight at once.
+/// The most sign-ins held in flight at once: a bound on state an
+/// unauthenticated browser makes the service keep before anyone signs in.
 pub const IN_FLIGHT_MAX: usize = 1024;
 
 fn failed(reason: &dyn std::fmt::Display) -> ServerError {

@@ -239,16 +239,11 @@ async fn an_edit_operation_cannot_be_reused_for_a_different_edit() -> TestResult
 }
 
 #[tokio::test]
-async fn rewording_validates_length_and_reminder_safe_text_before_writing() -> TestResult {
+async fn rewording_validates_reminder_safe_text_before_writing() -> TestResult {
     let table = Table::start().await?;
     let item = table.set().await?;
     let route = format!("/goals/{}/words", goal_id(&item)?);
-    for words in [
-        String::new(),
-        " ".to_owned(),
-        "a".repeat(501),
-        "two\nlines".to_owned(),
-    ] {
+    for words in [String::new(), " ".to_owned(), "two\nlines".to_owned()] {
         let (status, answer) = table
             .service
             .post(
@@ -270,13 +265,13 @@ async fn rewording_validates_length_and_reminder_safe_text_before_writing() -> T
         .post(
             &route,
             &json!({
-                "operation": OperationId::generate()?.to_string(), "words": "a".repeat(500),
+                "operation": OperationId::generate()?.to_string(), "words": "a".repeat(10_000),
             }),
         )
         .await?;
     assert_eq!(
-        valid["goal"]["words"].as_str().ok_or("words absent")?.len(),
-        500
+        valid["goal"]["words"].as_str().ok_or("words absent")?,
+        "a".repeat(10_000)
     );
     Ok(())
 }

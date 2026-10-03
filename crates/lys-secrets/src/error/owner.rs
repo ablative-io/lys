@@ -6,7 +6,7 @@
 pub enum OwnerChangeRefusal {
     /// The change carried no operation id, or one of the wrong shape.
     #[error(
-        "OperationMissing: the change of {secret} {reason} (act: send an operation id of 16 to 64 characters from A-Z, a-z, 0-9, _ and -, made once for this change)"
+        "OperationMissing: the change of {secret} {reason} (act: send an operation id of at least 16 characters from A-Z, a-z, 0-9, _ and -, made once for this change)"
     )]
     Missing {
         /// The secret the change was for.

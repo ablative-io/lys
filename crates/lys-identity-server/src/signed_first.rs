@@ -10,12 +10,22 @@
 //! seen to be present, whatever doors the table names: the route judges it,
 //! as it must, over the request it signs, and several routes take an app's
 //! or a registrar's credential beside a session.
+//!
+//! The body is read here only for a caller not yet judged. A caller judged
+//! in full before its body, by a session, the operator's token or a run
+//! pass, has its body read whole, however long. Any other caller, one whose
+//! credential or signature the route judges over the body or one on a
+//! public route, has no more than [`UNVERIFIED_BODY_LIMIT`] bytes read, and
+//! a longer body is refused `BodyTooLarge` before any route reads it.
 
 use std::collections::HashMap;
+use std::future::poll_fn;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::extract::{MatchedPath, Request, State};
+use axum::body::{Body, Bytes, HttpBody as _};
+use axum::extract::{DefaultBodyLimit, MatchedPath, Request, State};
 use axum::http::{HeaderMap, Method as HttpMethod, header};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
@@ -27,13 +37,18 @@ use crate::routes::{AppState, signed_in};
 /// The prefix the screens serve the routes under, when they are served.
 const NESTED: &str = "/api";
 
+/// The most bytes of a body read before its caller is verified.
+pub(crate) const UNVERIFIED_BODY_LIMIT: usize = 2 * 1024 * 1024;
+
 /// Each route's doors, by method and path as the table writes them.
 struct Doors {
     state: Arc<AppState>,
     doors: HashMap<(HttpMethod, &'static str), &'static [Auth]>,
 }
 
-/// `api` with every table route's doors checked before its handler runs.
+/// `api` with every table route's doors checked before its handler runs,
+/// and no body limit of the framework's own: what is read of a body is
+/// decided here, by who the caller is.
 pub(crate) fn guarded(api: Router, state: Arc<AppState>) -> Router {
     let doors = crate::openapi::api()
         .routes()
@@ -41,6 +56,7 @@ pub(crate) fn guarded(api: Router, state: Arc<AppState>) -> Router {
         .map(|route| ((http_method(route.method), route.path), route.auth))
         .collect();
     api.route_layer(from_fn_with_state(Arc::new(Doors { state, doors }), check))
+        .layer(DefaultBodyLimit::disable())
 }
 
 fn http_method(method: Method) -> HttpMethod {
@@ -72,18 +88,24 @@ async fn check(
         {
             return *refusal;
         }
+        // The pass, its seat and its grant are judged before the body.
         return next.run(request).await;
     }
+    // A call relayed from an MCP message: its body is the message's, read
+    // already under the guard its own caller was given.
     if request
         .extensions()
         .get::<crate::agent_signature::TokenPrincipal>()
         .is_some()
         || crate::agent_signature::relayed_agent().is_some()
-        || (request.method() == HttpMethod::POST
-            && matches!(request.uri().path(), "/mcp" | "/api/mcp")
-            && request.headers().contains_key(crate::grant_tokens::HEADER))
     {
         return next.run(request).await;
+    }
+    if request.method() == HttpMethod::POST
+        && matches!(request.uri().path(), "/mcp" | "/api/mcp")
+        && request.headers().contains_key(crate::grant_tokens::HEADER)
+    {
+        return unverified(request, next).await;
     }
     let named = matched.and_then(|matched| {
         let path = matched.as_str();
@@ -100,28 +122,85 @@ async fn check(
             })
             .copied()
     });
-    match named.map(|auth| admitted(&doors.state, auth, request.headers())) {
-        Some(Err(refusal)) => refusal.into_response(),
-        Some(Ok(())) | None => next.run(request).await,
+    let whole = match named {
+        Some(auth) => match admitted(&doors.state, auth, request.headers()) {
+            Ok(whole) => whole,
+            Err(refusal) => return refusal.into_response(),
+        },
+        None => judged(&doors.state, request.headers()),
+    };
+    if whole {
+        return next.run(request).await;
     }
+    unverified(request, next).await
 }
 
 /// Whether the request may reach its route: a public route, or a caller
 /// that brings a credential or a signature for the route to judge, or a
-/// live session; otherwise the session's own refusal.
-fn admitted(state: &AppState, auth: &[Auth], headers: &HeaderMap) -> Result<(), ServerError> {
+/// live session; otherwise the session's own refusal. `true` when the
+/// caller is judged in full here, before its body is read.
+fn admitted(state: &AppState, auth: &[Auth], headers: &HeaderMap) -> Result<bool, ServerError> {
     if headers.contains_key(header::COOKIE) && headers.contains_key(crate::agent_signature::HEADER)
     {
         return Err(ServerError::AgentSignatureRefused {
             reason: "an agent signature cannot carry a session cookie",
         });
     }
-    let brings = headers.contains_key(header::AUTHORIZATION)
-        || headers.contains_key(crate::agent_signature::HEADER);
-    if brings || auth.contains(&Auth::Public) {
-        return Ok(());
+    if brings(headers) {
+        return Ok(false);
     }
-    signed_in(state, headers).map(drop)
+    if auth.contains(&Auth::Public) {
+        return Ok(judged(state, headers));
+    }
+    signed_in(state, headers).map(|_actor| true)
+}
+
+/// Whether the request carries a credential or a signature that its route
+/// judges over the body.
+fn brings(headers: &HeaderMap) -> bool {
+    headers.contains_key(header::AUTHORIZATION)
+        || headers.contains_key(crate::agent_signature::HEADER)
+}
+
+/// Whether the caller is judged in full before its body is read: a live
+/// session or the operator, bringing nothing the route judges over the
+/// body. A caller that is not is answered by its route, as before; only
+/// its body is guarded.
+fn judged(state: &AppState, headers: &HeaderMap) -> bool {
+    !brings(headers) && signed_in(state, headers).is_ok()
+}
+
+/// Run `request` for a caller not yet verified: its body is read here, no
+/// more than [`UNVERIFIED_BODY_LIMIT`] bytes of it, and handed on whole, or
+/// refused by name before any route reads it.
+async fn unverified(request: Request, next: Next) -> Response {
+    let (parts, body) = request.into_parts();
+    match bounded(body).await {
+        Ok(bytes) => {
+            next.run(Request::from_parts(parts, Body::from(bytes)))
+                .await
+        }
+        Err(refusal) => refusal.into_response(),
+    }
+}
+
+/// The bytes of `body`, refused `BodyTooLarge` at the first frame that
+/// would take them past [`UNVERIFIED_BODY_LIMIT`]. A frame that is not
+/// data, a trailer, is not kept: no route reads one.
+async fn bounded(mut body: Body) -> Result<Bytes, ServerError> {
+    let mut read = Vec::new();
+    while let Some(frame) = poll_fn(|context| Pin::new(&mut body).poll_frame(context)).await {
+        let frame = frame.map_err(|error| ServerError::RequestMalformed {
+            reason: format!("the request body could not be read: {error}"),
+        })?;
+        if let Ok(data) = frame.into_data() {
+            if data.len() > UNVERIFIED_BODY_LIMIT - read.len() {
+                return Err(ServerError::BodyTooLarge);
+            }
+            read.extend_from_slice(&data);
+        }
+    }
+    Ok(Bytes::from(read))
 }
 
 fn pass_credentials(headers: &HeaderMap) -> Result<(), ServerError> {

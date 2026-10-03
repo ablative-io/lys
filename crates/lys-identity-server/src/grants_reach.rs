@@ -1,6 +1,6 @@
 //! Who may act on many resources at once, for the permission graph.
 //!
-//! `POST /grants/reach` takes up to [`REACH_MAX`] resources, each with the
+//! `POST /grants/reach` takes one or more resources, each with the
 //! actions asked about, and answers for each resource every holder the
 //! caller may see with the actions it may take, in holder order. It is
 //! `/grants/who` asked of every resource and action together: the same
@@ -25,9 +25,6 @@ use crate::grant_sight::sees_with;
 use crate::grants::with_grants;
 use crate::grants_batch::unanswered;
 use crate::session::now;
-
-/// The most resources one reach question names.
-pub const REACH_MAX: usize = 500;
 
 /// One resource and the actions asked about it.
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -86,9 +83,9 @@ pub(crate) async fn reach(
     headers: HeaderMap,
     Json(body): Json<ReachBody>,
 ) -> Result<Json<ReachAnswer>, ServerError> {
-    if body.resources.is_empty() || body.resources.len() > REACH_MAX {
+    if body.resources.is_empty() {
         return Err(ServerError::RequestMalformed {
-            reason: format!("resources names 1 to {REACH_MAX} resources"),
+            reason: "resources names at least one resource".to_owned(),
         });
     }
     let route = body.route.into();

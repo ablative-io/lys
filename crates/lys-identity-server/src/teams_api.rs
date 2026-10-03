@@ -46,12 +46,6 @@ pub(crate) mod giving;
 #[path = "teams_giving_tests.rs"]
 mod giving_tests;
 
-/// The most characters a team's name carries.
-pub(crate) const NAME_MAX: usize = 100;
-
-/// The most characters a team's description carries.
-pub(crate) const DESCRIPTION_MAX: usize = 500;
-
 /// A team as the routes answer it.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct TeamView {
@@ -246,13 +240,8 @@ pub(crate) fn kept(store: &mut TeamStore, line: Line) -> Result<TeamChanged, Ser
     })
 }
 
-pub(crate) fn words(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
+pub(crate) fn words(name: &str, text: &str) -> Result<String, ServerError> {
     let text = text.trim();
-    if text.chars().count() > most {
-        return Err(malformed(format!(
-            "{name} is longer than {most} characters"
-        )));
-    }
     if text.chars().any(char::is_control) {
         return Err(malformed(format!("{name} carries a control character")));
     }

@@ -142,10 +142,24 @@ fn setup_recovers_every_append_outcome_and_reopens_as_one_active_bound_person() 
 }
 
 #[tokio::test]
+async fn setup_keeps_a_ten_thousand_character_name_whole() -> Result {
+    let service = Service::start().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let name = "A".repeat(10_000);
+    let body = json!({"operation": OperationId::generate()?.to_string(), "display_name": name});
+    let (status, answer) = service.post("/setup", Some(&admin), &body).await?;
+    assert_eq!(status, 200, "{answer}");
+    let (status, me) = service.get("/me", Some(&admin)).await?;
+    assert_eq!(status, 200, "{me}");
+    assert_eq!(me["person"]["display_name"], name);
+    Ok(())
+}
+
+#[tokio::test]
 async fn setup_never_accepts_changed_retry_content_or_an_invalid_name() -> Result {
     let service = Service::start().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
-    for name in [String::new(), " A ".to_owned(), "A".repeat(201)] {
+    for name in ["", " A ", "A\u{7}B"] {
         let body = json!({"operation": OperationId::generate()?.to_string(), "display_name": name});
         let (status, refusal) = service.post("/setup", Some(&admin), &body).await?;
         assert_eq!(status, 409);

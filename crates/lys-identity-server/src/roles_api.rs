@@ -36,13 +36,6 @@ use crate::roles_views::{
 use crate::routes::{AppState, identity_id, signed_in, with_directory};
 use crate::session::now;
 
-/// The most characters a role's name carries.
-const NAME_MAX: usize = 100;
-/// The most characters a version's note carries.
-const NOTE_MAX: usize = 500;
-/// The most characters each of a version's texts carries.
-const TEXT_MAX: usize = 4000;
-
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 #[schema(as = RoleResourceBody)]
@@ -132,15 +125,10 @@ fn taken<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, ServerError> {
         .map_err(|refused| malformed(refused.body_text()))
 }
 
-fn words(name: &str, text: &str, most: usize, may_be_empty: bool) -> Result<String, ServerError> {
+fn words(name: &str, text: &str, may_be_empty: bool) -> Result<String, ServerError> {
     let text = text.trim();
     if text.is_empty() && !may_be_empty {
         return Err(malformed(format!("{name} is empty")));
-    }
-    if text.chars().count() > most {
-        return Err(malformed(format!(
-            "{name} is longer than {most} characters"
-        )));
     }
     Ok(text.to_owned())
 }
@@ -228,12 +216,12 @@ fn said(state: &AppState, body: &VersionBody) -> Result<Words, ServerError> {
         });
     }
     Ok(Words {
-        responsibilities: words("responsibilities", &body.responsibilities, TEXT_MAX, false)?,
-        goals: words("goals", &body.goals, TEXT_MAX, false)?,
-        practice: words("practice", &body.practice, TEXT_MAX, false)?,
-        profile: words("profile", &body.profile, TEXT_MAX, true)?,
+        responsibilities: words("responsibilities", &body.responsibilities, false)?,
+        goals: words("goals", &body.goals, false)?,
+        practice: words("practice", &body.practice, false)?,
+        profile: words("profile", &body.profile, true)?,
         grant_templates,
-        note: words("note", &body.note, NOTE_MAX, false)?,
+        note: words("note", &body.note, false)?,
     })
 }
 
@@ -282,7 +270,7 @@ async fn make(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let at = now();
-        let name = words("name", &body.name, NAME_MAX, false)?;
+        let name = words("name", &body.name, false)?;
         let body = VersionBody {
             operation: body.operation,
             responsibilities: body.responsibilities,

@@ -1,7 +1,7 @@
-//! A bounded durable access table stores token digests rather than bearer secrets.
+//! A durable access table stores token digests rather than bearer secrets.
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
@@ -11,8 +11,6 @@ use super::{Access, unavailable};
 use crate::error::ServerError;
 
 const FORMAT: &str = "lys-provider-access/v1";
-const LIMIT: usize = 4096;
-const FILE_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -48,18 +46,8 @@ pub(super) struct Tokens {
 
 impl Tokens {
     pub(super) fn open(file: PathBuf, at: u64) -> Result<Self, ServerError> {
-        let mut live = match std::fs::File::open(&file) {
-            Ok(input) => {
-                let mut bytes = Vec::new();
-                input
-                    .take(FILE_BYTES + 1)
-                    .read_to_end(&mut bytes)
-                    .map_err(|error| {
-                        unavailable(format!("the access table could not be read: {error}"))
-                    })?;
-                if u64::try_from(bytes.len()).map_or(true, |len| len > FILE_BYTES) {
-                    return Err(unavailable("the access table exceeds its byte limit"));
-                }
+        let mut live = match std::fs::read(&file) {
+            Ok(bytes) => {
                 let stored: Stored = serde_json::from_slice(&bytes).map_err(|error| {
                     unavailable(format!(
                         "the access table is malformed at line {}, column {}",
@@ -67,10 +55,8 @@ impl Tokens {
                         error.column()
                     ))
                 })?;
-                if stored.format != FORMAT || stored.tokens.len() > LIMIT {
-                    return Err(unavailable(
-                        "the access table has an invalid format or exceeds its entry limit",
-                    ));
+                if stored.format != FORMAT {
+                    return Err(unavailable("the access table has an invalid format"));
                 }
                 let mut entries = HashMap::new();
                 for token in stored.tokens {
@@ -84,7 +70,7 @@ impl Tokens {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
             Err(error) => {
                 return Err(unavailable(format!(
-                    "the access table could not be opened: {error}"
+                    "the access table could not be read: {error}"
                 )));
             }
         };
@@ -123,10 +109,8 @@ impl Tokens {
         self.ready()?;
         validate(&key, &access)?;
         self.live.retain(|_, access| access.expires_at > at);
-        if self.live.len() >= LIMIT || self.live.contains_key(&key) {
-            return Err(unavailable(
-                "the access table is full or the token digest is already issued",
-            ));
+        if self.live.contains_key(&key) {
+            return Err(unavailable("the token digest is already issued"));
         }
         self.change(Some((&key, &access)), None)?;
         self.live.insert(key, access);

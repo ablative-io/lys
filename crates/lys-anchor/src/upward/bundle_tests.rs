@@ -1,6 +1,6 @@
 #![cfg(test)]
-//! Gates on [`bundle_for`] — the **producer's** two refusals and the shape of
-//! what it emits.
+//! Gates on [`bundle_for`] — the **producer's** refusals, a cascade of any
+//! depth assembled whole, and the shape of what it emits.
 //!
 //! # What this file is deliberately not
 //!
@@ -11,15 +11,15 @@
 //! well would put the interesting claim in the file that also owns the
 //! implementation, which is the arrangement where a suite agrees with itself.
 //!
-//! So the cases below check only what assembly owns: the container's shape, and
-//! the two refusals this crate makes because it is in a position to have caused
-//! them.
+//! So the cases below check only what assembly owns: the container's shape, a
+//! deep cascade carried whole, and the refusals this crate makes because it is
+//! in a position to have caused them.
 //!
 //! # The duplication that exists, named rather than left to be noticed
 //!
-//! `verify_bundle` **also** checks the first-link join and **also** caps the
-//! link count. Two checks on one rule leave the rule proven by neither, so the
-//! two are isolated by construction rather than by hope:
+//! `verify_bundle` **also** checks the first-link join. Two checks on one rule
+//! leave the rule proven by neither, so the two are isolated by construction
+//! rather than by hope:
 //!
 //! - The cases here reach the producer's check and stop — they assert an
 //!   [`AnchorError`] variant that `verify_bundle` cannot produce, so a drift in
@@ -33,7 +33,7 @@
 //!
 //! | rule | the only case that may fail when it is drifted |
 //! |---|---|
-//! | a chain past the cap is refused, and the cap itself is not | [`a_cascade_one_link_past_the_cap_is_refused`] |
+//! | a cascade of any depth assembles, every link carried | [`a_cascade_a_thousand_links_deep_assembles_whole`] |
 //! | the first link must notarize the artifact's own checkpoint | [`a_checkpoint_that_moved_under_the_anchor_is_refused`] |
 //! | an index the log lacks is refused, not assembled around | [`an_index_the_log_lacks_is_refused`] |
 //! | the container is the frozen shape, with the leaf verbatim | [`the_container_carries_the_frozen_format_and_the_leaf`] |
@@ -42,7 +42,7 @@
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use lys_core::bundle::{MAX_LINKS, VERIFICATION_BUNDLE_FORMAT};
+use lys_core::bundle::VERIFICATION_BUNDLE_FORMAT;
 
 use crate::admission::{AcceptAll, SubmitterContext};
 use crate::error::{AnchorError, CascadeError, ProofError};
@@ -79,30 +79,20 @@ fn staged() -> Staged {
 }
 
 #[test]
-fn a_cascade_one_link_past_the_cap_is_refused() {
+fn a_cascade_a_thousand_links_deep_assembles_whole() {
     let staged = staged();
 
-    // The positive control, and it is the whole point of this pair: a chain of
-    // exactly `MAX_LINKS` copies assembles. The refusal below is therefore
-    // keyed on the length crossing the cap and on nothing else — a producer
-    // that refused every chain, or refused on some property these copies share,
-    // would fail here first.
-    let at_cap = vec![staged.pinned.clone(); MAX_LINKS];
-    assert_eq!(at_cap.len(), MAX_LINKS);
-    let accepted = bundle_for(&staged.child.anchor, staged.index, &at_cap)
-        .expect("a cascade exactly at the cap must assemble");
-    assert_eq!(accepted.links.len(), MAX_LINKS);
-
-    let past_cap = vec![staged.pinned.clone(); MAX_LINKS + 1];
-    let refused = bundle_for(&staged.child.anchor, staged.index, &past_cap);
-    match refused {
-        Err(AnchorError::Cascade(CascadeError::CascadeTooDeep { links, max, .. })) => {
-            // Keyed on what the call was handed and what the code read, not on
-            // literals this test could keep in step with by editing both.
-            assert_eq!(links, past_cap.len());
-            assert_eq!(max, MAX_LINKS);
-        }
-        other => panic!("expected CascadeTooDeep, got {other:?}"),
+    // The old cap was 32 links. A cascade far past it assembles, and every
+    // link is the pin it was handed, in order, with nothing dropped.
+    let deep = vec![staged.pinned.clone(); 1_000];
+    let accepted = bundle_for(&staged.child.anchor, staged.index, &deep)
+        .expect("a cascade of any depth must assemble");
+    assert_eq!(accepted.links.len(), deep.len());
+    let first = &accepted.links[0];
+    assert_eq!(first.checkpoint, staged.pinned.checkpoint.note);
+    for link in &accepted.links {
+        assert_eq!(link.checkpoint, first.checkpoint);
+        assert_eq!(link.receipt, first.receipt);
     }
 }
 

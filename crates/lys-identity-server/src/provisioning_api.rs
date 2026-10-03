@@ -36,15 +36,6 @@ use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
 
-/// The most characters a name carries.
-const NAME_MAX: usize = 100;
-/// The most names one list carries.
-const LIST_MAX: usize = 64;
-/// The most characters the instructions carry.
-const INSTRUCTIONS_MAX: usize = 20_000;
-/// The most characters a note carries.
-const NOTE_MAX: usize = 500;
-
 /// One version of a profile, in full.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(as = ProvisioningVersionView)]
@@ -196,30 +187,15 @@ fn malformed(reason: impl Into<String>) -> ServerError {
     }
 }
 
-fn text(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
-    let text = text.trim();
-    if text.chars().count() > most {
-        return Err(malformed(format!(
-            "{name} is longer than {most} characters"
-        )));
-    }
-    Ok(text.to_owned())
-}
-
 fn named(name: &str, given: &str) -> Result<String, ServerError> {
-    let given = text(name, given, NAME_MAX)?;
+    let given = given.trim();
     if given.is_empty() {
         return Err(malformed(format!("a name in {name} is empty")));
     }
-    Ok(given)
+    Ok(given.to_owned())
 }
 
 fn names(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
-    if given.len() > LIST_MAX {
-        return Err(malformed(format!(
-            "{name} holds more than {LIST_MAX} names"
-        )));
-    }
     let mut kept = Vec::new();
     for one in given {
         let one = named(name, one)?;
@@ -246,9 +222,9 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         tools: names("tools", &body.tools)?,
         skills: names("skills", &body.skills)?,
         mcp_servers: crate::mcp_record::servers(body.mcp_servers)?,
-        instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
+        instructions: body.instructions.trim().to_owned(),
         instructions_mode: body.instructions_mode,
-        note: text("note", &body.note, NOTE_MAX)?,
+        note: body.note.trim().to_owned(),
         session: body.session.clone().map(session).transpose()?,
         harness: declared,
         skill_pins: Vec::new(),

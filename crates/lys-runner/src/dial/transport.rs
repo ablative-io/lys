@@ -20,7 +20,9 @@ mod response;
 use response::parse;
 use response::read_response;
 
+/// Transport guard: the most response body bytes read from the network.
 const BODY_LIMIT: usize = 1_048_576;
+/// Transport guard: the most response head bytes read before parsing.
 const HEADER_LIMIT: usize = 16_384;
 
 enum Stream {

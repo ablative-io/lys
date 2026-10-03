@@ -21,8 +21,9 @@ const CHANGE_DOMAIN: &str = "lys-secrets/owner-change/v1";
 pub(super) const SCOPE: &str = "scope ";
 /// How an applied recipients change's outcome opens.
 pub(super) const RECIPIENTS: &str = "recipients ";
+/// The shortest operation id: an id made once per change must not collide,
+/// so it carries at least 16 characters. No longest is set.
 const SHORTEST: usize = 16;
-const LONGEST: usize = 64;
 
 /// What an owner change came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,7 +102,7 @@ pub(super) fn checked<'a>(
         return Err(missing("carried no operation id".to_owned()));
     };
     let length = operation.chars().count();
-    if !(SHORTEST..=LONGEST).contains(&length) {
+    if length < SHORTEST {
         return Err(missing(format!(
             "carried an operation id of {length} characters"
         )));

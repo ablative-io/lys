@@ -1,14 +1,11 @@
 //! Explicit MCP requests signed by the configured agent's broker lease.
 
-use std::io::{self, Write};
-
 use serde::Serialize;
 use serde_json::Value;
 
 use super::agent::{AgentClient, AgentLease, AgentResponse};
 use crate::error::RunnerError;
 
-const BODY_LIMIT: usize = 2 * 1024 * 1024;
 const HEADERS: [(&str, &str); 3] = [
     ("Content-Type", "application/json"),
     ("Accept", "application/json, text/event-stream"),
@@ -55,25 +52,6 @@ struct Arguments<'a> {
     path: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     body: Option<&'a Value>,
-}
-
-struct Body(Vec<u8>);
-
-impl Write for Body {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if bytes.len() > BODY_LIMIT - self.0.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "MCP request exceeds 2097152 bytes",
-            ));
-        }
-        self.0.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 fn invalid(reason: impl Into<String>) -> RunnerError {
@@ -149,6 +127,8 @@ impl McpClient {
         call: &ToolCall<'_>,
         extra: &[(&str, &str)],
     ) -> Result<AgentResponse, RunnerError> {
+        // 1 to 128 characters of A-Z, a-z, 0-9, `_`, `-` and `.`: the tool
+        // name rule of the MCP specification, revision 2025-11-25.
         if call.name.is_empty()
             || call.name.len() > 128
             || !call
@@ -190,9 +170,8 @@ impl McpClient {
         extra: &[(&str, &str)],
     ) -> Result<AgentResponse, RunnerError> {
         let headers = headers(extra)?;
-        let mut body = Body(Vec::new());
-        serde_json::to_writer(&mut body, request).map_err(|error| invalid(error.to_string()))?;
+        let body = serde_json::to_vec(request).map_err(|error| invalid(error.to_string()))?;
         // The bytes hashed for signing are the same buffer written to the service.
-        self.agent.send(lease, "POST", "/mcp", &headers, &body.0)
+        self.agent.send(lease, "POST", "/mcp", &headers, &body)
     }
 }

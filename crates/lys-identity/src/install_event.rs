@@ -39,9 +39,6 @@ const INSTALL: u64 = 4;
 /// The change kind code of an issuer move.
 const ISSUER_MOVED: u64 = 10;
 
-/// The longest build name an install event records, in bytes.
-pub const BUILD_MAX_BYTES: usize = 128;
-
 /// A change to the install as a whole.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InstallChange {
@@ -107,9 +104,9 @@ impl InstallEvent {
         recorded_at: u64,
         change: InstallChange,
     ) -> Result<Self, IdentityError> {
-        if build.is_empty() || build.len() > BUILD_MAX_BYTES || build.trim() != build {
+        if build.is_empty() || build.trim() != build {
             return Err(IdentityError::ChangeMismatch {
-                reason: "an install event names the build that recorded it, in 1 to 128 bytes",
+                reason: "an install event names its build, unpadded and not empty",
             });
         }
         let InstallChange::IssuerMoved { from, to } = &change;

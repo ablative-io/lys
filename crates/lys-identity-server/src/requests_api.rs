@@ -44,9 +44,6 @@ use crate::reviews_api::stands;
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
 
-/// The most characters a request's reason or a decision's note carries.
-const WORDS_MAX: usize = 500;
-
 /// The access request routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -81,11 +78,6 @@ pub(crate) fn words(name: &str, text: &str) -> Result<String, ServerError> {
     let text = text.trim();
     if text.is_empty() {
         return Err(malformed(format!("{name} is empty")));
-    }
-    if text.chars().count() > WORDS_MAX {
-        return Err(malformed(format!(
-            "{name} is longer than {WORDS_MAX} characters"
-        )));
     }
     Ok(text.to_owned())
 }

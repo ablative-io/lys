@@ -278,8 +278,8 @@ wire format nobody here has read the spec for. §4 avoids needing it in v1.
   (`verifier_key.rs:9-27`). WIRE-FORMATS says SHOULD (`WIRE-FORMATS.md:47`). **The anchor
   library must not add a URL-shape refusal**; it would reject origins existing logs
   already use. Advisory warning at the CLI only.
-- **`MAX_LINKS = 32`** (`bundle/artifact.rs:37`) caps verifiable cascade depth at 32. That
-  is a design bound on the hydra and belongs in the anchor's docs, not in a discovery.
+- **No link count is set**: a cascade of any depth is assembled and verified; `verify_bundle`
+  needs one anchor named per link. That belongs in the anchor's docs, not in a discovery.
 - **The receipt carries no origin** (`WIRE-DRAFTS.md:608-617`, settled at `:778-785`).
   Combined with DP16's rotation, the `kid` in a receipt is the *operational key at the time
   of issue*, and mapping it to an origin requires the anchor's log. A consequence, not a
@@ -999,8 +999,8 @@ same core functions increment 4 exposes** — the DP14 requirement, asserted str
 ### Increment 9 — bundle production  *(federation)*
 
 Assemble a `VerificationBundle` (`bundle/artifact.rs:47`) from a two-anchor cascade;
-`verify_bundle` (`bundle/verify.rs:161`) is the judge. Note `MAX_LINKS = 32`
-(`bundle/artifact.rs:37`) and that a populated `counter_anchor` is refused
+`verify_bundle` (`bundle/verify.rs:161`) is the judge. Note that a cascade of any depth
+is taken, with one anchor named per link, and that a populated `counter_anchor` is refused
 (`bundle/verify.rs:~177-180`).
 
 ### Increment 10 — the CLI binary  *(core, with federation subcommands behind the feature)*

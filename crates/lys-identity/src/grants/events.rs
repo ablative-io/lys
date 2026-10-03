@@ -38,15 +38,9 @@ pub const GRANT_EVENT_VERSION: u64 = 1;
 /// Separate signed envelope for service-account grant events.
 pub const SERVICE_ACCOUNT_ENVELOPE: &str = "application/vnd.lys.grant-event.v2+cbor";
 
-/// The largest grant event written or read, in bytes.
-pub const MAX_GRANT_EVENT_BYTES: usize = 64 * 1024;
-
 const COSE_SIGN1_TAG: u64 = 18;
 const SIGNATURE_LEN: usize = 64;
 const KEY_LEN: usize = 32;
-
-/// The longest reason a revocation may give, in bytes.
-pub const REVOKE_REASON_MAX_BYTES: usize = 1024;
 
 /// One change to the grants.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,7 +97,7 @@ impl GrantEvent {
     ///
     /// An issued grant names this event's operation as the one that
     /// authorised it, and its issuer is the caller; a revocation names a
-    /// reason of 1 to 1024 bytes.
+    /// reason that is not blank.
     pub fn new(
         operation: OperationId,
         caller: IdentityId,
@@ -124,9 +118,9 @@ impl GrantEvent {
                 }
             }
             GrantChange::Revoke { reason, .. } => {
-                if reason.trim().is_empty() || reason.len() > REVOKE_REASON_MAX_BYTES {
+                if reason.trim().is_empty() {
                     return Err(GrantError::EventMismatch {
-                        reason: "a revocation names its reason in 1 to 1024 bytes",
+                        reason: "a revocation names its reason",
                     });
                 }
             }
@@ -351,7 +345,8 @@ impl SignedGrantEvent {
     }
 }
 
-/// Sign `event` with the service key, refusing one larger than is read back.
+/// Sign `event` with the service key. Every event is signed whole, however
+/// large: each CBOR part carries its own length, so no size is refused.
 pub fn sign_grant_event(
     event: GrantEvent,
     service_key: &Ed25519Identity,
@@ -360,12 +355,6 @@ pub fn sign_grant_event(
     let protected = protected_header(&service_key.public_key_bytes(), event.content_type());
     let signature = service_key.sign(&sig_structure(&protected, &body));
     let bytes = cose_sign1(&protected, &body, &signature);
-    if bytes.len() > MAX_GRANT_EVENT_BYTES {
-        return Err(GrantError::EventTooLarge {
-            len: bytes.len(),
-            limit: MAX_GRANT_EVENT_BYTES,
-        });
-    }
     Ok(SignedGrantEvent {
         bytes,
         commitment: payload_commitment(&body),
@@ -407,12 +396,6 @@ pub fn verify_grant_event(
     service_key: &[u8; KEY_LEN],
 ) -> Result<SignedGrantEvent, GrantError> {
     const SHAPE: &str = "the message is not a tagged COSE_Sign1 of four parts";
-    if message.len() > MAX_GRANT_EVENT_BYTES {
-        return Err(GrantError::EventTooLarge {
-            len: message.len(),
-            limit: MAX_GRANT_EVENT_BYTES,
-        });
-    }
     let Value::Tag(COSE_SIGN1_TAG, inner) = cbor(message, SHAPE)? else {
         return Err(malformed(SHAPE));
     };

@@ -427,7 +427,7 @@ impl Importer<'_> {
             },
             body: EntryBody::Custom {
                 custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
-                data: Some(event.data()?),
+                data: Some(event.data()),
             },
         };
         self.session.append_entry(&entry)?;

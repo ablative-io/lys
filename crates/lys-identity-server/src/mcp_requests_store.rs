@@ -66,12 +66,12 @@ pub struct McpRequestStore<S: LeafStore = FileLeafStore> {
     uncertain: bool,
 }
 
-/// Validate the same bounded names provisioning declarations carry.
+/// Validate the same names provisioning declarations carry: trimmed and not empty.
 pub(crate) fn server_name(name: &str) -> Result<String, ServerError> {
     let name = name.trim();
-    if name.is_empty() || name.chars().count() > 100 {
+    if name.is_empty() {
         return Err(ServerError::RequestMalformed {
-            reason: "server must carry between 1 and 100 characters".to_owned(),
+            reason: "server is empty".to_owned(),
         });
     }
     Ok(name.to_owned())

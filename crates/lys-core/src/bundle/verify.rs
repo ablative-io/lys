@@ -59,7 +59,7 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 
-use crate::bundle::artifact::{MAX_LINKS, VERIFICATION_BUNDLE_FORMAT, VerificationBundle};
+use crate::bundle::artifact::{VERIFICATION_BUNDLE_FORMAT, VerificationBundle};
 use crate::checkpoint::{CheckpointBody, NoteVerifierKey, verify_checkpoint};
 use crate::error::{TrustError, TrustResult};
 use crate::receipt::verify_receipt_bytes;
@@ -168,7 +168,9 @@ pub fn verify_bundle(
     if bundle.format != VERIFICATION_BUNDLE_FORMAT {
         return Err(reject());
     }
-    if bundle.links.len() > MAX_LINKS || anchors.len() != bundle.links.len() {
+    // No link count is set: the verifier names one anchor per link, so the
+    // work a bundle can ask for is bounded by the anchors the verifier holds.
+    if anchors.len() != bundle.links.len() {
         return Err(reject());
     }
     // The slot exists in v1 so adding time attestation later is not a v2. Until

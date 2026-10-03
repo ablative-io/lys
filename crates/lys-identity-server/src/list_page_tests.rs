@@ -90,6 +90,31 @@ fn filtered_page_counts_exactly_and_builds_only_limit_plus_one_views() -> TestRe
 }
 
 #[test]
+fn ten_thousand_character_search_is_accepted_and_its_cursor_reads_every_page() -> TestResult {
+    let q = "a".repeat(10_000);
+    let rows: BTreeMap<_, _> = (0..12)
+        .map(|n| (format!("id-{n:04}"), format!("id-{n:04} {q}")))
+        .collect();
+    let mut read = Vec::new();
+    let mut query = page(Some(q.clone()), None)?;
+    loop {
+        let (selected, totals) = query.select(
+            rows.values(),
+            None,
+            |row| Ok(query.matches([row.as_str()])),
+            |row| row.as_str(),
+            |row| Ok((*row).clone()),
+        )?;
+        assert_eq!(totals.total, 12);
+        read.extend(selected);
+        let Some(next) = totals.next else { break };
+        query = page(Some(q.clone()), Some(next))?;
+    }
+    assert_eq!(read, rows.values().cloned().collect::<Vec<_>>());
+    Ok(())
+}
+
+#[test]
 fn subtree_visits_each_descendant_once_without_unrelated_teams() -> TestResult {
     let mut teams: Vec<crate::teams_state::Team> = Vec::new();
     for n in (0..64).rev() {

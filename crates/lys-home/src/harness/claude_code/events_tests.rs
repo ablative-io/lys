@@ -1,13 +1,14 @@
 #![cfg(test)]
-//! Gates on the `template_render` event: under the 512-byte cap with long
-//! paths riding in the manifest block, the five earlier kinds and the cap
-//! unchanged, and RECORD.md naming the kind and the manifest's fields.
+//! Gates on the `template_render` event: long paths riding in the manifest
+//! block and never in the event, the five earlier kinds unchanged, an event's
+//! data kept whole however long its names are, and RECORD.md naming the kind
+//! and the manifest's fields.
 
 use serde_json::Value;
 
 use crate::harness::claude_code::events::{
     KIND_ATTACHMENT, KIND_HOOK, KIND_PERMISSION_MODE, KIND_SYSTEM, KIND_TEMPLATE_RENDER,
-    KIND_TOOL_COMPLETED, MAX_DATA_BYTES, ManifestFile, RenderManifest, template_render,
+    KIND_TOOL_COMPLETED, ManifestFile, RenderManifest, template_render,
 };
 use crate::record::Home;
 use crate::record::blocks::Hash;
@@ -22,11 +23,9 @@ fn hex(byte: u8) -> Hash {
 }
 
 #[test]
-fn a_template_render_event_from_three_hashes_fits_the_cap_with_no_source_uuid() {
+fn a_template_render_event_from_three_hashes_has_no_source_uuid() {
     let event = template_render(&hex(1), &hex(2), &hex(3), 5);
-    let data = event.data().unwrap();
-    let len = serde_json::to_vec(&data).unwrap().len();
-    assert!(len <= MAX_DATA_BYTES, "{len}");
+    let data = event.data();
     assert_eq!(data["kind"], KIND_TEMPLATE_RENDER);
     assert_eq!(data["kind"], "template_render");
     assert_eq!(data["source_uuid"], Value::Null);
@@ -39,7 +38,7 @@ fn a_template_render_event_from_three_hashes_fits_the_cap_with_no_source_uuid() 
 }
 
 #[test]
-fn five_long_paths_ride_in_the_manifest_block_and_the_event_stays_under_the_cap() {
+fn five_long_paths_ride_in_the_manifest_block_and_never_in_the_event() {
     let dir = tempfile::tempdir().unwrap();
     let home = Home::open(dir.path().join("home")).unwrap();
     let blocks = home.blocks().unwrap();
@@ -64,23 +63,21 @@ fn five_long_paths_ride_in_the_manifest_block_and_the_event_stays_under_the_cap(
     assert!(put.new);
     let stored: RenderManifest = serde_json::from_slice(&blocks.get(&put.hash).unwrap()).unwrap();
     assert_eq!(stored, manifest);
-    assert!(serde_json::to_vec(&manifest).unwrap().len() > MAX_DATA_BYTES);
     let event = template_render(&hex(10), &hex(11), &put.hash, 5);
-    let data = event.data().unwrap();
-    assert!(serde_json::to_vec(&data).unwrap().len() <= MAX_DATA_BYTES);
+    let data = event.data();
+    assert_eq!(data["detail"].as_object().unwrap().len(), 3);
     assert_eq!(data["record"], put.hash.as_str());
     assert!(!data.to_string().contains("ppp"), "no path in the event");
     dir.close().unwrap();
 }
 
 #[test]
-fn the_five_earlier_kinds_and_the_cap_keep_their_values() {
+fn the_five_earlier_kinds_keep_their_values() {
     assert_eq!(KIND_HOOK, "hook");
     assert_eq!(KIND_PERMISSION_MODE, "permission_mode");
     assert_eq!(KIND_TOOL_COMPLETED, "tool_completed");
     assert_eq!(KIND_ATTACHMENT, "attachment");
     assert_eq!(KIND_SYSTEM, "system");
-    assert_eq!(MAX_DATA_BYTES, 512);
     let kinds = [
         KIND_HOOK,
         KIND_PERMISSION_MODE,
@@ -119,7 +116,7 @@ fn an_arrival_carries_exactly_its_four_detail_keys_and_no_block()
 -> Result<(), Box<dyn std::error::Error>> {
     use crate::harness::claude_code::events::{KIND_ARRIVAL, arrival};
     let event = arrival(&"a".repeat(40), "/r.git", "refs/lys/home", &"b".repeat(32));
-    let data = event.data()?;
+    let data = event.data();
     let expected: Value = serde_json::from_str(
         r#"{"kind":"arrival","harness":"claude-code","source_uuid":null,"record":null,"detail":{"execution":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ref":"refs/lys/home","remote":"/r.git","source_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}"#,
     )?;
@@ -129,20 +126,20 @@ fn an_arrival_carries_exactly_its_four_detail_keys_and_no_block()
 }
 
 #[test]
-fn an_arrival_over_the_cap_is_refused_as_too_large() {
-    use crate::error::HomeError;
+fn an_arrival_with_a_long_remote_keeps_the_remote_whole() {
     use crate::harness::claude_code::events::arrival;
-    let remote = format!("/{}", "x".repeat(399));
+    let remote = format!("/{}", "x".repeat(9_999));
     let event = arrival(&"a".repeat(40), &remote, "refs/lys/home", &"b".repeat(32));
-    let refused = event.data();
-    assert!(
-        matches!(&refused, Err(HomeError::EventTooLarge { len, .. }) if *len > MAX_DATA_BYTES),
-        "{refused:?}"
-    );
+    let data = event.data();
+    assert_eq!(data["kind"], "arrival");
+    assert_eq!(data["detail"]["remote"].as_str(), Some(remote.as_str()));
+    assert_eq!(data["detail"]["source_commit"], "a".repeat(40));
+    assert_eq!(data["detail"]["execution"], "b".repeat(32));
+    assert!(serde_json::to_vec(&data).unwrap().len() > 10_000);
 }
 
 #[test]
-fn the_six_existing_kinds_and_the_cap_keep_their_values_beside_the_arrival() {
+fn the_six_existing_kinds_keep_their_values_beside_the_arrival() {
     use crate::harness::claude_code::events::KIND_ARRIVAL;
     let kinds = [
         (KIND_HOOK, "hook"),
@@ -159,5 +156,4 @@ fn the_six_existing_kinds_and_the_cap_keep_their_values_beside_the_arrival() {
         checked += 1;
     }
     assert_eq!(checked, 6);
-    assert_eq!(MAX_DATA_BYTES, 512);
 }

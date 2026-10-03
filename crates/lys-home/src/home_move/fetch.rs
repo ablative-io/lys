@@ -2,11 +2,10 @@
 //! home, verified strictly, and one arrival hung beside each session's head.
 //!
 //! Before anything is written: the remote is a path on this machine, the
-//! target holds no `sessions/` and is absent or an empty directory, and the
-//! arrival data for this remote fits the event cap. Then every path fetch
-//! creates is recorded as it is created ([`Created`]): the target when it
-//! did not exist, `<dir>/.git`, each file and directory the checkout writes,
-//! each lock file opening a session leaves. The ref is fetched, its tree is
+//! target holds no `sessions/` and is absent or an empty directory. Then
+//! every path fetch creates is recorded as it is created ([`Created`]): the
+//! target when it did not exist, `<dir>/.git`, each file and directory the
+//! checkout writes, each lock file opening a session leaves. The ref is fetched, its tree is
 //! written into the target with HEAD at the fetched commit, and the home is
 //! verified: sessions, blocks and templates. A home that fails is removed
 //! and reported by session and by hash; nothing arrives.
@@ -89,7 +88,6 @@ pub fn fetch(
         .map_err(|e| HomeError::io("resolving the target", home_dir, e))?;
     let existed = check_target(&target)?;
     let remote_text = remote.to_string_lossy().into_owned();
-    arrival(&"0".repeat(40), &remote_text, HOME_REF, &"0".repeat(32)).data()?;
     let mut created = Created::new(&target, existed);
     match arrive(&mut created, &target, &remote, &remote_text, inherited) {
         Ok(Fetched::VerificationFailed(found)) => {
@@ -230,15 +228,13 @@ fn append_arrivals(
         let file = home.session_path(&session)?;
         created.file(&Index::lock_path(&file));
         let execution = fresh_id();
-        let appended = arrival(commit, remote_text, HOME_REF, &execution)
-            .data()
-            .and_then(|data| {
-                let mut open = home.open_session(&session)?;
-                open.append_beside(EntryBody::Custom {
-                    custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
-                    data: Some(data),
-                })
-            });
+        let data = arrival(commit, remote_text, HOME_REF, &execution).data();
+        let appended = home.open_session(&session).and_then(|mut open| {
+            open.append_beside(EntryBody::Custom {
+                custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
+                data: Some(data),
+            })
+        });
         if appended.is_err() {
             return Err(HomeError::Move(MoveError::ArrivalFailed {
                 step: format!("append to session `{session}`"),

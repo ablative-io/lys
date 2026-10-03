@@ -48,9 +48,6 @@ use crate::session::now;
 use crate::stops_state::Stop;
 use crate::stops_store::StopStore;
 
-/// The most characters a reason carries.
-const REASON_MAX: usize = 500;
-
 /// A stop to make.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -324,11 +321,6 @@ async fn stop(
     let reason = body.reason.trim().to_owned();
     if reason.is_empty() {
         return Err(malformed("reason is empty: say why the agent is stopped"));
-    }
-    if reason.chars().count() > REASON_MAX {
-        return Err(malformed(format!(
-            "reason is longer than {REASON_MAX} characters"
-        )));
     }
     let (agent, by, lifecycle) = admitted(&state, &actor, &id)?;
     let asked = Stop {

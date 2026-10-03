@@ -6,7 +6,6 @@
 
 use serde_json::{Value, json};
 
-use crate::harness::claude_code::events::MAX_DATA_BYTES;
 use crate::harness::claude_code::import::import_claude_code;
 use crate::record::Home;
 use crate::record::entries::{CUSTOM_AUTHORED, CUSTOM_HARNESS_EVENT, Entry, EntryBody};
@@ -263,10 +262,11 @@ fn harness_records_become_events_at_their_exact_place_and_carry_no_output() {
         else {
             panic!("an event without data")
         };
-        assert!(serde_json::to_vec(data).unwrap().len() <= MAX_DATA_BYTES);
         assert_eq!(data["harness"], "claude-code");
         let detail = data["detail"].as_object().unwrap();
-        assert!(!detail.contains_key("stdout") && !detail.contains_key("content"));
+        for body in ["stdout", "stderr", "content", "text"] {
+            assert!(!detail.contains_key(body), "{body}");
+        }
         match data["kind"].as_str().unwrap() {
             "hook" => {
                 assert_eq!(
