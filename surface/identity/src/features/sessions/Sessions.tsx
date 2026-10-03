@@ -25,7 +25,7 @@ export function Sessions() {
   const chosen = people.status === 'ok' ? people.data.people.find((entry) => entry.id === person) : undefined;
   return <div className="page fill">
     <div className="head"><div><div className="eyebrow">Sign-in</div><h1>Where you are signed in</h1>
-      <p className="sub">See where you’re signed in and end a session you no longer need. Agents that are running are on <a href="#/runtime">Running</a>.</p></div></div>
+      <p className="sub">See where you’re signed in and end a session you no longer need. Agents that are running are on <a href="#/canvas">Running</a>.</p></div></div>
     {people.status === 'ok' && people.data.scope === 'directory' ? <div className="tools">
       <span className="sec">{chosen ? 'Showing ' + chosen.display_name + '’s sessions' : 'Showing your sessions'}</span>
       {person ? <button className="btn" onClick={() => setParams({})}>Show mine</button> : null}

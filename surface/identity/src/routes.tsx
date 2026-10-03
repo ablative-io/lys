@@ -22,7 +22,6 @@ import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
 import { AccountPage } from './features/people/Account';
 import { Apps } from './features/apps/Apps';
-import { RunningSessions } from './features/runtime/Sessions';
 import { SessionCanvas } from './features/runtime/SessionCanvas';
 
 /** Every screen and tab has its own address (conformance 9.1). */
@@ -43,11 +42,10 @@ export function AppRoutes() {
       <Route path="/secrets/:section?" element={<SecretsPage />} />
       <Route path="/vault" element={<SecretsPage />} />
       <Route path="/sessions" element={<Sessions />} />
-      <Route path="/runtime/:session?" element={<RunningSessions />} />
+      <Route path="/runtime/:session?" element={<Navigate replace to="/canvas" />} />
       <Route path="/usage/:agent?" element={<UsageMoved />} />
-      <Route path="/runtime/canvas" element={<SessionCanvas />} />
       <Route path="/canvas/:agent?" element={<SessionCanvas />} />
-      <Route path="/team/:agent?" element={<You />} />
+      <Route path="/team/:agent?" element={<OneStart />} />
       <Route path="/people/:agent" element={<People />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
@@ -71,8 +69,9 @@ function UsageMoved() {
   return <Navigate replace to={agent ? '/file/' + encodeURIComponent(agent) + '/budgets' : '/people'} />;
 }
 
-/** An agent has one start: on the front page, in its own pane. */
+/** An agent has one start: on the Overview of its own page. Older addresses for it arrive there. */
 function OneStart() {
-  const { id = '' } = useParams();
-  return <Navigate replace to={'/team/' + encodeURIComponent(id)} />;
+  const { id, agent } = useParams();
+  const named = id ?? agent;
+  return <Navigate replace to={named ? '/file/' + encodeURIComponent(named) : '/me'} />;
 }

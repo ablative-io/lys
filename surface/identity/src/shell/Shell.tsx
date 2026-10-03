@@ -4,7 +4,6 @@ import { Dock } from './Dock';
 import { Explain } from './Explain';
 import { Palette } from './Palette';
 import { Rail } from './Rail';
-import { View } from './View';
 import { useShell } from './ShellContext';
 import { useShellKeys } from './keys';
 
@@ -28,7 +27,6 @@ export function Shell({ children }: { children: ReactNode }) {
       <aside className={'drawer' + (open ? ' open' : '')} id="drawer" aria-label="Detail" ref={drawer}>
         {shell.drawer}
       </aside>
-      <View />
       <div className={'scrim' + (shell.paletteOpen ? ' open' : '')} id="scrim" onClick={shell.closeAll} />
       <Palette />
       <div className={'toast' + (shell.toastShown ? ' show' : '')} id="toast" role="status">

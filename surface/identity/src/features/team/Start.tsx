@@ -114,7 +114,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       <p>{name} has no program chosen yet.</p>
       <button type="button" className="btn primary" onClick={settings}>Choose its program</button>
     </div> : null}
-    {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/runtime/' + encodeURIComponent(ended)}>See what it printed</a></p> : null}
+    {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/file/' + encodeURIComponent(agent) + '/sessions'}>See what its runner reported</a></p> : null}
     {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => <button key={computer.id} type="button" className="btn primary" disabled={busy} onClick={() => { void run(computer.id); }}>
       {busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name}
     </button>)}</div> : null}

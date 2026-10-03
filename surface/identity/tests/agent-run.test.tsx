@@ -118,12 +118,12 @@ describe('An agent\'s run on People and agents', () => {
   it('starts a stopped agent in its own pane with one press, on its one allowed computer, in its saved folder', async () => {
     let live = false;
     const start = started(SCRIBE);
-    const { posted } = await mount('#/team/' + SCRIBE, {
+    const { posted } = await mount('#/file/' + SCRIBE, {
       ...stopped,
       '/runtime/live': () => ok({ sessions: live ? [running] : [], unanswered: [] }),
       ['POST /agents/' + SCRIBE + '/start-command']: (body) => { live = true; return start(body); },
     });
-    expect(location.hash).toBe('#/team/' + SCRIBE);
+    expect(location.hash).toBe('#/file/' + SCRIBE);
     expect(text()).toContain('Scribe is not running.');
     expect(text()).toContain('On Lab, in the folder ' + FOLDER + '.');
     expect($('.team-start select')).toBeNull();
@@ -139,7 +139,7 @@ describe('An agent\'s run on People and agents', () => {
 
   it('approves unapproved settings as the person and starts, in the same one press', async () => {
     const review = '/agents/' + SCRIBE + '/provisioning/1/review';
-    const { posted } = await mount('#/team/' + SCRIBE, {
+    const { posted } = await mount('#/file/' + SCRIBE, {
       ...stopped, ...provisioning(SCRIBE, profile({ reviewed_by: null, reviewed_at: null })),
       ['POST ' + review]: (body) => ok({ agent: SCRIBE, profile: profile(), recorded: { operation: (body as { operation: string }).operation, version: 1 }, versions: [], enforced: false }),
       ['POST /agents/' + SCRIBE + '/start-command']: started(SCRIBE),
@@ -150,15 +150,15 @@ describe('An agent\'s run on People and agents', () => {
 
   it('offers each computer as its own Start when several are allowed and none is saved, and uses the saved one when there is one', async () => {
     const two = { ...stopped, '/network': ok({ machines: [machine(LAB, 'Lab', 'lys-runner', [SCRIBE]), machine(SHED, 'Shed', 'lys-runner', [SCRIBE])], reports_served: true }) };
-    await mount('#/team/' + SCRIBE, two);
+    await mount('#/file/' + SCRIBE, two);
     expect($$('.team-start-acts button').map((el) => el.textContent)).toEqual(['Start on Lab', 'Start on Shed']);
-    await mount('#/team/' + SCRIBE, { ...two, ...provisioning(SCRIBE, profile({ runs_on: SHED })) });
+    await mount('#/file/' + SCRIBE, { ...two, ...provisioning(SCRIBE, profile({ runs_on: SHED })) });
     expect(text()).toContain('On Shed, in the folder ' + FOLDER + '.');
   });
 
   it('says a paused agent is paused, turns it back on in place and starts it without a second press', async () => {
     let state = 'suspended';
-    const { posted } = await mount('#/team/' + ARCHIVIST, {
+    const { posted } = await mount('#/file/' + ARCHIVIST, {
       ...stopped, '/teams': ok({ teams: [team('team-2', ADA, 'Crew', [ARCHIVIST])] }),
       '/network': ok({ machines: [machine(LAB, 'Lab', 'lys-runner', [ARCHIVIST])], reports_served: true }),
       ...provisioning(ARCHIVIST, profile()),
@@ -174,12 +174,12 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('says what stops a start before any press: no computer, no folder, no program', async () => {
-    await mount('#/team/' + SCRIBE, { ...stopped, '/network': ok({ machines: [], reports_served: true }) });
+    await mount('#/file/' + SCRIBE, { ...stopped, '/network': ok({ machines: [], reports_served: true }) });
     expect(text()).toContain('No computer is allowed to run Scribe.');
     expect(button('Start')).toBeNull();
-    await mount('#/team/' + SCRIBE, { ...stopped, ...provisioning(SCRIBE, profile({ working_folder: undefined })) });
+    await mount('#/file/' + SCRIBE, { ...stopped, ...provisioning(SCRIBE, profile({ working_folder: undefined })) });
     expect(text()).toContain('Scribe has no folder to work in.');
-    await mount('#/team/' + SCRIBE, { ...stopped, ...provisioning(SCRIBE, null) });
+    await mount('#/file/' + SCRIBE, { ...stopped, ...provisioning(SCRIBE, null) });
     expect(text()).toContain('Scribe has no program chosen yet.');
     await click(button('Choose its program'));
     // Its settings have one home: the Settings tab of its own page.
@@ -189,7 +189,7 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('says the service\'s own reason when it refuses the start, with Try again, and no greyed button', async () => {
-    await mount('#/team/' + SCRIBE, { ...stopped, ['POST /agents/' + SCRIBE + '/start-command']: refused(409, 'SecretsUnavailable', 'the secrets store is closed') });
+    await mount('#/file/' + SCRIBE, { ...stopped, ['POST /agents/' + SCRIBE + '/start-command']: refused(409, 'SecretsUnavailable', 'the secrets store is closed') });
     await click(button('Start'));
     expect(text()).toContain('The secrets store is closed.');
     expect(text()).toContain('SecretsUnavailable');
@@ -198,11 +198,12 @@ describe('An agent\'s run on People and agents', () => {
     expect($('.team-start details')).toBeNull();
   });
 
-  it('sends the old start address to the agent\'s pane on the front page', async () => {
+  it('sends the old start addresses to the agent\'s own page, where Start is', async () => {
     await mount('#/file/' + SCRIBE + '/start', stopped);
-    expect(location.hash).toBe('#/team/' + SCRIBE);
-    expect(text()).toContain('Your agents');
-    expect(text()).toContain('Scribe is not running.');
+    expect(location.hash).toBe('#/file/' + SCRIBE);
+    expect($('section[aria-label="Run"]')?.textContent).toContain('Scribe is not running.');
+    await mount('#/team/' + SCRIBE, stopped);
+    expect(location.hash).toBe('#/file/' + SCRIBE);
   });
 
   it('says so when it cannot read whether the agent is running, and offers no Start it cannot stand behind', async () => {

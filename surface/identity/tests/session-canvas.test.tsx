@@ -21,9 +21,9 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-describe('Agent canvas', () => {
+describe('Running: the list and the canvas', () => {
   it('shows only recorded team and grant connections for returned sessions', async () => {
-    const { posted } = await mount('#/runtime/canvas', routes);
+    const { posted } = await mount('#/canvas', routes);
     expect(text()).toContain('Scribe');
     expect(text()).toContain('Test runner');
     expect(text()).toContain('Delivery');
@@ -35,7 +35,7 @@ describe('Agent canvas', () => {
   });
 
   it('draws the returned message addresses between identities without calling them terminal deliveries', async () => {
-    await mount('#/runtime/canvas', {
+    await mount('#/canvas', {
       ...routes,
       '/runtime/message-edges': ok({ places: ['chat'], messages: [], roots: [], next: null, unmapped: [] }),
       '/runtime/message-edges?stream=chat': ok({ places: [], messages: [{ message: 'message-one', stream: 'chat', source: ADA, recipients: [SCRIBE], addressing: 'direct', at: 1 }], roots: [], next: null, unmapped: [] }),
@@ -47,13 +47,13 @@ describe('Agent canvas', () => {
   });
 
   it('keeps the server refusal on a grant instead of drawing it as authority', async () => {
-    await mount('#/runtime/canvas', { ...routes, '/grants': ok({ grants: GRANTS.map((grant) => grant.holder === SCRIBE ? { ...grant, standing: { stands: false, refusal: 'GrantRevoked', grant: grant.id, reason: 'Its source was revoked' } } : grant), revision: 8 }) });
+    await mount('#/canvas', { ...routes, '/grants': ok({ grants: GRANTS.map((grant) => grant.holder === SCRIBE ? { ...grant, standing: { stands: false, refusal: 'GrantRevoked', grant: grant.id, reason: 'Its source was revoked' } } : grant), revision: 8 }) });
     expect(text()).toContain('GrantRevoked: Its source was revoked');
     expect($('.session-canvas-lines path[data-kind="grant"]')?.getAttribute('data-standing')).toBe('false');
   });
 
   it('keeps sessions and teams visible when reading grants is refused', async () => {
-    await mount('#/runtime/canvas', { ...routes, '/grants': refused(403, 'GrantReadRefused', 'These grants are not visible') });
+    await mount('#/canvas', { ...routes, '/grants': refused(403, 'GrantReadRefused', 'These grants are not visible') });
     expect(text()).toContain('GrantReadRefused: These grants are not visible');
     expect(text()).toContain('Delivery');
     expect(text()).toContain('Test runner');
@@ -61,21 +61,21 @@ describe('Agent canvas', () => {
   });
 
   it('does not use a failed live-session read as an empty graph', async () => {
-    await mount('#/runtime/canvas', { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'Reports could not be read') });
+    await mount('#/canvas', { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'Reports could not be read') });
     expect(text()).toContain('RuntimeUnavailable');
     expect(text()).not.toContain('No running sessions were returned');
     expect($('.session-canvas')).toBeNull();
   });
 
   it('does not label an unanswered runner as currently running', async () => {
-    await mount('#/runtime/canvas', { ...routes, '/runtime/live': ok({ sessions: [running], unanswered: [{ session, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'Socket closed' }] }) });
+    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [running], unanswered: [{ session, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'Socket closed' }] }) });
     expect(text()).toContain('Runner did not answer; current state unknown');
     expect(text()).toContain('runner_unreachable: Socket closed');
   });
 
   it('keeps saying the runner did not answer in the window when its terminal is open', async () => {
     const base = '/runtime/sessions/' + session;
-    await mount('#/runtime/canvas', { ...routes, '/runtime/live': ok({ sessions: [running], unanswered: [{ session, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'Socket closed' }] }),
+    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [running], unanswered: [{ session, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'Socket closed' }] }),
       ['POST ' + base + '/resize']: ok({ receipt: { index: 1 } }),
       ['POST ' + base + '/read-bytes']: refused(503, 'runner_unreachable', 'Socket closed') });
     const one = $('.session-canvas-node.sessions') as HTMLElement;
@@ -87,7 +87,7 @@ describe('Agent canvas', () => {
 
   it('opens the returned session terminal and closing the view never ends its process', async () => {
     const base = '/runtime/sessions/' + session;
-    const { posted } = await mount('#/runtime/canvas', {
+    const { posted } = await mount('#/canvas', {
       ...routes,
       ['POST ' + base + '/resize']: ok({ receipt: { index: 1 } }),
       ['POST ' + base + '/read-bytes']: ok({ session, answer: { kind: 'bytes', output: { session, from: 0, cursor: 0, oldest: 0, data: [], ended: { how: 'exited', at: 1, status: 0, signal: null } } }, receipt: { index: 2 } }),
@@ -114,7 +114,7 @@ describe('Agent canvas', () => {
   it('opens more than one terminal at once, each in its own window', async () => {
     const other = 'op-' + '8'.repeat(32);
     const bytes = (id: string) => ok({ session: id, answer: { kind: 'bytes', output: { session: id, from: 0, cursor: 0, oldest: 0, data: [], ended: { how: 'exited', at: 1, status: 0, signal: null } } }, receipt: { index: 2 } });
-    await mount('#/runtime/canvas', {
+    await mount('#/canvas', {
       ...routes,
       '/runtime/live': ok({ sessions: [running, { ...running, session: other }], unanswered: [] }),
       ...Object.fromEntries([session, other].flatMap((id) => [['POST /runtime/sessions/' + id + '/resize', ok({ receipt: { index: 1 } })], ['POST /runtime/sessions/' + id + '/read-bytes', bytes(id)]])),
@@ -126,7 +126,7 @@ describe('Agent canvas', () => {
   });
 
   it('moves a window with the arrow keys and keeps where it was put', async () => {
-    await mount('#/runtime/canvas', routes);
+    await mount('#/canvas', routes);
     const one = $('.session-canvas-node.sessions') as HTMLElement;
     const before = parseFloat(one.style.left);
     await act(async () => { one.querySelector('.session-canvas-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
@@ -149,7 +149,7 @@ describe('Agent canvas', () => {
   });
 
   it('drags a window by its bar and drags the surface by its background', async () => {
-    await mount('#/runtime/canvas', routes);
+    await mount('#/canvas', routes);
     const one = $('.session-canvas-node.sessions') as HTMLElement;
     const surface = $('.session-canvas-scroll') as HTMLElement;
     const pointer = (target: Element, type: string, x: number, y: number) => act(async () => { target.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y })); });
@@ -171,7 +171,7 @@ describe('Agent canvas', () => {
   it('still works, and says so, when the browser refuses to keep the arrangement', async () => {
     const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage is full'); });
     try {
-      await mount('#/runtime/canvas', routes);
+      await mount('#/canvas', routes);
       expect(text()).toContain('This browser will not keep the arrangement: storage is full');
       expect($('.session-canvas-node.sessions')).not.toBeNull();
     } finally { set.mockRestore(); }
@@ -179,7 +179,7 @@ describe('Agent canvas', () => {
 
   it('sizes an open terminal from the keyboard and never below the size its bar needs', async () => {
     const base = '/runtime/sessions/' + session;
-    await mount('#/runtime/canvas', { ...routes, ['POST ' + base + '/resize']: ok({ receipt: { index: 1 } }),
+    await mount('#/canvas', { ...routes, ['POST ' + base + '/resize']: ok({ receipt: { index: 1 } }),
       ['POST ' + base + '/read-bytes']: ok({ session, answer: { kind: 'bytes', output: { session, from: 0, cursor: 0, oldest: 0, data: [], ended: { how: 'exited', at: 1, status: 0, signal: null } } }, receipt: { index: 2 } }) });
     const one = $('.session-canvas-node.sessions') as HTMLElement;
     await click(one.querySelector('button'));
@@ -193,7 +193,7 @@ describe('Agent canvas', () => {
   it('keeps the place of a team card whose read was refused this visit', async () => {
     const place = { x: 40, y: 400, w: 220, h: 64 };
     localStorage.setItem('lys.canvas', JSON.stringify({ boxes: { 'team:team-a': place }, open: [], view: { x: 24, y: 24 } }));
-    await mount('#/runtime/canvas', { ...routes, '/teams': refused(503, 'TeamsUnavailable', 'Teams could not be read') });
+    await mount('#/canvas', { ...routes, '/teams': refused(503, 'TeamsUnavailable', 'Teams could not be read') });
     expect(text()).toContain('TeamsUnavailable');
     expect($('[data-node="team:team-a"]')).toBeNull();
     const kept = JSON.parse(localStorage.getItem('lys.canvas') ?? 'null') as { boxes: Record<string, unknown> };
@@ -201,7 +201,7 @@ describe('Agent canvas', () => {
   });
 
   it('says on each window what it is', async () => {
-    await mount('#/runtime/canvas', routes);
+    await mount('#/canvas', routes);
     expect([...document.querySelectorAll('.session-canvas-kind')].map((kind) => kind.textContent).sort()).toEqual(['Agent', 'Resource or recipient', 'Team or sender']);
   });
 

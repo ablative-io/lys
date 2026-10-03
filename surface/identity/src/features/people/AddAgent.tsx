@@ -123,7 +123,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
         agent = await addAgent(registration, me.person.id, keep, me.signed_in);
         sessionStorage.removeItem(key);
       }
-      navigate('/team/' + encodeURIComponent(agent), { replace: true });
+      navigate('/file/' + encodeURIComponent(agent), { replace: true });
     } catch (problem) {
       // The agent is added and only its folder is missing: a definite answer, so the
       // saved request is over and the team screen asks for the folder where Start is.
@@ -133,7 +133,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
         // which agent was added, and the refusal itself is shown below instead.
         try { added = readAddAndRun(runKey, me.person.id)?.registration.agent ?? null; } catch { added = null; }
       }
-      if (added) { sessionStorage.removeItem(runKey); navigate('/team/' + encodeURIComponent(added), { replace: true }); return; }
+      if (added) { sessionStorage.removeItem(runKey); navigate('/file/' + encodeURIComponent(added), { replace: true }); return; }
       setRefusal(problem);
     }
     finally { working.current = false; setSending(false); }

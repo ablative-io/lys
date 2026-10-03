@@ -21,14 +21,14 @@ const routes = {
 };
 
 describe('Front page', () => {
-  it('shows the running agent as a small view that opens its terminal and never resizes the session', async () => {
+  it('shows no terminal and no picture of one: a running agent\'s row links to it on the canvas', async () => {
     localStorage.clear();
     const { posted } = await mount('#/me', routes);
-    const peek = $('.peek') as HTMLAnchorElement | null;
-    expect(peek?.getAttribute('href')).toBe('#/runtime/' + LIVE);
-    expect(peek?.textContent).toContain('Scribe');
-    expect(peek?.textContent).toContain('on Lab');
-    expect($('.peek-screen')?.hasAttribute('inert')).toBe(true);
+    expect($('.peek')).toBeNull();
+    expect($('.terminal')).toBeNull();
+    expect($('.view')).toBeNull();
+    expect($('.you-tree a[data-act="watch"]')?.getAttribute('href')).toBe('#/canvas/' + SCRIBE);
+    expect(text()).not.toContain('Running now');
     expect(posted.filter((call) => call.path.endsWith('/resize'))).toEqual([]);
     expect(unreachable()).toEqual([]);
   });

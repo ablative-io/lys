@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { useParams } from 'react-router';
 import { useLive, useLoad } from '../../api';
+import { RunningList } from './Sessions';
 import type { Load } from '../../api';
 import { Gate } from '../signin/Gate';
 import { Terminal } from './Terminal';
@@ -215,7 +216,7 @@ function Canvas({ graph }: { graph: SessionGraph }) {
           </header>
           {node.session && shown ? <>
             {unanswered ? <p className="why-not session-canvas-unanswered" role="status">{state}</p> : null}
-            <Terminal key={node.session.session} session={node.session.session} agent={node.session.agent} />
+            <Terminal key={node.session.session} session={node.session.session} agent={node.session.agent} machine={node.session.machine_name ?? node.session.machine} />
             <span className="session-canvas-grip" aria-hidden="true" onPointerDown={begin((from) => ({ kind: 'size', id: node.id, from, box }))} />
           </> : null}
         </article>;
@@ -226,10 +227,10 @@ function Canvas({ graph }: { graph: SessionGraph }) {
 
 /** The connections in words, for a reader who does not follow the lines. */
 function Connections({ graph }: { graph: SessionGraph }) {
-  return <details className="canvas-connections"><summary>Connections ({graph.edges.length})</summary>
+  return <section className="canvas-connections" aria-label="Connections"><h4>Connections ({graph.edges.length})</h4>
     <ul>{graph.edges.map((edge) => <li key={edge.id} data-kind={edge.kind}>{graph.nodes.find((node) => node.id === edge.from)?.title} → {graph.nodes.find((node) => node.id === edge.to)?.title}: {edge.label}</li>)}</ul>
     {!graph.edges.length ? <p>No team memberships or grants connecting these sessions were returned.</p> : null}
-  </details>;
+  </section>;
 }
 
 /**
@@ -245,7 +246,7 @@ function Whole({ graph, messages }: { graph: SessionGraph; messages: Load<Messag
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
       {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
-      {read ? <details className="canvas-about"><summary>Message connections</summary><div><MessageConnections value={read} change={setLater} /></div></details> : null}
+      {read ? <section className="canvas-about" aria-label="Message connections"><MessageConnections value={read} change={setLater} /></section> : null}
       <Connections graph={whole} />
     </div>
     <Canvas graph={whole} />
@@ -256,14 +257,17 @@ export function SessionCanvas() {
   const load = useLive(readSessionGraph, 'session-canvas');
   const messages = useLoad(firstMessagePage, 'canvas-message-edges');
   return <div className="page fill session-canvas-page">
-    <div className="head"><h1>Agent canvas</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}
-      <details className="canvas-about"><summary>About this canvas</summary>
-        <p className="sub">Drag a window by its bar, drag its corner to size it, drag the background or use the wheel to move the surface. With a bar focused, arrows move the window and Shift with arrows sizes its terminal; with the surface focused, arrows move the surface. Closing a terminal view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p>
-      </details></div>
-    <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? <Whole graph={graph} messages={messages} /> : <>
-      {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
-      {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
-      <p>No running sessions were returned.</p>
-    </>} />
+    <div className="head"><div><h1>Running</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}
+      <p className="sub">Drag a window by its bar, drag its corner to size it, drag the background or use the wheel to move the surface. With a bar focused, arrows move the window and Shift with arrows sizes its terminal; with the surface focused, arrows move the surface. Closing a terminal view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p></div></div>
+    <div className="canvas-with-list">
+      <RunningList />
+      <div className="canvas-side">
+        <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? <Whole graph={graph} messages={messages} /> : <>
+          {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
+          {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
+          <p>No running sessions were returned.</p>
+        </>} />
+      </div>
+    </div>
   </div>;
 }

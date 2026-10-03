@@ -1,4 +1,4 @@
-/** DIRECTORY-050 R7: the Sessions screen lists every running session, opens one to its live terminal, types a line, sends keys, asks before Stop by naming the agent, and names every refusal. */
+/** DIRECTORY-050 R7: the Running page lists every running session beside the canvas, opens one to its live terminal there, types a line, sends keys, asks before Stop by naming the agent, and names every refusal. */
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { $, $$, click, mount, text } from './harness';
@@ -37,10 +37,10 @@ function readOnce(first: string): Route {
 }
 
 describe('Running sessions', () => {
-  it('switches permitted sessions, disposes the old view, and does not stop either process', async () => {
+  it('lists two permitted sessions, each opening on the canvas, and stops neither process by looking', async () => {
     const second = 'op-' + '6'.repeat(32);
     const secondBase = '/runtime/sessions/' + second;
-    const { posted } = await mount('#/runtime/' + ID, {
+    const { posted } = await mount('#/canvas', {
       ...SERVICE,
       '/runtime/live': ok({ sessions: [running, { ...running, session: second }], unanswered: [] }),
       ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }),
@@ -48,55 +48,53 @@ describe('Running sessions', () => {
       ['POST ' + base + '/read-bytes']: output(0, '', exited),
       ['POST ' + secondBase + '/read-bytes']: ok({ session: second, answer: { kind: 'bytes', output: { session: second, from: 0, cursor: 0, oldest: 0, data: [], ended: exited } }, receipt: { index: 2 } }),
     });
-    await click($('a[href="#/runtime/' + second + '"]'));
-    expect(disposed).toHaveBeenCalledOnce();
-    expect($('a[aria-current="page"]')?.getAttribute('href')).toBe('#/runtime/' + second);
-    expect(posted.some((entry) => entry.path === secondBase + '/read-bytes')).toBe(true);
+    expect($$('.running-list tbody tr[data-href="#/canvas/' + SCRIBE + '"]')).toHaveLength(2);
     expect(posted.some((entry) => entry.path.endsWith('/end'))).toBe(false);
   });
 
   it('never opens a terminal that was not returned in the permitted session list', async () => {
-    const { posted } = await mount('#/runtime/not-returned', { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
-    expect(text()).toContain('Session not returned');
+    const { posted } = await mount('#/canvas/agent-' + 'e'.repeat(32), { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
+    expect($('.terminal')).toBeNull();
+    expect($('.running-list a[aria-current="page"]')).toBeNull();
     expect(posted.some((entry) => entry.path.includes('/runtime/sessions/'))).toBe(false);
   });
 
   it('lists every running session the runners answered', async () => {
-    const { requests } = await mount('#/runtime', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
+    const { requests } = await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
     expect(requests).toContain('/runtime/live');
     expect(text()).toContain('Dean laptop');
     expect(text()).toContain('Running');
-    expect($('a[href="#/runtime/' + ID + '"]')).not.toBeNull();
+    expect($('.running-list a[href="#/canvas/' + SCRIBE + '"]')?.textContent).toBe('Scribe');
+    expect($('.running-list')?.textContent).toContain('Dean laptop');
   });
 
   it('refuses a stopped session listed as running, by name', async () => {
-    await mount('#/runtime', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [{ ...running, shown: 'stopped' }], unanswered: [] }) });
+    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [{ ...running, shown: 'stopped' }], unanswered: [] }) });
     expect(text()).toContain('listed a stopped session as running');
   });
 
   it('names each session whose runner did not answer, and never shows it as running', async () => {
     const unanswered = [{ session: ID, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'runner_unreachable: the socket is gone' }];
-    await mount('#/runtime', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered }) });
-    expect(text()).toContain('Runners that did not answer');
+    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered }) });
     expect(text()).toContain('runner_unreachable');
     expect(text()).toContain('Its runner did not answer; last reported running');
-    expect($$('.runner-list td').some((cell) => cell.textContent?.startsWith('Running'))).toBe(false);
+    expect($$('.running-list td').some((cell) => cell.textContent?.startsWith('Running'))).toBe(false);
   });
 
   it('refuses a list that does not say which runners answered, by name', async () => {
-    await mount('#/runtime', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running] }) });
+    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running] }) });
     expect(text()).toContain('did not say which runners did not answer');
   });
 
   it('names an unavailable runtime', async () => {
-    await mount('#/runtime', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': refused(503, 'RuntimeUnavailable', 'No reports store') });
+    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': refused(503, 'RuntimeUnavailable', 'No reports store') });
     expect(text()).toContain('RuntimeUnavailable');
     expect(text()).not.toContain('No running session was returned');
   });
 
   it('opens a session to its live output, read on from the cursor until it ends', async () => {
     const live = reads('$ echo hi\r\n\u001b[32mhi\u001b[0m\r\n');
-    await mount('#/runtime/' + ID, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: live.route });
+    await mount('#/canvas/' + SCRIBE, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: live.route });
     expect($('[role="alert"]')?.textContent ?? '').toBe('');
     expect(live.asked[0]).toEqual({ cursor: null, follow: true });
     expect(live.asked[1]).toEqual({ cursor: '$ echo hi\r\n\u001b[32mhi\u001b[0m\r\n'.length, follow: true });
@@ -108,7 +106,7 @@ describe('Running sessions', () => {
   it('shows the session in a browser without WebGPU and says what draws it instead', async () => {
     browser.webgpu = false;
     const live = reads('$ echo hi\r\n');
-    await mount('#/runtime/' + ID, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: live.route });
+    await mount('#/canvas/' + SCRIBE, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: live.route });
     expect($('[role="alert"]')?.textContent ?? '').toBe('');
     expect(written.map((bytes) => new TextDecoder().decode(bytes)).join('')).toBe('$ echo hi\r\n');
     expect($('.terminal-screen')?.getAttribute('data-renderer')).toBe('webgl2');
@@ -116,7 +114,7 @@ describe('Running sessions', () => {
   });
 
   it('says nothing of the renderer on WebGPU, and names the one it falls back to', async () => {
-    await mount('#/runtime/' + ID, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: reads('$ ').route });
+    await mount('#/canvas/' + SCRIBE, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: reads('$ ').route });
     expect($('.terminal-screen')?.getAttribute('data-renderer')).toBe('webgpu');
     expect($('.terminal-renderer')).toBeNull();
     const changed = listeners.get('renderer');
@@ -127,7 +125,7 @@ describe('Running sessions', () => {
   });
 
   it('shows the terminal alone: no line to type into and no key buttons, since the screen takes typing itself', async () => {
-    const { posted } = await mount('#/runtime/' + ID, {
+    const { posted } = await mount('#/canvas/' + SCRIBE, {
       ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }),
       ['POST ' + base + '/read-bytes']: readOnce('$ '),
     });
@@ -142,7 +140,7 @@ describe('Running sessions', () => {
   });
 
   it('asks before Stop by naming the agent, then ends the session', async () => {
-    const { posted } = await mount('#/runtime/' + ID, {
+    const { posted } = await mount('#/canvas/' + SCRIBE, {
       ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }),
       ['POST ' + base + '/read-bytes']: readOnce('$ '),
       ['POST ' + base + '/end']: ok({ session: ID, answer: { kind: 'ended', session: ID, ended: { ...exited, status: null, signal: 'Killed: 9' } }, receipt: { index: 4 } }),

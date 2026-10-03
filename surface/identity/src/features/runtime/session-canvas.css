@@ -53,3 +53,11 @@
 /* A runner that did not answer: the window says so under its bar, and the terminal does not say Running over it. */
 .session-canvas-unanswered { flex: none; margin: 0; padding: 4px 12px; font-size: 12px; }
 .session-canvas-node.unanswered .terminal-state[data-ended="false"] { display: none; }
+
+/* The page: what is running down the left, the canvas taking the rest. Each scrolls on its own; the page does not. */
+.canvas-with-list { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(280px, 26%) minmax(0, 1fr); gap: 16px; }
+.canvas-with-list .running-list { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.canvas-with-list .running-list .listing { flex: 1; min-height: 0; }
+.canvas-side { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.canvas-connections, .canvas-about { max-height: 120px; overflow: auto; overscroll-behavior: contain; }
+.canvas-connections h4 { margin: 0 0 4px; }

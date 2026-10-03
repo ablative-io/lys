@@ -115,7 +115,7 @@ describe('Add-agent reporting and permissions', () => {
     expect(posted[2].body).toMatchObject({ route: 'browser', source: source.id, recipient: COURIER, responsible: ADA, resource: source.resource, relation: 'only.edit', pass_on: { kind: 'use_only' } });
     expect((posted[2].body as { window: { ends_at: number } }).window.ends_at).toBe(source.effective_ends_at);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(location.hash).toBe('#/team/' + COURIER);
+    expect(location.hash).toBe('#/file/' + COURIER);
   });
   it('keeps and replays the exact delegation after an unknown outcome and remount', async () => {
     const extra = { 'POST /grants': refused(503, 'StorageUncertain', 'The outcome is unknown') };

@@ -9,7 +9,7 @@ import type { GrantWorld } from '../grants/model';
 import { keyable } from '../../shell/keyable';
 import { pref, setPref } from '../../shell/prefs';
 import { useShell } from '../../shell/ShellContext';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Start } from '../team/Start';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { Stop } from '../team/AgentRun';
@@ -21,7 +21,6 @@ import type { Entry } from '../people/directory';
 import { buildTree } from '../people/tree';
 import type { Branch, Node } from '../people/tree';
 import type { AccessRequest } from '../requests/contract';
-import { Peek } from '../runtime/Peek';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { SessionList } from '../sessions/Sessions';
 import type { Team } from '../teams/contract';
@@ -115,9 +114,8 @@ function RowStart({ entry, ask }: { entry: Entry; ask: (next: Asked) => void }) 
     : <button type="button" className="you-watch you-start" data-act="start" onClick={(event) => { event.stopPropagation(); ask({ agent: entry.id, what: 'start', pressed: true }); }}>Start</button>;
 }
 
-function AgentRows({ branches, level, sessions, held, folded, fold, open, watching, toggleWatch, me, asked, ask, changed }: {
+function AgentRows({ branches, level, sessions, held, folded, fold, open, me, asked, ask, changed }: {
   branches: Branch[]; level: number; sessions: RuntimeSession[]; held: (id: string) => string; folded: Set<string>; fold: (team: string) => void; open: (id: string) => void;
-  watching: (session: string) => boolean; toggleWatch: (session: RuntimeSession, name: string) => void;
   me: string; asked: Asked | null; ask: (next: Asked | null) => void; changed: () => void;
 }) {
   return <>{branches.map((branch, index) => {
@@ -140,7 +138,7 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
             <td className="sec you-where">{session ? 'on ' + (session.machine_name ?? session.machine) : member.entry.state === 'active' ? 'not running' : member.entry.state}</td>
             <td className="sec you-holds" title={held(member.entry.id) || 'no access'}>{holdsWord(held(member.entry.id))}</td>
             <td className="you-act">{session ? <Fragment>
-              <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={(event) => { event.stopPropagation(); toggleWatch(session, member.entry.display_name); }}>{watching(session.session) ? 'Watching' : 'Watch'}</button>
+              <a className="you-watch" data-act="watch" href={'#/canvas/' + encodeURIComponent(member.entry.id)} onClick={(event) => event.stopPropagation()}>Watch</a>
               <button type="button" className="you-watch" data-act="stop" onClick={(event) => { event.stopPropagation(); ask({ agent: member.entry.id, what: 'stop', pressed: true }); }}>Stop</button>
             </Fragment> : asked?.agent === member.entry.id && asked.what !== 'stop' ? null : <RowStart entry={member.entry} ask={ask} />}</td>
           </tr>
@@ -152,7 +150,7 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
               ? <p role="status" className="team-start-line">{member.entry.display_name} has started. Reading where it is running…</p>
               : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '')} entry={member.entry} me={me} pressed={asked.pressed} changed={() => { ask({ agent: member.entry.id, what: 'started', pressed: false }); changed(); }} close={() => ask(null)} />}
           </td></tr> : null}
-          <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} watching={watching} toggleWatch={toggleWatch} me={me} asked={asked} ask={ask} changed={changed} />
+          <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} me={me} asked={asked} ask={ask} changed={changed} />
         </FragmentRows>;
       })}
     </FragmentRows>;
@@ -232,11 +230,8 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
 }
 
 function Agents({ data, reload }: { data: ActiveData; reload: () => void }) {
-  const shell = useShell();
   const navigate = useNavigate();
-  // An address that names an agent opens its Start under its row, waiting for the press.
-  const named = useParams().agent;
-  const [asked, setAsked] = useState<Asked | null>(named ? { agent: named, what: 'start', pressed: false } : null);
+  const [asked, setAsked] = useState<Asked | null>(null);
   // A started row waits only for the next read of the page. When that read arrives the row says what is so: Watch and Stop if it runs, Start again if it does not.
   useEffect(() => { setAsked((held) => held?.what === 'started' ? null : held); }, [data]);
   const { agents, tree, sessions, w } = data;
@@ -249,14 +244,6 @@ function Agents({ data, reload }: { data: ActiveData; reload: () => void }) {
     setPref(FOLDED, [...next].join(','));
     setFolded(next);
   };
-  const byId = new Map<string, Entry>();
-  const walk = (node: Node) => { byId.set(node.entry.id, node.entry); node.branches.forEach((branch) => branch.members.forEach(walk)); };
-  walk(tree);
-  const running = sessions.filter((session) => session.shown !== 'stopped' && session.agent && byId.has(session.agent));
-  const watching = (session: string) => shell.watched.some((entry) => entry.session === session);
-  const toggleWatch = (session: RuntimeSession, name: string) => watching(session.session)
-    ? shell.unwatch(session.session)
-    : shell.watch({ session: session.session, agent: session.agent, name, machine: session.machine_name ?? session.machine });
   return <div className="you-body">
     <div className="you-panel">
       <div className="section-h">
@@ -266,25 +253,10 @@ function Agents({ data, reload }: { data: ActiveData; reload: () => void }) {
         <table className="you-tree">
           <tbody>
             {agents.length
-              ? <AgentRows branches={tree.branches} level={0} sessions={sessions} held={held} folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} watching={watching} toggleWatch={toggleWatch} me={data.me.person.id} asked={asked} ask={setAsked} changed={reload} />
+              ? <AgentRows branches={tree.branches} level={0} sessions={sessions} held={held} folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} me={data.me.person.id} asked={asked} ask={setAsked} changed={reload} />
               : <tr><td className="dim">None.</td></tr>}
           </tbody>
         </table>
-      </div>
-    </div>
-    <div className="you-panel">
-      <div className="section-h"><span>Running now</span><a href="#/runtime">Open the terminals</a></div>
-      <div className="you-scroll">
-        {running.length
-          ? <div className="you-grid" aria-label="Running agents">{running.map((session) => {
-            const name = byId.get(session.agent!)?.display_name ?? session.agent!;
-            const machine = session.machine_name ?? session.machine;
-            return <div className="you-peek" key={session.session}>
-              <Peek session={session.session} name={name} machine={machine} />
-              <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={() => toggleWatch(session, name)}>{watching(session.session) ? 'Watching' : 'Watch'}</button>
-            </div>;
-          })}</div>
-          : <p className="note you-quiet">Nothing running.</p>}
       </div>
     </div>
   </div>;

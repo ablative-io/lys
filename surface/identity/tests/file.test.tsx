@@ -17,13 +17,11 @@ describe("An agent's file", () => {
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Settings', 'Access1', 'Limits and goals', 'Sessions', 'Credentials', 'Record2']);
   });
 
-  it('explains three next steps, keeps lifecycle controls in the head, in view, and preserves Emergency stop', async () => {
+  it('starts from its own Overview, keeps lifecycle controls in the head, in view, and preserves Emergency stop', async () => {
     await mount('#/file/' + SCRIBE);
-    const next = $$('nav[aria-label="Next steps"] a');
-    expect(next.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Start', 'Set limits', 'Give access']);
-    expect(next.map((entry) => entry.getAttribute('href'))).toEqual(['#/team/' + SCRIBE, '#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']);
-    expect(next.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
-    expect($('.agent-next a[data-act="start"]')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
+    expect($('nav[aria-label="Next steps"]')).toBeNull();
+    expect($('section[aria-label="Run"]')?.textContent).toContain('Scribe is not running.');
+    expect($('a[href^="#/team"]')).toBeNull();
     expect($('.file .head [data-act="suspend"]')).not.toBeNull();
     expect($('.file .head button[data-act="stop"]')).not.toBeNull();
     expect($$('.file [data-act="stop"]').length).toBe(1);
