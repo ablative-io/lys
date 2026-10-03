@@ -126,16 +126,16 @@ pub(super) fn install(
     if let Some(timing) = &mut ready.record.capture {
         timing.block_syncs = blocks.syncs();
     }
-    // Durable is measured only when every body the call has was placed. A
-    // call the store refused a body of is unrecorded and claims no duration.
-    if let Some(timing) = &mut ready.record.capture {
-        if ready.record.status == CallStatus::Unrecorded {
-            timing.durable = DurableTime::NotPlaced;
-        } else if let Some(arrived) = job.last_arrival {
-            timing.durable = DurableTime::Measured(
-                u64::try_from(arrived.elapsed().as_nanos()).unwrap_or(u64::MAX),
-            );
-        }
+    // Durable is measured only when every body the call has was placed; a
+    // body the store refused by rename and by copy set NotPlaced above, and
+    // that stands. A call unrecorded for its shape (an error body, no model)
+    // with both bodies in the store still measures.
+    if let Some(arrived) = job.last_arrival
+        && let Some(timing) = &mut ready.record.capture
+        && timing.durable != DurableTime::NotPlaced
+    {
+        timing.durable =
+            DurableTime::Measured(u64::try_from(arrived.elapsed().as_nanos()).unwrap_or(u64::MAX));
     }
     Ok(())
 }
@@ -183,6 +183,8 @@ fn place_body(
                     }
                     if let Some(timing) = &mut ready.record.capture {
                         timing.refusals.push(copy.to_string());
+                        // The store never took this body: no durability is claimed.
+                        timing.durable = DurableTime::NotPlaced;
                     }
                     false
                 }
