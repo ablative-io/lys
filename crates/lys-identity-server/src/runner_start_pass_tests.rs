@@ -21,6 +21,7 @@ fn launch(configured: bool) -> Launch {
             argument_files: BTreeMap::new(),
             environment_paths: BTreeMap::new(),
             working_directory: false,
+            harness: None,
         }),
         columns: 120,
         rows: 30,

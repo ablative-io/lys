@@ -68,3 +68,21 @@ fn a_file_that_is_not_an_object_is_refused_by_name_and_left_as_it_is() -> TestRe
     assert_eq!(std::fs::read(home.join(FILE))?, b"[1, 2]");
     Ok(())
 }
+
+#[test]
+fn the_configuration_home_is_the_launch_claude_config_dir_else_the_login_home() -> TestResult {
+    use crate::trust::config_home;
+    use std::collections::BTreeMap;
+    let chosen = BTreeMap::from([("CLAUDE_CONFIG_DIR".to_owned(), "/chosen/config".to_owned())]);
+    assert_eq!(
+        config_home(&chosen)?,
+        std::path::PathBuf::from("/chosen/config")
+    );
+    let relative = BTreeMap::from([("CLAUDE_CONFIG_DIR".to_owned(), "chosen/config".to_owned())]);
+    let err = config_home(&relative).unwrap_err();
+    assert_eq!(err.name(), "trust_home_unknown", "{err}");
+    // With none chosen the harness reads the login's home, the runner's own.
+    let login = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    assert_eq!(config_home(&BTreeMap::new()).ok(), login);
+    Ok(())
+}

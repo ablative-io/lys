@@ -77,6 +77,11 @@ pub(crate) fn build(
             argument_files: native.argument_files,
             environment_paths: native.environment_paths,
             working_directory: false,
+            harness: version
+                .settings
+                .harness
+                .as_ref()
+                .and_then(crate::launch_template::runner_harness),
         }),
         columns: crate::runner_sessions::COLUMNS,
         rows: crate::runner_sessions::ROWS,

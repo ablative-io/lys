@@ -27,6 +27,12 @@ pub struct Config {
     pub environment_paths: BTreeMap<String, String>,
     /// Whether the process starts in the config directory.
     pub working_directory: bool,
+    /// The harness the files are for, when the profile declares one. A Claude
+    /// Code run's folder is recorded as trusted in the harness's own
+    /// per-project configuration before the spawn, so no run sits at a
+    /// trust prompt nobody sees.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness: Option<crate::tracking::Harness>,
 }
 
 /// Argument positions as the wire carries them: JSON object keys are strings,

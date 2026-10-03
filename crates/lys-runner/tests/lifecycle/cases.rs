@@ -241,23 +241,25 @@ fn a_claude_code_launch_records_its_folder_as_trusted_before_the_spawn_and_only_
     )?;
     std::fs::set_permissions(&harness, std::fs::Permissions::from_mode(0o755))?;
     let trust_file = home.join(crate::trust::FILE);
-    let tracking = Tracking {
-        harness: Harness::ClaudeCode,
-        adapter: CLAUDE_ADAPTER.to_owned(),
-        version: "2.1.285".to_owned(),
-        config_home: home.display().to_string(),
-        context_window: 200_000,
-        profile_version: 1,
-        account: None,
-        requires_pre_tool: false,
+    // As the server starts a run: no tracking, the harness named on the
+    // launch's config, and the configuration directory the profile chose.
+    let config = crate::launch_config::Config {
+        files: Vec::new(),
+        argument_files: BTreeMap::new(),
+        environment_paths: BTreeMap::new(),
+        working_directory: false,
+        harness: Some(Harness::ClaudeCode),
     };
     let launch = |session: &str| Launch {
         session: session.to_owned(),
         program: harness.display().to_string(),
         arguments: Vec::new(),
         directory: work.display().to_string(),
-        environment: BTreeMap::from([("TRUST".to_owned(), trust_file.display().to_string())]),
-        config: None,
+        environment: BTreeMap::from([
+            ("TRUST".to_owned(), trust_file.display().to_string()),
+            ("CLAUDE_CONFIG_DIR".to_owned(), home.display().to_string()),
+        ]),
+        config: Some(config.clone()),
         columns: 80,
         rows: 24,
         rotation: None,
@@ -275,7 +277,7 @@ fn a_claude_code_launch_records_its_folder_as_trusted_before_the_spawn_and_only_
         !trust_file.exists(),
         "nothing is trusted before the first launch"
     );
-    sessions.begin(launch("first"), None, Some(tracking.clone()))?;
+    sessions.begin(launch("first"), None, None)?;
     let output = sessions.until("first", &AtomicBool::new(false), ready)?;
     let bytes = std::fs::read(&trust_file)?;
     let root: serde_json::Value = serde_json::from_slice(&bytes)?;
@@ -290,7 +292,7 @@ fn a_claude_code_launch_records_its_folder_as_trusted_before_the_spawn_and_only_
         printed.contains(crate::trust::ROW) && printed.contains(&canonical),
         "the harness read the row at its start: {printed}"
     );
-    sessions.begin(launch("second"), None, Some(tracking))?;
+    sessions.begin(launch("second"), None, None)?;
     sessions.until("second", &AtomicBool::new(false), ready)?;
     assert_eq!(
         std::fs::read(&trust_file)?,

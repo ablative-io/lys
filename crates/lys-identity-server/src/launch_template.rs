@@ -202,3 +202,15 @@ pub fn command(
         .collect::<Vec<_>>()
         .join(" ")
 }
+
+/// The runner's name for `declared`, by its rendering contract: the harness
+/// whose per-project configuration the runner answers the trust prompt in.
+pub(crate) fn runner_harness(
+    declared: &lys_home::harness::launch_fields::DeclaredHarness,
+) -> Option<lys_runner::tracking::Harness> {
+    match declared.description.rendering_contract.as_str() {
+        "claude-code/template-v1" => Some(lys_runner::tracking::Harness::ClaudeCode),
+        "codex/template-v1" => Some(lys_runner::tracking::Harness::Codex),
+        _ => None,
+    }
+}

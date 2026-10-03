@@ -507,17 +507,22 @@ impl Sessions {
             .as_ref()
             .map(|tracking| lifecycle::launched(&launch, tracking))
             .transpose()?;
+        let harness = launch.config.as_ref().and_then(|config| config.harness);
         crate::launch_config::prepare(&self.state_dir, &mut launch)?;
         let id = launch.session.clone();
         let cwd = lifecycle::bound_directory(&launch.directory);
         // Naming the folder is the trust answer: a Claude Code run's folder
-        // is recorded as trusted in the harness's own configuration before
-        // anything is spawned, so no run sits at a prompt nobody sees.
-        let trusted = tracking
-            .as_ref()
-            .filter(|tracking| tracking.harness == crate::tracking::Harness::ClaudeCode)
-            .map(|tracking| crate::trust::record(std::path::Path::new(&tracking.config_home), &cwd))
-            .transpose()?;
+        // is recorded as trusted in the configuration the harness reads for
+        // this run, before anything is spawned, so no run sits at a prompt
+        // nobody sees. The environment is read after prepare, which binds
+        // the variables the profile points at its config files.
+        let trusted = match harness {
+            Some(crate::tracking::Harness::ClaudeCode) => Some(crate::trust::record(
+                &crate::trust::config_home(&launch.environment)?,
+                &cwd,
+            )?),
+            Some(crate::tracking::Harness::Codex) | None => None,
+        };
         let mut session = Session {
             started_at: now_ms(),
             pid: None,

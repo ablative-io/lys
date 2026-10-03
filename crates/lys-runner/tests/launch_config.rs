@@ -39,6 +39,7 @@ fn launch() -> Launch {
                 "settings.json".to_owned(),
             )]),
             working_directory: true,
+            harness: None,
         }),
     }
 }
@@ -333,6 +334,7 @@ fn mcp_launch(codex: bool) -> Launch {
         argument_files: BTreeMap::new(),
         environment_paths: BTreeMap::new(),
         working_directory: true,
+        harness: None,
     });
     launch
 }

@@ -7,15 +7,48 @@
 //! harness's configuration home: one row for that path, nothing else in the
 //! file touched, the whole file written to a sibling and renamed over it so
 //! the harness's own writes are never torn. A row already there leaves the
-//! file byte for byte as it was. The login's own home is never the file: the
-//! configuration home is the one the tracking declares for this run.
+//! file byte for byte as it was.
+//!
+//! The file is the one the harness reads for this run: under
+//! `CLAUDE_CONFIG_DIR` when the launch's environment sets it, else under the
+//! login's home, which the harness inherits from the runner. A Lys-started
+//! seat uses the machine's own Claude Code setup unless the person chose a
+//! configuration directory, so for most runs this is the login's
+//! `~/.claude.json`, and this one row is the only write Lys makes there.
 
+use std::collections::BTreeMap;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
 
 use crate::error::RunnerError;
+
+/// The configuration home the harness reads for a run with `environment`:
+/// `CLAUDE_CONFIG_DIR` when set there, else the runner's own `HOME`, which
+/// the harness inherits. Either must be absolute; neither is invented.
+pub fn config_home(environment: &BTreeMap<String, String>) -> Result<PathBuf, RunnerError> {
+    let unknown = |words: String| RunnerError::refused("trust_home_unknown", words);
+    let (name, home) = match environment.get("CLAUDE_CONFIG_DIR") {
+        Some(dir) => ("CLAUDE_CONFIG_DIR", PathBuf::from(dir)),
+        None => (
+            "HOME",
+            std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| {
+                unknown(
+                    "the launch sets no CLAUDE_CONFIG_DIR and the runner has no HOME to find the harness's configuration in"
+                        .to_owned(),
+                )
+            })?,
+        ),
+    };
+    if !home.is_absolute() {
+        return Err(unknown(format!(
+            "{name} is {}, not an absolute path",
+            home.display()
+        )));
+    }
+    Ok(home)
+}
 
 /// The harness's per-project configuration file, under its configuration
 /// home.
