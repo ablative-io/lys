@@ -114,7 +114,7 @@ pub(super) fn install(
         let Some(text) = text else { continue };
         let hash = Hash::parse(&text)?;
         if let Some(path) = path {
-            place_body(blocks, path, &hash, ready, request);
+            place_body(blocks, path, &hash, ready, request)?;
         } else if !blocks.contains(&hash) {
             return Err(ProxyError::io(
                 "recovering a prepared body",
@@ -153,7 +153,7 @@ fn place_body(
     hash: &Hash,
     ready: &mut PreparedCall,
     request: bool,
-) {
+) -> Result<(), ProxyError> {
     let (placement, kept, refusal) = match blocks.admit_spool(path, hash) {
         Ok(put) => {
             ready.raw_blocks += u64::from(put.new);
@@ -165,6 +165,7 @@ fn place_body(
             let copied = match blocks.put_file(path) {
                 Ok(put) => {
                     ready.raw_blocks += u64::from(put.new);
+                    crate::record::blocks::sync_dir(blocks.root())?;
                     true
                 }
                 Err(copy) => {
@@ -183,7 +184,12 @@ fn place_body(
             };
             let kept = if copied {
                 match std::fs::remove_file(path) {
-                    Ok(()) => false,
+                    Ok(()) => {
+                        if let Some(parent) = path.parent() {
+                            crate::record::blocks::sync_dir(parent)?;
+                        }
+                        false
+                    }
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
                     Err(error) => {
                         eprintln!("lys-proxy: spool_kept: {}: {error}", path.display());
@@ -208,4 +214,5 @@ fn place_body(
             timing.refusals.push(reason);
         }
     }
+    Ok(())
 }
