@@ -71,6 +71,12 @@ unit.
   had its own config folder, apart from Tom's: the 08:09 run's folder holds Claude Code's own state and no
   later run's does. The code's comment names Tom's ruling. (V7: seen; the earlier code is history not yet
   read, open)
+- A run inherits the whole environment of the Lys runner on that computer, not only the names Lys adds.
+  What the runner's environment holds on Tom's Mac has not been read. (V16, reopened, open)
+- Before every Claude Code start, Lys records the run's folder as trusted in the person's own Claude Code
+  file, so a folder chosen on the screen becomes one Claude Code trusts in the person's own sessions too.
+  (V21: code only, by Tom's ruling of 3 October; the file was not opened)
+- The agent's policy is handed to the runner on one of Lys's two start paths only. (V22, code only, open)
 
 **For Codex.**
 - No Codex agent has ever been started by the installed Lys, so every row about a Lys Codex run is open
