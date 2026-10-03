@@ -2,14 +2,15 @@
  * What the form says under a mode. The mode is shown by its real name with
  * the catalogue's words for it, and under that only what the fact tables
  * support about what Lys does and does not do (docs/design/home/PERMISSIONS-SCREEN.md,
- * proposal 1). Nothing here says a rule is enforced: no run has been watched
+ * proposal 1, and for Claude Code the clean start's own rows). Nothing here says a rule is enforced: no run has been watched
  * being refused. A program the tables do not cover gets the mode and no claim.
  */
 import type { Program } from './choices';
 
 /** The sentences for one program and mode; none for a program the tables do not cover. */
 export function lysDoes(program: string, mode: string): string[] {
-  if (program === 'Claude Code') return ['This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.'];
+  // The clean start: docs/harness/reference/claude-code/CLEAN-START.md rows 1 to 4 (seen on 2.1.288), and rows 8 and 9 for what is not switched off.
+  if (program === 'Claude Code') return ['Lys starts Claude Code without this computer’s own settings, plugins, hooks and connected tools.', 'Instruction files (CLAUDE.md) and Claude Code’s own memory on this computer may still be read. Lys does not check each action.'];
   if (program === 'Codex') return mode
     ? ['Lys sets where its commands may write and whether they may use the network, while they stay in the sandbox. It can read every file this login can read.', 'Web search and leaving the sandbox are decided by this computer’s own Codex settings.']
     : ['Lys has set nothing; this computer’s own Codex settings decide.'];

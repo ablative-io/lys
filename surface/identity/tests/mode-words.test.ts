@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { lysDoes } from '../src/features/provisioning/ModeWords';
 
 describe('What Lys says under a mode', () => {
-  it('says of Claude Code that the computer’s own settings apply and Lys checks no action', () => {
-    expect(lysDoes('Claude Code', 'default')).toEqual(['This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.']);
+  it('says of Claude Code that it starts without the computer’s own setup, what may still be read, and that Lys checks no action', () => {
+    expect(lysDoes('Claude Code', 'default')).toEqual(['Lys starts Claude Code without this computer’s own settings, plugins, hooks and connected tools.', 'Instruction files (CLAUDE.md) and Claude Code’s own memory on this computer may still be read. Lys does not check each action.']);
   });
   it('says of Codex with no mode that Lys has set nothing', () => {
     expect(lysDoes('Codex', '')).toEqual(['Lys has set nothing; this computer’s own Codex settings decide.']);

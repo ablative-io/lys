@@ -15,7 +15,7 @@ describe('Claude first run', () => {
     expect(html).toContain('Kept to its folder');
     expect(html).toContain('Workspace only');
     expect(html).not.toContain('<select name="mode"');
-    expect(html).toContain('This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.');
+    expect(html).toContain('Lys starts Claude Code without this computer’s own settings, plugins, hooks and connected tools.');
     expect(html).not.toContain('Works in its own folder');
   });
 });

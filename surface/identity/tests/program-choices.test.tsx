@@ -28,7 +28,7 @@ describe('A listed program', () => {
     expect(modes.filter((entry) => entry.checked).map((entry) => entry.value)).toEqual(['default']);
     expect(document.querySelector('.permissions')?.textContent).toContain('Asks before it acts');
     expect(document.querySelector('.permissions')?.textContent).toContain('Reads freely and asks before most changes and commands.');
-    expect(document.querySelector('.mode-words')?.textContent).toBe('This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.');
+    expect(document.querySelector('.mode-words')?.textContent).toBe('Lys starts Claude Code without this computer’s own settings, plugins, hooks and connected tools.Instruction files (CLAUDE.md) and Claude Code’s own memory on this computer may still be read. Lys does not check each action.');
   });
   it('keeps the prompt textbox optional and behind a choice', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);
