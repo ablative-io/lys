@@ -65,11 +65,11 @@ export function GrantRows({ listing }: { listing: SecretGrantListing }) {
 
 /* Audit */
 
-export function SecretAudit({ read }: { read: () => Promise<SecretAuditLog> }) {
+export function SecretAudit({ read, check }: { read: () => Promise<SecretAuditLog>; check: (handle: string) => Promise<RevocationAnswer> }) {
   const load = useLoad(read, 'secret-audit');
   return <div className="secrets-view">
-    <Head sub="The broker's checked record of the secrets you can see, newest first." />
-    <Gate load={load} title="Secret audit" ok={(log) => <AuditRows log={log} />} />
+    <Head sub="The broker's checked record of the secrets you can see, newest first. A line that names a handle can be asked whether use has stopped here and whether the provider has withdrawn its access too." />
+    <Gate load={load} title="Secret audit" ok={(log) => <AuditRows log={log} check={check} />} />
   </div>;
 }
 
@@ -87,14 +87,15 @@ const KIND_WORDS: Record<SecretAuditKind, string> = {
 };
 
 /** The log's lines by index, highest first: the broker numbers lines in the order it wrote them. */
-export function AuditRows({ log }: { log: SecretAuditLog }) {
+export function AuditRows({ log, check }: { log: SecretAuditLog; check?: (handle: string) => Promise<RevocationAnswer> }) {
   if (!log.lines.length) return <p className="note">Nothing is recorded yet on the secrets you can see.</p>;
   const lines = [...log.lines].sort((a, b) => b.index - a.index);
-  return <table><thead><tr><th>#</th><th>When</th><th>What</th><th>Secret</th><th>For</th><th>Handle id</th><th>Uses so far</th><th>Outcome</th></tr></thead>
+  return <table><thead><tr><th>#</th><th>When</th><th>What</th><th>Secret</th><th>For</th><th>Handle id</th><th>Uses so far</th><th>Outcome</th>{check ? <th>Revocation</th> : null}</tr></thead>
     <tbody>{lines.map((line) => <tr key={line.index}>
       <td>{line.index}</td><td>{clock(Math.floor(line.at_ms / 1000))}</td><td>{KIND_WORDS[line.kind] ?? line.kind}</td>
       <td>{line.secret ?? ''}</td><td>{line.identity ?? ''}</td><td>{line.handle ?? ''}</td>
       <td>{line.uses === null ? '' : line.uses}</td><td>{line.outcome}</td>
+      {check ? <td>{line.handle ? <RevocationCheck handle={line.handle} check={check} /> : null}</td> : null}
     </tr>)}</tbody>
   </table>;
 }
@@ -107,32 +108,26 @@ export type RevocationOutcome =
   | { at: 'answered'; answer: RevocationAnswer }
   | { at: 'refused'; refused: Refused };
 
-export function RevocationLookup({ check }: { check: (handle: string) => Promise<RevocationAnswer> }) {
-  const [handle, setHandle] = useState('');
+/** Where one handle's revocation stands, asked from the audit line that names it. */
+export function RevocationCheck({ handle, check }: { handle: string; check: (handle: string) => Promise<RevocationAnswer> }) {
   const [outcome, setOutcome] = useState<RevocationOutcome>({ at: 'idle' });
   const asking = useRef(false);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const id = handle.trim();
-    if (!id || asking.current) return;
+  const ask = async () => {
+    if (asking.current) return;
     asking.current = true;
     setOutcome({ at: 'checking' });
     try {
-      setOutcome({ at: 'answered', answer: await check(id) });
+      setOutcome({ at: 'answered', answer: await check(handle) });
     } catch (error) {
       setOutcome({ at: 'refused', refused: refusedOf(error) });
     } finally {
       asking.current = false;
     }
   };
-  return <div className="secrets-view">
-    <Head sub="Whether use has stopped here, and whether the provider has been asked to withdraw its access too." />
-    <form onSubmit={submit}>
-      <label className="field">Handle id<input value={handle} onChange={(event) => setHandle(event.target.value)} placeholder="The id from the audit record" /></label>
-      <button className="btn primary" type="submit" disabled={outcome.at === 'checking' || !handle.trim()}>Check</button>
-    </form>
+  return <>
+    {outcome.at === 'answered' ? null : <button className="btn" type="button" aria-label={'Check revocation of handle ' + handle} disabled={outcome.at === 'checking'} onClick={() => { void ask(); }}>Check</button>}
     <RevocationView outcome={outcome} />
-  </div>;
+  </>;
 }
 
 /** The provider's part of a revocation in plain words. */
@@ -152,9 +147,8 @@ export function RevocationView({ outcome }: { outcome: RevocationOutcome }) {
       if (outcome.refused.refusal.refusal === 'HandleUnknown') return <p className="note">No handle with that id is visible to you.</p>;
       return <RefusalLine refused={outcome.refused} />;
     case 'answered': return <div>
-      <p>Handle id: {outcome.answer.handle}</p>
-      <p>Use stopped here: {outcome.answer.stopped_here ? 'yes' : 'no'}</p>
-      <p>The provider: {upstreamWords(outcome.answer)}</p>
+      <div>Use stopped here: {outcome.answer.stopped_here ? 'yes' : 'no'}</div>
+      <div>The provider: {upstreamWords(outcome.answer)}</div>
     </div>;
   }
 }

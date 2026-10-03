@@ -7,7 +7,7 @@ import {
   ChangeView,
   GrantRows,
   RecipientsChange,
-  RevocationLookup,
+  RevocationCheck,
   RevocationView,
   ScopeChange,
   scopeWords,
@@ -69,9 +69,9 @@ describe('Revocation lookup', () => {
   const answer = (upstream: RevocationAnswer['upstream'], upstream_reason: string | null, stopped_here = true): RevocationAnswer =>
     ({ handle: 'a1b2c3', stopped_here, upstream, upstream_reason });
 
-  it('renders the handle id field and the Check button', () => {
-    const html = renderToStaticMarkup(<RevocationLookup check={() => Promise.resolve(answer('not_asked', null))} />);
-    expect(html).toContain('Handle id');
+  it('offers the check on the line that names the handle', () => {
+    const html = renderToStaticMarkup(<RevocationCheck handle="a1b2c3" check={() => Promise.resolve(answer('not_asked', null))} />);
+    expect(html).toContain('Check revocation of handle a1b2c3');
     expect(html).toContain('Check');
   });
   it('shows a provider that was not asked', () => {

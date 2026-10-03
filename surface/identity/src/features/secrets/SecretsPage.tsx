@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router';
 import { request } from '../../api';
 import { Secrets } from './Secrets';
 import type { SecretListing } from './Secrets';
-import { RevocationLookup, SecretAudit, SecretGrants } from './SecretsDetail';
+import { SecretAudit, SecretGrants } from './SecretsDetail';
 import { secretsApi } from './secretsApi';
 
 const listing = () => request<SecretListing>('/secrets');
@@ -20,7 +20,7 @@ export function SecretsPage() {
     </nav>
     {section === 'entries' ? <Secrets read={listing} />
       : <div className="pane">{section === 'grants' ? <SecretGrants read={secretsApi.grants} />
-      : section === 'audit' ? <><SecretAudit read={secretsApi.audit} /><RevocationLookup check={secretsApi.revocation} /></>
+      : section === 'audit' ? <SecretAudit read={secretsApi.audit} check={secretsApi.revocation} />
       : <><h2>Secrets view not found</h2><p>Choose a view above to continue.</p></>}</div>}
   </div>;
 }
