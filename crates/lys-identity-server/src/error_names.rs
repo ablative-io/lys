@@ -21,6 +21,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::Team(error) => team(error),
         ServerError::Budget(error) => budget(error),
         ServerError::Holding(error) => error.name(),
+        ServerError::Haem(error) => error.name(),
         ServerError::Machine(error) => error.name(),
         ServerError::HarnessCatalogueUnreadable { .. } => "harness_catalogue_unreadable",
         ServerError::Identity(error) => identity(error),

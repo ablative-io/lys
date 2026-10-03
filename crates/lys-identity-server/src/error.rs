@@ -17,6 +17,9 @@ pub enum ServerError {
     /// A giver's holding does not cover the requested gift.
     #[error(transparent)]
     Holding(#[from] crate::error_holding::HoldingError),
+    /// The door to a haematite store could not answer with the store's result.
+    #[error(transparent)]
+    Haem(#[from] crate::error_haem::HaemError),
     /// A catalogue description could not be read before serving.
     #[error("harness_catalogue_unreadable: {file}: {reason}")]
     HarnessCatalogueUnreadable {

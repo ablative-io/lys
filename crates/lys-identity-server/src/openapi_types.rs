@@ -151,6 +151,18 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
         (GET, "/authority", None, None),
         (
             GET,
+            "/haem",
+            None,
+            Some(api.schema::<crate::haem_door::HaemStores>()),
+        ),
+        (
+            POST,
+            "/haem/{store}",
+            Some(api.schema::<crate::haem_door::HaemVerb>()),
+            None,
+        ),
+        (
+            GET,
             "/health",
             None,
             Some(api.schema::<crate::health_api::Health>()),
