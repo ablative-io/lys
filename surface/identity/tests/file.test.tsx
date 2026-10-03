@@ -118,8 +118,8 @@ describe("An agent's file", () => {
   });
 
   it('offers a registered identity only activation, since the directory retires only an active or suspended one', async () => {
-    await mount('#/directory/manage?action=status&identity=' + COURIER);
-    expect($$('select[name="transition"] option').map((option) => option.getAttribute('value')).filter(Boolean)).toEqual(['activate']);
+    await mount('#/file/' + COURIER);
+    expect($$('.file .head button[data-act]').map((button) => button.getAttribute('data-act')).filter((act) => ['activate', 'suspend', 'retire', 'reinstate'].includes(act ?? ''))).toEqual(['activate']);
   });
 
   it('answers an agent that is not visible as not found, with the refusal', async () => {

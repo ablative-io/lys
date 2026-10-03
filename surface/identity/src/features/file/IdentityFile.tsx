@@ -65,7 +65,9 @@ function ReadProblems({ problems }: { problems: Refused[] }) {
   return problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <p key={index}><code>{problem.refusal.refusal}</code>: {problem.message}</p>)}</section> : null;
 }
 
-function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void }) {
+function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void;
+  /** What the last change in the head did, kept while the file is read again. */
+  notice: string; note: (words: string) => void }) {
   const { agent } = data;
   const x = stop?.agent === data.x.id && stop.state === 'suspended' ? { ...data.x, state: 'suspended' as const } : data.x;
   const kind = x.kind;
@@ -112,13 +114,16 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
           </div>
         </div>
         {changing === 'name' ? <RecordedForm name="change-profile" title="Save name" heading="Edit name" description="Change the display name while keeping the same identity and audit history." done={reload}
+          success={(asked) => { const words = 'Name saved: ' + String(asked.body.display_name) + '.'; note(words); return words; }}
           change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/profile', body: { display_name: String(form.get('display_name') ?? '').trim() } })}>
           <label className="field">Display name<input name="display_name" required defaultValue={x.display_name} /></label>
         </RecordedForm> : null}
         {changing && changing !== 'name' ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access. Retirement is permanent.' : changing === 'suspend' ? 'Suspending stops its access until it is restored.' : undefined} submitLabel={ACTION[changing]} done={reload}
+          success={(asked) => { const now: Record<string, string> = { activate: 'active', suspend: 'suspended', retire: 'retired', reinstate: 'active', resume: 'active' }; const words = x.display_name + ' is now ' + (now[String(asked.body.transition)] ?? 'updated') + '.'; note(words); return words; }}
           change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/transitions', body: { transition: changing, reason: String(form.get('reason') ?? '').trim() } })}>
           <label className="field">Reason<input name="reason" required /></label>
         </RecordedForm> : null}
+        {notice ? <p role="status" className="note">{notice}</p> : null}
         {stop && stop.agent === x.id ? <StopReceipt answer={stop} /> : null}
         <nav className="tabs" aria-label={agent ? 'Agent sections' : 'Sections'}>
           {tabsFor(x.id).map(([k, l]) => (
@@ -143,6 +148,7 @@ export function IdentityFile() {
   const tab = MERGED[asked] ?? asked;
   const [version, setVersion] = useState(0);
   const [stop, setStop] = useState<StopAnswer | null>(null);
+  const [notice, setNotice] = useState('');
   const load = useLoad(() => readFile(id), id + '#' + version);
   if (load.status === 'refused' && load.refused.status === 404 && load.refused.refusal.refusal !== 'Unanswered') {
     return (
@@ -153,5 +159,5 @@ export function IdentityFile() {
       </div>
     );
   }
-  return <Gate load={load} title="this person or agent’s file" ok={(data) => <File data={data} tab={tab} reload={() => setVersion((v) => v + 1)} stop={stop} stopped={(answer) => { setStop(answer); }} />} />;
+  return <Gate load={load} title="this person or agent’s file" ok={(data) => <File notice={notice} note={setNotice} data={data} tab={tab} reload={() => setVersion((v) => v + 1)} stop={stop} stopped={(answer) => { setStop(answer); }} />} />;
 }

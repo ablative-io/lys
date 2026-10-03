@@ -15,7 +15,6 @@ import { Settings } from './features/settings/Settings';
 import { People } from './features/people/People';
 import { AddAgent } from './features/people/AddAgent';
 import { AddPerson } from './features/people/AddPerson';
-import { Manage } from './features/people/Manage';
 import { IssueRoot } from './features/grants/IssueRoot';
 import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
@@ -32,7 +31,6 @@ export function AppRoutes() {
       <Route path="/network" element={<Network />} />
       <Route path="/service-accounts" element={<ServiceAccounts />} />
       <Route path="/connections" element={<Connections />} />
-      <Route path="/directory/manage" element={<Manage />} />
       <Route path="/access/issue" element={<IssueRoot />} />
       <Route path="/model" element={<Model />} />
       <Route path="/apps" element={<Apps />} />

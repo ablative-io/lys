@@ -31,67 +31,59 @@ function recorded(body: unknown, grant = false) {
     : { person: ADA, receipt });
 }
 
+const profile = '/identities/' + ADA + '/profile';
+/** The form a button in the head of Ada's file opens. */
+async function head(act: string, title: string, routes: Record<string, unknown> = SERVICE, at = '#/file/' + ADA) {
+  const world = await mount(at, routes as typeof SERVICE);
+  await click($('.file .head [data-act="' + act + '"]'));
+  return { ...world, page: form(title) };
+}
+
 describe('Directory mutations', () => {
-  it('edits the selected identity name through the receipt-bearing profile route', async () => {
-    const { posted } = await mount('#/directory/manage?action=profile&identity=' + ADA, { ...SERVICE, ['POST /identities/' + ADA + '/profile']: (body) => recorded(body) });
-    const page = form('Save name');
+  it('edits the name of the identity whose file it is through the receipt-bearing profile route', async () => {
+    const { posted, page } = await head('rename', 'Save name', { ...SERVICE, ['POST ' + profile]: (body: unknown) => recorded(body) });
     expect(page.querySelector<HTMLInputElement>('input[name="display_name"]')?.value).toBe('Ada (test person)');
+    expect(page.querySelector('[name="identity"]')).toBeNull();
     await fill(page, 'display_name', 'Ada Updated');
     await submit(page);
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toMatchObject({ path: '/identities/' + ADA + '/profile', body: { display_name: 'Ada Updated' } });
-    expect(text()).toContain('Recorded receipt');
+    expect(posted[0]).toMatchObject({ path: profile, body: { display_name: 'Ada Updated' } });
+    expect(text()).toContain('Name saved: Ada Updated.');
     expect(sessionStorage.getItem('lys.pending.change-profile')).toBeNull();
   });
 
-  it('shows one action at a time and opens a linked action directly', async () => {
+  it('has no separate page of directory controls', async () => {
     await mount('#/directory/manage?action=login', SERVICE);
-    expect(document.querySelectorAll('form')).toHaveLength(1);
-    expect(form('Bind a sign-in identity')).toBeTruthy();
-    expect($('nav[aria-label="Directory actions"] a[aria-current="page"]')?.textContent).toBe('Connect sign-in');
-    expect(text()).not.toContain('Every change is admitted');
-  });
-
-  it('registers a person and displays the returned receipt without silently activating them', async () => {
-    const { posted } = await mount('#/directory/manage', { ...SERVICE, 'POST /people': (body) => recorded(body) });
-    const page = form('Register a person');
-    await fill(page, 'display_name', 'New person');
-    await submit(page);
-    expect(posted).toHaveLength(1);
-    expect(posted[0]).toEqual({ path: '/people', body: { display_name: 'New person', operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } });
-    expect(text()).toContain('Recorded receipt');
-    expect(text()).not.toContain('UnconfirmedReceipt');
-    expect(sessionStorage.getItem('lys.pending.register-person')).toBeNull();
+    expect($('form[aria-label="Bind a sign-in identity"]')).toBeNull();
+    expect($('nav[aria-label="Directory actions"]')).toBeNull();
   });
 
   it('retains an uncertain change across unmount and refuses to submit it again', async () => {
-    const routes = { ...SERVICE, 'POST /agents': refused(503, 'StorageUncertain', 'record outcome unknown') };
-    const first = await mount('#/directory/manage?action=agent', routes);
-    const page = form('Register an agent');
-    await fill(page, 'display_name', 'New agent');
-    await submit(page);
-    await submit(page);
+    const routes = { ...SERVICE, ['POST ' + profile]: refused(503, 'StorageUncertain', 'record outcome unknown') };
+    const first = await head('rename', 'Save name', routes);
+    await fill(first.page, 'display_name', 'New name');
+    await submit(first.page);
+    await submit(first.page);
     expect(first.posted).toHaveLength(1);
     expect(text()).toContain('StorageUncertain');
-    const retained = sessionStorage.getItem('lys.pending.register-agent');
-    expect(retained).toContain('New agent');
+    const retained = sessionStorage.getItem('lys.pending.change-profile');
+    expect(retained).toContain('New name');
     unmountAll();
     document.body.innerHTML = '';
-    const second = await mount('#/directory/manage?action=agent', routes);
-    await submit(form('Register an agent'));
+    const second = await head('rename', 'Save name', routes);
+    await submit(second.page);
     expect(second.posted).toHaveLength(0);
     expect(text()).toContain('Do not submit this change again');
   });
 
   it('retains a successful write whose receipt cannot be read without resending', async () => {
-    const { posted } = await mount('#/directory/manage?action=agent', { ...SERVICE, 'POST /agents': { status: 200, body: 'not JSON' } });
-    const page = form('Register an agent');
-    await fill(page, 'display_name', 'New agent');
+    const { posted, page } = await head('rename', 'Save name', { ...SERVICE, ['POST ' + profile]: { status: 200, body: 'not JSON' } });
+    await fill(page, 'display_name', 'New name');
     await submit(page);
     await submit(page);
     expect(posted).toHaveLength(1);
     expect(text()).toContain('UnreadableResponse');
-    expect(sessionStorage.getItem('lys.pending.register-agent')).toContain('New agent');
+    expect(sessionStorage.getItem('lys.pending.change-profile')).toContain('New name');
   });
 
   it.each([
@@ -99,43 +91,34 @@ describe('Directory mutations', () => {
     { name: 'another operation', body: { receipt: { ...RECEIPTS[4].receipt, operation: 'op-unrelated' } } },
     { name: 'incomplete receipt', body: { receipt: { operation: 'op-unrelated' } } },
   ])('retains $name as uncertain and prevents another submission', async ({ body }) => {
-    const { posted } = await mount('#/directory/manage', { ...SERVICE, 'POST /people': ok(body) });
-    const page = form('Register a person');
-    await fill(page, 'display_name', 'New person');
+    const { posted, page } = await head('rename', 'Save name', { ...SERVICE, ['POST ' + profile]: ok(body) });
+    await fill(page, 'display_name', 'New name');
     await submit(page);
     await submit(page);
     expect(posted).toHaveLength(1);
     expect(text()).toContain('UnconfirmedReceipt');
-    expect(text()).not.toContain('Recorded receipt');
-    expect(sessionStorage.getItem('lys.pending.register-person')).toContain('New person');
+    expect(text()).not.toContain('Name saved');
+    expect(sessionStorage.getItem('lys.pending.change-profile')).toContain('New name');
   });
 
-  it('does not show administrator forms to a personal reader', async () => {
-    await mount('#/directory/manage', { ...SERVICE, '/directory/people': refused(403, 'NotAdmitted', 'administrator only') });
-    expect($('form')).toBeNull();
-    expect(text()).toContain('Only the configured directory administrator');
-  });
-
-  it('binds the exact provider identity to the selected person', async () => {
-    const { posted } = await mount('#/directory/manage?action=login', { ...SERVICE, ['POST /people/' + ADA + '/logins']: (body) => recorded(body) });
+  it('binds the exact provider identity to the person whose Credentials tab it is', async () => {
+    const { posted } = await mount('#/file/' + ADA + '/credentials', { ...SERVICE, ['POST /people/' + ADA + '/logins']: (body) => recorded(body) });
     const page = form('Bind a sign-in identity');
-    await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
+    expect(page.querySelector('[name="person"]')).toBeNull();
     await fill(page, 'issuer', 'https://issuer.example/');
     await fill(page, 'subject', 'subject-123');
     await submit(page);
     expect(posted[0]).toMatchObject({ path: '/people/' + ADA + '/logins', body: { issuer: 'https://issuer.example/', subject: 'subject-123' } });
   });
 
-  it('records the selected transition with its reason', async () => {
-    const { posted } = await mount('#/directory/manage?action=status', { ...SERVICE, ['POST /identities/' + ADA + '/transitions']: (body) => recorded(body) });
-    const page = form('Record lifecycle change');
-    await pick(page, 'Find a person or agent', 'Ada', 'Ada (test person)');
-    await choose(page.querySelector('select[name="transition"]'), 'suspend');
+  it('records the transition of the pressed button with its reason', async () => {
+    const { posted, page } = await head('suspend', 'Record lifecycle change', { ...SERVICE, ['POST /identities/' + ADA + '/transitions']: (body: unknown) => recorded(body) });
+    expect(page.querySelector('select[name="transition"]')).toBeNull();
     await fill(page, 'reason', 'Owner requested suspension');
     await submit(page);
     expect(posted[0]).toMatchObject({ path: '/identities/' + ADA + '/transitions', body: { transition: 'suspend', reason: 'Owner requested suspension' } });
     expect(text()).toContain('Ada (test person) is now suspended.');
-    expect(page.querySelector('details')).toBeNull();
+    expect(document.querySelector('.file details')).toBeNull();
   });
 
   it('issues a root grant only with the explicitly selected holder, relation and lifetime', async () => {
@@ -157,8 +140,8 @@ describe('Directory mutations', () => {
 
 describe('Uncertain directory change recovery', () => {
   const operation = 'op-' + 'a'.repeat(32);
-  const key = 'lys.pending.register-agent';
-  const retained = JSON.stringify({ path: '/agents', body: { display_name: 'Original agent' }, operation });
+  const key = 'lys.pending.change-profile';
+  const retained = JSON.stringify({ path: profile, body: { display_name: 'Original name' }, operation });
   async function recover() {
     const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether Lys saved it');
     if (!button) throw new Error('No recovery button');
@@ -167,16 +150,16 @@ describe('Uncertain directory change recovery', () => {
   }
   it('requires an explicit check and reuses exact original operation and body after reload', async () => {
     sessionStorage.setItem(key, retained);
-    const { posted } = await mount('#/directory/manage?action=agent', { ...SERVICE, 'POST /agents': (body) => recorded(body) });
+    const { posted } = await head('rename', 'Save name', { ...SERVICE, ['POST ' + profile]: (body: unknown) => recorded(body) });
     expect(posted).toHaveLength(0);
     await recover();
-    expect(posted).toEqual([{ path: '/agents', body: { display_name: 'Original agent', operation } }]);
+    expect(posted).toEqual([{ path: profile, body: { display_name: 'Original name', operation } }]);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(text()).toContain('Recorded receipt');
+    expect(text()).toContain('Name saved: Original name.');
   });
   it('keeps the original evidence after a recovery refusal', async () => {
     sessionStorage.setItem(key, retained);
-    await mount('#/directory/manage?action=agent', { ...SERVICE, 'POST /agents': refused(403, 'NotAdmitted', 'permission changed') });
+    await head('rename', 'Save name', { ...SERVICE, ['POST ' + profile]: refused(403, 'NotAdmitted', 'permission changed') });
     await recover();
     expect(sessionStorage.getItem(key)).toBe(retained);
     expect(text()).toContain('NotAdmitted');
@@ -184,8 +167,8 @@ describe('Uncertain directory change recovery', () => {
   });
   it.each(['not JSON', JSON.stringify({ path: '/people', body: {}, operation })])('refuses damaged or wrong-form pending evidence without modifying it', async (saved) => {
     sessionStorage.setItem(key, saved);
-    const { posted } = await mount('#/directory/manage?action=agent', SERVICE);
-    await submit(form('Register an agent'));
+    const { posted } = await head('rename', 'Save name', SERVICE);
+    await submit(form('Save name'));
     expect(posted).toHaveLength(0);
     expect(sessionStorage.getItem(key)).toBe(saved);
     expect(text()).not.toContain('Check whether Lys saved it');

@@ -42,7 +42,7 @@ export function RefusedPage({ refused, title }: { refused: Refused; title: strin
       <div className="eyebrow">{title}</div>
       <h1>{serviceFailure ? 'The service could not complete this request' : refused.refusal.refusal === 'NoPerson' ? 'Your account needs access' : 'Refused'}</h1>
       {serviceFailure ? <p>If you were making a change, keep its original request until its outcome is confirmed. Do not submit it again as a new change.</p> : null}
-      {refused.refusal.refusal === 'NoPerson' ? <p>Your sign-in worked, but your account has not been connected to the directory yet. Ask your administrator to connect it. <a href="#/directory/manage?action=login">Administrator controls</a></p> : null}
+      {refused.refusal.refusal === 'NoPerson' ? <p>Your sign-in worked, but your account has not been connected to the directory yet. Ask your administrator to connect it on the Credentials tab of your page in People and agents.</p> : null}
       <div className="why-not">
         <b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span>
       </div>
