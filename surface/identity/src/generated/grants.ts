@@ -94,7 +94,7 @@ export interface DelegateBody {
   window: GrantWindow;
 }
 
-/** POST /grants/{id}/revoke: `RevokeBody`. The reason is 1 to 1024 bytes. */
+/** POST /grants/{id}/revoke: `RevokeBody`. The reason is not empty. */
 export interface RevokeBody {
   operation: string;
   route: RouteWire;
@@ -181,7 +181,5 @@ export interface ReachAnswer {
   resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[] }[] })[];
 }
 
-/** `REACH_MAX`. */
-export const REACH_MAX = 500;
 
 export const resourceText = (r: ResourceRef): string => `${r.kind}:${r.id}`;

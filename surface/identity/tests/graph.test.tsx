@@ -92,12 +92,12 @@ describe('Complete permission reads', () => {
     expect(text()).toContain('PermissionAnswerIncomplete');
     expect(drawing()).toBeNull();
   });
-  it('asks at most REACH_MAX resources at once and refuses permissions assembled across changing revisions', async () => {
-    let revision = 7;
+  it('asks about every resource in one question, however many, so the answer is at one revision', async () => {
     const posted: { path: string; body: unknown }[] = [];
-    serve({ 'POST /grants/reach': (body) => ({ ...noHolders(body), body: { ...(noHolders(body).body as object), revision: revision++ } }) }, posted);
-    const many = Array.from({ length: 501 }, (_, n) => ({ resource: { kind: 'project', id: String(n) }, actions: ['view'] }));
-    await expect(reachMap(many)).rejects.toMatchObject({ refusal: { refusal: 'GrantRevisionChanged' } });
-    expect(posted.map((call) => (call.body as { resources: unknown[] }).resources.length)).toEqual([500, 1]);
+    serve({ 'POST /grants/reach': (body) => noHolders(body) }, posted);
+    const many = Array.from({ length: 1001 }, (_, n) => ({ resource: { kind: 'project', id: String(n) }, actions: ['view'] }));
+    const map = await reachMap(many);
+    expect(map.size).toBe(1001);
+    expect(posted.map((call) => (call.body as { resources: unknown[] }).resources.length)).toEqual([1001]);
   });
 });

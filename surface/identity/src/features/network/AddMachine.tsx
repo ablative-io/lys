@@ -55,7 +55,7 @@ export function AddMachine({ person, agent, changed, cancel }: {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (pending || working.current || restored.error) return;
     const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
-    if (!validComputerName(name)) { setFailure('Give this computer a name of 1 to 100 characters without control characters.'); return; }
+    if (!validComputerName(name)) { setFailure('Give this computer a name, without control characters.'); return; }
     if (agent !== undefined && !/^agent-[0-9a-f]{32}$/.test(agent)) { setFailure('AgentIdentifierMalformed: the agent for this addition could not be read.'); return; }
     void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : [], may_run_roles: [], may_reach: [] }, phase: 'machine', machine: null });
   };

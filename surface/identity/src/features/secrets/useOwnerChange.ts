@@ -15,7 +15,7 @@ function savedAt(store: PendingStore, key: string): Saved | null {
   if (raw === null) return null;
   const value: unknown = JSON.parse(raw);
   if (!value || typeof value !== 'object' || !('asked' in value) || typeof value.asked !== 'string'
-    || !('operation' in value) || typeof value.operation !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(value.operation)
+    || !('operation' in value) || typeof value.operation !== 'string' || !/^[A-Za-z0-9_-]{16,}$/.test(value.operation)
     || !('change' in value) || !value.change || typeof value.change !== 'object') return null;
   const change = value.change;
   if (!('secret' in change) || typeof change.secret !== 'string' || !change.secret || !('type' in change)) return null;
