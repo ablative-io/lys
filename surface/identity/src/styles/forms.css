@@ -2,10 +2,18 @@
    drawn from the tokens, so no screen falls back to the browser's defaults. */
 .field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
 .field .hint { font-weight: 400; color: var(--text-muted); }
+.field label { font-size: 12px; color: var(--text-secondary); }
+.field textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+/* A form is laid out across the page: fields side by side in aligned columns, a field marked wide spanning them all. */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; align-items: start; }
+.form-grid > .wide, .form-grid > fieldset, .form-grid > table, .form-grid > p, .form-grid > h2, .form-grid > h3 { grid-column: 1 / -1; }
+.form-grid > .field { margin: 0 0 14px; }
+/* A tick and its words stand on one line, aligned with the fields around them. */
+label.tick { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 13px; color: var(--text-primary); }
 input:not([type=radio]):not([type=checkbox]), select, textarea {
   font: inherit; font-size: 13px; color: var(--text-primary);
   background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-md);
-  padding: 8px 11px; min-height: 36px; width: 100%; max-width: 480px;
+  padding: 8px 11px; min-height: 36px; width: 100%;
   transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
@@ -54,7 +62,7 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; p
 .folder-chooser .folders { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .works-in code { font-family: "JetBrains Mono"; }
 .mode-words p { margin: 4px 0; color: var(--text-muted); }
-.mode-words code { font-family: "JetBrains Mono"; color: var(--text); }
+.mode-words code { font-family: "JetBrains Mono"; color: var(--text-primary); }
 .permissions .mode-row { margin: 6px 0; }
 .permissions .mode-id, .permissions small code { font-family: "JetBrains Mono"; color: var(--text-muted); }
 .permissions .mode-meaning { margin: 2px 0 0 22px; color: var(--text-muted); }

@@ -11,10 +11,6 @@
 .palette .it { padding: 7px 16px; display: flex; justify-content: space-between; cursor: pointer; }
 .palette .it.sel { background: rgba(212,151,90,.1); }
 .palette .list { max-height: 50vh; overflow: auto; padding-bottom: 6px; }
-.field { display: grid; gap: 4px; margin-top: 12px; }
-.field label { font-size: 12px; color: var(--text-secondary); }
-.field input, .field select, .field textarea { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 7px 10px; font: 13px "DM Sans"; }
-.field textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: all .3s var(--spring); background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 999px; padding: 6px 14px; font-size: 12px; box-shadow: var(--shadow-lg); z-index: 40; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .open-q { color: var(--accent); font: 10px "JetBrains Mono"; letter-spacing: .08em; border: 1px dashed rgba(212,151,90,.45); border-radius: 3px; padding: 0 5px; }
