@@ -183,6 +183,12 @@ fn place_body(
                 }
                 Err(copy) => {
                     ready.record.status = CallStatus::Unrecorded;
+                    // The first reason found stands; this one is why the body is absent.
+                    if ready.record.unrecorded_reason.is_none() {
+                        let body = if request { "request" } else { "response" };
+                        ready.record.unrecorded_reason =
+                            Some(format!("the store refused the {body} body: {copy}"));
+                    }
                     ready.record.response.clear();
                     if request {
                         ready.record.raw_request = None;

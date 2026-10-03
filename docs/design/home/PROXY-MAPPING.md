@@ -37,19 +37,23 @@ one JSON object per line, never rewritten by Lys. Record kinds seen in this run'
 2. **Call to assistant record, by message id.** A streamed call's stored `raw_response` (gzip, SSE)
    begins with `message_start`, whose `message.id` equals the harness `assistant.message.id`. Call 3's
    stored response holds the id of the assistant record on disk, so a streamed call pairs to its
-   assistant record by id, read from the stored raw body, not by time. Nothing on the `lys.call`
-   record itself carries that id yet: the assembled `response[]` parts are `{type, text}` only and
-   drop it. Next proxy slice: lift `message.id` from `message_start` onto the record so the pairing
-   needs no decode.
+   assistant record by id, not by time. Since c627d5cb the `lys.call` record carries it as
+   `message_id`, read as `message_start` passes, so the pairing needs no decode; it is there for a
+   stream that stopped short too. Not yet: a Messages response that is not an event stream, and the
+   two OpenAI grammars.
 3. **The harness `requestId` (`req_…`) appears nowhere in the stored bodies.** It comes from a
-   response header, and the record stores no headers. PROXY.md says "headers that matter"; today none
-   are kept. Same slice: store the request id and the headers that matter.
+   response header. Since 5790186b the record carries it as `request_id`, and `head` holds the
+   upstream's status and the kept headers of each side. The kept names are one list in
+   `crates/lys-home/src/proxy/headers.rs`; no header that carries a credential is on it.
 4. **Call 1 has no pair by id.** A non-stream request (`model, max_tokens, messages[1], metadata`; no
    system, no tools) answered by a 114-byte response block that is not gzip, zlib, zstd or JSON
    (first bytes `83 38 00 00`). The proxy stored it whole and did not decode it, and the record says
-   Unrecorded with both bodies stored and no reason. That is slice 1's finding 1, already carried;
-   the encoding is established from the request's accept-encoding by whoever takes that finding, not
-   guessed here.
+   Unrecorded with both bodies stored and no reason. That is slice 1's finding 1. The record now
+   names its reason (`unrecorded_reason`), and for a response that is not JSON as stored the reason
+   says what the response's own `content-encoding` named, with the request's `accept-encoding`
+   beside it in `head`. The encoding of that first call is therefore read off the next run's
+   record, not guessed from four bytes. What is still not done: a response that is not an event
+   stream is read as stored and never decoded, so an encoded one stays unrecorded, with its reason.
 5. **Model and time agree but are not the link.** `data.model` on the call equals
    `assistant.message.model` and `attachment.identity.modelId`. Timestamps align to the second (call
    3's record time is the assistant record's timestamp; calls 2 and 3 `started_at` are the user
@@ -61,6 +65,8 @@ one JSON object per line, never rewritten by Lys. Record kinds seen in this run'
 {id, parentId, timestamp, type: "custom", customType: "lys.call",
  data: {api: "anthropic-messages", provider: "anthropic", call_id, model, stream, status,
         started_at, duration_ms,
+        message_id, request_id, unrecorded_reason,
+        head: {status, request: {<name>: [<values>]}, response: {<name>: [<values>]}},
         raw_request: <block hash>, raw_response: <block hash>,
         request: [<part block hashes>], response: [<part block hashes>],
         capture: {admission_ns, drain_ns, hash_ns, write_ns, block_syncs, spool_syncs,
@@ -77,8 +83,7 @@ gzipped).
 
 ## What each side lacks
 
-**The proxy record lacks:** headers (so no `requestId`, no rate-limit or usage headers); the
-assistant message id on the record itself; usage and cost (the harness keeps `message.usage` and
+**The proxy record lacks:** every header not on the kept list; usage and cost (the harness keeps `message.usage` and
 `cost-state`; the proxy has them only inside the raw SSE `message_delta`); cwd, version, gitBranch,
 hooks, permission mode; the person's prompt as a turn (only as part of the request body); tool
 results as the harness sees them.
@@ -89,7 +94,14 @@ durability; the upstream used; whether the call was lost or unrecorded.
 
 ## Lines for the next proxy slice, from this read
 
-- Lift `message.id` from `message_start` onto the `lys.call` record (link 2).
-- Store the request id and the headers that matter (link 3).
-- Finding 1 as carried: an unrecorded call with both bodies stored names its reason on the record,
-  and the 114-byte body's encoding is established, not guessed (link 4).
+Done, each its own commit: `message_id` (c627d5cb), `request_id` and `head` (5790186b), and
+`unrecorded_reason` with the response's named encoding.
+
+Next, from what those three leave open:
+
+- Read the first call of a run off its new record: its `head` says what the client offered and what
+  the response named, which settles the 114-byte body.
+- Decode a response that is not an event stream by its named encoding before reading it as JSON,
+  so such a call is complete instead of unrecorded.
+- `message_id` for a Messages response that is not an event stream, and for the two OpenAI
+  grammars.

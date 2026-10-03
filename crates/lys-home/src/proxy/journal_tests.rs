@@ -201,6 +201,11 @@ async fn a_journal_lost_after_admission_forwards_and_records_unrecorded_once_wri
     let calls = harness.calls(KEY)?;
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].status, CallStatus::Unrecorded);
+    let reason = calls[0].unrecorded_reason.as_deref().ok_or("no reason")?;
+    assert!(
+        reason.contains("the journal could not be written"),
+        "{reason}"
+    );
     Ok(())
 }
 
@@ -250,6 +255,10 @@ async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all(
     assert_eq!(calls[0].status, CallStatus::Unrecorded);
     assert!(calls[0].response.is_empty());
     assert!(calls[0].raw_response.is_none());
+    assert_eq!(
+        calls[0].unrecorded_reason.as_deref(),
+        Some("a capture spool could not be created or written")
+    );
     // A body the store never took claims no durability: the record says so by name.
     let timing = calls[0]
         .capture

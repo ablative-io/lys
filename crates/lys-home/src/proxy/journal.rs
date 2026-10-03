@@ -375,6 +375,9 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
         // The journal cannot be written after the call was admitted: the call
         // is recorded unrecorded, once the journal can be written again.
         job.status = CallStatus::Unrecorded;
+        if job.seen.unrecorded.is_none() {
+            job.seen.unrecorded = Some(format!("the journal could not be written: {error}"));
+        }
         report.status = CallStatus::Unrecorded;
         report.held = Some(error.to_string());
         return report;

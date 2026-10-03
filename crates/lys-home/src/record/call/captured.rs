@@ -97,6 +97,8 @@ pub struct Seen {
     pub message_id: Option<String>,
     /// The status and the kept headers.
     pub head: Head,
+    /// Why the proxy marked the call unrecorded, when it did.
+    pub unrecorded: Option<String>,
 }
 
 /// The response headers that carry the provider's id for the request, in the
@@ -147,6 +149,25 @@ pub(crate) struct Captured<'a> {
     pub seen: &'a Seen,
 }
 
+/// Why a call that ended whole could not be read into parts. Only the
+/// response is parsed here as JSON, so a JSON failure is the response's: the
+/// reason then says what the response's own head named as its encoding, the
+/// one thing that says why stored bytes that reached the client whole do not
+/// parse. Nothing is guessed from the bytes.
+fn unread(error: &HomeError, head: &Head) -> String {
+    match (error, head.response.get("content-encoding")) {
+        (HomeError::Json { .. }, Some(codings)) => format!(
+            "{error}; the response's content-encoding is {}, and a response that is not an \
+             event stream is read as stored, not decoded",
+            codings.join(", ")
+        ),
+        (HomeError::Json { .. }, None) if head.status.is_some() => {
+            format!("{error}; the response names no content-encoding")
+        }
+        _ => error.to_string(),
+    }
+}
+
 impl PreparedCall {
     pub(crate) fn prepare(blocks: &BlockStore, input: Captured<'_>) -> Result<Self, HomeError> {
         let meta = input.meta;
@@ -166,6 +187,7 @@ impl PreparedCall {
             None => (Vec::new(), None, false),
         };
         let mut status = meta.status;
+        let mut reason = input.seen.unrecorded.clone();
         let response = if status == CallStatus::Complete {
             let result = match (&model, input.response) {
                 (Some(model), Some(path)) if request_whole => {
@@ -193,8 +215,9 @@ impl PreparedCall {
             };
             match result {
                 Ok(parts) => parts,
-                Err(HomeError::BodyShape { .. } | HomeError::Json { .. }) => {
+                Err(error @ (HomeError::BodyShape { .. } | HomeError::Json { .. })) => {
                     status = CallStatus::Unrecorded;
+                    reason = Some(unread(&error, &input.seen.head));
                     Cow::Owned(Vec::new())
                 }
                 Err(error) => return Err(error),
@@ -211,6 +234,7 @@ impl PreparedCall {
                 message_id: input.seen.message_id.clone(),
                 request_id: input.seen.head.request_id(),
                 head: (input.seen.head != Head::default()).then(|| input.seen.head.clone()),
+                unrecorded_reason: reason.filter(|_| status == CallStatus::Unrecorded),
                 request: Vec::new(),
                 response: Vec::new(),
                 raw_request: input.raw_request,

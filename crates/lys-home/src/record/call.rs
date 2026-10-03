@@ -63,7 +63,8 @@ pub enum CallStatus {
     Cancelled,
     /// The upstream stream ended early or malformed.
     Partial,
-    /// The call was forwarded but its capture could not be written.
+    /// The call was forwarded but its capture could not be written or read
+    /// into parts; the record's `unrecorded_reason` says which.
     Unrecorded,
     /// The process died mid-call; known from the open-call journal.
     Lost,
@@ -95,6 +96,13 @@ pub struct CallRecord {
     /// call the proxy did not see pass (an import, a call lost in flight).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head: Option<captured::Head>,
+    /// Why the call is `unrecorded`, in the words of the step that found it:
+    /// a spool or the journal that could not be written, a body the store
+    /// refused, or bodies that could not be read into parts. Absent for
+    /// every other status, and for an unrecorded call written by a caller
+    /// that gave no reason (an import).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unrecorded_reason: Option<String>,
     /// The request's parts, by block hash, in order; empty when the request
     /// was not readable.
     pub request: Vec<String>,
@@ -217,6 +225,7 @@ pub fn ingest_call(
         message_id: None,
         request_id: None,
         head: None,
+        unrecorded_reason: None,
         request: Vec::new(),
         response: Vec::new(),
         raw_request: Some(raw_req.hash.to_string()),
@@ -267,6 +276,7 @@ pub fn ingest_call_files(
         message_id: None,
         request_id: None,
         head: None,
+        unrecorded_reason: None,
         request: Vec::new(),
         response: Vec::new(),
         raw_request: Some(raw_req.hash.to_string()),
@@ -334,6 +344,7 @@ pub fn ingest_outcome(
         message_id: None,
         request_id: None,
         head: None,
+        unrecorded_reason: None,
         request: Vec::new(),
         response: Vec::new(),
         raw_request: raw_req.map(|p| p.hash.to_string()),

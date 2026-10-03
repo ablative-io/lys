@@ -5,7 +5,8 @@
 //!
 //! Invariants:
 //! - A spool that cannot be created or written stops spooling; the bytes go
-//!   on to the client as they came, and the call is recorded `unrecorded`.
+//!   on to the client as they came, and the call is recorded `unrecorded`
+//!   with the reason on its record.
 //! - A call ends once: `complete` only when the upstream response ended
 //!   whole, every spool was written and synced, the journal took the call's
 //!   link, and, for an event stream, the grammar says the stream ended whole;
@@ -227,6 +228,12 @@ impl Call {
                 End::Complete if unspooled => CallStatus::Unrecorded,
                 End::Complete => CallStatus::Complete,
             };
+            let why = if s.journal_failed {
+                "the journal could not be written with the call's session link"
+            } else {
+                "a capture spool could not be created or written"
+            };
+            let unrecorded = (status == CallStatus::Unrecorded).then(|| why.to_owned());
             let mut call = self.open.clone();
             call.session = s.scanner.link().to_record();
             Some(Job {
@@ -244,6 +251,7 @@ impl Call {
                 seen: Seen {
                     message_id,
                     head: std::mem::take(&mut s.seen.head),
+                    unrecorded,
                 },
             })
         });
