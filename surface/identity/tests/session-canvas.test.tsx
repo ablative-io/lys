@@ -109,7 +109,7 @@ describe('Agent canvas', () => {
 
   it('is reached from an agent\'s file', async () => {
     await mount('#/file/' + SCRIBE, routes);
-    expect($('a[data-act="canvas"]')?.getAttribute('href')).toBe('#/canvas/' + SCRIBE);
+    expect($('section[aria-label="Run"] a[data-act="watch"]')?.getAttribute('href')).toBe('#/canvas/' + SCRIBE);
   });
   it('opens more than one terminal at once, each in its own window', async () => {
     const other = 'op-' + '8'.repeat(32);
