@@ -6,7 +6,8 @@ import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { buildTree } from './tree';
 import type { Node } from './tree';
 
-export interface World { tree: Node; sessions: RuntimeSession[] }
+/** `me` is the signed-in person; `admin` says they read the whole directory, so they may approve any agent's settings. */
+export interface World { tree: Node; sessions: RuntimeSession[]; me: string; admin: boolean }
 
 export function useWorld(revision: number) {
   return useLoad(async (): Promise<World> => {
@@ -16,7 +17,7 @@ export function useWorld(revision: number) {
     const all = entries(people);
     const root = all.find((entry) => entry.id === me.person.id);
     if (!root) throw new Error('The directory did not list you.');
-    return { tree: buildTree(root, teams.teams.filter((team) => team.state === 'active'), all), sessions: live.sessions };
+    return { tree: buildTree(root, teams.teams.filter((team) => team.state === 'active'), all), sessions: live.sessions, me: me.person.id, admin: people.scope === 'directory' };
   }, 'team-world:' + revision);
 }
 

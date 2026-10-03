@@ -53,3 +53,9 @@
 .team-settings .card { margin-bottom: 12px; max-width: 720px; }
 .team-settings .head h2 { margin: 0; }
 .team-command { width: 100%; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 8px 10px; font: 12px "JetBrains Mono"; }
+.team-start-where { margin: 0; font-size: 12.5px; }
+.team-stop { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-base); border-top: 1px solid var(--border-default); font-size: 13px; }
+.team-stop p { margin: 0; flex: 1; }
+.tree-new { display: flex; align-items: center; height: 32px; margin-top: 12px; padding: 0 8px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-size: 12.5px; }
+.tree-new:hover { background: var(--surface-hover); color: var(--text-primary); }
+.team-empty p { margin: 0 0 12px; }

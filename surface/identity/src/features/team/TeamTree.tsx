@@ -54,5 +54,6 @@ export function TeamTree({ world }: { world: World | null }) {
   };
   return <nav className="team-tree" aria-label="Teams and agents">
     {world ? <Branches branches={world.tree.branches} level={0} open={open} sessions={world.sessions} folded={folded} fold={fold} /> : null}
+    {world ? <a className="tree-new" href="#/agents/new">Add an agent</a> : null}
   </nav>;
 }
