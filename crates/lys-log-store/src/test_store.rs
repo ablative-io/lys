@@ -15,13 +15,14 @@ pub(crate) const ORIGIN: &str = "example.com/lys/start-test";
 
 /// The store's durable parts, kept apart from the handle so a test can
 /// "crash" by dropping the handle and open a new one over the same parts.
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct Disk {
     pub(crate) leaves: Vec<Vec<u8>>,
     pub(crate) pinned: Option<PinnedRoot>,
     pub(crate) snapshot: Option<Vec<u8>>,
 }
 
+#[derive(Debug)]
 pub(crate) struct CountingStore {
     pub(crate) disk: Disk,
     reads: Cell<u64>,
