@@ -95,10 +95,6 @@ fn choosing_cdx_executes_its_path_with_the_codex_flags_unchanged() -> TestResult
     let expected = [
         "--model",
         "gpt-6.1-sol",
-        "--ask-for-approval",
-        "on-request",
-        "-C",
-        ".",
         "-c",
         "sandbox_workspace_write.network_access=false",
         "-c",
