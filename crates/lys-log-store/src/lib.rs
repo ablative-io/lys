@@ -71,7 +71,7 @@ pub mod start;
 pub mod store;
 
 pub use error::{StoreError, StoreResult};
-pub use file::FileLeafStore;
+pub use file::{FileLeafStore, UnfinishedTail};
 pub use frontier::Frontier;
 pub use frontier_log::{FrontierLog, Tail};
 pub use log::{Log, validate_origin};
