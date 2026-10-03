@@ -22,7 +22,9 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false, 
   </section>} />;
 }
 
-export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, render }: {
+export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, render }: {
+  /** Only the model and the computer are shown; everything else is kept as saved. */
+  brief?: boolean;
   profile: ProvisioningProfile | null; choices: Choices; strict?: boolean; firstRun?: boolean;
   /** The folder is asked first and must be chosen: the agent is started straight after the save. */
   folderFirst?: boolean;
@@ -89,6 +91,13 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun && !folderFirst ? ' Choose one now, or when you start this agent.' : ''}</p>}
     {canChoose ? <FolderChooser computers={machines} preferred={preferred} chosen={folder} choose={setFolder} /> : null}
   </div>;
+  // The two choices the Overview also offers: the same fields, the same state, the same saver.
+  const modelField = <label className="field">Model this agent uses<select name="model" value={model} onChange={(event) => setModel(event.target.value)}>{!program?.models.some((entry) => entry.id === model) ? <option value={model}>{model || 'Choose a model'}</option> : null}{program?.models.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>;
+  const computerField = computer !== undefined ? null : <label className="field">Computer this agent runs on<select name="runs_on" value={runsOn} disabled={!canChoose} onChange={(event) => setRunsOn(event.target.value)}>
+      <option value="">Settled when it starts</option>
+      {runsOn && !machines.some((entry) => entry.id === runsOn) ? <option value={runsOn}>A computer Lys no longer lists</option> : null}
+      {machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+    </select></label>;
   const fields = <div className="form-grid">
     {folderFirst ? where : null}
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
@@ -102,12 +111,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     </select></label>
     {program ? <label className="field">Installed copy this agent uses<select name="build" value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose an installed copy</option>{builds.map((entry) => <option key={entry.program + '\n' + entry.package} value={entry.program + '\n' + entry.package}>{entry.name} — {entry.package}</option>)}<option value="another">Another program…</option></select></label> : null}
     {build === 'another' ? <label className="field">Program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}
-    <label className="field">Model this agent uses<select name="model" value={model} onChange={(event) => setModel(event.target.value)}>{!program?.models.some((entry) => entry.id === model) ? <option value={model}>{model || 'Choose a model'}</option> : null}{program?.models.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
-    {computer !== undefined ? null : <label className="field">Computer this agent runs on<select name="runs_on" value={runsOn} disabled={!canChoose} onChange={(event) => setRunsOn(event.target.value)}>
-      <option value="">Settled when it starts</option>
-      {runsOn && !machines.some((entry) => entry.id === runsOn) ? <option value={runsOn}>A computer Lys no longer lists</option> : null}
-      {machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-    </select></label>}
+    {modelField}
+    {computerField}
     {firstRun && profile && !program?.modes.some((entry) => entry.id === mode) ? <p>The saved program settings are kept for this request.</p> : null}
     <Permissions key={programName} agent={agent} program={program} value={permissions} change={setPermissions} tools={tools} computers={machines} computer={preferred} />
     <div className="wide"><ModeWords program={program} mode={mode} sentencesOnly /></div>
@@ -119,5 +124,5 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {prompt && prompt !== 'keep' ? <label className="field wide">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
     {folderFirst ? null : where}
   </div>;
-  return render(fields, settings, refusal);
+  return render(brief ? <div className="form-grid">{modelField}{computerField}</div> : fields, settings, refusal);
 }

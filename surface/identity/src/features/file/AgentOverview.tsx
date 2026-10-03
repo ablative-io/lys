@@ -1,9 +1,13 @@
-import { Refused, request, useLoad } from '../../api';
+import { useState } from 'react';
+import { api, Refused, request, useLoad } from '../../api';
 import type { Load } from '../../api';
 import type { ReactNode } from 'react';
 import type { AgentView } from '../../generated';
 import type { NetworkView } from '../network/contract';
+import { readChoices } from '../provisioning/choices';
 import type { Program } from '../provisioning/choices';
+import { ProfileFields } from '../provisioning/ProfileEditor';
+import { SaveSettings } from '../provisioning/SaveSettings';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { Team } from '../teams/contract';
 import { Pill } from '../people/Pill';
@@ -66,25 +70,35 @@ function modelName(programs: Program[], id: string): string {
   return listed ? listed.label : id + ' (no program lists this model now)';
 }
 
-/** The agent's run and its saved choices, with every failed read named. Limits, access and settings are the tabs beside this one. */
+/** The agent's run and its saved choices, with every failed read named. The model and the computer are changed here with the settings form's own fields and saver; limits, access and the rest of its settings are the tabs beside this one. */
 export function AgentOverview({ agent, details }: { agent: AgentView; details: (problems: Refused[]) => ReactNode }) {
-  const profile = useLoad(() => readProfile(agent.id), 'agent-about-profile:' + agent.id);
+  const [revision, setRevision] = useState(0);
+  const reload = () => setRevision((value) => value + 1);
+  const profile = useLoad(() => readProfile(agent.id), 'agent-about-profile:' + agent.id + ':' + revision);
   const teams = useLoad(readTeams, 'agent-about-teams:' + agent.id);
   const network = useLoad(readNetwork, 'agent-about-computers:' + agent.id);
   const programs = useLoad(readPrograms, 'agent-about-programs:' + agent.id);
+  const choices = useLoad(() => readChoices(), 'agent-about-choices:' + agent.id);
+  const people = useLoad(api.people, 'agent-about-people');
   const held = teams.status === 'ok' ? teams.data.filter((team) => team.state === 'active' && team.members.includes(agent.id)) : [];
   const computer = profile.status === 'ok' ? profile.data?.runs_on : undefined;
   const machine = network.status === 'ok' ? network.data.find((entry) => entry.id === computer) : undefined;
   const saved = profile.status === 'ok' ? profile.data?.model_access ?? [] : [];
   const models = programs.status === 'ok' ? saved.map((id) => modelName(programs.data, id)).join(', ') : '';
-  const problems = [profile, teams, network, programs].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
+  const problems = [profile, teams, network, programs, choices, people].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
   return <><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
   <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
       <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : held.length ? held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/people/view/teams">{team.name}</a></span>) : 'No team yet'}</dd>
+      {profile.status === 'ok' && profile.data?.harness && choices.status === 'ok' && people.status === 'ok'
+        ? <><dt>Model and computer</dt><dd><ProfileFields brief key={profile.data.version} profile={profile.data} choices={choices.data} agent={agent.id} canChoose={people.data.scope === 'directory'} render={(fields, settings, refusal) => <>
+          {fields}<SaveSettings agent={agent.id} profile={profile.data} settings={settings} refusal={refusal} canSave={people.data.scope === 'directory'} people={people.data} machines={choices.data.machines} saved={reload} />
+        </>} /></dd></>
+        : <>
       <dt>Computer</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !computer ? 'Choose a computer when you start' : network.status !== 'ok' ? reading(network, 'computers') : machine ? <a href="#/network">{machine.name}</a> : <span className="why-not">The saved computer is no longer visible. Choose an available computer in Start.</span>}<p className="note">Saved choice for the next start.</p></dd>
       <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !saved.length ? 'Choose a model when you start' : programs.status !== 'ok' ? reading(programs, 'model names') : models}<p className="note">Saved choice for the next start.</p></dd>
+        </>}
     </dl>
   </section>{details(problems)}</>;
 }
