@@ -2,7 +2,8 @@
 import { useRef, useState } from 'react';
 import { request, useLoad } from '../../api';
 import { clock } from '../file/time';
-import { Gate, SignIn } from '../signin/Gate';
+import { Gate } from '../signin/Gate';
+import { SignIn } from '../sign-in/SignIn';
 import { ReadFailure, failureWords } from '../signin/words';
 
 /** crates/lys-identity-server/src/sessions_api.rs: SessionView and SessionsView. */

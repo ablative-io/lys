@@ -31,7 +31,7 @@ export function Rail() {
   const waiting = useWaiting();
   const { pathname } = useLocation();
   const on = railView(pathname);
-  const press = (id: string | undefined, dock: 'help' | 'assistant' | undefined) => {
+  const press = (id: string | undefined, dock: 'help' | undefined) => {
     if (dock) return shell.toggleDock(dock);
     if (id === 'palBtn') return shell.openPalette();
     if (id === 'railBtn') return shell.toggleLabels();

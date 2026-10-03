@@ -1,34 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { API, api, useLoad } from '../../api';
+import { api } from '../../api';
 import type { Load, Refused } from '../../api';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (
     <div className="page">
       <div className="dim">Reading {title}…</div>
-    </div>
-  );
-}
-
-/** Sign-in, through the service's configured issuer. The service keeps the session. */
-export function SignIn() {
-  const authority = useLoad(api.authority, 'sign-in-authority');
-  return (
-    <div className="page">
-      <div className="eyebrow">Identity</div>
-      <h1>Sign in</h1>
-      <p className="sub">Use your account to open the directory and manage your access.</p>
-      <a className="btn primary" href={API + '/login'}>
-        Sign in
-      </a>
-      <details style={{ marginTop: 18, maxWidth: 640 }}>
-        <summary>Advanced: how access is managed</summary>
-        <p>People sign in. Agents are registered by a person responsible for them.</p>
-        {authority.status === 'loading' ? <p>Reading access details…</p>
-          : authority.status === 'ok' ? <><p>{authority.data.authority}</p><p className="dim">Build <code>{authority.data.build}</code></p></>
-          : <p role="status">Access details are unavailable: {authority.refused.refusal.refusal} — {authority.refused.refusal.reason}</p>}
-      </details>
     </div>
   );
 }

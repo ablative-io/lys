@@ -1,5 +1,5 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
-/* v4: the dock (help or assistant, one at a time), explain mode, builders, graph, network. */
+/* The help dock, explain mode, builders, graph, network. */
 .dock { width: 0; flex: none; overflow: hidden; background: var(--surface-base); border-left: 1px solid var(--border-subtle); transition: width .32s var(--spring); }
 .dock-right .dock { border-left: 0; border-right: 1px solid var(--border-subtle); }
 .dock.open { width: 380px; }

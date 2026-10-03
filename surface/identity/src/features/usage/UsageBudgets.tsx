@@ -97,7 +97,7 @@ function SetBudget({ budgets, busy, save }: FormProps) {
   const [limit, setLimit] = useState('');
   const [length, setLength] = useState<Length>('day');
   const [act, setAct] = useState<BudgetAct>('tell');
-  const valid = validAmount(measure, limit) && budgets.limits.length < 64
+  const valid = validAmount(measure, limit)
     && !budgets.unavailable.some((each) => each.unit === measure);
   const submit = () => {
     if (busy || !valid) return;
@@ -118,6 +118,5 @@ function SetBudget({ budgets, busy, save }: FormProps) {
     <select aria-label="When it's hit" value={act} disabled={busy} onChange={(event) => setAct(event.target.value as BudgetAct)}>{Object.entries(ACTS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select>
     <span />
     <span><button className="btn primary" type="submit" disabled={busy || !valid}>Add this limit</button></span>
-    {budgets.limits.length >= 64 ? <p>A budget can hold at most 64 limits.</p> : null}
   </form>;
 }

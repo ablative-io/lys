@@ -38,7 +38,7 @@ function GoalRow({ agent, item, changed }: { agent: string; item: GoalItem; chan
     (answer) => changed(answer.goal.active ? 'Goal switched on.' : 'Goal switched off.'));
   const blocked = reword.blocked || activity.blocked || item.standing !== 'open';
   const next = words.trim();
-  const valid = next.length > 0 && next.length <= 500 && !/\p{Cc}/u.test(next);
+  const valid = next.length > 0 && !/\p{Cc}/u.test(next);
   const form = 'reword-' + goal.id;
   return <tr>
     <td>{goal.kind}</td>
@@ -46,7 +46,7 @@ function GoalRow({ agent, item, changed }: { agent: string; item: GoalItem; chan
       <form id={form} aria-label={'Reword goal ' + goal.id} onSubmit={(event) => {
         event.preventDefault(); if (!blocked && valid && next !== goal.words) reword.submit({ operation: operationId(), words: next });
       }}>
-        <input name="words" aria-label={'Words of goal ' + goal.id} value={words} required maxLength={500} disabled={blocked} onChange={(event) => setWords(event.target.value)} />
+        <input name="words" aria-label={'Words of goal ' + goal.id} value={words} required disabled={blocked} onChange={(event) => setWords(event.target.value)} />
       </form>
       <ChangeStatus change={reword} />
     </td>
@@ -76,7 +76,7 @@ function SetGoal({ agent, kind, changed }: { agent: string; kind: 'agent' | 'tea
   };
   return <form aria-label="Set a goal" className="usage-add-row" style={{ gridTemplateColumns: COLUMNS.slice(0, 3).join(' ') + ' 24%' }} onSubmit={(event) => { event.preventDefault(); submit(); }}>
     <span className="sec">goal</span>
-    <textarea name="words" aria-label={'What the ' + kind + ' is reminded of'} rows={4} value={words} required maxLength={500} disabled={change.blocked} placeholder="Type a goal and press Enter" onChange={(event) => setWords(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } }} />
+    <textarea name="words" aria-label={'What the ' + kind + ' is reminded of'} rows={4} value={words} required disabled={change.blocked} placeholder="Type a goal and press Enter" onChange={(event) => setWords(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } }} />
     <input name="deadline" aria-label="Deadline, empty for none" type="datetime-local" value={deadline} disabled={change.blocked} onChange={(event) => setDeadline(event.target.value)} />
     <span><button className="btn primary" type="submit" disabled={change.blocked || !ready}>Set goal</button></span>
     <ChangeStatus change={change} />

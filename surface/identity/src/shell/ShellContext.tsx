@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import type { ReactNode } from 'react';
 import { pref, setPref } from './prefs';
 
-export type DockMode = 'help' | 'assistant' | null;
+export type DockMode = 'help' | null;
 
 export type KindFilter = 'all' | 'person' | 'agent' | 'teams' | 'accounts' | 'found';
 
@@ -55,7 +55,7 @@ function returnFocus(opener: Element | null) {
 export function ShellProvider({ children }: { children: ReactNode }) {
   const [labels, setLabelsState] = useState(pref('labels', 'icons') === 'labels');
   const [dockRight, setDockRight] = useState(pref('dock', 'left') === 'right');
-  const [dockMode, setDockMode] = useState<DockMode>(() => { const saved = pref('dock-panel', ''); return saved === 'help' || saved === 'assistant' ? saved : null; });
+  const [dockMode, setDockMode] = useState<DockMode>(() => { const saved = pref('dock-panel', ''); return saved === 'help' ? saved : null; });
   const [helpSel, setHelpSel] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [explaining, setExplaining] = useState(false);

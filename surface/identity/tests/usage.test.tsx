@@ -81,7 +81,6 @@ describe('Usage', () => {
     await mount(file, keeping());
     const what = $('form[aria-label="Set a goal"] textarea[name="words"]') as HTMLTextAreaElement | null;
     expect(what?.rows).toBeGreaterThanOrEqual(4);
-    expect(what?.maxLength).toBe(500);
   });
 
   it('shows a deadline-free goal without inventing a date', async () => {
