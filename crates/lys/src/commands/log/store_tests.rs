@@ -138,7 +138,12 @@ fn an_unfinished_append_still_opens_through_the_cli_path() {
     assert_eq!(recovered.recovered_to(), None);
     assert_eq!(recovered.store().extent(), 2);
     assert_eq!(recovered.store().pinned().tree_size, 2);
-    assert!(recovered.store().unfinished_tail().is_none());
+    // The writable open names what it cut; the cut itself is what the
+    // read-only open below no longer finds.
+    assert_eq!(
+        recovered.store().unfinished_tail().map(|tail| tail.bytes),
+        Some(7)
+    );
     let read_only = lys_log_store::FileLeafStore::open_read_only(&dir).unwrap();
     assert_eq!(read_only.extent(), 2);
     assert!(
