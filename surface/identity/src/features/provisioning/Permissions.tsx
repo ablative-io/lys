@@ -105,7 +105,8 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   if (!program) return null;
-  const takesRules = program.description.permissions.rule_forms.length > 0;
+  // A program listed with no description takes no rules here; the service refuses permissions for one (provisioning_api.rs, `settings`).
+  const takesRules = (program.description?.permissions?.rule_forms?.length ?? 0) > 0;
   const kept = mode === KEPT;
   const forced = policy.status === 'read' ? policy.forced : null;
   const unread = policy.status === 'unread' ? <>Lys could not read this agent’s policy, so what it refuses is not shown. {policy.reason} <small className="refusal-name">{policy.refusal}</small></> : null;

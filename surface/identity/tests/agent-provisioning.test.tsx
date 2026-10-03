@@ -43,9 +43,11 @@ describe('Agent provisioning', () => {
     expect(button('Approve these settings')).toBeNull();
     expect(posted).toEqual([]);
   });
-  it('does not rewrite an old profile just by reading its connected services', async () => {
+  it('shows an old profile’s connected tools in words and does not rewrite it just by reading them', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', routes);
-    expect(text()).not.toContain('/opt/mcp/excalidraw');
+    expect(text()).toContain('Cambium Reached at http://localhost:6010, and its messages wake the agent');
+    expect(text()).toContain('Excalidraw Runs /opt/mcp/excalidraw --stdio');
+    expect(text()).not.toContain('"command"');
     expect(posted).toEqual([]);
   });
   it('greys Save for a non-administrator and says an administrator changes these settings', async () => {
