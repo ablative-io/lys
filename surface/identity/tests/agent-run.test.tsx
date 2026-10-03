@@ -22,7 +22,8 @@ const started = (agent: string) => (body: unknown) => {
   const sent = body as { machine: string; operation: string };
   return ok({ agent, machine: sent.machine, runtime: 'lys-runner', session: sent.operation, provisioning_version: 1, harness: 'Claude Code', handles: [], template: '', template_sha256: '', command: 'claude', left_out: [], executed: false, runner: { session: sent.operation, state: 'running', pid: 7, started_at: 1790000003 } });
 };
-const button = (words: string) => $$('button').find((el) => el.textContent === words) ?? null;
+// A button inside what one agent's Start or Stop opened: the row under it on the front page, or its pane on People and agents. Every stopped agent's row has its own Start, so the whole page is never searched.
+const button = (words: string) => $$('.you-asked button, .agent-run button').find((el) => el.textContent === words) ?? null;
 
 const routes = {
   ...SERVICE,
