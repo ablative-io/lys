@@ -423,12 +423,26 @@ async fn a_revoked_grant_names_when_and_at_which_revision_it_was_revoked() -> Te
     Ok(())
 }
 
+/// Gives or takes write permission on the grant log's segment files and
+/// their directory (LYSLOGSTORE-008 R1: an append opens, writes, flushes and
+/// closes the current segment, or creates the next one), so the store's next
+/// append is refused by the filesystem while `writable` is false.
 fn leaves_writable(service: &Service, writable: bool) -> TestResult {
-    let mode = if writable { 0o755 } else { 0o555 };
-    std::fs::set_permissions(
-        service.dir.path().join("grant-log").join("leaves"),
-        std::fs::Permissions::from_mode(mode),
-    )?;
+    let segments = service
+        .dir
+        .path()
+        .join("grant-log")
+        .join("leaves")
+        .join("segments");
+    let (file_mode, dir_mode) = if writable {
+        (0o644, 0o755)
+    } else {
+        (0o444, 0o555)
+    };
+    for entry in std::fs::read_dir(&segments)? {
+        std::fs::set_permissions(entry?.path(), std::fs::Permissions::from_mode(file_mode))?;
+    }
+    std::fs::set_permissions(&segments, std::fs::Permissions::from_mode(dir_mode))?;
     Ok(())
 }
 

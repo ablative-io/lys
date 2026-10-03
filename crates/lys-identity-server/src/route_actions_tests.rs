@@ -252,8 +252,8 @@ async fn a_pass_exercises_get_and_head_and_refuses_a_revoked_grant_and_an_ungran
             .as_u16(),
         403
     );
-    let pin = service.dir.path().join("organisation/state.json");
-    let before = std::fs::read(&pin)?;
+    let pin = service.dir.path().join("organisation");
+    let before = pinned_at(&pin)?;
     let response = client()
         .post(format!("{}/mcp", service.base))
         .header("lys-agent-pass", &pass)
@@ -274,7 +274,7 @@ async fn a_pass_exercises_get_and_head_and_refuses_a_revoked_grant_and_an_ungran
         body["result"]["structuredContent"]["body"]["refusal"], "NotHeld",
         "{body}"
     );
-    assert_eq!(std::fs::read(&pin)?, before);
+    assert_eq!(pinned_at(&pin)?, before);
     let granted = grant(&service, &cookie, &person, &agent).await?;
     assert_eq!(get(&service, "/configuration", &pass).await?.0, 200);
     assert_eq!(
@@ -387,17 +387,47 @@ async fn a_pass_asks_for_access_without_a_grant_and_an_unknown_or_ended_pass_can
     Ok(())
 }
 
+/// The pin of the log at `dir`, read through the store.
+fn pinned_at(dir: &std::path::Path) -> TestResult<lys_log_store::PinnedRoot> {
+    use lys_log_store::LeafStore;
+    Ok(lys_log_store::FileLeafStore::open_read_only(dir)?.pinned())
+}
+
+/// Takes write permission off the log's segment files and their directory
+/// (LYSLOGSTORE-008 R1: an append opens, writes, flushes and closes the
+/// current segment, or creates the next one), so the store's next append is
+/// refused by the filesystem. Answers the act that puts every mode back.
+fn log_write_refused(dir: &std::path::Path) -> TestResult<impl FnOnce() -> TestResult + use<>> {
+    use std::os::unix::fs::PermissionsExt;
+    let segments = dir.join("leaves").join("segments");
+    let mut modes = Vec::new();
+    for entry in std::fs::read_dir(&segments)? {
+        let path = entry?.path();
+        modes.push((path.clone(), std::fs::metadata(&path)?.permissions()));
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400))?;
+    }
+    modes.push((
+        segments.clone(),
+        std::fs::metadata(&segments)?.permissions(),
+    ));
+    std::fs::set_permissions(&segments, std::fs::Permissions::from_mode(0o500))?;
+    Ok(move || {
+        for (path, mode) in modes.into_iter().rev() {
+            std::fs::set_permissions(&path, mode)?;
+        }
+        Ok(())
+    })
+}
+
 async fn refuses_an_unrecorded_use(service: &Service, pass: &str) -> TestResult {
     use std::os::unix::fs::PermissionsExt;
-    let leaves = service.dir.path().join("grant-log/leaves");
-    let mode = std::fs::metadata(&leaves)?.permissions();
-    let pin = service.dir.path().join("grant-log/state.json");
-    let before = std::fs::read(&pin)?;
-    std::fs::set_permissions(&leaves, std::fs::Permissions::from_mode(0o500))?;
+    let log = service.dir.path().join("grant-log");
+    let before = pinned_at(&log)?;
+    let restore = log_write_refused(&log)?;
     let response = get(service, "/configuration", pass).await;
-    std::fs::set_permissions(&leaves, mode)?;
+    restore()?;
     let (status, body) = response?;
-    assert_eq!(std::fs::read(&pin)?, before);
+    assert_eq!(pinned_at(&log)?, before);
     assert_eq!(status, 503, "{body}");
     assert_eq!(body["refusal"], "LogUnavailable");
     Ok(())
