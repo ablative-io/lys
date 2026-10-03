@@ -11,20 +11,22 @@ describe("An agent's file", () => {
     expect($('.file')?.dataset.tab).toBe('agent file · A/00000000');
     expect($('#state')?.textContent).toBe('Active');
     expect($('[aria-label="About this agent"] .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
-    expect($('.agent-details')?.textContent).toContain('since 22 Sep');
-    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access1', 'Settings', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Tool policy', 'Record2', 'Budgets and goals']);
+    expect($('.file .head')?.textContent).toContain('since 22 Sep');
+    expect($('.agent-details')).toBeNull();
+    expect($('.file details')).toBeNull();
+    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Access1', 'Settings', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Tool policy', 'Record2', 'Budgets and goals']);
   });
 
-  it('explains three next steps, keeps lifecycle controls in Details and preserves Emergency stop', async () => {
+  it('explains three next steps, keeps lifecycle controls in the head, in view, and preserves Emergency stop', async () => {
     await mount('#/file/' + SCRIBE);
     const next = $$('nav[aria-label="Next steps"] a');
     expect(next.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Start', 'Set limits', 'Give access']);
     expect(next.map((entry) => entry.getAttribute('href'))).toEqual(['#/team/' + SCRIBE, '#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']);
     expect(next.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
     expect($('.agent-next a[data-act="start"]')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
-    expect($('.agent-details [data-act="suspend"]')?.getAttribute('href')).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
+    expect($('.file .head [data-act="suspend"]')).not.toBeNull();
     expect($('.file .head button[data-act="stop"]')).not.toBeNull();
-    expect($('.agent-details [data-act="stop"]')).toBeNull();
+    expect($$('.file [data-act="stop"]').length).toBe(1);
   });
 
   it('stops an agent only after a reason is given, under one operation, and never claims a session ended', async () => {
@@ -64,12 +66,9 @@ describe("An agent's file", () => {
 
   it('shows role and version as not recorded, never a sample role', async () => {
     await mount('#/file/' + SCRIBE);
-    const details = $('.agent-details');
-    if (!(details instanceof HTMLDetailsElement)) throw new Error('Agent details missing');
-    await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); });
-    const facts = $('.facts')?.textContent ?? '';
+    const about = $('[aria-label="About this agent"]')?.textContent ?? '';
     expect(text()).toContain('No role is currently assigned');
-    expect(facts).toContain('Ada (test person)');
+    expect(about).toContain('Ada (test person)');
     expect(text()).not.toContain('Identity lead');
   });
 
@@ -86,7 +85,7 @@ describe("An agent's file", () => {
     await press('7', {}, document.body);
     expect(location.hash).toBe(`#/file/${SCRIBE}/certificate`);
     await press('1', {}, document.body);
-    expect($('.tabs a.on')?.textContent).toBe('Role');
+    expect($('.tabs a.on')?.textContent).toBe('Overview');
   });
 
   it('draws the record from the signed receipts', async () => {
@@ -101,10 +100,7 @@ describe("An agent's file", () => {
 
   it('opens the lifecycle form without changing identity state before submission', async () => {
     const { posted } = await mount('#/file/' + SCRIBE);
-    const details = $('.agent-details');
-    if (!(details instanceof HTMLDetailsElement)) throw new Error('Agent details missing');
-    await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); });
-    await click($('[data-act="suspend"]'));
+    await click($('.file .head [data-act="suspend"]'));
     expect(location.hash).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
     expect(document.querySelector<HTMLInputElement>('input[type="hidden"][name="identity"]')?.value).toBe(SCRIBE);
     expect($('form[aria-label="Record lifecycle change"]')).not.toBeNull();

@@ -65,12 +65,12 @@ describe('An agent page explains the agent before its controls', () => {
     expect(actions[0]?.textContent).toContain('Scribe is running on Ward computer.');
     expect($('[data-act="start"]')).toBeNull();
     expect(actions[0]?.textContent).not.toContain('Choose its computer and model');
-    expect($('.file .head')?.textContent).not.toContain('Edit name');
-    expect($('.file .head [data-act="suspend"]')).toBeNull();
+    expect($('.file .head')?.textContent).toContain('Edit name');
+    expect($('.file .head [data-act="suspend"]')).not.toBeNull();
     expect(requests).not.toContain('/receipts/4');
-    const details = $('.agent-details');
-    expect(details?.querySelector('summary')?.textContent).toBe('Details');
-    expect(details?.textContent).toContain(SCRIBE);
+    expect($('.agent-details')).toBeNull();
+    expect($('.file details')).toBeNull();
+    expect($('.file .head .fileno')?.textContent).toBe(SCRIBE);
     expect(posted).toEqual([]);
   });
 
@@ -84,7 +84,7 @@ describe('An agent page explains the agent before its controls', () => {
     const overview = $('[aria-label="About this agent"]');
     expect(overview?.textContent).toContain('Lys could not read model names just now');
     expect(overview?.textContent).not.toContain('model-one');
-    expect($('.agent-details')?.textContent).toContain('HarnessesUnavailable');
+    expect($('[aria-label="Read problems"]')?.textContent).toContain('HarnessesUnavailable');
     expect($('[aria-label="Next steps"]')?.textContent).toContain('Choose its computer and model, then start this agent.');
   });
 
@@ -100,37 +100,38 @@ describe('An agent page explains the agent before its controls', () => {
     expect(overview?.textContent).toContain('No runner has reported a session');
     expect(overview?.textContent).toContain('Running state is unknown');
     expect(overview?.textContent).not.toContain('Stopped');
-    expect($('.agent-details')?.textContent).toContain('Active');
+    expect($('#state')?.textContent).toBe('Active');
   });
 
   it('names a failed runtime read instead of inventing an empty or stopped state', async () => {
     await open({ [prefix + '/runtime/sessions']: refused(503, 'RunnerUnavailable', 'The runner did not answer') });
     const overview = $('[aria-label="About this agent"]');
     expect(overview?.textContent).toContain('Lys could not read runner reports just now');
-    expect($('.agent-details')?.textContent).toContain('RunnerUnavailable');
-    expect($('.agent-details')?.textContent).toContain('The runner did not answer');
+    expect($('[aria-label="Read problems"]')?.textContent).toContain('RunnerUnavailable');
+    expect($('[aria-label="Read problems"]')?.textContent).toContain('The runner did not answer');
     expect(overview?.textContent).not.toContain('No runner has reported a session');
     expect(overview?.textContent).not.toContain('Stopped');
   });
 
   it('rejects another agent’s runtime report instead of claiming this agent is running', async () => {
     await open({ [prefix + '/runtime/sessions']: ok({ sessions: [{ ...session, agent: 'agent-' + 'f'.repeat(32) }] }) });
-    expect($('.agent-details')?.textContent).toContain('RuntimeReportMismatch');
+    expect($('[aria-label="Read problems"]')?.textContent).toContain('RuntimeReportMismatch');
     expect($('[aria-label="About this agent"]')?.textContent).toContain('Lys could not read runner reports just now');
     expect($('[aria-label="About this agent"]')?.textContent).not.toContain('Running, as its runner last reported');
   });
 
-  it('reads receipts only when Details opens and keeps lifecycle changes there', async () => {
-    const { posted, requests } = await open();
-    const details = $('.agent-details');
-    if (!(details instanceof HTMLDetailsElement)) throw new Error('Agent details are missing');
-    expect(details.open).toBe(false);
-    expect(requests).not.toContain('/receipts/4');
-    await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); });
+  it('reads receipts only when the Record tab is opened and keeps lifecycle changes in the head', async () => {
+    const first = await open();
+    expect(first.requests).not.toContain('/receipts/4');
+    expect($('.file .head [data-act="suspend"]')).not.toBeNull();
+    expect(first.posted).toEqual([]);
+    act(() => root?.unmount()); root = null;
+    const { posted, requests } = await open({}, '#/file/' + SCRIBE + '/record');
     expect(requests).toContain('/receipts/4');
     expect(requests).toContain('/receipts/5');
-    expect(details.textContent).toContain('registered, under its person');
-    expect(details.querySelector('[data-act="suspend"]')).not.toBeNull();
+    expect($('.file .pane')?.textContent).toContain('registered, under its person');
+    expect($('.file .head [data-act="suspend"]')).not.toBeNull();
+    expect($('.file details.agent-details')).toBeNull();
     expect(posted).toEqual([]);
   });
 
@@ -160,7 +161,7 @@ describe('An agent page explains the agent before its controls', () => {
 
   it('keeps an unreadable computer list unknown instead of offering to add a first computer', async () => {
     const { posted } = await open({ '/network': refused(503, 'NetworkUnavailable', 'The computer list could not be read') });
-    expect($('.agent-details')?.textContent).toContain('NetworkUnavailable');
+    expect($('[aria-label="Read problems"]')?.textContent).toContain('NetworkUnavailable');
     expect($('[aria-label="Next steps"]')?.textContent).not.toContain('Lys has no computer');
     expect($('[aria-label="Next steps"] a[href="#/network?add=computer"]')).toBeNull();
     expect(posted).toEqual([]);
@@ -177,14 +178,15 @@ describe('An agent page explains the agent before its controls', () => {
     { tab: 'provisioning', control: '[aria-label="Settings of this agent"]' },
     { tab: 'budgets', control: 'section.usage' },
     { tab: 'access', control: '[data-act="grant"]' },
-  ])('puts $tab before folded Details without reading receipts', async ({ tab, control }) => {
+  ])('shows $tab in the open, under visible tabs, without reading receipts', async ({ tab, control }) => {
     const { posted, requests } = await open({}, '#/file/' + SCRIBE + '/' + tab);
     const form = $(control);
-    const details = $('.agent-details');
-    if (!form || !(details instanceof HTMLDetailsElement)) throw new Error('Agent settings or Details are missing');
+    const tabs = $('.file nav.tabs');
+    if (!form || !tabs) throw new Error('Agent settings or tabs are missing');
     expect(form.closest('details')).toBeNull();
-    expect(form.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(details.open).toBe(false);
+    expect(tabs.closest('details')).toBeNull();
+    expect(tabs.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect($('.agent-details')).toBeNull();
     expect(requests).not.toContain('/receipts/4');
     expect(requests).not.toContain('/receipts/5');
     const stop = $('.file .head [data-act="stop"]');

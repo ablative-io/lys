@@ -83,7 +83,8 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
         <div className="head">
           <div>
             <h1 style={{ fontSize: 24, marginTop: 0 }}>{x.display_name}</h1>
-            {agent ? <p className="sec">{x.state === 'active' ? x.display_name + ' is added.' : x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}</p> : <div className="sec">
+            <div className="fileno">{x.id}</div>
+            {agent ? <p className="sec">{x.state === 'active' ? x.display_name + ' is added.' : x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}{since ? ' Registered since ' + day(since) + '.' : ''}</p> : <div className="sec">
               {kind}
               {person ? (
                 <>
