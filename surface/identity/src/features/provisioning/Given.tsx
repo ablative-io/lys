@@ -16,13 +16,20 @@ import { useState } from 'react';
 
 const count = (n: number, one: string, many: string) => n + ' ' + (n === 1 ? one : many);
 
-export function Skills({ kept, value, change }: { kept: string[] | null; value: string[]; change: (next: string[]) => void }) {
+/** The skills that reach a run beside the ones Lys gives, said only for a program it is known of (CLEAN-START.md rows 10 and 16). */
+export function otherSkills(program: string): string {
+  if (program === 'Claude Code') return 'Claude Code’s own built-in skills are there as well.';
+  if (program === 'Codex') return 'Codex also uses the skills set up for it on the agent’s computer.';
+  return '';
+}
+
+export function Skills({ program, kept, value, change }: { program: string; kept: string[] | null; value: string[]; change: (next: string[]) => void }) {
   const [open, setOpen] = useState(false);
   const unknown = kept ? value.filter((name) => !kept.includes(name)) : [];
   const offered = kept ?? [];
   return <section className="rule-list given-skills" aria-label="Skills">
     <p><b>Skills this agent is given</b></p>
-    <p className="dim">{value.length ? count(value.length, 'skill', 'skills') + ': ' + value.join(', ') + '.' : 'None.'}</p>
+    <p className="dim">{value.length ? count(value.length, 'skill', 'skills') + ': ' + value.join(', ') + '.' : 'None from Lys.'}{otherSkills(program) ? ' ' + otherSkills(program) : ''}</p>
     {unknown.map((name) => <p key={name} className="why-not">Lys keeps no skill named {name}, so these settings cannot be saved until it is removed.{' '}
       <button type="button" className="btn" onClick={() => change(value.filter((one) => one !== name))}>Remove {name}</button></p>)}
     {kept === null ? <p className="why-not">Lys could not list the skills it keeps, so none can be chosen here.</p>

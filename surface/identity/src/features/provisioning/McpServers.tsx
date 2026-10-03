@@ -1,8 +1,9 @@
 /**
- * The connected tools an agent has: the MCP servers named in its own
- * settings. A Lys-started agent gets these and Lys's own, and none from the
- * person's own setup on the computer (docs/harness/reference/claude-code/
- * CLEAN-START.md), so this list is the whole of it.
+ * The connected tools an agent is given: the MCP servers named in its own
+ * settings. A Lys-started Claude Code gets these and Lys's own, and none from
+ * the person's own setup on the computer (docs/harness/reference/claude-code/
+ * CLEAN-START.md); a Codex run also reads the login's own Codex setup, so
+ * for Codex this list is not the whole of it, and the screen says so.
  *
  * Each server is one row in plain words. One is added by choosing how it is
  * reached, then giving only what that needs: a web address, or a program on
@@ -59,7 +60,7 @@ function AddServer({ kinds, taken, add, done }: { kinds: ServerKind[]; taken: st
     {kind === 'address' ? <label className="field">Web address<span className="hint">For example: https://tools.example.org/mcp</span><input name="server-address" value={given.address} onChange={set('address')} onKeyDown={noSubmit} autoComplete="off" /></label> : null}
     {kind === 'program' ? <>
       <label className="field">The program’s full path<span className="hint">For example: /usr/local/bin/notes-mcp</span><input name="server-program" value={given.program} onChange={set('program')} onKeyDown={noSubmit} autoComplete="off" /></label>
-      <label className="field">What it is started with<span className="hint">Optional. One argument on each line.</span><textarea name="server-args" rows={3} value={given.args} onChange={set('args')} /></label>
+      <label className="field">What it is started with<span className="hint">The words that follow the program’s name when it is started, one on each line. Leave empty if there are none.</span><textarea name="server-args" rows={3} value={given.args} onChange={set('args')} /></label>
     </> : null}
     {server ? <p className="rule-row"><b>{server.name}</b> {serverWords(server)}</p> : null}
     <p>
@@ -68,6 +69,17 @@ function AddServer({ kinds, taken, add, done }: { kinds: ServerKind[]; taken: st
     </p>
     {!kind ? <p className="why-not">Choose how they are reached.</p> : built && 'problem' in built ? <p className="why-not">{built.problem}</p> : null}
   </div>;
+}
+
+/**
+ * What else reaches the run beside this list, said only for a program it is
+ * known of (docs/harness/reference/claude-code/CLEAN-START.md rows 4, 7a, 14):
+ * Claude Code is started without the person's own setup; Codex is not.
+ */
+export function others(program: string): string {
+  if (program === 'Claude Code') return 'Lys’s own tools are there too. These are the only others: Lys starts Claude Code without the connected tools of anyone’s own setup on this computer.';
+  if (program === 'Codex') return 'Lys’s own tools are there too. Codex also uses whatever connected tools are set up for it on the agent’s computer; Lys does not list those here.';
+  return '';
 }
 
 /** The ways a program's description says a server can be reached, as this screen offers them. */
@@ -80,7 +92,7 @@ export function McpServers({ program, transports, value, change }: { program: st
   const kinds = kindsFor(transports);
   return <section className="rule-list mcp-servers" aria-label="Connected tools">
     <p><b>Connected tools {program || 'this agent'} can use</b></p>
-    <p className="dim">Lys’s own tools are always there. These are the others, and the only others: nothing is taken from anyone’s own setup on the computer.</p>
+    {others(program) ? <p className="dim">{others(program)}</p> : null}
     {value.length ? <ul>{value.map((server) => <li key={server.name} className="rule-row">
       <b>{server.name}</b> {serverWords(server)}{server.channel === 'wake' ? ', and its messages wake the agent' : ''}{' '}
       <button type="button" className="btn" onClick={() => change(value.filter((one) => one.name !== server.name))}>Remove</button>

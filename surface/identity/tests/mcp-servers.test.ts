@@ -1,6 +1,6 @@
 /** A connected-tools server is built from a name and what reaches it, and read back in plain words. */
 import { describe, expect, it } from 'vitest';
-import { kindsFor, serverFor, serverWords } from '../src/features/provisioning/McpServers';
+import { kindsFor, others, serverFor, serverWords } from '../src/features/provisioning/McpServers';
 
 const blank = { name: '', address: '', program: '', args: '' };
 
@@ -31,6 +31,13 @@ describe('connected tools', () => {
     expect(kindsFor(['stdio'])).toEqual(['program']);
     expect(kindsFor([])).toEqual([]);
     expect(kindsFor(undefined)).toEqual([]);
+  });
+
+  it('never says the list is the whole of it for a program whose own setup also reaches the run', () => {
+    expect(others('Claude Code')).toContain('These are the only others');
+    expect(others('Codex')).toContain('Codex also uses whatever connected tools are set up for it');
+    expect(others('Codex')).not.toContain('only others');
+    expect(others('Another')).toBe('');
   });
 
   it('says a server in one line of plain words', () => {

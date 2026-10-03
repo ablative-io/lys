@@ -93,7 +93,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     <ModeWords program={program} mode={mode} sentencesOnly />
     <ToolsNamed value={tools} change={setTools} />
     <McpServers key={'servers:' + programName} program={program?.name ?? ''} transports={program?.description?.mcp?.transports} value={servers} change={setServers} />
-    <Skills kept={choices.skills} value={skills} change={setSkills} />
+    <Skills program={program?.name ?? ''} kept={choices.skills} value={skills} change={setSkills} />
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
     {prompt ? <p className="dim prompt-words">{promptWords(prompt, prompt === 'keep' ? '' : instructions)}</p> : null}
     {prompt && prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
