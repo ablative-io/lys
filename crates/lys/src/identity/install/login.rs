@@ -41,6 +41,7 @@ pub const KEPT: &[&str] = &[
 pub struct Environment {
     kept: BTreeMap<String, String>,
     path: String,
+    anthropic_base: Option<String>,
 }
 
 /// What the install record says about the services' environment: the names
@@ -63,6 +64,13 @@ impl Environment {
             .chain(std::iter::once(("PATH", self.path.as_str())))
     }
 
+    /// The login's own `ANTHROPIC_BASE_URL`, as the same login shell answered
+    /// it; never given to a service, only recorded as the model proxy's
+    /// upstream.
+    pub fn anthropic_base(&self) -> Option<&str> {
+        self.anthropic_base.as_deref()
+    }
+
     /// What the install record says about this environment.
     pub fn record(&self) -> EnvironmentRecord {
         EnvironmentRecord {
@@ -77,6 +85,9 @@ impl Environment {
 /// outside it and never taken as PATH.
 const PATH_MARKER: &str = "LYS_LOGIN_PATH:";
 const PATH_END: &str = ":LYS_LOGIN_PATH_END";
+/// The same, around the login's `ANTHROPIC_BASE_URL` in the same answer.
+const BASE_MARKER: &str = "LYS_LOGIN_ANTHROPIC_BASE_URL:";
+const BASE_END: &str = ":LYS_LOGIN_ANTHROPIC_BASE_URL_END";
 
 static LOGIN: OnceLock<Environment> = OnceLock::new();
 
@@ -128,7 +139,9 @@ pub fn login_from(
         .args([
             "-l",
             "-c",
-            &format!(r#"printf '\n%s%s%s' '{PATH_MARKER}' "$PATH" '{PATH_END}'"#),
+            &format!(
+                r#"printf '\n%s%s%s%s%s%s' '{PATH_MARKER}' "$PATH" '{PATH_END}' '{BASE_MARKER}' "${{ANTHROPIC_BASE_URL-}}" '{BASE_END}'"#
+            ),
         ])
         .stdin(Stdio::null())
         .output()
@@ -184,9 +197,21 @@ pub fn login_from(
             format!("login shell {shell} answered an empty PATH"),
         ));
     }
+    let anthropic_base = after_mark
+        .rsplit_once(BASE_MARKER)
+        .and_then(|(_, after)| after.split_once(BASE_END))
+        .map(|(base, _)| base)
+        .ok_or_else(|| {
+            refuse(
+                "read login",
+                "environment",
+                format!("login shell {shell} did not answer its ANTHROPIC_BASE_URL"),
+            )
+        })?;
     Ok(Environment {
         kept,
         path: path.to_string(),
+        anthropic_base: (!anthropic_base.is_empty()).then(|| anthropic_base.to_owned()),
     })
 }
 

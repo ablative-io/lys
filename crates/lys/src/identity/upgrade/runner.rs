@@ -328,7 +328,7 @@ impl Restart {
             say("the service's configuration names no model proxy; none started");
             return Ok(());
         }
-        proxy::configure(layout, services::login()?, say)?;
+        proxy::configure(layout, login::login()?, say)?;
         super::launch(layout, &self.proxy, true)?;
         say(&format!("model proxy {word} on {}", self.proxy_url));
         Ok(())

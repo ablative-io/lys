@@ -110,5 +110,26 @@ fn a_login_profile_that_prints_does_not_become_part_of_path() -> Result<(), Box<
             .contains("did not close its PATH answer"),
         "{refusal}"
     );
+
+    // A shell that answers its PATH but not the login's ANTHROPIC_BASE_URL is
+    // refused by name, never taken as naming none.
+    let half = dir.path().join("half-shell");
+    std::fs::write(
+        &half,
+        "#!/bin/sh\nprintf 'LYS_LOGIN_PATH:/bin:LYS_LOGIN_PATH_END'\n",
+    )?;
+    std::fs::set_permissions(&half, std::fs::Permissions::from_mode(0o700))?;
+    let mut process = process_with_leak();
+    process.retain(|(name, _)| name != "SHELL");
+    process.push(("SHELL".into(), half.into()));
+    let refusal = login_from(process)
+        .err()
+        .ok_or("an answer without the base must be refused")?;
+    assert!(
+        refusal
+            .to_string()
+            .contains("did not answer its ANTHROPIC_BASE_URL"),
+        "{refusal}"
+    );
     Ok(())
 }

@@ -48,7 +48,7 @@ fn login_with(
     dir: &std::path::Path,
     name: &str,
     profile: &str,
-) -> Result<crate::identity::install::services::Environment, Box<dyn std::error::Error>> {
+) -> Result<crate::identity::install::login::Environment, Box<dyn std::error::Error>> {
     use std::os::unix::fs::PermissionsExt;
     let shell = dir.join(name);
     std::fs::write(
@@ -64,11 +64,11 @@ fn login_with(
         "ANTHROPIC_BASE_URL".into(),
         "http://invoking.example".into(),
     ));
-    Ok(crate::identity::install::services::login_from(process)?)
+    Ok(crate::identity::install::login::login_from(process)?)
 }
 
 #[test]
-fn the_upstream_is_the_login_shell_s_own_and_never_the_invoking_process_s()
+fn the_upstream_is_the_login_shell_s_own_answer_in_the_one_login_exchange_never_the_invoking_process_s()
 -> Result<(), Box<dyn std::error::Error>> {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir()?;
@@ -78,11 +78,11 @@ fn the_upstream_is_the_login_shell_s_own_and_never_the_invoking_process_s()
         "export ANTHROPIC_BASE_URL=https://gateway.example/anthropic",
     )?;
     assert_eq!(
-        super::login_base(&gateway)?.as_deref(),
+        gateway.anthropic_base(),
         Some("https://gateway.example/anthropic")
     );
     let plain = login_with(dir.path(), "plain-shell", "unset ANTHROPIC_BASE_URL")?;
-    assert_eq!(super::login_base(&plain)?, None);
+    assert_eq!(plain.anthropic_base(), None);
     let layout = Layout::at(dir.path().join("root"));
     std::fs::create_dir_all(layout.data_dir())?;
     let mut said = Vec::new();

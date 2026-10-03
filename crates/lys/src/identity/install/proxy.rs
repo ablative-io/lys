@@ -8,14 +8,13 @@
 //! held at the stop is recorded `lost` when it next starts.
 //!
 //! Its Anthropic upstream is recorded, never read from its environment: the
-//! install and each upgrade ask the login shell for the login's own
-//! `ANTHROPIC_BASE_URL`, as they ask it for `PATH`, and write what it answered
-//! and where it came from to `upstream.json` beside the proxy's state. A
-//! machine pointed at a gateway keeps it; a login changed later takes effect
-//! at the next install or upgrade.
+//! install and each upgrade take the login's own `ANTHROPIC_BASE_URL` from
+//! the one login-shell exchange that answers `PATH`, and write what it
+//! answered and where it came from to `upstream.json` beside the proxy's
+//! state. A machine pointed at a gateway keeps it; a login changed later
+//! takes effect at the next install or upgrade.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 
@@ -24,8 +23,9 @@ use super::super::private_files::{self, Outcome};
 use super::super::upgrade::{Ready, Unit};
 use super::layout::Layout;
 use super::log_wait::{self, LogCursor};
+use super::login::{self, Environment};
 use super::ports::Ports;
-use super::services::{self, Environment};
+use super::services;
 
 /// A base as the start line names it: scheme, host, port and path, without
 /// any user, password or query it carried.
@@ -45,11 +45,6 @@ const LISTENING: &str = r#""proxy":"listening""#;
 /// Anthropic's API, the upstream when the login names none.
 pub const ANTHROPIC: &str = "https://api.anthropic.com";
 
-/// What the login shell prints around the login's `ANTHROPIC_BASE_URL`, so
-/// that anything a profile or a logout file prints is never taken for it.
-const BASE_MARKER: &str = "LYS_LOGIN_ANTHROPIC_BASE_URL:";
-const BASE_END: &str = ":LYS_LOGIN_ANTHROPIC_BASE_URL_END";
-
 /// The proxy's Anthropic upstream as the install recorded it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Upstream {
@@ -63,56 +58,6 @@ pub struct Upstream {
 /// Where the recorded upstream is kept.
 pub fn upstream_file(layout: &Layout) -> PathBuf {
     layout.data_dir().join("proxy").join("upstream.json")
-}
-
-fn unread(detail: impl Into<String>) -> IdentityError {
-    IdentityError::new(
-        ErrorKind::Unready,
-        "read login",
-        "ANTHROPIC_BASE_URL",
-        detail,
-    )
-}
-
-/// The login's own `ANTHROPIC_BASE_URL`, as its login shell answers it when
-/// started with `environment` and nothing else; `None` when it names none
-/// or names it empty.
-pub fn login_base(environment: &Environment) -> IdentityResult<Option<String>> {
-    let variables: Vec<(&str, &str)> = environment.variables().collect();
-    let shell = variables
-        .iter()
-        .find(|(name, _)| *name == "SHELL")
-        .map(|(_, value)| *value)
-        .filter(|shell| !shell.is_empty())
-        .ok_or_else(|| unread("SHELL is not set; start the install from a login"))?;
-    let output = Command::new(shell)
-        .env_clear()
-        .envs(variables.iter().copied())
-        .args([
-            "-l",
-            "-c",
-            &format!(
-                r#"printf '\n%s%s%s' '{BASE_MARKER}' "${{ANTHROPIC_BASE_URL-}}" '{BASE_END}'"#
-            ),
-        ])
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|error| unread(format!("login shell {shell} could not run: {error}")))?;
-    if !output.status.success() {
-        return Err(unread(format!(
-            "login shell {shell} exited {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        )));
-    }
-    let answer = String::from_utf8(output.stdout)
-        .map_err(|error| unread(format!("login shell {shell} answered no text: {error}")))?;
-    let base = answer
-        .rsplit_once(BASE_MARKER)
-        .and_then(|(_, after)| after.split_once(BASE_END))
-        .map(|(base, _)| base)
-        .ok_or_else(|| unread(format!("login shell {shell} did not answer it")))?;
-    Ok((!base.is_empty()).then(|| base.to_owned()))
 }
 
 /// Whether the service's configuration in place names a model proxy.
@@ -141,7 +86,7 @@ pub fn configure(
     environment: &Environment,
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<bool> {
-    let upstream = match login_base(environment)? {
+    let upstream = match environment.anthropic_base().map(str::to_owned) {
         Some(base) => Upstream {
             anthropic: base,
             from: "login".to_owned(),
@@ -221,7 +166,7 @@ pub fn start(
     for directory in [layout.run_dir(), layout.logs_dir(), layout.data_dir()] {
         private_files::ensure_dir(&directory)?;
     }
-    let changed = configure(layout, services::login()?, say)?;
+    let changed = configure(layout, login::login()?, say)?;
     let unit = unit(layout, ports);
     let before = std::fs::metadata(&unit.log).map_or(0, |meta| meta.len());
     let started = services::start_detached(program, &unit.args, &unit.log, &unit.pid, changed)?;
