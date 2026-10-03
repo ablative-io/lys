@@ -9,8 +9,7 @@
 //!   ([`forward`]).
 //! - A call is linked only by the key in its own body, read as it passes
 //!   with bounded memory ([`link`]).
-//! - Capture is bounded; a call without a slot is still forwarded and is
-//!   recorded `unrecorded`; only a call that ended whole is `complete`
+//! - Every call is captured; only a call that ended whole is `complete`
 //!   ([`capture`]).
 //! - A call is journalled durably before it is sent, and a call a previous
 //!   run left open is recorded `lost` once ([`journal`]).

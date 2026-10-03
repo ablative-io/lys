@@ -27,7 +27,6 @@ use std::sync::mpsc;
 use serde::{Deserialize, Serialize};
 
 use crate::error::HomeError;
-use crate::proxy::capture::Slot;
 use crate::proxy::error::ProxyError;
 use crate::proxy::link::{Link, day_of};
 use crate::record::call::{
@@ -156,8 +155,6 @@ pub struct Job {
     pub response: Option<PathBuf>,
     /// The response parts the proxy assembled from an event stream.
     pub parts: Option<Vec<serde_json::Value>>,
-    /// The capture slot the call holds until it is recorded.
-    pub slot: Option<Slot>,
 }
 
 /// What the sink reports of each call: ids, a status and counts only.
@@ -254,7 +251,6 @@ fn run(
                 if !report.retired {
                     unretired.push(job.call.call_id.clone());
                 }
-                // The call's capture slot is freed before its report is sent.
                 drop(job);
             }
             if let Err(unread) = reports.send(report) {
@@ -402,7 +398,6 @@ pub fn recover(
             request: spooled("request"),
             response: spooled("response"),
             parts: None,
-            slot: None,
             call,
         };
         let report = record(home, journal, &mut job);

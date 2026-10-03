@@ -35,10 +35,6 @@ struct Args {
     /// Where an `/openai` path is forwarded.
     #[arg(long, default_value = "https://api.openai.com")]
     openai: String,
-    /// How many calls may hold spooled bodies not yet recorded; above it a
-    /// call is forwarded and recorded `unrecorded`.
-    #[arg(long, default_value_t = 64)]
-    capture_slots: usize,
 }
 
 fn main() -> ExitCode {
@@ -58,7 +54,6 @@ fn run(args: Args) -> Result<(), ProxyError> {
         state: args.state,
         anthropic: Base::parse(&args.anthropic)?,
         openai: Base::parse(&args.openai)?,
-        capture_slots: args.capture_slots,
     };
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)

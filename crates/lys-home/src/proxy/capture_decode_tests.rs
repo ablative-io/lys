@@ -27,15 +27,27 @@ async fn round_trip_chunks(
     status: CallStatus,
     chunk_size: usize,
 ) -> Res {
+    capture_whole(encoding, sent, status, chunk_size).await?;
+    Ok(())
+}
+
+pub(super) async fn capture_whole(
+    encoding: Option<&'static str>,
+    sent: &[u8],
+    status: CallStatus,
+    chunk_size: usize,
+) -> Res<Harness> {
     const PREFIX: usize = 1;
     let sent: Arc<[u8]> = Arc::from(sent);
     let provider_bytes = Arc::clone(&sent);
+    let (sent_at, last_byte) = std::sync::mpsc::channel();
     let (resume, resumed) = mpsc::channel::<()>(1);
     let resumed = Arc::new(Mutex::new(resumed));
     let task = Arc::new(Mutex::new(None));
     let provider_task = Arc::clone(&task);
     let (upstream, count) = fake(move || {
         let sent = Arc::clone(&provider_bytes);
+        let sent_at = sent_at.clone();
         let resumed = Arc::clone(&resumed);
         let task = Arc::clone(&provider_task);
         async move {
@@ -56,6 +68,7 @@ async fn round_trip_chunks(
                 for byte in sent[PREFIX..].chunks(chunk_size) {
                     sender.send(Bytes::copy_from_slice(byte)).await?;
                 }
+                sent_at.send(std::time::Instant::now())?;
                 Res::Ok(())
             });
             *task.lock().await = Some(sending);
@@ -63,7 +76,7 @@ async fn round_trip_chunks(
         }
     })
     .await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let mut request = messages_request(Some(KEY), true)?;
     request
         .headers_mut()
@@ -96,6 +109,14 @@ async fn round_trip_chunks(
         .ok_or("provider task absent")?
         .await??;
     let report = harness.report()?;
+    let durable_report_delay = last_byte.recv()?.elapsed();
+    if sent.len() >= 64 * 1024 * 1024 {
+        println!(
+            "capture_bytes={} last_upstream_send_to_durable_report_ms={:.3}",
+            sent.len(),
+            durable_report_delay.as_secs_f64() * 1000.0
+        );
+    }
     assert_eq!(report.status, status);
     assert!(report.retired);
     let calls = harness.calls(KEY)?;
@@ -126,14 +147,13 @@ async fn round_trip_chunks(
         assert!(stored_decoded_text <= DECODED_BOUND);
     }
     assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(harness.proxy.slots().in_use(), 0);
     connection.abort();
     if let Err(error) = connection.await
         && !error.is_cancelled()
     {
         return Err(error.into());
     }
-    Ok(())
+    Ok(harness)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -220,13 +240,13 @@ fn encode_response(encoding: &str, prefix: &[u8], decoded_size: usize) -> Res<Ve
     ];
     match encoding {
         "gzip" => {
-            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+            let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
             encoder.write_all(&padding)?;
             encoder.write_all(prefix)?;
             Ok(encoder.finish()?)
         }
         "deflate" => {
-            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::fast());
             encoder.write_all(&padding)?;
             encoder.write_all(prefix)?;
             Ok(encoder.finish()?)

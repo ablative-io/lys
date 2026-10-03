@@ -8,6 +8,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use http_body_util::BodyExt;
 use hyper::StatusCode;
 use tokio::sync::mpsc as channel;
 
@@ -104,7 +105,7 @@ async fn a_call_open_when_the_proxy_stops_is_recorded_lost_by_the_next_start() -
         }
     })
     .await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let addr = harness.addr;
     let in_flight =
         tokio::spawn(async move { send(addr, messages_request(Some(KEY), false)?).await });
@@ -119,7 +120,6 @@ async fn a_call_open_when_the_proxy_stops_is_recorded_lost_by_the_next_start() -
         state: harness.dir.path().join("state"),
         anthropic: base.clone(),
         openai: base,
-        capture_slots: 4,
     })?;
     assert_eq!(restarted.lost.len(), 1);
     assert_eq!(restarted.lost[0].status, CallStatus::Lost);
@@ -135,7 +135,7 @@ async fn a_call_open_when_the_proxy_stops_is_recorded_lost_by_the_next_start() -
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_journal_that_cannot_be_written_refuses_the_call_before_it_is_sent() -> Res {
     let (upstream, count) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let journal = harness.state("journal");
     std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o500))?;
     let sent = send(harness.addr, messages_request(Some(KEY), false)?).await;
@@ -166,7 +166,7 @@ async fn a_journal_lost_after_admission_forwards_and_records_unrecorded_once_wri
         }
     })
     .await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let addr = harness.addr;
     let call = tokio::spawn(async move {
         let (response, _connection) = send(addr, messages_request(Some(KEY), false)?).await?;
@@ -198,5 +198,82 @@ async fn a_journal_lost_after_admission_forwards_and_records_unrecorded_once_wri
     let calls = harness.calls(KEY)?;
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].status, CallStatus::Unrecorded);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all() -> Res {
+    use std::os::unix::fs::PermissionsExt;
+    let (go_tx, go_rx) = channel::channel::<()>(1);
+    let (arrived_tx, mut arrived_rx) = channel::channel::<()>(1);
+    let go_rx = Arc::new(tokio::sync::Mutex::new(go_rx));
+    let (upstream, _) = fake(move || {
+        let go_rx = Arc::clone(&go_rx);
+        let arrived_tx = arrived_tx.clone();
+        async move {
+            if arrived_tx.send(()).await.is_ok() {
+                go_rx.lock().await.recv().await;
+            }
+            whole(StatusCode::OK, &message_response())
+        }
+    })
+    .await?;
+    let harness = Harness::start(upstream).await?;
+    let addr = harness.addr;
+    let call = tokio::spawn(async move {
+        let (response, _connection) = send(addr, messages_request(Some(KEY), false)?).await?;
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(
+            response.into_body().collect().await?.to_bytes(),
+        )
+    });
+    arrived_rx
+        .recv()
+        .await
+        .ok_or("the upstream saw no request")?;
+    let capture = harness.state("capture");
+    std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o500))?;
+    go_tx.send(()).await?;
+    let received = call.await??;
+    let report = harness.report()?;
+    std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o700))?;
+    assert_eq!(
+        received,
+        hyper::body::Bytes::from(message_response().to_string())
+    );
+    assert_eq!(report.status, CallStatus::Unrecorded);
+    let calls = harness.calls(KEY)?;
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].status, CallStatus::Unrecorded);
+    assert!(calls[0].response.is_empty());
+    assert!(calls[0].raw_response.is_none());
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_whole_large_response_stays_complete_after_journal_recovery() -> Res {
+    let mut sent = vec![b'\n'; 20 * 1024 * 1024];
+    sent.extend_from_slice(super::capture_decode_tests::PLAIN);
+    let harness =
+        super::capture_decode_tests::capture_whole(None, &sent, CallStatus::Complete, 65536)
+            .await?;
+    let calls = harness.calls(KEY)?;
+    let home = harness.home()?;
+    let journal = Journal::open(harness.state("journal"))?;
+    journal.write(&open_call(&calls[0].call_id, Some(KEY)))?;
+    let reports = recover(&home, &journal, &harness.state("capture"))?;
+    assert_eq!(reports.len(), 1);
+    assert!(reports[0].already_recorded);
+    let recovered = harness.calls(KEY)?;
+    assert_eq!(recovered.len(), 1);
+    assert_eq!(recovered[0].status, CallStatus::Complete);
+    let raw = recovered[0]
+        .raw_response
+        .as_ref()
+        .ok_or("response absent")?;
+    let bytes = home
+        .blocks()?
+        .get(&crate::record::blocks::Hash::parse(raw)?)?;
+    assert_eq!(bytes.len(), sent.len());
+    assert_eq!(bytes, sent);
     Ok(())
 }

@@ -27,7 +27,6 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{Arc, mpsc};
 use std::task::{Context, Poll};
-use std::time::Instant;
 
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -45,7 +44,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 
-use crate::proxy::capture::{Call, Slots};
+use crate::proxy::capture::Call;
 use crate::proxy::error::ProxyError;
 use crate::proxy::journal::{CallReport, Journal, OpenCall, Sink, recover};
 use crate::record::call::Api;
@@ -199,6 +198,7 @@ impl<O: Observer> Body for Tee<O> {
     type Data = Bytes;
     type Error = hyper::Error;
 
+    /// Gate: holds the frame for the observer's decode and spool write.
     fn poll_frame(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -300,46 +300,12 @@ where
     }
 }
 
-/// The pass-through: forward `request` to `base` unchanged and return the
-/// response unchanged. One line per call is written on stderr, when the
-/// response head arrives (or the upstream fails): its method, its path
-/// (never its query), its status and the milliseconds until the head, and
-/// never a header value or a body byte. A failure to reach the upstream is
-/// answered 502, naming the failure.
-pub async fn pass_through(
-    upstream: &Upstream,
-    base: &Base,
-    request: Request<Incoming>,
-) -> Response<ProxyBody> {
-    let started = Instant::now();
-    let method = request.method().as_str().to_owned();
-    let path = request.uri().path().to_owned();
-    let path_and_query = request
-        .uri()
-        .path_and_query()
-        .map_or_else(|| path.clone(), |pq| pq.as_str().to_owned());
-    let request = request.map(BodyExt::boxed_unsync);
-    let (status, response) = match upstream.send(base, &path_and_query, request).await {
-        Ok(response) => (response.status(), response.map(BodyExt::boxed_unsync)),
-        Err(error) => (
-            StatusCode::BAD_GATEWAY,
-            refusal(StatusCode::BAD_GATEWAY, &format!("pass-through: {error}")),
-        ),
-    };
-    let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
-    let line = serde_json::json!({
-        "method": method,
-        "path": path,
-        "status": status.as_u16(),
-        "duration_ms": duration_ms,
-    });
-    eprintln!("{line}");
-    response
-}
+#[path = "pass_through.rs"]
+mod passing;
+pub use passing::pass_through;
 
 /// What `lys-proxy` is given: the home its calls are recorded in, the
-/// directory its journal and capture live in, the two provider bases and
-/// the capture bound.
+/// directory its journal and capture live in, and the two provider bases.
 #[derive(Clone, Debug)]
 pub struct ProxyConfig {
     /// The home the calls are recorded in.
@@ -350,8 +316,6 @@ pub struct ProxyConfig {
     pub anthropic: Base,
     /// The base an `/openai` path is forwarded to.
     pub openai: Base,
-    /// How many calls may hold spooled bodies not yet recorded.
-    pub capture_slots: usize,
 }
 
 /// The little proxy: forwards by path prefix and records each model call
@@ -361,7 +325,6 @@ pub struct Proxy {
     upstream: Upstream,
     anthropic: Base,
     openai: Base,
-    slots: Slots,
     capture: PathBuf,
     journal: Journal,
     sink: Sink,
@@ -397,7 +360,6 @@ impl Proxy {
             upstream,
             anthropic: config.anthropic,
             openai: config.openai,
-            slots: Slots::new(config.capture_slots),
             capture,
             journal,
             sink,
@@ -413,12 +375,6 @@ impl Proxy {
     #[must_use]
     pub const fn sink(&self) -> &Sink {
         &self.sink
-    }
-
-    /// The capture bound.
-    #[must_use]
-    pub const fn slots(&self) -> &Slots {
-        &self.slots
     }
 
     /// Serve on `listener` for as long as it accepts.
@@ -478,13 +434,7 @@ impl Proxy {
                 &format!("lys-proxy refused the call: {error}"),
             );
         }
-        let call = Call::admit(
-            open,
-            self.slots.take(),
-            &self.capture,
-            self.journal.clone(),
-            self.sink.clone(),
-        );
+        let call = Call::admit(open, &self.capture, self.journal.clone(), self.sink.clone());
         let request = request.map(|body| Tee::new(body, call.request_side()).boxed_unsync());
         match self.upstream.send(base, &rest, request).await {
             Ok(response) => {

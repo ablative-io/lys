@@ -120,7 +120,7 @@ pub(super) struct Harness {
 }
 
 impl Harness {
-    pub(super) async fn start(upstream: SocketAddr, slots: usize) -> Res<Self> {
+    pub(super) async fn start(upstream: SocketAddr) -> Res<Self> {
         let dir = tempfile::tempdir()?;
         let base = Base::parse(&format!("http://{upstream}"))?;
         let started = Proxy::start(ProxyConfig {
@@ -128,7 +128,6 @@ impl Harness {
             state: dir.path().join("state"),
             anthropic: base.clone(),
             openai: base,
-            capture_slots: slots,
         })?;
         assert!(started.lost.is_empty());
         let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -343,7 +342,7 @@ async fn a_stream_of_200_events_reaches_the_client_before_its_last_event_is_sent
         }
     })
     .await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let (response, _connection) = send(harness.addr, messages_request(Some(KEY), true)?).await?;
     let mut body = response.into_body();
     let mut got = read_exactly(&mut body, events[0].len()).await?;
@@ -364,7 +363,7 @@ async fn a_stream_of_200_events_reaches_the_client_before_its_last_event_is_sent
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn one_keyed_call_is_one_lys_call_whose_request_blocks_are_the_request_parts() -> Res {
     let (upstream, _) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let sent = messages_body(Some(KEY), false);
     let (response, _connection) = send(harness.addr, messages_request(Some(KEY), false)?).await?;
     let answered = response.into_body().collect().await?.to_bytes();
@@ -385,7 +384,6 @@ async fn one_keyed_call_is_one_lys_call_whose_request_blocks_are_the_request_par
     assert_eq!(calls[0].model.as_deref(), Some("claude-test-model"));
     assert_eq!(calls[0].response.len(), 1);
     assert_eq!(std::fs::read_dir(harness.state("journal"))?.count(), 0);
-    assert_eq!(harness.proxy.slots().in_use(), 0);
     Ok(())
 }
 
@@ -407,7 +405,7 @@ async fn an_upstream_that_drops_mid_request_sees_one_request_and_the_call_is_par
             drop(stream);
         }
     });
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let (response, _connection) = send(harness.addr, messages_request(Some(KEY), false)?).await?;
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
     let report = harness.report()?;
@@ -431,7 +429,7 @@ async fn a_client_that_closes_mid_stream_is_recorded_cancelled_with_no_response_
         response
     })
     .await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let (response, connection) = send(harness.addr, messages_request(Some(KEY), true)?).await?;
     let mut body = response.into_body();
     let first = body.frame().await.ok_or("no first frame")??;
@@ -461,7 +459,7 @@ async fn an_upstream_stream_that_ends_before_message_stop_is_partial() -> Res {
         response
     })
     .await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let (response, _connection) = send(harness.addr, messages_request(Some(KEY), true)?).await?;
     let received = response.into_body().collect().await?.to_bytes();
     assert_eq!(received, messages_events(3)[..4].concat());
@@ -474,44 +472,18 @@ async fn an_upstream_stream_that_ends_before_message_stop_is_partial() -> Res {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all() -> Res {
-    use std::os::unix::fs::PermissionsExt;
-    let (go_tx, go_rx) = channel::channel::<()>(1);
-    let (arrived_tx, mut arrived_rx) = channel::channel::<()>(1);
-    let go_rx = Arc::new(tokio::sync::Mutex::new(go_rx));
-    let (upstream, _) = fake(move || {
-        let go_rx = Arc::clone(&go_rx);
-        let arrived_tx = arrived_tx.clone();
-        async move {
-            if arrived_tx.send(()).await.is_ok() {
-                go_rx.lock().await.recv().await;
-            }
-            whole(StatusCode::OK, &message_response())
-        }
-    })
-    .await?;
-    let harness = Harness::start(upstream, 4).await?;
-    let addr = harness.addr;
-    let call = tokio::spawn(async move {
-        let (response, _connection) = send(addr, messages_request(Some(KEY), false)?).await?;
-        Ok::<_, Box<dyn Error + Send + Sync>>(response.into_body().collect().await?.to_bytes())
-    });
-    arrived_rx
-        .recv()
-        .await
-        .ok_or("the upstream saw no request")?;
-    let capture = harness.state("capture");
-    std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o500))?;
-    go_tx.send(()).await?;
-    let received = call.await??;
-    let report = harness.report()?;
-    std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o700))?;
-    assert_eq!(received, Bytes::from(message_response().to_string()));
-    assert_eq!(report.status, CallStatus::Unrecorded);
+async fn a_response_larger_than_the_old_bound_is_forwarded_and_recorded_whole() -> Res {
+    let mut sent = vec![b'\n'; 64 * 1024 * 1024];
+    sent.extend_from_slice(super::capture_decode_tests::PLAIN);
+    let harness =
+        super::capture_decode_tests::capture_whole(None, &sent, CallStatus::Complete, 65536)
+            .await?;
     let calls = harness.calls(KEY)?;
-    assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].status, CallStatus::Unrecorded);
-    assert!(calls[0].response.is_empty());
-    assert!(calls[0].raw_response.is_none());
+    assert_eq!(calls[0].status, CallStatus::Complete);
+    let bytes = harness.home()?.blocks()?.get(&Hash::parse(
+        calls[0].raw_response.as_ref().ok_or("response absent")?,
+    )?)?;
+    assert_eq!(bytes.len(), sent.len());
+    assert_eq!(bytes, sent);
     Ok(())
 }

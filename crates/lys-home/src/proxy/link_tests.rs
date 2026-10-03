@@ -67,7 +67,7 @@ fn a_metadata_value_over_the_budget_links_nothing() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_call_without_a_key_lands_under_unlinked_and_the_report_says_so() -> Res {
     let (upstream, _) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let (response, _connection) = send(harness.addr, messages_request(None, false)?).await?;
     assert_eq!(response.status(), StatusCode::OK);
     let report = harness.report()?;
@@ -81,7 +81,7 @@ async fn a_call_without_a_key_lands_under_unlinked_and_the_report_says_so() -> R
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn two_unkeyed_calls_after_a_keyed_one_never_land_under_its_session() -> Res {
     let (upstream, _) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
-    let harness = Harness::start(upstream, 4).await?;
+    let harness = Harness::start(upstream).await?;
     let mut sessions = Vec::new();
     for key in [Some(KEY), None, None] {
         let (response, _connection) = send(harness.addr, messages_request(key, false)?).await?;
@@ -99,7 +99,7 @@ async fn two_unkeyed_calls_after_a_keyed_one_never_land_under_its_session() -> R
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_keyed_call_is_recorded_whole_without_a_capture_allowance() -> Res {
     let (upstream, _) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
-    let harness = Harness::start(upstream, 0).await?;
+    let harness = Harness::start(upstream).await?;
     let (response, _connection) = send(harness.addr, messages_request(Some(KEY), false)?).await?;
     assert_eq!(response.status(), StatusCode::OK);
     let report = harness.report()?;

@@ -1,15 +1,9 @@
-//! Bounded capture: the request and response bodies spooled to files while
+//! Capture: the request and response bodies spooled to files while
 //! they are forwarded, the session key read from the request as it passes,
 //! the event stream read as it passes, and the call handed to the sink when
 //! it ends.
 //!
 //! Invariants:
-//! - Capture is bounded by [`Slots`]: at most `limit` calls hold spooled
-//!   bodies not yet recorded. A call admitted with no free slot is still
-//!   forwarded whole; nothing of it is spooled and it is recorded
-//!   `unrecorded`. Its session key is still read, by the bounded
-//!   [`KeyScanner`], so it is recorded under its own session and never under
-//!   `unlinked` for want of a slot.
 //! - A spool that cannot be created or written stops spooling; the bytes go
 //!   on to the client as they came, and the call is recorded `unrecorded`.
 //! - A call ends once: `complete` only when the upstream response ended
@@ -23,7 +17,7 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -35,57 +29,6 @@ use crate::proxy::forward::{End, Observer};
 use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
 use crate::proxy::link::{KeyScanner, Link};
 use crate::record::call::CallStatus;
-
-/// The capture bound: how many calls may hold spooled bodies not yet
-/// recorded.
-#[derive(Clone, Debug)]
-pub struct Slots {
-    limit: usize,
-    used: Arc<AtomicUsize>,
-}
-
-impl Slots {
-    /// A bound of `limit` calls.
-    #[must_use]
-    pub fn new(limit: usize) -> Self {
-        Self {
-            limit,
-            used: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
-    /// Take a slot, when one is free.
-    #[must_use]
-    pub fn take(&self) -> Option<Slot> {
-        let limit = self.limit;
-        self.used
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
-                (n < limit).then_some(n + 1)
-            })
-            .ok()
-            .map(|_| Slot {
-                used: Arc::clone(&self.used),
-            })
-    }
-
-    /// How many slots are held.
-    #[must_use]
-    pub fn in_use(&self) -> usize {
-        self.used.load(Ordering::Acquire)
-    }
-}
-
-/// One held capture slot, freed when dropped: after the call is recorded.
-#[derive(Debug)]
-pub struct Slot {
-    used: Arc<AtomicUsize>,
-}
-
-impl Drop for Slot {
-    fn drop(&mut self) {
-        self.used.fetch_sub(1, Ordering::AcqRel);
-    }
-}
 
 /// A body spooled to a file.
 #[derive(Debug)]
@@ -129,7 +72,6 @@ impl Spool {
 #[derive(Debug, Default)]
 struct CallState {
     scanner: KeyScanner,
-    slot: Option<Slot>,
     request: Option<Spool>,
     response: Option<Spool>,
     capture_failed: bool,
@@ -154,22 +96,15 @@ pub struct Call {
 }
 
 impl Call {
-    /// A call admitted: its journal record is already durable. With a slot,
-    /// its request is spooled into `capture` as `<call id>.request`.
+    /// Gate: creates the request spool after durable admission.
     #[must_use]
-    pub fn admit(
-        open: OpenCall,
-        slot: Option<Slot>,
-        capture: &Path,
-        journal: Journal,
-        sink: Sink,
-    ) -> Arc<Self> {
-        let mut state = CallState::default();
-        if slot.is_some() {
-            state.request = Spool::create(capture.join(format!("{}.request", open.call_id)));
-            state.capture_failed = state.request.is_none();
-        }
-        state.slot = slot;
+    pub fn admit(open: OpenCall, capture: &Path, journal: Journal, sink: Sink) -> Arc<Self> {
+        let request = Spool::create(capture.join(format!("{}.request", open.call_id)));
+        let state = CallState {
+            capture_failed: request.is_none(),
+            request,
+            ..CallState::default()
+        };
         Arc::new(Self {
             open,
             started: Instant::now(),
@@ -222,7 +157,7 @@ impl Call {
         self.with(|s| {
             s.stream = stream;
             s.reader = stream.then(|| Reader::for_api(api, encodings));
-            if s.slot.is_some() && !s.capture_failed {
+            if !s.capture_failed {
                 s.response = Spool::create(spool);
                 s.capture_failed = s.response.is_none();
             }
@@ -275,7 +210,7 @@ impl Call {
                     }
                 }
             });
-            let unspooled = s.slot.is_none() || s.capture_failed || s.journal_failed;
+            let unspooled = s.capture_failed || s.journal_failed;
             let status = match end {
                 End::Dropped => CallStatus::Cancelled,
                 End::Failed => CallStatus::Partial,
@@ -293,7 +228,6 @@ impl Call {
                 request: s.request.take().map(|spool| spool.path),
                 response: s.response.take().map(|spool| spool.path),
                 parts,
-                slot: s.slot.take(),
             })
         });
         // An interrupted capture keeps its durable open journal entry;
@@ -307,11 +241,12 @@ impl Call {
 }
 
 /// Reads the request body as it goes upstream: the session key, and the
-/// spool when the call holds a slot.
+/// spool for the call.
 #[derive(Debug)]
 pub struct RequestSide(Arc<Call>);
 
 impl Observer for RequestSide {
+    /// Gate: holds the frame for session scanning and spool write.
     fn data(&mut self, bytes: &Bytes) {
         self.0.with(|s| {
             s.scanner.feed(bytes);
@@ -329,11 +264,12 @@ impl Observer for RequestSide {
 }
 
 /// Reads the response body as it goes to the client: the stream grammar,
-/// and the spool when the call holds a slot; its end ends the call.
+/// and the spool for the call; its end ends the call.
 #[derive(Debug)]
 pub struct ResponseSide(Arc<Call>);
 
 impl Observer for ResponseSide {
+    /// Gate: holds the frame for decode and spool write under the call state lock.
     fn data(&mut self, bytes: &Bytes) {
         self.0.with(|s| {
             if let Some(reader) = &mut s.reader
@@ -379,7 +315,7 @@ mod poison_tests {
         journal.write(&open)?;
         let (reports, received) = mpsc::channel();
         let sink = Sink::start(home, journal.clone(), reports);
-        let call = Call::admit(open.clone(), None, dir.path(), journal.clone(), sink);
+        let call = Call::admit(open.clone(), dir.path(), journal.clone(), sink);
         let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             call.with(|state| {
                 state.capture_failed = true;

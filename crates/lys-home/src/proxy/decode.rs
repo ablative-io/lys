@@ -11,9 +11,6 @@ use serde_json::Value;
 use super::stream::StreamReader;
 use crate::record::call::Api;
 
-/// Limits recording memory and work per compressed response, across all members:
-/// delivered decoded bytes are bounded; the codec's internal 32 KiB window is fixed.
-const DECODED_LIMIT: usize = 16 * 1024 * 1024;
 const CHUNK: usize = 8192;
 
 /// A response-side reader; unsupported or absent codings retain the raw reader.
@@ -57,7 +54,6 @@ impl Reader {
                     coding: Coding::Compressed(Box::new(Decoded {
                         codec,
                         reader,
-                        delivered: 0,
                         ended: false,
                         failure: None,
                     })),
@@ -201,7 +197,6 @@ impl Read for Inflater {
 struct Decoded {
     codec: Codec,
     reader: StreamReader,
-    delivered: usize,
     ended: bool,
     failure: Option<(io::ErrorKind, String)>,
 }
@@ -223,11 +218,7 @@ impl Decoded {
         self.check_failure()?;
         let mut output = [0; CHUNK];
         while !self.ended {
-            let remaining = DECODED_LIMIT - self.delivered;
-            // A one-byte probe distinguishes an exact-bound trailer from excess output.
-            // The probe is never delivered to the assembler or retained on failure.
-            let capacity = remaining.clamp(1, CHUNK);
-            match self.codec.read(&mut output[..capacity]) {
+            match self.codec.read(&mut output) {
                 Ok(0) => {
                     if !self.codec.input().bytes.is_empty() {
                         return self.fail(invalid("bytes follow the compression trailer"));
@@ -235,12 +226,6 @@ impl Decoded {
                     self.ended = true;
                 }
                 Ok(amount) => {
-                    if amount > remaining {
-                        return self.fail(invalid(format!(
-                            "response_decoded_limit_exceeded: delivered decoded bytes exceed {DECODED_LIMIT}"
-                        )));
-                    }
-                    self.delivered += amount;
                     self.reader.feed(&output[..amount]);
                 }
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(()),
