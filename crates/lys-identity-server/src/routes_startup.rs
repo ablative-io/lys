@@ -115,7 +115,6 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         setup: config.setup.clone(),
         password_policy: config.password_policy.clone(),
         model_proxy: config.model_proxy.clone(),
-        haem_stores: config.haem_stores.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
         sessions: match &config.sessions_file {
             Some(file) => {

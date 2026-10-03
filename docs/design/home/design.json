@@ -81,8 +81,7 @@
     "ADR-110",
     "ADR-072",
     "ADR-112",
-    "ADR-133",
-    "ADR-136"
+    "ADR-133"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -2215,66 +2214,6 @@
       "path": "crates/lys-home/src/proxy/persist.rs",
       "note": "touched by HOME-038 R2 and R3: the persist fallback uses a batch and the timing carries three counts",
       "brief": "HOME-038"
-    },
-    {
-      "path": "crates/lys-identity-server/src/haem_door.rs",
-      "note": "HOME-039 R1 and R2: the routes GET /haem and POST /haem/{store}, the framing and the exchange with a store's service",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/error_haem.rs",
-      "note": "HOME-039 R2: the door's three refusals, their names and statuses",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/tests/haem_door.rs",
-      "note": "HOME-039 R1 to R3: admission, the carried verb, refusal against silence, and the configured socket",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/config.rs",
-      "note": "touched by HOME-039 R3: haem_stores, validated at start",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/openapi_table.rs",
-      "note": "touched by HOME-039 R1: the two routes and their refusals",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/routes_table.rs",
-      "note": "touched by HOME-039 R1: the door's routes are merged into the table",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/routes.rs",
-      "note": "touched by HOME-039 R1 and R3: the state carries the configured stores",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/routes_startup.rs",
-      "note": "touched by HOME-039 R1 and R3: the configured stores are copied into the state",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/openapi_types.rs",
-      "note": "touched by HOME-039 R1: the two routes' request and answer schemas",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/error.rs",
-      "note": "touched by HOME-039 R2: ServerError wraps the door's refusals",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/error_names.rs",
-      "note": "touched by HOME-039 R2: the door's refusal names",
-      "brief": "HOME-039"
-    },
-    {
-      "path": "crates/lys-identity-server/src/error_status.rs",
-      "note": "touched by HOME-039 R2: the door's refusal statuses",
-      "brief": "HOME-039"
     }
   ],
   "inventory": [

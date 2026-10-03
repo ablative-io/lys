@@ -215,11 +215,6 @@ pub struct Config {
     /// own setup says.
     #[serde(default)]
     pub model_proxy: Option<String>,
-    /// The haematite stores the door reaches: each name and the absolute
-    /// path of the Unix socket its `haem serve` listens on. Without any, the
-    /// door lists no store and reaches none.
-    #[serde(default)]
-    pub haem_stores: std::collections::BTreeMap<String, PathBuf>,
     /// The compiled screens the service serves at `/`, its own routes then
     /// answering under `/api`. Without it the routes answer at the root and
     /// no screen is served.
@@ -277,7 +272,6 @@ impl Config {
             ));
         }
         self.link_audit_binding()?;
-        crate::haem_door::validate(&self.haem_stores).map_err(invalid)?;
         if let Some(policy) = &self.password_policy {
             policy
                 .validate()

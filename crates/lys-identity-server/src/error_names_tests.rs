@@ -195,26 +195,6 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         (ServerError::LoginUnbound, "LoginUnbound"),
         (ServerError::MachineUnknown, "MachineUnknown"),
         (
-            ServerError::Haem(crate::error_haem::HaemError::StoreUnknown {
-                store: detail.to_owned(),
-            }),
-            "HaemStoreUnknown",
-        ),
-        (
-            ServerError::Haem(crate::error_haem::HaemError::Refused {
-                code: detail.to_owned(),
-                message: detail.to_owned(),
-            }),
-            "HaemRefused",
-        ),
-        (
-            ServerError::Haem(crate::error_haem::HaemError::Unreachable {
-                store: detail.to_owned(),
-                reason: detail.to_owned(),
-            }),
-            "HaemUnreachable",
-        ),
-        (
             ServerError::Machine(crate::error_machine::MachineError::Reused {
                 machine: detail.to_owned(),
             }),

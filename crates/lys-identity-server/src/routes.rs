@@ -68,8 +68,6 @@ pub struct AppState {
     /// Lys's model proxy for Anthropic calls, given to each Claude Code run
     /// Lys starts as its base URL; absent, runs reach their provider directly.
     pub model_proxy: Option<String>,
-    /// The haematite stores the door reaches, each by its service's socket.
-    pub haem_stores: std::collections::BTreeMap<String, PathBuf>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.

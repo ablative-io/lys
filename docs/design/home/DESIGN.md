@@ -69,7 +69,6 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 - ADR-072 — The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, written only when render-launch is given a key — The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data, so its signed payload hash is the given hash render-launch reports as given_sha256. It is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event, which HOME-003 keeps unaltered; and changing lys verify's one failure message to name the file, which would change the published lys for every user.
 - ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
 - ADR-133 — The launch is everything Lys records for the seat, for Claude Code and our Codex build — A provisioning profile declares its harness build; the launch renders every field for that build or the profile is refused by name when it is recorded. Command MCP servers carry secrets only as handles. Claude Code permissions come from the profile and the Tool policy; Codex permissions are DIRECTORY-065's render of the same policy.
-- ADR-136 — The door to a haematite store is Lys: haem serve stays a local socket, and Lys carries each verb for a caller it has admitted — Lys's identity server lists the haematite stores its configuration names (haem_stores: a name and the absolute path of the service's socket) and carries one verb per request to that store's service over the socket, greeting first. Only an administrator is admitted until a grant per store exists. The service's result is answered as it came; its own refusal is HaemRefused, a definite answer; a service that does not answer is HaemUnreachable, never a refusal, so a caller settles a change by its receipt.
 
 ## Goals
 
@@ -535,18 +534,6 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/src/record/call/captured.rs` | touched by HOME-038 R2: captured parts go through the call's one batch | HOME-038 |
 | `crates/lys-home/src/harness/claude_code/import/content.rs` | touched by HOME-038 R2: an imported entry's content blocks go through one batch | HOME-038 |
 | `crates/lys-home/src/proxy/persist.rs` | touched by HOME-038 R2 and R3: the persist fallback uses a batch and the timing carries three counts | HOME-038 |
-| `crates/lys-identity-server/src/haem_door.rs` | HOME-039 R1 and R2: the routes GET /haem and POST /haem/{store}, the framing and the exchange with a store's service | HOME-039 |
-| `crates/lys-identity-server/src/error_haem.rs` | HOME-039 R2: the door's three refusals, their names and statuses | HOME-039 |
-| `crates/lys-identity-server/tests/haem_door.rs` | HOME-039 R1 to R3: admission, the carried verb, refusal against silence, and the configured socket | HOME-039 |
-| `crates/lys-identity-server/src/config.rs` | touched by HOME-039 R3: haem_stores, validated at start | HOME-039 |
-| `crates/lys-identity-server/src/openapi_table.rs` | touched by HOME-039 R1: the two routes and their refusals | HOME-039 |
-| `crates/lys-identity-server/src/routes_table.rs` | touched by HOME-039 R1: the door's routes are merged into the table | HOME-039 |
-| `crates/lys-identity-server/src/routes.rs` | touched by HOME-039 R1 and R3: the state carries the configured stores | HOME-039 |
-| `crates/lys-identity-server/src/routes_startup.rs` | touched by HOME-039 R1 and R3: the configured stores are copied into the state | HOME-039 |
-| `crates/lys-identity-server/src/openapi_types.rs` | touched by HOME-039 R1: the two routes' request and answer schemas | HOME-039 |
-| `crates/lys-identity-server/src/error.rs` | touched by HOME-039 R2: ServerError wraps the door's refusals | HOME-039 |
-| `crates/lys-identity-server/src/error_names.rs` | touched by HOME-039 R2: the door's refusal names | HOME-039 |
-| `crates/lys-identity-server/src/error_status.rs` | touched by HOME-039 R2: the door's refusal statuses | HOME-039 |
 
 ## Inventory
 

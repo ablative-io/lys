@@ -268,7 +268,6 @@ impl ServerError {
             Self::Team(error) => error.status(),
             Self::Budget(error) => error.status(),
             Self::Holding(error) => error.status(),
-            Self::Haem(error) => error.status(),
             Self::Machine(error) => error.status(),
         }
     }

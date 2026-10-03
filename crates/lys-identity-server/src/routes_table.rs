@@ -65,7 +65,6 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::apps_bench::routes())
         .merge(crate::openapi::routes())
         .merge(crate::changes::routes())
-        .merge(crate::haem_door::routes())
         .merge(crate::health_api::routes())
         .layer(axum::middleware::from_fn_with_state(
             std::sync::Arc::clone(&state),

@@ -870,26 +870,6 @@
           "done": false
         }
       ]
-    },
-    {
-      "name": "The door to a haematite store (HOME-039)",
-      "items": [
-        {
-          "id": "C199",
-          "text": "GET /haem answers the stores the configuration names, in name order, to an administrator; POST /haem/{store} carries one verb to that store's service over its Unix socket after greeting it with hello on the same connection, and answers the service's result as it came; a caller who is not signed in is refused NotSignedIn and one who is not an administrator NotAdmitted, before the body is read and before the socket is opened (HOME-039 R1).",
-          "done": false
-        },
-        {
-          "id": "C200",
-          "text": "The service's own refusal is answered HaemRefused (409) carrying its code and words; a socket that cannot be reached, a connection closed before the answer, an answer to another request or a frame that is not JSON is HaemUnreachable (502) and never a refusal; a store the configuration does not name is HaemStoreUnknown (404); a body that is not a method and optional params and no other member is RequestMalformed (HOME-039 R2).",
-          "done": false
-        },
-        {
-          "id": "C201",
-          "text": "haem_stores in the configuration maps a store's name to the absolute path of its service's socket; a relative path or a name that is empty or holds a slash is refused at start as ConfigInvalid naming the entry; without the setting the door lists no store (HOME-039 R3).",
-          "done": false
-        }
-      ]
     }
   ]
 }
