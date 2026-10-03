@@ -91,9 +91,10 @@ unit.
 - The confinement Lys has written for Codex is called only by a test, and as written would not run a
   command and would not hold the network. (A16 agreed; A17, A18 seen)
 - No judge is installed for Codex, and Codex's own pages say such a hook is not a wall. (A23, A26)
-- Run with an empty config folder, the installed Codex still listed 32 of the login's own skills to the
-  model, and both instruction files reached it even in Lys's "replace" mode. (A37 to A40, seen; no Lys
-  run) So for Codex, giving a run its own config folder does not by itself make it start clean.
+- Run with its Codex home pointed at a scratch folder holding only a marker instruction file, the
+  installed Codex still listed 32 of the login's own skills to the model; and that marker file and the
+  working folder's own instruction file both reached the model, even in Lys's "replace" mode. (A37 to A40,
+  seen; no Lys run) So for Codex, giving a run its own config folder does not by itself make it start clean.
 - The one place Codex offers a setting the login cannot undo is an administrator's requirements file.
   Documentation only; no Lys code writes it; not observed. (A33, open)
 
@@ -111,8 +112,9 @@ either not enforced by anything, or enforced by something Lys does not control.
   this for a start; the screen shows that rendering, not a description of it.
 - Under it, one plain block that claims no more than the rows support. For Claude Code: "This computer's
   own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each
-  action." For Codex: "Lys sets where its commands may write and whether they may use the network,
-  while they stay in the sandbox. It can read every file this login can read. Web search and leaving the
+  action." For Codex with no mode chosen: "Lys has set nothing; this computer's own Codex settings
+  decide." (A2, open) For Codex with a mode: "Lys sets where its commands may write and whether they may
+  use the network, while they stay in the sandbox. It can read every file this login can read. Web search and leaving the
   sandbox are decided by this computer's own Codex settings." Nothing on the screen says a rule is enforced until a run has been watched
   being refused (V8).
 - Show the policy on the settings form and the front page pane, not only on a tab of the file, with who
@@ -127,8 +129,8 @@ recommend, each to be proved by a watched run before the next:
   machine's own Claude Code and Codex setup. That ruling and "a serious permission system" pull against
   each other: a plugin hook with full access ran inside tonight's agent. This is Tom's call (question 1).
 - Turn the sandbox on by default for Claude Code agents, as `workspace-only` already does.
-- For Codex: a choice between two things that by the documentation do not combine (A28, A29, not
-  observed): a sandbox mode, as today, or a permission profile, which is the only thing that can confine
+- For Codex: a choice between two things that by the documentation do not combine (A28, A29: seen for a mode given on the command line, where the profile was
+  ignored and the denied read went through; the `--sandbox` flag itself and an agent run not seen): a sandbox mode, as today, or a permission profile, which is the only thing that can confine
   reads (A8) and which Lys's unused code gets wrong (A17, A18). Either way set the approval policy, but
   only once it has been seen what `never` does to a request to leave the sandbox (A41); and observe a
   requirements file holding against a looser login before leaning on it (A33).
@@ -161,7 +163,7 @@ promises what nothing holds.
 - A Codex agent started by Lys at all, in each mode. (A2 to A15)
 - A requirements file refusing a looser login setting. (A33)
 - What Codex's approval setting `never` does to a request to leave the sandbox. (A41)
-- Whether a permission profile is ignored when a sandbox mode is given. (A28, A29)
+- Whether a permission profile is ignored under the `--sandbox` flag itself, in an agent run. (A28, A29; seen for `-c sandbox_mode=`)
 
 ## The worst credible failure
 
