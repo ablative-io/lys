@@ -30,7 +30,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lys_log_store::{FileLeafStore, LeafStore, StoreError};
+use lys_log_store::{FileLeafStore, FrontierLog, LeafStore, StoreError};
 use tempfile::TempDir;
 
 use crate::admission::{AcceptAll, AdmissionPolicy, MaxSize, NotAdmitted, SubmitterContext};
@@ -56,13 +56,17 @@ fn signer(dir: &Path) -> FileSigner {
     FileSigner::load(&path).unwrap()
 }
 
-/// Path of a leaf file, per the layout `FileLeafStore` documents.
+/// The first segment file, per the layout `FileLeafStore` documents
+/// (LYSLOGSTORE-008 R1): a record is its u32 LE length, the leaf bytes, the
+/// pin and a CRC, so byte 4 of the first segment is the first byte of leaf 0.
 ///
-/// Only the crash-recovery case needs this: fabricating the one-leaf-ahead
-/// state means writing a leaf *without* the pin advancing, which no API offers
-/// because no API is allowed to offer it.
-fn leaf_path(dir: &Path, index: u64) -> PathBuf {
-    dir.join("leaves").join(format!("{index:020}"))
+/// Only the damage cases need this: editing a leaf underneath the log, and a
+/// tail torn before its flush, are states no API offers because no API is
+/// allowed to offer them.
+fn first_segment(dir: &Path) -> PathBuf {
+    dir.join("leaves")
+        .join("segments")
+        .join(format!("{:020}", 0))
 }
 
 /// Creates a store and an anchor over it, returning the anchor.
@@ -172,49 +176,65 @@ fn a_tampered_genesis_leaf_is_refused_at_open() {
     // Positive control: untampered, this opens.
     assert!(reopen(dir).is_ok());
 
-    // The one difference: one byte of leaf 0, edited underneath the log. The
-    // store's pin is what catches this — a rule written down before this crate
-    // existed.
-    let path = leaf_path(dir, 0);
+    // The one difference: one byte of leaf 0, edited underneath the log. A
+    // second leaf behind it keeps the genesis record from being the last, so
+    // the open cannot read the damage as a torn tail; the record's own CRC is
+    // what catches it.
+    {
+        let (mut log, _tail) = FrontierLog::open(FileLeafStore::open(dir).unwrap()).unwrap();
+        log.append(b"a second leaf behind genesis").unwrap();
+    }
+    assert!(reopen(dir).is_ok(), "two whole records open");
+    let path = first_segment(dir);
     let mut bytes = std::fs::read(&path).unwrap();
-    bytes[0] ^= 0x01;
+    bytes[4] ^= 0x01;
     std::fs::write(&path, &bytes).unwrap();
 
     match reopen(dir) {
-        Err(AnchorError::Store(StoreError::PinMismatch {
-            pinned_size,
-            rebuilt_size,
-            ..
-        })) => {
-            assert_eq!(pinned_size, 1);
-            assert_eq!(rebuilt_size, 1);
+        Err(AnchorError::Store(StoreError::CorruptRecord { offset, .. })) => {
+            assert_eq!(offset, 0, "the damaged record is the first");
         }
-        other => panic!("expected PinMismatch for an edited leaf 0, got {other:?}"),
+        other => panic!("expected CorruptRecord for an edited leaf 0, got {other:?}"),
     }
 }
 
 #[test]
-fn an_interrupted_append_is_repaired_and_reported_rather_than_swallowed() {
+fn an_unfinished_append_is_cut_and_reported_rather_than_swallowed() {
+    use std::io::Write;
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path();
     create_anchor(dir, ORIGIN, GENESIS);
 
-    // Positive control: a clean log reports no recovery, so `Some` below cannot
-    // be an artefact of this accessor always answering the same way.
+    // Positive control: a clean log reports no recovery and no cut, so `Some`
+    // below cannot be an artefact of an accessor always answering the same way.
     assert_eq!(reopen(dir).unwrap().recovered_to(), None);
+    assert!(
+        FileLeafStore::open_read_only(dir)
+            .unwrap()
+            .unfinished_tail()
+            .is_none()
+    );
 
-    // Fabricate the one state a crash can leave: the leaf is durable, the pin
-    // has not advanced. `Log::append` writes in that order precisely so this is
-    // the only divergence recovery has to repair.
-    std::fs::write(leaf_path(dir, 1), b"an append interrupted before its pin").unwrap();
+    // Fabricate the one state a crash can leave: bytes of a record that never
+    // reached its flush, after the last whole record. The append writes the
+    // leaf and its pin as one act precisely so this is the only divergence.
+    let mut segment = std::fs::OpenOptions::new()
+        .append(true)
+        .open(first_segment(dir))
+        .unwrap();
+    segment.write_all(&[7, 0, 0, 0, b'l', b'e', b'a']).unwrap();
+    drop(segment);
 
     let recovered = reopen(dir).unwrap();
-    assert_eq!(recovered.recovered_to(), Some(2));
-    assert_eq!(recovered.tree_size(), 2);
+    assert_eq!(recovered.recovered_to(), None, "nothing acknowledged moved");
+    assert_eq!(recovered.tree_size(), 1);
 
-    // The repair was durable, and it is reported exactly once: the next open is
-    // clean. An anchor that re-reported it would be describing a repair that no
-    // longer happened.
+    // The cut was durable, and it is reported exactly once: the next open finds
+    // a whole log. An anchor that re-reported it would be describing a cut
+    // that no longer happened.
+    let store = FileLeafStore::open_read_only(dir).unwrap();
+    assert_eq!(store.extent(), 1);
+    assert!(store.unfinished_tail().is_none());
     assert_eq!(reopen(dir).unwrap().recovered_to(), None);
 }
 

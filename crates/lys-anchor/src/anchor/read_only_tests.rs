@@ -28,7 +28,7 @@
 use std::path::Path;
 
 use lys_core::checkpoint::{NoteVerifierKey, verify_checkpoint};
-use lys_log_store::{FileLeafStore, Log, StoreError};
+use lys_log_store::{FileLeafStore, LeafStore, Log};
 use tempfile::TempDir;
 
 use crate::AnchorConfig;
@@ -177,54 +177,89 @@ fn reading_an_anchor_does_not_change_it() {
     assert_eq!(read_only(dir).root(), before);
 }
 
-/// An anchor at `dir` with its genesis leaf, and a second leaf written behind
-/// it as an append interrupted before its pin. Returns the bytes of
-/// `state.json` as they stand.
-fn one_leaf_ahead_of_its_pin(dir: &Path) -> Vec<u8> {
+/// An anchor at `dir` with its genesis leaf, and seven bytes of a record that
+/// never reached its flush appended after it (LYSLOGSTORE-008 R1: an
+/// unfinished append is a torn tail after the last whole record carrying a
+/// pin). Returns the segment's bytes as they stand.
+fn torn_tail_behind_genesis(dir: &Path) -> Vec<u8> {
+    use std::io::Write;
     drop(create_anchor(dir));
-    std::fs::write(
-        dir.join("leaves").join(format!("{:020}", 1)),
-        b"an append interrupted before its pin",
+    let segment = dir
+        .join("leaves")
+        .join("segments")
+        .join(format!("{:020}", 0));
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&segment)
+        .unwrap();
+    file.write_all(&[7, 0, 0, 0, b'l', b'e', b'a']).unwrap();
+    drop(file);
+    std::fs::read(&segment).unwrap()
+}
+
+#[test]
+fn a_reader_serves_the_last_whole_record_and_names_the_torn_tail_it_does_not_cut() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    let segment = torn_tail_behind_genesis(dir);
+
+    let store = FileLeafStore::open_read_only(dir).unwrap();
+    assert_eq!(store.extent(), 1);
+    assert_eq!(store.pinned().tree_size, 1);
+    let tail = store
+        .unfinished_tail()
+        .expect("a read-only open names the tail it does not cut");
+    assert_eq!(tail.bytes, 7);
+    assert_eq!(read_only(dir).tree_size(), 1);
+
+    let unchanged = std::fs::read(
+        dir.join("leaves")
+            .join("segments")
+            .join(format!("{:020}", 0)),
     )
     .unwrap();
-    std::fs::read(dir.join("state.json")).unwrap()
+    assert_eq!(unchanged, segment, "a reader changes no byte");
 }
 
 #[test]
-fn a_reader_is_refused_a_store_one_leaf_ahead_of_its_pin() {
+fn a_writable_open_cuts_the_tail_a_reader_only_named() {
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path();
-    let state = one_leaf_ahead_of_its_pin(dir);
-
-    match FileLeafStore::open_read_only(dir) {
-        Err(StoreError::RepairPending {
-            pinned_size: 1,
-            extent: 2,
-            ..
-        }) => {}
-        other => panic!("expected RepairPending at pin 1 and extent 2, got {other:?}"),
-    }
-
-    assert_eq!(std::fs::read(dir.join("state.json")).unwrap(), state);
-    let mut names: Vec<String> = std::fs::read_dir(dir.join("leaves"))
-        .unwrap()
-        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    assert_eq!(names, ["00000000000000000000", "00000000000000000001"]);
-}
-
-#[test]
-fn a_writable_open_repairs_the_log_a_reader_was_refused() {
-    let tmp = TempDir::new().unwrap();
-    let dir = tmp.path();
-    one_leaf_ahead_of_its_pin(dir);
+    let before = torn_tail_behind_genesis(dir);
 
     {
         let log = Log::open(FileLeafStore::open(dir).unwrap()).unwrap();
-        assert_eq!(log.recovered_to(), Some(2));
-        assert_eq!(log.store().pinned().tree_size, 2);
+        assert_eq!(
+            log.recovered_to(),
+            None,
+            "nothing acknowledged was repaired"
+        );
+        assert_eq!(log.store().pinned().tree_size, 1);
+        let cut = log
+            .store()
+            .unfinished_tail()
+            .expect("the writable open says what it cut");
+        assert_eq!(cut.bytes, 7);
     }
 
-    assert_eq!(read_only(dir).tree_size(), 2);
+    let after = std::fs::read(
+        dir.join("leaves")
+            .join("segments")
+            .join(format!("{:020}", 0)),
+    )
+    .unwrap();
+    assert_eq!(
+        after.len() + 7,
+        before.len(),
+        "exactly the torn bytes are gone"
+    );
+    assert_eq!(&before[..after.len()], &after[..]);
+    assert!(
+        FileLeafStore::open_read_only(dir)
+            .unwrap()
+            .unfinished_tail()
+            .is_none(),
+        "the cut was made"
+    );
+    assert_eq!(read_only(dir).tree_size(), 1);
 }
