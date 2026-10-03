@@ -11,7 +11,7 @@ const button = (label: string) => [...document.querySelectorAll('button')].find(
 describe('Sessions', () => {
   it('reads sessions and requires confirmation before ending exactly the selected one', async () => {
     let ended = false;
-    const { posted } = await mount('#/sessions', { ...SERVICE, '/sessions': () => ok(ended ? { ...sessions, sessions: [current] } : sessions),
+    const { posted } = await mount('#/file/' + ME.person.id + '/sessions', { ...SERVICE, '/sessions': () => ok(ended ? { ...sessions, sessions: [current] } : sessions),
       'POST /sessions/session-other/end': () => { ended = true; return ok({ ended: other.id }); },
     });
     expect(text()).toContain('This session');
@@ -26,7 +26,7 @@ describe('Sessions', () => {
   });
 
   it('never repeats an uncertain end, and reads the list again itself instead of offering Refresh', async () => {
-    const { posted, requests } = await mount('#/sessions', { ...SERVICE, '/sessions': ok(sessions),
+    const { posted, requests } = await mount('#/file/' + ME.person.id + '/sessions', { ...SERVICE, '/sessions': ok(sessions),
       'POST /sessions/session-other/end': refused(503, 'Unavailable', 'Outcome not confirmed'),
     });
     expect(button('Refresh sessions')).toBeNull();
@@ -41,7 +41,7 @@ describe('Sessions', () => {
   });
 
   it('returns to sign-in after the current session is ended', async () => {
-    await mount('#/sessions', { ...SERVICE, '/sessions': ok(sessions), 'POST /sessions/session-current/end': ok({ ended: current.id }) });
+    await mount('#/file/' + ME.person.id + '/sessions', { ...SERVICE, '/sessions': ok(sessions), 'POST /sessions/session-current/end': ok({ ended: current.id }) });
     await click(button('Sign out'));
     expect(text()).toContain('You will need to sign in again');
     await click(button('Confirm end session'));
@@ -49,7 +49,7 @@ describe('Sessions', () => {
   });
 
   it('uses the administrator route for an explicitly selected person', async () => {
-    const { requests } = await mount('#/sessions?person=' + ADA, { ...SERVICE, ['/directory/people/' + ADA + '/sessions']: ok(sessions) });
+    const { requests } = await mount('#/file/' + ADA + '/sessions', { ...SERVICE, ['/directory/people/' + ADA + '/sessions']: ok(sessions) });
     expect(requests).toContain('/directory/people/' + ADA + '/sessions');
     expect(requests).not.toContain('/sessions');
   });

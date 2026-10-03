@@ -4,7 +4,6 @@ import { Roles } from './features/roles/Roles';
 import { Network } from './features/network/Network';
 import { Connections } from './features/connections/Connections';
 import { SecretsPage } from './features/secrets/SecretsPage';
-import { Sessions } from './features/sessions/Sessions';
 import { Reviews } from './features/reviews/Reviews';
 import { Requests } from './features/requests/Requests';
 import { Navigate, Route, Routes, useParams } from 'react-router';
@@ -38,7 +37,7 @@ export function AppRoutes() {
       <Route path="/resources" element={<Resources />} />
       <Route path="/secrets/:section?" element={<SecretsPage />} />
       <Route path="/vault" element={<SecretsPage />} />
-      <Route path="/sessions" element={<Sessions />} />
+      <Route path="/sessions" element={<Navigate replace to="/me" />} />
       <Route path="/runtime/:session?" element={<Navigate replace to="/canvas" />} />
       <Route path="/usage/:agent?" element={<UsageMoved />} />
       <Route path="/canvas/:agent?" element={<SessionCanvas />} />

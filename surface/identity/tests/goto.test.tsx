@@ -6,10 +6,10 @@ import { $, $$, click, mount, press } from './harness';
 
 const LETTERS: Record<string, [string, string]> = {
   p: ['#/people', 'people'], o: ['#/roles', 'roles'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/requests', 'access'], w: ['#/reviews', 'access'],
-  v: ['#/secrets', 'secrets'], n: ['#/connections', 'connections'], x: ['#/sessions', 'sessions'], m: ['#/model', 'access'], s: ['#/settings', 'settings'],
+  v: ['#/secrets', 'secrets'], n: ['#/connections', 'connections'], m: ['#/model', 'access'], s: ['#/settings', 'settings'],
   h: ['#/graph', 'access'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], l: ['#/canvas', 'canvas'],
 };
-const RAIL_ITEMS = ['me', 'people', 'canvas', 'roles', 'access', 'secrets', 'connections', 'network', 'sessions', 'settings'];
+const RAIL_ITEMS = ['me', 'people', 'canvas', 'roles', 'access', 'secrets', 'connections', 'network', 'settings'];
 
 const current = () => $('#rail a.on')?.dataset.nav;
 
@@ -29,7 +29,7 @@ describe('go-to keys and palette (conformance 9.1)', () => {
     await mount('#/people');
     await press('k', { metaKey: true }, document.body);
     const count = goToRows().length;
-    expect(count).toBe(16);
+    expect(count).toBe(15);
     await press('Escape');
     const reached = new Set<string>();
     const lit = new Set<string>();
@@ -44,7 +44,7 @@ describe('go-to keys and palette (conformance 9.1)', () => {
       expect(nav, entry.hash).toBeDefined();
       if (nav) lit.add(nav);
     }
-    expect(reached.size).toBe(16);
+    expect(reached.size).toBe(15);
     expect([...lit].sort()).toEqual([...RAIL_ITEMS].sort());
   });
 

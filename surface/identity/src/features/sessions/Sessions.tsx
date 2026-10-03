@@ -1,8 +1,6 @@
 /** Live sign-ins use public session IDs; ending one requires an explicit confirmation. */
 import { useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
-import { Picker } from '../../shell/Picker';
-import { api, request, useLoad } from '../../api';
+import { request, useLoad } from '../../api';
 import { clock } from '../file/time';
 import { Gate, SignIn } from '../signin/Gate';
 import { ReadFailure, failureWords } from '../signin/words';
@@ -17,25 +15,6 @@ export interface SessionView {
 }
 interface SessionsView { person: string; sessions: SessionView[] }
 const sessionPath = (person: string) => person ? '/directory/people/' + encodeURIComponent(person) + '/sessions' : '/sessions';
-
-export function Sessions() {
-  const [params, setParams] = useSearchParams();
-  const person = params.get('person') ?? '';
-  const people = useLoad(api.people, 'session-people');
-  const chosen = people.status === 'ok' ? people.data.people.find((entry) => entry.id === person) : undefined;
-  return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Sign-in</div><h1>Where you are signed in</h1>
-      <p className="sub">See where you’re signed in and end a session you no longer need. Agents that are running are on <a href="#/canvas">Running</a>.</p></div></div>
-    {people.status === 'ok' && people.data.scope === 'directory' ? <div className="tools">
-      <span className="sec">{chosen ? 'Showing ' + chosen.display_name + '’s sessions' : 'Showing your sessions'}</span>
-      {person ? <button className="btn" onClick={() => setParams({})}>Show mine</button> : null}
-      <Picker name="person" label="Another person’s sessions" options={people.data.people.map((entry) => ({ id: entry.id, name: entry.display_name }))} onChange={(ids) => setParams(ids[0] ? { person: ids[0] } : {})} />
-    </div> : null}
-    <div className="pane">
-      <SessionList key={person} person={person} />
-    </div>
-  </div>;
-}
 
 export function SessionList({ person }: { person: string }) {
   const [revision, setRevision] = useState(0);

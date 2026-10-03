@@ -19,7 +19,7 @@ const routes = { ...SERVICE,
 const elsewhere = ['Refresh runtime reports'];
 
 describe('No Refresh or Reload button', () => {
-  it.each(['#/sessions', '#/reviews', '#/requests', '#/connections', '#/secrets/entries', '#/secrets/grants', '#/secrets/audit', '#/secrets/manage?secret=Calendar'])('on %s', async (hash) => {
+  it.each(['#/reviews', '#/requests', '#/connections', '#/secrets/entries', '#/secrets/grants', '#/secrets/audit', '#/secrets/manage?secret=Calendar'])('on %s', async (hash) => {
     await mount(hash, routes);
     expect($$('button').map((button) => button.textContent ?? '').filter((words) => /refresh|reload/i.test(words) && !elsewhere.includes(words))).toEqual([]);
   });
