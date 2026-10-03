@@ -199,7 +199,7 @@ removes exactly the paths it created, deepest first: a target it made is
 gone, and an empty target that stood before is left existing and empty.
 
 `lys-proxy --home <dir> --state <dir> [--listen <addr>] [--anthropic <url>]
-[--openai <url>] [--capture-slots <n>]` is the little proxy (HOME-001 R10).
+[--openai <url>]` is the little proxy (HOME-001 R10).
 A harness pointed at `http://<listen>/anthropic` (or `/openai`) has every
 call forwarded to the provider with its headers and streamed body unchanged
 (only `host` is set to the upstream's), frame by frame, through one transport
@@ -207,8 +207,8 @@ that never sends a request twice. Each model call (a `POST` to
 `/v1/messages`, `/v1/chat/completions` or `/v1/responses`) is journalled
 under `<state>/journal` before it is sent, and a journal that cannot be
 written refuses the call by name with nothing sent. The call's bodies are
-spooled under `<state>/capture` while they pass, bounded at
-`--capture-slots` calls (default 64). When it ends, it is recorded as one
+spooled under `<state>/capture` while they pass, without a capture-slot limit.
+When a call ends, it is recorded as one
 `lys.call` in the home. The session is the one named by the key in the
 call's own body (`metadata.user_id`, read as it passes with bounded memory),
 or `unlinked-<day>` when the body carries no key; the proxy never infers a

@@ -3,7 +3,7 @@
 use hyper::header::{CONTENT_ENCODING, HeaderValue};
 
 use super::{Coding, Reader};
-use crate::proxy::capture_decode_tests::{DECODED_BOUND, PLAIN, gzip_members, sized_response};
+use crate::proxy::capture_decode_tests::{OLD_DECODED_BOUND, PLAIN, gzip_members, sized_response};
 use crate::proxy::forward_tests::Res;
 use crate::record::call::Api;
 
@@ -16,7 +16,7 @@ fn reader(encoding: &'static str) -> Reader {
 #[test]
 fn responses_beyond_the_old_bound_are_whole_and_corrupt_decoders_never_resume() -> Res {
     for encoding in ["gzip", "deflate"] {
-        let sent = sized_response(encoding, DECODED_BOUND * 2)?;
+        let sent = sized_response(encoding, OLD_DECODED_BOUND * 2)?;
         let mut whole = reader(encoding);
         whole.feed(&sent)?;
         let parts = whole.finish()?.ok_or("large response is partial")?;
@@ -45,7 +45,7 @@ fn responses_beyond_the_old_bound_are_whole_and_corrupt_decoders_never_resume() 
 
 #[test]
 fn concatenated_members_beyond_the_old_bound_are_kept_whole() -> Res {
-    for size in [DECODED_BOUND, DECODED_BOUND * 2] {
+    for size in [OLD_DECODED_BOUND, OLD_DECODED_BOUND * 2] {
         let mut reader = reader("gzip");
         reader.feed(&gzip_members(size)?)?;
         let parts = reader.finish()?.ok_or("members are partial")?;
@@ -59,7 +59,7 @@ fn concatenated_members_beyond_the_old_bound_are_kept_whole() -> Res {
 fn events_are_assembled_before_eof_and_old_boundary_trailers_remain_valid() -> Res {
     for encoding in ["gzip", "deflate"] {
         let mut reader = reader(encoding);
-        reader.feed(&sized_response(encoding, DECODED_BOUND)?)?;
+        reader.feed(&sized_response(encoding, OLD_DECODED_BOUND)?)?;
         let Coding::Compressed(decoder) = &reader.coding else {
             return Err("compressed reader absent".into());
         };

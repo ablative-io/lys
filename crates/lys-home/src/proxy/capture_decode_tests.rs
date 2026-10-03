@@ -144,16 +144,6 @@ pub(super) async fn capture_whole(
         );
     } else {
         assert!(calls[0].response.is_empty());
-        let stored_decoded_text: usize =
-            calls[0]
-                .response
-                .iter()
-                .try_fold(0, |total, part| -> Res<usize> {
-                    let bytes = blocks.get(&Hash::parse(part)?)?;
-                    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
-                    Ok(total + value["text"].as_str().map_or(0, str::len))
-                })?;
-        assert!(stored_decoded_text <= DECODED_BOUND);
     }
     assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
     connection.abort();
@@ -223,10 +213,10 @@ async fn missing_or_corrupt_compression_trailers_never_complete_a_call() -> Res 
     round_trip(Some("gzip"), &corrupt, CallStatus::Partial).await
 }
 
-pub(super) const DECODED_BOUND: usize = 16 * 1024 * 1024;
+pub(super) const OLD_DECODED_BOUND: usize = 16 * 1024 * 1024;
 
 fn oversized_response(encoding: &str) -> Res<Vec<u8>> {
-    sized_response(encoding, DECODED_BOUND * 2)
+    sized_response(encoding, OLD_DECODED_BOUND * 2)
 }
 
 pub(super) fn sized_response(encoding: &str, decoded_size: usize) -> Res<Vec<u8>> {
@@ -279,7 +269,7 @@ async fn oversized_deflate_is_complete_and_preserves_the_entire_client_response(
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn exact_bound_compressed_responses_remain_complete_with_unchanged_client_bytes() -> Res {
     for encoding in ["gzip", "deflate"] {
-        let sent = sized_response(encoding, DECODED_BOUND)?;
+        let sent = sized_response(encoding, OLD_DECODED_BOUND)?;
         round_trip_chunks(Some(encoding), &sent, CallStatus::Complete, 8192).await?;
     }
     Ok(())
@@ -287,7 +277,7 @@ async fn exact_bound_compressed_responses_remain_complete_with_unchanged_client_
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concatenated_gzip_members_beyond_the_old_bound_are_complete() -> Res {
-    let sent = gzip_members(DECODED_BOUND * 2)?;
+    let sent = gzip_members(OLD_DECODED_BOUND * 2)?;
     round_trip_chunks(Some("gzip"), &sent, CallStatus::Complete, 8192).await
 }
 
