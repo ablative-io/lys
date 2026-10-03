@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api, operationId, Refused, request, useLoad } from '../../api';
+import { sendKept } from '../../kept';
 import { DirectoryGate, ErrorWords } from './Words';
 import { confirmReceipt } from './recorded-receipt';
 
@@ -35,15 +36,17 @@ function PersonForm({ person }: { person: string }) {
     sending.current = true; setBusy(true); setFailure(null);
     try {
       const asked = pending ?? { name: name.trim(), operation: operationId() };
-      sessionStorage.setItem(key, JSON.stringify(asked)); setPending(asked);
-      const answer = await request<unknown>('/people', { operation: asked.operation, display_name: asked.name });
-      confirmReceipt(answer, asked.operation, '/people');
-      if (!object(answer) || typeof answer.person !== 'string' || !/^person-[0-9a-f]{32}$/.test(answer.person)
-        || !object(answer.receipt) || answer.receipt.identity !== answer.person || answer.receipt.change_kind !== 1) {
-        throw new Refused(200, { refusal: 'UnconfirmedReceipt', reason: 'The answer did not confirm the person added. The original request is saved.' });
-      }
-      sessionStorage.removeItem(key);
-      navigate('/file/' + encodeURIComponent(answer.person), { replace: true });
+      const added = await sendKept(key, asked, async () => {
+        setPending(asked);
+        const answer = await request<unknown>('/people', { operation: asked.operation, display_name: asked.name });
+        confirmReceipt(answer, asked.operation, '/people');
+        if (!object(answer) || typeof answer.person !== 'string' || !/^person-[0-9a-f]{32}$/.test(answer.person)
+          || !object(answer.receipt) || answer.receipt.identity !== answer.person || answer.receipt.change_kind !== 1) {
+          throw new Refused(200, { refusal: 'UnconfirmedReceipt', reason: 'The answer did not confirm the person added. The original request is saved.' });
+        }
+        return answer.person;
+      }, false);
+      navigate('/file/' + encodeURIComponent(added), { replace: true });
     } catch (error) { setFailure(error); }
     finally { sending.current = false; setBusy(false); }
   };

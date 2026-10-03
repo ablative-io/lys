@@ -1,7 +1,8 @@
 /** Decisions retain their exact operation through unknown outcomes; server choices govern approval. */
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { operationId, Refused, request } from '../../api';
+import { operationId, request } from '../../api';
+import { answeredNo, sendKept } from '../../kept';
 import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import type { AccessRequest } from './contract';
@@ -40,21 +41,21 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
     if (working.current) return;
     working.current = true; setBusy(true); setFailure('');
     try {
-      sessionStorage.setItem(key, JSON.stringify(decision));
-      setPending({ kind: 'held', decision });
       const { kind, ...body } = decision;
-      const answer = await request<AccessRequest>('/requests/' + encodeURIComponent(entry.id) + '/' + kind, body);
-      if (answer.id !== entry.id || answer.state !== (kind === 'approve' ? 'approved' : 'declined')
-        || answer.decision?.by !== person || answer.decision.note !== decision.note
-        || (kind === 'approve' ? typeof answer.decision.grant !== 'string' : answer.decision.grant !== null)) {
-        throw new Error('The answer did not confirm this decision. Its original details remain held.');
-      }
-      sessionStorage.removeItem(key); setPending({ kind: 'empty' }); setAction(null);
+      const answer = await sendKept(key, decision, async () => {
+        setPending({ kind: 'held', decision });
+        const given = await request<AccessRequest>('/requests/' + encodeURIComponent(entry.id) + '/' + kind, body);
+        if (given.id !== entry.id || given.state !== (kind === 'approve' ? 'approved' : 'declined')
+          || given.decision?.by !== person || given.decision.note !== decision.note
+          || (kind === 'approve' ? typeof given.decision.grant !== 'string' : given.decision.grant !== null)) {
+          throw new Error('The answer did not confirm this decision. Its original details remain held.');
+        }
+        return given;
+      }, !retry);
+      setPending({ kind: 'empty' }); setAction(null);
       setDone(kind === 'approve' ? 'Access approved.' : 'Request declined.'); changed(answer);
     } catch (error) {
-      if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) {
-        sessionStorage.removeItem(key); setPending({ kind: 'empty' });
-      }
+      if (!retry && answeredNo(error)) setPending({ kind: 'empty' });
       setFailure(failureWords(error, 'Check the decision details. If the result is unconfirmed, choose Check original decision.'));
     } finally { working.current = false; setBusy(false); }
   };

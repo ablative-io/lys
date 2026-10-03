@@ -24,13 +24,13 @@ export function readWhose(value: string | null, admin: boolean): Whose {
 }
 
 /** Active teams in tree order, each with its depth, siblings by name. */
-export function treeOrder(teams: OrgTeam[]): { team: OrgTeam; depth: number }[] {
+export function treeOrder<T extends OrgTeam>(teams: T[]): { team: T; depth: number }[] {
   const active = teams.filter((team) => team.state === 'active');
   const known = new Set(active.map((team) => team.id));
   const children = (parent: string | null) => active
     .filter((team) => (team.parent && known.has(team.parent) ? team.parent : null) === parent)
     .sort((left, right) => left.name.localeCompare(right.name));
-  const out: { team: OrgTeam; depth: number }[] = [];
+  const out: { team: T; depth: number }[] = [];
   const walk = (parent: string | null, depth: number) => {
     for (const team of children(parent)) { out.push({ team, depth }); walk(team.id, depth + 1); }
   };

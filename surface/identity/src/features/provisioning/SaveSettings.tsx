@@ -1,6 +1,7 @@
 /** The settings form's one button: it saves what the form shows as the next version of the agent's settings, and nothing else. Approving and starting belong to Start on the front page. The request is kept until its answer is confirmed, and the button is never greyed without its reason beside it. */
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
+import { answeredNo, sendKept } from '../../kept';
 import type { PeopleView } from '../../generated';
 import { ComputerAdmission } from '../network/ComputerAdmission';
 import type { Machine } from '../network/contract';
@@ -92,14 +93,16 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then }
     const version = base?.version ?? 0;
     const current: KeptSave = pending ?? { path, body: { ...settings, operation: operationId(), from_version: version }, version };
     try {
-      sessionStorage.setItem(key, JSON.stringify(current)); setPending(current);
-      // The computer is no part of a save; the request helper reads only the stage, the path, the body and the version.
-      const confirmed = await profileRequest(agent, { stage: 'profile', path: current.path, body: current.body, version: current.version, machine: '' });
-      sessionStorage.removeItem(key); setPending(null); setBase(confirmed.profile);
+      const confirmed = await sendKept(key, current, () => {
+        setPending(current);
+        // The computer is no part of a save; the request helper reads only the stage, the path, the body and the version.
+        return profileRequest(agent, { stage: 'profile', path: current.path, body: current.body, version: current.version, machine: '' });
+      }, true);
+      setPending(null); setBase(confirmed.profile);
       if (then) then(); else setSaved(true);
     } catch (error) {
       // The service answered no: nothing of this request is outstanding. Anything else may have been carried out, so the request stays kept.
-      if (error instanceof Refused && error.status >= 400 && error.status < 500) { sessionStorage.removeItem(key); setPending(null); }
+      if (answeredNo(error)) setPending(null);
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
     } finally { working.current = false; setBusy(false); }
   };

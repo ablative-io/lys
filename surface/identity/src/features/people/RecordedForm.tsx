@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { operationId, Refused, request } from '../../api';
+import { answeredNo, sendKept } from '../../kept';
 import { confirmReceipt } from './recorded-receipt';
 import { ErrorWords } from './Words';
 import './recorded-form.css';
@@ -67,22 +68,19 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     try {
       const asked = change(new FormData(event.currentTarget));
       const operation = operationId();
-      // Persist before sending. Failure to retain the request refuses the send.
-      sessionStorage.setItem(key, JSON.stringify({ ...asked, operation }));
-      setPending({ ...asked, operation });
       try {
-        const result = await request<unknown>(asked.path, { ...asked.body, operation });
-        confirmReceipt(result, operation, asked.path);
+        const result = await sendKept(key, { ...asked, operation }, async () => {
+          setPending({ ...asked, operation });
+          const given = await request<unknown>(asked.path, { ...asked.body, operation });
+          confirmReceipt(given, operation, asked.path);
+          return given;
+        }, true);
         setAnswer(JSON.stringify(result, null, 2));
         setMessage(success?.(asked) ?? 'Change recorded.');
-        sessionStorage.removeItem(key);
         setPending(null);
         done();
       } catch (error) {
-        if (error instanceof Refused && error.status >= 400 && error.status < 500) {
-          sessionStorage.removeItem(key);
-          setPending(null);
-        }
+        if (answeredNo(error)) setPending(null);
         throw error;
       }
     } catch (error) {
@@ -96,9 +94,11 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     busy.current = true;
     setFailure('');
     try {
-      const result = await request<unknown>(pending.path, { ...pending.body, operation: pending.operation });
-      confirmReceipt(result, pending.operation, pending.path);
-      sessionStorage.removeItem(key);
+      const result = await sendKept(key, pending, async () => {
+        const given = await request<unknown>(pending.path, { ...pending.body, operation: pending.operation });
+        confirmReceipt(given, pending.operation, pending.path);
+        return given;
+      }, false);
       setPending(null);
       setAnswer(JSON.stringify(result, null, 2));
       setMessage(success?.(pending) ?? 'Change recorded.');

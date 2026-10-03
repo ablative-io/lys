@@ -133,7 +133,7 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
     </div> : <>
       {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
       <div className="body one" style={issuing ? { gridTemplateRows: 'minmax(0, auto) minmax(0, 1fr)' } : undefined}>
-        {issuing ? <div className="pane"><ActPanel label="Issue root grant" close={() => navigate('/access')}><IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /></ActPanel></div> : null}
+        {issuing ? <div className="pane"><ActPanel label="Issue root grant" opener={null} close={() => navigate('/access')}><IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /></ActPanel></div> : null}
         <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
           words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceWords(g.resource)} noun="grants"
           holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' grant' : ' grants')}

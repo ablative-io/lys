@@ -77,7 +77,7 @@ function Profile({ data }: { data: FileData }) {
 
 function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const shell = useShell();
-  const [giving, setGiving] = useState(false);
+  const [giving, setGiving] = useState<HTMLElement | null>(null);
   const { x, grants: w } = data;
   const name = calledBy(x.id, x.display_name);
   const held = w.list.grants.filter((g) => g.holder === x.id);
@@ -92,10 +92,10 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
   return (
     <>
       <div className="section-h" style={{ marginTop: 0 }}><span>Grants</span>
-        {x.kind === 'agent' && x.state !== 'retired' ? <button className="btn" data-act="grant" onClick={() => mineToGive && passable.length ? setGiving(true)
+        {x.kind === 'agent' && x.state !== 'retired' ? <button className="btn" data-act="grant" onClick={(event) => mineToGive && passable.length ? setGiving(event.currentTarget)
           : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)}>Give access</button> : null}
       </div>
-      {giving && passable.length ? <ActPanel label="Give" close={() => setGiving(false)}><Delegate w={w} source={passable[0]} to={x.id} done={reload} close={() => setGiving(false)} /></ActPanel> : null}
+      {giving && passable.length ? <ActPanel label="Give" opener={giving} close={() => setGiving(null)}><Delegate w={w} source={passable[0]} to={x.id} done={reload} close={() => setGiving(null)} /></ActPanel> : null}
       <GrantTable w={w} grants={held} done={reload} give={false} />
     <div className="grid2">
       <div>

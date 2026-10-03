@@ -126,7 +126,7 @@ const ROWS: ConformanceRow[] = [
       expect(accounts?.querySelector('[data-act="delegate"]')).toBeNull();
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
       // What cannot be given is the service's answer, and it lists no service account.
-      const cannot = $$('#act .why-not').map((d) => d.querySelector('b')?.textContent);
+      const cannot = $$('.act-panel .why-not').map((d) => d.querySelector('b')?.textContent);
       expect(cannot).toEqual(['viewer of project:ledger', 'Your sign-in identities']);
     },
   },
@@ -164,7 +164,7 @@ const ROWS: ConformanceRow[] = [
     check: async () => {
       await mount('#/me?tab=account');
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-      const source = $$('#act .card')[0].textContent ?? '';
+      const source = $$('.act-panel .card')[0].textContent ?? '';
       expect(source).toContain('Source grant');
       expect(source).toContain('owner of project:identity');
       expect(source).toContain('Actions it allowseverything here');
@@ -178,7 +178,7 @@ const ROWS: ConformanceRow[] = [
     check: async () => {
       await mount('#/me?tab=account');
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-      const reasons = $$('#act .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
+      const reasons = $$('.act-panel .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
       expect(reasons).toEqual([
         ['viewer of project:ledger', 'You may use it; it does not let you pass it on.'],
         ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
@@ -255,27 +255,27 @@ describe('Keyboard operation (conformance 9.3)', () => {
     // The shell yields Enter to a focused button (src/shell/keys.ts): it neither
     // opens the drawer itself nor navigates a cursor row in its place.
     await press('Enter');
-    expect($('#act')).toBeNull();
+    expect($('.act-panel')).toBeNull();
     expect(location.hash).toBe('#/me?tab=account');
 
     // jsdom does not perform the user agent's default activation of a button.
     await click(give);
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
     expect(document.activeElement?.id).toBe('dTo');
     expect(unreachable()).toEqual([]);
 
     // An agent is offered one native checkbox per action, none ticked, so the keyboard reaches each and Space ticks it.
-    const boxes = () => $$('#act input[name="action"]') as HTMLInputElement[];
+    const boxes = () => $$('.act-panel input[name="action"]') as HTMLInputElement[];
     const offered = boxes().map((box) => box.value);
     expect(offered).toContain('view');
     expect(boxes().filter((box) => box.checked)).toEqual([]);
-    await click($('#act input[name="action"][value="view"]'));
+    await click($('.act-panel input[name="action"][value="view"]'));
     expect(boxes().filter((box) => box.checked).map((box) => box.value)).toEqual(['view']);
 
     // The whole form is in the tab order, in the order it reads.
-    const order = $$('#act select, #act input[name="action"], #act button').map((el) => el.id || (el as HTMLInputElement).value || el.dataset.act);
+    const order = $$('.act-panel select, .act-panel input[name="action"], .act-panel button').map((el) => el.id || (el as HTMLInputElement).value || el.dataset.act);
     expect(order).toEqual(['dTo', ...offered, 'dLease', 'dPass', 'delegatedo', 'close']);
-    for (const el of $$('#act select, #act input[name="action"], #act button')) expect(el.tabIndex).toBeGreaterThanOrEqual(0);
+    for (const el of $$('.act-panel select, .act-panel input[name="action"], .act-panel button')) expect(el.tabIndex).toBeGreaterThanOrEqual(0);
 
     const submit = $('[data-act="delegatedo"]');
     expect(submit?.tagName).toBe('BUTTON');
@@ -290,7 +290,7 @@ describe('Keyboard operation (conformance 9.3)', () => {
     again?.focus();
     await click(again);
     await press('Escape');
-    expect($('#act')).toBeNull();
+    expect($('.act-panel')).toBeNull();
     expect(document.activeElement).toBe($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
   });
 });
@@ -302,7 +302,7 @@ describe('Deep linking (conformance 9.1)', () => {
     expect(requests).toContain('/directory/agents/' + SCRIBE);
     expect(text()).toContain('Scribe');
     await click($('[data-act="grant"]'));
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
     expect(($('#dTo') as HTMLSelectElement).value).toBe(SCRIBE);
 
     fresh();
@@ -327,7 +327,7 @@ describe('API refusal parity', () => {
     const name = reason.split(':')[0];
     const { posted } = await mount('#/me?tab=account', { ...SERVICE, 'POST /grants': refused(403, name, reason) });
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-    await click($('#act input[name="action"][value="view"]'));
+    await click($('.act-panel input[name="action"][value="view"]'));
     await click($('[data-act="delegatedo"]'));
     expect(posted).toHaveLength(1);
     expect($('#dAnswer b')?.textContent).toBe(name);

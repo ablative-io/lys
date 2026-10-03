@@ -66,7 +66,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect(run()?.querySelector('[data-act="restart"]')).not.toBeNull();
     expect(run()?.querySelector('[data-act="stop"]')).not.toBeNull();
     expect(run()?.querySelector('.terminal')).toBeNull();
-    expect(run()?.compareDocumentPosition(overview as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect((run()?.compareDocumentPosition(overview as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect($('[aria-label="Next steps"]')).toBeNull();
     expect($$('.file nav.tabs a').map((entry) => entry.getAttribute('href'))).toEqual(expect.arrayContaining(['#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']));
     expect($('[data-act="start"]')).toBeNull();

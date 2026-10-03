@@ -35,16 +35,16 @@ describe('The delegation form', () => {
 
   it('row_2_3_the_form_shows_the_source_grant_its_actions_may_pass_on_and_the_effective_end', async () => {
     await open();
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
     expect(document.activeElement?.id).toBe('dTo');
-    expect($('#act h2')?.textContent).toBe('Give part of owner of project:identity to an agent');
-    const from = $$('#act .card')[0].textContent ?? '';
+    expect($('.act-panel h2')?.textContent).toBe('Give part of owner of project:identity to an agent');
+    const from = $$('.act-panel .card')[0].textContent ?? '';
     expect(from).toContain('Source grant');
     expect(from).toContain('owner of project:identity');
     expect(from).toContain('Actions it allowseverything here');
     expect(from).toContain('You may pass it onagent');
     expect(from).toContain('Ends no later than27 Oct');
-    const ends = () => $$('#act .card')[0].querySelectorAll('.row')[3];
+    const ends = () => $$('.act-panel .card')[0].querySelectorAll('.row')[3];
     expect(ends().textContent).toBe('Ends no later than27 Oct');
     expect(ends().querySelector('.open-q')).toBeNull();
     expect(from).not.toContain('when yours does');
@@ -54,17 +54,17 @@ describe('The delegation form', () => {
     unmountAll();
     const endless = GRANTS.map((g) => (g.id === ROOT_G ? { ...g, window: { ...g.window, ends_at: null }, effective_ends_at: null } : g));
     await open({ ...SERVICE, '/grants': ok({ grants: endless, revision: 7 }) });
-    expect($$('#act .card')[0].textContent).toContain('Ends no later thanno end');
+    expect($$('.act-panel .card')[0].textContent).toContain('Ends no later thanno end');
     expect(ends().textContent).toBe('Ends no later thanno end');
   });
 
-  const tick = async (...actions: string[]) => { for (const action of actions) await click($(`#act input[name="action"][value="${action}"]`)); };
+  const tick = async (...actions: string[]) => { for (const action of actions) await click($(`.act-panel input[name="action"][value="${action}"]`)); };
 
   it('offers an agent one action at a time, only what may be passed on and is not withheld, and never a wider relation', async () => {
     const { requests } = await open();
     expect(requests).toContain('/grants/model');
-    expect($$('#act input[name="action"]').map((c) => (c as HTMLInputElement).value)).toEqual(['edit', 'view']);
-    expect($$('#act input[name="action"]').filter((c) => (c as HTMLInputElement).checked)).toEqual([]);
+    expect($$('.act-panel input[name="action"]').map((c) => (c as HTMLInputElement).value)).toEqual(['edit', 'view']);
+    expect($$('.act-panel input[name="action"]').filter((c) => (c as HTMLInputElement).checked)).toEqual([]);
     expect($$('[data-pickrel]')).toEqual([]);
     expect(($('[data-act="delegatedo"]') as HTMLButtonElement).disabled).toBe(true);
   });
@@ -72,15 +72,15 @@ describe('The delegation form', () => {
   it('offers nothing to an agent until the service names what it withholds from agents', async () => {
     const { withheld_from_agents: _withheld, ...silent } = MODEL;
     await open({ ...SERVICE, '/grants/model': ok(silent) });
-    expect($$('#act input[name="action"]')).toEqual([]);
-    expect($('#act')?.textContent).toContain('has not said which actions an agent may hold');
+    expect($$('.act-panel input[name="action"]')).toEqual([]);
+    expect($('.act-panel')?.textContent).toContain('has not said which actions an agent may hold');
   });
 
   it("offers an agent nothing on an app's resource, since the service refuses every agent grant there until the app allows it", async () => {
     const onApp = GRANTS.map((g) => (g.id === ROOT_G ? { ...g, resource: { kind: 'fixture.doc', id: 'd1' } } : g));
     await open({ ...SERVICE, '/grants': ok({ grants: onApp, revision: 7 }) });
-    expect($$('#act input[name="action"]')).toEqual([]);
-    expect($('#act')?.textContent).toContain("can't give an agent this app's actions until the app allows it");
+    expect($$('.act-panel input[name="action"]')).toEqual([]);
+    expect($('.act-panel')?.textContent).toContain("can't give an agent this app's actions until the app allows it");
     expect(($('[data-act="delegatedo"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -99,7 +99,7 @@ describe('The delegation form', () => {
     expect(body.operation).toMatch(/^op-[0-9a-f]{32}$/);
     const E = GRANTS.find((g) => g.id === ROOT_G)?.effective_ends_at ?? NaN;
     expect(body.window.ends_at).toBe(Math.min(E, body.window.starts_at + 604800));
-    expect($('#act')).toBeNull();
+    expect($('.act-panel')).toBeNull();
     expect($('#toast')?.textContent).toContain('Given. Scribe can now View this resource project:identity, through you.');
 
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
@@ -134,7 +134,7 @@ describe('The delegation form', () => {
     await click($('[data-act="delegatedo"]'));
     expect(posted.filter((p) => p.path === '/grants')).toHaveLength(2);
     expect($('#dAnswer b')?.textContent).toBe('pending');
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
     expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G + '.rest')).toBeNull();
     expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G)).not.toBeNull();
     await click($('[data-act="delegatedo"]'));
@@ -186,7 +186,7 @@ describe('The delegation form', () => {
     await click($('[data-act="delegatedo"]'));
     expect($('#dAnswer b')?.textContent).toBe('IdentityNotActive');
     expect($('#dAnswer .note')?.textContent).toContain('is suspended');
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
   });
 
   it('shows the service refusal by name and records nothing as given', async () => {
@@ -194,7 +194,7 @@ describe('The delegation form', () => {
     await tick('view');
     await click($('[data-act="delegatedo"]'));
     expect($('#dAnswer b')?.textContent).toBe('RecipientRefused');
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
     expect($('#toast')?.textContent).not.toContain('Given');
   });
 
@@ -360,7 +360,7 @@ describe('The delegation form', () => {
   it('opens the real bounded grant form from temporary access on an agent file', async () => {
     await mount('#/file/' + SCRIBE + '/access');
     await click($('[data-act="grant"]'));
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
     expect(($('#dTo') as HTMLSelectElement).value).toBe(SCRIBE);
     expect(($('#dLease') as HTMLSelectElement).value).toBe('7 days');
   });
@@ -372,7 +372,7 @@ describe('The delegation form', () => {
     await click(give);
     expect(document.activeElement?.id).toBe('dTo');
     await press('Escape');
-    expect($('#act')).toBeNull();
+    expect($('.act-panel')).toBeNull();
     expect(document.activeElement).toBe($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
   });
 });
@@ -382,7 +382,7 @@ describe("What you can't give (conformance 2.4)", () => {
     const { requests } = await mount('#/me?tab=account');
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     expect(requests).toContain(`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`);
-    const reasons = $$('#act .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
+    const reasons = $$('.act-panel .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
     expect(reasons).toEqual([
       ['viewer of project:ledger', 'You may use it; it does not let you pass it on.'],
       ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
@@ -515,7 +515,7 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
     await choose($('#dTo'), SCRIBE);
     expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with Scribe assignment (9 Oct)', 'no end']);
     await choose($('#dLease'), 'assignment:op-00000000000000000000000000000001');
-    await click($('#act input[name="action"][value="view"]'));
+    await click($('.act-panel input[name="action"][value="view"]'));
     await click($('[data-act="delegatedo"]'));
     const body = posted.find((p) => p.path === '/grants')?.body as DelegateBody;
     expect(body.window.ends_at).toBe(ROLE_END);
@@ -555,8 +555,8 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     ]);
     expect(grantIdsOnScreen()).toEqual([ROOT_G]);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-    expect($('#act')?.textContent).toContain('Scribe');
-    const adaSource = $$('#act .card')[0].textContent ?? '';
+    expect($('.act-panel')?.textContent).toContain('Scribe');
+    const adaSource = $$('.act-panel .card')[0].textContent ?? '';
     expect(adaSource).toContain('owner of project:identity');
     expect(adaSource).toContain('Actions it allowseverything here');
     expect(adaSource).toContain('You may pass it onagent');
@@ -578,7 +578,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     location.hash = '#/me?tab=account';
     await settle();
     await click($(`[data-act="delegate"][data-g="${BEA_ROOT_G}"]`));
-    const beaSource = $$('#act .card')[0].textContent ?? '';
+    const beaSource = $$('.act-panel .card')[0].textContent ?? '';
     expect(beaSource).toContain('editor of project:ledger');
     expect(beaSource).toContain('Actions it allowsEdit this resource; View this resource');
     expect(beaSource).toContain('You may pass it onagent');
@@ -678,7 +678,7 @@ describe('Every refusal of a delegation (conformance 2.3, 2.4)', () => {
       expect(before).toHaveLength(2);
       const reads = requests.filter((r) => r === '/grants').length;
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-      await click($('#act input[name="action"][value="view"]'));
+      await click($('.act-panel input[name="action"][value="view"]'));
     await click($('[data-act="delegatedo"]'));
 
       // One request, no retry, nothing else posted.
@@ -692,7 +692,7 @@ describe('Every refusal of a delegation (conformance 2.3, 2.4)', () => {
       // Nothing given: no re-read of the list, no success, the rows as they were.
       expect(requests.filter((r) => r === '/grants')).toHaveLength(reads);
       expect($('#toast')?.textContent ?? '').not.toContain('Given');
-      expect($('#act')).not.toBeNull();
+      expect($('.act-panel')).not.toBeNull();
       expect(holdText()).toEqual(before);
       expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G) !== null).toBe(c.retained);
 

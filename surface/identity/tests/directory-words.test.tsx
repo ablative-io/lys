@@ -7,7 +7,7 @@ import type { Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Teams } from '../src/features/teams/Teams';
-import { ServiceAccounts } from '../src/features/service-accounts/ServiceAccounts';
+import { ServiceAccountsList as ServiceAccounts } from '../src/features/service-accounts/ServiceAccounts';
 import { PersonalBudgets } from '../src/features/file/PersonalBudgets';
 import { AgentCredentials } from '../src/features/file/AgentCredentials';
 import { StopReceipt } from '../src/features/file/EmergencyStop';

@@ -28,16 +28,23 @@ export async function ask(caller: string, who: string, whoName: string, resource
       return { ...base, ok: false, kind: refusal, why: reason.replace(/^[A-Za-z]+: /, ''), revision: null, open };
     }
   }
+  // Every page is read, at one revision, before the answer is No. A read that did not finish is refused, never told as No.
   let after: string | null = null;
-  let revision = 0;
-  // Every page is read before the answer is No. A page that names itself as the next one is a fault of the service and is said, never read forever.
+  let revision: number | null = null;
+  const read = new Set<string>();
   for (;;) {
     const answer = await api.who({ route: 'browser', resource, action, page_size: PAGE_MAX, after });
+    if (revision !== null && answer.revision !== revision) {
+      throw new Refused(409, { refusal: 'GrantRevisionChanged', reason: `Permissions changed while reading ${resourceText(resource)}; refresh to read them again.` });
+    }
     revision = answer.revision;
     const found = answer.holders.find((h) => h.holder === who);
     if (found) return { ...base, ok: true, permit: found };
-    if (answer.complete || !answer.next) break;
-    if (answer.next === after) throw new Error('HoldersPageRepeated: the service named the same page as the next one, so who holds this cannot be read to its end.');
+    if (answer.complete) break;
+    if (!answer.next || read.has(answer.next)) {
+      throw new Refused(502, { refusal: 'PermissionPageIncomplete', reason: `The permission service did not advance its page for ${resourceText(resource)} (${action}).` });
+    }
+    read.add(answer.next);
     after = answer.next;
   }
   return {

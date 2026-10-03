@@ -6,7 +6,7 @@ import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { RuntimeSession } from '../src/features/runtime/RuntimeSessions';
 import { byteOutput } from '../src/features/runtime/terminal-transport';
-import { browser, disposed, listeners, mockTerminal, written } from './terminal-double';
+import { browser, listeners, mockTerminal, written } from './terminal-double';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
 const ID = 'op-' + '5'.repeat(32);

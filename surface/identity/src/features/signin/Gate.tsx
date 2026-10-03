@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../../api';
 import type { Load, Refused } from '../../api';
+import { SignIn } from '../sign-in/SignIn';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (

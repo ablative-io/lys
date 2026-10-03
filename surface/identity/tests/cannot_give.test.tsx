@@ -70,7 +70,7 @@ const open = async (answers: Record<string, CannotGiveAnswer>) => {
   return m;
 };
 
-const rows = () => $$('#act [data-cannot-give]').map((row) => [row.querySelector('b')?.textContent, row.dataset.cannotGive]);
+const rows = () => $$('.act-panel [data-cannot-give]').map((row) => [row.querySelector('b')?.textContent, row.dataset.cannotGive]);
 const pairs = (a: CannotGiveAnswer) => a.items.map((item) => [subjectOf(item), item.reason]);
 const subjectOf = (item: CannotGiveItem): string => {
   switch (item.subject) {
@@ -116,7 +116,7 @@ describe('What you cannot give, as the service answers it (conformance 2.4)', ()
     await open({ [A1]: FOR_A1, [P2]: FOR_P2_AGENTS_ONLY });
     await choose($$('#dTo')[0] ?? null, P2);
     expect(rows()).toHaveLength(4);
-    const agentsOnly = $$('#act [data-cannot-give="agents_only"]');
+    const agentsOnly = $$('.act-panel [data-cannot-give="agents_only"]');
     expect(agentsOnly).toHaveLength(1);
     expect(agentsOnly[0].querySelector('b')?.textContent).toBe('alder of project:s');
     expect(agentsOnly[0].querySelector('.note')?.textContent).toBe('This can be passed on only to an agent.');
@@ -151,7 +151,7 @@ describe('What you cannot give, as the service answers it (conformance 2.4)', ()
     const borrowed = { subject: 'grant', grant: G3, reason: 'borrowed', source: false };
     await open({ [A1]: answer(A1, [g2, damson, borrowed, signIn]) });
     expect(rows()).toHaveLength(0);
-    const refusals = $$('#act [data-refusal]');
+    const refusals = $$('.act-panel [data-refusal]');
     expect(refusals).toHaveLength(1);
     expect(refusals[0].dataset.refusal).toBe('unknown_cannot_give_reason');
     expect(refusals[0].querySelector('b')?.textContent).toBe('unknown_cannot_give_reason');

@@ -42,8 +42,8 @@ const open = async (routes: Record<string, Route>) => {
 describe('Revoke', () => {
   it('asks for the reason and shows everything derived from it before it goes', async () => {
     await open(revocable());
-    expect($('#act')).not.toBeNull();
-    expect($('#act h2')?.textContent).toBe('Revoke owner of project:identity');
+    expect($('.act-panel')).not.toBeNull();
+    expect($('.act-panel h2')?.textContent).toBe('Revoke owner of project:identity');
     expect(document.activeElement?.id).toBe('why');
     expect($('#derived')?.textContent).toBe("Scribe · viewerrevoked with it");
     expect(unreachable()).toEqual([]);
@@ -57,7 +57,7 @@ describe('Revoke', () => {
     expect(body.route).toBe('browser');
     expect(body.operation).toMatch(/^op-[0-9a-f]{32}$/);
     expect($('#toast')?.textContent).toBe(`Revoked G/${ROOT_G.slice(6, 14)}. Everything derived from it goes with it.`);
-    expect($('#act')).toBeNull();
+    expect($('.act-panel')).toBeNull();
     const card = $(`tr[data-grant="${ROOT_G}"]`);
     expect(card?.textContent).toContain('no: ');
     expect(card?.textContent).toMatch(/Revoked .*, change 8; every check from here on refuses\./);
@@ -79,7 +79,7 @@ describe('Revoke', () => {
     await open({ ...SERVICE, [`POST /grants/${ROOT_G}/revoke`]: refused(409, 'RevokeRefused', `RevokeRefused: ${ADA} neither issued ${ROOT_G} nor holds a grant it derives from`) });
     await click($('[data-act="revokedo"]'));
     expect($('#rAnswer b')?.textContent).toBe('RevokeRefused');
-    expect($('#act')).not.toBeNull();
+    expect($('.act-panel')).not.toBeNull();
     expect($('#toast')?.textContent).not.toContain('Revoked');
   });
 

@@ -29,17 +29,16 @@ export function grantColumns(w: GrantWorld): Column<Grant>[] {
   ];
 }
 
-type Open = { grant: string; act: 'revoke' | 'delegate' };
+type Open = { grant: string; act: 'revoke' | 'delegate'; opener: HTMLElement };
 
-/** The panel an act opens in: it takes the keyboard when it opens, Escape closes it, and the button that opened it gets the keyboard back. */
-export function ActPanel({ label, close, children }: { label: string; close: () => void; children: ReactNode }) {
+/** The panel an act opens in: it takes the keyboard when it opens, Escape closes it, and the button that opened it, named by the press itself, gets the keyboard back. */
+export function ActPanel({ label, opener, close, children }: { label: string; opener: HTMLElement | null; close: () => void; children: ReactNode }) {
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
-    const opener = document.activeElement;
     panel.current?.querySelector<HTMLElement>('textarea,input,select,button')?.focus();
-    return () => { if (opener instanceof HTMLElement && opener.isConnected) opener.focus(); };
-  }, []);
-  return <section id="act" className="act-panel" aria-label={label} ref={panel} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>{children}</section>;
+    return () => { if (opener?.isConnected) opener.focus(); };
+  }, [opener]);
+  return <section className="act-panel" aria-label={label} ref={panel} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>{children}</section>;
 }
 
 export function GrantTable({ w, grants, done, give = true, empty = 'No grants.' }: { w: GrantWorld; grants: Grant[]; done: () => void; give?: boolean; empty?: string }) {
@@ -56,12 +55,12 @@ export function GrantTable({ w, grants, done, give = true, empty = 'No grants.' 
         return [<tr key={g.id} data-grant={g.id} style={voidOf(w, g) === null ? undefined : { opacity: 0.72 }}>
           {columns.map((column) => <td key={column.head}>{column.cell(g)}</td>)}
           <td>
-            {mayGive ? <button className="btn" type="button" data-act="delegate" data-g={g.id} onClick={() => setOpen({ grant: g.id, act: 'delegate' })}>Give to an agent…</button> : null}
-            {mayRevoke ? <button className="btn danger" type="button" data-act="revoke" data-g={g.id} onClick={() => setOpen({ grant: g.id, act: 'revoke' })}>Revoke</button> : null}
+            {mayGive ? <button className="btn" type="button" data-act="delegate" data-g={g.id} onClick={(event) => setOpen({ grant: g.id, act: 'delegate', opener: event.currentTarget })}>Give to an agent…</button> : null}
+            {mayRevoke ? <button className="btn danger" type="button" data-act="revoke" data-g={g.id} onClick={(event) => setOpen({ grant: g.id, act: 'revoke', opener: event.currentTarget })}>Revoke</button> : null}
           </td>
         </tr>,
-        mine ? <tr key={g.id + ':act'} className="review-row"><td colSpan={columns.length + 1}>
-          <ActPanel label={mine === 'revoke' ? 'Revoke' : 'Give'} close={close}>{mine === 'revoke' ? <Revoke w={w} g={g} done={done} close={close} /> : <Delegate w={w} source={g} done={done} close={close} />}</ActPanel>
+        mine && open ? <tr key={g.id + ':' + mine} className="review-row"><td colSpan={columns.length + 1}>
+          <ActPanel label={mine === 'revoke' ? 'Revoke' : 'Give'} opener={open.opener} close={close}>{mine === 'revoke' ? <Revoke w={w} g={g} done={done} close={close} /> : <Delegate w={w} source={g} done={done} close={close} />}</ActPanel>
         </td></tr> : null];
       })}
       {grants.length ? null : <tr><td colSpan={columns.length + 1} className="dim">{empty}</td></tr>}

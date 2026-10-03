@@ -1,6 +1,7 @@
 /** A recorded change retains its path and exact JSON until a matching answer establishes its outcome. */
 import { useRef, useState } from 'react';
 import { Refused, request } from '../../api';
+import { answeredNo, sendKept } from '../../kept';
 
 interface Saved { path: string; body: Record<string, unknown> }
 function read(key: string, allowed: string): Saved | null {
@@ -24,12 +25,15 @@ export function useRoleChange<T>(key: string, path: string, accepts: (answer: T,
     if (working.current || initial.error) return;
     working.current = true; setBusy(true); setFailure('');
     try {
-      sessionStorage.setItem(key, JSON.stringify({ path, body })); setSaved({ path, body });
-      const answer = await request<T>(path, body);
-      if (!accepts(answer, body)) throw new Error('The answer did not confirm this recorded change. Its original request is retained.');
-      sessionStorage.removeItem(key); setSaved(null); setDone(true); changed(answer);
+      const answer = await sendKept(key, { path, body }, async () => {
+        setSaved({ path, body });
+        const given = await request<T>(path, body);
+        if (!accepts(given, body)) throw new Error('The answer did not confirm this recorded change. Its original request is retained.');
+        return given;
+      }, !retry);
+      setSaved(null); setDone(true); changed(answer);
     } catch (error) {
-      if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) { sessionStorage.removeItem(key); setSaved(null); }
+      if (!retry && answeredNo(error)) setSaved(null);
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
     } finally { working.current = false; setBusy(false); }
   };

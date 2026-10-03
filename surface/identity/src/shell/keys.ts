@@ -61,7 +61,7 @@ export function useShellKeys(): void {
       }
       if (e.key === 'Escape') return s.closeAll();
       if (s.paletteOpen || s.explaining) return;
-      if (e.target instanceof HTMLElement && e.target.closest('#act')) return;
+      if (e.target instanceof HTMLElement && e.target.closest('.act-panel')) return;
       if (typing(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Enter' && e.target instanceof HTMLElement && e.target.closest('button,a')) return;

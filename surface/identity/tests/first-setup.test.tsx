@@ -1,7 +1,7 @@
 /** Setup is explicit, accessible, administrator-only and keeps one operation across retries. */
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, click, mount, settle, text, unmountAll, unreachable } from './harness';
+import { $, mount, settle, text, unmountAll, unreachable } from './harness';
 import { ADA, ME, RECEIPTS, SERVICE, ok, refused } from './fixtures';
 
 const needsSetup = refused(403, 'SetupRequired', 'administrator has no person');
