@@ -36,11 +36,26 @@ R1 = the settings file tonight's run of pancake was handed:
 
 ## Codex
 
-Not read by me yet. The catalogue says three modes (`read-only`, `workspace-write`, `danger-full-access`) and
-no rule forms (`docs/harness/catalogue/codex.json`). Lys renders a permissions profile named `lys-bound` from
-a containment plan (`lys-runner/src/codex_policy.rs:1-16`). Every row is **open**.
+Written 20:31 by the clock, before reading Archie's table. D = the fetched pages in
+`docs/harness/reference/codex/` (a5425952). I have no real observation of my own for any Codex row, so
+every row is **open** on that leg.
+
+| # | Claim | D | L | R | State |
+|---|---|---|---|---|---|
+| C1 | Lys refuses to start a Codex agent whose settings carry any allow, deny or ask rule, or whose policy has any hard rule: "native tool rules and hard policy rules are unsupported" | n/a | `lys-home/src/harness/codex/launch_template.rs:44-53` | none | **open**. Consequence if true: pancake's kind of policy cannot be put on a Codex agent at all |
+| C2 | The only modes Lys accepts for Codex are `read-only`, `workspace-write`, `danger-full-access`, passed as `--sandbox <mode>` | agent-approvals-security 360-371 names `--sandbox` with those values | `launch_template.rs:54-60`; `launch.rs:109-122` | none | **open** |
+| C3 | When the agent's settings name no mode, Lys passes no `--sandbox`; Codex then takes its sandbox from the computer's own Codex config, or its launch default (a version-controlled folder: workspace write with on-request approvals; otherwise read-only) | agent-approvals-security 279-288 | `launch.rs:109` (`if let Some`), comment at 88-92 | none | **open** |
+| C4 | Lys never sets Codex's approval policy; it is whatever the computer's own Codex config says | two layers, sandbox mode and approval policy: agent-approvals-security 60-62 | comment `launch.rs:88-89`; no `--ask-for-approval` or `approval_policy` anywhere in `lys-home/src/harness/codex/` or `lys-runner/src/codex_policy.rs` (grep, 20:31) | none | **open** |
+| C5 | For `workspace-write` Lys also sets: command network off, no extra writable roots, temp folders excluded, web search disabled | keys not yet checked by me against the configuration reference | `launch.rs:110-121` | none | **open**, D unread |
+| C6 | Extra folders are passed as `--add-dir` | not read by me | `launch.rs:124-126` | none | **open**, D unread |
+| C7 | Codex's sandbox is enforced by the operating system (Seatbelt on macOS), and on macOS Codex refuses a command rather than run it unsandboxed when the policy cannot be enforced | agent-approvals-security 425-428; permissions 511-514 | n/a | none | **open** |
+| C8 | The sandbox governs local commands only. MCP servers, connectors, web search, the browser and computer use have their own controls and are not held by it | permissions 467-507 | n/a | none | **open** |
+| C9 | In workspace write, `.git`, `.agents` and `.codex` under a writable root stay read-only | agent-approvals-security 291-298 | n/a | none | **open** |
+| C10 | Lys's runner can render a Codex permissions profile named `lys-bound` from a containment plan; its own comment calls it "a config fragment ... not an enforcement receipt" | permission profiles exist: permissions 45-200 (headings only read) | `lys-runner/src/codex_policy.rs:1-16` | none | **open**: whether any start made through the server uses it is unread |
 
 ## Not yet read by me
 
 permission-modes 47-546 and 660 to the end; sandboxing 53 to the end; settings; iam; Lys's policy records
-(the rules with hard and grantable authority) and `containment_policy.rs`; all of Codex.
+(the rules with hard and grantable authority) and `containment_policy.rs`. Codex: the configuration reference,
+managed configuration, hooks, rules, auto-review, sandboxing.md, permissions.md 1-446; Lys's Codex files other than
+`launch.rs` 85-128 and `launch_template.rs` 30-110.
