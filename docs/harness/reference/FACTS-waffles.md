@@ -67,6 +67,19 @@ started 10:57:16, 11:54:34, 14:46:48 and 19:55:07 on 3 October; my installs fini
 record, and each install is followed by my readback script, which starts a run and ends it. So those are my readbacks ending
 their own runs, not an agent failing to start. The 11:54 run has no install beside it in my record: **open**.
 
+## Two of my open rows closed by Archie's observation, 20:33 by the clock
+
+Archie read the proxy's kept request bodies on the installed Lys (`data/proxy/home/blocks`, the block under `raw_request`;
+his script prints tool names and nothing else) and reported in the room at 20:31.
+
+- **Row 4, now agreed.** Session ab7e825f (pancake's 19:19 run): 103 tools offered on the first real call; Edit, Read, WebFetch
+  and Write are absent. Session 9918e737 (a 14:54 run of an agent without that policy): 107 tools, with them present. So a tool
+  refused by bare name is not offered to the model. Glob and Grep were not named either way in his report: **open**.
+- **Row 12, now agreed as to tools.** In both runs 70 of the tools offered came from Tom's own setup and not from Lys: 8 from
+  his claude.ai account's Claude Docs connector and 62 from his user-level Argus plugin. Lys's `mcp.json` named neither. Among
+  them are tools that type into and start other sessions on the computer. Whether a call to one would have been allowed was not
+  seen: **open**.
+
 ## Not yet read by me
 
 permission-modes 47-546 and 660 to the end; sandboxing 53 to the end; settings; iam; Lys's policy records

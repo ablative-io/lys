@@ -28,8 +28,9 @@ unit.
 - Those refusals are pancake's own policy, version 1, seven hard rules. Nobody chose it: Lys wrote it for
   every agent added between 1 October 17:39 and 2 October 12:33 and has never taken it back. Ten of the
   fifteen policies on the installed Lys are that seed; the five newest are empty. (W16, V3, V4, agreed)
-- By Claude Code's page, a tool refused by bare name is taken away from the model entirely. What pancake
-  could then actually do was not watched. (W4, V9, open)
+- A tool refused by bare name is taken away from the model entirely: in that run's first real call Edit,
+  Read, WebFetch and Write were not among the 103 tools offered. Bash was. (W4, V9, agreed; seen by Archie
+  in the proxy's kept request, 20:31)
 
 **Lys has two permission systems and the screens show neither truthfully.**
 - Per agent, in its settings: three lists (without asking, ask first, refused), extra folders, one mode.
@@ -50,8 +51,11 @@ unit.
 - The sandbox is off in every mode but one. Lys's own `workspace-only` mode turns it on, with no network
   and no way out; no run in that mode has been observed. (W10, V13, open)
 - The person's own Claude Code setup reaches a Lys run. A plugin's hook ran inside pancake's 19:19 run;
-  hooks run with the person's full access whatever the file says. (V5, V14, agreed) Whether the person's
-  own allow rules also widen what the agent may do is documentation and code only. (V6, open)
+  hooks run with the person's full access whatever the file says. (V5, V14, agreed) And 70 of the 103 tools
+  that run was offered came from Tom's own setup, not from Lys: 62 from his Argus plugin, 8 from his
+  claude.ai connector. They include tools that type into and start other sessions on the computer. No Lys
+  record names them. (W12, agreed; whether a call to one would have been allowed was not seen) Whether the
+  person's own allow rules also widen what the agent may do is documentation and code only. (V6, open)
 - A path rule typed with one leading slash would mean "beside the settings file", not the top of the
   disk. Lys's own hard rules come out right; nothing checks a rule a person types. (W9, V11)
 
@@ -68,6 +72,8 @@ unit.
 - The confinement Lys has written for Codex is called only by a test, and as written would not run a
   command and would not hold the network. (A16 agreed; A17, A18 seen)
 - No judge is installed for Codex, and Codex's own pages say such a hook is not a wall. (A23, A26)
+- Run with an empty config folder, the installed Codex still listed 32 of the login's own skills to the
+  model, and both instruction files reached it even in Lys's "replace" mode. (A37 to A40, seen; no Lys run)
 - The one place Codex offers a setting the login cannot undo is an administrator's requirements file.
   Documentation only; no Lys code writes it; not observed. (A33, open)
 
@@ -120,7 +126,7 @@ promises what nothing holds.
 ## Before anything in 2 or 3 is built, these are observed, not assumed
 
 - A Claude Code run watched refusing a refused call, and asking on an ask-first call. (V8, V12)
-- Which tools the model was actually offered in a real run. Archie is reading the proxy record. (W4)
+- Whether a call to one of the person's own tools is allowed in a Lys run. (W12)
 - Whether the person's own allow rules merge into a Lys run. (V6)
 - A run in `workspace-only`, with the sandbox seen to hold. (W10)
 - A Codex agent started by Lys at all, in each mode. (A2 to A15)
