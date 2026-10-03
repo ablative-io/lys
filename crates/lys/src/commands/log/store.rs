@@ -48,8 +48,12 @@ pub fn init(dir: &Path, origin: &str) -> CliResult<()> {
 /// [`CliError::LogDirInvalid`] with the specific discrepancy on an integrity
 /// failure, and [`CliError::Io`] on filesystem failure.
 pub fn open(dir: &Path) -> CliResult<LogStore> {
-    let store = FileLeafStore::open(dir)?;
-    store.audit_leaves()?;
+    // Every way the store can find the directory damaged reads as one
+    // refusal naming the directory, whichever check met it first.
+    let store = FileLeafStore::open(dir).map_err(|err| integrity_failure(dir, err))?;
+    store
+        .audit_leaves()
+        .map_err(|err| integrity_failure(dir, err))?;
     if let Some(line) = unfinished_tail_line(store.unfinished_tail()) {
         eprintln!("{line}");
     }
