@@ -93,7 +93,7 @@ const depth = (level: number) => ({ '--depth': level } as CSSProperties);
 function FragmentRows({ children }: { children: React.ReactNode }) { return <>{children}</>; }
 
 /** What the person asked of one agent from its row: start it, or stop it. Shown in a row of its own under the agent. */
-export interface Asked { agent: string; what: 'start' | 'stop'; pressed: boolean; setup?: boolean }
+export interface Asked { agent: string; what: 'start' | 'stop' | 'started'; pressed: boolean; setup?: boolean }
 
 /** Start, where the agent is listed. Whether the person may approve its settings is read here, when it is first shown. */
 function StartHere({ entry, me, pressed, setupFirst, changed, close }: { entry: Entry; me: string; pressed: boolean; setupFirst: boolean; changed: () => void; close: () => void }) {
@@ -104,6 +104,7 @@ function StartHere({ entry, me, pressed, setupFirst, changed, close }: { entry: 
   if (load.status === 'loading') return null;
   if (setup) return <div className="you-setup">
     <Provisioning id={entry.id} />
+    <p className="dim">Press Save these settings before you go back; what is not saved is not kept.</p>
     <p><button type="button" className="btn primary" onClick={() => { setSetup(false); setRound((value) => value + 1); }}>Done, back to Start</button>{' '}
       <button type="button" className="btn" onClick={close}>Close</button></p>
   </div>;
@@ -151,12 +152,15 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
             <td className="you-act">{session ? <Fragment>
               <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={(event) => { event.stopPropagation(); toggleWatch(session, member.entry.display_name); }}>{watching(session.session) ? 'Watching' : 'Watch'}</button>
               <button type="button" className="you-watch" data-act="stop" onClick={(event) => { event.stopPropagation(); ask({ agent: member.entry.id, what: 'stop', pressed: true }); }}>Stop</button>
-            </Fragment> : asked?.agent === member.entry.id && asked.what === 'start' ? null : <RowStart entry={member.entry} ask={ask} />}</td>
+            </Fragment> : asked?.agent === member.entry.id && asked.what !== 'stop' ? null : <RowStart entry={member.entry} ask={ask} />}</td>
           </tr>
           {asked?.agent === member.entry.id && (asked.what === 'stop' ? session : !session) ? <tr className="you-asked"><td colSpan={4}>
             {asked.what === 'stop' && session
               ? <Stop entry={member.entry} session={session} changed={changed} done={() => ask(null)} />
-              : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '') + (asked.setup ? ':setup' : '')} entry={member.entry} me={me} pressed={asked.pressed} setupFirst={asked.setup === true} changed={() => { ask(null); changed(); }} close={() => ask(null)} />}
+              : asked.what === 'started'
+              // The start was answered; the row offers no second Start while the page reads where it is running.
+              ? <p role="status" className="team-start-line">{member.entry.display_name} has started. Reading where it is running…</p>
+              : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '') + (asked.setup ? ':setup' : '')} entry={member.entry} me={me} pressed={asked.pressed} setupFirst={asked.setup === true} changed={() => { ask({ agent: member.entry.id, what: 'started', pressed: false }); changed(); }} close={() => ask(null)} />}
           </td></tr> : null}
           <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} watching={watching} toggleWatch={toggleWatch} me={me} asked={asked} ask={ask} changed={changed} />
         </FragmentRows>;
