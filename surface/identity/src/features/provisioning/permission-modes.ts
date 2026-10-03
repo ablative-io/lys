@@ -31,8 +31,8 @@ export function firstSentence(meaning: string): { first: string; rest: string } 
 /** What an agent's policy does to a start: the rules it writes into the Refused list, the rules the start cannot write at all, and how many hard rules there are. */
 export interface Forced { written: string[]; unwritable: string[]; hard: number }
 
-/** A tool name the settings file reads: letters, digits and underscores, not starting with a digit (rendering_permissions.rs, `expressible`). */
-const named = (tool: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(tool);
+/** A tool name the settings file reads: a letter first, then letters, digits, `_` or `-` (crates/lys-home/src/harness/rendering_permissions.rs, `expressible`, lines 20 to 25). */
+const named = (tool: string) => /^[A-Za-z][A-Za-z0-9_-]*$/.test(tool);
 
 /**
  * Only the policy's hard rules reach a start, written as

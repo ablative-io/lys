@@ -244,6 +244,13 @@ describe('What the policy forces', () => {
       { id: 'g', tool: 'Bash', kind: 'tool', authority: { permission: { resource: { kind: 'agent', id: 'x' }, action: 'read' } } },
     ])).toEqual({ written: ['WebFetch(domain:example.org)', 'Edit(//)', 'Edit(///**)'], unwritable: ['c', 'd', 'e', 'f'], hard: 6 });
   });
+  it('writes a tool with a hyphen in its name, as the start does, and not one that starts with an underscore', () => {
+    expect(forcedBy([
+      { id: 'h', tool: 'mcp__my-server__read', kind: 'tool', authority: 'hard' },
+      { id: 'i', tool: '_hidden', kind: 'tool', authority: 'hard' },
+      { id: 'j', tool: '9lives', kind: 'tool', authority: 'hard' },
+    ])).toEqual({ written: ['mcp__my-server__read'], unwritable: ['i', 'j'], hard: 3 });
+  });
   it('takes the first sentence of a mode’s words and keeps the rest', () => {
     expect(firstSentence('One thing. Another thing.')).toEqual({ first: 'One thing.', rest: 'Another thing.' });
     expect(firstSentence('No full stop')).toEqual({ first: 'No full stop', rest: '' });
