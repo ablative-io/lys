@@ -1,10 +1,9 @@
 #![cfg(test)]
 //! LYSLOGSTORE-008 R4: a v1 directory, built here from the old layout's own
 //! bytes and never through the store, is migrated once at the first writable
-//! open, kept aside whole, and left alone by every open after.
-//!
-//! These cases hold once this build's layout is past v1; while it is still
-//! v1 the migration is inert by construction and they say so by failing.
+//! open, kept aside whole, and left alone by every open after. A crash at
+//! either rename of the switch is finished or refused by name, never
+//! guessed at, and never built over with an empty store.
 
 use std::path::Path;
 
@@ -180,5 +179,168 @@ fn a_directory_that_is_not_v1_is_left_alone() -> Outcome {
     assert_eq!(migrate_v1(&dir)?, None);
     assert_eq!(listing(&dir)?, before);
     assert_eq!(migrate_v1(&root.path().join("absent"))?, None);
+    Ok(())
+}
+
+/// The leaves every switch case below starts from.
+const LEAVES: [&[u8]; 5] = [b"one", b"two", b"three", b"four", b"five"];
+
+/// The state a crash between the two renames leaves: the v1 directory kept
+/// under `<name>.v1`, the built copy beside it as `<name>.migrating`, and
+/// nothing at the store's path. Built from a real migration of a v1 fixture
+/// at `dir`, stopped by moving the finished store back to the copy's name.
+/// Answers the v1 pin and the kept directory's listing.
+fn between_the_renames(
+    dir: &Path,
+) -> Result<(PinnedRoot, Vec<(String, Vec<u8>)>), Box<dyn std::error::Error>> {
+    let pin = v1_fixture(dir, &LEAVES, 5, Some(b"snapshot bytes"))?;
+    let before = listing(dir)?;
+    migrate_v1(dir)?.ok_or("nothing migrated")?;
+    std::fs::rename(dir, dir.with_file_name("directory.migrating"))?;
+    assert!(!dir.exists());
+    assert_eq!(listing(&kept_name(dir)?)?, before);
+    Ok((pin, before))
+}
+
+#[test]
+fn a_crash_between_the_two_renames_is_finished_by_the_next_open() -> Outcome {
+    let root = tempfile::tempdir()?;
+    let dir = root.path().join("directory");
+    let (pin, kept_before) = between_the_renames(&dir)?;
+
+    let err = FileLeafStore::open_read_only(&dir).unwrap_err();
+    assert!(
+        matches!(err, StoreError::MigrationPending { .. }),
+        "a reader refuses the window by name: {err}"
+    );
+    assert!(!dir.exists(), "and changes nothing");
+
+    let store = FileLeafStore::open(&dir)?;
+    let finished = store.migrated().ok_or("the open finished no switch")?;
+    assert_eq!(finished.leaves, 5);
+    assert_eq!(finished.beyond_pin, 0);
+    assert!(finished.snapshot);
+    assert_eq!(finished.kept, kept_name(&dir)?);
+    assert_eq!(store.extent(), 5);
+    assert_eq!(store.pinned(), pin);
+    for (index, bytes) in (0..).zip(&LEAVES) {
+        assert_eq!(store.leaf(index)?.as_deref(), Some(*bytes));
+    }
+    assert_eq!(store.snapshot()?.as_deref(), Some(&b"snapshot bytes"[..]));
+    drop(store);
+    assert!(!root.path().join("directory.migrating").exists());
+    assert_eq!(
+        listing(&kept_name(&dir)?)?,
+        kept_before,
+        "the v1 copy is kept whole"
+    );
+    assert_eq!(migrate_v1(&dir)?, None, "the next open finds nothing to do");
+    FileLeafStore::open_read_only(&dir)?;
+    Ok(())
+}
+
+#[test]
+fn the_create_a_server_start_falls_back_to_finishes_the_switch_instead_of_an_empty_store() -> Outcome
+{
+    let root = tempfile::tempdir()?;
+    let dir = root.path().join("directory");
+    let (pin, kept_before) = between_the_renames(&dir)?;
+    // The identity server creates a store wherever log.json is missing and
+    // opens it after; the window must not answer that with an empty log.
+    assert!(!dir.join("log.json").exists());
+    let created = FileLeafStore::create(&dir, ORIGIN)?;
+    assert_eq!(created.extent(), 5, "the kept history, not an empty store");
+    assert_eq!(created.pinned(), pin);
+    let finished = created.migrated().ok_or("create finished no switch")?;
+    assert_eq!(finished.leaves, 5);
+    drop(created);
+    let reopened = FileLeafStore::open(&dir)?;
+    assert_eq!(reopened.extent(), 5);
+    assert_eq!(reopened.migrated(), None);
+    assert_eq!(listing(&kept_name(&dir)?)?, kept_before);
+    assert!(!root.path().join("directory.migrating").exists());
+    Ok(())
+}
+
+#[test]
+fn a_kept_copy_standing_alone_is_refused_by_name_and_never_built_over() -> Outcome {
+    let root = tempfile::tempdir()?;
+    let dir = root.path().join("directory");
+    let (_pin, kept_before) = between_the_renames(&dir)?;
+    std::fs::remove_dir_all(root.path().join("directory.migrating"))?;
+
+    for attempt in [
+        FileLeafStore::open(&dir),
+        FileLeafStore::create(&dir, ORIGIN),
+    ] {
+        let err = attempt.err().ok_or("the kept copy alone was guessed at")?;
+        assert!(
+            matches!(err, StoreError::MigrationCopyMissing { .. }),
+            "{err}"
+        );
+        assert!(
+            err.to_string().contains("rename the kept copy back"),
+            "the refusal names the fix: {err}"
+        );
+    }
+    let err = FileLeafStore::open_read_only(&dir).unwrap_err();
+    assert!(matches!(err, StoreError::MigrationPending { .. }), "{err}");
+    assert!(!dir.exists(), "nothing was built at the store's path");
+    assert_eq!(
+        listing(&kept_name(&dir)?)?,
+        kept_before,
+        "the kept copy is untouched"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_built_copy_that_does_not_match_the_kept_bytes_is_refused_and_both_stay() -> Outcome {
+    let root = tempfile::tempdir()?;
+    let dir = root.path().join("directory");
+    let (_pin, kept_before) = between_the_renames(&dir)?;
+    let building = root.path().join("directory.migrating");
+    std::fs::remove_dir_all(&building)?;
+    let mut other = FileLeafStore::create(&building, ORIGIN)?;
+    let frontier = Frontier::from_leaves(&LEAVES[..4]);
+    other.append(
+        0,
+        &LEAVES[..4],
+        PinnedRoot {
+            tree_size: frontier.size(),
+            root: frontier.root(),
+        },
+    )?;
+    drop(other);
+    let copy_before = listing(&building)?;
+
+    let err = FileLeafStore::open(&dir).unwrap_err();
+    assert!(matches!(err, StoreError::Corrupt { .. }), "{err}");
+    assert!(!dir.exists(), "the mismatched copy was not switched in");
+    assert_eq!(listing(&building)?, copy_before, "and was not removed");
+    assert_eq!(
+        listing(&kept_name(&dir)?)?,
+        kept_before,
+        "the kept copy is untouched"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_unfinished_copy_beside_a_v1_store_is_rebuilt_before_the_switch() -> Outcome {
+    let root = tempfile::tempdir()?;
+    let dir = root.path().join("directory");
+    let pin = v1_fixture(&dir, &LEAVES, 5, None)?;
+    // A crash before the first rename: the v1 directory is still the store
+    // and the copy beside it is whatever the stopped attempt left.
+    let building = root.path().join("directory.migrating");
+    std::fs::create_dir_all(&building)?;
+    std::fs::write(building.join("log.json"), b"half-written")?;
+    let migrated = migrate_v1(&dir)?.ok_or("nothing migrated")?;
+    assert_eq!(migrated.leaves, 5);
+    assert!(!building.exists());
+    let store = FileLeafStore::open(&dir)?;
+    assert_eq!(store.extent(), 5);
+    assert_eq!(store.pinned(), pin);
     Ok(())
 }

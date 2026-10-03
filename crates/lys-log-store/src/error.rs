@@ -370,10 +370,11 @@ pub enum StoreError {
         /// The number of leaves counted.
         extent: u64,
     },
-    /// A read-only open met a store still in the v1 per-leaf layout. Only a
-    /// writable open migrates it, once; a reader never changes a directory.
+    /// A read-only open met a store still in the v1 per-leaf layout, or a
+    /// migration's switch left unfinished beside its path. Only a writable
+    /// open migrates or finishes it; a reader never changes a directory.
     #[error(
-        "refusing to open the log store at {} read-only: it is in the v1 per-leaf layout, which only a writable open migrates",
+        "refusing to open the log store at {} read-only: it is in the v1 per-leaf layout or its migration's switch is unfinished, which only a writable open completes",
         path.display()
     )]
     MigrationPending {
@@ -390,6 +391,21 @@ pub enum StoreError {
     MigrationKeptExists {
         /// The name the v1 directory would be kept under.
         path: PathBuf,
+    },
+    /// A migration's switch was interrupted after the v1 directory was kept
+    /// aside, and the built copy that should stand beside it is gone. Nothing
+    /// is guessed and no empty store is built over the kept history.
+    #[error(
+        "refusing to open the log store at {}: its migration was interrupted after the v1 directory was kept at {}, and the migrated copy beside it is gone; rename the kept copy back to {} and open again to migrate it afresh",
+        path.display(),
+        kept.display(),
+        path.display()
+    )]
+    MigrationCopyMissing {
+        /// The store's directory, now absent.
+        path: PathBuf,
+        /// Where the v1 directory is kept, whole.
+        kept: PathBuf,
     },
     /// A record of a segment does not read: short, or failing its checksum
     /// or shape. Named by segment and offset so the damage can be looked at.

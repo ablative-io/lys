@@ -16,6 +16,14 @@
 //! reported. The leaves under the pin must hash to the pinned root before
 //! anything is written; a v1 directory that does not match its own pin is
 //! refused and left exactly as it was.
+//!
+//! The switch is two renames, `<name>` to `<name>.v1` and then
+//! `<name>.migrating` to `<name>`, and a crash between them leaves nothing at
+//! the store's path. That state is looked for first, by every writable open
+//! and by [`FileLeafStore::create`]: the built copy is checked against the
+//! kept v1 bytes again and the second rename is finished. A kept copy with
+//! nothing beside it is refused by name, never guessed at, and never built
+//! over with an empty store.
 
 use std::path::{Path, PathBuf};
 
@@ -42,33 +50,26 @@ pub fn kept_name(dir: &Path) -> StoreResult<PathBuf> {
     sibling(dir, "v1")
 }
 
-/// Migrate the store at `dir` out of the v1 layout, when it is in one.
-/// Answers `None` when there is nothing to migrate: the directory is not a v1
-/// store, or this build's own layout is still v1 (then nothing newer exists
-/// to migrate into, and the open proceeds as before).
+/// Migrate the store at `dir` out of the v1 layout, when it is in one, or
+/// finish a switch a crash interrupted. Answers `None` when there is nothing
+/// to do: the directory is not a v1 store and no switch is pending.
 ///
 /// # Errors
 ///
 /// [`StoreError::Corrupt`] when the v1 directory does not match its own pin
 /// or the new store does not read back what was written;
-/// [`StoreError::MigrationKeptExists`] when the kept name is taken; and the
-/// errors of creating and appending to the new store. On any error the v1
-/// directory is as it was.
+/// [`StoreError::MigrationKeptExists`] when the kept name is taken;
+/// [`StoreError::MigrationCopyMissing`] when only the kept copy remains; and
+/// the errors of creating and appending to the new store. On any error the
+/// v1 directory is as it was.
 pub fn migrate_v1(dir: &Path) -> StoreResult<Option<Migrated>> {
-    if crate::file::LOG_DIR_FORMAT == v1::FORMAT || !v1::present(dir)? {
+    if let Some(finished) = finish_switch(dir)? {
+        return Ok(Some(finished));
+    }
+    if !v1::present(dir)? {
         return Ok(None);
     }
-    let contents = v1::read(dir)?;
-    let frontier = Frontier::from_leaves(&contents.leaves);
-    if frontier.size() != contents.pinned.tree_size || frontier.root() != contents.pinned.root {
-        return Err(StoreError::Corrupt {
-            path: dir.to_path_buf(),
-            reason: format!(
-                "the {} leaves under the pin do not hash to the pinned root; nothing migrated",
-                contents.pinned.tree_size
-            ),
-        });
-    }
+    let contents = checked_contents(dir)?;
     let kept = kept_name(dir)?;
     if kept.exists() {
         return Err(StoreError::MigrationKeptExists { path: kept });
@@ -105,6 +106,70 @@ pub fn migrate_v1(dir: &Path) -> StoreResult<Option<Migrated>> {
         beyond_pin: contents.beyond_pin,
         snapshot: contents.snapshot.is_some(),
     }))
+}
+
+/// Whether a switch is pending at `dir`: nothing at the store's path, and
+/// the kept v1 copy beside it. A reader refuses this state by name; only a
+/// writable open or [`FileLeafStore::create`] finishes it.
+///
+/// # Errors
+///
+/// [`StoreError::Corrupt`] when `dir` has no name to keep a copy under.
+pub fn switch_pending(dir: &Path) -> StoreResult<bool> {
+    Ok(!dir.exists() && kept_name(dir)?.exists())
+}
+
+/// Finish a switch a crash interrupted between its two renames: `dir` is
+/// absent, the v1 directory is already kept, and the built copy stands
+/// beside it. The copy is checked against the kept bytes as it was before
+/// the first rename, then renamed into place. Answers `None` when no switch
+/// is pending.
+///
+/// # Errors
+///
+/// [`StoreError::MigrationCopyMissing`] when the kept copy stands alone:
+/// nothing is guessed and nothing is built over it. [`StoreError::Corrupt`]
+/// when the kept copy does not match its own pin or the built copy does not
+/// read back the kept bytes; then both stay where they are.
+pub fn finish_switch(dir: &Path) -> StoreResult<Option<Migrated>> {
+    if !switch_pending(dir)? {
+        return Ok(None);
+    }
+    let kept = kept_name(dir)?;
+    let building = sibling(dir, "migrating")?;
+    if !building.exists() {
+        return Err(StoreError::MigrationCopyMissing {
+            path: dir.to_path_buf(),
+            kept,
+        });
+    }
+    let contents = checked_contents(&kept)?;
+    verify(&building, &contents)?;
+    rename(&building, dir)?;
+    sync_parent(dir)?;
+    Ok(Some(Migrated {
+        kept,
+        leaves: contents.pinned.tree_size,
+        beyond_pin: contents.beyond_pin,
+        snapshot: contents.snapshot.is_some(),
+    }))
+}
+
+/// Read a v1 directory and refuse one whose leaves under the pin do not hash
+/// to its pinned root.
+fn checked_contents(dir: &Path) -> StoreResult<v1::Contents> {
+    let contents = v1::read(dir)?;
+    let frontier = Frontier::from_leaves(&contents.leaves);
+    if frontier.size() != contents.pinned.tree_size || frontier.root() != contents.pinned.root {
+        return Err(StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: format!(
+                "the {} leaves under the pin do not hash to the pinned root; nothing migrated",
+                contents.pinned.tree_size
+            ),
+        });
+    }
+    Ok(contents)
 }
 
 /// Reopen the new store and check it holds exactly what the v1 directory did.

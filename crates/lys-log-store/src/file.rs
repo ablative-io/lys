@@ -126,14 +126,24 @@ impl std::fmt::Debug for FileLeafStore {
 impl FileLeafStore {
     /// Creates a store at `dir` with the given origin, pinning the empty tree.
     ///
+    /// A path left empty by a migration's interrupted switch is not a place
+    /// for an empty store: the switch is finished ([`crate::migrate`]) and
+    /// the migrated store is answered, with [`FileLeafStore::migrated`] set.
+    ///
     /// # Errors
     ///
     /// [`StoreError::Trust`] if the origin violates the checkpoint-origin
     /// rules, [`StoreError::AlreadyInitialized`] if `dir` is already a store
-    /// (the origin is fixed at creation, so this never runs twice), and
-    /// [`StoreError::Io`] on filesystem failure.
+    /// (the origin is fixed at creation, so this never runs twice),
+    /// [`StoreError::MigrationCopyMissing`] when only a kept v1 copy stands
+    /// beside the path, and [`StoreError::Io`] on filesystem failure.
     pub fn create(dir: &Path, origin: &str) -> StoreResult<Self> {
         crate::validate_origin(origin)?;
+        if let Some(finished) = crate::migrate::finish_switch(dir)? {
+            let mut store = Self::open(dir)?;
+            store.migrated = Some(finished);
+            return Ok(store);
+        }
         let config_path = dir.join("log.json");
         if config_path.exists() {
             return Err(StoreError::AlreadyInitialized {
@@ -216,10 +226,11 @@ impl FileLeafStore {
     ///
     /// # Errors
     ///
-    /// [`StoreError::MigrationPending`] for a v1 directory, and otherwise the
-    /// errors of [`FileLeafStore::open`].
+    /// [`StoreError::MigrationPending`] for a v1 directory or a migration's
+    /// switch left unfinished beside the path, and otherwise the errors of
+    /// [`FileLeafStore::open`].
     pub fn open_read_only(dir: &Path) -> StoreResult<Self> {
-        if v1::present(dir)? {
+        if v1::present(dir)? || crate::migrate::switch_pending(dir)? {
             return Err(StoreError::MigrationPending {
                 path: dir.to_path_buf(),
             });
