@@ -52,3 +52,16 @@ describe('Agent provisioning', () => {
     expect(posted).toEqual([]);
   });
 });
+
+describe('The folder an agent works in', () => {
+  it('shows the saved folder in the settings, and never the old promise of a folder of its own', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok({ ...answer, profile: { ...profile, working_folder: '/Users/ada/Developer/receipts' } }) });
+    expect(text()).toContain('Works in /Users/ada/Developer/receipts');
+    expect(text()).not.toContain('own folder when it starts');
+  });
+  it('says no folder is chosen when the profile names none', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', routes);
+    expect(text()).toContain('No folder chosen yet.');
+    expect(text()).not.toContain('Works in /');
+  });
+});
