@@ -1,6 +1,6 @@
 import type { Grant } from '../../generated/grants';
 import type { Answer } from './check';
-import { Chain } from './GrantCard';
+import { Chain } from './Chain';
 import { chainOf, needsText } from './model';
 import type { GrantWorld } from './model';
 

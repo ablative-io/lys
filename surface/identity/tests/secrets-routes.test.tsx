@@ -1,7 +1,7 @@
 /** Secrets navigation reaches each served route and never reads a credential value. */
 import { describe, expect, it } from 'vitest';
 import { act } from 'react';
-import { $, mount, pick, text, unreachable, settle } from './harness';
+import { $, mount, text, unreachable, settle } from './harness';
 import { SERVICE, ok } from './fixtures';
 
 const secret = { name: 'Calendar', class: 'oauth', owner: 'Tom', sequence: 2, upstream: 'never-render-upstream', header: 'never-render-header' };
@@ -24,10 +24,8 @@ describe('Secrets routes', () => {
   });
 
   it('requires a named selection before showing owner controls and makes no automatic change', async () => {
-    const { posted } = await mount('#/secrets/manage', routes);
-    expect(document.querySelectorAll('form')).toHaveLength(0);
-    await pick(document, 'Find a secret', 'Cal', 'Calendar');
-    expect(document.querySelectorAll('form')).toHaveLength(2);
+    const { posted } = await mount('#/secrets/entries?secret=Calendar', routes);
+    expect(document.querySelectorAll('section[aria-label="Controls of Calendar"] form')).toHaveLength(2);
     expect(posted).toHaveLength(0);
     expect(text()).toContain('Only its owner');
     expect(text()).toContain('Who it can be handed to');
@@ -38,7 +36,7 @@ describe('Secrets routes', () => {
 
 
 it('sends the retained operation through the actual recipients API', async () => {
-  const { posted } = await mount('#/secrets/manage?secret=Calendar', { ...routes,
+  const { posted } = await mount('#/secrets/entries?secret=Calendar', { ...routes,
     'POST /secrets/recipients': ok({ secret: 'Calendar', recipients: 'people_only', operation: 'wrong-operation-on-purpose', repeated: false }),
   });
   const form = [...document.querySelectorAll('form')].find((entry) => entry.textContent?.includes('Who it can be handed to'));

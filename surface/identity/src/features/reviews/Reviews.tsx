@@ -17,6 +17,9 @@ import { readTeams } from '../teams/Teams';
 import type { Grant } from '../../generated/grants';
 import { clock } from '../file/time';
 import { Gate } from '../signin/Gate';
+import { GrantTable } from '../grants/GrantTable';
+import { readGrantWorld } from '../grants/model';
+import type { GrantWorld } from '../grants/model';
 import { KeepGrant } from './KeepGrant';
 import type { Kept } from './KeepGrant';
 import { IdentityName, ReadFailure } from '../signin/words';
@@ -35,21 +38,22 @@ type Due = ReviewsView['due'][number];
 export function Reviews() {
   const [confirmed, setConfirmed] = useState<Record<string, Kept>>({});
   const [notice, setNotice] = useState('');
+  const [revision, setRevision] = useState(0);
   const load = useLoad(() => readTogether({
-    model: api.model(), view: request<ReviewsView>('/reviews'), me: api.me(), people: api.people(),
+    model: api.model(), view: request<ReviewsView>('/reviews'), me: api.me(), people: api.people(), w: readGrantWorld(),
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
-  }), 'reviews');
+  }), 'reviews:' + revision);
   const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
   return <div className="page fill">
     <AccessTabs on="reviews" />
     <div className="head"><div><h1>Reviews</h1>
       <p className="sub">Check what each agent can do, and withdraw access it no longer needs.</p></div></div>
     {notice ? <p role="status">{notice}</p> : null}
-    <Gate load={load} title="agent access to review" renderError={(error) => <ReadFailure error={error} subject="agent access to review" />} ok={(data) => <Due {...data} confirmed={confirmed} kept={kept} />} />
+    <Gate load={load} title="agent access to review" renderError={(error) => <ReadFailure error={error} subject="agent access to review" />} ok={(data) => <Due {...data} confirmed={confirmed} kept={kept} reload={() => setRevision((value) => value + 1)} />} />
   </div>;
 }
 
-function Due({ model, view, me, people, teams, confirmed, kept }: { model: GrantModel; view: ReviewsView; me: MeView; people: PeopleView; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string }; confirmed: Record<string, Kept>; kept: (answer: Kept) => void }) {
+function Due({ model, view, me, people, teams, w, confirmed, kept, reload }: { w: GrantWorld; reload: () => void; model: GrantModel; view: ReviewsView; me: MeView; people: PeopleView; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string }; confirmed: Record<string, Kept>; kept: (answer: Kept) => void }) {
   const admin = people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [picked, setPicked] = useState<string | null>(null);
@@ -79,11 +83,10 @@ function Due({ model, view, me, people, teams, confirmed, kept }: { model: Grant
         selected={open?.grant.id ?? null} select={() => undefined} open={(due) => setPicked(due.grant.id)}
         tools={<WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />} />
       <div className="detail">{open ? <section className="card" aria-label="Grant to review">
-        <h2>{open.agent.display_name}</h2>
-        <p>{open.grant.relation} on {open.grant.resource.kind} {open.grant.resource.id}</p>
+        <h2><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>{open.agent.display_name}</Link></h2>
+        <GrantTable w={w} grants={[open.grant]} done={reload} give={false} />
         <p className="note">{actionWords(model, open.grant.resource, open.grant.actions)}</p>
         <p className="sec">Responsible: {open.reviewer.display_name}</p>
-        <p><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>Review access</Link></p>
         {last(open) ? <p>Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} /> on {clock(last(open)?.at ?? 0)}. {last(open)?.note}</p> : null}
         {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p>Keep decisions are unavailable here.</p>}
       </section> : null}</div>

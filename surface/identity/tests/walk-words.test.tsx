@@ -26,8 +26,8 @@ describe('Walk words', () => {
         items: [{ subject: 'grant', grant: ROOT_G, reason: 'recipient_kind_excluded', source: true }] }),
     });
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-    expect($('#drawer [data-refusal]')).toBeNull();
-    expect($('#drawer [data-cannot-give="recipient_kind_excluded"] .note')?.textContent)
+    expect($('#act [data-refusal]')).toBeNull();
+    expect($('#act [data-cannot-give="recipient_kind_excluded"] .note')?.textContent)
       .toBe('This access cannot be passed on to this kind of recipient.');
   });
 
@@ -49,10 +49,10 @@ describe('Walk words', () => {
       'POST /grants': (body: unknown) => ok({ operation: (body as DelegateBody).operation, grant: SCRIBE_G, index: 1, receipt: { caller: ADA } }),
     });
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-    expect($('#drawer h2')?.textContent).toBe('Give part of editor of the agents directory to an agent');
-    expect($$('#drawer legend').map((legend) => legend.textContent)).toEqual(['Actions']);
-    expect($$('#drawer .field > label').map((label) => label.textContent)).not.toContain('Actions');
-    await click($('#drawer input[name="action"][value="agent.stop"]'));
+    expect($('#act h2')?.textContent).toBe('Give part of editor of the agents directory to an agent');
+    expect($$('#act legend').map((legend) => legend.textContent)).toEqual(['Actions']);
+    expect($$('#act .field > label').map((label) => label.textContent)).not.toContain('Actions');
+    await click($('#act input[name="action"][value="agent.stop"]'));
     await click($('[data-act="delegatedo"]'));
     expect(mounted.posted.find((entry) => entry.path === '/grants')?.body)
       .toMatchObject({ source: ROOT_G, recipient: SCRIBE, relation: 'only.agent.stop' });

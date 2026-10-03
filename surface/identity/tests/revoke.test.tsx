@@ -42,8 +42,8 @@ const open = async (routes: Record<string, Route>) => {
 describe('Revoke', () => {
   it('asks for the reason and shows everything derived from it before it goes', async () => {
     await open(revocable());
-    expect($('#drawer')?.classList.contains('open')).toBe(true);
-    expect($('#drawer h2')?.textContent).toBe('Revoke owner of project:identity');
+    expect($('#act')).not.toBeNull();
+    expect($('#act h2')?.textContent).toBe('Revoke owner of project:identity');
     expect(document.activeElement?.id).toBe('why');
     expect($('#derived')?.textContent).toBe("Scribe · viewerrevoked with it");
     expect(unreachable()).toEqual([]);
@@ -57,10 +57,10 @@ describe('Revoke', () => {
     expect(body.route).toBe('browser');
     expect(body.operation).toMatch(/^op-[0-9a-f]{32}$/);
     expect($('#toast')?.textContent).toBe(`Revoked G/${ROOT_G.slice(6, 14)}. Everything derived from it goes with it.`);
-    expect($('#drawer')?.classList.contains('open')).toBe(false);
-    const card = $$('.file .card').find((c) => c.textContent?.includes('owner of project:identity'));
-    expect(card?.textContent).toContain('void');
-    expect(card?.textContent).toMatch(/Policy changed at \d\d:\d\d, change 8\. Every check from here on refuses\./);
+    expect($('#act')).toBeNull();
+    const card = $(`tr[data-grant="${ROOT_G}"]`);
+    expect(card?.textContent).toContain('no: ');
+    expect(card?.textContent).toMatch(/Revoked .*, change 8; every check from here on refuses\./);
     expect(card?.querySelector('[data-act="revoke"]')).toBeNull();
     location.hash = `#/file/${SCRIBE}/access`;
     await press('Escape', {}, document.body);
@@ -79,7 +79,7 @@ describe('Revoke', () => {
     await open({ ...SERVICE, [`POST /grants/${ROOT_G}/revoke`]: refused(409, 'RevokeRefused', `RevokeRefused: ${ADA} neither issued ${ROOT_G} nor holds a grant it derives from`) });
     await click($('[data-act="revokedo"]'));
     expect($('#rAnswer b')?.textContent).toBe('RevokeRefused');
-    expect($('#drawer')?.classList.contains('open')).toBe(true);
+    expect($('#act')).not.toBeNull();
     expect($('#toast')?.textContent).not.toContain('Revoked');
   });
 

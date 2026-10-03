@@ -37,7 +37,7 @@ const uncertain = (r: Refused) => r.status < 400 || r.status >= 500;
  * to 2.4). Every decision is the service's: this form only asks, and shows its
  * answer, including what the chosen recipient cannot be given.
  */
-export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant; to?: string; done: () => void }) {
+export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source: Grant; to?: string; done: () => void; close: () => void }) {
   const shell = useShell();
   const me = w.me.person.id;
   const agents = [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired');
@@ -211,7 +211,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         }
         current = next;
       }
-      shell.closeAll();
+      close();
       shell.toast(`Given. ${nameOf(w, first.recipient)} can now ${grantedWords(given)} ${givenOnText(source)}, through you.${unreleased.current ? ' The browser could not release the retained request; opening this again checks it, never gives it twice.' : ''}`);
       done();
     } finally { working.current = false; }
@@ -302,7 +302,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || damaged || !recipient || !leaseKnown || (pending.kind !== 'held' && rest.kind !== 'held' && (toAgent ? picked.length === 0 : !relation))} onClick={give}>
           {pending.kind === 'held' ? 'Check original grant' : 'Give'}
         </button>
-        <button className="btn" data-act="close" onClick={shell.closeAll}>Cancel</button>
+        <button className="btn" data-act="close" onClick={close}>Cancel</button>
       </div>
     </>
   );

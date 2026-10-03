@@ -3,12 +3,11 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { api, request, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
-import { Delegate } from '../grants/Delegate';
-import { mayText, nameOf, onText, passesToAgents, readGrantWorld } from '../grants/model';
+import { GrantTable } from '../grants/GrantTable';
+import { onText, readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { keyable } from '../../shell/keyable';
 import { pref, setPref } from '../../shell/prefs';
-import { useShell } from '../../shell/ShellContext';
 import { useLocation, useNavigate } from 'react-router';
 import { Start } from '../team/Start';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
@@ -167,32 +166,13 @@ function Waiting({ waiting }: { waiting: ActiveData['waiting'] }) {
 }
 
 function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
-  const shell = useShell();
   const { me, agents, w } = data;
   const mine = w.list.grants.filter((g) => g.holder === me.person.id && g.standing.stands);
   const same = (a: Login) => a.provider === me.signed_in.provider && a.subject === me.signed_in.subject;
   return <div className="you-account grid2">
     <div>
       <div className="section-h" style={{ marginTop: 0 }}><span>What you hold</span></div>
-      <table>
-        <thead><tr><th>What it lets you do</th><th>Given by</th><th>You can give it to your agents</th><th></th></tr></thead>
-        <tbody>
-          {mine.length ? mine.map((g) => (
-            <tr key={g.id}>
-              <td>{mayText(w, g)}</td>
-              <td className="sec">{g.source ? nameOf(w, w.byId.get(g.source)?.holder ?? g.issuer) : 'root'}</td>
-              <td>{passesToAgents(g.pass_on) ? <span className="pass">yes</span> : <span className="dim">no</span>}</td>
-              <td>
-                {passesToAgents(g.pass_on) && agents.length ? (
-                  <button className="btn" data-act="delegate" data-g={g.id} onClick={() => shell.openDrawer(<Delegate w={w} source={g} done={reload} />)}>
-                    Give to an agent…
-                  </button>
-                ) : null}
-              </td>
-            </tr>
-          )) : <tr><td colSpan={4} className="dim">Nothing yet.</td></tr>}
-        </tbody>
-      </table>
+      <GrantTable w={w} grants={mine} done={reload} give={agents.length > 0} empty="Nothing yet." />
     </div>
     <div>
       <OwnAccount />

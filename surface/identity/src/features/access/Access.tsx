@@ -5,7 +5,6 @@ import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
 import { AccessTabs } from './AccessTabs';
 import { Listing } from '../../shell/Listing';
-import type { Column } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
 import type { Held, OrgTeam } from '../../shell/org';
 import { Picker } from '../../shell/Picker';
@@ -14,7 +13,8 @@ import { DirectoryGate as Gate, problemWords } from '../people/Words';
 import { readTeams } from '../teams/Teams';
 import { reachMap } from '../grants/check';
 import { CheckBox, resourcesSeen } from '../grants/CheckBox';
-import { grantNo, lastUsedText, lastsText, nameOf, passText, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
+import { grantColumns } from '../grants/GrantTable';
+import { grantNo, nameOf, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import type { Grant } from '../../generated/grants';
 import { Pill } from '../people/Pill';
@@ -117,17 +117,7 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
   const held = (g: Grant): Held => ({ id: g.holder, person: w.who.get(g.holder)?.responsible ?? null });
   const scoped = w.list.grants.filter((g) => inWhose(whose, teams.list, w.me.person.id, held(g))).filter((g) => show === 'all' || voidOf(w, g) !== null);
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => nameOf(w, id));
-  const columns: Column<Grant>[] = [
-    { head: 'Grant', cell: (g) => <span className="mono">{grantNo(g.id)}</span> },
-    { head: 'Holder', cell: (g) => nameOf(w, g.holder) },
-    { head: 'Relation', cell: (g) => <span className="mono">{g.relation}</span> },
-    { head: 'On', cell: (g) => <span className="mono">{resourceWords(g.resource)}</span> },
-    { head: 'Derives from', cell: (g) => { const up = g.source ? w.byId.get(g.source) : undefined; return <span className="sec">{g.source ? `${grantNo(g.source)} · ${up ? nameOf(w, up.holder) : 'not visible'}` : <span className="dim">root</span>}</span>; } },
-    { head: 'May pass on', cell: (g) => <span className="sec">{passText(g.pass_on)}</span> },
-    { head: 'Lasts', cell: (g) => <span className="sec">{lastsText(g)}</span> },
-    { head: 'Last used', cell: (g) => <span className="sec">{g.last_use.seen ? lastUsedText(g) : <span className="dim">{lastUsedText(g)}</span>}</span> },
-    { head: 'Stands', cell: (g) => { const v = voidOf(w, g); return v === null ? <><span className="dot s-active" />yes</> : <span className="danger">no: {v.why}</span>; } },
-  ];
+  const columns = grantColumns(w);
   return <div className="page fill">
     <AccessTabs on={mode ? 'ask' : 'grants'} />
     <div className="head">

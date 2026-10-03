@@ -1,7 +1,4 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
-.drawer { position: fixed; top: 0; bottom: 0; right: 0; width: 440px; background: var(--glass-bg); backdrop-filter: blur(12px); border-left: 1px solid var(--border-default); box-shadow: var(--shadow-lg); transform: translateX(105%); transition: transform .34s var(--spring); padding: 22px; overflow: auto; z-index: 20; }
-.dock-right .drawer { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--border-default); transform: translateX(-105%); }
-.drawer.open { transform: none; }
 .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
 .scrim.open { opacity: 1; pointer-events: auto; }
 .palette { position: fixed; left: 50%; top: 14vh; width: 560px; max-width: 92vw; transform: translate(-50%, -8px) scale(.98); opacity: 0; pointer-events: none; transition: all .22s var(--spring); background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 31; overflow: hidden; }
@@ -37,3 +34,5 @@ table.wrap td { white-space: normal; }
 .file { margin-top: 30px; }
 .empty-note { border: 1px dashed var(--border-default); border-radius: var(--radius-lg); padding: 12px 14px; color: var(--text-secondary); font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: opacity .15s !important; } }
+
+.act-panel { border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); padding: 14px 16px; margin: 6px 0 12px; }

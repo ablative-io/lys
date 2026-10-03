@@ -31,7 +31,7 @@ export function derivedFrom(w: GrantWorld, g: Grant): Grant[] {
 type Outcome = { at: 'editing' } | { at: 'sending' } | { at: 'refused'; refused: Refused } | { at: 'pending'; reason: string };
 
 /** Withdraw a grant, and everything derived from it (conformance 2.5). */
-export function Revoke({ w, g, done }: { w: GrantWorld; g: Grant; done: () => void }) {
+export function Revoke({ w, g, done, close }: { w: GrantWorld; g: Grant; done: () => void; close: () => void }) {
   const shell = useShell();
   const [why, setWhy] = useState('No longer needed.');
   const [outcome, setOutcome] = useState<Outcome>({ at: 'editing' });
@@ -42,7 +42,7 @@ export function Revoke({ w, g, done }: { w: GrantWorld; g: Grant; done: () => vo
     setOutcome({ at: 'sending' });
     try {
       await api.revoke(g.id, { operation: op.current, route: 'browser', reason: why });
-      shell.closeAll();
+      close();
       shell.toast(`Revoked ${grantNo(g.id)}. Everything derived from it goes with it.`);
       done();
     } catch (error) {
@@ -91,7 +91,7 @@ export function Revoke({ w, g, done }: { w: GrantWorld; g: Grant; done: () => vo
       ) : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
         <button className="btn primary" data-act="revokedo" data-g={g.id} disabled={outcome.at === 'sending'} onClick={revoke}>Revoke</button>
-        <button className="btn" data-act="close" onClick={shell.closeAll}>Cancel</button>
+        <button className="btn" data-act="close" onClick={close}>Cancel</button>
       </div>
     </>
   );

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PersonalBudgets } from './PersonalBudgets';
 import { AgentUsage } from '../usage/Usage';
 import { AgentCertificates } from './AgentCertificates';
@@ -16,8 +17,8 @@ import { DirectoryGate as Gate } from '../people/Words';
 import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
 import { Delegate } from '../grants/Delegate';
-import { GrantCard } from '../grants/GrantCard';
-import { chainOf, onText, passesToAgents } from '../grants/model';
+import { ActPanel, GrantTable } from '../grants/GrantTable';
+import { onText, passesToAgents } from '../grants/model';
 import { CHANGE_KINDS } from '../../generated';
 import { Pill } from '../people/Pill';
 import { calledBy, firstName } from '../people/directory';
@@ -76,6 +77,7 @@ function Profile({ data }: { data: FileData }) {
 
 function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const shell = useShell();
+  const [giving, setGiving] = useState(false);
   const { x, grants: w } = data;
   const name = calledBy(x.id, x.display_name);
   const held = w.list.grants.filter((g) => g.holder === x.id);
@@ -88,28 +90,15 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const passable = w.list.grants.filter((g) => g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on));
   const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
   return (
+    <>
+      <div className="section-h" style={{ marginTop: 0 }}><span>Grants</span>
+        {x.kind === 'agent' && x.state !== 'retired' ? <button className="btn" data-act="grant" onClick={() => mineToGive && passable.length ? setGiving(true)
+          : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)}>Give access</button> : null}
+      </div>
+      {giving && passable.length ? <ActPanel label="Give" close={() => setGiving(false)}><Delegate w={w} source={passable[0]} to={x.id} done={reload} close={() => setGiving(false)} /></ActPanel> : null}
+      <GrantTable w={w} grants={held} done={reload} give={false} />
     <div className="grid2">
       <div>
-        <div className="section-h" style={{ marginTop: 0 }}>
-          <span>Grants</span>
-        </div>
-        {held.length ? held.map((g) => <GrantCard key={g.id} w={w} g={g} chain={chainOf(w, g)} done={reload} />) : <div className="dim">No grants.</div>}
-        {x.kind === 'agent' && x.state !== 'retired' ? (
-          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-            <button
-              className="btn"
-              data-act="grant"
-              onClick={() =>
-                mineToGive && passable.length
-                  ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />)
-                  : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)
-              }
-            >
-              Grant access
-            </button>
-            <button className="btn" data-act="temporary-access" onClick={() => mineToGive && passable.length ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />) : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)}>Temporary access…</button>
-          </div>
-        ) : null}
         {mineToGive && !passable.length ? (
           <div style={{ marginTop: 12 }}>
             <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record it once, for themselves.</p>
@@ -136,6 +125,7 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
         <CheckBox w={w} who={x.id} />
       </div>
     </div>
+    </>
   );
 }
 
