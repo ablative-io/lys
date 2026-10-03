@@ -288,6 +288,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::RunnerAbsent { .. }
         | ServerError::Runner { .. }
         | ServerError::DialRefused { .. }
+        | ServerError::Haem(..)
         | ServerError::DialStale { .. } => "server_error",
     };
     let body = json!({

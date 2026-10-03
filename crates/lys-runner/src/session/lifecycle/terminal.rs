@@ -23,6 +23,8 @@ impl Sessions {
         let mut buffer = [0_u8; 8192];
         // Whether this generation has been sent its hang-up at a usage limit.
         let mut told = false;
+        // Whether the repeat has been said; it is said once, however often it is sent.
+        let mut said_again = false;
         loop {
             let read = match reader.read(&mut buffer) {
                 Ok(0) => break,
@@ -39,8 +41,12 @@ impl Sessions {
                     // command when it lands only notes it and goes back to
                     // reading. Output from a generation already told to hang up
                     // means its program is still running, so it is told again,
-                    // and the runner says so. Nothing is sent to a generation
-                    // that has gone quiet; nothing here waits on a clock.
+                    // and the runner says so, once. Nothing is sent to a generation
+                    // that has gone quiet; nothing here waits on a clock. A program
+                    // that took the first hang-up and prints while it shuts down
+                    // is hung up again as it prints: one whose handler stands
+                    // loses nothing, one whose handler was for a single signal is
+                    // ended there with what it had printed kept.
                     if !tripped && !told {
                         continue;
                     }
@@ -66,7 +72,8 @@ impl Sessions {
                     };
                     if let Some(leader) = leader {
                         told = true;
-                        if again {
+                        if again && !said_again {
+                            said_again = true;
                             crate::error::said(&format!(
                                 "session {id}: rotation_signal_repeated: output came after the hang-up"
                             ));
