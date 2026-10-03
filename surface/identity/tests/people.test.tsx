@@ -42,15 +42,15 @@ describe('People and agents', () => {
     expect(text()).not.toContain('not built yet');
   });
 
-  it('moves with j and k, previews the row, and opens it with Enter', async () => {
+  it('moves with j and k, marks the row, and opens it with Enter, with no side pane repeating the row', async () => {
     await mount('#/people');
-    expect($('.detail h2')?.textContent).toBe('Ada (test person)');
+    expect($('tr.cursor td')?.textContent).toBe('Ada (test person)');
+    expect($('.detail')).toBeNull();
     await press('j', {}, document.body);
     await press('j', {}, document.body);
     expect($('tr.cursor td')?.textContent).toBe("Courier");
-    expect($('.detail h2')?.textContent).toBe("Courier");
     await press('k', {}, document.body);
-    expect($('.detail h2')?.textContent).toBe('Scribe');
+    expect($('tr.cursor td')?.textContent).toBe('Scribe');
     await press('Enter', {}, document.body);
     expect(location.hash).toBe('#/file/' + SCRIBE);
   });
@@ -110,10 +110,12 @@ describe('People and agents', () => {
     await mount('#/people', { ...SERVICE, '/runtime/sessions': refused(503, 'RuntimeUnavailable', 'No reports store') });
     expect($$('.stat .n').slice(3).map((entry) => entry.textContent)).toEqual(['—', '—']); expect(text()).toContain('RuntimeUnavailable');
   });
-  it('shows the chosen agent\'s run beside the list, with no link to another page to start it', async () => {
+  it('lists agents across the full width, with no run or terminal beside the list', async () => {
     await mount('#/people'); await click($('[data-kind="agent"]'));
     expect($('[data-act="start"]')).toBeNull();
-    expect($('.detail .agent-run')).not.toBeNull();
+    expect($('.detail')).toBeNull();
+    expect($('.agent-run')).toBeNull();
+    expect($('.fill > .body.one table')).not.toBeNull();
   });
 
 });

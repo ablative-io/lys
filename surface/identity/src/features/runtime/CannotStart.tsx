@@ -170,7 +170,7 @@ function AllowComputer({ agent, name, again }: { agent: string; name: string; ag
   };
   if (!computers.length) return <>
     <p>No computer has Lys running on it yet.</p>
-    <a className="btn primary" href="#/network">Add a computer</a>
+    <a className="btn primary" href="#/network?add=computer">Add a computer</a>
   </>;
   return <>
     {computers.map((computer) => <button key={computer.id} type="button" className="btn primary" disabled={busy} onClick={() => { void allow(computer.id); }}>

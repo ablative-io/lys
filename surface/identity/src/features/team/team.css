@@ -58,6 +58,8 @@
 .team-empty p { margin: 0 0 12px; }
 
 /* The run beside the list on People and agents: the pane gets room for a terminal when an agent is running. */
-.fill > .body:has(.agent-run[data-live="true"]) { grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); }
-.agent-run { margin-bottom: 12px; }
-.agent-run .team-pane { height: min(70vh, 640px); border-radius: 8px; overflow: hidden; }
+.agent-run { margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); }
+.agent-run-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.agent-run-words { flex: 1 1 320px; }
+.agent-run .team-stop { position: static; margin-top: 12px; padding: 12px 0 0; background: none; }
+.agent-run .team-start { width: 100%; }

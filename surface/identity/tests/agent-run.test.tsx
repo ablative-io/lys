@@ -1,4 +1,4 @@
-/** People and agents is the front page, and an agent's run is beside the list there: a running agent's terminal with Stop and Restart, a stopped agent started in place with one press, and what stops a start said in one sentence with the button that fixes it. */
+/** An agent's run is on the agent's own page: where it is running with Stop and Restart and a link to its terminal on the canvas, a stopped agent started in place with one press, and what stops a start said in one sentence with the button that fixes it. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, click, mount, text, leaveTheReachReadOutOfPosted } from './harness';
 // These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
@@ -39,7 +39,7 @@ const stopped = { ...routes, '/teams': ok({ teams: [] }), '/runtime/live': ok({ 
 describe('An agent\'s run on People and agents', () => {
   beforeEach(() => { sessionStorage.clear(); });
 
-  it('has no page of its own: the front page is your agents, each with Start or Stop in its own row, and People and agents shows a chosen agent\'s terminal beside the list', async () => {
+  it('has no page of its own: the front page is your agents, each with Start or Stop in its own row, and the agent\'s own page says where it runs with its acts, with no terminal and no side pane on People and agents', async () => {
     await mount('#/', routes);
     expect(text()).toContain('Your agents');
     expect($('.team-screen')).toBeNull();
@@ -48,10 +48,15 @@ describe('An agent\'s run on People and agents', () => {
     expect($$('button[data-act="start"]').length).toBeGreaterThan(0);
     await mount('#/people/' + SCRIBE, routes);
     expect($('.page .head h1')?.textContent).toBe('People and agents');
-    expect($('.detail h2')?.textContent).toBe('Scribe');
-    expect($('.detail .team-pane .terminal')).not.toBeNull();
-    expect($('.team-foot')?.textContent).toContain('Lab');
-    expect($$('.team-foot-act').find((el) => el.textContent === 'Settings')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    expect($('.detail')).toBeNull();
+    expect($('.agent-run')).toBeNull();
+    expect($('.terminal')).toBeNull();
+    await mount('#/file/' + SCRIBE, routes);
+    const run = $('section[aria-label="Run"]');
+    expect(run?.textContent).toContain('Scribe is running on Lab');
+    expect(run?.querySelector('.terminal')).toBeNull();
+    expect(run?.querySelector('[data-act="watch"]')?.getAttribute('href')).toBe('#/canvas/' + SCRIBE);
+    expect($$('.file nav.tabs a').map((el) => el.getAttribute('href'))).toContain('#/file/' + SCRIBE + '/provisioning');
   });
 
   it('offers Set up, not Start, on the row of an agent with no program chosen, and sets it up under that row', async () => {
@@ -95,8 +100,8 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('restarts a running agent in place, after asking, with one request', async () => {
-    const { posted } = await mount('#/people/' + SCRIBE, { ...routes, ['POST /agents/' + SCRIBE + '/restart']: ok({}) });
-    await click($$('.team-foot-act').find((el) => el.textContent === 'Restart') ?? null);
+    const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /agents/' + SCRIBE + '/restart']: ok({}) });
+    await click($('section[aria-label="Run"] [data-act="restart"]'));
     expect(text()).toContain('Restart Scribe? This ends the run and starts it again in the same folder, on Lab.');
     expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toEqual([]);
     await click(button('Restart Scribe'));
@@ -104,8 +109,8 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('stops a running agent by ending its run, after asking, and never by the emergency stop', async () => {
-    const { posted } = await mount('#/people/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
-    await click($$('.team-foot-act').find((el) => el.textContent === 'Stop') ?? null);
+    const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
+    await click($('section[aria-label="Run"] [data-act="stop"]'));
     expect(text()).toContain('Stop Scribe? What it has not saved is lost. You can start it again afterwards.');
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
     await click(button('Stop Scribe'));
@@ -206,7 +211,7 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('says so when it cannot read whether the agent is running, and offers no Start it cannot stand behind', async () => {
-    await mount('#/people/' + SCRIBE, { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'no reports store') });
+    await mount('#/file/' + SCRIBE, { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'no reports store') });
     expect(text()).toContain('Lys could not read whether Scribe is running');
     expect(text()).toContain('RuntimeUnavailable');
     expect(button('Start')).toBeNull();

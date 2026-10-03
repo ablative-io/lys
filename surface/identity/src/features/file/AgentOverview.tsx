@@ -5,10 +5,9 @@ import type { AgentView } from '../../generated';
 import type { NetworkView } from '../network/contract';
 import type { Program } from '../provisioning/choices';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
-import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import type { Team } from '../teams/contract';
 import { Pill } from '../people/Pill';
-import { clock } from './time';
+import { AgentRun } from '../team/AgentRun';
 import './agent-overview.css';
 
 function reading<T>(load: Load<T>, subject: string) {
@@ -67,77 +66,25 @@ function modelName(programs: Program[], id: string): string {
   return listed ? listed.label : id + ' (no program lists this model now)';
 }
 
-async function readSessions(id: string) {
-  const answer = await request<{ sessions: RuntimeSession[] }>('/agents/' + encodeURIComponent(id) + '/runtime/sessions');
-  if (!Array.isArray(answer.sessions)) mismatch('RuntimeReportUnreadable', 'The runner did not answer a session list.');
-  for (const session of answer.sessions) {
-    if (!session || session.agent !== id) mismatch('RuntimeReportMismatch', 'A runner report did not name this agent.');
-    if (typeof session.session !== 'string' || typeof session.machine !== 'string'
-      || !(session.machine_name === null || typeof session.machine_name === 'string')
-      || !['running', 'stopped', 'unconfirmed'].includes(session.shown) || !Number.isFinite(session.last_report_at)
-      || (session.shown === 'stopped' && (!session.stopped || typeof session.stopped.confirmation !== 'string' || !session.stopped.confirmation))) {
-      mismatch('RuntimeReportUnreadable', 'The runner did not answer a valid state and report time.');
-    }
-  }
-  return answer.sessions;
-}
-
-function Running({ load }: { load: Load<RuntimeSession[]> }) {
-  if (load.status !== 'ok') return <>{reading(load, 'runner reports')}<p className="note">Running state is unknown until the runner answers.</p></>;
-  const sessions = load.data;
-  if (!sessions.length) return <>No runner has reported a session. <span className="note">Running state is unknown.</span></>;
-  const latest: Partial<Record<RuntimeSession['shown'], RuntimeSession>> = {};
-  for (const session of sessions) {
-    const previous = latest[session.shown];
-    if (!previous || previous.last_report_at < session.last_report_at) latest[session.shown] = session;
-  }
-  return <>
-    <span className={latest.running ? 'agent-running' : ''}>{latest.running ? 'Running, as its runner last reported' : latest.unconfirmed ? 'Running state is unconfirmed' : 'Stopped, as its runner confirmed'}</span>
-    <ul className="agent-reports">{Object.values(latest).map((session) => <li key={session.session}>
-      <a href={'#/runtime/' + encodeURIComponent(session.session)}>{session.machine_name || 'Reported computer'}</a>
-      {' · '}{session.shown === 'running' ? 'reported running' : session.shown === 'stopped' ? 'confirmed stopped' : 'not confirmed'}
-      {' · '}{clock(session.last_report_at)}
-      {session.stop_asked_at && !session.stopped ? <p className="why-not">A stop was requested. The runner has not confirmed it ended.</p> : null}
-    </li>)}</ul><a className="note" href={'#/file/' + encodeURIComponent(sessions[0].agent ?? '') + '/sessions'}>See all runner reports</a>
-  </>;
-}
-
-/** Saved choices and runner observations stay distinct, with every failed read named. */
+/** The agent's run and its saved choices, with every failed read named. Limits, access and settings are the tabs beside this one. */
 export function AgentOverview({ agent, details }: { agent: AgentView; details: (problems: Refused[]) => ReactNode }) {
   const profile = useLoad(() => readProfile(agent.id), 'agent-about-profile:' + agent.id);
   const teams = useLoad(readTeams, 'agent-about-teams:' + agent.id);
   const network = useLoad(readNetwork, 'agent-about-computers:' + agent.id);
-  const sessions = useLoad(() => readSessions(agent.id), 'agent-about-sessions:' + agent.id);
   const programs = useLoad(readPrograms, 'agent-about-programs:' + agent.id);
   const held = teams.status === 'ok' ? teams.data.filter((team) => team.state === 'active' && team.members.includes(agent.id)) : [];
   const computer = profile.status === 'ok' ? profile.data?.runs_on : undefined;
   const machine = network.status === 'ok' ? network.data.find((entry) => entry.id === computer) : undefined;
-  const noInUseComputer = network.status === 'ok' && !network.data.some((entry) => entry.state === 'in_use');
-  const noComputer = network.status === 'ok' && !network.data.some((entry) => entry.state === 'in_use' && entry.runtime !== null
-    && (entry.may_run.some((allowed) => allowed.id === agent.id) || Boolean(entry.may_run_roles?.length)));
   const saved = profile.status === 'ok' ? profile.data?.model_access ?? [] : [];
   const models = programs.status === 'ok' ? saved.map((id) => modelName(programs.data, id)).join(', ') : '';
-  const problems = [profile, teams, network, sessions, programs].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
-  return <><section className="agent-overview" aria-label="About this agent">
+  const problems = [profile, teams, network, programs].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
+  return <><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
+  <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
       <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : held.length ? held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/teams">{team.name}</a></span>) : 'No team yet'}</dd>
-      <dt>Computer</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !computer ? 'Choose a computer when you start' : network.status !== 'ok' ? reading(network, 'computers') : machine ? <a href="#/network">{machine.name}</a> : <span className="why-not">The saved computer is no longer visible. Choose an available computer in Start.</span>}<p className="note">Saved choice; the runner reports below say where a session was seen.</p></dd>
+      <dt>Computer</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !computer ? 'Choose a computer when you start' : network.status !== 'ok' ? reading(network, 'computers') : machine ? <a href="#/network">{machine.name}</a> : <span className="why-not">The saved computer is no longer visible. Choose an available computer in Start.</span>}<p className="note">Saved choice for the next start.</p></dd>
       <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !saved.length ? 'Choose a model when you start' : programs.status !== 'ok' ? reading(programs, 'model names') : models}<p className="note">Saved choice for the next start.</p></dd>
-      <dt>Running</dt><dd><Running load={sessions} /></dd>
     </dl>
-  </section><AgentNextSteps id={agent.id} name={agent.display_name} noComputer={noComputer} noInUseComputer={noInUseComputer} chosen={machine && models ? { computer: machine.name, models } : null} running={sessions.status === 'ok' ? sessions.data.filter((session) => session.shown === 'running').sort((a, b) => b.last_report_at - a.last_report_at)[0] : undefined} />{details(problems)}</>;
-}
-
-/** Each next act opens the existing form and never makes a change just by visiting. */
-export function AgentNextSteps({ id, name, noComputer, noInUseComputer, chosen = null, running }: { id: string; name: string; noComputer: boolean; noInUseComputer: boolean; chosen?: { computer: string; models: string } | null;
-  /** The run its runner last reported running, when there is one: the first card then opens its terminal. */
-  running?: RuntimeSession }) {
-  const base = '#/file/' + encodeURIComponent(id) + '/';
-  return <nav className="agent-next" aria-label="Next steps">
-    {running ? <div className="agent-next-step"><a data-act="watch" href={'#/runtime/' + encodeURIComponent(running.session)}><strong>Watch</strong><span>{name} is running{running.machine_name ? ' on ' + running.machine_name : ''}. Open its terminal to watch it, type to it or stop it.</span></a></div> :
-    <div className="agent-next-step"><a data-act="start" href={'#/team/' + encodeURIComponent(id)}><strong>Start</strong><span>{noInUseComputer ? 'Lys has no computer to run ' + name + ' on yet.' : noComputer ? 'No computer lets ' + name + ' run yet. Ask for it to be allowed on a computer before starting.' : chosen ? 'Start ' + name + ' on ' + chosen.computer + ' with ' + chosen.models + '.' : 'Choose its computer and model, then start this agent.'}</span></a>{noInUseComputer ? <a className="agent-add-computer" href="#/network?add=computer">Add this computer</a> : null}</div>}
-    <div className="agent-next-step"><a href={base + 'budgets'}><strong>Set limits</strong><span>Set how much this agent may use and when it must stop.</span></a></div>
-    <div className="agent-next-step"><a href={base + 'access'}><strong>Give access</strong><span>Choose what this agent may reach from access you can give.</span></a></div>
-  </nav>;
+  </section>{details(problems)}</>;
 }

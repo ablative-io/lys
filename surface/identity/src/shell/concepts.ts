@@ -16,7 +16,6 @@ export const CONCEPTS: Concept[] = [
   {"id": "svc", "t": "Where a type comes from", "s": "Built in, or added by a connected product.", "sel": ".svc", "body": "This service has its own types and works with nothing else installed. Other products, ours or not, add theirs when a person approves them."},
   {"id": "sealed", "t": "Sealed value", "s": "Never shown, to anyone.", "sel": ".sealed", "body": "Secret values go into the store once. Agents use virtual credentials made from them; people use them through the same."},
   {"id": "stat", "t": "At a glance", "s": "Counts for this screen.", "sel": ".stat-strip", "body": "Each number opens the list behind it."},
-  {"id": "preview", "t": "Preview", "s": "The selected row, without leaving the list.", "sel": ".preview", "body": "Move with j and k, or hover. Enter opens the whole file."},
   {"id": "graph", "t": "Graph", "s": "The same answers as Access, drawn.", "sel": "#gsvg", "body": "Click a person or agent to light what it reaches; click a resource to light who reaches it."},
   {"id": "scope", "t": "Scope", "s": "Organisation, team, or yours alone.", "sel": "[data-scope]", "body": "A personal secret is yours. An agent uses it only through a virtual credential you issue, acting for you."},
   {"id": "tabs", "t": "Sections", "s": "Each section has its own address.", "sel": ".tabs", "body": "Keys 1 to 7 switch sections of a file. Every section can be linked to."},

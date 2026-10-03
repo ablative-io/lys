@@ -16,6 +16,10 @@ const session = {
   runtime: 'runner', shown: 'running', last_reported: 'running', first_report_at: 1790000000,
   last_report_at: 1790000200, what: 'Runner confirmed the process', stopped: null, reported_by: ADA,
 };
+const ready = { version: 1, operation: 'op-' + 'b'.repeat(32), harness: { name: 'Claude Code', description: {}, program: '/opt/claude', package: 'claude' }, model_access: ['model-one'], runs_on: 'computer-one',
+  tools: [], skills: [], mcp_servers: [], instructions: '', note: '', set_by: ADA, set_at: 1790000000, reviewed_by: ADA, reviewed_at: 1790000000, working_folder: '/Users/ada/work' };
+const notRunning = { '/runtime/live': ok({ sessions: [], unanswered: [] }), [prefix + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: ready }) };
+const run = () => $('section[aria-label="Run"]');
 const routes = {
   ...SERVICE,
   '/teams': ok({ teams: [{ id: 'team-one', name: 'Care team', state: 'active', members: [SCRIBE] }] }),
@@ -24,7 +28,7 @@ const routes = {
     version: 1, operation: 'op-' + 'b'.repeat(32), model_access: ['model-one'], runs_on: 'computer-one',
     tools: [], skills: [], mcp_servers: [], instructions: '', note: '', set_by: ADA, set_at: 1790000000,
   } }),
-  [prefix + '/runtime/sessions']: ok({ sessions: [session] }),
+  '/runtime/live': ok({ sessions: [session], unanswered: [] }),
   '/harnesses': ok({ programs: [{ name: 'Claude Code', line: 'claude', models: [{ id: 'model-one', label: 'Model One' }], modes: [], builds: [] }] }),
 };
 
@@ -49,7 +53,7 @@ async function follow(link: HTMLElement | null) {
 }
 
 describe('An agent page explains the agent before its controls', () => {
-  it('shows its person, team, computer, saved model and reported running state before three explained next acts', async () => {
+  it('shows its run with its acts first, then its person, team, computer and saved model, and repeats no tab as a card', async () => {
     const { posted, requests } = await open();
     const overview = $('[aria-label="About this agent"]');
     expect(overview?.textContent).toContain('Ada (test person)');
@@ -57,14 +61,16 @@ describe('An agent page explains the agent before its controls', () => {
     expect(overview?.textContent).toContain('Ward computer');
     expect(overview?.textContent).toContain('Model One');
     expect(overview?.textContent).not.toContain('model-one');
-    expect(overview?.textContent).toContain('Running, as its runner last reported');
-    const actions = $$('[aria-label="Next steps"] a');
-    expect(actions.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Watch', 'Set limits', 'Give access']);
-    expect(actions.map((entry) => entry.getAttribute('href'))).toEqual(['#/runtime/' + session.session, '#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']);
-    expect(actions.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
-    expect(actions[0]?.textContent).toContain('Scribe is running on Ward computer.');
+    expect(run()?.textContent).toContain('Scribe is running on Ward computer, as its runner last reported.');
+    expect(run()?.querySelector('[data-act="watch"]')?.getAttribute('href')).toBe('#/canvas/' + SCRIBE);
+    expect(run()?.querySelector('[data-act="restart"]')).not.toBeNull();
+    expect(run()?.querySelector('[data-act="stop"]')).not.toBeNull();
+    expect(run()?.querySelector('.terminal')).toBeNull();
+    expect(run()?.compareDocumentPosition(overview as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect($('[aria-label="Next steps"]')).toBeNull();
+    expect($$('.file nav.tabs a').map((entry) => entry.getAttribute('href'))).toEqual(expect.arrayContaining(['#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']));
     expect($('[data-act="start"]')).toBeNull();
-    expect(actions[0]?.textContent).not.toContain('Choose its computer and model');
+    expect(run()?.textContent).not.toContain('is not running');
     expect($('.file .head')?.textContent).toContain('Edit name');
     expect($('.file .head [data-act="suspend"]')).not.toBeNull();
     expect(requests).not.toContain('/receipts/4');
@@ -80,44 +86,55 @@ describe('An agent page explains the agent before its controls', () => {
   });
 
   it('names an unreadable model list instead of showing the saved id', async () => {
-    await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), '/harnesses': refused(503, 'HarnessesUnavailable', 'The program list could not be read') });
+    await open({ '/runtime/live': ok({ sessions: [], unanswered: [] }), '/harnesses': refused(503, 'HarnessesUnavailable', 'The program list could not be read') });
     const overview = $('[aria-label="About this agent"]');
     expect(overview?.textContent).toContain('Lys could not read model names just now');
     expect(overview?.textContent).not.toContain('model-one');
     expect($('[aria-label="Read problems"]')?.textContent).toContain('HarnessesUnavailable');
-    expect($('[aria-label="Next steps"]')?.textContent).toContain('Choose its computer and model, then start this agent.');
+    expect(run()?.textContent).toContain('Scribe is not running.');
+    expect(run()?.textContent).toContain('Scribe has no program chosen yet.');
   });
 
   it('asks for a computer and model when none is saved', async () => {
-    await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), [prefix + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: null }) });
+    await open({ '/runtime/live': ok({ sessions: [], unanswered: [] }), [prefix + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: null }) });
     expect($('[aria-label="About this agent"]')?.textContent).toContain('Choose a model when you start');
-    expect($('[aria-label="Next steps"]')?.textContent).toContain('Choose its computer and model, then start this agent.');
+    expect(run()?.textContent).toContain('Scribe is not running.');
+    expect(run()?.textContent).toContain('Scribe has no program chosen yet.');
   });
 
-  it('keeps absence of a runtime report distinct from the active identity and never guesses stopped', async () => {
-    await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }) });
-    const overview = $('[aria-label="About this agent"]');
-    expect(overview?.textContent).toContain('No runner has reported a session');
-    expect(overview?.textContent).toContain('Running state is unknown');
-    expect(overview?.textContent).not.toContain('Stopped');
+  it('says an agent no runner lists is not running, apart from the identity being active, and offers Start in place', async () => {
+    await open(notRunning);
+    expect(run()?.textContent).toContain('Scribe is not running.');
+    expect(run()?.textContent).toContain('On Ward computer, in the folder /Users/ada/work.');
+    expect([...(run()?.querySelectorAll('button') ?? [])].map((entry) => entry.textContent)).toEqual(['Start']);
+    expect(run()?.textContent).not.toContain('Stopped');
     expect($('#state')?.textContent).toBe('Active');
   });
 
-  it('names a failed runtime read instead of inventing an empty or stopped state', async () => {
-    await open({ [prefix + '/runtime/sessions']: refused(503, 'RunnerUnavailable', 'The runner did not answer') });
-    const overview = $('[aria-label="About this agent"]');
-    expect(overview?.textContent).toContain('Lys could not read runner reports just now');
-    expect($('[aria-label="Read problems"]')?.textContent).toContain('RunnerUnavailable');
-    expect($('[aria-label="Read problems"]')?.textContent).toContain('The runner did not answer');
-    expect(overview?.textContent).not.toContain('No runner has reported a session');
-    expect(overview?.textContent).not.toContain('Stopped');
+  it('never says running for a run whose runner did not answer or whose state is unconfirmed', async () => {
+    await open({ '/runtime/live': ok({ sessions: [session], unanswered: [{ session: session.session, machine: 'computer-one', refusal: 'runner_unreachable', reason: 'no answer' }] }) });
+    expect(run()?.textContent).toContain('Whether Scribe is still running on Ward computer is not confirmed');
+    expect(run()?.textContent).not.toContain('Scribe is running on');
+    act(() => root?.unmount()); root = null;
+    await open({ '/runtime/live': ok({ sessions: [{ ...session, shown: 'unconfirmed' }], unanswered: [] }) });
+    expect(run()?.textContent).toContain('is not confirmed');
+    expect(run()?.textContent).not.toContain('Scribe is running on');
   });
 
-  it('rejects another agent’s runtime report instead of claiming this agent is running', async () => {
-    await open({ [prefix + '/runtime/sessions']: ok({ sessions: [{ ...session, agent: 'agent-' + 'f'.repeat(32) }] }) });
-    expect($('[aria-label="Read problems"]')?.textContent).toContain('RuntimeReportMismatch');
-    expect($('[aria-label="About this agent"]')?.textContent).toContain('Lys could not read runner reports just now');
-    expect($('[aria-label="About this agent"]')?.textContent).not.toContain('Running, as its runner last reported');
+  it('names a failed runtime read instead of inventing an empty or stopped state', async () => {
+    await open({ '/runtime/live': refused(503, 'RunnerUnavailable', 'The runner did not answer') });
+    expect($('.agent-run')?.textContent).toContain('Lys could not read whether Scribe is running: The runner did not answer');
+    expect($('.agent-run')?.textContent).toContain('RunnerUnavailable');
+    expect($('.agent-run')?.textContent).not.toContain('is not running');
+    expect($('.agent-run button')).toBeNull();
+    expect($('[data-act="watch"]')).toBeNull();
+  });
+
+  it('does not take another agent’s run for this agent’s', async () => {
+    await open({ ...notRunning, '/runtime/live': ok({ sessions: [{ ...session, agent: 'agent-' + 'f'.repeat(32) }], unanswered: [] }) });
+    expect(run()?.textContent).toContain('Scribe is not running.');
+    expect(run()?.textContent).not.toContain('Scribe is running on');
+    expect($('[data-act="watch"]')).toBeNull();
   });
 
   it('reads receipts only when the Record tab is opened and keeps lifecycle changes in the head', async () => {
@@ -135,13 +152,14 @@ describe('An agent page explains the agent before its controls', () => {
     expect(posted).toEqual([]);
   });
 
-  it('names the missing computer permission without presenting activation as readiness', async () => {
-    const { posted } = await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), '/network': ok({ machines: [{ id: 'computer-one', name: 'Ward computer', state: 'in_use', runtime: 'runner', may_run: [], may_run_roles: [] }], reports_served: true }) });
+  it('names the missing computer permission without presenting activation as readiness, with the fix in place', async () => {
+    const { posted } = await open({ ...notRunning, '/network': ok({ machines: [{ id: 'computer-one', name: 'Ward computer', state: 'in_use', runtime: 'runner', may_run: [], may_run_roles: [] }], reports_served: true }) });
     expect($('.file .head')?.textContent).toContain('Scribe is added.');
     expect($('.file .head')?.textContent).not.toContain('finish setting it up');
     expect($('.file .head')?.textContent).not.toContain('Scribe is ready');
-    expect($('[aria-label="Next steps"]')?.textContent).toContain('No computer lets Scribe run yet');
-    expect($('[aria-label="Next steps"] a')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
+    expect(run()?.textContent).toContain('No computer is allowed to run Scribe.');
+    expect([...(run()?.querySelectorAll('button') ?? [])].map((entry) => entry.textContent)).toEqual(['Allow on this computer']);
+    expect(run()?.querySelector('a[href^="#/team"]')).toBeNull();
     expect(posted).toEqual([]);
   });
 
@@ -149,21 +167,24 @@ describe('An agent page explains the agent before its controls', () => {
     { name: 'no computers', machines: [] },
     { name: 'only a retired computer', machines: [{ id: 'computer-one', name: 'Ward computer', state: 'retired', runtime: 'runner', may_run: [{ id: SCRIBE }], may_run_roles: [] }] },
   ])('opens the existing add form when Lys has $name', async ({ machines }) => {
-    const { posted } = await open({ [prefix + '/runtime/sessions']: ok({ sessions: [] }), '/network': ok({ machines, reports_served: true }), '/network/machines/computer-one/runner': ok({ runner: null }) });
-    expect($('[aria-label="Next steps"]')?.textContent).toContain('Lys has no computer to run Scribe on yet.');
-    const add = $$('[aria-label="Next steps"] a').find((link) => link.textContent === 'Add this computer') ?? null;
+    const { posted } = await open({ ...notRunning, '/network': ok({ machines, reports_served: true }), '/network/machines/computer-one/runner': ok({ runner: null }) });
+    expect(run()?.textContent).toContain('No computer is allowed to run Scribe.');
+    expect(run()?.textContent).toContain('No computer has Lys running on it yet.');
+    const add = [...(run()?.querySelectorAll('a') ?? [])].find((link) => link.textContent === 'Add a computer') ?? null;
     expect(add?.getAttribute('href')).toBe('#/network?add=computer');
-    expect($('[data-act="start"]')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
+    expect($('[data-act="start"]')).toBeNull();
     await follow(add);
     expect($('form[aria-label="Add a computer"]')).not.toBeNull();
     expect(posted).toEqual([]);
   });
 
   it('keeps an unreadable computer list unknown instead of offering to add a first computer', async () => {
-    const { posted } = await open({ '/network': refused(503, 'NetworkUnavailable', 'The computer list could not be read') });
+    const { posted } = await open({ ...notRunning, '/network': refused(503, 'NetworkUnavailable', 'The computer list could not be read') });
     expect($('[aria-label="Read problems"]')?.textContent).toContain('NetworkUnavailable');
-    expect($('[aria-label="Next steps"]')?.textContent).not.toContain('Lys has no computer');
-    expect($('[aria-label="Next steps"] a[href="#/network?add=computer"]')).toBeNull();
+    expect(run()?.textContent).toContain('Lys could not read what Scribe needs to start.');
+    expect(run()?.textContent).not.toContain('No computer has Lys running on it yet');
+    expect($('a[href="#/network?add=computer"]')).toBeNull();
+    expect([...(run()?.querySelectorAll('button') ?? [])].map((entry) => entry.textContent)).toEqual(['Try again']);
     expect(posted).toEqual([]);
   });
 

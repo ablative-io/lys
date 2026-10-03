@@ -18,7 +18,6 @@ import { entries, needsNewPerson } from './directory';
 import type { Entry } from './directory';
 import { readTeams } from '../teams/Teams';
 import { Reach, readDirectoryReach } from './reach';
-import { Preview } from './Preview';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
 
 function PeopleHead() {
@@ -124,7 +123,7 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
         <RuntimeCounts />
       </div>
       {admin ? null : <p className="note">Your own records: you and the agents that answer to you. A directory administrator sees everyone through the directory&apos;s own routes.</p>}
-      <div className="body work">
+      <div className="body one">
         <Listing<Row>
           groups={groups} columns={columns} id={(x) => x.id} href={(x) => '#/file/' + x.id} words={(x) => x.display_name}
           noun={shell.filterKind === 'agent' ? 'agents' : shell.filterKind === 'person' ? 'people' : 'people and agents'}
@@ -132,7 +131,6 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
           selected={selected?.id ?? null} select={(x) => shell.setCursor(Math.max(0, shown.indexOf('#/file/' + x.id)))} open={(x) => navigate('/file/' + x.id)}
           tools={<><WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />{retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}</>} shown={setShown}
         />
-        <div className="detail">{selected ? <Preview x={selected} roles={roles} reach={reach} /> : null}</div>
       </div>
     </>
   );

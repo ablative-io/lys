@@ -1,12 +1,10 @@
-/** An agent's run, on the People and agents page beside the list. Running: its terminal, with Stop under it. Stopped: Start, in place, with one press. There is no page of its own for this; the list is the page. */
+/** An agent's run, on the agent's own page. Running: where, with Restart and Stop, and a link to its terminal on the canvas. Stopped: Start, in place, with one press. */
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Refused, api, operationId, request, useLoad } from '../../api';
 import type { Entry } from '../people/directory';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
-import { Terminal } from '../runtime/Terminal';
 import { Start } from './Start';
-import '../runtime/terminal.css';
 import './team.css';
 
 const asRefused = (error: unknown): Refused =>
@@ -68,26 +66,26 @@ export function AgentRun({ entry }: { entry: Entry }) {
   const navigate = useNavigate();
   const settings = '/file/' + encodeURIComponent(entry.id) + '/provisioning';
   const load = useLoad(async () => {
-    const [live, me, people] = await Promise.all([request<{ sessions: RuntimeSession[] }>('/runtime/live'), api.me(), api.people()]);
-    return { session: live.sessions.find((one) => one.agent === entry.id && one.shown !== 'stopped'), me: me.person.id, admin: people.scope === 'directory' };
+    const [live, me, people] = await Promise.all([request<{ sessions: RuntimeSession[]; unanswered?: { session: string }[] }>('/runtime/live'), api.me(), api.people()]);
+    const session = live.sessions.find((one) => one.agent === entry.id && one.shown !== 'stopped');
+    return { session, silent: !!session && (live.unanswered ?? []).some((each) => each.session === session.session), me: me.person.id, admin: people.scope === 'directory' };
   }, 'agent-run:' + entry.id + ':' + revision);
   const changed = () => setRevision((value) => value + 1);
   if (load.status === 'loading') return null;
   if (load.status === 'refused') return <p className="why-not agent-run">Lys could not read whether {entry.display_name} is running: {load.refused.message} <small className="refusal-name">{load.refused.refusal.refusal}</small></p>;
-  const { session, me, admin } = load.data;
-  if (!session) return <div className="agent-run" data-live="false"><div className="team-stopped"><Start key={entry.id} entry={entry} me={me} admin={admin} changed={changed} settings={() => navigate(settings)} /></div></div>;
-  return <div className="agent-run" data-live="true"><div className="team-pane">
-    <div className="team-pane-body">
-      <Terminal key={session.session} session={session.session} agent={entry.id} bare />
-      {asking === 'stop' ? <Stop entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
-      {asking === 'restart' ? <Restart entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
+  const { session, silent, me, admin } = load.data;
+  if (!session) return <section className="agent-run" aria-label="Run" data-live="false"><Start key={entry.id} entry={entry} me={me} admin={admin} changed={changed} settings={() => navigate(settings)} /></section>;
+  const where = session.machine_name ?? session.machine;
+  return <section className="agent-run" aria-label="Run" data-live="true">
+    <div className="agent-run-line">
+      <span className="agent-run-words">{session.shown === 'running' && !silent ? entry.display_name + ' is running on ' + where + ', as its runner last reported.'
+        : 'Whether ' + entry.display_name + ' is still running on ' + where + ' is not confirmed: its runner has not answered since its last report.'}</span>
+      <a className="btn" data-act="watch" href={'#/canvas/' + encodeURIComponent(entry.id)}>Open its terminal</a>
+      <button type="button" className="btn" data-act="restart" onClick={() => setAsking('restart')}>Restart</button>
+      <button type="button" className="btn danger" data-act="stop" onClick={() => setAsking('stop')}>Stop</button>
     </div>
-    <div className="team-foot">
-      <span className="team-foot-name">{entry.display_name}</span>
-      <span className="team-foot-machine">on {session.machine_name ?? session.machine}</span>
-      <a className="team-foot-act" href={'#' + settings}>Settings</a>
-      <button type="button" className="team-foot-act" onClick={() => setAsking('restart')}>Restart</button>
-      <button type="button" className="team-foot-act" onClick={() => setAsking('stop')}>Stop</button>
-    </div>
-  </div></div>;
+    {session.stop_asked_at && !session.stopped ? <p className="why-not">A stop was requested. The runner has not confirmed it ended.</p> : null}
+    {asking === 'stop' ? <Stop entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
+    {asking === 'restart' ? <Restart entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
+  </section>;
 }
