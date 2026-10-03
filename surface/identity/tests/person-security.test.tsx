@@ -13,7 +13,10 @@ describe('Person security tabs', () => {
     expect(text()).toContain(ME.sign_in_identities[0].provider);
     expect(requests).not.toContain('/identities/' + ADA);
     expect(posted).toEqual([]);
-    expect($('a[href="#/directory/manage?action=login&identity=' + ADA + '"]')).not.toBeNull();
+    expect($('a[href*="directory/manage"]')).toBeNull();
+    expect($('form[aria-label="Bind a sign-in identity"] input[name="issuer"]')).not.toBeNull();
+    expect($('form[aria-label="Bind a sign-in identity"] [name="person"]')).toBeNull();
+    expect($('section[aria-label="Lys account"]')).not.toBeNull();
   });
   it('reads another person’s bindings from the protected identity route', async () => {
     const { requests, posted } = await mount('#/file/' + BEA + '/credentials', { ...SERVICE,

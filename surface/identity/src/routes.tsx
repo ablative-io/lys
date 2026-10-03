@@ -20,7 +20,6 @@ import { IssueRoot } from './features/grants/IssueRoot';
 import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
-import { AccountPage } from './features/people/Account';
 import { Apps } from './features/apps/Apps';
 import { SessionCanvas } from './features/runtime/SessionCanvas';
 
@@ -55,7 +54,7 @@ export function AppRoutes() {
       <Route path="/file/:id/start" element={<OneStart />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />
-      <Route path="/account/:id" element={<AccountPage />} />
+      <Route path="/account/:id" element={<AccountMoved />} />
       <Route path="/settings/:sec?" element={<Settings />} />
       <Route path="/access/:mode?/:arg?" element={<Access />} />
       <Route path="*" element={<You />} />
@@ -67,6 +66,12 @@ export function AppRoutes() {
 function UsageMoved() {
   const { agent } = useParams();
   return <Navigate replace to={agent ? '/file/' + encodeURIComponent(agent) + '/budgets' : '/people'} />;
+}
+
+/** A person's Lys account is on the Credentials tab of their own page. */
+function AccountMoved() {
+  const { id = '' } = useParams();
+  return <Navigate replace to={'/file/' + encodeURIComponent(id) + '/credentials'} />;
 }
 
 /** An agent has one start: on the Overview of its own page. Older addresses for it arrive there. */

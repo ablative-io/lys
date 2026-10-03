@@ -6,7 +6,6 @@
  */
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { useParams } from 'react-router';
 import { request } from '../../api';
 import { reasonOf } from '../sign-in/SignIn';
 import './recorded-form.css';
@@ -131,14 +130,4 @@ export function PersonAccount({ id }: { id: string }) {
       return changed.enabled ? 'They can sign in again.' : 'They can no longer sign in.';
     }}><p className="note">{account.enabled ? 'Disabling stops this person signing in at their next sign-in.' : 'Enabling lets this person sign in again.'}</p></Change> : null}
   </section>;
-}
-
-/** The administrator's account screen for one person. */
-export function AccountPage() {
-  const { id = '' } = useParams();
-  return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Directory</div><h1>Lys account</h1>
-      <p className="sub">Change this person's email and password, or whether they can sign in.</p></div><a className="btn" href={'#/file/' + encodeURIComponent(id)}>Back to their file</a></div>
-    <div className="pane"><PersonAccount id={id} /></div>
-  </div>;
 }
