@@ -420,7 +420,6 @@ fn log_write_refused(dir: &std::path::Path) -> TestResult<impl FnOnce() -> TestR
 }
 
 async fn refuses_an_unrecorded_use(service: &Service, pass: &str) -> TestResult {
-    use std::os::unix::fs::PermissionsExt;
     let log = service.dir.path().join("grant-log");
     let before = pinned_at(&log)?;
     let restore = log_write_refused(&log)?;

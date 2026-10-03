@@ -469,7 +469,7 @@ async fn a_machine_without_a_runner_refuses_restart_before_ending() -> TestResul
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_kept_start_naming_no_directory_restarts_into_the_profiles_folder() -> TestResult {
-    let mut held = Held::open().await?;
+    let held = Held::open().await?;
     held.review(1).await?;
     // A session kept from before starts named their folder: reported and
     // started by hand, so its kept start carries no directory at all.
