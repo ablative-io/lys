@@ -7,6 +7,7 @@
  * before activation. A proposed schema change waits here the same way. The permission template is built and edited here too, and saved
  * through the same routes an upload uses.
  */
+import { ConfigTabs } from '../settings/ConfigTabs';
 import { useState } from 'react';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -84,7 +85,8 @@ export function Apps() {
   const changed = (message: string) => { setApproved({}); setNotice(message); setRegistering(false); setRevision((value) => value + 1); };
   const [picked, setPicked] = useState<string | null>(null);
   return <div className="page fill apps">
-    <div className="head"><div><div className="eyebrow">Connections</div><h1>Apps</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
+    <ConfigTabs on="apps" />
+    <div className="head"><div><h1>Apps</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
       <button type="button" className="btn primary" onClick={() => setRegistering(!registering)}>{registering ? 'Close the new app' : 'Register an app'}</button></div>
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {

@@ -8,6 +8,7 @@ export function railView(pathname: string): string {
   if (view === 'file') return 'people';
   if (view === 'vault') return 'secrets';
   if (['resources', 'graph', 'requests', 'reviews', 'model'].includes(view)) return 'access';
+  if (view === 'connections' || view === 'apps') return 'settings';
   return view;
 }
 

@@ -2,11 +2,7 @@ import { EffectiveSettings } from './EffectiveSettings';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { useShell } from '../../shell/ShellContext';
-
-const SET: [string, string][] = [
-  ['layout', 'Layout'], ['signin', 'Sign-in'], ['directory', 'Directory'], ['permissions', 'Permissions'],
-  ['secrets', 'Secrets'], ['runtimes', 'Runtimes'], ['storage', 'Storage and keys'],
-];
+import { ConfigTabs } from './ConfigTabs';
 
 function Row({ t, d, children }: { t: string; d: string; children: ReactNode }) {
   return (
@@ -20,23 +16,17 @@ function Row({ t, d, children }: { t: string; d: string; children: ReactNode }) 
   );
 }
 
-/** Layout preferences and the administrator's effective startup configuration. */
+/** Layout preferences and the administrator's effective startup configuration, every section on the one page. An address that names a section still opens the page. */
 export function Settings() {
   const shell = useShell();
-  const { sec = 'layout' } = useParams();
+  const { sec } = useParams();
   return (
     <div className="page fill">
-      <div className="head"><div><div className="eyebrow">Configuration</div><h1>Configuration</h1>
+      <ConfigTabs on="settings" />
+      <div className="head"><div><h1>Configuration</h1>
         <p className="sub">How this service runs. It stands on its own; nothing else needs to be installed for it to be useful.</p></div></div>
-      <div className="set-grid">
-        <nav className="set-nav">
-          {SET.map(([k, t]) => (
-            <a key={k} href={'#/settings/' + k} className={sec === k ? 'on' : ''}>{t}</a>
-          ))}
-        </nav>
-        <div className="card pane">
-          {sec === 'layout' ? (
-            <>
+      <div className="card pane" data-section={sec}>
+        <h2>Layout</h2>
               <Row t="Dock side" d="Which edge the rail and its drawer occupy. The screen takes the other.">
                 <div className="seg">
                   <button data-dock="left" className={shell.dockRight ? '' : 'on'} onClick={() => shell.setDockSide('left')}>Left</button>
@@ -49,11 +39,7 @@ export function Settings() {
                   <button data-labels="labels" className={shell.labels ? 'on' : ''} onClick={() => shell.setLabels(true)}>Labels</button>
                 </div>
               </Row>
-            </>
-          ) : (
-            <EffectiveSettings section={sec} />
-          )}
-        </div>
+        <EffectiveSettings />
       </div>
     </div>
   );

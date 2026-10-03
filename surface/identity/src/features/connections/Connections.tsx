@@ -1,4 +1,5 @@
 /** The configured integrations served by Lys, with configuration kept apart from health. */
+import { ConfigTabs } from '../settings/ConfigTabs';
 import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import { SignInProviders } from './SignInProviders';
@@ -17,7 +18,8 @@ const labels = { configured: 'Configured', local: 'Local to Lys', unconfigured: 
 export function Connections() {
   const load = useLoad(readConnections, 'connections');
   return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Runtime</div><h1>Connections</h1>
+    <ConfigTabs on="connections" />
+    <div className="head"><div><h1>Services and sign-in providers</h1>
       <p className="sub">The services this Lys installation is configured to use.</p></div>
     </div>
     <Gate load={load} title="Connections" ok={(data) => <div className="pane stack">
@@ -28,9 +30,6 @@ export function Connections() {
         <span className={'pill' + (connection.state === 'unconfigured' ? '' : ' ok')}>{labels[connection.state]}</span>
       </section>)}</div>}
       <SignInProviders />
-      <p className="note">This view shows installation settings. It does not yet list products using Lys or external accounts available to agents.</p>
-      <div className="actions"><a className="btn" href="#/people/view/accounts">Manage service accounts</a>
-        <a className="btn" href="#/me">Your sign-in accounts</a></div>
     </div>} />
   </div>;
 }
