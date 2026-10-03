@@ -259,11 +259,21 @@ where
     H: Fn(Request<Incoming>) -> F + Send + Sync + 'static,
     F: Future<Output = Response<ProxyBody>> + Send + 'static,
 {
+    serve_until(listener, handle, std::future::pending()).await
+}
+
+pub(super) async fn serve_until<H, F>(listener: TcpListener, handle: H, shutdown: impl Future<Output = ()>) -> Result<(), ProxyError>
+where
+    H: Fn(Request<Incoming>) -> F + Send + Sync + 'static,
+    F: Future<Output = Response<ProxyBody>> + Send + 'static,
+{
+    tokio::pin!(shutdown);
     let handle = Arc::new(handle);
     let mut connections = JoinSet::new();
     loop {
         let (stream, _) = tokio::select! {
             biased;
+            () = &mut shutdown => break,
             finished = connections.join_next(), if !connections.is_empty() => {
                 if let Some(Err(error)) = finished {
                     eprintln!("lys-proxy: proxy_connection_task_failed: {error}");
@@ -286,6 +296,13 @@ where
             }
         });
     }
+    connections.abort_all();
+    while let Some(result) = connections.join_next().await {
+        if let Err(error) = result && !error.is_cancelled() {
+            eprintln!("lys-proxy: proxy_connection_task_failed: {error}");
+        }
+    }
+    Ok(())
 }
 
 #[path = "pass_through.rs"]

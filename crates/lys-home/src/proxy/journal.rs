@@ -203,6 +203,8 @@ enum Message {
     Capture(Work),
     Settle,
     #[cfg(test)]
+    Stop,
+    #[cfg(test)]
     Pause(mpsc::Sender<()>, mpsc::Receiver<()>),
 }
 
@@ -210,6 +212,8 @@ enum Message {
 #[derive(Clone, Debug)]
 pub struct Sink {
     tx: mpsc::Sender<Message>,
+    #[cfg(test)]
+    worker: std::sync::Arc<std::sync::Mutex<Option<std::thread::JoinHandle<()>>>>,
 }
 
 impl Sink {
@@ -217,8 +221,22 @@ impl Sink {
     /// to `reports`.
     pub fn start(home: Home, journal: Journal, reports: mpsc::Sender<CallReport>) -> Self {
         let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || run(&home, &journal, &rx, &reports));
-        Self { tx }
+        let worker = std::thread::spawn(move || run(&home, &journal, &rx, &reports));
+        #[cfg(not(test))]
+        drop(worker);
+        Self { tx, #[cfg(test)] worker: std::sync::Arc::new(std::sync::Mutex::new(Some(worker))) }
+    }
+
+    #[cfg(test)]
+    pub(super) fn shutdown(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let worker = self.worker.lock().map_err(|error| std::io::Error::other(error.to_string()))?.take();
+        if let Some(worker) = worker {
+            let sent = self.tx.send(Message::Stop).map_err(|error| std::io::Error::other(error.to_string()));
+            let joined = worker.join().map_err(|_| std::io::Error::other("capture worker panicked"));
+            sent?;
+            joined?;
+        }
+        Ok(())
     }
 
     #[cfg(test)]
@@ -258,6 +276,8 @@ impl Message {
             Self::Capture(..) => String::from("a capture event"),
             Self::Settle => String::from("a settle request"),
             #[cfg(test)]
+            Self::Stop => String::from("a worker shutdown"),
+            #[cfg(test)]
             Self::Pause(..) => String::from("a worker barrier"),
         }
     }
@@ -287,6 +307,8 @@ fn run(
                 None => continue,
             },
             Message::Settle => {}
+            #[cfg(test)]
+            Message::Stop => return,
             #[cfg(test)]
             Message::Pause(..) => continue,
         }

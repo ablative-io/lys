@@ -233,6 +233,7 @@ async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all(
         .recv()
         .await
         .ok_or("the upstream saw no request")?;
+    drop(harness.proxy.sink().pause()?);
     let capture = harness.state("capture");
     std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o500))?;
     go_tx.send(()).await?;

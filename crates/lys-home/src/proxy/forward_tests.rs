@@ -117,6 +117,8 @@ pub(super) struct Harness {
     pub(super) proxy: Arc<Proxy>,
     pub(super) reports: mpsc::Receiver<CallReport>,
     pub(super) addr: SocketAddr,
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    server: tokio::task::JoinHandle<Result<(), crate::proxy::error::ProxyError>>,
 }
 
 impl Harness {
@@ -132,12 +134,19 @@ impl Harness {
         assert!(started.lost.is_empty());
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let addr = listener.local_addr()?;
-        tokio::spawn(Arc::clone(&started.proxy).serve(listener));
+        let (stop, stopped) = tokio::sync::oneshot::channel();
+        let proxy = Arc::clone(&started.proxy);
+        let server = tokio::spawn(crate::proxy::forward::serve_until(listener, move |request| {
+            let proxy = Arc::clone(&proxy);
+            async move { proxy.handle(request).await }
+        }, async move { match stopped.await { Ok(()) | Err(_) => {} } }));
         Ok(Self {
             dir,
             proxy: started.proxy,
             reports: started.reports,
             addr,
+            stop: Some(stop),
+            server,
         })
     }
 
@@ -167,6 +176,18 @@ impl Harness {
             }
         }
         Ok(records)
+    }
+}
+
+impl Drop for Harness {
+    fn drop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            match stop.send(()) { Ok(()) | Err(()) => {} }
+        }
+        let server = tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(&mut self.server));
+        assert!(matches!(server, Ok(Ok(()))), "proxy fixture server did not shut down: {server:?}");
+        let worker = self.proxy.sink().shutdown();
+        assert!(worker.is_ok(), "proxy fixture worker did not shut down: {worker:?}");
     }
 }
 
