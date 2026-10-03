@@ -4,6 +4,7 @@ import type { Choices } from './choices';
 import type { ProvisioningProfile } from './Provisioning';
 import { FolderChooser } from './FolderChooser';
 import { ModeWords } from './ModeWords';
+import { usable } from '../network/allowed';
 import { SaveSettings } from './SaveSettings';
 import type { PeopleView } from '../../generated';
 
@@ -79,7 +80,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
     {prompt && prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
     {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun ? ' Choose one now, or when you start this agent.' : ''}</p>}
-    {canChoose ? <FolderChooser computers={choices.machines} preferred={computer ?? profile?.runs_on ?? ''} chosen={folder} choose={setFolder} /> : null}
+    {canChoose ? <FolderChooser computers={usable(choices.machines)} preferred={computer ?? profile?.runs_on ?? ''} chosen={folder} choose={setFolder} /> : null}
   </>;
   return render(fields, settings, refusal);
 }
