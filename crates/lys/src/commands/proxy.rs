@@ -101,7 +101,6 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
         state,
         anthropic: anthropic_base,
         openai: parsed(&openai)?,
-        capture_slots: 64,
     };
     let start = json!({
         "proxy": "listening",

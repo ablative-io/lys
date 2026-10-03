@@ -17,7 +17,7 @@
 //! - The transport is one Hyper client whose cancelled-request setting is
 //!   set explicitly to off, so a request whose connection closes under it is
 //!   answered with the failure and never sent a second time. The
-//!   pass-through example (R7) and `lys-proxy` (R10) share this transport.
+//!   pass-through example (R7) and `lys proxy serve` (R10) share this transport.
 //! - No clock bounds a call: the pool keeps no idle limit and nothing here
 //!   waits on a timer.
 
@@ -304,7 +304,7 @@ where
 mod passing;
 pub use passing::pass_through;
 
-/// What `lys-proxy` is given: the home its calls are recorded in, the
+/// What `lys proxy serve` gives the proxy: the home its calls are recorded in, the
 /// directory its journal and capture live in, and the two provider bases.
 #[derive(Clone, Debug)]
 pub struct ProxyConfig {
