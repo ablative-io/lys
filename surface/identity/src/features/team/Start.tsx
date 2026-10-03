@@ -84,8 +84,11 @@ export function Start({ entry, me, admin, changed, settings }: {
         current = current.stage === 'profile' && !confirmed.profile.reviewed_by ? review(confirmed.version, current.machine) : start(confirmed.version, current.machine);
       }
     } catch (error) {
-      if (answeredNo(error) || error instanceof SyntaxError) sessionStorage.removeItem(key);
-      setRefusal(refusalOf(error));
+      // A kept request that cannot be read can never be sent again, so it is dropped, and said: the next press
+      // sends a new one. That is safe here because Start is shown only while no run of this agent is live.
+      const unreadable = error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('PendingStartUnreadable'));
+      if (answeredNo(error) || unreadable) sessionStorage.removeItem(key);
+      setRefusal(unreadable ? { refusal: 'PendingStartUnreadable', reason: 'An earlier start from this tab could not be read back, so it was dropped. Try again sends a new one.' } : refusalOf(error));
     } finally { working.current = false; setBusy(false); }
   };
 

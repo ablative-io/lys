@@ -80,7 +80,10 @@ function Settings({ entry, session, changed, done }: { entry: Entry; session: Ru
   const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') { event.stopPropagation(); done(); }
   };
-  return <div className="team-settings" role="dialog" aria-label={entry.display_name + ' settings'} tabIndex={-1} onKeyDown={onKey} ref={(el) => el?.focus()}>
+  // Focused once, when it opens: a callback ref would take the focus back from a field on every render of the page.
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => { box.current?.focus(); }, []);
+  return <div className="team-settings" role="dialog" aria-label={entry.display_name + ' settings'} tabIndex={-1} onKeyDown={onKey} ref={box}>
     <div className="team-settings-head"><h2>{entry.display_name}</h2><button type="button" className="btn" onClick={() => { changed(); done(); }}>{session ? 'Back to the terminal' : 'Done'}</button></div>
     {session ? <Restart entry={entry} session={session} changed={() => { changed(); done(); }} /> : null}
     <Provisioning id={entry.id} />
