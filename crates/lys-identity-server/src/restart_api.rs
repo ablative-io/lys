@@ -1,7 +1,9 @@
 //! An operator restart ends the selected session on its exit signal before
 //! starting a new session through the existing reviewed launch path, in the
 //! folder the ended session's own start named: a restart never moves a run
-//! back to the profile's default folder.
+//! back to the profile's default folder. A kept start from before folders
+//! were named goes through naming none, and lands where a start naming none
+//! lands: the profile's working_folder, else refused by name.
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -22,6 +24,7 @@ use crate::provisioning_api::with_provisioning;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runner_api::{Carried, perform};
 use crate::runner_sessions::driven;
+use crate::runtime_api::with_runtime;
 
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -78,14 +81,19 @@ async fn restart(
     if admitted(&state, &operation, &driven.agent)?.is_some() {
         return start_for(&state, &headers, &actor, agent, &driven.machine, &operation).await;
     }
-    let directory = admitted(&state, &session, &driven.agent)?
-        .as_ref()
-        .and_then(|kept| kept.get("directory"))
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| ServerError::LaunchUnrenderable {
-            reason: format!("the kept start of session {session} names no directory"),
-        })?;
+    // The folder the ended session's own start named, when it named one;
+    // a kept start from before folders were named goes through as none,
+    // and start_profile does the rest: the profile's working_folder, else
+    // WorkingFolderUnnamed by name.
+    let kept_directory = with_runtime(&state, |store| {
+        Ok(store
+            .session(&session)
+            .and_then(|tracked| tracked.first())
+            .and_then(|first| first.launch.as_ref())
+            .and_then(|kept| kept.get("directory"))
+            .and_then(Value::as_str)
+            .map(str::to_owned))
+    })?;
     with_directory(&state, |directory| {
         let record = directory
             .projection()?
@@ -135,7 +143,7 @@ async fn restart(
         &operation,
         Chosen {
             profile: Some(profile),
-            directory: Some(directory),
+            directory: kept_directory,
         },
     )
     .await

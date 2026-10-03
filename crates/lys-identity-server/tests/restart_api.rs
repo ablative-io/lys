@@ -466,3 +466,48 @@ async fn a_machine_without_a_runner_refuses_restart_before_ending() -> TestResul
     assert!(held.status(session)?.ended.is_none());
     held.close()
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_kept_start_naming_no_directory_restarts_into_the_profiles_folder() -> TestResult {
+    let mut held = Held::open().await?;
+    held.review(1).await?;
+    // A session kept from before starts named their folder: reported and
+    // started by hand, so its kept start carries no directory at all.
+    let session = operation()?;
+    held.ok(
+        &format!("/agents/{}/runtime/sessions/{session}/reports", held.agent()),
+        &json!({ "operation": operation()?, "machine": held.machine, "state": "starting", "what": "process requested" }),
+    )
+    .await?;
+    held.client().ask(&Act::Start {
+        lys_mcp: None,
+        launch: Box::new(Launch {
+            session: session.clone(),
+            program: "/bin/cat".to_owned(),
+            arguments: Vec::new(),
+            directory: "/".to_owned(),
+            environment: BTreeMap::new(),
+            config: None,
+            columns: 80,
+            rows: 24,
+            rotation: None,
+            policy: None,
+        }),
+    })?;
+    held.ok(&format!("/agents/{}/runtime/sessions/{session}/reports", held.agent()), &json!({ "operation": operation()?, "machine": held.machine, "state": "running", "what": "process started" })).await?;
+    let started = held
+        .ok(
+            &format!("/agents/{}/restart", held.agent()),
+            &json!({ "session": session, "operation": operation()? }),
+        )
+        .await?;
+    assert_eq!(
+        started["directory"], "/tmp",
+        "a kept start naming no folder restarts into the profile's working_folder: {started}"
+    );
+    assert!(
+        held.status(&session)?.ended.is_some(),
+        "old process still running"
+    );
+    held.close()
+}
