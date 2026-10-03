@@ -141,8 +141,10 @@ fn poison(layout: &Layout, line: &str, fixture: &Path) -> ProbeResult {
         "team":team, "member":member, "reason":"deliberate upgrade proof negative control", "at":0});
     let (mut log, _) = FrontierLog::open(FileLeafStore::open(&directory)?)?;
     let (index, _) = log.append(&serde_json::to_vec(&leaf)?)?;
-    let path = directory.join("leaves").join(format!("{index:020}"));
-    println!("negative control new-format record: {}", path.display());
+    println!(
+        "negative control new-format record: leaf {index} of the log at {}",
+        directory.display()
+    );
     Ok(())
 }
 
