@@ -23,3 +23,11 @@
 @media (max-width: 760px) {
   .terminal-head { align-items: flex-start; flex-wrap: wrap; }
 }
+/* A chosen session's terminal is what the person came for: it fills the page beside a narrow list. */
+.fill > .body.terminal-open { grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); }
+.fill > .body.terminal-open > .detail { display: flex; flex-direction: column; overflow: hidden; }
+.fill > .body.terminal-open > .detail > .terminal { flex: 1; min-height: 0; margin-top: 0; }
+.fill > .body.terminal-open > .detail .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.fill > .body.terminal-open > .detail .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; }
+.fill > .body.terminal-open .tools { flex-wrap: wrap; }
+.fill > .body.terminal-open .tools .search { width: 100%; }

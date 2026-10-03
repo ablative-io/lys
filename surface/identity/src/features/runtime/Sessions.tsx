@@ -64,8 +64,9 @@ function Running({ sessions, unanswered, people, me, teams, session }: Awaited<R
   return <>
     {unanswered.length ? <div className="why-not" role="alert"><h3>Runners that did not answer</h3><ul>{unanswered.map((entry) => <li key={entry.session}><span className="mono">{entry.session}</span> on {entry.machine}: {entry.refusal}: {entry.reason}</li>)}</ul></div> : null}
     {teams.refused ? <p className="why-not">Teams cannot be read, so sessions are listed without their team. {teams.refused}</p> : null}
-    <div className="body">
-      <Listing<RuntimeSession> groups={groups} columns={columns} id={(entry) => entry.session} href={(entry) => '#/runtime/' + encodeURIComponent(entry.session)}
+    {/* With a terminal open the terminal is the page: the list narrows to the agent and its state, and the terminal takes the rest of the width and the height. */}
+    <div className={open ? 'body terminal-open' : 'body'}>
+      <Listing<RuntimeSession> groups={groups} columns={open ? [columns[0], columns[2]] : columns} id={(entry) => entry.session} href={(entry) => '#/runtime/' + encodeURIComponent(entry.session)}
         words={(entry) => name(entry) + ' ' + (entry.machine_name ?? entry.machine)} noun="running sessions"
         holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' running' : ' running')}
         selected={open?.session ?? null} select={() => undefined} open={(entry) => navigate('/runtime/' + encodeURIComponent(entry.session))}
