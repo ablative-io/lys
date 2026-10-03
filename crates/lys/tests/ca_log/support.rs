@@ -209,6 +209,11 @@ pub(crate) fn missing_required(output: &Output) -> Vec<String> {
 /// (LYSLOGSTORE-008 R1: a record is its u32 length, the leaf bytes, the pin
 /// and a CRC, so byte 4 of the first segment is the first byte of leaf 0).
 pub(crate) fn corrupt_first_leaf(log_dir: &Path) {
+    assert!(
+        leaf_files(log_dir) > 1,
+        "damage in the log's last act is an unfinished act, which an open cuts; \
+         the damaged leaf must sit behind a later act to be an integrity failure"
+    );
     let segment = log_dir
         .join("leaves")
         .join("segments")
@@ -236,6 +241,14 @@ pub(crate) fn dir_bytes(dir: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u
         }
     }
     files
+}
+
+/// The leaf the log at `log_dir` holds at `index`, read through the store
+/// itself, never from the files under the directory.
+pub(crate) fn logged_leaf(log_dir: &Path, index: u64) -> Vec<u8> {
+    use lys_log_store::LeafStore;
+    let store = lys_log_store::FileLeafStore::open_read_only(log_dir).unwrap();
+    store.leaf(index).unwrap().unwrap()
 }
 
 /// The number of leaves in the log at `log_dir`, read through the store

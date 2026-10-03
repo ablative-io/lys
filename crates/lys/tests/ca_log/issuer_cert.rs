@@ -246,17 +246,29 @@ fn a_log_that_refuses_the_entry_leaves_no_stored_issuer_certificate() {
         "--origin",
         "example.com/lys/issuance",
     ]));
-    // A leaf to damage: an empty log has no record to corrupt.
-    let seed_leaf = bench.path("badlog-seed.leaf");
-    std::fs::write(&seed_leaf, b"a leaf the bad log held before it was damaged").unwrap();
-    assert_success(&run_lys(&[
-        "log",
-        "append",
-        "--dir",
-        path_str(&badlog),
-        "--leaf",
-        path_str(&seed_leaf),
-    ]));
+    // A leaf to damage and an act behind it: an empty log has no record to
+    // corrupt, and damage in the last act is an unfinished act an open cuts.
+    for (name, leaf) in [
+        (
+            "badlog-seed.leaf",
+            "a leaf the bad log held before it was damaged",
+        ),
+        (
+            "badlog-later.leaf",
+            "the act that came after the damaged leaf",
+        ),
+    ] {
+        let seed_leaf = bench.path(name);
+        std::fs::write(&seed_leaf, leaf).unwrap();
+        assert_success(&run_lys(&[
+            "log",
+            "append",
+            "--dir",
+            path_str(&badlog),
+            "--leaf",
+            path_str(&seed_leaf),
+        ]));
+    }
     let leaves = leaf_files(&badlog);
     corrupt_first_leaf(&badlog);
     let damaged = dir_bytes(&badlog);
@@ -277,5 +289,5 @@ fn a_log_that_refuses_the_entry_leaves_no_stored_issuer_certificate() {
         damaged,
         "a refused issuance writes nothing to the log"
     );
-    assert_eq!(leaves, 1);
+    assert_eq!(leaves, 2);
 }

@@ -15,7 +15,7 @@ use std::path::Path;
 
 use crate::support::{
     Bench, Stranger, assert_success, copy_verify_inclusion, corrupt_first_leaf, dir_bytes,
-    leaf_files, missing_required, path_str, pem_to_der, report, run_lys, said,
+    leaf_files, logged_leaf, missing_required, path_str, pem_to_der, report, run_lys, said,
 };
 
 /// What `lys ca issue` reported for one certificate.
@@ -52,9 +52,7 @@ fn issue_and_prove(bench: &Bench, subject: &str, request: Option<&Path>) -> Issu
     assert_eq!(leaf, pem_to_der(&pem), "the leaf is the certificate's DER");
 
     let leaf_index = issued["leaf_index"].as_u64().unwrap();
-    let leaves = bench.log_dir.join("leaves");
-    let name = format!("{leaf_index:020}");
-    let logged = std::fs::read(leaves.join(name)).unwrap();
+    let logged = logged_leaf(&bench.log_dir, leaf_index);
     assert_eq!(logged, leaf, "the log holds the leaf");
 
     let artifact = output(bench, subject, "inclusion.json");
@@ -264,6 +262,10 @@ fn a_log_that_fails_its_integrity_check_stops_the_issuance_with_nothing_written(
     let bench = Bench::new();
     let first = bench.issuer_only_args(&bench.log_dir, "agent-one", None);
     assert_success(&run_lys(&first));
+    // A second act: the damaged leaf must sit behind a later one, or the
+    // damage is the log's unfinished last act and an open cuts it.
+    let second = bench.issuer_only_args(&bench.log_dir, "agent-two", None);
+    assert_success(&run_lys(&second));
     let key = bench.path("issuer4.key");
     assert_success(&run_lys(&["key", "generate", "--out", path_str(&key)]));
     let before = leaf_files(&bench.log_dir);
@@ -305,5 +307,5 @@ fn a_log_that_fails_its_integrity_check_stops_the_issuance_with_nothing_written(
         damaged,
         "a refused issuance writes nothing to the log"
     );
-    assert_eq!(before, 1);
+    assert_eq!(before, 2);
 }
