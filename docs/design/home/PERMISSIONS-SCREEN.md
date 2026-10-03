@@ -118,9 +118,10 @@ either not enforced by anything, or enforced by something Lys does not control.
   the next start: every refused, ask-first and without-asking rule by name, the mode by its real name with
   the documentation's own words for it, the extra folders, sandbox on or off. The server already renders
   this for a start; the screen shows that rendering, not a description of it.
-- Under it, one plain block that claims no more than the rows support. For Claude Code: "This computer's
-  own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each
-  action." For Codex with no mode chosen: "Lys has set nothing; this computer's own Codex settings
+- Under it, one plain block that claims no more than the rows support. For Claude Code, since the clean start was written on 3 October (f91cefb8, docs/harness/reference/claude-code/CLEAN-START.md):
+  "Lys starts Claude Code without this computer's own settings, plugins, hooks and connected tools.
+  Instruction files (CLAUDE.md) and Claude Code's own memory on this computer may still be read. Lys does
+  not check each action." For Codex with no mode chosen: "Lys has set nothing; this computer's own Codex settings
   decide." (A2, open) For Codex with a mode: "Lys sets where its commands may write and whether they may
   use the network, while they stay in the sandbox. It can read every file this login can read. Web search and leaving the
   sandbox are decided by this computer's own Codex settings." Nothing on the screen says a rule is enforced until a run has been watched
