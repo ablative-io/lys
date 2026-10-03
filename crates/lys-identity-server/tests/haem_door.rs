@@ -108,6 +108,35 @@ async fn nobody_reaches_a_store_without_signing_in() -> TestResult {
 }
 
 #[tokio::test]
+async fn a_signed_in_person_who_is_not_an_administrator_reaches_no_store() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let socket = dir.path().join("s");
+    let seen = serving(&socket)?;
+    let service = door(vec![("ablative", socket)]).await?;
+    let cookie = service
+        .sign_in(identity_contract::fake_issuer::Login {
+            subject: "ordinary-person".to_owned(),
+            email: "ordinary@example.test".to_owned(),
+        })
+        .await?;
+    let (status, refused) = get(&service, "/haem", Auth::Cookie(&cookie)).await?;
+    assert_eq!((status, &refused["refusal"]), (403, &json!("NotAdmitted")));
+    assert!(refused.get("stores").is_none(), "{refused}");
+    let verb = json!({"method": "branches.list", "params": {"limit": 200}});
+    let (status, refused) = post(&service, "/haem/ablative", Auth::Cookie(&cookie), &verb).await?;
+    assert_eq!((status, &refused["refusal"]), (403, &json!("NotAdmitted")));
+    // A store this door does not name is refused the same way: who is not
+    // admitted does not learn which stores exist.
+    let (status, refused) = post(&service, "/haem/nowhere", Auth::Cookie(&cookie), &verb).await?;
+    assert_eq!((status, &refused["refusal"]), (403, &json!("NotAdmitted")));
+    assert!(
+        seen.lock().map_err(|error| error.to_string())?.is_empty(),
+        "a caller who is not admitted reaches the store's service"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn an_administrator_is_answered_what_the_store_answered() -> TestResult {
     let dir = tempfile::tempdir()?;
     let socket = dir.path().join("s");
