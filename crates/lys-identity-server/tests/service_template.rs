@@ -16,8 +16,8 @@ async fn prepared_service_startup_flushes() -> Result<(), Box<dyn std::error::Er
         service.startup_flushes
     );
     assert_eq!(
-        service.startup_flushes, 21,
-        "17 leaf-directory opens and four migration snapshot flushes"
+        service.startup_flushes, 4,
+        "no flush on any of the store opens, and four migration snapshot flushes"
     );
     Ok(())
 }
