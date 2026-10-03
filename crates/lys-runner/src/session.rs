@@ -57,6 +57,7 @@ mod lifecycle;
 pub(crate) mod output;
 mod owned;
 mod restart;
+mod trust_dialog;
 
 #[cfg(test)]
 #[path = "../tests/session_start/cases.rs"]
@@ -581,13 +582,20 @@ impl Sessions {
             recorded = recorded
                 .and_then(|()| lifecycle::tracking_started(&mut table, &id, &executable, &version));
         }
-        if let Some(trust) = trusted {
-            recorded = recorded.and_then(|()| lifecycle::trust_recorded(&mut table, &id, &trust));
+        if let Some(trust) = &trusted {
+            recorded = recorded.and_then(|()| lifecycle::trust_recorded(&mut table, &id, trust));
         }
         drop(table);
         self.activate(&id, pending)?;
         drop(reservation);
         recorded?;
+        // The row went into a file the harness rewrites whole at its own
+        // start; another harness starting in between can lose it. The run's
+        // first screen is watched for the dialog, which is answered for the
+        // named folder only and said in the feed.
+        if let Some(trust) = trusted {
+            self.watch_trust_dialog(&id, trust.directory)?;
+        }
         self.writer.barrier()?;
         self.wake();
         Ok((pid, started_at))

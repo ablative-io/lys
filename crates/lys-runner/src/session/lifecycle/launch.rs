@@ -125,6 +125,28 @@ pub(crate) fn trust_recorded(
     append(table, id, vec![Body::Coverage(coverage)], None)
 }
 
+/// Say, in the feed, what the watch of session `id`'s first screen found of
+/// the trust dialog: `state` is `trust_answered` or
+/// `trust_dialog_unanswered`, and `words` say which folder and what was done.
+pub(crate) fn trust_dialog(
+    table: &mut Table,
+    id: &str,
+    state: &str,
+    words: String,
+) -> Result<(), RunnerError> {
+    let coverage = Coverage {
+        state: state.to_owned(),
+        source: None,
+        generation: 0,
+        offset: None,
+        words,
+        executable: None,
+        harness_version: None,
+        adapter: None,
+    };
+    append(table, id, vec![Body::Coverage(coverage)], None)
+}
+
 pub(crate) fn window_limit(table: &mut Table, id: &str, bodies: &[Body]) -> Option<Leader> {
     let session = table.sessions.get_mut(id)?;
     if session.ending {

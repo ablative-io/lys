@@ -191,6 +191,7 @@ pub struct Commit {
 #[serde(deny_unknown_fields)]
 pub struct Coverage {
     /// The state, by name: `tracking_started`, `trust_recorded`,
+    /// `trust_answered`, `trust_dialog_unanswered`,
     /// `source_bound`, `source_generation`, `record_unreadable`,
     /// `source_refused`, `coverage_incomplete` or `audit_incomplete`.
     pub state: String,

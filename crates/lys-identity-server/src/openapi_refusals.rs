@@ -156,6 +156,7 @@ pub(crate) const START_RUNNER: &[&str] = &[
     "trust_file_unreadable",
     "trust_file_unwritable",
     "trust_home_unknown",
+    "trust_watch_failed",
     "size_invalid",
     "rotation_invalid",
     "launch_config_refused",

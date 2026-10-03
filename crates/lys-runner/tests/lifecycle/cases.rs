@@ -302,3 +302,99 @@ fn a_claude_code_launch_records_its_folder_as_trusted_before_the_spawn_and_only_
     sessions.stop_all()?;
     Ok(())
 }
+
+#[test]
+fn a_trust_dialog_the_harness_still_shows_is_answered_for_the_named_folder_only() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir()?;
+    let home = dir.path().join("home");
+    let work = dir.path().join("work");
+    let other = dir.path().join("other");
+    std::fs::create_dir_all(&work)?;
+    std::fs::create_dir_all(&other)?;
+    let shown_work = std::fs::canonicalize(&work)?.display().to_string();
+    let shown_other = std::fs::canonicalize(&other)?.display().to_string();
+    // A harness that lost the row to another harness's rewrite: it paints
+    // the trust dialog for the folder named in DIALOG_FOLDER, waits for the
+    // answer, and only then is ready.
+    let harness = dir.path().join("claude");
+    std::fs::write(
+        &harness,
+        "#!/bin/sh\nif [ \"$1\" = --version ]; then echo '2.1.285 (Claude Code)'; exit 0; fi\nprintf 'Do you trust the files in this folder?\\n\\n%s\\n\\n1. Yes, proceed\\n2. No, exit\\n' \"$DIALOG_FOLDER\"\nread answer\nprintf 'answered\\nready\\n'\nexec cat\n",
+    )?;
+    std::fs::set_permissions(&harness, std::fs::Permissions::from_mode(0o755))?;
+    let config = crate::launch_config::Config {
+        files: Vec::new(),
+        argument_files: BTreeMap::new(),
+        environment_paths: BTreeMap::new(),
+        working_directory: false,
+        harness: Some(Harness::ClaudeCode),
+    };
+    let launch = |session: &str, shown: &str| Launch {
+        session: session.to_owned(),
+        program: harness.display().to_string(),
+        arguments: Vec::new(),
+        directory: work.display().to_string(),
+        environment: BTreeMap::from([
+            ("DIALOG_FOLDER".to_owned(), shown.to_owned()),
+            ("CLAUDE_CONFIG_DIR".to_owned(), home.display().to_string()),
+        ]),
+        config: Some(config.clone()),
+        columns: 80,
+        rows: 24,
+        rotation: None,
+        policy: None,
+    };
+    let never = AtomicBool::new(false);
+    let printed = |session: &mut crate::session::output::OutputState, _: &str| {
+        session.scrollback().from(0).ok().map(Ok)
+    };
+    let ready = |session: &mut crate::session::output::OutputState, _: &str| {
+        let bytes = session.scrollback().from(0).ok()?;
+        bytes
+            .windows(7)
+            .any(|word| word == b"ready\r\n")
+            .then_some(Ok(bytes))
+    };
+    let state_of = |session: &str, state: &str| {
+        let session = session.to_owned();
+        let state = state.to_owned();
+        move |table: &mut crate::session::Table| {
+            table
+                .feed
+                .page(None)
+                .ok()?
+                .entries
+                .iter()
+                .any(|entry| {
+                    entry.session == session
+                        && matches!(&entry.body, Body::Coverage(coverage) if coverage.state == state)
+                })
+                .then_some(())
+        }
+    };
+    let sessions = Sessions::open(&dir.path().join("state"), 4096)?;
+
+    // The dialog names the run's folder: answered, and the run goes on.
+    sessions.begin(launch("named", &shown_work), None, None)?;
+    let output = sessions.until("named", &never, ready)?;
+    let text = String::from_utf8_lossy(&output);
+    assert!(
+        text.contains("answered"),
+        "the harness read the answer: {text}"
+    );
+    sessions.until_any(&never, state_of("named", "trust_answered"))?;
+
+    // The dialog names another folder: left alone, said in the feed, and
+    // the harness is still waiting at it.
+    sessions.begin(launch("other", &shown_other), None, None)?;
+    sessions.until_any(&never, state_of("other", "trust_dialog_unanswered"))?;
+    let output = sessions.until("other", &never, printed)?;
+    let text = String::from_utf8_lossy(&output);
+    assert!(
+        text.contains("Do you trust") && !text.contains("answered"),
+        "nothing was typed into a dialog for another folder: {text}"
+    );
+    sessions.stop_all()?;
+    Ok(())
+}

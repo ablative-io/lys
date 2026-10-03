@@ -32,7 +32,7 @@ mod stream;
 mod terminal;
 
 pub(crate) use launch::{
-    bound_directory, launched, tracking_started, trust_recorded, window_limit,
+    bound_directory, launched, tracking_started, trust_dialog, trust_recorded, window_limit,
 };
 use stream::stop_follower;
 pub(crate) use stream::{accounts, append};
