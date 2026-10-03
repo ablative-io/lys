@@ -12,8 +12,9 @@ pub enum ProxyCommand {
     /// method, path, query, headers and body as sent. Each call is recorded
     /// as one `lys.call` entry in --home, under the session its request body
     /// names (`metadata.user_id`) or the day's `unlinked` session. The
-    /// Anthropic upstream is the login's own `ANTHROPIC_BASE_URL` when it has
-    /// one, so a machine pointed at a gateway keeps it. Prints one JSON line
+    /// Anthropic upstream is --anthropic, else the one --upstream records
+    /// (the install writes the login's own `ANTHROPIC_BASE_URL` there), else
+    /// Anthropic's API; the proxy's environment is never read for it. Prints one JSON line
     /// naming where it listens and each upstream once it answers, then one
     /// JSON report line per call; the calls a run before it left open are
     /// recorded `lost` and reported first. SIGTERM or SIGINT stops it.
@@ -30,10 +31,14 @@ pub enum ProxyCommand {
         #[arg(long)]
         state: PathBuf,
 
-        /// Where an `/anthropic` path is forwarded. Absent, the login's own
-        /// `ANTHROPIC_BASE_URL` when it has one, and Anthropic's API when not.
+        /// Where an `/anthropic` path is forwarded, over any recorded one.
         #[arg(long)]
         anthropic: Option<String>,
+
+        /// A file recording the Anthropic upstream and where it came from,
+        /// as the install writes it.
+        #[arg(long)]
+        upstream: Option<PathBuf>,
 
         /// Where an `/openai` path is forwarded.
         #[arg(long, default_value = "https://api.openai.com")]

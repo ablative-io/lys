@@ -198,8 +198,8 @@ subcommand); and `git_failed`. A fetch that refuses after its first write
 removes exactly the paths it created, deepest first: a target it made is
 gone, and an empty target that stood before is left existing and empty.
 
-`lys-proxy --home <dir> --state <dir> [--listen <addr>] [--anthropic <url>]
-[--openai <url>]` is the little proxy (HOME-001 R10).
+`lys proxy serve --listen <addr> --home <dir> --state <dir> [--upstream <file>]
+[--anthropic <url>] [--openai <url>]` is the little proxy (HOME-001 R10).
 A harness pointed at `http://<listen>/anthropic` (or `/openai`) has every
 call forwarded to the provider with its headers and streamed body unchanged
 (only `host` is set to the upstream's), frame by frame, through one transport

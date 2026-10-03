@@ -321,6 +321,20 @@ impl Restart {
             ));
         }
         say(&format!("runner {word} on {}", self.socket.display()));
+        // A lys from before the proxy has no `proxy` command; the build put
+        // back with it names no model proxy for runs to use.
+        let carries_proxy = Command::new(layout.binary("lys"))
+            .args(["proxy", "serve", "--help"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success());
+        if !carries_proxy {
+            say("model proxy not in this lys; runs reach their provider directly");
+            return Ok(());
+        }
+        proxy::configure(layout, services::login()?, say)?;
         super::launch(layout, &self.proxy, true)?;
         say(&format!("model proxy {word} on {}", self.proxy_url));
         Ok(())

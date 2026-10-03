@@ -40,10 +40,6 @@ rustix.workspace = true
 name = "lys-home"
 path = "src/main.rs"
 
-[[bin]]
-name = "lys-proxy"
-path = "src/bin/lys-proxy.rs"
-
 [dev-dependencies]
 tempfile.workspace = true
 

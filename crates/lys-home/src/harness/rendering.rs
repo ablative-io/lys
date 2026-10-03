@@ -52,6 +52,9 @@ pub(super) fn refused(
     }
 }
 
+/// The variable a run's model calls are sent to Lys's proxy through.
+pub const PROXY_VARIABLE: &str = "ANTHROPIC_BASE_URL";
+
 enum Contract {
     Native,
     Codex,
@@ -185,7 +188,16 @@ fn native_template(
         }
     });
     if let Some(proxy) = &fields.model_proxy {
-        body["slots"]["env"]["ANTHROPIC_BASE_URL"] = json!(proxy);
+        // The profile's own base would be lost under the proxy's, silently.
+        if secrets.iter().any(|held| held.env == PROXY_VARIABLE) {
+            return Err(refused(
+                fields,
+                &format!("secrets.{PROXY_VARIABLE}"),
+                "the profile names its own ANTHROPIC_BASE_URL and Lys's model proxy would replace it; \
+                 remove it from the profile, or start this agent where no model proxy is configured",
+            ));
+        }
+        body["slots"]["env"][PROXY_VARIABLE] = json!(proxy);
     }
     if !skills.is_empty() {
         body["slots"]["skills"] = json!(skills);

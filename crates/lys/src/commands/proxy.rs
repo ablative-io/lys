@@ -2,6 +2,7 @@
 //! the proxy's logic.
 
 use std::io::Write;
+use std::path::Path;
 
 use lys_home::proxy::error::ProxyError;
 use lys_home::proxy::forward::{Base, Proxy, ProxyConfig};
@@ -10,42 +11,31 @@ use serde_json::json;
 
 use crate::cli::ProxyCommand;
 use crate::commands::error::{CliError, CliResult};
+use crate::identity::install::proxy::{ANTHROPIC, Upstream};
 
-/// The login's own Anthropic base, which the proxy keeps as its upstream.
-pub const LOGIN_BASE: &str = "ANTHROPIC_BASE_URL";
-
-/// Anthropic's API, the upstream when nothing names another.
-const ANTHROPIC: &str = "https://api.anthropic.com";
-
-/// Where the Anthropic upstream came from, as the start line names it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Source {
-    /// `--anthropic` on the command line.
-    Flag,
-    /// The login's own `ANTHROPIC_BASE_URL`.
-    Login,
-    /// Neither: Anthropic's API.
-    Default,
-}
-
-impl Source {
-    fn word(self) -> &'static str {
-        match self {
-            Self::Flag => "flag",
-            Self::Login => "login",
-            Self::Default => "default",
-        }
+/// The Anthropic upstream and where it came from: `--anthropic`, else the
+/// record `--upstream` names, else Anthropic's API. Never the environment.
+pub fn anthropic_upstream(
+    flag: Option<String>,
+    record: Option<&Path>,
+) -> CliResult<(String, String)> {
+    if let Some(flag) = flag {
+        return Ok((flag, "flag".to_owned()));
     }
-}
-
-/// The Anthropic upstream: the flag, else the login's own base, else
-/// Anthropic's API. An empty login value is no value.
-pub fn anthropic_upstream(flag: Option<String>, login: Option<String>) -> (String, Source) {
-    match (flag, login.filter(|value| !value.is_empty())) {
-        (Some(flag), _) => (flag, Source::Flag),
-        (None, Some(login)) => (login, Source::Login),
-        (None, None) => (ANTHROPIC.to_owned(), Source::Default),
-    }
+    let Some(path) = record else {
+        return Ok((ANTHROPIC.to_owned(), "default".to_owned()));
+    };
+    let bytes = std::fs::read(path).map_err(|source| CliError::Io {
+        context: format!("reading the proxy's upstream record {}", path.display()),
+        source,
+    })?;
+    let upstream: Upstream =
+        serde_json::from_slice(&bytes).map_err(|source| CliError::JsonParse {
+            what: "proxy upstream",
+            path: path.to_path_buf(),
+            source,
+        })?;
+    Ok((upstream.anthropic, upstream.from))
 }
 
 /// A base as the start line names it: scheme, host, port and path, without
@@ -85,16 +75,20 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
         home,
         state,
         anthropic,
+        upstream,
         openai,
     } = command;
-    let (anthropic, source) = anthropic_upstream(anthropic, std::env::var(LOGIN_BASE).ok());
+    // Every prompt and reply of every run passes into the proxy's home and
+    // state: what it writes is its owner's alone.
+    #[cfg(unix)]
+    rustix::process::umask(rustix::fs::Mode::from_raw_mode(0o077));
+    let (anthropic, source) = anthropic_upstream(anthropic, upstream.as_deref())?;
     if names_itself(&anthropic, &listen) {
         return Err(ProxyError::BadUpstream {
             base: shown(&anthropic),
             reason: format!(
-                "the Anthropic upstream ({}) is this proxy's own address; \
-                 the login's {LOGIN_BASE} must name the provider or gateway, not Lys's proxy",
-                source.word()
+                "the Anthropic upstream (from {source}) is this proxy's own address; \
+                 the login's ANTHROPIC_BASE_URL must name the provider or gateway, not Lys's proxy"
             ),
         }
         .into());
@@ -110,7 +104,7 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
         "proxy": "listening",
         "listen": listen,
         "anthropic": shown(&anthropic),
-        "anthropic_from": source.word(),
+        "anthropic_from": source,
         "openai": shown(&openai),
     });
     let runtime = tokio::runtime::Builder::new_multi_thread()

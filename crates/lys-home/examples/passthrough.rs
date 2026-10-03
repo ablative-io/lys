@@ -4,7 +4,7 @@
 //!
 //! Every request is forwarded to the base with its headers and streamed body
 //! unchanged and its response returned unchanged, through the one transport
-//! `lys-proxy` uses (`lys_home::proxy::forward`). The only thing written is
+//! `lys proxy serve` uses (`lys_home::proxy::forward`). The only thing written is
 //! one line per call on stderr, `{method, path, status, duration_ms}`; no
 //! header value and no body byte is written, printed or stored. It is an
 //! example binary, never a service: point one harness at it with
