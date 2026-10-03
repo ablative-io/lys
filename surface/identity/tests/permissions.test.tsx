@@ -1,9 +1,9 @@
-/** What an agent may do: a short column of plain choices in front, the rules behind one button, and a rule added by its kind and never typed as grammar. */
+/** What an agent may do: the ways it can work as one table, the rules as one table with an add row, and a rule added by its kind and never typed as grammar. Nothing is folded away. */
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
-import { click, serve, settle, type } from './harness';
+import { choose, click, serve, settle, type } from './harness';
 import { SCRIBE, SERVICE, ok } from './fixtures';
 import { Permissions } from '../src/features/provisioning/Permissions';
 import type { Program } from '../src/features/provisioning/choices';
@@ -38,26 +38,35 @@ const button = (scope: HTMLElement, label: string) => [...scope.querySelectorAll
 const radios = (scope: HTMLElement, name: string) => [...scope.querySelectorAll<HTMLInputElement>('input[name="' + name + '"]')];
 const radio = (scope: HTMLElement, name: string, value: string) => radios(scope, name).find((entry) => entry.value === value) ?? null;
 
-describe('The quick picker', () => {
-  it('shows three plain choices for Claude Code to begin with, and no drop-down anywhere', async () => {
+const table = (scope: HTMLElement, label: string) => scope.querySelector<HTMLTableElement>('table[aria-label="' + label + '"]');
+const ruleRows = (scope: HTMLElement) => [...(table(scope, 'Rules')?.querySelectorAll<HTMLTableRowElement>('tbody tr.rule-row') ?? [])];
+const rowOf = (scope: HTMLElement, rule: string) => ruleRows(scope).find((row) => row.querySelector('code')?.textContent === rule) ?? null;
+const addRow = (scope: HTMLElement) => {
+  const row = scope.querySelector<HTMLElement>('tr[aria-label="Add a rule"]');
+  if (!row) throw new Error('The add-a-rule row is missing');
+  return row;
+};
+const options = (select: Element | null) => [...(select?.querySelectorAll('option') ?? [])].map((entry) => entry.getAttribute('value')).filter(Boolean);
+
+describe('The ways it can work', () => {
+  it('shows every way Claude Code can work in one table, the usual three first, each with all of its words', async () => {
     const { element, requests } = await shown(claude, { default_mode: 'default' });
-    expect(radios(element, 'permission-mode').map((entry) => entry.value)).toEqual(['workspace-only', 'default', 'acceptEdits']);
-    expect(element.textContent).toContain('Kept to its folder');
+    expect(radios(element, 'permission-mode').map((entry) => entry.value)).toEqual(['workspace-only', 'default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']);
+    expect(table(element, 'How it works')?.textContent).toContain('Kept to its folder');
     expect(element.textContent).toContain('Asks before it acts');
     expect(element.textContent).toContain('Changes files in its folder without asking');
-    expect(element.textContent).toContain('First of default.');
-    expect(element.textContent).not.toContain('Second of default.');
-    expect(element.querySelector('select')).toBeNull();
+    expect(element.textContent).toContain('First of default. Second of default.');
+    expect(button(element, 'More ways it can work')).toBeNull();
+    expect(button(element, 'more')).toBeNull();
+    expect(element.querySelector('details')).toBeNull();
     expect(requests).toEqual([]);
   });
-  it('opens the rest in place, and the one with no checks carries a warning', async () => {
+  it('carries a warning on the one with no checks', async () => {
     const { element } = await shown(claude, { default_mode: 'default' });
-    await click(button(element, 'More ways it can work'));
-    expect(radios(element, 'permission-mode').map((entry) => entry.value)).toEqual(['workspace-only', 'default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']);
     expect(radio(element, 'permission-mode', 'bypassPermissions')?.closest('label')?.querySelector('[aria-label="Warning"]')).not.toBeNull();
     expect(radio(element, 'permission-mode', 'default')?.closest('label')?.querySelector('[aria-label="Warning"]')).toBeNull();
   });
-  it('shows a mode that is already chosen even when it is one of the rest', async () => {
+  it('shows a mode that is already chosen', async () => {
     const { element } = await shown(claude, { default_mode: 'plan' });
     expect(radio(element, 'permission-mode', 'plan')?.checked).toBe(true);
   });
@@ -65,11 +74,6 @@ describe('The quick picker', () => {
     const { element } = await shown(claude, { default_mode: 'default', deny: ['WebSearch'], additional_directories: ['/srv/a'] });
     await click(radio(element, 'permission-mode', 'acceptEdits'));
     expect(latest).toEqual({ default_mode: 'acceptEdits', deny: ['WebSearch'], additional_directories: ['/srv/a'] });
-  });
-  it('opens the rest of a mode’s words in place', async () => {
-    const { element } = await shown(codex, { default_mode: 'read-only' });
-    await click(button(element, 'more'));
-    expect(element.textContent).toContain('Second of read-only.');
   });
   it('shows a mode nobody named by its own id', async () => {
     const { element } = await shown({ ...codex, modes: [mode('strange')] }, { default_mode: 'strange' });
@@ -79,61 +83,60 @@ describe('The quick picker', () => {
 
 describe('The rules', () => {
   const rules: Value = { default_mode: 'default', deny: ['WebSearch', 'Read(//srv/private/**)'], ask: ['Bash(git push *)'], allow: ['WebFetch(domain:example.org)'], additional_directories: ['/srv/a'] };
-  it('are summed in one line and stay closed until asked for', async () => {
+  it('are summed in one line and all shown in one table, with nothing to open', async () => {
     const { element } = await shown(claude, rules);
     expect(element.textContent).toContain('4 rules: 2 refused, 1 asks first, 1 without asking. 1 extra folder.');
-    expect(element.textContent).not.toContain('Read files under /srv/private');
-    expect(element.querySelector('section[aria-label="Refused"]')).toBeNull();
+    expect(button(element, 'Show every rule')).toBeNull();
+    expect(ruleRows(element)).toHaveLength(4);
+    expect(element.querySelectorAll('table[aria-label="Rules"]')).toHaveLength(1);
   });
-  it('open as three lists in plain words with the exact rule beside each, and a rule is removed by its button', async () => {
+  it('shows each rule in plain words with the exact rule beside it and what happens in its row, and a rule is removed by its button', async () => {
     const { element } = await shown(claude, rules);
-    await click(button(element, 'Show every rule'));
-    const refused = element.querySelector<HTMLElement>('section[aria-label="Refused"]');
-    expect(refused?.textContent).toContain('Read files under /srv/private');
-    expect(refused?.textContent).toContain('Read(//srv/private/**)');
-    expect(element.querySelector('section[aria-label="Asks first"]')?.textContent).toContain('Bash(git push *)');
-    expect(element.querySelector('section[aria-label="Without asking"]')?.textContent).toContain('WebFetch(domain:example.org)');
-    const row = [...(refused?.querySelectorAll('li') ?? [])].find((entry) => entry.textContent?.includes('WebSearch'));
-    await click(row?.querySelector('button') ?? null);
+    const refused = rowOf(element, 'Read(//srv/private/**)');
+    expect(refused?.children[0]?.textContent).toBe('Read files under /srv/private');
+    expect(refused?.querySelector('select')?.value).toBe('deny');
+    expect(rowOf(element, 'Bash(git push *)')?.querySelector('select')?.value).toBe('ask');
+    expect(rowOf(element, 'WebFetch(domain:example.org)')?.querySelector('select')?.value).toBe('allow');
+    expect(refused?.children[3]?.textContent).toBe('Claude Code');
+    await click(rowOf(element, 'WebSearch')?.querySelector('button') ?? null);
     expect(latest.deny).toEqual(['Read(//srv/private/**)']);
     expect(latest.ask).toEqual(rules.ask);
   });
-  it('says an empty list has nothing in it, in one line', async () => {
+  it('changes what happens to a rule in its own row, moving it between the lists and losing nothing', async () => {
+    const { element } = await shown(claude, rules);
+    await choose(rowOf(element, 'Bash(git push *)')?.querySelector('select') ?? null, 'deny');
+    expect(latest).toEqual({ ...rules, ask: [], deny: ['WebSearch', 'Read(//srv/private/**)', 'Bash(git push *)'] });
+    expect(rowOf(element, 'Bash(git push *)')?.querySelector('select')?.value).toBe('deny');
+  });
+  it('says an empty table has nothing in it, in one line', async () => {
     const { element } = await shown(claude, { default_mode: 'default' });
     expect(element.textContent).toContain('No extra rules.');
-    await click(button(element, 'Show every rule'));
-    expect(element.querySelector('section[aria-label="Asks first"]')?.textContent).toContain('Nothing.');
+    expect(table(element, 'Rules')?.querySelector('tbody')?.textContent).toBe('Nothing.');
   });
-  it('adds a rule step by step: the kind, the one thing it needs, then what happens', async () => {
+  it('adds a rule in the table’s last row: the kind, the one thing it needs, then what happens', async () => {
     const { element } = await shown(claude, { default_mode: 'default' });
-    await click(button(element, 'Show every rule'));
-    await click(button(element, 'Add a rule'));
-    const step = element.querySelector<HTMLElement>('[aria-label="Add a rule"]');
-    if (!step) throw new Error('The add-a-rule step is missing');
-    expect(radios(step, 'rule-kind')).toHaveLength(5);
-    expect(step.querySelector('input:not([type="radio"])')).toBeNull();
+    const step = addRow(element);
+    expect(options(step.querySelector('select[name="rule-kind"]'))).toHaveLength(5);
+    expect(step.querySelector('input')).toBeNull();
     expect(button(step, 'Add this rule')?.disabled).toBe(true);
-    expect(step.textContent).toContain('Choose what the rule is about.');
-    await click(radio(step, 'rule-kind', 'command'));
-    expect(radios(step, 'rule-list')).toHaveLength(0);
+    await choose(step.querySelector('select[name="rule-kind"]'), 'command');
     await type(step.querySelector('input[name="rule-command"]'), 'git push');
     expect(step.textContent).toContain('Bash(git push *)');
     expect(button(step, 'Add this rule')?.disabled).toBe(true);
-    await click(radio(step, 'rule-list', 'ask'));
+    await choose(step.querySelector('select[name="rule-list"]'), 'ask');
     await click(button(step, 'Add this rule'));
     expect(latest).toEqual({ default_mode: 'default', ask: ['Bash(git push *)'] });
-    expect(element.querySelector('[aria-label="Add a rule"]')).toBeNull();
+    expect(rowOf(element, 'Bash(git push *)')?.querySelector('select')?.value).toBe('ask');
+    expect(addRow(element).querySelector<HTMLSelectElement>('select[name="rule-kind"]')?.value).toBe('');
+    expect(addRow(element).querySelector('input')).toBeNull();
   });
   it('says why a rule cannot be written and adds nothing', async () => {
     const { element } = await shown(claude, { default_mode: 'default' });
-    await click(button(element, 'Show every rule'));
-    await click(button(element, 'Add a rule'));
-    const step = element.querySelector<HTMLElement>('[aria-label="Add a rule"]');
-    if (!step) throw new Error('The add-a-rule step is missing');
-    await click(radio(step, 'rule-kind', 'website'));
+    const step = addRow(element);
+    await choose(step.querySelector('select[name="rule-kind"]'), 'website');
     await type(step.querySelector('input[name="rule-host"]'), 'https://example.org/page');
     expect(step.textContent).toContain('Type the website’s name alone');
-    expect(radios(step, 'rule-list')).toHaveLength(0);
+    await choose(step.querySelector('select[name="rule-list"]'), 'deny');
     expect(button(step, 'Add this rule')?.disabled).toBe(true);
     expect(latest).toEqual({ default_mode: 'default' });
   });
@@ -141,31 +144,27 @@ describe('The rules', () => {
   const policyOf = (rules: unknown[]) => ({ ['/agents/' + SCRIBE + '/policy']: ok({ agent: SCRIBE, digest: null, applies: '', policy: { version: 1, agent: SCRIBE, rules } }) });
   const seeded = [hard('deny-Read', 'Read', 'tool'), hard('deny-top', 'Read', 'path_prefix', '/srv/x'),
     { id: 'liftable', tool: 'Bash', kind: 'tool', authority: { permission: { resource: { kind: 'agent', id: SCRIBE }, action: 'read' } } }];
-  it('never says there are no rules while the agent’s policy refuses things: the closed line carries the count', async () => {
+  it('never says there are no rules while the agent’s policy refuses things: the line above the table carries the count', async () => {
     const { element, requests } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf(seeded));
     await settle();
     expect(requests).toEqual(['/agents/' + SCRIBE + '/policy']);
     expect(element.querySelector('.rules-summary')?.textContent).toContain('No extra rules. This agent’s policy refuses 3 things.');
-    expect(button(element, 'Show every rule')).not.toBeNull();
-    expect(element.querySelector('section[aria-label="Refused"]')).toBeNull();
+    expect(table(element, 'Rules')?.querySelector('tbody')?.textContent).not.toContain('Nothing.');
   });
-  it('shows the rules the policy forces in the Refused list, locked and said to be the policy’s', async () => {
+  it('shows the rules the policy forces as rows of the same table, refused, locked and said to be the policy’s', async () => {
     const { element } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf(seeded));
     await settle();
-    await click(button(element, 'Show every rule'));
-    const locked = [...element.querySelectorAll('section[aria-label="Refused"] li.locked')];
+    const locked = ruleRows(element).filter((row) => row.classList.contains('locked'));
     expect(locked.map((entry) => entry.querySelector('code')?.textContent)).toEqual(['Read', 'Read(//srv/x)', 'Read(//srv/x/**)']);
-    expect(locked.every((entry) => entry.textContent?.includes('from this agent’s policy') && entry.querySelector('button') === null)).toBe(true);
-    expect(element.querySelector('section[aria-label="Refused"]')?.textContent).not.toContain('Nothing.');
+    expect(locked.every((entry) => entry.children[2]?.textContent === 'Refused' && entry.textContent?.includes('from this agent’s policy') && entry.querySelector('button') === null && entry.querySelector('select') === null)).toBe(true);
   });
-  it('says in the closed line when the policy cannot be read, and still shows the agent’s own rules', async () => {
+  it('says when the policy cannot be read, above the table and in it, and still shows the agent’s own rules', async () => {
     const { element } = await shown(claude, { default_mode: 'default', deny: ['WebSearch'] }, SCRIBE);
     await settle();
     expect(element.querySelector('.rules-summary')?.textContent).toContain('Lys could not read this agent’s policy, so what it refuses is not shown.');
-    await click(button(element, 'Show every rule'));
-    const refused = element.querySelector('section[aria-label="Refused"]');
-    expect(refused?.textContent).toContain('Lys could not read this agent’s policy');
-    expect(refused?.textContent).toContain('WebSearch');
+    const body = table(element, 'Rules')?.querySelector('tbody');
+    expect(body?.textContent).toContain('Lys could not read this agent’s policy');
+    expect(rowOf(element, 'WebSearch')?.querySelector('select')?.value).toBe('deny');
   });
   it('names a policy rule the start cannot write, and says the agent will not start until it is changed', async () => {
     const { element } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf([hard('deny-glob-path', 'Glob', 'path_prefix', '/srv'), hard('deny-Read', 'Read', 'tool')]));
@@ -188,38 +187,34 @@ describe('The rules', () => {
     const { element } = await shown(claude, { default_mode: 'workspace-only', allow: ['WebSearch'], additional_directories: ['/srv/a'] }, undefined, {}, ['reader']);
     expect(element.textContent).toContain('Kept to its folder cannot carry rules that run without asking or extra folders. Remove these before it can start as Kept to its folder.');
     expect(element.textContent).toContain('These settings list tools, so it cannot start as Kept to its folder.');
+    expect(rowOf(element, 'WebSearch')?.textContent).toContain('Not available with Kept to its folder');
     await click(radio(element, 'permission-mode', 'default'));
     expect(element.textContent).not.toContain('cannot start as Kept to its folder');
     expect(element.textContent).not.toContain('Remove these before');
+    expect(element.textContent).not.toContain('Not available with Kept to its folder');
   });
   it('says Kept to its folder cannot carry rules that run without asking or extra folders', async () => {
     const { element } = await shown(claude, { default_mode: 'workspace-only' });
-    await click(button(element, 'Show every rule'));
-    expect(element.querySelector('section[aria-label="Without asking"]')?.textContent).toContain('Not available with Kept to its folder');
-    expect(element.querySelector('section[aria-label="Extra folders"]')?.textContent).toContain('Not available with Kept to its folder');
+    expect(table(element, 'Extra folders')?.textContent).toContain('Not available with Kept to its folder');
     expect(button(element, 'Add an extra folder')).toBeNull();
-    await click(button(element, 'Add a rule'));
-    const step = element.querySelector<HTMLElement>('[aria-label="Add a rule"]');
-    if (!step) throw new Error('The add-a-rule step is missing');
-    await click(radio(step, 'rule-kind', 'tool'));
+    const step = addRow(element);
+    await choose(step.querySelector('select[name="rule-kind"]'), 'tool');
     await type(step.querySelector('input[name="rule-tool"]'), 'WebSearch');
-    expect(radios(step, 'rule-list').map((entry) => entry.value)).toEqual(['ask', 'deny']);
+    expect(options(step.querySelector('select[name="rule-list"]'))).toEqual(['ask', 'deny']);
   });
 });
 
 describe('Codex', () => {
-  it('has the picker with all three shown, extra folders, and one sentence that it takes no rules', async () => {
+  it('has all three ways of working shown, extra folders as a table, and one sentence that it takes no rules', async () => {
     const { element } = await shown(codex, { default_mode: 'workspace-write', additional_directories: ['/srv/a'] });
     expect(radios(element, 'permission-mode').map((entry) => entry.value)).toEqual(['read-only', 'workspace-write', 'danger-full-access']);
-    expect(button(element, 'More ways it can work')).toBeNull();
     expect(element.textContent).toContain('Codex takes no rules about single tools or files.');
-    expect(button(element, 'Show every rule')).toBeNull();
-    expect(element.querySelector('section[aria-label="Refused"]')).toBeNull();
+    expect(table(element, 'Rules')).toBeNull();
     expect(radio(element, 'permission-mode', 'danger-full-access')?.closest('label')?.querySelector('[aria-label="Warning"]')).not.toBeNull();
-    const folders = element.querySelector<HTMLElement>('section[aria-label="Extra folders"]');
+    const folders = table(element, 'Extra folders');
     expect(folders?.textContent).toContain('/srv/a');
     expect(button(element, 'Add an extra folder')).not.toBeNull();
-    await click(folders?.querySelector('li button') ?? null);
+    await click(folders?.querySelector('tbody tr button') ?? null);
     expect(latest).toEqual({ default_mode: 'workspace-write', additional_directories: [] });
   });
   it('adds an extra folder from the computer’s own folders', async () => {
