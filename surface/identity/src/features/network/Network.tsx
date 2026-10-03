@@ -95,7 +95,7 @@ function Computers({ computers, people, me, teams, teamsRefused, notice, refresh
     </div>
     {notice ? <p role="status">{notice}</p> : null}
     {teamsRefused ? <p className="why-not">Teams cannot be read, so computers are listed without their team. {teamsRefused}</p> : null}
-    <div className="body">
+    <div className="body halves">
       <Listing<Computer> groups={groups} columns={columns} id={(computer) => computer.machine.id} href={(computer) => '#/network?computer=' + computer.machine.id}
         words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers"
         holds={(items) => count(items.length) + (items.length === 1 ? ' computer' : ' computers')}
@@ -105,20 +105,18 @@ function Computers({ computers, people, me, teams, teamsRefused, notice, refresh
           <div className="seg">{([['all', 'All'], ['attention', 'Not heard from']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
           {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
         </>} />
-      <div className="detail">
+      <div className="pane">
         {adding && admin ? <AddMachine person={me.person.id} changed={changed} cancel={() => setAdding(false)} />
-          : selected ? <MachineDetail computer={selected} admin={admin} names={names} changed={changed} /> : <p className="dim">{computers.length ? 'Choose a computer.' : 'No computers yet. Add the one Lys runs on to start agents here.'}</p>}
+          : selected ? <MachineDetail key={selected.machine.id} computer={selected} admin={admin} me={me.person.id} teams={teams} names={names} changed={changed} /> : <p className="dim">{computers.length ? 'Choose a computer.' : 'No computers yet. Add the one Lys runs on to start agents here.'}</p>}
       </div>
     </div>
   </>;
 }
 
-/** Who may start agents on a computer, in a line that stays short however many there are. */
+/** Who may start agents on a computer, every one named. */
 export function mayStart(machine: Machine): string {
   if (machine.runtime === null) return 'Lys does not start agents here.';
   const roles = (machine.may_run_roles ?? []).map((role) => 'anyone holding ' + role);
-  const agents = machine.may_run.map((agent) => agent.display_name);
-  const listed = agents.length > 3 ? [...agents.slice(0, 2), agents.length - 2 + ' more agents'] : agents;
-  const all = [...listed, ...roles];
+  const all = [...machine.may_run.map((agent) => agent.display_name), ...roles];
   return all.length ? all.join(', ') : 'No agent may start here yet.';
 }

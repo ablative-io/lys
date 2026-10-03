@@ -46,7 +46,7 @@ describe('Network', () => {
     expect($('#screen .page.fill .pane table')).not.toBeNull();
     const row = $$('#screen tbody tr[data-href]')[0];
     expect(row.textContent).toContain('Workshop laptop'); expect(row.textContent).toContain('Does not run agents'); expect(row.textContent).toContain('Lys does not start agents here.');
-    expect($('.detail h2')?.textContent).toBe('Workshop laptop');
+    expect($('section[aria-label="Workshop laptop"] h2')?.textContent).toBe('Workshop laptop');
     expect(button('Refresh network')).toBeNull();
   });
   it('adds this computer with a name and no website permissions', async () => {

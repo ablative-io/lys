@@ -2,7 +2,7 @@
 import type { AgentSummary } from '../../generated';
 import { Refused } from '../../api';
 export interface Machine {
-  id: string; name: string; kind: string; runtime: string | null; slots: number;
+  id: string; name: string; kind: string; runtime: string | null; team?: string | null; slots: number;
   may_run: AgentSummary[]; may_run_roles?: string[]; may_reach: string[]; named_by: string; named_at: number;
   state: 'in_use' | 'retired'; retired_at: number | null; last_report_at: number | null;
 }
