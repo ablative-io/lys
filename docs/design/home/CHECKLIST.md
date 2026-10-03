@@ -225,3 +225,9 @@
 - [ ] **C196** — Every act that stores blocks (call ingest and its parts, harness events, import content, the given statement, templates, the proxy's persist fallback) puts them through one batch committed before the entry naming them is appended; a thirty-part call rises the device flushes by exactly two (HOME-038 R2).
 - [ ] **C197** — BlockStore::io() answers file pushes, directory syncs and device flushes as three counts a test reads, replacing syncs() and the capture timing's block_syncs (HOME-038 R3).
 - [ ] **C198** — BlockStore::get hashes what it read and refuses a block whose bytes do not hash to the name asked for as BlockDiffers naming both hashes, never repairing or removing it (HOME-038 R4).
+
+## The door to a haematite store (HOME-039)
+
+- [ ] **C199** — GET /haem answers the stores the configuration names, in name order, to an administrator; POST /haem/{store} carries one verb to that store's service over its Unix socket after greeting it with hello on the same connection, and answers the service's result as it came; a caller who is not signed in is refused NotSignedIn and one who is not an administrator NotAdmitted, before the body is read and before the socket is opened (HOME-039 R1).
+- [ ] **C200** — The service's own refusal is answered HaemRefused (409) carrying its code and words; a socket that cannot be reached, a connection closed before the answer, an answer to another request or a frame that is not JSON is HaemUnreachable (502) and never a refusal; a store the configuration does not name is HaemStoreUnknown (404); a body that is not a method and optional params and no other member is RequestMalformed (HOME-039 R2).
+- [ ] **C201** — haem_stores in the configuration maps a store's name to the absolute path of its service's socket; a relative path or a name that is empty or holds a slash is refused at start as ConfigInvalid naming the entry; without the setting the door lists no store (HOME-039 R3).

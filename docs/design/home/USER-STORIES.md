@@ -124,6 +124,8 @@
 
 **S76.** As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
+**S80.** As the operator who runs Lys in front of a haematite store, I want the store's screens and agents to reach it only through Lys, with Lys deciding who is admitted, so that a service which asks nobody who is calling is never the thing a browser or an agent talks to.
+
 ## Seat operator — Starts an agent session from what Lys records for it
 
 **S78.** As the operator who starts a seat from Lys, I want everything I set for it (its harness build, models, skills, MCP servers and permissions) to be everything Claude Code or our Codex build is given, so that a seat started from Lys is the seat I configured and nothing is silently dropped.

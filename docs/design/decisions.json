@@ -2014,6 +2014,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-136",
+      "title": "The door to a haematite store is Lys: haem serve stays a local socket, and Lys carries each verb for a caller it has admitted",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-10-04",
+      "decided_by": "The haematite Studio board's card D8, 'serve stays local, the door carries it' (aOM0f--U), marked taken; the v6 conformance mock-up's AI screen places all identity and access in lys. Recorded by Waffles.",
+      "context": "haem serve listens on a Unix socket and asks nobody who is calling: whoever reaches the socket reads and writes the store. The Studio's screens run in a browser and call GET /api/haem and POST /api/haem/<store> on the page's own origin.",
+      "decision": "Lys's identity server lists the haematite stores its configuration names (haem_stores: a name and the absolute path of the service's socket) and carries one verb per request to that store's service over the socket, greeting first. Only an administrator is admitted until a grant per store exists. The service's result is answered as it came; its own refusal is HaemRefused, a definite answer; a service that does not answer is HaemUnreachable, never a refusal, so a caller settles a change by its receipt.",
+      "quote": "D8 serve stays local, the door carries it",
+      "consequences": [
+        "No store is reachable through Lys unless the configuration names it.",
+        "Nobody but an administrator reaches a store through Lys until grants per store, collection and field exist; that is its own work.",
+        "haem serve itself still checks nothing: anyone who can open its socket on that machine bypasses the door.",
+        "The door adds no caller identity to the verb it carries; who changed what is not yet recorded by the store."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
