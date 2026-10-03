@@ -52,10 +52,10 @@ function GroupedActionPicker({ model, groups, selected, change, disabled = false
     const allIds = new Set(all);
     return <fieldset key={group.id} disabled={disabled} style={{ border: 0, padding: 0 }}>
       <legend>{group.href ? <a href={group.href}>{group.title}</a> : group.title}</legend>
-      {available.length ? <label><input type="checkbox" name="all_actions" checked={all.every((id) => held.has(id))}
+      {available.length ? <label className="action-choice"><input type="checkbox" name="all_actions" checked={all.every((id) => held.has(id))}
         onChange={(event) => change(event.target.checked ? [...selected.filter((id) => !choiceIds.has(id)), ...all] : selected.filter((id) => !allIds.has(id)))} /> Everything here</label> : null}
       {/* Each label sits directly in the fieldset, as "Everything here" does, so one rule sets every checkbox beside its words. */}
-      {choices.map((choice) => <Fragment key={choice.id}><label className={choice.reason ? 'dim' : undefined}>
+      {choices.map((choice) => <Fragment key={choice.id}><label className={'action-choice' + (choice.reason ? ' dim' : '')}>
         <input type="checkbox" name="action" value={choice.id} disabled={Boolean(choice.reason)} checked={held.has(choice.id)}
           onChange={(event) => { if (everything) change(event.target.checked ? [...selected.filter((id) => id !== everything.id), choice.id] : selected.filter((id) => id !== choice.id)); else toggle([choice.id], event.target.checked); }} /> {actionWords(model, choice.resource, choice.actions)}
       </label>{choice.reason ? <p className="hint">{choice.reason}</p> : null}</Fragment>)}
