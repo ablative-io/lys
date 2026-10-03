@@ -233,7 +233,7 @@ impl Scratch {
             .local_addr()?
             .port();
         let proxy = format!("{{\"model_proxy\": \"http://127.0.0.1:{free}/anthropic\"}}");
-        std::fs::write(layout.service_config(), proxy)?;
+        crate::identity::private_files::write(&layout.service_config(), proxy.as_bytes())?;
         std::fs::write(layout.data_dir().join("directory").join("log"), [7_u8; 64])?;
         for rendered in files_for(&layout, A, true) {
             std::fs::write(&rendered.target, rendered.bytes.as_slice())?;
