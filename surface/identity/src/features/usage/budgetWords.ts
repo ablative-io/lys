@@ -5,8 +5,6 @@ export const UNITS: Record<Measure, string> = { dollars: 'dollars', plan_percent
 
 export const PERIOD_WORDS: Record<Length, string> = { five_hour: '5-hour window', day: 'day', week: 'week', month: 'month' };
 
-export const ACT_WORDS: Record<BudgetAct, string> = { tell: 'Just tell me', stop: 'Stop this agent', compact: 'Compact its session', notice: 'Type a notice into its session' };
-
 const THIS: Record<Length, string> = { five_hour: 'this 5-hour window', day: 'today', week: 'this week', month: 'this month' };
 
 const ADJECTIVE: Record<Length, string> = { five_hour: '5-hour', day: 'daily', week: 'weekly', month: 'monthly' };

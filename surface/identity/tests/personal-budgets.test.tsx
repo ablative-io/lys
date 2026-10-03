@@ -19,23 +19,24 @@ describe('personal budgets', () => {
       ['POST ' + path + '/confirm']: ok(confirmed),
     }));
     expect(text()).toContain('Limits across Ada (test person)’s agents');
-    const before = $('section[aria-label="Currently enforced"]');
+    const before = $('tr[aria-label="Enforced tokens"]');
     expect(before?.textContent).toContain('100');
     expect(before?.textContent).toContain('Each day, Australia/Melbourne');
     expect(before?.textContent).toContain('End the session');
-    const after = $('section[aria-label="Requested change"]');
+    const after = $('tr[aria-label="Pending tokens"]');
     expect(after?.textContent).toContain('200');
     expect(after?.textContent).toContain('Each week, Australia/Melbourne');
     expect(after?.textContent).toContain('Tell the responsible person');
     await click(confirm());
     expect(world.posted).toEqual([{ path: path + '/confirm', body: { measure: 'tokens', version: 2 } }]);
     expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
-    expect(document.querySelector('article[aria-label="Pending tokens"]')).toBeNull();
+    expect(document.querySelector('tr[aria-label="Pending tokens"]')).toBeNull();
     expect(text()).toContain('Enforced budget');
-    const enforced = $('section[aria-label="Personal budgets"] article');
+    const enforced = $('section[aria-label="Personal budgets"] tbody tr');
     expect(enforced?.textContent).toContain('150');
     expect(enforced?.textContent).toContain('Each week, Australia/Melbourne');
-    expect(enforced?.textContent).toContain('Version3');
+    expect(enforced?.children[4]?.textContent).toBe('3');
+    expect(document.querySelectorAll('section[aria-label="Personal budgets"] tbody tr')).toHaveLength(1);
     expect(confirm()).toBeNull();
   });
   it('keeps the owner read-only', async () => {
@@ -105,7 +106,7 @@ describe('personal budgets', () => {
     await click(confirm());
     expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
     expect(text()).not.toContain('cannot read recorded budget');
-    expect(document.querySelector('article[aria-label="Pending tokens"]')).toBeNull();
+    expect(document.querySelector('tr[aria-label="Pending tokens"]')).toBeNull();
     expect(text()).toContain('Enforced budget');
   });
 

@@ -1,8 +1,10 @@
 /** Personal budgets keep the requested change beside the limits still enforced until an administrator confirms. */
 import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { api, request, useLoad } from '../../api';
 import { DirectoryGate as Gate, ErrorWords } from '../people/Words';
-import { ACTS, MEASURES, shown, asLimit } from '../usage/contract';
+import { ACTS, MEASURES, asLimit } from '../usage/contract';
+import { amount } from '../usage/budgetWords';
 import type { Budget, BudgetsView, Limit } from '../usage/contract';
 
 type PersonalView = BudgetsView;
@@ -20,13 +22,17 @@ export function PersonalBudgets({ id, name }: { id: string; name: string }) {
   </section>;
 }
 
-function Details({ limit, version, zone }: { limit: Limit; version: number; zone: string }) {
-  return <dl className="facts">
-    <dt>Limit</dt><dd>{shown(limit.unit, limit.amount)}</dd>
-    <dt>Period</dt><dd>{limit.period ? 'Each ' + limit.period + ', ' + (limit.zone ?? zone) : 'No period'}</dd>
-    <dt>When reached</dt><dd>{ACTS[limit.act]}</dd>
-    <dt>Version</dt><dd>{version}</dd>
-  </dl>;
+/** One limit as a row of the table: what it is on, how much, over what period, what happens, its version, and where it stands. */
+function Row({ label, limit, version, zone, state, children }: { label: string; limit: Limit; version: number; zone: string; state: string; children?: ReactNode }) {
+  return <tr aria-label={label}>
+    <td>{MEASURES[limit.unit]}</td>
+    <td>{amount(limit.unit, limit.amount)}</td>
+    <td>{limit.period ? 'Each ' + limit.period + ', ' + (limit.zone ?? zone) : 'No period'}</td>
+    <td>{ACTS[limit.act]}</td>
+    <td>{version}</td>
+    <td>{state}</td>
+    <td>{children}</td>
+  </tr>;
 }
 
 function BudgetReview({ path, initial, administrator }: { path: string; initial: PersonalView; administrator: boolean }) {
@@ -60,20 +66,21 @@ function BudgetReview({ path, initial, administrator }: { path: string; initial:
   const waiting = new Set(view.unconfirmed.map((entry) => entry.requested.measure));
   return <>
     {failure ? <ErrorWords problem={failure} /> : null}
-    {!view.limits.length && !view.unconfirmed.length ? <p>No personal budget is set.</p> : null}
-    {view.limits.map((limit, index) => ({ limit, index })).filter(({ limit }) => !waiting.has(limit.unit)).map(({ limit, index }) => <article key={index} aria-label={MEASURES[limit.unit]}>
-      <h3>{MEASURES[limit.unit]}</h3><p>Enforced budget</p><Details limit={limit} version={view.version} zone={view.zone} />
-    </article>)}
-    {view.unconfirmed.map(({ requested, effective, reason }) => <article key={requested.measure} aria-label={'Pending ' + requested.measure}>
-      <h3>{MEASURES[requested.measure]}</h3>
-      <p>{reason}</p>
-      <div className="grid2">
-        <section aria-label="Currently enforced"><h4>Currently enforced</h4><Details limit={asLimit(effective)} version={effective.version} zone={view.zone} /></section>
-        <section aria-label="Requested change"><h4>Requested change</h4><Details limit={asLimit(requested)} version={requested.version} zone={view.zone} /></section>
-      </div>
-      {administrator ? <button className="btn primary" disabled={busy} onClick={() => void confirm(requested)}>Apply the new limit of {shown(requested.measure, requested.limit)} {requested.measure === 'tokens' ? 'tokens' : requested.measure === 'running_ms' ? 'minutes' : 'percent'}</button>
-        : <p>An administrator must confirm this change. The currently enforced budget remains in place.</p>}
-    </article>)}
+    <table className="usage-list usage-table">
+      <thead><tr><th>Limit on</th><th>Amount</th><th>Period</th><th>When reached</th><th>Version</th><th>Where it stands</th><th>Change</th></tr></thead>
+      <tbody>
+        {!view.limits.length && !view.unconfirmed.length ? <tr><td colSpan={7} className="dim">No personal budget is set.</td></tr> : null}
+        {view.limits.map((limit, index) => ({ limit, index })).filter(({ limit }) => !waiting.has(limit.unit)).map(({ limit, index }) =>
+          <Row key={index} label={MEASURES[limit.unit]} limit={limit} version={view.version} zone={view.zone} state="Enforced budget" />)}
+        {view.unconfirmed.flatMap(({ requested, effective, reason }) => [
+          <Row key={requested.measure + '.enforced'} label={'Enforced ' + requested.measure} limit={asLimit(effective)} version={effective.version} zone={view.zone} state="Currently enforced" />,
+          <Row key={requested.measure + '.requested'} label={'Pending ' + requested.measure} limit={asLimit(requested)} version={requested.version} zone={view.zone} state={'Requested change. ' + reason}>
+            {administrator ? <button className="btn primary" disabled={busy} onClick={() => void confirm(requested)}>Apply the new limit of {amount(requested.measure, requested.limit)}</button>
+              : <p>An administrator must confirm this change. The currently enforced budget remains in place.</p>}
+          </Row>,
+        ])}
+      </tbody>
+    </table>
     {busy ? <p role="status">Sending the confirmation; the stored result is not yet known.</p> : null}
   </>;
 }

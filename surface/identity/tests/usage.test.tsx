@@ -101,7 +101,9 @@ describe('Usage', () => {
     expect(requests).toContain('PUT ' + budgets);
     expect(text()).toContain('Budget kept as version 1.');
     await reload(routes);
-    expect($('section[aria-label="Budgets"] table')?.textContent).toContain('5,000 tokens a day');
+    expect(document.querySelector<HTMLInputElement>('section[aria-label="Budgets"] tbody input[name="amount-0"]')?.value).toBe('5000');
+    expect($('section[aria-label="Budgets"] tbody tr')?.children[0]?.textContent).toBe('tokens a day');
+    expect($('button[aria-label="Remove 5,000 tokens a day"]')).not.toBeNull();
     expect($('.usage-summary')?.textContent).toBe('Tells you at 5,000 tokens a day.');
     expect(text()).not.toMatch(/time zone|Measure|Counted each/);
   });

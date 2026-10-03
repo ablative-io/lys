@@ -1,10 +1,10 @@
 /** An agent's budgets with where each stands, and the form that sets one. */
 import { useRef, useState } from 'react';
 import { Refused, request } from '../../api';
-import { kept, shown, standing } from './contract';
+import { ACTS, kept, shown, standing } from './contract';
 import type { BudgetsView, BudgetBody, BudgetAct, Length, Measure, Receipt } from './contract';
 import { PERIODS, confirmsBudget, validAmount } from './budgetForm';
-import { ACT_WORDS, PERIOD_WORDS, UNITS, limitWords, summary, usedWords } from './budgetWords';
+import { PERIOD_WORDS, UNITS, limitWords, summary, usedWords } from './budgetWords';
 
 type Props = { agent: string; budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void };
 
@@ -31,15 +31,9 @@ export function UsageBudgets({ agent, budgets, receipts, changed }: Props) {
   };
   const blocked = busy || done || uncertain;
   return <section className="card usage-budgets" aria-label="Budgets"><h3>Budget</h3>
-    {budgets.limits.length ? <table className="usage-list"><thead><tr><th>Spend at most</th><th>Used</th><th>When it's hit</th><th>Where it stands</th></tr></thead>
-      <tbody>{budgets.limits.map((limit, index) => {
-        const stands = standing(budgets, index, receipts);
-        return <tr key={index} data-reached={stands.reached}><td>{limitWords(limit)}</td><td className="usage-used">{usedWords(limit, budgets.used[index]) ?? 'Nothing reported yet'}</td>
-          <td>{ACT_WORDS[limit.act]}</td><td>{stands.words}</td></tr>;
-      })}</tbody></table> : <p>No budget is set for this agent.</p>}
-    <p className="usage-summary">{summary(budgets.limits, budgets.warn_at)}</p>
-    {budgets.limits.length ? <EditBudgets budgets={budgets} busy={blocked} save={save} /> : null}
+    <EditBudgets budgets={budgets} receipts={receipts} busy={blocked} save={save} />
     <SetBudget budgets={budgets} busy={blocked} save={save} />
+    <p className="usage-summary">{summary(budgets.limits, budgets.warn_at)}</p>
     {budgets.unavailable.map((each) => <p key={each.unit}>{UNITS[each.unit]}: {each.reason}</p>)}
     {busy ? <p role="status">Sending; not yet confirmed.</p> : null}
     {failure ? <p role="alert" className="why-not">{failure}</p> : null}
@@ -47,9 +41,12 @@ export function UsageBudgets({ agent, budgets, receipts, changed }: Props) {
   </section>;
 }
 
+const COLUMNS = ['34%', '20%', '18%', '18%', '10%'];
+
 type FormProps = { budgets: BudgetsView; busy: boolean; save: (body: BudgetBody) => Promise<void> };
 
-function EditBudgets({ budgets, busy, save }: FormProps) {
+/** The limits as one table: each row's amount and act are changed where they stand, and one button saves them all. */
+function EditBudgets({ budgets, receipts, busy, save }: FormProps & { receipts: Receipt[] }) {
   const [rows, setRows] = useState(() => budgets.limits.map((limit) => ({ amount: String(shown(limit.unit, limit.amount)), act: limit.act })));
   const [warning, setWarning] = useState(budgets.warn_at === null ? '' : String(budgets.warn_at));
   const valid = rows.every((row, index) => validAmount(budgets.limits[index].unit, row.amount))
@@ -65,18 +62,36 @@ function EditBudgets({ budgets, busy, save }: FormProps) {
       amount: rows[index].amount === String(shown(limit.unit, limit.amount)) ? limit.amount : kept(limit.unit, Number(rows[index].amount)), act: rows[index].act }));
     void save({ limits, warn_at: warning === '' ? null : Number(warning), version: budgets.version });
   };
-  return <form aria-label="Edit budget limits" onSubmit={(event) => { event.preventDefault(); submit(); }}><h4>Change the limits</h4>
-    {budgets.limits.map((limit, index) => <fieldset key={index} disabled={busy}><legend>{limitWords(limit)}</legend>
-      <label className="field">Spend at most, in {UNITS[limit.unit]}{limit.period ? ' per ' + PERIOD_WORDS[limit.period] : ''}
-        <input name={'amount-' + index} type="number" min={0} max={limit.unit.includes('percent') ? 100 : undefined} step="any" required value={rows[index].amount} onChange={(event) => edit(index, { amount: event.target.value })} /></label>
-      <label className="field">When it's hit<select name={'act-' + index} value={rows[index].act} onChange={(event) => edit(index, { act: event.target.value as BudgetAct })}>{Object.entries(ACT_WORDS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select></label>
-      <button className="btn" type="button" aria-label={'Remove ' + limitWords(limit)} onClick={() => remove(index)}>Remove this limit</button>
-    </fieldset>)}
-    <label className="field">Warn me at this % of a limit (leave blank for no warning)<input name="warn_at" type="number" min={0} max={100} step="any" value={warning} disabled={busy} onChange={(event) => setWarning(event.target.value)} /></label>
-    <button className="btn primary" type="submit" disabled={busy || !valid}>Save these limits</button>
+  return <form aria-label="Edit budget limits" className="usage-edit" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+    <table className="usage-list usage-table">
+      <colgroup>{COLUMNS.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>
+      <thead><tr><th>Spend at most</th><th>Used</th><th>When it's hit</th><th>Where it stands</th><th>Change</th></tr></thead>
+      <tbody>
+        {budgets.limits.map((limit, index) => {
+          const stands = standing(budgets, index, receipts);
+          return <tr key={index} data-reached={stands.reached}>
+            <td><div className="usage-amount">
+              <input name={'amount-' + index} aria-label={'Amount of ' + limitWords(limit)} type="number" min={0} max={limit.unit.includes('percent') ? 100 : undefined} step="any" required disabled={busy} value={rows[index].amount} onChange={(event) => edit(index, { amount: event.target.value })} />
+              <span>{UNITS[limit.unit]}{limit.period ? ' a ' + PERIOD_WORDS[limit.period] : ', at any moment'}</span>
+            </div></td>
+            <td className="usage-used">{usedWords(limit, budgets.used[index]) ?? 'Nothing reported yet'}</td>
+            <td><select name={'act-' + index} aria-label={'When ' + limitWords(limit) + ' is hit'} disabled={busy} value={rows[index].act} onChange={(event) => edit(index, { act: event.target.value as BudgetAct })}>{Object.entries(ACTS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select></td>
+            <td>{stands.words}</td>
+            <td><button className="btn" type="button" disabled={busy} aria-label={'Remove ' + limitWords(limit)} onClick={() => remove(index)}>Remove</button></td>
+          </tr>;
+        })}
+        {budgets.limits.length ? null : <tr><td colSpan={5} className="dim">No budget is set for this agent.</td></tr>}
+      </tbody>
+      {budgets.limits.length ? <tfoot><tr>
+        <td colSpan={3}><div className="usage-amount"><span id="warn-at-words">Warn me at this % of a limit (leave blank for no warning)</span>
+          <input name="warn_at" aria-labelledby="warn-at-words" type="number" min={0} max={100} step="any" value={warning} disabled={busy} onChange={(event) => setWarning(event.target.value)} /></div></td>
+        <td colSpan={2}><button className="btn primary" type="submit" disabled={busy || !valid}>Save these limits</button></td>
+      </tr></tfoot> : null}
+    </table>
   </form>;
 }
 
+/** The row under the table that adds a limit, in the table's own columns. */
 function SetBudget({ budgets, busy, save }: FormProps) {
   const [measure, setMeasure] = useState<Measure>('tokens');
   const [limit, setLimit] = useState('');
@@ -90,15 +105,19 @@ function SetBudget({ budgets, busy, save }: FormProps) {
     const body: BudgetBody = { limits: [...budgets.limits, next], warn_at: budgets.warn_at, version: budgets.version };
     void save(body);
   };
-  return <form aria-label="Set a budget" onSubmit={(event) => { event.preventDefault(); if (limit !== '') void submit(); }}><h4>Add a limit</h4>
-    <label className="field">Spend at most<input name="limit" type="number" min={0} step="any" required value={limit} disabled={busy} onChange={(event) => setLimit(event.target.value)} /></label>
-    <label className="field">In<select aria-label="Unit" value={measure} disabled={busy} onChange={(event) => {
-      const next = event.target.value as Measure; setMeasure(next);
-      if (next !== 'context_percent' && !PERIODS[next].includes(length)) setLength(PERIODS[next][0]);
-    }}>{Object.entries(UNITS).map(([value, words]) => <option key={value} value={value} disabled={budgets.unavailable.some((each) => each.unit === value)}>{words}</option>)}</select></label>
-    {measure === 'context_percent' ? <p>at any moment</p> : <label className="field">Per<select aria-label="Period" value={length} disabled={busy} onChange={(event) => setLength(event.target.value as Length)}>{PERIODS[measure].map((period) => <option key={period} value={period}>{PERIOD_WORDS[period]}</option>)}</select></label>}
-    <label className="field">When it's hit<select aria-label="When it's hit" value={act} disabled={busy} onChange={(event) => setAct(event.target.value as BudgetAct)}>{Object.entries(ACT_WORDS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select></label>
-    <button className="btn primary" type="submit" disabled={busy || !valid}>Add this limit</button>
+  return <form aria-label="Set a budget" className="usage-add-row" style={{ gridTemplateColumns: COLUMNS.join(' ') }} onSubmit={(event) => { event.preventDefault(); if (limit !== '') void submit(); }}>
+    <div className="usage-amount">
+      <input name="limit" aria-label="Spend at most" type="number" min={0} step="any" required value={limit} disabled={busy} placeholder="Amount" onChange={(event) => setLimit(event.target.value)} />
+      <select aria-label="Unit" value={measure} disabled={busy} onChange={(event) => {
+        const next = event.target.value as Measure; setMeasure(next);
+        if (next !== 'context_percent' && !PERIODS[next].includes(length)) setLength(PERIODS[next][0]);
+      }}>{Object.entries(UNITS).map(([value, words]) => <option key={value} value={value} disabled={budgets.unavailable.some((each) => each.unit === value)}>{words}</option>)}</select>
+      {measure === 'context_percent' ? <span>at any moment</span> : <select aria-label="Period" value={length} disabled={busy} onChange={(event) => setLength(event.target.value as Length)}>{PERIODS[measure].map((period) => <option key={period} value={period}>{'a ' + PERIOD_WORDS[period]}</option>)}</select>}
+    </div>
+    <span className="dim">New limit</span>
+    <select aria-label="When it's hit" value={act} disabled={busy} onChange={(event) => setAct(event.target.value as BudgetAct)}>{Object.entries(ACTS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select>
+    <span />
+    <span><button className="btn primary" type="submit" disabled={busy || !valid}>Add this limit</button></span>
     {budgets.limits.length >= 64 ? <p>A budget can hold at most 64 limits.</p> : null}
   </form>;
 }
