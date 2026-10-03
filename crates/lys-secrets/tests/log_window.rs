@@ -201,8 +201,10 @@ fn the_log_command_prints_the_last_lines_and_reads_only_those() -> TestResult {
     );
     let said = String::from_utf8(longer.stderr)?;
     assert!(
-        said.contains(&format!("AuditSignatureInvalid: audit line {older} ")),
-        "the longer page names line {older}: {said}"
+        said.contains(&format!("AuditLineUnreadable: audit leaf {older} "))
+            && said.contains("corrupt record: ")
+            && said.contains(" at offset "),
+        "the longer page names line {older} and its record's segment and offset: {said}"
     );
     Ok(())
 }
@@ -346,8 +348,10 @@ fn the_audit_command_names_an_altered_line_and_passes_a_sound_log() -> TestResul
     assert!(!altered.status.success(), "an altered line fails the audit");
     let said = String::from_utf8(altered.stderr)?;
     assert!(
-        said.contains("AuditSignatureInvalid: audit line 1 "),
-        "the audit names line 1: {said}"
+        said.contains("AuditLineUnreadable: audit leaf 1 ")
+            && said.contains("corrupt record: ")
+            && said.contains(" at offset "),
+        "the audit names line 1 and its record's segment and offset: {said}"
     );
     Ok(())
 }

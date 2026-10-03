@@ -443,7 +443,19 @@ impl AuditLog {
     fn leaf(&self, index: u64) -> Result<Vec<u8>, SecretsError> {
         self.lines_read.fetch_add(1, Ordering::Relaxed);
         self.log
-            .leaf_bytes(index)?
+            .leaf_bytes(index)
+            // A record the store cannot read is this line unreadable: the
+            // person is told which line, and the store's words carry the
+            // segment and offset to look at.
+            .map_err(|error| match error {
+                error @ lys_log_store::StoreError::CorruptRecord { .. } => {
+                    SecretsError::AuditLineUnreadable {
+                        index,
+                        reason: error.to_string(),
+                    }
+                }
+                other => other.into(),
+            })?
             .ok_or(SecretsError::AuditLineMissing {
                 index,
                 len: self.len(),
