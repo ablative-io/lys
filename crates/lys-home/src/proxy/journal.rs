@@ -19,7 +19,8 @@
 //!   `unrecorded`, and is held, with nothing ingested, until the journal can
 //!   be written again ([`Sink::settle`] asks the sink to look again).
 //! - The sink writes no body byte anywhere but the home's block store, and
-//!   no header but the kept ones (`proxy::headers`) on the call's record;
+//!   of the headers only their names and the kept values (`proxy::headers`),
+//!   on the call's record;
 //!   its reports carry ids, a status and counts only.
 
 use std::path::{Path, PathBuf};

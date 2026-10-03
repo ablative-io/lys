@@ -105,18 +105,29 @@ pub struct Seen {
 /// order they are read: Anthropic's, then `OpenAI`'s.
 const REQUEST_ID: [&str; 2] = ["request-id", "x-request-id"];
 
-/// A call's status and the few headers its record keeps of each side: each
-/// name to its values in the order sent. Which names are kept is the
-/// proxy's to say (`proxy::headers`); no credential is among them.
+/// A call's status and what its record keeps of each side's headers.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Head {
     /// The upstream's HTTP status; absent when no response head arrived.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<u16>,
-    /// The kept request headers.
-    pub request: BTreeMap<String, Vec<String>>,
-    /// The kept response headers.
-    pub response: BTreeMap<String, Vec<String>>,
+    /// The request's headers.
+    pub request: Side,
+    /// The response's headers.
+    pub response: Side,
+}
+
+/// One side's headers as the record keeps them: every name, and the values
+/// of a named few. Which names keep their values is the proxy's to say
+/// (`proxy::headers`); a header that carries a credential never does.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Side {
+    /// Every header's name in the order received, one per header line, so a
+    /// header whose value is not kept is still on the record as having been
+    /// there.
+    pub names: Vec<String>,
+    /// The kept values: each name to its values in the order received.
+    pub values: BTreeMap<String, Vec<String>>,
 }
 
 impl Head {
@@ -125,7 +136,7 @@ impl Head {
     pub fn request_id(&self) -> Option<String> {
         REQUEST_ID
             .iter()
-            .find_map(|name| self.response.get(*name)?.first().cloned())
+            .find_map(|name| self.response.values.get(*name)?.first().cloned())
     }
 }
 
@@ -155,7 +166,7 @@ pub(crate) struct Captured<'a> {
 /// one thing that says why stored bytes that reached the client whole do not
 /// parse. Nothing is guessed from the bytes.
 fn unread(error: &HomeError, head: &Head) -> String {
-    match (error, head.response.get("content-encoding")) {
+    match (error, head.response.values.get("content-encoding")) {
         (HomeError::Json { .. }, Some(codings)) => format!(
             "{error}; the response's content-encoding is {}, and a response that is not an \
              event stream is read as stored, not decoded",

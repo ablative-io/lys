@@ -13,8 +13,9 @@
 //!   `cancelled` when the client went before the response ended; `partial`
 //!   when the upstream failed or its stream ended early or malformed. No
 //!   other path reports a call complete.
-//! - The spools hold body bytes only. The only headers read are the kept
-//!   ones (`proxy::headers`), which go on the call's record and nowhere else.
+//! - The spools hold body bytes only. Of the headers, every name and the
+//!   values of the kept ones (`proxy::headers`) go on the call's record and
+//!   nowhere else.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -30,10 +31,7 @@ use crate::proxy::forward::{End, Observer};
 use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
 use crate::proxy::link::{KeyScanner, Link};
 use crate::record::call::CallStatus;
-use crate::record::call::captured::{CaptureTiming, Seen};
-
-/// Kept headers: each name to its values in the order sent.
-type Kept = std::collections::BTreeMap<String, Vec<String>>;
+use crate::record::call::captured::{CaptureTiming, Seen, Side};
 
 /// What a call knows while it passes.
 #[derive(Debug, Default)]
@@ -281,12 +279,12 @@ enum Event {
     Start,
     Request(Bytes),
     RequestEnd,
-    RequestHead(Kept),
+    RequestHead(Side),
     ResponseHead {
         stream: bool,
         headers: HeaderMap,
         status: u16,
-        kept: Kept,
+        kept: Side,
     },
     Response(Bytes, Instant, u64),
     End(End, Instant),

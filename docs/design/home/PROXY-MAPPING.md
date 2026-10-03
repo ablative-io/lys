@@ -43,8 +43,9 @@ one JSON object per line, never rewritten by Lys. Record kinds seen in this run'
    two OpenAI grammars.
 3. **The harness `requestId` (`req_…`) appears nowhere in the stored bodies.** It comes from a
    response header. Since 5790186b the record carries it as `request_id`, and `head` holds the
-   upstream's status and the kept headers of each side. The kept names are one list in
-   `crates/lys-home/src/proxy/headers.rs`; no header that carries a credential is on it.
+   upstream's status and, of each side, every header's name in the order received and the values
+   of a named few. Which keep their values is one list in `crates/lys-home/src/proxy/headers.rs`,
+   with the credential headers named there as never valued; no header leaves no trace.
 4. **Call 1 has no pair by id.** A non-stream request (`model, max_tokens, messages[1], metadata`; no
    system, no tools) answered by a 114-byte response block that is not gzip, zlib, zstd or JSON
    (first bytes `83 38 00 00`). The proxy stored it whole and did not decode it, and the record says
@@ -66,7 +67,8 @@ one JSON object per line, never rewritten by Lys. Record kinds seen in this run'
  data: {api: "anthropic-messages", provider: "anthropic", call_id, model, stream, status,
         started_at, duration_ms,
         message_id, request_id, unrecorded_reason,
-        head: {status, request: {<name>: [<values>]}, response: {<name>: [<values>]}},
+        head: {status, request: {names: [<every name>], values: {<name>: [<values>]}},
+               response: {names: [<every name>], values: {<name>: [<values>]}}},
         raw_request: <block hash>, raw_response: <block hash>,
         request: [<part block hashes>], response: [<part block hashes>],
         capture: {admission_ns, drain_ns, hash_ns, write_ns, block_syncs, spool_syncs,
@@ -83,7 +85,7 @@ gzipped).
 
 ## What each side lacks
 
-**The proxy record lacks:** every header not on the kept list; usage and cost (the harness keeps `message.usage` and
+**The proxy record lacks:** the value of every header not on the kept list (its name is there); usage and cost (the harness keeps `message.usage` and
 `cost-state`; the proxy has them only inside the raw SSE `message_delta`); cwd, version, gitBranch,
 hooks, permission mode; the person's prompt as a turn (only as part of the request body); tool
 results as the harness sees them.

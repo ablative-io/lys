@@ -111,6 +111,7 @@ fn answered(coding: Option<&str>) -> Seen {
     if let Some(coding) = coding {
         seen.head
             .response
+            .values
             .insert("content-encoding".to_owned(), vec![coding.to_owned()]);
     }
     seen

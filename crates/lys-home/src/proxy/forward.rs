@@ -13,8 +13,8 @@
 //!   provider serves its own name and the client addressed this process.
 //!   Every other header passes as it came. No header value is logged here.
 //!   The reads are a response's `content-type`, to know an event stream, and
-//!   the few named headers of each side a call's record keeps
-//!   (`proxy::headers`), none of which carries a credential.
+//!   what a call's record keeps of each side (`proxy::headers`): every
+//!   header's name, and the values of a named few, never a credential's.
 //! - The transport is one Hyper client whose cancelled-request setting is
 //!   set explicitly to off, so a request whose connection closes under it is
 //!   answered with the failure and never sent a second time. The

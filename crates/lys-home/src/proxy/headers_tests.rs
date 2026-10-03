@@ -1,6 +1,7 @@
-//! Gates on the kept headers: only the named ones, never a credential, every
-//! value of a repeated name, and the whole of it on the call's record with
-//! the bytes that passed unchanged.
+//! Gates on what the record keeps of the headers: every name of each side in
+//! the order received, values only for the named ones, never a credential's
+//! value, and the whole of it on the call's record with the bytes that
+//! passed unchanged.
 
 use std::collections::BTreeMap;
 
@@ -8,11 +9,11 @@ use http_body_util::BodyExt;
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::{HeaderMap, StatusCode};
 
-use super::{answered, asked};
+use super::{ANSWERED_FAMILIES, NEVER_VALUED, answered, asked, kept};
 use crate::proxy::forward_tests::{
     Harness, KEY, Res, fake, message_response, messages_request, send, whole,
 };
-use crate::record::call::captured::Head;
+use crate::record::call::captured::{Head, Side};
 
 fn headers(pairs: &[(&'static str, &'static str)]) -> HeaderMap {
     let mut map = HeaderMap::new();
@@ -25,7 +26,7 @@ fn headers(pairs: &[(&'static str, &'static str)]) -> HeaderMap {
     map
 }
 
-fn map(pairs: &[(&str, &[&str])]) -> BTreeMap<String, Vec<String>> {
+fn values(pairs: &[(&str, &[&str])]) -> BTreeMap<String, Vec<String>> {
     pairs
         .iter()
         .map(|(name, values)| {
@@ -33,6 +34,10 @@ fn map(pairs: &[(&str, &[&str])]) -> BTreeMap<String, Vec<String>> {
             ((*name).to_owned(), values)
         })
         .collect()
+}
+
+fn names(names: &[&str]) -> Vec<String> {
+    names.iter().map(|name| (*name).to_owned()).collect()
 }
 
 const CREDENTIALS: [(&str, &str); 5] = [
@@ -44,24 +49,25 @@ const CREDENTIALS: [(&str, &str); 5] = [
 ];
 
 #[test]
-fn only_the_named_request_headers_are_kept_and_no_credential() {
+fn every_request_header_is_named_and_only_the_listed_ones_keep_a_value() {
     let mut sent = vec![
         ("accept-encoding", "gzip, br"),
         ("anthropic-beta", "one"),
+        ("x-stainless-lang", "js"),
         ("anthropic-beta", "two"),
         ("anthropic-version", "2023-06-01"),
         ("content-type", "application/json"),
         ("user-agent", "claude-cli/9"),
-        ("x-stainless-lang", "js"),
         (
             "request-id",
-            "a response header's name, not kept of a request",
+            "a response header's name, not valued of a request",
         ),
     ];
     sent.extend(CREDENTIALS);
+    let side = asked(&headers(&sent));
     assert_eq!(
-        asked(&headers(&sent)),
-        map(&[
+        side.values,
+        values(&[
             ("accept-encoding", &["gzip, br"]),
             ("anthropic-beta", &["one", "two"]),
             ("anthropic-version", &["2023-06-01"]),
@@ -69,10 +75,18 @@ fn only_the_named_request_headers_are_kept_and_no_credential() {
             ("user-agent", &["claude-cli/9"]),
         ])
     );
+    // No header vanishes: each of the thirteen lines is named once, and a
+    // header map keeps a repeated name's lines together.
+    let mut named = side.names.clone();
+    named.sort();
+    let mut every: Vec<String> = sent.iter().map(|(name, _)| (*name).to_owned()).collect();
+    every.sort();
+    assert_eq!(named, every);
+    assert_eq!(side.names.len(), 13);
 }
 
 #[test]
-fn only_the_named_response_headers_and_the_rate_limit_report_are_kept() {
+fn every_response_header_is_named_and_the_providers_own_keep_their_values() {
     let mut came = vec![
         ("content-encoding", "br"),
         ("content-type", "application/json"),
@@ -81,18 +95,20 @@ fn only_the_named_response_headers_and_the_rate_limit_report_are_kept() {
         ("x-request-id", "req_openai"),
         ("anthropic-ratelimit-requests-remaining", "7"),
         ("anthropic-ratelimit-unified-5h-utilization", "0.42"),
+        ("anthropic-organization-id", "org_1"),
         ("x-ratelimit-remaining-tokens", "900"),
-        ("anthropic-organization-id", "not kept"),
-        ("server", "not kept"),
+        ("server", "named, not valued"),
         (
             "user-agent",
-            "a request header's name, not kept of a response",
+            "a request header's name, not valued of a response",
         ),
     ];
     came.extend(CREDENTIALS);
+    let side = answered(&headers(&came));
     assert_eq!(
-        answered(&headers(&came)),
-        map(&[
+        side.values,
+        values(&[
+            ("anthropic-organization-id", &["org_1"]),
             ("anthropic-ratelimit-requests-remaining", &["7"]),
             ("anthropic-ratelimit-unified-5h-utilization", &["0.42"]),
             ("content-encoding", &["br"]),
@@ -103,34 +119,62 @@ fn only_the_named_response_headers_and_the_rate_limit_report_are_kept() {
             ("x-request-id", &["req_openai"]),
         ])
     );
+    assert_eq!(
+        side.names,
+        came.iter()
+            .map(|(name, _)| (*name).to_owned())
+            .collect::<Vec<_>>(),
+        "every header is named, in the order received"
+    );
 }
 
 #[test]
-fn a_value_that_is_not_utf8_is_kept_as_having_been_there() -> Res {
+fn a_credential_header_is_named_and_never_valued_whatever_list_would_keep_it() {
+    let came = headers(&CREDENTIALS);
+    for side in [asked(&came), answered(&came), kept(&came, |_| true)] {
+        assert_eq!(side.values, BTreeMap::new());
+        assert_eq!(side.names.len(), 5, "each is on the record by name");
+    }
+    for (name, _) in CREDENTIALS {
+        assert!(NEVER_VALUED.contains(&name), "{name}");
+        assert!(
+            !ANSWERED_FAMILIES
+                .iter()
+                .any(|start| name.starts_with(start)),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_value_that_is_not_utf8_is_kept_as_far_as_it_reads() -> Res {
     let mut came = HeaderMap::new();
     came.insert("request-id", HeaderValue::from_bytes(b"req_\xff")?);
-    assert_eq!(answered(&came), map(&[("request-id", &["req_\u{fffd}"])]));
+    let side = answered(&came);
+    assert_eq!(side.values, values(&[("request-id", &["req_\u{fffd}"])]));
+    assert_eq!(side.names, names(&["request-id"]));
     Ok(())
 }
 
 #[test]
 fn the_request_id_is_the_providers_own_header_first() {
-    let both = Head {
+    let response = |pairs: &[(&str, &[&str])]| Head {
         status: Some(200),
-        request: BTreeMap::new(),
-        response: map(&[("request-id", &["req_a"]), ("x-request-id", &["req_b"])]),
+        request: Side::default(),
+        response: Side {
+            names: Vec::new(),
+            values: values(pairs),
+        },
     };
+    let both = response(&[("request-id", &["req_a"]), ("x-request-id", &["req_b"])]);
     assert_eq!(both.request_id(), Some("req_a".to_owned()));
-    let other = Head {
-        response: map(&[("x-request-id", &["req_b"])]),
-        ..Head::default()
-    };
+    let other = response(&[("x-request-id", &["req_b"])]);
     assert_eq!(other.request_id(), Some("req_b".to_owned()));
     assert_eq!(Head::default().request_id(), None);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_calls_record_carries_its_status_request_id_and_kept_headers() -> Res {
+async fn a_calls_record_carries_its_status_request_id_and_headers() -> Res {
     let (upstream, _) = fake(|| async {
         let mut response = whole(StatusCode::TOO_MANY_REQUESTS, &message_response());
         for (name, value) in [
@@ -172,22 +216,39 @@ async fn a_calls_record_carries_its_status_request_id_and_kept_headers() -> Res 
     let calls = harness.calls(KEY)?;
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].request_id.as_deref(), Some("req_011"));
+    let head = calls[0].head.as_ref().ok_or("the record has no head")?;
+    assert_eq!(head.status, Some(429));
     assert_eq!(
-        calls[0].head,
-        Some(Head {
-            status: Some(429),
-            request: map(&[
-                ("accept-encoding", &["gzip, br"]),
-                ("anthropic-version", &["2023-06-01"]),
-                ("content-type", &["application/json"]),
-            ]),
-            response: map(&[
-                ("anthropic-ratelimit-requests-remaining", &["0"]),
-                ("content-type", &["application/json"]),
-                ("request-id", &["req_011"]),
-                ("retry-after", &["3"]),
-            ]),
-        })
+        head.request.values,
+        values(&[
+            ("accept-encoding", &["gzip, br"]),
+            ("anthropic-version", &["2023-06-01"]),
+            ("content-type", &["application/json"]),
+        ])
+    );
+    assert_eq!(
+        head.response.values,
+        values(&[
+            ("anthropic-ratelimit-requests-remaining", &["0"]),
+            ("content-type", &["application/json"]),
+            ("request-id", &["req_011"]),
+            ("retry-after", &["3"]),
+        ])
+    );
+    // The credential of each side is on the record by name and by name only;
+    // the names the transport adds itself are there too, so only presence is
+    // asserted.
+    for (side, name) in [
+        (&head.request, "authorization"),
+        (&head.response, "set-cookie"),
+    ] {
+        assert!(side.names.iter().any(|named| named == name), "{name}");
+        assert!(!side.values.contains_key(name), "{name}");
+    }
+    let record = serde_json::to_string(&calls[0])?;
+    assert!(
+        !record.contains("never"),
+        "no credential's value is on the record"
     );
     Ok(())
 }
