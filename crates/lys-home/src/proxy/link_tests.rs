@@ -97,18 +97,28 @@ async fn two_unkeyed_calls_after_a_keyed_one_never_land_under_its_session() -> R
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn with_no_capture_slot_a_keyed_call_is_unrecorded_under_its_own_session() -> Res {
+async fn a_keyed_call_is_recorded_whole_without_a_capture_allowance() -> Res {
     let (upstream, _) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
     let harness = Harness::start(upstream, 0).await?;
     let (response, _connection) = send(harness.addr, messages_request(Some(KEY), false)?).await?;
     assert_eq!(response.status(), StatusCode::OK);
     let report = harness.report()?;
-    assert_eq!(report.status, CallStatus::Unrecorded);
+    assert_eq!(report.status, CallStatus::Complete);
     assert_eq!(report.session, KEY);
     let calls = harness.calls(KEY)?;
     assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].status, CallStatus::Unrecorded);
-    assert!(calls[0].raw_request.is_none());
+    assert_eq!(calls[0].status, CallStatus::Complete);
+    let blocks = harness.home()?.blocks()?;
+    let raw = calls[0].raw_request.as_ref().ok_or("request is absent")?;
+    assert_eq!(
+        blocks.get(&crate::record::blocks::Hash::parse(raw)?)?,
+        messages_body(Some(KEY), false)
+    );
+    let raw = calls[0].raw_response.as_ref().ok_or("response is absent")?;
+    assert_eq!(
+        blocks.get(&crate::record::blocks::Hash::parse(raw)?)?,
+        message_response().to_string().as_bytes()
+    );
     assert_eq!(harness.home()?.session_ids()?, vec![KEY.to_owned()]);
     Ok(())
 }

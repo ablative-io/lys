@@ -197,7 +197,7 @@ async fn missing_or_corrupt_compression_trailers_never_complete_a_call() -> Res 
 pub(super) const DECODED_BOUND: usize = 16 * 1024 * 1024;
 
 fn oversized_response(encoding: &str) -> Res<Vec<u8>> {
-    sized_response(encoding, DECODED_BOUND + 1)
+    sized_response(encoding, DECODED_BOUND * 2)
 }
 
 pub(super) fn sized_response(encoding: &str, decoded_size: usize) -> Res<Vec<u8>> {
@@ -206,8 +206,8 @@ pub(super) fn sized_response(encoding: &str, decoded_size: usize) -> Res<Vec<u8>
 
 pub(super) fn gzip_members(decoded_size: usize) -> Res<Vec<u8>> {
     let first = decoded_size / 2;
-    let mut sent = sized_response("gzip", first)?;
-    sent.extend_from_slice(&encode_response("gzip", &[], decoded_size - first)?);
+    let mut sent = encode_response("gzip", &[], first)?;
+    sent.extend_from_slice(&sized_response("gzip", decoded_size - first)?);
     Ok(sent)
 }
 
@@ -221,14 +221,14 @@ fn encode_response(encoding: &str, prefix: &[u8], decoded_size: usize) -> Res<Ve
     match encoding {
         "gzip" => {
             let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(prefix)?;
             encoder.write_all(&padding)?;
+            encoder.write_all(prefix)?;
             Ok(encoder.finish()?)
         }
         "deflate" => {
             let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(prefix)?;
             encoder.write_all(&padding)?;
+            encoder.write_all(prefix)?;
             Ok(encoder.finish()?)
         }
         _ => Err("fixture encoding is unsupported".into()),
@@ -236,15 +236,15 @@ fn encode_response(encoding: &str, prefix: &[u8], decoded_size: usize) -> Res<Ve
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn oversized_gzip_is_partial_and_preserves_the_entire_client_response() -> Res {
+async fn oversized_gzip_is_complete_and_preserves_the_entire_client_response() -> Res {
     let sent = oversized_response("gzip")?;
-    round_trip_chunks(Some("gzip"), &sent, CallStatus::Partial, 8192).await
+    round_trip_chunks(Some("gzip"), &sent, CallStatus::Complete, 8192).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn oversized_deflate_is_partial_and_preserves_the_entire_client_response() -> Res {
+async fn oversized_deflate_is_complete_and_preserves_the_entire_client_response() -> Res {
     let sent = oversized_response("deflate")?;
-    round_trip_chunks(Some("deflate"), &sent, CallStatus::Partial, 8192).await
+    round_trip_chunks(Some("deflate"), &sent, CallStatus::Complete, 8192).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -257,13 +257,13 @@ async fn exact_bound_compressed_responses_remain_complete_with_unchanged_client_
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn the_decoded_bound_counts_all_concatenated_gzip_members_together() -> Res {
-    let sent = gzip_members(DECODED_BOUND + 1)?;
-    round_trip_chunks(Some("gzip"), &sent, CallStatus::Partial, 8192).await
+async fn concatenated_gzip_members_beyond_the_old_bound_are_complete() -> Res {
+    let sent = gzip_members(DECODED_BOUND * 2)?;
+    round_trip_chunks(Some("gzip"), &sent, CallStatus::Complete, 8192).await
 }
 
 #[test]
-fn oversized_compressed_responses_report_the_named_decoded_bound() -> Res {
+fn oversized_compressed_responses_keep_the_final_event() -> Res {
     for encoding in ["gzip", "deflate"] {
         let mut headers = hyper::HeaderMap::new();
         headers.insert(CONTENT_ENCODING, HeaderValue::from_static(encoding));
@@ -271,17 +271,10 @@ fn oversized_compressed_responses_report_the_named_decoded_bound() -> Res {
             crate::record::call::Api::Messages,
             headers.get_all(CONTENT_ENCODING),
         );
-        let error = reader
-            .feed(&oversized_response(encoding)?)
-            .err()
-            .ok_or("oversized response was decoded without a refusal")?;
-        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
-        assert!(
-            error
-                .to_string()
-                .contains("response_decoded_limit_exceeded")
-        );
-        assert!(error.to_string().contains(&DECODED_BOUND.to_string()));
+        reader.feed(&oversized_response(encoding)?)?;
+        let parts = reader.finish()?.ok_or("large response is partial")?;
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0]["text"], "answer");
     }
     Ok(())
 }
