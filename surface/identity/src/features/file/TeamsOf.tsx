@@ -8,5 +8,5 @@ export function TeamsOf({ id }: { id: string }) {
   if (load.status === 'refused') return <span className="why-not">{load.refused.refusal.refusal}: {load.refused.message}</span>;
   const held = load.data.teams.filter((team) => team.state === 'active' && team.members.includes(id));
   if (!held.length) return <span className="dim">In no team</span>;
-  return <>{held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/teams">{team.name}</a></span>)} <span className="note">membership gives no access</span></>;
+  return <>{held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/people/view/teams">{team.name}</a></span>)} <span className="note">membership gives no access</span></>;
 }

@@ -11,11 +11,13 @@ import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
 import { Picker } from '../../shell/Picker';
 interface AccountsView { scope: 'personal' | 'directory'; service_accounts: ServiceAccount[] }
-export function ServiceAccounts() {
+/** The service-account records, as a view of People and agents. */
+export function ServiceAccountsList() {
   const load = useLoad(() => readTogether({ me: api.me(), accounts: request<AccountsView>('/service-accounts') }), 'service-accounts');
-  return <main className="page fill"><div className="head"><div><div className="eyebrow">Directory</div><h1>Service accounts</h1><p className="sub">Keep a list of accounts used for work. Retiring an account here marks its Lys record retired; it does not close the provider account or revoke credentials.</p></div></div>
+  return <>
+    <p className="note">Keep a list of accounts used for work. Retiring an account here marks its Lys record retired; it does not close the provider account or revoke credentials.</p>
     <Gate load={load} title="Service accounts" ok={({ me, accounts }) => <AccountList initial={accounts} me={me} />} />
-  </main>;
+  </>;
 }
 function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
   const [accounts, setAccounts] = useState(initial);
@@ -40,7 +42,7 @@ function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
     {adding ? <Create key={me.person.id + ':' + revision} person={me.person.id} administrator={accounts.scope === 'directory'} changed={(answer) => { changed(answer); setAdding(false); }} /> : null}
     {!adding && !accounts.service_accounts.length ? <p>No service-account records were returned.</p> : null}
     <div className="body one">
-      <Listing<ServiceAccount> groups={group} columns={columns} id={(account) => account.id} href={(account) => '#/service-accounts?account=' + account.id} words={(account) => account.name + ' ' + account.description}
+      <Listing<ServiceAccount> groups={group} columns={columns} id={(account) => account.id} href={(account) => '#/people/view/accounts?account=' + account.id} words={(account) => account.name + ' ' + account.description}
         noun="accounts" holds={(items) => items.length + ' accounts'} selected={null} select={() => undefined} />
     </div>
   </>;

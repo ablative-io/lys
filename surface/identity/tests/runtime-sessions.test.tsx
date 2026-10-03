@@ -25,7 +25,7 @@ describe('Runtime sessions', () => {
   it('shows found sessions without registering an identity', async () => {
     const { requests, posted } = await mount('#/people', { ...SERVICE, '/runtime/found': ok({ sessions: [{ ...session, agent: null, shown: 'running' }] }) });
     posted.length = 0;
-    await click($('button[data-kind="found"]'));
+    await click($('a[data-kind="found"]'));
     expect(requests).toContain('/runtime/found'); expect(posted).toEqual([]);
     expect(text()).toContain('No agent attached'); expect(text()).toContain('Running, as its runner reported');
   });

@@ -1,5 +1,4 @@
 import { EstateApproval } from './features/import/EstateApproval';
-import { ServiceAccounts } from './features/service-accounts/ServiceAccounts';
 import { Roles } from './features/roles/Roles';
 import { Network } from './features/network/Network';
 import { Connections } from './features/connections/Connections';
@@ -28,7 +27,7 @@ export function AppRoutes() {
       <Route path="/access/import" element={<EstateApproval />} />
       <Route path="/roles/:id?" element={<Roles />} />
       <Route path="/network" element={<Network />} />
-      <Route path="/service-accounts" element={<ServiceAccounts />} />
+      <Route path="/service-accounts" element={<Navigate replace to="/people/view/accounts" />} />
       <Route path="/connections" element={<Connections />} />
       <Route path="/access/issue" element={<IssueRoot />} />
       <Route path="/model" element={<Model />} />
@@ -42,6 +41,7 @@ export function AppRoutes() {
       <Route path="/usage/:agent?" element={<UsageMoved />} />
       <Route path="/canvas/:agent?" element={<SessionCanvas />} />
       <Route path="/team/:agent?" element={<OneStart />} />
+      <Route path="/people/view/:view" element={<People />} />
       <Route path="/people/:agent" element={<People />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />

@@ -29,7 +29,7 @@ export function Connections() {
       </section>)}</div>}
       <SignInProviders />
       <p className="note">This view shows installation settings. It does not yet list products using Lys or external accounts available to agents.</p>
-      <div className="actions"><a className="btn" href="#/service-accounts">Manage service accounts</a>
+      <div className="actions"><a className="btn" href="#/people/view/accounts">Manage service accounts</a>
         <a className="btn" href="#/me">Your sign-in accounts</a></div>
     </div>} />
   </div>;

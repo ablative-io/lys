@@ -4,7 +4,7 @@ import { pref, setPref } from './prefs';
 
 export type DockMode = 'help' | 'assistant' | null;
 
-export type KindFilter = 'all' | 'person' | 'agent' | 'teams' | 'found';
+export type KindFilter = 'all' | 'person' | 'agent' | 'teams' | 'accounts' | 'found';
 
 export interface Shell {
   labels: boolean;

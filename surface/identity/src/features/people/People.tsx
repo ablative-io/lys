@@ -1,3 +1,4 @@
+import { ServiceAccountsList } from '../service-accounts/ServiceAccounts';
 import { readTogether } from '../../reads';
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
@@ -20,28 +21,36 @@ import { readTeams } from '../teams/Teams';
 import { Reach, readDirectoryReach } from './reach';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
 
+/** The views of People and agents, each with its own address. */
+const VIEWS: [KindFilter, string, string][] = [
+  ['all', 'All', '/people'], ['person', 'People', '/people/view/people'], ['agent', 'Agents', '/people/view/agents'],
+  ['teams', 'Teams', '/people/view/teams'], ['accounts', 'Service accounts', '/people/view/accounts'], ['found', 'Found', '/people/view/found'],
+];
+
 function PeopleHead() {
   const shell = useShell();
-  const filters: [KindFilter, string][] = [['all', 'All'], ['person', 'People'], ['agent', 'Agents'], ['teams', 'Teams'], ['found', 'Found']];
+  const navigate = useNavigate();
   return (
-    <div className="head">
-      <div>
-        <div className="eyebrow">Directory</div>
-        <h1>People and agents</h1>
-        <p className="sub">Everyone who works here, human or not. Every agent answers to a person.</p>
-      </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div className="seg">
-          {filters.map(([k, l]) => (
-            <button key={k} data-kind={k} className={shell.filterKind === k ? 'on' : ''} onClick={() => { shell.setFilterKind(k); shell.setCursor(0); }}>
-              {l}
-            </button>
-          ))}
+    <>
+      <div className="head">
+        <div>
+          <h1>People and agents</h1>
+          <p className="sub">Everyone who works here, human or not. Every agent answers to a person.</p>
         </div>
-        <a className="btn primary" href="#/agents/new">Add agent</a>
-        <a className="btn" href="#/people/new">Add person</a>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <a className="btn primary" href="#/agents/new">Add agent</a>
+          <a className="btn" href="#/people/new">Add person</a>
+        </div>
       </div>
-    </div>
+      <nav className="tabs" aria-label="People and agents views">
+        {VIEWS.map(([k, l, path]) => (
+          <a key={k} data-kind={k} href={'#' + path} className={shell.filterKind === k ? 'on' : ''} aria-current={shell.filterKind === k ? 'page' : undefined}
+            onClick={(event) => { event.preventDefault(); shell.setFilterKind(k); shell.setCursor(0); navigate(path); }}>
+            {l}
+          </a>
+        ))}
+      </nav>
+    </>
   );
 }
 
@@ -139,11 +148,15 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
 export function People() {
   const shell = useShell();
   const load = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
-  if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
+  // The address says which view is shown; the view is kept in the shell so the keys and the list agree with it.
+  const { view } = useParams();
+  const addressed = VIEWS.find(([, , path]) => path === '/people/view/' + view)?.[0];
+  useEffect(() => { shell.setFilterKind(addressed ?? 'all'); }, [view]);
+  if (shell.filterKind === 'teams' || shell.filterKind === 'found' || shell.filterKind === 'accounts') {
     return (
       <div className="page fill">
         <PeopleHead />
-        {shell.filterKind === 'found' ? <RuntimeSessions found /> : <Teams />}
+        {shell.filterKind === 'found' ? <RuntimeSessions found /> : shell.filterKind === 'accounts' ? <ServiceAccountsList /> : <Teams />}
       </div>
     );
   }

@@ -82,7 +82,7 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
   <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
-      <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : held.length ? held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/teams">{team.name}</a></span>) : 'No team yet'}</dd>
+      <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : held.length ? held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/people/view/teams">{team.name}</a></span>) : 'No team yet'}</dd>
       <dt>Computer</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !computer ? 'Choose a computer when you start' : network.status !== 'ok' ? reading(network, 'computers') : machine ? <a href="#/network">{machine.name}</a> : <span className="why-not">The saved computer is no longer visible. Choose an available computer in Start.</span>}<p className="note">Saved choice for the next start.</p></dd>
       <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !saved.length ? 'Choose a model when you start' : programs.status !== 'ok' ? reading(programs, 'model names') : models}<p className="note">Saved choice for the next start.</p></dd>
     </dl>
