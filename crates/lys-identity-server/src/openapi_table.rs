@@ -231,7 +231,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runtime/live" "The sessions still running" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable", "AgentNotVisible", "IdentifierMalformed", "RuntimeSessionUnknown"]] scope("runtime-session", "read", []);
     GET "/network/machines/{id}/runner" "A machine's runner" S [SIGNED, &["MachineUnknown"]] scope("machine", "read", ["id"]);
     POST "/network/machines/{id}/runner" "Name a machine's runner" S [ADMIN_BODY, &["MachineUnknown"]] scope("machine", "machine.runner.set", ["id"]);
-    POST "/network/machines/{id}/folders" "The folders inside one folder of a computer" S [ADMIN_BODY, &["MachineUnknown", "runner_absent"]] scope("machine", "read", ["id"]);
+    POST "/network/machines/{id}/folders" "The folders inside one folder of a computer" S [ADMIN_BODY, &["MachineUnknown", "runner_absent"], &["runner_request_unsigned", "runner_request_malformed", "runner_protocol_mismatch", "runner_request_replayed", "runner_request_misaddressed", "runner_unreachable", "runner_reply_malformed", "runner_stopping", "runner_answer_unexpected", "caller_left", "home_unknown", "folder_invalid", "folder_unreadable"]] scope("machine", "read", ["id"]);
     GET "/runner/protocol" "The runner protocol" P [];
     POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
     POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
