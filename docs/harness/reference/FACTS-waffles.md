@@ -53,6 +53,20 @@ every row is **open** on that leg.
 | C9 | In workspace write, `.git`, `.agents` and `.codex` under a writable root stay read-only | agent-approvals-security 291-298 | n/a | none | **open** |
 | C10 | Lys's runner can render a Codex permissions profile named `lys-bound` from a containment plan; its own comment calls it "a config fragment ... not an enforcement receipt" | permission profiles exist: permissions 45-200 (headings only read) | `lys-runner/src/codex_policy.rs:1-16` | none | **open**: whether any start made through the server uses it is unread |
 
+## Reconciled with Vesper's and Archie's tables, 20:32 by the clock
+
+Read after mine was written. No row of mine contradicts one of theirs. Vesper's rows 1, 3, 5, 8, 9, 11, 13, 15 are my 11, 16, 12, 5,
+4, 9, 10, 13. What theirs add that mine lacked: Vesper 4 (nobody chose pancake's policy: Lys seeded it for agents added between
+1 October 17:39 and 2 October 12:33 and never took it back), Vesper 5 (a plugin's hook ran inside a Lys run; seen in the run's own
+record), Vesper 14 (hooks sit outside every limit in the file). Archie's Codex table has real observations; mine had none.
+
+One row of Vesper's I can close. Her 17: six of nine runs ended within seven seconds, five with exit status 129, cause open.
+All nine runs in the runner's `sessions.json` ended with 129 or `Hangup: 1`. The runner ends a session by sending its process
+group the hangup signal (`lys-runner/src/pty.rs:336`), and 129 is how a program killed by hangup reports. The seven-second runs
+started 10:57:16, 11:54:34, 14:46:48 and 19:55:07 on 3 October; my installs finished 10:57:07, 14:46:30 and 19:55:01 by my own
+record, and each install is followed by my readback script, which starts a run and ends it. So those are my readbacks ending
+their own runs, not an agent failing to start. The 11:54 run has no install beside it in my record: **open**.
+
 ## Not yet read by me
 
 permission-modes 47-546 and 660 to the end; sandboxing 53 to the end; settings; iam; Lys's policy records

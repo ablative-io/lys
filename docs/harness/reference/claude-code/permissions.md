@@ -1,4 +1,4 @@
-<!-- Source: https://code.claude.com/docs/en/permissions.md, fetched 3 October 2026 20:40 AEST by Waffles. A copy to read against; the source is the authority. -->
+<!-- Source: https://code.claude.com/docs/en/permissions.md, fetched 3 October 2026 20:19 AEST by Waffles (the time is the fetched file's own timestamp; an earlier header said 20:40, which was a guess). A copy to read against; the source is the authority. -->
 
 > ## Documentation Index
 > Fetch the complete documentation index at: https://code.claude.com/docs/llms.txt
