@@ -415,11 +415,11 @@ describe('Can X do this? (conformance 8.1)', () => {
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
   });
 
-  it('tags a refusal for a suspended identity with the open question', async () => {
+  it('names a refusal for a suspended identity, with no design note beside it', async () => {
     await mount('#/access/can', { ...SERVICE, 'POST /grants/why': refused(409, 'IdentityNotActive', `IdentityNotActive: ${ADA} is suspended, and only an active identity's grants are effective`) });
     await click($('[data-act="check"]'));
     expect($('#answer .tag')?.textContent).toBe('IdentityNotActive');
-    expect($('#answer .why .open-q')?.textContent).toBe('what suspension refuses: open');
+    expect($('#answer .open-q')).toBeNull();
   });
 
   it('names each resource as the mock-up does: a project by its id, anything else as name (type)', async () => {

@@ -23,10 +23,8 @@ export function Rail() {
   return (
     <nav className={'rail' + (shell.labels ? ' open' : '')} id="rail" aria-label="Main">
       <div className="mark">
-        <span className="seal">ID</span>
-        <span className="lbl">
-          Identity <span className="open-q">name open</span>
-        </span>
+        <span className="seal">L</span>
+        <span className="lbl">Lys</span>
       </div>
       {RAIL.map((item, index) => {
         if (item.t === 'sep') return <div className="sep" key={index} />;

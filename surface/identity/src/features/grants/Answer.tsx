@@ -22,7 +22,7 @@ export function AnswerView({ w, a, land }: { w: GrantWorld; a: Answer; land: boo
         <div className="answer">
           <span className={'verdict-mark no' + (land ? ' land' : '')}>No</span>
           <span className="tag">{a.kind}</span>
-          <span className="why">{a.why}.{a.open ? <> <span className="open-q">what suspension refuses: open</span></> : null}</span>
+          <span className="why">{a.why}.</span>
         </div>
       )}
       <div className="meta-line">

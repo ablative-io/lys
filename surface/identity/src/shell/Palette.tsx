@@ -17,8 +17,8 @@ interface Item {
 export const PAGES: [string, string][] = [
   ['People and agents', '#/people'], ['Roles', '#/roles'], ['Resources', '#/resources'], ['Access', '#/access'],
   ['Requests', '#/requests'], ['Reviews', '#/reviews'], ['Credentials', '#/vault'], ['Connections', '#/connections'],
-  ['Sessions', '#/sessions'], ['Model', '#/model'], ['Try a change', '#/model/try'], ['Configuration', '#/settings'],
-  ['Graph', '#/graph'], ['Secrets', '#/secrets'], ['Network', '#/network'], ['You', '#/me'], ['Agent canvas', '#/canvas'],
+  ['Sign-ins', '#/sessions'], ['Model', '#/model'], ['Try a change', '#/model/try'], ['Configuration', '#/settings'],
+  ['Graph', '#/graph'], ['Secrets', '#/secrets'], ['Computers', '#/network'], ['Running', '#/runtime'], ['You', '#/me'], ['Agent canvas', '#/canvas'],
 ];
 
 export function Palette() {
@@ -50,7 +50,7 @@ export function Palette() {
   const source: Item[] = [
     ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
     ...ids.map((x) => ({ g: 'Ask', t: `What can ${x.display_name} reach?`, d: '', go: () => go('#/access/reach/' + x.id) })),
-    { g: 'Acts', t: 'Register an agent', d: 'directory registration', go: () => go('#/directory/manage?action=agent') },
+    { g: 'Acts', t: 'Add an agent', d: '', go: () => go('#/agents/new') },
     { g: 'Acts', t: 'Toggle dock side', d: '\\', go: shell.toggleDockSide },
     { g: 'Acts', t: 'Toggle rail labels', d: '[', go: shell.toggleLabels },
     ...PAGES.map(([t, h]) => ({ g: 'Go to', t, d: h, go: () => go(h) })),

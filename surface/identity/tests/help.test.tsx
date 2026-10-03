@@ -80,9 +80,9 @@ describe('help overlay (conformance 9.2)', () => {
     expect($('#dock')?.classList.contains('open')).toBe(false);
   });
 
-  it('the assistant says it is not built', async () => {
+  it('offers nothing that is not built: there is no assistant button', async () => {
     await mount('#/people');
-    await click($('[data-dockbtn="assistant"]'));
-    expect($('#dock .empty-note')?.textContent).toContain('not built yet');
+    expect($('[data-dockbtn="assistant"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('not built yet');
   });
 });

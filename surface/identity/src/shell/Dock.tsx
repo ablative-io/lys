@@ -67,36 +67,11 @@ function HelpPanel() {
   );
 }
 
-function AssistantPanel() {
-  const shell = useShell();
-  return (
-    <div className="dock-in">
-      <div className="dock-head">
-        <b style={{ fontWeight: 600 }}>Assistant</b>
-        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button className="icon-btn" data-dockbtn-close="" title="Close" onClick={shell.closeDock}>
-            ×
-          </button>
-        </span>
-      </div>
-      <div className="dock-body">
-        <div className="empty-note">
-          <span className="open-q">not built yet</span> The assistant is proposed (conformance 9.4): it would see the screen
-          only when you opt in, and act only through its own grants and the same requests.
-        </div>
-      </div>
-      <div className="dock-foot">
-        <div className="note">Which runtime powers it is <span className="open-q">open</span></div>
-      </div>
-    </div>
-  );
-}
-
 export function Dock() {
   const shell = useShell();
   return (
-    <aside className={'dock' + (shell.dockMode ? ' open' : '')} id="dock" aria-label="Help and assistant">
-      {shell.dockMode === 'help' ? <HelpPanel /> : shell.dockMode === 'assistant' ? <AssistantPanel /> : null}
+    <aside className={'dock' + (shell.dockMode === 'help' ? ' open' : '')} id="dock" aria-label="Help">
+      {shell.dockMode === 'help' ? <HelpPanel /> : null}
     </aside>
   );
 }

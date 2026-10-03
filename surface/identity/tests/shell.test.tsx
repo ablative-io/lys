@@ -9,7 +9,7 @@ describe('shell (conformance 9.1)', () => {
     const expected = RAIL.filter((i) => i.t === 'a');
     expect(links.map((a) => a.getAttribute('href'))).toEqual(expected.map((i) => 'href' in i && i.href));
     expect(links.map((a) => a.title)).toEqual(expected.map((i) => 'title' in i && i.title));
-    expect($$('#rail button.rb').map((b) => b.title)).toEqual(['Help (?)', 'Assistant', 'Command palette (⌘K)', 'Rail labels ([)']);
+    expect($$('#rail button.rb').map((b) => b.title)).toEqual(['Help (?)', 'Command palette (⌘K)', 'Rail labels ([)']);
     expect($('#rail a.on')?.dataset.nav).toBe('people');
   });
 

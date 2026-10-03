@@ -46,7 +46,6 @@ export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chai
       {v === null ? null : (
         <div className="note" style={{ color: 'var(--danger)', marginTop: 4 }}>
           {v.why}
-          {v.open ? <> <span className="open-q">what suspension refuses: open</span></> : null}
         </div>
       )}
       {g.revoked ? <Revocation g={g} /> : null}
@@ -54,7 +53,7 @@ export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chai
   );
 }
 
-/** After a revoke: the policy change, and what is still to design. */
+/** After a revoke: the policy change. */
 function Revocation({ g }: { g: Grant }) {
   const made = g.revoked_at !== null && g.revoked_revision !== null ? { at: clock(g.revoked_at).split(' ').at(-1) ?? '', revision: g.revoked_revision } : null;
   return (
@@ -66,7 +65,6 @@ function Revocation({ g }: { g: Grant }) {
         <span><span className="svc built-in">built in</span></span>
         <span className="note">{made ? `asks with change ${made.revision} or later, so its next check refuses` : 'asks before acting, so its next check refuses'}</span>
       </div>
-      <div className="note">Calls already admitted before the change: <span className="open-q">to design</span></div>
     </div>
   );
 }
