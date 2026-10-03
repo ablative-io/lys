@@ -529,6 +529,11 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `docs/design/home/PROOF-LAUNCH-ALL.md` | HOME-037 R7: proof: a real seat's setup recorded, rendered and compared | HOME-037 |
 | `docs/design/project.json` | HOME-037 R7: proof: a real seat's setup recorded, rendered and compared | HOME-037 |
 | `docs/design/home/briefs/HOME-037.json` | the launch carries every profile field to Claude Code and our Codex build, or refuses it by name | HOME-037 |
+| `crates/lys-home/src/record/block_batch.rs` | HOME-038 R1: an act's blocks staged together and committed with a fixed flush count; the only file that names libc | HOME-038 |
+| `crates/lys-home/src/record/block_batch_tests.rs` | HOME-038 R1: the batch's counts, drop and racing-writer tests | HOME-038 |
+| `crates/lys-home/src/record/call/captured.rs` | touched by HOME-038 R2: captured parts go through the call's one batch | HOME-038 |
+| `crates/lys-home/src/harness/claude_code/import/content.rs` | touched by HOME-038 R2: an imported entry's content blocks go through one batch | HOME-038 |
+| `crates/lys-home/src/proxy/persist.rs` | touched by HOME-038 R2 and R3: the persist fallback uses a batch and the timing carries three counts | HOME-038 |
 
 ## Inventory
 

@@ -98,6 +98,10 @@
         {
           "id": "S50",
           "text": "As the owner of the platform, I want a render's report to say whether what the session was given was signed, so that an unsigned render is never taken for a signed one."
+        },
+        {
+          "id": "S79",
+          "text": "As Tom, I want a recorded call's blocks written as one durable operation with a fixed number of device flushes, so that the home's cost per act does not grow with the parts a reply has and a block that exists is whole."
         }
       ]
     },

@@ -48,6 +48,8 @@
 
 **S50.** As the owner of the platform, I want a render's report to say whether what the session was given was signed, so that an unsigned render is never taken for a signed one.
 
+**S79.** As Tom, I want a recorded call's blocks written as one durable operation with a fixed number of device flushes, so that the home's cost per act does not grow with the parts a reply has and a block that exists is whole.
+
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.

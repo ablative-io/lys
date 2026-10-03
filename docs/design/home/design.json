@@ -2189,6 +2189,31 @@
       "path": "docs/design/home/briefs/HOME-037.json",
       "note": "the launch carries every profile field to Claude Code and our Codex build, or refuses it by name",
       "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-home/src/record/block_batch.rs",
+      "note": "HOME-038 R1: an act's blocks staged together and committed with a fixed flush count; the only file that names libc",
+      "brief": "HOME-038"
+    },
+    {
+      "path": "crates/lys-home/src/record/block_batch_tests.rs",
+      "note": "HOME-038 R1: the batch's counts, drop and racing-writer tests",
+      "brief": "HOME-038"
+    },
+    {
+      "path": "crates/lys-home/src/record/call/captured.rs",
+      "note": "touched by HOME-038 R2: captured parts go through the call's one batch",
+      "brief": "HOME-038"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/import/content.rs",
+      "note": "touched by HOME-038 R2: an imported entry's content blocks go through one batch",
+      "brief": "HOME-038"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/persist.rs",
+      "note": "touched by HOME-038 R2 and R3: the persist fallback uses a batch and the timing carries three counts",
+      "brief": "HOME-038"
     }
   ],
   "inventory": [

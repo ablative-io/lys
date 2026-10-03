@@ -218,3 +218,10 @@
 - [ ] **C192** — The settings file carries the permissions from the profile and the Tool policy (HOME-037 R5).
 - [ ] **C193** — A Codex launch renders for our declared Codex build (HOME-037 R6).
 - [ ] **C194** — Proof: a real seat's setup recorded, rendered and compared (HOME-037 R7).
+
+## A home act's blocks are one durable operation (HOME-038)
+
+- [ ] **C195** — A BlockBatch stages an act's new blocks unsynced, and its commit pushes every staged file, flushes the device once, renames every file to its hash name, syncs each touched shard directory once and flushes once more, in that order; a dropped batch places nothing; put and put_file exist only on the batch (HOME-038 R1).
+- [ ] **C196** — Every act that stores blocks (call ingest and its parts, harness events, import content, the given statement, templates, the proxy's persist fallback) puts them through one batch committed before the entry naming them is appended; a thirty-part call rises the device flushes by exactly two (HOME-038 R2).
+- [ ] **C197** — BlockStore::io() answers file pushes, directory syncs and device flushes as three counts a test reads, replacing syncs() and the capture timing's block_syncs (HOME-038 R3).
+- [ ] **C198** — BlockStore::get hashes what it read and refuses a block whose bytes do not hash to the name asked for as BlockDiffers naming both hashes, never repairing or removing it (HOME-038 R4).
