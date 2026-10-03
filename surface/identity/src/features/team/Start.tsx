@@ -69,7 +69,7 @@ export function Start({ entry, me, admin, changed, settings }: {
       const raw = sessionStorage.getItem(key);
       let current: Pending = raw === null
         ? profile.reviewed_by ? start(profile.version, computer) : review(profile.version, computer)
-        : pendingStartOf(JSON.parse(raw), key, prefix);
+        : pendingStartOf(JSON.parse(raw), prefix);
       for (;;) {
         if (current.stage === 'review' && !mayReview) throw new Error('NotAdmitted: The person it answers to or an administrator must approve its settings before it starts.');
         sessionStorage.setItem(key, JSON.stringify(current));
