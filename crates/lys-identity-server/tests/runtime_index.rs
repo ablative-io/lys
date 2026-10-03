@@ -64,6 +64,25 @@ fn poisoned(error: impl std::fmt::Display) -> StoreError {
     }
 }
 
+/// A pin the store admits after `held`: never backwards, and never a second
+/// root at the size already pinned.
+fn admits(held: PinnedRoot, pin: PinnedRoot) -> StoreResult<()> {
+    if pin.tree_size < held.tree_size {
+        return Err(StoreError::PinWentBackwards {
+            pinned: held.tree_size,
+            requested: pin.tree_size,
+        });
+    }
+    if pin.tree_size == held.tree_size && pin.root != held.root {
+        return Err(StoreError::PinRootChanged {
+            tree_size: pin.tree_size,
+            held: STANDARD.encode(held.root),
+            offered: STANDARD.encode(pin.root),
+        });
+    }
+    Ok(())
+}
+
 impl LeafStore for MemoryStore {
     fn origin(&self) -> &str {
         ORIGIN
@@ -80,25 +99,38 @@ impl LeafStore for MemoryStore {
             .and_then(|index| held.leaves.get(index).cloned()))
     }
 
-    fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        let mut held = self.lock()?;
-        let next = u64::try_from(held.leaves.len()).map_err(|error| StoreError::Io {
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
+        let overflow = |error: &dyn std::fmt::Display| StoreError::Io {
             context: "memory_store_extent_overflow".to_owned(),
-            source: std::io::Error::other(error),
-        })?;
+            source: std::io::Error::other(error.to_string()),
+        };
+        let mut held = self.lock()?;
+        let next = u64::try_from(held.leaves.len()).map_err(|error| overflow(&error))?;
         if index < next {
             return Err(StoreError::LeafAlreadyWritten { index });
         }
         if index > next {
             return Err(StoreError::LeafWouldLeaveGap { index, next });
         }
-        let following = next.checked_add(1).ok_or_else(|| StoreError::Io {
-            context: "memory_store_extent_overflow".to_owned(),
-            source: std::io::Error::other("one more leaf exceeds the store extent"),
-        })?;
-        held.leaves.push(bytes.to_vec());
+        let count = u64::try_from(leaves.len()).map_err(|error| overflow(&error))?;
+        let end = next
+            .checked_add(count)
+            .ok_or_else(|| overflow(&"the appended leaves exceed the store extent"))?;
+        if pin.tree_size != end {
+            return Err(StoreError::PinNotOfAppend {
+                end,
+                tree_size: pin.tree_size,
+            });
+        }
+        admits(held.pin, pin)?;
+        // One act under one lock: the leaves and their pin land together or
+        // not at all, the memory shape of the file store's one write and flush.
+        held.leaves
+            .extend(leaves.iter().map(|bytes| bytes.to_vec()));
+        held.pin = pin;
         drop(held);
-        self.extent = following;
+        self.extent = end;
+        self.pin = pin;
         Ok(())
     }
 
@@ -108,19 +140,7 @@ impl LeafStore for MemoryStore {
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         let mut held = self.lock()?;
-        if pin.tree_size < held.pin.tree_size {
-            return Err(StoreError::PinWentBackwards {
-                pinned: held.pin.tree_size,
-                requested: pin.tree_size,
-            });
-        }
-        if pin.tree_size == held.pin.tree_size && pin.root != held.pin.root {
-            return Err(StoreError::PinRootChanged {
-                tree_size: pin.tree_size,
-                held: STANDARD.encode(held.pin.root),
-                offered: STANDARD.encode(pin.root),
-            });
-        }
+        admits(held.pin, pin)?;
         held.pin = pin;
         drop(held);
         self.pin = pin;
