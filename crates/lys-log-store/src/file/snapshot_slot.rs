@@ -9,8 +9,7 @@ use std::path::Path;
 
 use crate::error::{StoreError, StoreResult};
 
-use super::leaves::fsync_dir;
-use super::write_durably;
+use super::{fsync_dir, write_durably};
 
 /// The slot's file name.
 const SNAPSHOT_FILE: &str = "snapshot.bin";
