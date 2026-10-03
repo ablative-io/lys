@@ -124,9 +124,17 @@ pub(super) async fn capture_whole(
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].status, status);
     assert!(calls[0].stream);
-    assert_eq!(calls[0].raw_response, Some(Hash::of(&sent).to_string()));
+    let hash_started = std::time::Instant::now();
+    let raw_hash = Hash::of(&sent);
+    if sent.len() >= 64 * 1024 * 1024 {
+        println!(
+            "fixture_hash_nanoseconds={}",
+            hash_started.elapsed().as_nanos()
+        );
+    }
+    assert_eq!(calls[0].raw_response, Some(raw_hash.to_string()));
     let blocks = harness.home()?.blocks()?;
-    assert_eq!(blocks.get(&Hash::of(&sent))?, &*sent);
+    assert_eq!(blocks.get(&raw_hash)?, &*sent);
     if status == CallStatus::Complete {
         assert_eq!(calls[0].response.len(), 1);
         let part = blocks.get(&Hash::parse(&calls[0].response[0])?)?;
