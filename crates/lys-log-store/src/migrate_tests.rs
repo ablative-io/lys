@@ -16,7 +16,10 @@ use crate::frontier::Frontier;
 use crate::migrate::{kept_name, migrate_v1};
 use crate::store::{LeafStore, PinnedRoot};
 
-type Outcome = Result<(), Box<dyn std::error::Error>>;
+type Fallible<T> = Result<T, Box<dyn std::error::Error>>;
+type Outcome = Fallible<()>;
+/// A directory's files by relative name and bytes, sorted.
+type Listing = Vec<(String, Vec<u8>)>;
 
 const ORIGIN: &str = "example.com/lys/migrate-test";
 
@@ -28,7 +31,7 @@ fn v1_fixture(
     leaves: &[&[u8]],
     pinned: usize,
     snapshot: Option<&[u8]>,
-) -> Result<PinnedRoot, Box<dyn std::error::Error>> {
+) -> Fallible<PinnedRoot> {
     std::fs::create_dir_all(dir.join("leaves"))?;
     std::fs::write(
         dir.join("log.json"),
@@ -56,7 +59,7 @@ fn v1_fixture(
     Ok(pin)
 }
 
-fn listing(dir: &Path) -> Result<Vec<(String, Vec<u8>)>, Box<dyn std::error::Error>> {
+fn listing(dir: &Path) -> Fallible<Listing> {
     let mut entries = Vec::new();
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
@@ -190,9 +193,7 @@ const LEAVES: [&[u8]; 5] = [b"one", b"two", b"three", b"four", b"five"];
 /// nothing at the store's path. Built from a real migration of a v1 fixture
 /// at `dir`, stopped by moving the finished store back to the copy's name.
 /// Answers the v1 pin and the kept directory's listing.
-fn between_the_renames(
-    dir: &Path,
-) -> Result<(PinnedRoot, Vec<(String, Vec<u8>)>), Box<dyn std::error::Error>> {
+fn between_the_renames(dir: &Path) -> Fallible<(PinnedRoot, Listing)> {
     let pin = v1_fixture(dir, &LEAVES, 5, Some(b"snapshot bytes"))?;
     let before = listing(dir)?;
     migrate_v1(dir)?.ok_or("nothing migrated")?;

@@ -343,9 +343,7 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted() {
     // Kill once real acts have landed and another is in flight. A writer
     // that exits on its own is named; a slow one is waited for.
     loop {
-        let len = std::fs::metadata(&segment)
-            .map(|meta| meta.len())
-            .unwrap_or(0);
+        let len = std::fs::metadata(&segment).map_or(0, |meta| meta.len());
         if len > 12 * 1024 * 1024 {
             break;
         }
