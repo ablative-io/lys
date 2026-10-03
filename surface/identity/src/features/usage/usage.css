@@ -19,11 +19,12 @@
 .usage-table td input:not([type=checkbox]), .usage-table td select, .usage-table td textarea { width: 100%; }
 .usage-table td form { display: block; margin: 0; }
 .usage-table .usage-add { padding: 8px 0 0; border-bottom: 0; }
-.usage .usage-add-row { display: grid; gap: 0; align-items: start; margin: 0; }
-.usage .usage-add-row > * { margin: 0 10px; min-width: 0; }
-.usage .usage-add-row > [role="status"], .usage .usage-add-row > [role="alert"], .usage .usage-add-row > p { grid-column: 1 / -1; }
-.usage .usage-add-row select, .usage .usage-add-row input, .usage .usage-add-row textarea { width: 100%; }
+.usage-add-row { display: grid; gap: 0; align-items: start; margin: 0; }
+.usage-add-row > * { margin: 0 10px; min-width: 0; }
+.usage-add-row > [role="status"], .usage-add-row > [role="alert"], .usage-add-row > p { grid-column: 1 / -1; }
+.usage-add-row select, .usage-add-row input, .usage-add-row textarea { width: 100%; }
 .usage form.usage-edit { display: block; margin: 0; }
 .usage-amount { display: flex; align-items: center; gap: 8px; }
 .usage-amount > * { flex: 1 1 0; min-width: 0; }
 .usage-table label.tick { margin: 0 0 6px; }
+.usage-add-row input[type=checkbox] { width: auto; }

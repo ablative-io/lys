@@ -19,21 +19,38 @@ function held(key: string, id: string): Action | null {
   if (value.path.startsWith(prefix) && value.path.endsWith('/confirm')) return { act: 'confirmed', member: decodeURIComponent(value.path.slice(prefix.length, -'/confirm'.length)) };
   throw new Error('The retained team change names an unexpected route. Resolve its outcome before another change.');
 }
-export function TeamActions({ team, person, login, members, administrator, changed }: { team: Team; person: string; login: Login; members: Member[]; administrator: boolean; changed: (answer: TeamChanged, message: string) => void }) {
+/** A team's members as a table: remove on each row, add as the last row. One change is confirmed at a time, above the table. */
+export function TeamMembers({ team, person, login, members, name, administrator, manages, changed }: { team: Team; person: string; login: Login; members: Member[]; name: (id: string) => string; administrator: boolean; manages: boolean; changed: (answer: TeamChanged, message: string) => void }) {
   const key = 'lys.pending.team.' + person + '.' + team.id;
-  const [initial] = useState(() => { try { return { action: held(key, team.id), error: '' }; } catch (error) { return { action: null, error: String(error) }; } });
+  const [initial] = useState(() => { try { return { action: manages ? held(key, team.id) : null, error: '' }; } catch (error) { return { action: null, error: String(error) }; } });
   const [action, setAction] = useState<Action | null>(initial.action);
   const [member, setMember] = useState('');
-  const label = (id: string) => members.find((entry) => entry.id === id)?.display_name ?? 'Name unavailable';
-  if (initial.error) return <p role="alert">{initial.error}</p>;
-  if (action) return <Act team={team} login={login} action={action} memberName={action.member ? label(action.member) : null} storageKey={key} changed={changed} cancel={() => setAction(null)} />;
-  if (team.state === 'retired') return null;
-  return <><label className="field">Add a member<select value={member} onChange={(event) => setMember(event.target.value)}><option value="">Choose a person or agent</option>{members.filter((entry) => entry.state !== 'retired' && !team.members.includes(entry.id)).map((entry) => <option key={entry.id} value={entry.id}>{entry.display_name}</option>)}</select></label>
-    <button className="btn" disabled={!member} onClick={() => setAction({ act: 'added', member })}>Add member</button>
-    {team.members.map((id) => <button className="btn" key={id} onClick={() => setAction({ act: 'removed', member: id })}>Remove {label(id)}</button>)}
-    {administrator ? (team.held ?? []).map((held) => <button className="btn" key={'confirm:' + held.member} onClick={() => setAction({ act: 'confirmed', member: held.member })}>Allow {label(held.member)} to take part</button>) : null}
-    <button className="btn danger" onClick={() => setAction({ act: 'retired', member: null })}>Retire team</button>
-  </>;
+  const open = manages && team.state !== 'retired' && !action && !initial.error;
+  return <section className="card" aria-label="Members"><h3>Members <span className="sec">{team.members.length.toLocaleString('en-AU')}</span></h3>
+    {initial.error ? <p role="alert">{initial.error}</p> : null}
+    {action ? <Act team={team} login={login} action={action} memberName={action.member ? name(action.member) : null} storageKey={key} changed={changed} cancel={() => setAction(null)} /> : null}
+    <table className="usage-table"><thead><tr><th>Member</th><th>Takes part</th>{manages ? <th>Change</th> : null}</tr></thead>
+      <tbody>
+        {team.members.map((id) => {
+          const waiting = team.held?.find((each) => each.member === id);
+          return <tr key={id} aria-label={'Member ' + name(id)}>
+            <td><a href={'#/file/' + id}>{name(id)}</a></td>
+            <td>{waiting ? <span className="why-not">Awaiting administrator confirmation. Team reminders and budget actions do not include this member. {waiting.reason}</span> : 'Yes'}</td>
+            {manages ? <td>{open ? <>
+              <button className="btn" type="button" aria-label={'Remove ' + name(id)} onClick={() => setAction({ act: 'removed', member: id })}>Remove</button>
+              {administrator && waiting ? <button className="btn" type="button" aria-label={'Allow ' + name(id) + ' to take part'} onClick={() => setAction({ act: 'confirmed', member: id })}>Allow to take part</button> : null}
+            </> : null}</td> : null}
+          </tr>;
+        })}
+        {team.members.length ? null : <tr><td colSpan={manages ? 3 : 2} className="dim">No members yet.</td></tr>}
+      </tbody>
+      {open ? <tfoot><tr><td colSpan={3} className="usage-add"><div className="usage-add-row" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }}>
+        <select name="member" aria-label="Add a member" value={member} onChange={(event) => setMember(event.target.value)}><option value="">Choose a person or agent</option>{members.filter((entry) => entry.state !== 'retired' && !team.members.includes(entry.id)).map((entry) => <option key={entry.id} value={entry.id}>{entry.display_name}</option>)}</select>
+        <span><button className="btn" type="button" disabled={!member} onClick={() => setAction({ act: 'added', member })}>Add member</button></span>
+      </div></td></tr></tfoot> : null}
+    </table>
+    {open ? <p><button className="btn danger" type="button" onClick={() => setAction({ act: 'retired', member: null })}>Retire team</button></p> : null}
+  </section>;
 }
 function Act({ team, login, action, memberName, storageKey, changed, cancel }: { team: Team; login: Login; action: Action; memberName: string | null; storageKey: string; changed: (answer: TeamChanged, message: string) => void; cancel: () => void }) {
   const change = useRoleChange<TeamChanged>(storageKey, pathOf(team.id, action), (answer, body) => answer.id === team.id && answer.recorded?.operation === body.operation && answer.recorded.act === action.act && answer.recorded.member === action.member && sameLogin(answer.recorded.by, login), (answer) => changed(answer, 'Your team change was recorded. The list shows the team returned with that change.'));

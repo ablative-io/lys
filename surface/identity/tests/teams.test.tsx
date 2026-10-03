@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { $, choose, click, mount, settle, text, unmountAll } from './harness';
 import type { Route } from './fixtures';
 import { ADA, ME, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { budgetsView } from './budget-fixtures';
 const team = { id: 'op-' + 'a'.repeat(32), name: 'Delivery', owner: ADA, description: 'Ship work', members: [SCRIBE], state: 'active', created_by: ME.signed_in, created_at: 1790000000, retired_at: null };
-const routes = { ...SERVICE, '/teams': ok({ teams: [team] }) };
+const routes = { ...SERVICE, '/teams': ok({ teams: [team] }), ['/budgets/team/' + team.id]: ok(budgetsView({ kind: 'team', id: team.id })), ['/teams/' + team.id + '/goals']: ok({ goals: [] }) };
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
 const receipt = (body: unknown, act: string, member: string | null, current = team) => ok({ ...current, recorded: { operation: (body as Record<string, unknown>).operation, act, member, by: ME.signed_in, at: 1790000000 } });
 async function open(extra: Record<string, Route> = routes) { const mounted = await mount('#/people', extra); await click($('[data-kind="teams"]')); return mounted; }
@@ -20,12 +21,12 @@ describe('Teams', () => {
   });
   it('confirms membership changes and records only the selected person', async () => {
     const path = '/teams/' + team.id + '/members'; const { posted } = await open({ ...routes, ['POST ' + path]: (body) => receipt(body, 'added', ADA) });
-    posted.length = 0; await choose($('select'), ADA); await click(button('Add member')); expect(posted).toEqual([]); await click(button('Confirm add member'));
+    posted.length = 0; await choose($('select[name="member"]'), ADA); await click(button('Add member')); expect(posted).toEqual([]); await click(button('Confirm add member'));
     expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-/), member: ADA } }]); expect(text()).toContain('Your team change was recorded');
   });
   it('recovers a removed member receipt after the member no longer appears', async () => {
     const path = '/teams/' + team.id + '/members/' + SCRIBE + '/remove'; const first = await open({ ...routes, ['POST ' + path]: refused(503, 'TeamsUnavailable', 'Unknown outcome') });
-    first.posted.length = 0; await click(button('Remove Scribe')); await click(button('Confirm remove member')); unmountAll(); document.body.innerHTML = '';
+    first.posted.length = 0; await click($('button[aria-label="Remove Scribe"]')); await click(button('Confirm remove member')); unmountAll(); document.body.innerHTML = '';
     const changed = { ...team, members: [] }; const later = await open({ ...routes, '/teams': ok({ teams: [changed] }), ['POST ' + path]: (body) => receipt(body, 'removed', SCRIBE, changed) });
     later.posted.length = 0; await click(button('Check whether Lys saved it')); expect(later.posted).toEqual(first.posted); expect(text()).toContain('Your team change was recorded');
   });
@@ -33,7 +34,7 @@ describe('Teams', () => {
     const path = '/teams/' + team.id + '/retire'; await open({ ...routes, ['POST ' + path]: (body) => receipt(body, 'removed', SCRIBE) }); await click(button('Retire team')); await click(button('Confirm retire team')); expect(text()).toContain('original request is retained'); expect(sessionStorage.length).toBe(1);
   });
   it('accepts an original add receipt even after the member was removed later', async () => {
-    const path = '/teams/' + team.id + '/members'; await open({ ...routes, ['POST ' + path]: (body) => receipt(body, 'added', ADA, { ...team, members: [] }) }); await choose($('select'), ADA); await click(button('Add member')); await click(button('Confirm add member')); expect(text()).toContain('Your team change was recorded');
+    const path = '/teams/' + team.id + '/members'; await open({ ...routes, ['POST ' + path]: (body) => receipt(body, 'added', ADA, { ...team, members: [] }) }); await choose($('select[name="member"]'), ADA); await click(button('Add member')); await click(button('Confirm add member')); expect(text()).toContain('Your team change was recorded');
   });
   it('names an unavailable team store instead of claiming it is empty', async () => {
     await open({ ...routes, '/teams': refused(503, 'TeamsUnavailable', 'No team store') }); expect(text()).toContain('TeamsUnavailable'); expect(text()).not.toContain('No teams have been recorded');
@@ -45,7 +46,7 @@ describe('Teams', () => {
     expect(text()).toContain('Awaiting administrator confirmation');
     expect(text()).toContain('The earlier addition was not authorized.');
     posted.length = 0;
-    await click(button('Allow Scribe to take part'));
+    await click($('button[aria-label="Allow Scribe to take part"]'));
     expect(posted).toEqual([]);
     expect(text()).toContain('Allow Scribe to take part in Delivery?');
     expect($('section[aria-label="Confirm team change"]')?.textContent).not.toContain(SCRIBE);

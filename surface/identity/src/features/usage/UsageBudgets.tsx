@@ -1,4 +1,4 @@
-/** An agent's budgets with where each stands, and the form that sets one. */
+/** An agent's or a team's budgets with where each stands, and the form that sets one. */
 import { useRef, useState } from 'react';
 import { Refused, request } from '../../api';
 import { ACTS, kept, shown, standing } from './contract';
@@ -6,9 +6,9 @@ import type { BudgetsView, BudgetBody, BudgetAct, Length, Measure, Receipt } fro
 import { PERIODS, confirmsBudget, validAmount } from './budgetForm';
 import { PERIOD_WORDS, UNITS, limitWords, summary, usedWords } from './budgetWords';
 
-type Props = { agent: string; budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void };
+type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void };
 
-export function UsageBudgets({ agent, budgets, receipts, changed }: Props) {
+export function UsageBudgets({ budgets, receipts, changed }: Props) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState('');
   const [done, setDone] = useState(false);
@@ -19,7 +19,7 @@ export function UsageBudgets({ agent, budgets, receipts, changed }: Props) {
     if (working.current || locked.current) return;
     working.current = true; setBusy(true); setFailure('');
     try {
-      const answer = await request<unknown>('/budgets/agent/' + encodeURIComponent(agent), body, 'PUT');
+      const answer = await request<unknown>('/budgets/' + budgets.holder.kind + '/' + encodeURIComponent(budgets.holder.id), body, 'PUT');
       if (!confirmsBudget(answer, body, budgets.holder)) throw new Error('BudgetAnswerUnconfirmed: the answer did not confirm every limit and its version. Reload the saved budget before another change.');
       locked.current = true; setDone(true); changed('Budget kept as version ' + (body.version + 1) + '.');
     } catch (error) {
@@ -80,7 +80,7 @@ function EditBudgets({ budgets, receipts, busy, save }: FormProps & { receipts: 
             <td><button className="btn" type="button" disabled={busy} aria-label={'Remove ' + limitWords(limit)} onClick={() => remove(index)}>Remove</button></td>
           </tr>;
         })}
-        {budgets.limits.length ? null : <tr><td colSpan={5} className="dim">No budget is set for this agent.</td></tr>}
+        {budgets.limits.length ? null : <tr><td colSpan={5} className="dim">No budget is set for this {budgets.holder.kind}.</td></tr>}
       </tbody>
       {budgets.limits.length ? <tfoot><tr>
         <td colSpan={3}><div className="usage-amount"><span id="warn-at-words">Warn me at this % of a limit (leave blank for no warning)</span>

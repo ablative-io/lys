@@ -1,5 +1,5 @@
 import { readTogether } from '../../reads';
-/** Plain controls for an agent's budgets and goals, on its own file; graphs and analytics stay with the monitoring app. */
+/** Plain controls for an agent's budgets and goals on its own file, and a team's on the Teams page; graphs and analytics stay with the monitoring app. */
 import { useState } from 'react';
 import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
@@ -23,8 +23,24 @@ export function AgentUsage({ agent }: { agent: string }) {
     const tracked = tracking(usage);
     return <>
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
-      <UsageBudgets agent={agent} budgets={budgets} receipts={usage.receipts} changed={changed} />
+      <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
     </>;
   }} /></>;
+}
+
+/** A team's limits and goals: the same two tables as an agent's. A team's use is read with its limits. */
+export function TeamUsage({ team }: { team: string }) {
+  const [revision, setRevision] = useState(0);
+  const [notice, setNotice] = useState('');
+  const path = encodeURIComponent(team);
+  const load = useLoad(() => readTogether({
+    budgets: request<BudgetsView>('/budgets/team/' + path),
+    goals: request<GoalsView>('/teams/' + path + '/goals'),
+  }), 'team-usage:' + team + ':' + revision);
+  const changed = (words: string) => { setNotice(words); setRevision((value) => value + 1); };
+  return <div className="usage">{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Team limits and goals" ok={({ budgets, goals }) => <>
+    <UsageBudgets budgets={budgets} receipts={[]} changed={changed} />
+    <UsageGoals agent={team} kind="team" goals={goals.goals} changed={changed} />
+  </>} /></div>;
 }

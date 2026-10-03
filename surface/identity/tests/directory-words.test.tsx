@@ -67,7 +67,7 @@ describe('Directory words and write answers', () => {
     await click('Create team');
     expect(world.posted).toHaveLength(1);
     expect(world.requests.filter((path) => path === '/teams')).toHaveLength(1);
-    expect(document.querySelectorAll('.team-tree [data-team]').length).toBe(2);
+    expect(document.querySelectorAll('.teams-table [data-team]').length).toBe(2);
     expect(visibleWords()).toContain('Reviewers');
     expect(visibleWords()).not.toContain(ADA);
   });

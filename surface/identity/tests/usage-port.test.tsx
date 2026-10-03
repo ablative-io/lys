@@ -71,7 +71,7 @@ describe('Usage port', () => {
     const posted: { path: string; body: unknown }[] = [];
     const changed = vi.fn();
     serve({ ['PUT ' + path]: (body) => ok({ ...view, ...body as BudgetBody, version: 8 }) }, posted);
-    await render(<UsageBudgets agent={SCRIBE} budgets={view} receipts={[]} changed={changed} />);
+    await render(<UsageBudgets budgets={view} receipts={[]} changed={changed} />);
     expect(element<HTMLInputElement>(edit + ' input[name="amount-0"]').value).toBe('12.5');
     expect(element<HTMLInputElement>(edit + ' input[name="amount-1"]').value).toBe('2');
     await input(edit + ' input[name="amount-0"]', '25.75');
@@ -84,7 +84,7 @@ describe('Usage port', () => {
   it('keeps a version refusal visible without confirming a budget edit', async () => {
     const changed = vi.fn();
     serve({ ['PUT ' + path]: refused(409, 'BudgetVersionConflict', 'The limits changed elsewhere') });
-    await render(<UsageBudgets agent={SCRIBE} budgets={budgetsView(holder, [], { limits: [{ unit: 'tokens', amount: 500, period: 'week', act: 'stop' }] })} receipts={[]} changed={changed} />);
+    await render(<UsageBudgets budgets={budgetsView(holder, [], { limits: [{ unit: 'tokens', amount: 500, period: 'week', act: 'stop' }] })} receipts={[]} changed={changed} />);
     await input(edit + ' input[name="amount-0"]', '600');
     await click(edit + ' button[type="submit"]');
     expect(document.body.textContent).toContain('BudgetVersionConflict');
@@ -97,7 +97,7 @@ describe('Usage port', () => {
     const posted: { path: string; body: unknown }[] = [];
     const changed = vi.fn();
     serve({ ['PUT ' + path]: (body) => ok({ ...view, ...body as BudgetBody, version: 8 }) }, posted);
-    await render(<UsageBudgets agent={SCRIBE} budgets={view} receipts={[]} changed={changed} />);
+    await render(<UsageBudgets budgets={view} receipts={[]} changed={changed} />);
     await choose(edit + ' select[name="act-0"]', 'notice');
     await input(edit + ' input[name="warn_at"]', '70');
     await click(edit + ' button[type="submit"]');
@@ -109,7 +109,7 @@ describe('Usage port', () => {
     const changed = vi.fn();
     const view = budgetsView(holder, [], { limits: [{ unit: 'tokens', amount: 500, period: 'week', act: 'stop' }], version: 7 });
     serve({ ['PUT ' + path]: ok({ ...view, limits: [{ ...view.limits[0], amount: 600, act: 'tell' }], version: 8 }) });
-    await render(<UsageBudgets agent={SCRIBE} budgets={view} receipts={[]} changed={changed} />);
+    await render(<UsageBudgets budgets={view} receipts={[]} changed={changed} />);
     await input(edit + ' input[name="amount-0"]', '600');
     await click(edit + ' button[type="submit"]');
     expect(changed).not.toHaveBeenCalled();
@@ -121,7 +121,7 @@ describe('Usage port', () => {
   it('refuses an empty or negative edited amount before sending a request', async () => {
     const posted: { path: string; body: unknown }[] = [];
     serve({}, posted);
-    await render(<UsageBudgets agent={SCRIBE} budgets={budgetsView(holder, [], { limits: [{ unit: 'tokens', amount: 500, period: 'week', act: 'tell' }] })} receipts={[]} changed={vi.fn()} />);
+    await render(<UsageBudgets budgets={budgetsView(holder, [], { limits: [{ unit: 'tokens', amount: 500, period: 'week', act: 'tell' }] })} receipts={[]} changed={vi.fn()} />);
     for (const value of ['', '-1', '0.5', '9007199254740992']) {
       await input(edit + ' input[name="amount-0"]', value);
       expect(element<HTMLButtonElement>(edit + ' button[type="submit"]').disabled).toBe(true);
@@ -134,7 +134,7 @@ describe('Usage port', () => {
     const posted: { path: string; body: unknown }[] = [];
     const changed = vi.fn();
     serve({ ['PUT ' + path]: (body) => ok({ ...view, ...body as BudgetBody, version: 1 }) }, posted);
-    await render(<UsageBudgets agent={SCRIBE} budgets={view} receipts={[]} changed={changed} />);
+    await render(<UsageBudgets budgets={view} receipts={[]} changed={changed} />);
     const form = 'form[aria-label="Set a budget"]';
     await choose(form + ' select', 'plan_percent');
     expect(Array.from(document.querySelectorAll<HTMLSelectElement>(form + ' select'))[1].value).toBe('five_hour');

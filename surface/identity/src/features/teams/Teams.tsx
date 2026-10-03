@@ -7,7 +7,8 @@ import { DirectoryGate as Gate } from '../people/Words';
 import { useRoleChange } from '../roles/useRoleChange';
 import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
 import { entries } from '../people/directory';
-import { TeamActions } from './TeamActions';
+import { TeamMembers } from './TeamActions';
+import { TeamUsage } from '../usage/Usage';
 import { sameLogin } from './contract';
 import type { Team, TeamChanged } from './contract';
 import type { MeView, PeopleView } from '../../generated';
@@ -45,6 +46,7 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
   };
   const members = entries(people);
   const name = (id: string) => members.find((entry) => entry.id === id)?.display_name ?? 'someone outside your view';
+  const manages = (each: Team) => each.owner === me.person.id || people.scope === 'directory';
   const needle = query.trim().toLowerCase();
   const order = [...treeOrder(teams), ...teams.filter((team) => team.state === 'retired').map((team) => ({ team, depth: 0 }))];
   const shown = order.filter(({ team }) => !needle || team.name.toLowerCase().includes(needle));
@@ -55,31 +57,50 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
       <button className="btn primary" onClick={() => { setCreating(true); setNotice(''); }}>+ Create a team</button>
       {notice ? <span role="status" className="note">{notice}</span> : null}
     </div>
-    <div className="body work">
+    <div className="body halves">
       <div className="pane">
-        <table className="team-tree">
-          <thead><tr><th>Team</th><th>Lead</th><th>Holds</th></tr></thead>
-          <tbody>{shown.map(({ team: each, depth }) => <tr key={each.id} data-team={each.id} data-depth={depth} className={each.id === team?.id && !creating ? 'cursor' : ''} tabIndex={0}
-            onClick={() => { setPicked(each.id); setCreating(false); }} onKeyDown={(event) => { if (event.key === 'Enter') { setPicked(each.id); setCreating(false); } }}>
-            <td style={{ paddingLeft: 10 + depth * 18 }}>{each.name}{each.state === 'retired' ? <span className="note"> retired</span> : null}</td>
-            <td className="sec">{each.lead ? name(each.lead) : <span className="dim">none named</span>}</td>
-            <td className="sec">{size(teams, each.id, people)}</td>
-          </tr>)}</tbody>
+        <table className="teams-table usage-table">
+          <thead><tr><th>Team</th><th>Part of</th><th>Lead</th><th>Holds</th><th>Change</th></tr></thead>
+          <tbody>{shown.map(({ team: each, depth }) => <TeamRow key={each.id + ':' + revision} team={each} depth={depth} teams={teams} current={each.id === team?.id && !creating} manages={manages(each)} person={me.person.id} login={me.signed_in}
+            name={name} holds={size(teams, each.id, people)} pick={() => { setPicked(each.id); setCreating(false); }} changed={changed} />)}</tbody>
         </table>
         {teams.length ? null : <p className="dim">No teams yet. A team is how Lys groups people and their agents: create the first one.</p>}
       </div>
-      <div className="detail">
-        {creating ? <Create key={revision} person={me.person.id} login={me.signed_in} changed={changed} /> : team ? <section className="card" key={team.id}>
-          <h2>{team.name}</h2>
-          {team.description ? <p className="sec">{team.description}</p> : null}
-          <p>{team.parent ? <>Part of {teams.find((each) => each.id === team.parent)?.name ?? 'a team outside your view'}. </> : null}{team.lead ? <>Led by <a href={'#/file/' + team.lead}>{name(team.lead)}</a>. </> : null}Managed by <a href={'#/file/' + team.owner}>{name(team.owner)}</a>.</p>
-          <div className="section-h">Members <span>{team.members.length.toLocaleString('en-AU')}</span></div>
-          {team.members.length ? <ul className="plain">{team.members.map((id) => <li key={id}><a href={'#/file/' + id}>{name(id)}</a>{team.held?.find((held) => held.member === id) ? <p className="why-not">Awaiting administrator confirmation. Team reminders and budget actions do not include this member. {team.held.find((held) => held.member === id)?.reason}</p> : null}</li>)}</ul> : <p className="dim">No members yet.</p>}
-          {team.owner === me.person.id || people.scope === 'directory' ? <TeamActions key={team.id + ':' + revision} team={team} person={me.person.id} login={me.signed_in} members={members} administrator={people.scope === 'directory'} changed={changed} /> : null}
-        </section> : null}
+      <div className="pane">
+        {creating ? <Create key={revision} person={me.person.id} login={me.signed_in} changed={changed} /> : team ? <div key={team.id}>
+          <section className="card"><h2>{team.name}</h2>
+            {team.description ? <p className="sec">{team.description}</p> : null}
+            <p>Managed by <a href={'#/file/' + team.owner}>{name(team.owner)}</a>.</p>
+          </section>
+          <TeamMembers key={team.id + ':' + revision} team={team} person={me.person.id} login={me.signed_in} members={members} name={name} administrator={people.scope === 'directory'} manages={manages(team)} changed={changed} />
+          <TeamUsage team={team.id} />
+        </div> : null}
       </div>
     </div>
   </>;
+}
+
+/** One team as a row. Whoever manages it sets the team it is part of and its lead here; both are kept by one change. */
+function TeamRow({ team, depth, teams, current, manages, person, login, name, holds, pick, changed }: { team: Team; depth: number; teams: Team[]; current: boolean; manages: boolean; person: string; login: Login; name: (id: string) => string; holds: string; pick: () => void; changed: (answer: TeamChanged, message: string) => void }) {
+  const [parent, setParent] = useState(team.parent ?? '');
+  const [lead, setLead] = useState(team.lead ?? '');
+  const change = useRoleChange<TeamChanged>('lys.pending.team-nest.' + person + '.' + team.id, '/teams/' + encodeURIComponent(team.id) + '/nesting',
+    (answer, body) => answer.id === team.id && (answer.parent ?? null) === body.parent && (answer.lead ?? null) === body.lead && answer.recorded?.operation === body.operation && answer.recorded.act === 'nested' && sameLogin(answer.recorded.by, login),
+    (answer) => changed(answer, 'The team’s place was recorded.'));
+  const below = subtree(teams, team.id);
+  const parents = teams.filter((each) => each.state === 'active' && !below.has(each.id) && each.id !== team.id);
+  const leads = [...new Set([...team.members.filter((id) => !team.held?.some((each) => each.member === id)), ...(team.lead ? [team.lead] : [])])];
+  const edits = manages && team.state === 'active';
+  const dirty = parent !== (team.parent ?? '') || lead !== (team.lead ?? '');
+  return <tr data-team={team.id} data-depth={depth} className={current ? 'cursor' : ''} tabIndex={0} onClick={pick} onKeyDown={(event) => { if (event.key === 'Enter' && event.target === event.currentTarget) pick(); }}>
+    <td style={{ paddingLeft: 10 + depth * 18 }}>{team.name}{team.state === 'retired' ? <span className="note"> retired</span> : null}</td>
+    <td className="sec">{edits ? <select aria-label={'Team that ' + team.name + ' is part of'} value={parent} disabled={change.blocked} onChange={(event) => setParent(event.target.value)}><option value="">No team above it</option>{parents.map((each) => <option key={each.id} value={each.id}>{each.name}</option>)}</select>
+      : team.parent ? teams.find((each) => each.id === team.parent)?.name ?? 'a team outside your view' : <span className="dim">none</span>}</td>
+    <td className="sec">{edits ? <select aria-label={'Lead of ' + team.name} value={lead} disabled={change.blocked} onChange={(event) => setLead(event.target.value)}><option value="">None named</option>{leads.map((id) => <option key={id} value={id}>{name(id)}</option>)}</select>
+      : team.lead ? name(team.lead) : <span className="dim">none named</span>}</td>
+    <td className="sec">{holds}</td>
+    <td>{edits && (dirty || change.pending) ? <button className="btn" type="button" disabled={change.blocked || !dirty} onClick={(event) => { event.stopPropagation(); change.submit({ operation: operationId(), parent: parent || null, lead: lead || null }); }}>Save place</button> : null}<ChangeStatus change={change} /></td>
+  </tr>;
 }
 function Create({ person, login, changed }: { person: string; login: Login; changed: (answer: TeamChanged, message: string) => void }) {
   const [name, setName] = useState(''); const [description, setDescription] = useState('');
