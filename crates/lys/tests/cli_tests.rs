@@ -127,9 +127,12 @@ fn init_test_log(dir: &Path) -> std::path::PathBuf {
     log_dir
 }
 
-/// The number of leaves in the test log at `log_dir`.
+/// The number of leaves in the test log at `log_dir`, read through the store
+/// itself: the layout under the directory is the store's own.
 fn log_leaf_count(log_dir: &Path) -> usize {
-    std::fs::read_dir(log_dir.join("leaves")).unwrap().count()
+    use lys_log_store::LeafStore;
+    let store = lys_log_store::FileLeafStore::open_read_only(log_dir).unwrap();
+    usize::try_from(store.extent()).unwrap()
 }
 
 /// Generate an issuer key and issue a certificate with the standard claims,
