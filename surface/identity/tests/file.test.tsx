@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable, unmountAll } from './harness';
 import { ADA, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 
+/** What an agent's Overview reads for its run: its settings, the computers and the offered choices. */
+const RUN = {
+  ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE, profile: null, versions: [], enforced: false }),
+  '/network': ok({ machines: [], reports_served: true }), '/harnesses': ok({ programs: [] }), '/skills': ok({ skills: [] }), '/secrets': ok({ secrets: [] }),
+};
+
 describe("An agent's file", () => {
   it('shows its person, state and registration from the service', async () => {
     const { requests } = await mount('#/file/' + SCRIBE);
@@ -18,7 +24,7 @@ describe("An agent's file", () => {
   });
 
   it('starts from its own Overview, keeps lifecycle controls in the head, in view, and preserves Emergency stop', async () => {
-    await mount('#/file/' + SCRIBE);
+    await mount('#/file/' + SCRIBE, { ...SERVICE, ...RUN });
     expect($('nav[aria-label="Next steps"]')).toBeNull();
     expect($('section[aria-label="Run"]')?.textContent).toContain('Scribe is not running.');
     expect($('a[href^="#/team"]')).toBeNull();
@@ -118,7 +124,7 @@ describe("An agent's file", () => {
   });
 
   it('offers a registered identity only activation, since the directory retires only an active or suspended one', async () => {
-    await mount('#/file/' + COURIER);
+    await mount('#/file/' + COURIER, { ...SERVICE, ...RUN, ['/directory/agents/' + COURIER]: ok({ ...SCRIBE_VIEW, id: COURIER, display_name: 'Courier', state: 'registered' }), ['/agents/' + COURIER + '/provisioning']: ok({ agent: COURIER, profile: null, versions: [], enforced: false }), ['/agents/' + COURIER + '/runtime/sessions']: ok({ sessions: [] }) });
     expect($$('.file .head button[data-act]').map((button) => button.getAttribute('data-act')).filter((act) => ['activate', 'suspend', 'retire', 'reinstate'].includes(act ?? ''))).toEqual(['activate']);
   });
 

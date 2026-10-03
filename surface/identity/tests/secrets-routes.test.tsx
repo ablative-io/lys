@@ -27,7 +27,7 @@ describe('Secrets routes', () => {
     const { posted } = await mount('#/secrets/entries?secret=Calendar', routes);
     expect(document.querySelectorAll('section[aria-label="Controls of Calendar"] form')).toHaveLength(2);
     expect(posted).toHaveLength(0);
-    expect(text()).toContain('Only its owner');
+    expect(text()).toContain('owner can change this');
     expect(text()).toContain('Who it can be handed to');
     expect(text()).toContain('the team Operations');
     expect(text()).not.toContain('never-render-secret-value');

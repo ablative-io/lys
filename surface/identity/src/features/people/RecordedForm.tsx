@@ -94,11 +94,9 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     busy.current = true;
     setFailure('');
     try {
-      const result = await sendKept(key, pending, async () => {
-        const given = await request<unknown>(pending.path, { ...pending.body, operation: pending.operation });
-        confirmReceipt(given, pending.operation, pending.path);
-        return given;
-      }, false);
+      const result = await request<unknown>(pending.path, { ...pending.body, operation: pending.operation });
+      confirmReceipt(result, pending.operation, pending.path);
+      sessionStorage.removeItem(key);
       setPending(null);
       setAnswer(JSON.stringify(result, null, 2));
       setMessage(success?.(pending) ?? 'Change recorded.');

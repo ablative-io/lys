@@ -14,7 +14,7 @@
  * the API are the same record, and an uploaded schema opens here to edit.
  */
 import { useEffect, useState } from 'react';
-import { API, Refused, operationId, send } from '../../api';
+import { Refused, operationId, send } from '../../api';
 import { SchemaBench } from './SchemaBench';
 import './schema-builder.css';
 

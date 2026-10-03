@@ -38,6 +38,6 @@ export function StopReceipt({ answer }: { answer: StopAnswer }) {
     {answer.credentials_ended !== null ? <p>Credentials ended at the credential service: {answer.credentials_ended.length}.</p> : <div className="why-not" role="alert"><p>The credential service did not confirm that credentials ended. Open the Credentials tab and end them after the service answers.</p><p><small className="refusal-name">{answer.credentials_refused}</small></p></div>}
     <p>Sessions asked to end: {answer.sessions_asked.length}. Confirmed stopped by their runtime: {confirmed.length}. Other sessions remain unconfirmed; open the Sessions tab to read their reports.</p>
     {refused.length ? <p role="alert">A runtime could not complete {refused.length} end request(s). Ask the administrator to check the session error details.</p> : null}
-    <dl className="facts"><dt>Request</dt><dd className="mono">{answer.operation}</dd><dt>Certificates</dt><dd>{answer.certificates_withdrawn.join(', ') || 'None'}</dd><dt>Credentials</dt><dd>{answer.credentials_ended?.join(', ') ?? 'Not confirmed'}</dd><dt>Sessions</dt><dd>{answer.sessions_asked.join(', ') || 'None'}</dd></dl>{confirmed.map((entry) => <p key={entry.session}>{entry.session}: {entry.confirmation}</p>)}{refused.map((entry, index) => <p key={index}>{entry}</p>)}
+    <p className="refusal-name">Request {answer.operation}</p>
   </div>;
 }

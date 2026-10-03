@@ -39,12 +39,13 @@ describe('No read-again buttons', () => {
     const { requests } = await mount('#/file/' + SCRIBE, { ...agentRoutes,
       ['/directory/agents/' + SCRIBE]: () => ok({ ...(SERVICE['/directory/agents/' + SCRIBE] as { body: object }).body, state: stopped ? 'suspended' : 'active' }),
       ['POST ' + path]: (body) => { stopped = true; return ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: [], credentials_ended: [], credentials_refused: null, sessions_asked: [], reason: 'leaked its key' }); } });
+    const readsBefore = requests.filter((entry) => entry === '/directory/agents/' + SCRIBE).length;
     await click($('[data-act="stop"]'));
     const reason = $('form[aria-label="Confirm emergency stop"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
     await click($$('form[aria-label="Confirm emergency stop"] button[type="submit"]')[0] ?? null);
-    expect(requests.filter((entry) => entry === '/directory/agents/' + SCRIBE)).toHaveLength(1);
+    expect(requests.filter((entry) => entry === '/directory/agents/' + SCRIBE)).toHaveLength(readsBefore);
     expect($('#state')?.textContent).toBe('Suspended in this stop answer');
     expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
     expect(reloaders()).toEqual([]);

@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router';
-import { request, useLoad } from '../api';
+import { api, request, useLoad } from '../api';
 import { readTogether } from '../reads';
 import { RAIL } from './railItems';
 import { useShell } from './ShellContext';
@@ -15,12 +15,12 @@ export function railView(pathname: string): string {
 
 /** What waits under Access: requests awaiting a decision and grants due a review, as the service lists them for whoever is signed in. */
 function useWaiting(): { count: number; words: string } | { problem: string } | null {
-  const load = useLoad(() => readTogether({
+  const load = useLoad(async () => { await api.me(); return readTogether({
     requests: request<{ requests: { state: string }[] }>('/requests'),
     reviews: request<{ due: unknown[] }>('/reviews'),
-  }), 'rail-waiting');
+  }); }, 'rail-waiting');
   if (load.status === 'loading') return null;
-  if (load.status === 'refused') return { problem: load.refused.refusal.reason };
+  if (load.status === 'refused') return load.refused.status === 401 || load.refused.status === 403 ? null : { problem: load.refused.refusal.reason };
   const waiting = load.data.requests.requests.filter((entry) => entry.state === 'waiting').length;
   const due = load.data.reviews.due.length;
   return { count: waiting + due, words: waiting + (waiting === 1 ? ' request waiting, ' : ' requests waiting, ') + due + (due === 1 ? ' grant to review' : ' grants to review') };

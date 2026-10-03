@@ -104,7 +104,7 @@ describe('Owner changes', () => {
   it('render their forms with the owner-only note', () => {
     const scope = renderToStaticMarkup(<ScopeChange secret="calendar" change={() => Promise.reject(new Error('not called'))} />);
     expect(scope).toContain('Only the secret&#x27;s owner can change this.');
-    expect(scope).toContain('calendar');
+    expect(scope).toContain('Kept for');
     const recipients = renderToStaticMarkup(<RecipientsChange secret="calendar" change={() => Promise.reject(new Error('not called'))} />);
     expect(recipients).toContain('People only');
     expect(recipients).toContain('Anyone who is permitted');

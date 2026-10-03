@@ -106,7 +106,7 @@ export function OwnAccount({ readOnly = false }: { readOnly?: boolean }) {
 export function PersonAccount({ id }: { id: string }) {
   const path = '/directory/people/' + encodeURIComponent(id) + '/account';
   const { account, setAccount, unavailable } = useAccount(path);
-  if (unavailable) return <section className="card"><h2>Lys account</h2><p className="note">{unavailable}</p></section>;
+  if (unavailable) return <section className="card" aria-label="Lys account"><h2>Lys account</h2><p className="note">{unavailable}</p></section>;
   return <section className="card" aria-label="Lys account">
     <h2>Lys account</h2>
     <p className="note">{account ? `Signs in with ${account.email ?? 'no email'}. Sign-in is ${account.enabled ? 'enabled' : 'disabled'}.` : 'Reading the account…'}</p>

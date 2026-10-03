@@ -79,9 +79,9 @@ describe('Walk words', () => {
     expect([...form?.querySelectorAll('.field > label') ?? []].map((label) => label.textContent)).not.toContain('Access needed');
     expect(checkboxes.map((input) => input.closest('tr')?.querySelector('label')?.textContent?.trim())).toEqual(['Everything here', 'Start this agent', 'Stop this agent']);
     for (const input of checkboxes) {
-      const label = input.closest('label');
+      const label = [...input.closest('tr')?.querySelectorAll('label') ?? []].find((each) => each.htmlFor === input.id) ?? null;
       expect(label).not.toBeNull();
-      expect(getComputedStyle(label as HTMLLabelElement).display).toBe('flex');
+      expect(input.closest('td')?.nextElementSibling?.contains(label)).toBe(true);
       expect(getComputedStyle(input).width).toBe('15px');
       expect(getComputedStyle(input).padding).toBe('0px');
     }

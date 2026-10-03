@@ -20,7 +20,7 @@ export function Resources() {
         return { id: kind, name: kind, lead: null, depth: 0, items, within: items };
       }).filter((group) => group.items.length);
       const columns: Column<ResourceSummary>[] = [
-        { head: 'Resource', cell: (resource) => resource.id },
+        { head: 'Resource', cell: (resource) => <a href={'#/access/who/' + encodeURIComponent(keyOf(resource))}>{resource.id}</a> },
         { head: 'Standing grants', cell: (resource) => resource.standing },
         { head: 'Ended grants', cell: (resource) => <span className="sec">{resource.ended}</span> },
         { head: 'Current holders', cell: (resource) => resource.holders },

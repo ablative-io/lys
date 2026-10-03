@@ -81,10 +81,7 @@ describe('Personal scope', () => {
     expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe', 'Courier', 'Archivist']);
     unmountAll();
     await mount('#/me?tab=account', routes);
-    const holds = [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
-      const exactly = tr.querySelectorAll('td .mono');
-      return `${exactly[0].textContent} of ${exactly[1].textContent}`;
-    });
+    const holds = [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`);
     expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger']);
     expect(holds).not.toContain('viewer of project:atlas');
     const secrets = $$('.card').find((c) => c.querySelector('h2')?.textContent === 'Secrets available to you');
@@ -111,8 +108,8 @@ function withInstallGrants(): typeof SERVICE {
 }
 
 describe('What you hold', () => {
-  const rows = () => [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) =>
-    [tr.querySelector('td')?.firstChild?.textContent, ...[...tr.querySelectorAll('td .mono')].map((span) => span.textContent), tr.querySelectorAll('td')[1].textContent]);
+  const cell = (tr: Element, col: string) => tr.querySelector('td[data-col="' + col + '"]')?.textContent ?? '';
+  const rows = () => [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => [cell(tr, 'Allows'), cell(tr, 'Relation'), (tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title ?? ''), ((pills) => pills.length === 1 ? 'root' : (pills[pills.length - 2].textContent ?? '').split(' · ')[0])([...tr.querySelectorAll('.chain .pill')])]);
 
   it('starts each row with what the grant lets the person do, from the actions it carries, then the relation, object and source', async () => {
     await mount('#/me?tab=account', withInstallGrants());

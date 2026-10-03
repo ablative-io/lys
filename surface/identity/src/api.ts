@@ -64,8 +64,16 @@ async function exchange<T>(method: 'GET' | 'POST' | 'PUT', path: string, body: u
 
 /** Ask the service: a read without a body, else a change sent as `method`, POST unless named. */
 export function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST', signal?: AbortSignal): Promise<T> {
-  return exchange<T>(body === undefined ? 'GET' : method, path, body, signal, false);
+  if (body !== undefined || signal) return exchange<T>(body === undefined ? 'GET' : method, path, body, signal, false);
+  const flying = reading.get(path);
+  if (flying) return flying as Promise<T>;
+  const read = exchange<T>('GET', path, undefined, undefined, false).finally(() => reading.delete(path));
+  reading.set(path, read);
+  return read;
 }
+
+/** Reads of one path in flight together are one request: the parts of a page that ask for the same list share its answer. Nothing is kept once it has answered. */
+const reading = new Map<string, Promise<unknown>>();
 
 /** The same exchange with the method named, for routes that take a POST with no body or answer with none. */
 export function send<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {

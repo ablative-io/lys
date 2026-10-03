@@ -1,5 +1,6 @@
 /** A retained change is retried with its original operation; a record that cannot be read holds the form. */
 import { Refused } from '../../api';
+import { answeredNo } from '../../kept';
 
 /** The part of Storage a pending change needs; sessionStorage in the browser. */
 export interface PendingStore {
@@ -30,7 +31,7 @@ export function pendingAt(store: PendingStore, key: string): string | null {
 }
 
 /** Whether a failure is the service's definite answer, which settles the change. */
-export const definitelyRefused = (refused: Refused): boolean => refused.status >= 400 && refused.status < 500;
+export const definitelyRefused = (refused: Refused): boolean => answeredNo(refused);
 
 /** A 2xx answer that does not say what was asked: the outcome is unknown. */
 export const unconfirmed = (reason: string): Refused =>

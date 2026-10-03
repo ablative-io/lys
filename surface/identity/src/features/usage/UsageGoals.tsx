@@ -48,8 +48,9 @@ function GoalRow({ agent, item, changed }: { agent: string; item: GoalItem; chan
         event.preventDefault(); if (!blocked && valid && next !== goal.words) reword.submit({ operation: operationId(), words: next });
       }}>
         <input name="words" aria-label={'Words of goal ' + goal.id} value={words} required disabled={blocked} onChange={(event) => setWords(event.target.value)} />
+        {words !== goal.words ? <div className="note">Saved words: {goal.words}</div> : null}
+        <ChangeStatus change={reword} />
       </form>
-      <ChangeStatus change={reword} />
     </td>
     <td>{goal.deadline === null ? 'No deadline' : clock(goal.deadline)}</td>
     <td>{STANDING[item.standing]}</td>

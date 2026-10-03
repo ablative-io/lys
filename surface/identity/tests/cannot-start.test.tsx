@@ -130,7 +130,7 @@ describe('why an agent cannot start', () => {
   it('says there is no computer with Lys on it and where to add one', async () => {
     const { host } = await shown({ refusal: 'MachineUnavailable', reason: 'no computer admits this agent' }, { '/network': ok({ machines: [], reports_served: true }) });
     expect(host.textContent).toContain('No computer has Lys running on it yet.');
-    expect(host.querySelector('a.btn')?.getAttribute('href')).toBe('#/network');
+    expect(host.querySelector('a.btn')?.getAttribute('href')).toBe('#/network?add=computer');
   });
 
   it('offers the same start again for a reason it has no fix for', async () => {

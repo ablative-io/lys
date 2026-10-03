@@ -6,6 +6,7 @@ import type { Entry } from '../people/directory';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { Start } from './Start';
 import './team.css';
+import { answeredNo } from '../../kept';
 
 const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unexpected', reason: String(error) });
@@ -47,7 +48,7 @@ function Restart({ entry, session, changed, done }: { entry: Entry; session: Run
       changed();
     } catch (error) {
       const refusal = asRefused(error);
-      if (refusal.status >= 400 && refusal.status < 500) operation.current = '';
+      if (answeredNo(refusal)) operation.current = '';
       setRefused(refusal);
     }
     setBusy(false);

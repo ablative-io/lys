@@ -141,7 +141,7 @@ describe('Add-agent retry safety', () => {
   });
 
   it('keeps a saved other-person request unsent when that field is not served', async () => {
-    const saved = { name: 'Held helper', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null, answersTo: BEA, team: null, membership: null, activated: false };
+    const saved = { version: 1, responsible: null, grants: [], name: 'Held helper', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null, answersTo: BEA, team: null, membership: null, activated: false };
     sessionStorage.setItem('lys.add-agent.' + ADA, JSON.stringify(saved));
     const { entry, posted } = await form({ '/surface-contract': schema(false) });
     expect(entry.textContent).toContain('saved request');

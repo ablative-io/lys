@@ -1,6 +1,6 @@
 /** An agent's run is on the agent's own page: where it is running with Stop and Restart and a link to its terminal on the canvas, a stopped agent started in place with one press, and what stops a start said in one sentence with the button that fixes it. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { $, $$, click, mount, text, leaveTheReachReadOutOfPosted } from './harness';
+import { $, $$, click, mount, text, leaveTheReachReadOutOfPosted, unmountAll } from './harness';
 // These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
 leaveTheReachReadOutOfPosted();
 import { ADA, ARCHIVIST, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
@@ -67,6 +67,7 @@ describe('An agent\'s run on People and agents', () => {
     // The settings form has one home. No copy of it opens under the row.
     expect($('.you-setup')).toBeNull();
     expect($('.you-asked')).toBeNull();
+    unmountAll(); document.body.innerHTML = '';
     await mount('#/file/' + SCRIBE + '/provisioning', { ...stopped, ...provisioning(SCRIBE, null) });
     expect($('section[aria-label="Settings of this agent"]')).not.toBeNull();
     expect($$('section[aria-label="Settings of this agent"] button[type="submit"]').map((el) => el.textContent)).toEqual(['Save these settings']);

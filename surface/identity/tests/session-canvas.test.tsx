@@ -1,6 +1,6 @@
 /** The canvas starts with a returned running session and never turns membership or missing reads into authority. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { $, click, mount, text } from './harness';
+import { $, $$, click, mount, text } from './harness';
 import { ADA, GRANTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import { act } from 'react';
 import { mockTerminal } from './terminal-double';
@@ -103,7 +103,7 @@ describe('Running: the list and the canvas', () => {
   it('is its own place in the rail, and an agent opens straight onto its terminal', async () => {
     await mount('#/canvas/' + SCRIBE, routes);
     expect($('#rail a.on')?.dataset.nav).toBe('canvas');
-    expect($('button[aria-expanded="true"]')?.textContent).toBe('Close terminal view');
+    expect($$('button[aria-expanded="true"]').map((button) => button.textContent)).toContain('Close terminal view');
     expect([...document.querySelectorAll('button')].map((button) => button.textContent ?? '').filter((words) => /refresh|again/i.test(words))).toEqual([]);
   });
 

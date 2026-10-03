@@ -33,7 +33,7 @@ describe('Roles', () => {
   it('shows actual versions, holder state and expiry without changing any holder', async () => {
     const { posted } = await mount('#/roles/' + role.id, routes);
     expect(text()).toContain('Review code and docs'); expect(text()).toContain('Scribe');
-    expect([...document.querySelectorAll('tr[aria-label="Holder Scribe"] td')].slice(1, 3).map((cell) => cell.textContent)).toEqual(['Version 1', 'holding']); expect(text()).toContain('never extends its expiry');
+    expect([...document.querySelectorAll('tr[aria-label="Holder Scribe"] td')].slice(1, 3).map((cell) => cell.textContent)).toEqual(['Version 1A newer version is available.', 'holding']); expect(text()).toContain('never extends its expiry');
     expect(posted).toEqual([]); expect(text()).not.toContain('not built yet');
   });
   it('creates a role with complete explicit words and no implicit access grants', async () => {

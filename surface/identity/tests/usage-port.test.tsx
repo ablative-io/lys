@@ -152,10 +152,10 @@ describe('Usage port', () => {
     serve({ ['POST /goals/' + goal.goal.id + '/words']: (body) => ok({ ...goal, goal: { ...goal.goal, words: (body as { words: string }).words } }) }, posted);
     await render(<UsageGoals agent={SCRIBE} goals={[goal, other]} changed={changed} />);
     await input(words + ' input[name="words"]', '  Keep all records available  ');
-    await click(words + ' button[type="submit"]');
+    await click('button[form="reword-' + goal.goal.id + '"]');
     expect(posted).toEqual([{ path: '/goals/' + goal.goal.id + '/words', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), words: 'Keep all records available' } }]);
     expect(changed).toHaveBeenCalledWith('Goal reworded.');
-    expect(document.body.textContent).toContain(other.goal.words);
+    expect([...document.querySelectorAll<HTMLInputElement>('input[name=\"words\"]')].map((each) => each.defaultValue)).toContain(other.goal.words);
   });
 
   it.each([false, true])('switches goal activity to %s with an independent recorded operation', async (next) => {
@@ -175,10 +175,10 @@ describe('Usage port', () => {
     serve({ ['POST /goals/' + goal.goal.id + '/words']: refused(403, 'NotPermitted', 'The goal cannot be changed by this caller') });
     await render(<UsageGoals agent={SCRIBE} goals={[goal]} changed={changed} />);
     await input(words + ' input[name="words"]', 'Changed words');
-    await click(words + ' button[type="submit"]');
+    await click('button[form="reword-' + goal.goal.id + '"]');
     expect(document.body.textContent).toContain('NotPermitted');
     expect(changed).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain(goal.goal.words);
+    expect(document.body.textContent).toContain('Saved words: ' + goal.goal.words);
   });
 
   it('retains and retries the exact uncertain goal edit after remount', async () => {
@@ -187,7 +187,7 @@ describe('Usage port', () => {
     serve({ ['POST /goals/' + goal.goal.id + '/words']: refused(503, 'GoalsUnavailable', 'The answer is unknown') }, posted);
     await render(<UsageGoals agent={SCRIBE} goals={[goal]} changed={changed} />);
     await input(words + ' input[name="words"]', 'Keep records available');
-    await click(words + ' button[type="submit"]');
+    await click('button[form="reword-' + goal.goal.id + '"]');
     expect(posted).toHaveLength(1);
     expect(changed).not.toHaveBeenCalled();
     for (const root of roots.splice(0)) act(() => root.unmount());
@@ -205,7 +205,7 @@ describe('Usage port', () => {
     serve({ ['POST /goals/' + goal.goal.id + '/words']: ok({ ...other, goal: { ...other.goal, words: 'Changed words' } }) });
     await render(<UsageGoals agent={SCRIBE} goals={[goal]} changed={changed} />);
     await input(words + ' input[name="words"]', 'Changed words');
-    await click(words + ' button[type="submit"]');
+    await click('button[form="reword-' + goal.goal.id + '"]');
     expect(changed).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('The answer did not confirm this recorded change');
   });

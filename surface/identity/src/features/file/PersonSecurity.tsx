@@ -1,4 +1,5 @@
 /** A person's credentials are sign-in bindings; their sessions are browser sign-ins, never agent runtimes. */
+import { useState } from 'react';
 import { api, useLoad } from '../../api';
 import { SessionList } from '../sessions/Sessions';
 import { DirectoryGate as Gate } from '../people/Words';
@@ -11,7 +12,7 @@ export function PersonCredentials({ id }: { id: string }) {
     const me = await api.me();
     const logins = me.person.id === id ? me.sign_in_identities.map((login) => ({ issuer: login.provider, subject: login.subject })) : (await api.identity(id)).logins;
     return { logins, directory: (await api.people()).scope === 'directory' };
-  }, 'person-credentials:' + id);
+  }, 'person-credentials:' + id + ':' + revision);
   return <section className="card"><h2>Sign-in accounts</h2><p>These accounts sign this person into Lys. Passwords and secret values are never shown here.</p>
     <Gate load={load} title="Sign-in accounts" ok={({ logins, directory }) => <>
       {logins.length ? <table><thead><tr><th>Sign-in provider</th><th>Account identifier</th></tr></thead><tbody>{logins.map((login) => <tr key={JSON.stringify([login.issuer, login.subject])}><td>{login.issuer}</td><td>{login.subject}</td></tr>)}</tbody></table> : <p>No sign-in account is bound to this person.</p>}

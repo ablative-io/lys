@@ -27,7 +27,7 @@ function Form({ people, model, resources }: { people: PeopleView; model: GrantMo
     }}>
       <p>Only the directory's root authority may issue this grant. A root grant is given to a person; that person may delegate only if you permit it below.</p>
       <div className="field">Holder<Picker name="holder" label="Find a person" options={people.people.map((p) => ({ id: p.id, name: p.display_name, detail: p.state }))} /></div>
-      <label className="field">Kind of thing<input name="kind" required list="root-kinds" autoComplete="off" value={kind} onChange={(event) => setKind(event.target.value)} /></label>
+      <label className="field">Kind of thing<input name="kind" required list="root-kinds" autoComplete="off" onChange={(event) => setKind(event.target.value)} /></label>
       <datalist id="root-kinds">{[...new Set(resources.map((resource) => resource.kind))].sort().map((each) => <option key={each} value={each} />)}</datalist>
       <label className="field">Which one<input name="resource" required list="root-ids" autoComplete="off" /></label>
       <datalist id="root-ids">{resources.filter((resource) => !kind || resource.kind === kind).map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} />)}</datalist>

@@ -1,13 +1,14 @@
 /** A request keeps the same operation and exact body across an uncertain answer or reload. */
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { operationId, Refused, request } from '../../api';
+import { operationId, request } from '../../api';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import { ActionPicker, singleActionCarriers } from '../grants/ActionPicker';
 import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import { matchesAsk } from './contract';
 import type { AccessRequest, Ask } from './contract';
+import { answeredNo } from '../../kept';
 
 type Pending = { kind: 'empty' } | { kind: 'damaged' } | { kind: 'held'; asked: Ask };
 
@@ -105,7 +106,7 @@ export function AskForm({ person, resources, model, changed }: {
     } catch (error) {
       // A later refusal cannot undo an earlier uncertain admission.
       let release = '';
-      if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) {
+      if (!retry && answeredNo(error)) {
         try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (failed) { release = ' The browser could not release the retained request; Check original request will answer this same refusal, never record a second: ' + String(failed); }
       }
       setFailure(failureWords(error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.') + release);

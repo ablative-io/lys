@@ -59,12 +59,12 @@ describe('Revoke', () => {
     expect($('#toast')?.textContent).toBe(`Revoked G/${ROOT_G.slice(6, 14)}. Everything derived from it goes with it.`);
     expect($('.act-panel')).toBeNull();
     const card = $(`tr[data-grant="${ROOT_G}"]`);
-    expect(card?.textContent).toContain('no: ');
+    expect(card?.textContent).toContain('void');
     expect(card?.textContent).toMatch(/Revoked .*, change 8; every check from here on refuses\./);
     expect(card?.querySelector('[data-act="revoke"]')).toBeNull();
     location.hash = `#/file/${SCRIBE}/access`;
     await press('Escape', {}, document.body);
-    const derived = $$('.file .card').find((c) => c.textContent?.includes('viewer of project:identity'));
+    const derived = $$('tr[data-grant]').find((c) => c.textContent?.includes('viewer of project:identity'));
     expect(derived?.textContent).toContain('void');
     expect(derived?.textContent).toContain('which no longer stands');
     expect(derived?.textContent).toContain(revokedReason(ROOT_G));
@@ -128,10 +128,7 @@ function handbook(): Record<string, Route> {
 }
 
 /** What you hold on You, each row by its relation and resource only. */
-const held = () => [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
-  const exactly = tr.querySelectorAll('td .mono');
-  return `${exactly[0].textContent} of ${exactly[1].textContent}`;
-});
+const held = () => [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`);
 
 /** What Scribe holds, as its row under Your agents on You carries it: the list in the cell's title, the count in its text. */
 const scribeHolds = () => ($(`tr[data-href="#/file/${SCRIBE}"]`)?.querySelectorAll('td')[2].getAttribute('title') ?? '').split('; ');

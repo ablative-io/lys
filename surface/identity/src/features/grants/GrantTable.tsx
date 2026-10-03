@@ -6,7 +6,8 @@ import type { Column } from '../../shell/Listing';
 import { clock } from '../file/time';
 import { resourceWords } from './action-words';
 import { Delegate } from './Delegate';
-import { grantNo, lastUsedText, lastsText, nameOf, passText, passesToAgents, voidOf } from './model';
+import { Chain } from './Chain';
+import { chainOf, grantNo, lastUsedText, mayText, nameOf, onText, passText, passesToAgents, voidOf, windowText } from './model';
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
 
@@ -15,16 +16,17 @@ export function grantColumns(w: GrantWorld): Column<Grant>[] {
   return [
     { head: 'Grant', cell: (g) => <span className="mono">{grantNo(g.id)}</span> },
     { head: 'Holder', cell: (g) => nameOf(w, g.holder) },
+    { head: 'Allows', cell: (g) => mayText(w, g) },
     { head: 'Relation', cell: (g) => <span className="mono">{g.relation}</span> },
-    { head: 'On', cell: (g) => resourceWords(g.resource) },
-    { head: 'Derives from', cell: (g) => { const up = g.source ? w.byId.get(g.source) : undefined; return <span className="sec">{g.source ? `${grantNo(g.source)} · ${up ? nameOf(w, up.holder) : 'not visible'}` : <span className="dim">root</span>}</span>; } },
+    { head: 'On', cell: (g) => <span title={onText(g)}>{resourceWords(g.resource)}</span> },
+    { head: 'Path to a person', cell: (g) => <Chain w={w} chain={chainOf(w, g)} /> },
     { head: 'May pass on', cell: (g) => <span className="sec">{passText(g.pass_on)}</span> },
-    { head: 'Lasts', cell: (g) => <span className="sec">{lastsText(g)}</span> },
+    { head: 'Window', cell: (g) => <span className="sec">{windowText(g)}</span> },
     { head: 'Last used', cell: (g) => <span className="sec">{g.last_use.seen ? lastUsedText(g) : <span className="dim">{lastUsedText(g)}</span>}</span> },
     { head: 'Stands', cell: (g) => {
       const v = voidOf(w, g);
       if (v === null) return <><span className="dot s-active" />yes</>;
-      return <span className="danger">no: {v.why}{g.revoked && g.revoked_at !== null && g.revoked_revision !== null ? ` Revoked ${clock(g.revoked_at)}, change ${g.revoked_revision}; every check from here on refuses.` : ''}</span>;
+      return <span className="danger"><span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>void</span> {v.why}{g.revoked && g.revoked_at !== null && g.revoked_revision !== null ? ` Revoked ${clock(g.revoked_at)}, change ${g.revoked_revision}; every check from here on refuses.` : ''}</span>;
     } },
   ];
 }
@@ -53,8 +55,9 @@ export function GrantTable({ w, grants, done, give = true, empty = 'No grants.' 
         const mayGive = give && g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on);
         const mine = open?.grant === g.id ? open.act : null;
         return [<tr key={g.id} data-grant={g.id} style={voidOf(w, g) === null ? undefined : { opacity: 0.72 }}>
-          {columns.map((column) => <td key={column.head}>{column.cell(g)}</td>)}
-          <td>
+          {columns.map((column) => <td key={column.head} data-col={column.head}>{column.cell(g)}</td>)}
+
+          <td data-col="Change">
             {mayGive ? <button className="btn" type="button" data-act="delegate" data-g={g.id} onClick={(event) => setOpen({ grant: g.id, act: 'delegate', opener: event.currentTarget })}>Give to an agent…</button> : null}
             {mayRevoke ? <button className="btn danger" type="button" data-act="revoke" data-g={g.id} onClick={(event) => setOpen({ grant: g.id, act: 'revoke', opener: event.currentTarget })}>Revoke</button> : null}
           </td>

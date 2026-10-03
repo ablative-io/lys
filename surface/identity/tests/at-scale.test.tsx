@@ -89,7 +89,7 @@ describe('Teams at the size of a business', () => {
   it('draws the tree with each team\'s lead and size, and no identifiers', async () => {
     await mount('#/people', routes);
     await click($('[data-kind="teams"]'));
-    const tree = $$('#screen .team-tree [data-team]');
+    const tree = $$('#screen tbody tr[data-team]');
     expect(tree).toHaveLength(40);
     expect(tree[1].getAttribute('data-depth')).toBe('1');
     expect(tree[1].textContent).toMatch(/Squad 01.*Person 0.*9 people/);

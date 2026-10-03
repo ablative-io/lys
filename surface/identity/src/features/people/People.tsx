@@ -119,7 +119,7 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
   const columns: Column<Row>[] = [
     { head: 'Name', cell: (x) => x.display_name },
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
-    { head: 'State', cell: (x) => <><span className={'dot s-' + x.state} />{x.state}</> },
+    { head: 'State', cell: (x) => <span className="state-of"><span className={'dot s-' + x.state} />{x.state}</span> },
     { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}</span> : null },
     { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
   ];

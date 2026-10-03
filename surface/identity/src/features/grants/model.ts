@@ -66,9 +66,11 @@ export const objectText = (w: GrantWorld, r: ResourceRef): string => {
  * action first, as the model carries them (view before edit before grant).
  */
 export function mayText(w: GrantWorld, g: Grant): string {
-  if (!g.actions.length) return `You can take no action on ${objectText(w, g.resource)}.`;
+  // "You" is said only of the signed-in person's own grant; anyone else's is said of them.
+  const you = g.holder === w.me.person.id;
+  if (!g.actions.length) return `${you ? 'You can' : 'Can'} take no action on ${objectText(w, g.resource)}.`;
   const listed = actionWords(w.model, g.resource, g.actions);
-  return `${listed === 'everything here' ? 'You can do everything here' : listed} (${objectText(w, g.resource)}).`;
+  return `${listed === 'everything here' ? (you ? 'You can do everything here' : 'Can do everything here') : listed} (${objectText(w, g.resource)}).`;
 }
 
 /**
@@ -137,7 +139,8 @@ export const lastUsedText = (g: Grant): string => {
   return seen + ' · ' + n + (n === 1 ? ' use' : ' uses') + ' not recorded';
 };
 
-export const lastsText = (g: Grant): string => (g.window.ends_at === null ? 'no end' : 'until ' + day(g.window.ends_at));
+/** A grant's window as its effective end stands: `27 Sep to 4 Oct`, or `from 27 Sep, no end`. */
+export const windowText = (g: Grant): string => (g.effective_ends_at === null ? `from ${day(g.window.starts_at)}, no end` : `${day(g.window.starts_at)} to ${day(g.effective_ends_at)}`);
 
 /**
  * Each relation the service's model defines, with the actions it carries, widest

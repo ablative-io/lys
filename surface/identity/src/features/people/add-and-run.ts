@@ -13,6 +13,7 @@ import type { Pending } from '../runtime/start-requests';
 import { readChoices } from '../provisioning/choices';
 import type { Choices } from '../provisioning/choices';
 import type { HarnessDescription, ProvisioningProfile } from '../provisioning/Provisioning';
+import { answeredNo } from '../../kept';
 
 type Placement = { kind: 'new'; machine: PendingMachine } | { kind: 'existing'; computer: Machine; admission: MachineAdmission | null };
 export interface AddAndRun {
@@ -116,7 +117,7 @@ export class AddAndRunFailure extends Error {
     const code = problem instanceof Refused ? problem.refusal.refusal : problem instanceof Error ? problem.message.split(':', 1)[0] : '';
     // A refusal is a definite answer, so its own sentence is shown; only an
     // unknown outcome is "could not confirm".
-    const refusedWith = problem instanceof Refused && problem.status >= 400 && problem.status < 500 ? problem.refusal.reason : '';
+    const refusedWith = answeredNo(problem) && problem instanceof Refused ? problem.refusal.reason : '';
     super((refusedWith ? 'Lys refused ' + step + ': ' + refusedWith : 'Lys could not confirm ' + step + '.') + (code === 'RunnerStartUnconfirmed' || code === 'RunnerDidNotRun' ? ' Lys admitted the start, but no runner ran it.' : code === 'RunnerStartEnded' ? ' The runner confirmed this session already ended.' : ''));
   }
 }

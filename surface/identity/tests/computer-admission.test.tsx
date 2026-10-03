@@ -76,9 +76,9 @@ describe('Choosing where an agent can run', () => {
     { name: 'absent', schema: ok({ openapi: '3.1.0', paths: {} }) },
     { name: 'malformed', schema: ok({ paths: { '/network/machines/{id}/agents': { post: {} } } }) },
     { name: 'unavailable', schema: refused(503, 'SchemaUnavailable', 'The served schema could not be read') },
-  ])('shows coming and sends no tick when the served route is $name', async ({ schema }) => {
+  ])('says the service does not serve it and sends no tick when the served route is $name', async ({ schema }) => {
     const { posted } = await open(service({ '/surface-contract': schema }));
-    expect($('[aria-label="Where can Scribe run?"]')?.textContent).toContain('coming');
+    expect($('[aria-label="Where can Scribe run?"]')?.textContent).toContain('does not serve changes to a computer’s permissions');
     expect(tick().disabled).toBe(true);
     await change();
     expect(posted).toEqual([]);

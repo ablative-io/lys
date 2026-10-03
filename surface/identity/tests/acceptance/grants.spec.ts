@@ -78,9 +78,8 @@ const fresh = () => {
   sessionStorage.clear();
 };
 
-const holdRows = () =>
-  [...($$('.grid2 > div:first-child table')[0]?.querySelectorAll('tbody tr') ?? [])].map((tr) =>
-    { const [first, ...rest] = [...tr.querySelectorAll('td')]; return [first.firstChild?.textContent, ...[...first.querySelectorAll('.mono')].map((span) => span.textContent), ...rest.map((td) => td.textContent)]; });
+const cell = (tr: Element, col: string) => tr.querySelector('td[data-col="' + col + '"]')?.textContent ?? '';
+const holdRows = () => [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => [cell(tr, 'Allows'), cell(tr, 'Relation'), (tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title ?? ''), ((pills) => pills.length === 1 ? 'root' : (pills[pills.length - 2].textContent ?? '').split(' · ')[0])([...tr.querySelectorAll('.chain .pill')]), (cell(tr, 'May pass on').includes('agent') ? 'yes' : 'no'), (tr.querySelector('[data-act="delegate"]')?.textContent ?? '')]);
 
 /** The administrator's wider view: both people, and the grants of both. */
 const ADMIN: Record<string, (typeof SERVICE)[string]> = {
@@ -208,10 +207,10 @@ const ROWS: ConformanceRow[] = [
     rule: 'every grant shows last used, its source and window; "not seen" is never shown as "never used"',
     check: async () => {
       await mount(`#/file/${SCRIBE}/access`);
-      const card = $$('.file .card').filter((c) => (c.textContent ?? '').includes('Passable:'));
+      const card = $$('tr[data-grant]').filter((c) => Boolean(c));
       expect(card).toHaveLength(1);
-      expect(card[0].textContent).toContain('Last used: 27 Sep 12:00 · tool');
-      expect(card[0].textContent).toContain('Window: 27 Sep to 4 Oct');
+      expect(card[0].textContent).toContain('27 Sep 12:00 · tool');
+      expect(card[0].textContent).toContain('27 Sep to 4 Oct');
       // Its source, as the chain from the person who issued it.
       expect(card[0].querySelector('.chain')?.textContent).toBe('Ada (test person) · owner of project:identity→Scribe · viewer of project:identity');
       expect(text()).not.toContain('never used');
@@ -220,7 +219,7 @@ const ROWS: ConformanceRow[] = [
       await mount('#/me?tab=account', ADMIN);
       fresh();
       await mount(`#/file/${BEA}/access`, ADMIN);
-      expect(text()).toContain('Last used: not seen');
+      expect(text()).toContain('not seen');
       expect(text()).not.toContain('never used');
     },
   },
@@ -273,7 +272,7 @@ describe('Keyboard operation (conformance 9.3)', () => {
     expect(boxes().filter((box) => box.checked).map((box) => box.value)).toEqual(['view']);
 
     // The whole form is in the tab order, in the order it reads.
-    const order = $$('.act-panel select, .act-panel input[name="action"], .act-panel button').map((el) => el.id || (el as HTMLInputElement).value || el.dataset.act);
+    const order = $$('.act-panel select, .act-panel input[name="action"], .act-panel button').map((el) => (el as HTMLInputElement).name === 'action' ? (el as HTMLInputElement).value : el.id || (el as HTMLInputElement).value || el.dataset.act);
     expect(order).toEqual(['dTo', ...offered, 'dLease', 'dPass', 'delegatedo', 'close']);
     for (const el of $$('.act-panel select, .act-panel input[name="action"], .act-panel button')) expect(el.tabIndex).toBeGreaterThanOrEqual(0);
 

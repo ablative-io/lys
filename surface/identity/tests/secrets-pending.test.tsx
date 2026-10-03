@@ -126,7 +126,7 @@ describe('An owner change of unknown outcome', () => {
       select.value = 'team';
       select.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await type(container, 1, 'billing');
+    await type(container, 0, 'billing');
     await submit(container);
     await submit(container);
     expect(sent).toBe(1);
@@ -146,9 +146,14 @@ describe('A settled owner change', () => {
     expect(asked).toEqual(['people_only']);
     expect(container.textContent).toContain('calendar: confirmed change to people only, never agents.');
     expect(store.entries.size).toBe(0);
-    await type(container, 0, 'mailbox');
+    await act(async () => {
+      const select = container.querySelector('select');
+      if (!select) throw new Error('no select');
+      select.value = 'anyone';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     await submit(container);
-    expect(asked).toEqual(['people_only', 'people_only']);
+    expect(asked).toEqual(['people_only', 'anyone']);
   });
 
   it('may be asked again after a definite refusal, which clears the hold', async () => {
@@ -244,7 +249,7 @@ describe('Owner operation receipts', () => {
     const first = await show(<ScopeChange secret="calendar" store={store} change={(secret, kind, name, operation) => {
       calls.push({ secret, kind, name, operation }); return unanswered();
     }} />);
-    await type(first, 1, 'person-owner');
+    await type(first, 0, 'person-owner');
     await submit(first);
     for (const root of roots.splice(0)) act(() => root.unmount());
     const next = await show(<ScopeChange secret="calendar" store={store} change={(secret, kind, name, operation) => {

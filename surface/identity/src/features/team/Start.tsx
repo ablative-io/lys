@@ -10,6 +10,7 @@ import { CannotStart } from '../runtime/CannotStart';
 import type { StartRefusal } from '../runtime/CannotStart';
 import { pendingStartOf, profileRequest, startRequest } from '../runtime/start-requests';
 import type { Pending } from '../runtime/start-requests';
+import { answeredNo } from '../../kept';
 
 /** A refusal as the service named it; a failure the screen found itself keeps the name it was thrown with. */
 function refusalOf(error: unknown): StartRefusal {
@@ -20,7 +21,6 @@ function refusalOf(error: unknown): StartRefusal {
 }
 
 /** The service answered no: nothing of this request is outstanding. Anything else may have been carried out. */
-const answeredNo = (error: unknown) => error instanceof Refused && error.status >= 400 && error.status < 500;
 
 export function Start({ entry, me, admin, changed, settings, straightAway = false }: {
   entry: Entry; me: string; admin: boolean; changed: () => void; settings: () => void;

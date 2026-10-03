@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import { operationId, Refused, request } from '../../api';
 import { confirmRunner, matchesMachine, savedMachine } from './contract';
 import type { Machine, PendingMachine } from './contract';
+import { answeredNo } from '../../kept';
 
 export async function recordComputer(initial: PendingMachine, person: string, keep: (next: PendingMachine) => void): Promise<Machine> {
   let current = initial;
@@ -44,7 +45,7 @@ export function AddMachine({ person, agent, changed, cancel }: {
       sessionStorage.removeItem(key); setPending(null);
       changed(current.body.name + ' was added. Its runner is recorded.', machine);
     } catch (error) {
-      if (!retry && current.phase === 'machine' && error instanceof Refused && error.status >= 400 && error.status < 500 && error.refusal.refusal !== 'Unanswered') {
+      if (!retry && current.phase === 'machine' && answeredNo(error) && error instanceof Refused && error.refusal.refusal !== 'Unanswered') {
         sessionStorage.removeItem(key); setPending(null);
       }
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));

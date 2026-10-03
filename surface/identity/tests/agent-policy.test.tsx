@@ -18,6 +18,8 @@ function keeping(start: Policy | null): Record<string, Route> {
   let kept = start;
   return {
     ...SERVICE,
+    ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE, profile: null, versions: [], enforced: false }),
+    '/harnesses': ok({ programs: [] }), '/network': ok({ machines: [], reports_served: true }),
     [refusals]: ok(none),
     [policy]: () => ok({ agent: SCRIBE, policy: kept, digest: kept ? 'd'.repeat(64) : null, applies: APPLIES } satisfies PolicyView),
     ['POST ' + policy]: (body) => {

@@ -11,7 +11,8 @@ beforeEach(() => sessionStorage.clear());
 const SERVICE: typeof BASE = { ...BASE, '/grants/model': ok(MODEL) };
 const BEA_SERVICE: typeof BEA_BASE = { ...BEA_BASE, '/grants/model': ok(MODEL) };
 
-const holdRows = () => $$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr');
+const holdRows = () => document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]');
+const cell = (tr: Element, col: string) => tr.querySelector('td[data-col="' + col + '"]')?.textContent ?? '';
 
 describe('What you hold', () => {
   it('row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on', async () => {
@@ -393,7 +394,7 @@ describe("What you can't give (conformance 2.4)", () => {
 describe('Can X do this? (conformance 8.1)', () => {
   it("answers yes with the path to a person on an agent's file", async () => {
     const { posted } = await mount(`#/file/${SCRIBE}/access`);
-    expect($$('.file .card .chain .pill').map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', "Scribe · viewer of project:identity"]);
+    expect($$('tr[data-grant] .chain .pill').map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', "Scribe · viewer of project:identity"]);
     await choose($('#cPerm'), 'view');
     await press('c', {}, document.body);
     expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
@@ -461,9 +462,12 @@ describe('Who can reach this? (conformance 8.2)', () => {
   it('lists every grant, with where it derives from, and keeps every control reachable', async () => {
     await mount('#/access/reach/' + SCRIBE);
     expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project identityView this resource']);
-    const grants = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[4].textContent);
-    expect(grants).toEqual(['root', 'root', `G/${ROOT_G.slice(6, 14)} · Ada (test person)`]);
-    const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[7].textContent);
+    // The grants themselves are the Grants tab of the same page.
+    location.hash = '#/access';
+    await settle();
+    const grants = $$('table tbody tr[data-href]').map((r) => [...r.querySelectorAll('.chain .pill')].map((pill) => pill.textContent));
+    expect(grants).toEqual([['Ada (test person) · owner of project:identity'], ['Ada (test person) · viewer of project:ledger'], ['Ada (test person) · owner of project:identity', 'Scribe · viewer of project:identity']]);
+    const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[8].textContent);
     expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool']);
     expect(unreachable()).toEqual([]);
     expect(SCRIBE_G).toMatch(/^grant-/);
@@ -476,11 +480,11 @@ describe('A grant card', () => {
     const reason = `IdentityNotActive: ${SCRIBE} is suspended, and only an active identity's grants are effective`;
     const refusedScribe = GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, standing: { stands: false as const, refusal: 'IdentityNotActive', grant: null, reason } } : g));
     await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: refusedScribe, revision: 7 }), '/directory/people': ok(suspend(DIRECTORY)), '/people': ok(suspend({ ...DIRECTORY, scope: 'personal', people: [DIRECTORY.people[0]] })) });
-    const card = $$('.file .card').find((c) => c.querySelector('.verdict-mark.no'));
+    const card = $$('tr[data-grant]').find((c) => c.querySelector('.verdict-mark.no'));
     expect(card?.textContent).toContain(reason);
     expect(card?.textContent).not.toContain('what suspension refuses');
     expect(text()).not.toContain('Allows:');
-    expect(card?.textContent).toContain('Last used: 27 Sep 12:00 · tool');
+    expect(card?.textContent).toContain('27 Sep 12:00 · tool');
   });
 });
 
@@ -488,10 +492,10 @@ describe('A grant card, its use and its window', () => {
   it('row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used', async () => {
     const unseen = GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, last_use: { seen: false as const, recorded: 0, source: 'reported' as const } } : g));
     await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: unseen, revision: 7 }) });
-    const card = $$('.file .card').find((c) => c.querySelector('.chain') && c.textContent?.includes('Last used'));
-    expect(card?.textContent).toContain('Last used: not seen');
+    const card = $$('tr[data-grant]').find((c) => c.querySelector('.chain'));
+    expect(card?.textContent).toContain('not seen');
     expect([...(card?.querySelectorAll('.chain .pill') ?? [])].map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', 'Scribe · viewer of project:identity']);
-    expect(card?.textContent).toContain('Window: 27 Sep to 4 Oct');
+    expect(card?.textContent).toContain('27 Sep to 4 Oct');
     expect(card?.textContent).not.toContain('never used');
   });
 });
@@ -531,10 +535,10 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
 });
 
 /** The hold table as text, one array per row. */
-const holdText = () => [...holdRows()].map((tr) => { const [first, ...rest] = [...tr.querySelectorAll('td')]; return [first.firstChild?.textContent, ...[...first.querySelectorAll('.mono')].map((span) => span.textContent), ...rest.map((td) => td.textContent)]; });
+const holdText = () => [...holdRows()].map((tr) => [cell(tr, 'Allows'), cell(tr, 'Relation'), (tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title ?? ''), ((pills) => pills.length === 1 ? 'root' : (pills[pills.length - 2].textContent ?? '').split(' · ')[0])([...tr.querySelectorAll('.chain .pill')]), (cell(tr, 'May pass on').includes('agent') ? 'yes' : 'no'), (tr.querySelector('[data-act="delegate"]')?.textContent ?? '')]);
 
 /** Every grant id the page put in the DOM, from the buttons that carry one. */
-const grantIdsOnScreen = () => $$('[data-g]').map((el) => el.dataset.g);
+const grantIdsOnScreen = () => $$('[data-g]').map((el) => el.dataset.act + ':' + el.dataset.g);
 
 /** Start the next mount of a test from an empty page, as a new session would. */
 const fresh = () => {
@@ -553,7 +557,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
       ['You can do everything here (project identity).', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
       ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
-    expect(grantIdsOnScreen()).toEqual([ROOT_G]);
+    expect(grantIdsOnScreen()).toEqual(['delegate:' + ROOT_G, 'revoke:' + ROOT_G, 'revoke:grant-00000000000000000000000000000020']);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     expect($('.act-panel')?.textContent).toContain('Scribe');
     const adaSource = $$('.act-panel .card')[0].textContent ?? '';
@@ -569,7 +573,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(bea.requests.filter((r) => r === '/me')).toHaveLength(meReads);
     expect($('h1')?.textContent).toBe('Bea (test person)');
     expect(holdText()).toEqual([['Edit this resource; View this resource (project ledger).', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
-    expect(grantIdsOnScreen()).toEqual([BEA_ROOT_G]);
+    expect(grantIdsOnScreen()).toEqual(['delegate:' + BEA_ROOT_G, 'revoke:' + BEA_ROOT_G]);
     // Her agent, and what it holds under her root grant, not Ada's.
     location.hash = '#/me';
     await settle();
@@ -603,13 +607,13 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(requests).toContain('/directory/people');
     expect(requests).not.toContain('/people');
     expect($('h1')?.textContent).toBe('Bea (test person)');
-    const cards = $$('.file .card').filter((c) => (c.textContent ?? '').includes('Passable:'));
+    const cards = $$('tr[data-grant]').filter((c) => Boolean(c));
     expect(cards).toHaveLength(1);
     expect(cards[0].textContent).toContain('editor of project:ledger');
-    expect(cards[0].textContent).toContain('Passable: agent');
-    expect(cards[0].textContent).toContain('Window: 27 Sep to 15 Nov');
-    expect(cards[0].textContent).toContain('Last used: not seen');
-    expect(grantIdsOnScreen()).toEqual([BEA_ROOT_G]);
+    expect(cards[0].textContent).toContain('agent');
+    expect(cards[0].textContent).toContain('27 Sep to 15 Nov');
+    expect(cards[0].textContent).toContain('not seen');
+    expect(grantIdsOnScreen()).toEqual(['revoke:' + BEA_ROOT_G]);
     // The administrator sees her grants, not her agent's: only what she holds.
     expect(document.body.innerHTML).not.toContain(BEA_REVIEWER_G);
   });
@@ -706,7 +710,7 @@ describe('Every refusal of a delegation (conformance 2.3, 2.4)', () => {
 });
 
 describe('A grant whose uses were not all recorded (conformance 8.4)', () => {
-  const card = () => $$('.file .card').filter((c) => (c.textContent ?? '').includes('Last used:'));
+  const card = () => $$('tr[data-grant]').filter((c) => Boolean(c));
   const withLastUse = (last_use: LastUse) => GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, last_use } : g));
 
   it('counts the uses it could not record beside "not seen", and a reported zero says only "not seen"', async () => {
@@ -714,7 +718,7 @@ describe('A grant whose uses were not all recorded (conformance 8.4)', () => {
     const missing = withLastUse({ seen: false, recorded: 0, source: 'missing', unreported });
     await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: missing, revision: 7 }) });
     expect(card()).toHaveLength(1);
-    expect(card()[0].textContent).toContain('Last used: not seen · 1 use not recorded');
+    expect(card()[0].textContent).toContain('not seen · 1 use not recorded');
     expect(text()).not.toContain('never used');
 
     fresh();
@@ -723,7 +727,7 @@ describe('A grant whose uses were not all recorded (conformance 8.4)', () => {
     const reported = withLastUse({ seen: false, recorded: 0, source: 'reported' });
     await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: reported, revision: 7 }) });
     expect(card()).toHaveLength(1);
-    expect(card()[0].textContent).toContain('Last used: not seen');
+    expect(card()[0].textContent).toContain('not seen');
     expect(text()).not.toContain('not recorded');
     expect(text()).not.toContain('never used');
   });

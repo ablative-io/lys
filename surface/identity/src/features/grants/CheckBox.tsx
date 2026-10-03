@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { resourceText } from '../../generated/grants';
 import type { ResourceRef } from '../../generated/grants';
 import { calledBy } from '../people/directory';
+import { ErrorWords } from '../people/Words';
 import { Picker } from '../../shell/Picker';
 import { actionSentence } from './action-words';
 import { AnswerView } from './Answer';
@@ -38,14 +39,18 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
   const [chosen, setChosen] = useState(who ?? w.me.person.id);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [asking, setAsking] = useState(false);
+  const [refused, setRefused] = useState<unknown>(null);
   const subject = who ?? chosen;
 
   const check = async () => {
     const at = resources.get(res);
     if (!at || !action) return;
-    setAsking(true);
+    setAsking(true); setRefused(null);
     try {
       setAnswer(await ask(w.me.person.id, subject, nameOf(w, subject), at.resource, action));
+    } catch (error) {
+      // A read that was refused answers nothing: the answer to the question before is taken down, never left standing.
+      setAnswer(null); setRefused(error);
     } finally {
       setAsking(false);
     }
@@ -70,7 +75,7 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
       Check <span className="kbd">c</span>
     </button>
   );
-  const shown = answer && answer.who === subject ? <AnswerView w={w} a={answer} land /> : null;
+  const shown = refused ? <ErrorWords problem={refused} /> : answer && answer.who === subject ? <AnswerView w={w} a={answer} land /> : null;
 
   if (who) {
     return (

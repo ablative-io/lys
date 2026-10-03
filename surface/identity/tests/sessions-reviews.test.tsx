@@ -1,7 +1,7 @@
 /** Real routes expose session controls and authoritative review data without fictional decisions. */
 import { describe, expect, it } from 'vitest';
 import { $, click, mount, text, unreachable } from './harness';
-import { ADA, ME, SERVICE, ok, refused } from './fixtures';
+import { ADA, ME, SERVICE, ok, refused, BEA, BEA_DIRECTORY } from './fixtures';
 
 const current = { id: 'session-current', current: true, login: { issuer: 'https://issuer.test', subject: 'account-1' }, started_at: 1790000000, ends_at: 1790003600 };
 const other = { ...current, id: 'session-other', current: false };
@@ -49,8 +49,8 @@ describe('Sessions', () => {
   });
 
   it('uses the administrator route for an explicitly selected person', async () => {
-    const { requests } = await mount('#/file/' + ADA + '/sessions', { ...SERVICE, ['/directory/people/' + ADA + '/sessions']: ok(sessions) });
-    expect(requests).toContain('/directory/people/' + ADA + '/sessions');
+    const { requests } = await mount('#/file/' + BEA + '/sessions', { ...SERVICE, '/directory/people': ok(BEA_DIRECTORY), ['/directory/people/' + BEA + '/sessions']: ok(sessions) });
+    expect(requests).toContain('/directory/people/' + BEA + '/sessions');
     expect(requests).not.toContain('/sessions');
   });
 });

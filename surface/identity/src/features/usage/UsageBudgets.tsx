@@ -5,6 +5,7 @@ import { ACTS, kept, shown, standing } from './contract';
 import type { BudgetsView, BudgetBody, BudgetAct, Length, Measure, Receipt } from './contract';
 import { PERIODS, confirmsBudget, validAmount } from './budgetForm';
 import { PERIOD_WORDS, UNITS, limitWords, summary, usedWords } from './budgetWords';
+import { answeredNo } from '../../kept';
 
 type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void };
 
@@ -23,7 +24,7 @@ export function UsageBudgets({ budgets, receipts, changed }: Props) {
       if (!confirmsBudget(answer, body, budgets.holder)) throw new Error('BudgetAnswerUnconfirmed: the answer did not confirm every limit and its version. Reload the saved budget before another change.');
       locked.current = true; setDone(true); changed('Budget kept as version ' + (body.version + 1) + '.');
     } catch (error) {
-      if (!(error instanceof Refused && error.status >= 400 && error.status < 500)) {
+      if (!answeredNo(error)) {
         locked.current = true; setUncertain(true);
       }
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
