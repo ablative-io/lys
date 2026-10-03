@@ -13,6 +13,8 @@
 //! - `GET /runtime/live`: the sessions still running, as their runners say,
 //!   and by name each session whose runner did not answer
 //! - `GET`, `POST /network/machines/{id}/runner`: a machine's runner
+//! - `POST /network/machines/{id}/folders`: the folders its runner names
+//!   (`machine_folders.rs`)
 //! - `GET /runner/protocol`: the runner protocol, published
 //!
 //! Each act requires the operate relation on the session's agent and
@@ -123,6 +125,7 @@ pub fn routes() -> Router<Arc<AppState>> {
             get(runner).post(name_runner),
         )
         .route("/runner/protocol", get(protocol))
+        .merge(crate::machine_folders::routes())
         .merge(crate::runner_dial::routes())
         .merge(crate::runner_bytes_api::routes())
 }

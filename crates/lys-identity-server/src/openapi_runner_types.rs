@@ -12,6 +12,7 @@ use crate::agent_policy_api::{PolicyBody, PolicyView};
 use crate::budgets_act::{UsageBody, UsageView};
 use crate::budgets_api::{BudgetBody, BudgetsView, ConfirmBody as BudgetConfirmBody};
 use crate::budgets_state::Budget;
+use crate::machine_folders::{FoldersBody, FoldersView};
 use crate::openapi_table::{GET, POST, PUT};
 use crate::openapi_types::Entry;
 use crate::refusals_api::RefusalsView;
@@ -144,6 +145,12 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             "/network/machines/{id}/runner",
             Some(api.schema::<RunnerBody>()),
             None,
+        ),
+        (
+            POST,
+            "/network/machines/{id}/folders",
+            Some(api.schema::<FoldersBody>()),
+            Some(api.schema::<FoldersView>()),
         ),
         (GET, "/runner/protocol", None, None),
         (POST, "/runner/dial/{machine}/next", None, None),
