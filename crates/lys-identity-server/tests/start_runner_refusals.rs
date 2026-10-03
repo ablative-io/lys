@@ -32,9 +32,10 @@ async fn the_runners_refusal_survives(refused: RunnerError, name: &str, words: &
     let table = Table::set().await?;
     let socket = table.dir.path().join("refusing.sock");
     let listener = UnixListener::bind(&socket)?;
+    let body = machine_body(&table)?;
     let machine = table
         .machine(
-            &machine_body(&table)?,
+            &body,
             Some(json!({
                 "kind": "socket", "path": socket,
             })),
@@ -58,7 +59,8 @@ async fn the_runners_refusal_survives(refused: RunnerError, name: &str, words: &
         writeln!(writer, "{}", reply_line(Answer::refusal(&refused)))
             .map_err(|error| error.to_string())
     });
-    let sent = table.start(&table.agent(), &start_body(&machine)?).await;
+    let start = start_body(&machine)?;
+    let sent = table.start(&table.agent(), &start).await;
     answering
         .join()
         .map_err(|panic| format!("the refusing runner panicked: {panic:?}"))??;
