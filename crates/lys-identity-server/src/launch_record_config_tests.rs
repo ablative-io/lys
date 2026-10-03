@@ -41,6 +41,7 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
             version: &version,
             skills: &[],
             policy: None,
+            model_proxy: None,
         },
         &[],
     )?;
@@ -68,22 +69,78 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
     let mut unknown = record.clone();
     unknown.profile_version = "op-fixture-absent".to_owned();
     assert!(matches!(
-        build(&store, &unknown, "session-fixture".to_owned(), "sh", None),
+        build(
+            &store,
+            &unknown,
+            "session-fixture".to_owned(),
+            "sh",
+            None,
+            None
+        ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
     let mut foreign = record.clone();
     foreign.agent = AgentId::from_bytes([2; 16]).to_string();
     assert!(matches!(
-        build(&store, &foreign, "session-fixture".to_owned(), "sh", None),
+        build(
+            &store,
+            &foreign,
+            "session-fixture".to_owned(),
+            "sh",
+            None,
+            None
+        ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
     let mut changed = record.clone();
     changed.executable = "/bin/false".to_owned();
     assert!(matches!(
-        build(&store, &changed, "session-fixture".to_owned(), "sh", None),
+        build(
+            &store,
+            &changed,
+            "session-fixture".to_owned(),
+            "sh",
+            None,
+            None
+        ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
-    let launch = build(&store, &record, "session-fixture".to_owned(), "sh", None)?;
+    let launch = build(
+        &store,
+        &record,
+        "session-fixture".to_owned(),
+        "sh",
+        None,
+        None,
+    )?;
+    if launch.environment.contains_key("ANTHROPIC_BASE_URL") {
+        return Err("a start without a model proxy forced a base URL".into());
+    }
+    let proxy = "http://127.0.0.1:18484/anthropic";
+    let proxied = build(
+        &store,
+        &record,
+        "session-fixture".to_owned(),
+        "sh",
+        None,
+        Some(proxy),
+    )?;
+    if proxied
+        .environment
+        .get("ANTHROPIC_BASE_URL")
+        .map(String::as_str)
+        != Some(proxy)
+    {
+        return Err("the model proxy is not the run's base URL".into());
+    }
+    let added: Vec<&String> = proxied
+        .environment
+        .keys()
+        .filter(|name| !launch.environment.contains_key(*name))
+        .collect();
+    if added.len() != 1 || proxied.arguments != launch.arguments {
+        return Err("the model proxy forced more on the run than its base URL".into());
+    }
     let mut passes = Passes::open(dir.path().join("passes.json"))?;
     let act =
         crate::runner_start_pass::act(&mut passes, agent, "http://fixture.test", launch, None)?;

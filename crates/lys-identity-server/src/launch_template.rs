@@ -48,6 +48,9 @@ pub struct Start<'a> {
     pub skills: &'a [SkillFile],
     /// The agent's latest Tool policy, when it has one.
     pub policy: Option<&'a Policy>,
+    /// Lys's model proxy for Anthropic calls, as the run's base URL; absent
+    /// when this service runs without one.
+    pub model_proxy: Option<&'a str>,
 }
 
 /// A rendered start.

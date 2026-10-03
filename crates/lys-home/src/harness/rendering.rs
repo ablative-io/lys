@@ -184,6 +184,9 @@ fn native_template(
             "instructions": fields.instructions
         }
     });
+    if let Some(proxy) = &fields.model_proxy {
+        body["slots"]["env"]["ANTHROPIC_BASE_URL"] = json!(proxy);
+    }
     if !skills.is_empty() {
         body["slots"]["skills"] = json!(skills);
     }

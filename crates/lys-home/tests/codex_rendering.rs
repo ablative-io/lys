@@ -32,6 +32,7 @@ fn fields() -> Result<LaunchFields, Box<dyn Error>> {
         models: vec!["gpt-6.1-sol".to_owned()],
         mcp_servers: Vec::new(),
         skills: Vec::new(),
+        model_proxy: None,
     })
 }
 

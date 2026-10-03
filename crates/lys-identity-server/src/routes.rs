@@ -65,6 +65,9 @@ pub struct AppState {
     pub estate_plan_file: PathBuf,
     /// Lys's password policy, when the configuration names it.
     pub password_policy: Option<crate::accounts::PasswordPolicy>,
+    /// Lys's model proxy for Anthropic calls, given to each Claude Code run
+    /// Lys starts as its base URL; absent, runs reach their provider directly.
+    pub model_proxy: Option<String>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.

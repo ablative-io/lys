@@ -209,6 +209,12 @@ pub struct Config {
     /// checks one.
     #[serde(default)]
     pub password_policy: Option<crate::accounts::PasswordPolicy>,
+    /// Lys's model proxy for Anthropic calls, the base URL a Claude Code run
+    /// Lys starts sends its model calls to, so each call is recorded under
+    /// its session. Without it a run reaches its provider as the machine's
+    /// own setup says.
+    #[serde(default)]
+    pub model_proxy: Option<String>,
     /// The compiled screens the service serves at `/`, its own routes then
     /// answering under `/api`. Without it the routes answer at the root and
     /// no screen is served.

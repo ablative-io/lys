@@ -192,6 +192,7 @@ pub(crate) async fn start_profile(
             version: &version,
             skills: &skills,
             policy: policy.as_ref(),
+            model_proxy: state.model_proxy.as_deref(),
         },
         &handles,
     )?;

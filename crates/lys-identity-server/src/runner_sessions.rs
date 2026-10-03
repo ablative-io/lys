@@ -492,6 +492,7 @@ impl Launcher for DirectoryLauncher {
                     driven.session.clone(),
                     &runtime,
                     policy,
+                    self.0.model_proxy.as_deref(),
                 )
             }) {
                 Ok(launch) => launch,

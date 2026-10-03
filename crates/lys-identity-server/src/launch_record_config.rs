@@ -16,6 +16,7 @@ pub(crate) fn build(
     session: String,
     runtime: &str,
     policy: Option<Box<Admitted>>,
+    model_proxy: Option<&str>,
 ) -> Result<Launch, ServerError> {
     let (agent, version) =
         store
@@ -43,6 +44,7 @@ pub(crate) fn build(
             version,
             skills: &skills,
             policy: policy.as_ref().map(|admitted| &admitted.policy),
+            model_proxy,
         },
         &[],
     )?;

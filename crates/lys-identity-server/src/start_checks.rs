@@ -148,6 +148,8 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         .ok_or(ServerError::HarnessUndeclared {
             version: start.version.number,
         })?;
+    // Only Claude Code's model calls go through Lys's proxy for now.
+    let harness_is_claude = harness.description.rendering_contract == "claude-code/template-v1";
     crate::launch_fields::models(&harness, &settings.model_access)?;
     crate::launch_fields::mcp(&harness, &settings.mcp_servers)?;
     let mcp_servers = settings
@@ -167,6 +169,10 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         models: settings.model_access.clone(),
         mcp_servers,
         skills: skills(settings)?,
+        model_proxy: start
+            .model_proxy
+            .filter(|_| harness_is_claude)
+            .map(str::to_owned),
     })
 }
 
