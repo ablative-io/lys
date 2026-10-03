@@ -183,6 +183,12 @@ pub(crate) async fn start_profile(
     chosen: Chosen,
 ) -> Result<Json<Value>, ServerError> {
     let Chosen { profile, directory } = chosen;
+    // The body's shape is refused before any record is consulted, as a start
+    // naming no machine already is: a folder that is not an absolute, plain
+    // path is RequestMalformed whatever the machine's or the agent's state.
+    let named = directory
+        .map(|given| crate::provisioning_api::folder("directory", given))
+        .transpose()?;
     let session = OperationId::from_str(operation)?.to_string();
     let agent = agent.to_string();
     let admitted_by = start_caller(state, headers, actor, &agent)?;
@@ -223,8 +229,8 @@ pub(crate) async fn start_profile(
         }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
-    let directory = match directory {
-        Some(given) => crate::provisioning_api::folder("directory", given)?,
+    let directory = match named {
+        Some(given) => given,
         None => version
             .settings
             .working_folder
