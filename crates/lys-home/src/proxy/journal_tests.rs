@@ -250,6 +250,15 @@ async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all(
     assert_eq!(calls[0].status, CallStatus::Unrecorded);
     assert!(calls[0].response.is_empty());
     assert!(calls[0].raw_response.is_none());
+    // A body the store never took claims no durability: the record says so by name.
+    let timing = calls[0]
+        .capture
+        .as_ref()
+        .ok_or("an unrecorded call keeps its capture timing")?;
+    assert_eq!(
+        timing.durable,
+        crate::record::call::captured::DurableTime::NotPlaced
+    );
     assert!(report.held.is_none());
     assert_eq!(report.spool_kept, 1);
     assert!(!report.retired);

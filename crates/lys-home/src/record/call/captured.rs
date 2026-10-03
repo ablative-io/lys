@@ -22,6 +22,9 @@ mod tests;
 pub enum DurableTime {
     /// The process ended before the duration was durably recorded.
     Interrupted,
+    /// A body the store never took, by rename or by copy; the refusal is in
+    /// `refusals` and the call is unrecorded. No duration is claimed.
+    NotPlaced,
     /// Nanoseconds from the last response frame to synced, installed body blocks.
     Measured(u64),
 }

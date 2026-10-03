@@ -126,11 +126,16 @@ pub(super) fn install(
     if let Some(timing) = &mut ready.record.capture {
         timing.block_syncs = blocks.syncs();
     }
-    if let Some(arrived) = job.last_arrival
-        && let Some(timing) = &mut ready.record.capture
-    {
-        timing.durable =
-            DurableTime::Measured(u64::try_from(arrived.elapsed().as_nanos()).unwrap_or(u64::MAX));
+    // Durable is measured only when every body the call has was placed. A
+    // call the store refused a body of is unrecorded and claims no duration.
+    if let Some(timing) = &mut ready.record.capture {
+        if ready.record.status == CallStatus::Unrecorded {
+            timing.durable = DurableTime::NotPlaced;
+        } else if let Some(arrived) = job.last_arrival {
+            timing.durable = DurableTime::Measured(
+                u64::try_from(arrived.elapsed().as_nanos()).unwrap_or(u64::MAX),
+            );
+        }
     }
     Ok(())
 }
