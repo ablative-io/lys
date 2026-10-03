@@ -1,20 +1,43 @@
-/* Readable terminal nodes and recorded edges share the existing Lys palette and controls. */
-.session-canvas-scroll { overflow: auto; margin-top: 20px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); }
+/* A surface of windows: terminals and the things they are connected to, placed by the person, in the existing Lys palette. */
+.session-canvas-page > .head { align-items: center; justify-content: flex-start; gap: 14px; }
+.session-canvas-page > .head h1 { font-size: 16px; margin: 0; }
+.canvas-about, .canvas-connections { position: relative; font-size: 12.5px; color: var(--text-secondary); }
+.canvas-about > summary, .canvas-connections > summary { cursor: pointer; }
+.canvas-about[open] > p, .canvas-connections[open] > ul, .canvas-connections[open] > p { position: absolute; z-index: 20; top: 22px; left: 0; width: min(640px, 70vw); max-height: 50vh; overflow: auto; margin: 0; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.canvas-connections li { margin: 8px 0; overflow-wrap: anywhere; }
+.session-canvas-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 6px; font-size: 12.5px; }
+.session-canvas-strip > p { margin: 0; }
+.fill > .session-canvas-scroll { flex: 1; min-height: 0; margin-top: 8px; }
+.session-canvas-scroll { position: relative; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); cursor: grab; touch-action: none; }
+.session-canvas-scroll:active { cursor: grabbing; }
 .session-canvas-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.session-canvas { position: relative; display: grid; grid-template-columns: 200px minmax(600px, 1fr) 240px; gap: 48px; padding: 24px; min-width: 1184px; }
-.session-canvas-column { display: flex; flex-direction: column; gap: 14px; z-index: 1; min-width: 0; }
-.session-canvas-column > h2 { color: var(--text-secondary); font-size: 13px; font-weight: 500; }
-.session-canvas-node { min-width: 0; padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); overflow-wrap: anywhere; }
-.session-canvas-node > h3 { margin: 0 0 6px; font-size: 15px; }
-.session-canvas-node > .note { margin: 4px 0 10px; }
-.session-canvas-node .terminal { padding: 0; border: 0; }
-.session-canvas-node .terminal-screen { height: 420px; }
-.session-canvas-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.session-canvas-tools { position: absolute; z-index: 10; top: 8px; right: 8px; display: flex; gap: 6px; }
+.session-canvas { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+.session-canvas-lines { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; overflow: visible; }
 .session-canvas-lines path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
 .session-canvas-lines path[data-kind="membership"] { stroke: var(--text-muted); }
 .session-canvas-lines path[data-kind="message"] { stroke: var(--text-primary); }
 .session-canvas-lines path[data-kind="identity"] { stroke: var(--text-secondary); stroke-dasharray: 2 3; }
 .session-canvas-lines path[data-standing="false"] { stroke-dasharray: 5 4; opacity: .6; }
-.canvas-connections { margin-top: 16px; }
-.canvas-connections li { margin: 8px 0; overflow-wrap: anywhere; }
-.fill > .session-canvas-scroll { flex: 1; min-height: 0; margin-top: 12px; }
+.session-canvas-node { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); overflow: hidden; cursor: default; }
+.session-canvas-bar { flex: none; display: flex; align-items: center; gap: 10px; height: 34px; box-sizing: border-box; padding: 0 6px 0 12px; cursor: grab; user-select: none; white-space: nowrap; overflow: hidden; }
+.session-canvas-bar:active { cursor: grabbing; }
+.session-canvas-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.session-canvas-bar > h3 { margin: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.session-canvas-bar > .note { margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.session-canvas-bar > .btn { margin-left: auto; padding: 3px 9px; font-size: 12px; }
+.session-canvas-node:not(.sessions) > .session-canvas-bar { height: 52px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
+/* An open window has one bar: the terminal's own state and Stop sit in it, left of the close control, and its second name is not shown. */
+.session-canvas-node.open > .session-canvas-bar { padding-right: 6px; border-bottom: 1px solid var(--border-subtle); }
+.session-canvas-node .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; gap: 0; border: 0; border-radius: 0; }
+.session-canvas-slot { flex: none; width: 190px; margin-left: auto; }
+.session-canvas-node.open > .session-canvas-bar > .btn { flex: none; width: 150px; margin-left: 0; }
+.session-canvas-node .terminal-head { position: absolute; top: 0; right: 166px; width: 190px; height: 34px; justify-content: flex-end; gap: 10px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+.session-canvas-node .terminal-state { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.session-canvas-node .terminal-head > div { display: none; }
+.session-canvas-node .terminal-head .btn { padding: 2px 9px; font-size: 12px; }
+.session-canvas-node .terminal-renderer { display: none; }
+.session-canvas-node .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.session-canvas-node .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
+.session-canvas-node .terminal-stop { margin: 6px; }
+.session-canvas-grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--border-default) 50%); }

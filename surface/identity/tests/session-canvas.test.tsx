@@ -2,7 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, click, mount, text } from './harness';
 import { ADA, GRANTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { act } from 'react';
 import { mockTerminal } from './terminal-double';
+import { lineBetween, placed } from '../src/features/runtime/SessionCanvas';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
 const session = 'op-' + '7'.repeat(32);
@@ -15,6 +17,8 @@ const routes = {
 
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  // The arrangement is kept in the browser; each test starts from none.
+  localStorage.clear();
 });
 
 describe('Agent canvas', () => {
@@ -94,5 +98,38 @@ describe('Agent canvas', () => {
   it('is reached from an agent\'s file', async () => {
     await mount('#/file/' + SCRIBE, routes);
     expect($('a[data-act="canvas"]')?.getAttribute('href')).toBe('#/canvas/' + SCRIBE);
+  });
+  it('opens more than one terminal at once, each in its own window', async () => {
+    const other = 'op-' + '8'.repeat(32);
+    const bytes = (id: string) => ok({ session: id, answer: { kind: 'bytes', output: { session: id, from: 0, cursor: 0, oldest: 0, data: [], ended: { how: 'exited', at: 1, status: 0, signal: null } } }, receipt: { index: 2 } });
+    await mount('#/runtime/canvas', {
+      ...routes,
+      '/runtime/live': ok({ sessions: [running, { ...running, session: other }], unanswered: [] }),
+      ...Object.fromEntries([session, other].flatMap((id) => [['POST /runtime/sessions/' + id + '/resize', ok({ receipt: { index: 1 } })], ['POST /runtime/sessions/' + id + '/read-bytes', bytes(id)]])),
+    });
+    const windows = [...document.querySelectorAll<HTMLElement>('.session-canvas-node.sessions')];
+    expect(windows).toHaveLength(2);
+    for (const one of windows) await click(one.querySelector('button'));
+    expect(document.querySelectorAll('.session-canvas-node.open .terminal')).toHaveLength(2);
+  });
+
+  it('moves a window with the arrow keys and keeps where it was put', async () => {
+    await mount('#/runtime/canvas', routes);
+    const one = $('.session-canvas-node.sessions') as HTMLElement;
+    const before = parseFloat(one.style.left);
+    await act(async () => { one.querySelector('.session-canvas-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
+    expect(parseFloat(one.style.left)).toBe(before + 16);
+    const kept = JSON.parse(localStorage.getItem('lys.canvas') ?? 'null') as { boxes: Record<string, { x: number }> };
+    expect(kept.boxes['session:' + session].x).toBe(before + 16);
+  });
+
+  it('places every node once, leaves a moved one where it is, and joins two windows edge to edge', () => {
+    const node = (id: string, column: 'teams' | 'sessions' | 'resources') => ({ id, column, title: id, detail: '' });
+    const graph = { nodes: [node('t', 'teams'), node('a', 'sessions'), node('b', 'sessions'), node('r', 'resources')], edges: [], notices: [], unanswered: [], names: {} };
+    const boxes = placed(graph, { b: { x: 5, y: 6, w: 7, h: 8 } }, new Set(['a']));
+    expect(boxes.b).toEqual({ x: 5, y: 6, w: 7, h: 8 });
+    expect(boxes.t.x < boxes.a.x && boxes.a.x + boxes.a.w < boxes.r.x).toBe(true);
+    expect([boxes.a.w, boxes.a.h]).toEqual([760, 480]);
+    expect(lineBetween({ x: 0, y: 0, w: 10, h: 20 }, { x: 110, y: 100, w: 10, h: 20 })).toBe('M 10 10 C 60 10, 60 110, 110 110');
   });
 });
