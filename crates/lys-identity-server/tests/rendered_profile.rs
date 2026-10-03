@@ -116,7 +116,8 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
         },
         &handles,
     )?;
-    let view = json!({"agent": "agent", "session": "session", "provisioning_version": 1,
+    let view = json!({"agent": "agent", "session": "session", "directory": "/srv/agents/agent",
+        "provisioning_version": 1,
         "template": rendered.template, "template_sha256": rendered.template_sha256, "handles": handles});
     let dir = tempfile::tempdir()?;
     let mut store = ProvisioningStore::open(&dir.path().join("profiles.json"))?;
@@ -149,6 +150,10 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
             .get("LYS_HANDLE_SERVER_TOKEN")
             .map(String::as_str),
         Some("h-kept")
+    );
+    assert_eq!(
+        first.directory, "/srv/agents/agent",
+        "the kept start runs in the folder its start named"
     );
     let config = first.config.as_ref().ok_or("no config")?;
     let file = |name: &str| {
