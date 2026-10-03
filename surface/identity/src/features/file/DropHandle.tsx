@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { operationId } from '../../api';
 import { useRoleChange } from '../roles/useRoleChange';
-import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
+import { ChangeStatus } from '../roles/ChangeStatus';
 interface DropAnswer { handle: string; operation: string; outcome: 'ended' | 'repeated' | 'already_ended'; ended: string[]; stopped_here: boolean; upstream: 'not_asked' | 'unconfirmed' | 'confirmed'; upstream_reason: string | null }
 export function DropHandle({ handle, person, dropped }: { handle: string; person: string; dropped: boolean }) {
   const [confirm, setConfirm] = useState(false);

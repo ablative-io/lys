@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { operationId } from '../../api';
 import { useRoleChange } from '../roles/useRoleChange';
-import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
+import { ChangeStatus } from '../roles/ChangeStatus';
 import type { CertificatesAnswer } from './AgentCertificates';
 
 export function IssueCertificate({ agent, person, changed }: { agent: string; person: string; changed: () => void }) {

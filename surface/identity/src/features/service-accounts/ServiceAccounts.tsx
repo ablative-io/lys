@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api, operationId, request, useLoad } from '../../api';
 import type { MeView, ServiceAccount } from '../../generated';
 import { DirectoryGate as Gate, IdentityName } from '../people/Words';
-import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
+import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 import { clock } from '../file/time';
 import { Listing } from '../../shell/Listing';

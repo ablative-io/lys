@@ -5,7 +5,7 @@ import { api, operationId, request, useLoad } from '../../api';
 import type { Login } from '../../generated';
 import { DirectoryGate as Gate } from '../people/Words';
 import { useRoleChange } from '../roles/useRoleChange';
-import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
+import { ChangeStatus } from '../roles/ChangeStatus';
 import { entries } from '../people/directory';
 import { TeamMembers } from './TeamActions';
 import { TeamUsage } from '../usage/Usage';

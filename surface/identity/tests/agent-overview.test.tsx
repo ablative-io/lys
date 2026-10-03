@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { $, $$, serve } from './harness';
-import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { $, $$, choose, click, serve, settle, text } from './harness';
+import { ADA, ME, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
 let root: Root | null = null;
@@ -78,6 +78,32 @@ describe('An agent page explains the agent before its controls', () => {
     expect($('.file details')).toBeNull();
     expect($('.file .head .fileno')?.textContent).toBe(SCRIBE);
     expect(posted).toEqual([]);
+  });
+
+  it('adds the agent to a team and removes it from one on its own page, each as one confirmed change', async () => {
+    const teams = [{ id: 'team-one', name: 'Care team', state: 'active', owner: ADA, members: [SCRIBE] }, { id: 'team-two', name: 'Night team', state: 'active', owner: ADA, members: [] as string[] }];
+    const recorded = (body: unknown, act: string) => ({ operation: (body as { operation: string }).operation, act, member: SCRIBE, by: ME.signed_in, at: 1790000000 });
+    const { posted } = await open({ '/teams': () => ok({ teams }),
+      'POST /teams/team-two/members': (body) => { teams[1].members = [SCRIBE]; return ok({ ...teams[1], recorded: recorded(body, 'added') }); },
+      ['POST /teams/team-one/members/' + SCRIBE + '/remove']: (body) => { teams[0].members = []; return ok({ ...teams[0], recorded: recorded(body, 'removed') }); } });
+    await settle();
+    const about = () => $('[aria-label="About this agent"]');
+    await choose($('select[aria-label="Add to a team"]'), 'team-two');
+    expect(about()?.textContent).toContain('Add Scribe to Night team?');
+    expect(posted).toEqual([]);
+    await click($$('[aria-label="Confirm team change"] button').find((button) => button.textContent === 'Confirm add member') ?? null);
+    await settle();
+    expect(posted.at(-1)).toMatchObject({ path: '/teams/team-two/members', body: { member: SCRIBE } });
+    expect($('button[aria-label="Remove from Night team"]')).not.toBeNull();
+    expect($('select[aria-label="Add to a team"]')).toBeNull();
+    await click($('button[aria-label="Remove from Care team"]'));
+    expect(about()?.textContent).toContain('Remove Scribe from Care team?');
+    await click($$('[aria-label="Confirm team change"] button').find((button) => button.textContent === 'Confirm remove member') ?? null);
+    await settle();
+    expect(posted.at(-1)?.path).toBe('/teams/team-one/members/' + SCRIBE + '/remove');
+    expect(posted).toHaveLength(2);
+    expect($('button[aria-label="Remove from Care team"]')).toBeNull();
+    expect(text()).not.toContain('team-one');
   });
 
   it('says a saved model no program lists is unlisted instead of showing a bare id as its name', async () => {

@@ -1,21 +1,6 @@
 /** Failures explain the next act; identifiers remain available only in details. */
 import { Refused } from '../../api';
-import type { RoleChange } from '../roles/useRoleChange';
-
-const REFUSALS: Record<string, string> = {
-  NoPerson: 'Your sign-in account has not been connected to a person in Lys.',
-  NotAdmitted: 'Your account does not have permission to do this.',
-  SecretsUnavailable: 'Lys could not reach or use its secret storage service.',
-  SignInProvidersUnavailable: 'Lys could not read or change its sign-in services.',
-  SignInProvidersRefused: 'The sign-in service did not accept these settings.',
-  ProviderRefused: 'The provider did not accept these sign-in settings.',
-  HandleUnknown: 'That permission to use a secret was not found in the records you can see.',
-  RequestHeld: 'An earlier approval still has no confirmed result.',
-  LeaseExhausted: 'The permitted number of uses has been reached.',
-  app_exists: 'An app is already registered with that short name.',
-  schema_version_moved: 'Someone saved a newer version of these permissions.',
-  schema_change_strands_grants: 'These permissions are still in use and cannot be removed yet.',
-};
+import { refusalWords } from '../people/Words';
 
 /** Keep an unrecognised reason readable without repeating codes or raw identities. */
 export function plainReason(reason: string, hidden: string[] = []): string {
@@ -34,7 +19,7 @@ export function plainReason(reason: string, hidden: string[] = []): string {
 /** A definite refusal or an unconfirmed answer, followed by the screen's next step. */
 export function failureWords(error: unknown, next: string, hidden: string[] = []): string {
   const reason = error instanceof Refused
-    ? REFUSALS[error.refusal.refusal] ?? plainReason(error.refusal.reason, hidden)
+    ? refusalWords(error.refusal.refusal) ?? plainReason(error.refusal.reason, hidden)
     : plainReason(error instanceof Error ? error.message : String(error), hidden);
   return reason + ' ' + next;
 }
@@ -54,10 +39,3 @@ export function ReadFailure({ error, subject, administrator = false }: { error: 
 }
 
 export { IdentityName } from '../people/Words';
-
-/** Checking a pending change sends its original request, with no new request identity. */
-export function ChangeResult({ change }: { change: RoleChange }) {
-  return <>{change.pending ? <div role="status"><p>This change has no confirmed answer. Its original details are retained.</p>
-    <button className="btn" type="button" disabled={change.busy} onClick={change.retry}>Check original change</button></div> : null}
-    {change.failure ? <p role="alert" className="why-not">{failureWords(change.failure, 'Check the details. If the result is unconfirmed, choose Check original change; do not create another change.')}</p> : null}</>;
-}

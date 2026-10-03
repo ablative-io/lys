@@ -17,7 +17,7 @@ describe('Keep access', () => {
   it('recovers the original decision after a lost reply and remount', async () => {
     const first = await mount('#/reviews', { ...routes, ['POST ' + path]: refused(503, 'ReviewsUnavailable', 'Unknown outcome') });
     await click(button('Keep access')); await click(button('Confirm keep')); unmountAll(); document.body.innerHTML = '';
-    const later = await mount('#/reviews', { ...routes, ['POST ' + path]: kept }); await click(button('Check original change')); expect(later.posted).toEqual(first.posted);
+    const later = await mount('#/reviews', { ...routes, ['POST ' + path]: kept }); await click(button('Check whether Lys saved it')); expect(later.posted).toEqual(first.posted);
   });
   it('does not accept a receipt for a different reviewer', async () => {
     await mount('#/reviews', { ...routes, ['POST ' + path]: (body) => ok({ ...kept(body).body as object, kept_by: 'another-person' }) });
@@ -25,7 +25,10 @@ describe('Keep access', () => {
   });
   it('shows the named refusal when the grant no longer stands', async () => {
     await mount('#/reviews', { ...routes, ['POST ' + path]: refused(409, 'GrantNotDue', 'This grant has ended') });
-    await click(button('Keep access')); await click(button('Confirm keep')); expect(text()).toContain('This grant has ended'); expect(text()).not.toContain('GrantNotDue'); expect(text()).not.toContain('decision to keep this access was recorded');
+    await click(button('Keep access')); await click(button('Confirm keep')); expect(text()).toContain('This grant has ended');
+    // The refusal's name is kept small beside the sentence, as on every other form.
+    const face = document.body.cloneNode(true) as HTMLElement; for (const small of face.querySelectorAll('.refusal-name')) small.remove();
+    expect(face.textContent).not.toContain('GrantNotDue'); expect(text()).not.toContain('decision to keep this access was recorded');
   });
   it('does not offer a recording action when the store is unavailable', async () => {
     await mount('#/reviews', { ...routes, '/reviews': ok({ ...view, decisions_recorded: false }) }); expect(button('Keep access')).toBeNull(); expect(text()).toContain('This service does not record keep decisions.');

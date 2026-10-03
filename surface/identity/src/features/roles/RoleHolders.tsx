@@ -7,7 +7,7 @@ import { field } from '../people/RecordedForm';
 import { clock } from '../file/time';
 import type { Role, RoleAnswer, RoleHolder, RoleVersion } from './contract';
 import { useRoleChange } from './useRoleChange';
-import { DirectoryChangeStatus as ChangeStatus } from './ChangeStatus';
+import { ChangeStatus } from './ChangeStatus';
 import { IdentityName, PART } from '../people/Words';
 
 /** The holders table's last row: who, until when, and the button that assigns the latest saved version. */

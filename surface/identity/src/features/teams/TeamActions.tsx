@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { operationId } from '../../api';
 import type { Login } from '../../generated';
 import { useRoleChange } from '../roles/useRoleChange';
-import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
+import { ChangeStatus } from '../roles/ChangeStatus';
 import { sameLogin } from './contract';
 import type { Member, Team, TeamChanged } from './contract';
 type Action = { act: 'added' | 'removed' | 'retired' | 'confirmed'; member: string | null };
@@ -60,4 +60,28 @@ function Act({ team, login, action, memberName, storageKey, changed, cancel }: {
     <button className="btn primary" disabled={change.blocked} onClick={() => change.submit({ operation: operationId(), ...(action.act === 'added' ? { member: action.member } : {}) })}>Confirm {word}</button>
     <button className="btn" disabled={change.busy || change.pending} onClick={cancel}>Cancel</button><ChangeStatus change={change} />
   </section>;
+}
+
+/** An agent's teams on its own page: each team it is in, with Remove where the signed-in person manages that team, and one control that adds it to another. The same confirmed change, on the same kept record, as the Members table. */
+export function AgentTeams({ agent, name, teams, person, login, administrator, changed }: { agent: string; name: string; teams: Team[]; person: string; login: Login; administrator: boolean; changed: () => void }) {
+  const key = (team: Team) => 'lys.pending.team.' + person + '.' + team.id;
+  const manages = (team: Team) => team.state === 'active' && (administrator || team.owner === person);
+  const [initial] = useState(() => {
+    try {
+      for (const team of teams.filter(manages)) { const action = held(key(team), team.id); if (action) return { open: { team, action }, error: '' }; }
+      return { open: null, error: '' };
+    } catch (error) { return { open: null, error: String(error) }; }
+  });
+  const [open, setOpen] = useState<{ team: Team; action: Action } | null>(initial.open);
+  const inTeams = teams.filter((team) => team.state === 'active' && team.members.includes(agent));
+  const addable = teams.filter((team) => manages(team) && !team.members.includes(agent));
+  const blocked = Boolean(open) || Boolean(initial.error);
+  return <>
+    {inTeams.length ? inTeams.map((team) => <span key={team.id} className="agent-team"><a href="#/people/view/teams">{team.name}</a>
+      {manages(team) ? <button className="btn" type="button" aria-label={'Remove from ' + team.name} disabled={blocked} onClick={() => setOpen({ team, action: { act: 'removed', member: agent } })}>Remove</button> : null}</span>) : 'No team yet'}
+    {addable.length ? <select aria-label="Add to a team" value="" disabled={blocked} onChange={(event) => { const team = addable.find((each) => each.id === event.target.value); if (team) setOpen({ team, action: { act: 'added', member: agent } }); }}>
+      <option value="">Add to a team</option>{addable.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select> : null}
+    {initial.error ? <p className="why-not" role="alert">{initial.error}</p> : null}
+    {open ? <Act team={open.team} login={login} action={open.action} memberName={open.action.member === agent ? name : null} storageKey={key(open.team)} changed={() => { setOpen(null); changed(); }} cancel={() => setOpen(null)} /> : null}
+  </>;
 }

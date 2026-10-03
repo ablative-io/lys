@@ -7,7 +7,7 @@ import { field } from '../people/RecordedForm';
 import { roleWordsOf, sameWords } from './contract';
 import type { GrantTemplate, Role } from './contract';
 import { useRoleChange } from './useRoleChange';
-import { DirectoryChangeStatus as ChangeStatus } from './ChangeStatus';
+import { ChangeStatus } from './ChangeStatus';
 
 export function RoleEditor({ role, person, model, changed }: { role?: Role; person: string; model: GrantModel; changed: (answer: Role) => void }) {
   const current = role?.versions.find((version) => version.number === role.latest);

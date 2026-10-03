@@ -10,6 +10,7 @@ import { ProfileFields } from '../provisioning/ProfileEditor';
 import { SaveSettings } from '../provisioning/SaveSettings';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { Team } from '../teams/contract';
+import { AgentTeams } from '../teams/TeamActions';
 import { Pill } from '../people/Pill';
 import { AgentRun } from '../team/AgentRun';
 import './agent-overview.css';
@@ -75,22 +76,24 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
   const [revision, setRevision] = useState(0);
   const reload = () => setRevision((value) => value + 1);
   const profile = useLoad(() => readProfile(agent.id), 'agent-about-profile:' + agent.id + ':' + revision);
-  const teams = useLoad(readTeams, 'agent-about-teams:' + agent.id);
+  const [teamRevision, setTeamRevision] = useState(0);
+  const me = useLoad(api.me, 'agent-about-me');
+  const teams = useLoad(readTeams, 'agent-about-teams:' + agent.id + ':' + teamRevision);
   const network = useLoad(readNetwork, 'agent-about-computers:' + agent.id);
   const programs = useLoad(readPrograms, 'agent-about-programs:' + agent.id);
   const choices = useLoad(() => readChoices(), 'agent-about-choices:' + agent.id);
   const people = useLoad(api.people, 'agent-about-people');
-  const held = teams.status === 'ok' ? teams.data.filter((team) => team.state === 'active' && team.members.includes(agent.id)) : [];
   const computer = profile.status === 'ok' ? profile.data?.runs_on : undefined;
   const machine = network.status === 'ok' ? network.data.find((entry) => entry.id === computer) : undefined;
   const saved = profile.status === 'ok' ? profile.data?.model_access ?? [] : [];
   const models = programs.status === 'ok' ? saved.map((id) => modelName(programs.data, id)).join(', ') : '';
-  const problems = [profile, teams, network, programs, choices, people].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
+  const problems = [profile, teams, network, programs, choices, people, me].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
   return <><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
   <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
-      <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : held.length ? held.map((team, index) => <span key={team.id}>{index ? ', ' : ''}<a href="#/people/view/teams">{team.name}</a></span>) : 'No team yet'}</dd>
+      <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : me.status !== 'ok' ? reading(me, 'who is signed in')
+        : <AgentTeams key={teamRevision} agent={agent.id} name={agent.display_name} teams={teams.data} person={me.data.person.id} login={me.data.signed_in} administrator={people.status === 'ok' && people.data.scope === 'directory'} changed={() => setTeamRevision((value) => value + 1)} />}</dd>
       {profile.status === 'ok' && profile.data?.harness && choices.status === 'ok' && people.status === 'ok'
         ? <><dt>Model and computer</dt><dd><ProfileFields brief key={profile.data.version} profile={profile.data} choices={choices.data} agent={agent.id} canChoose={people.data.scope === 'directory'} render={(fields, settings, refusal) => <>
           {fields}<SaveSettings agent={agent.id} profile={profile.data} settings={settings} refusal={refusal} canSave={people.data.scope === 'directory'} people={people.data} machines={choices.data.machines} saved={reload} />

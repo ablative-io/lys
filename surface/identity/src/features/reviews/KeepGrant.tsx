@@ -1,7 +1,7 @@
 /** Keeping access records the reviewer's exact decision; it never renews or widens the grant. */
 import { useRef, useState } from 'react';
 import { operationId } from '../../api';
-import { ChangeResult } from '../signin/words';
+import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 export interface Kept { grant: string; kept_by: string; note: string; operation: string; at: number; revision: number }
 export function KeepGrant({ grant, person, changed }: { grant: string; person: string; changed: (answer: Kept) => void }) {
@@ -19,5 +19,5 @@ export function KeepGrant({ grant, person, changed }: { grant: string; person: s
       <p>Record that this access is still needed. Its permissions and expiry stay the same.</p>
       <label className="field">Review note (optional)<textarea maxLength={500} value={note} disabled={change.blocked} onChange={(event) => setNote(event.target.value)} /></label>
       <button className="btn primary" type="submit" disabled={change.blocked}>Confirm keep</button><button className="btn" type="button" disabled={change.busy} onClick={() => setOpen(false)}>Cancel</button>
-    </form> : null}<ChangeResult change={change} /></>;
+    </form> : null}<ChangeStatus change={change} /></>;
 }

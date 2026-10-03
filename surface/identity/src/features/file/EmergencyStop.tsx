@@ -1,7 +1,7 @@
 /** The emergency stop of an agent: suspend it, withdraw its certificates, end its credential handles and ask every runtime to end its sessions. Nothing here claims a session ended. */
 import { useState } from 'react';
 import { operationId } from '../../api';
-import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
+import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 
 /** The answer of `POST /agents/{id}/stop`. */

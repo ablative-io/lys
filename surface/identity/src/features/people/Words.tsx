@@ -5,7 +5,8 @@ import type { PeopleView } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { entries } from './directory';
 
-const explanations: Record<string, string> = {
+/** The one table of what a named refusal means and what to do next. */
+const REFUSALS: Record<string, string> = {
   NotAdmitted: 'You do not have permission to do this. Ask the directory administrator to make the change.',
   not_permitted: 'You do not have permission to do this. Ask the responsible person or the administrator.',
   NoPerson: 'Your sign-in account is not connected to a person in the directory. Ask the administrator to connect it.',
@@ -22,11 +23,23 @@ const explanations: Record<string, string> = {
   UnconfirmedReceipt: 'The answer did not confirm this change. Use Check whether Lys saved it before sending another.',
   StorageUncertain: 'The change may have been saved, but its outcome is unknown. Use Check whether Lys saved it before sending another.',
   ServiceUnreachable: 'Lys could not be reached. Ask the administrator to check the service. Keep any change whose outcome is unknown.',
+  SecretsUnavailable: 'Lys could not reach or use its secret storage service. Ask the administrator to check it.',
+  SignInProvidersUnavailable: 'Lys could not read or change its sign-in services. Ask the administrator to check them.',
+  SignInProvidersRefused: 'The sign-in service did not accept these settings.',
+  ProviderRefused: 'The provider did not accept these sign-in settings.',
+  HandleUnknown: 'That permission to use a secret was not found in the records you can see.',
+  RequestHeld: 'An earlier approval still has no confirmed result.',
+  LeaseExhausted: 'The permitted number of uses has been reached.',
+  app_exists: 'An app is already registered with that short name.',
+  schema_version_moved: 'Someone saved a newer version of these permissions.',
+  schema_change_strands_grants: 'These permissions are still in use and cannot be removed yet.',
 };
+
+export const refusalWords = (code: string): string | undefined => REFUSALS[code];
 
 export function problemWords(problem: unknown): string {
   const code = problem instanceof Refused ? problem.refusal.refusal : String(problem).split(':')[0];
-  if (explanations[code]) return explanations[code];
+  if (REFUSALS[code]) return REFUSALS[code];
   if (code.endsWith('Unavailable')) return 'This part of Lys cannot answer. Ask the administrator to check the service. Keep any change whose outcome is unknown.';
   return 'Lys could not complete this request. Ask the administrator to check the error details before repeating a change.';
 }
