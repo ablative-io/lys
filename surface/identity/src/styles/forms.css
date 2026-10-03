@@ -27,12 +27,10 @@ select {
 }
 select option { background: var(--surface-default); color: var(--text-primary); }
 input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; padding: 0; }
-.btn { cursor: pointer; min-height: 32px; transition: background .12s ease, border-color .12s ease, transform .08s ease; }
-.btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn.primary:disabled { background: var(--accent-deep); }
-.btn.lg { padding: 9px 16px; font-size: 13px; }
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface-hover); color: var(--text-secondary); }
+/* The one pill: what the two earlier definitions drew together. */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; margin: 2px 4px 2px 0; border: 1px solid var(--border-default); border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface-hover); color: var(--text-secondary); }
+.pill.human { border-color: rgba(212,151,90,.4); color: var(--accent); text-decoration: none; }
+.pill.off { opacity: .45; text-decoration: line-through; }
 .pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted-dot); }
 .pill.ok { background: var(--ok-glow); color: var(--ok); }
 .pill.ok::before { background: var(--ok); }
