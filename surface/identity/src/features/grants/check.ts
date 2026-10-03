@@ -30,12 +30,14 @@ export async function ask(caller: string, who: string, whoName: string, resource
   }
   let after: string | null = null;
   let revision = 0;
-  for (let page = 0; page < 1000; page += 1) {
+  // Every page is read before the answer is No. A page that names itself as the next one is a fault of the service and is said, never read forever.
+  for (;;) {
     const answer = await api.who({ route: 'browser', resource, action, page_size: PAGE_MAX, after });
     revision = answer.revision;
     const found = answer.holders.find((h) => h.holder === who);
     if (found) return { ...base, ok: true, permit: found };
     if (answer.complete || !answer.next) break;
+    if (answer.next === after) throw new Error('HoldersPageRepeated: the service named the same page as the next one, so who holds this cannot be read to its end.');
     after = answer.next;
   }
   return {

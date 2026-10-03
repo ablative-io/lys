@@ -4,19 +4,11 @@ import { Refused, operationId, request } from '../../api';
 import type { OrgTeam } from '../../shell/org';
 import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
+import { ago } from '../file/time';
 import type { Computer } from './Network';
 import type { Machine } from './contract';
 
 export type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
-
-/** How long ago, as a person says it. */
-function ago(seconds: number): string {
-  const gone = Math.max(0, Math.floor(Date.now() / 1000) - seconds);
-  if (gone < 60) return 'just now';
-  if (gone < 3600) return Math.floor(gone / 60) + ' min ago';
-  if (gone < 86400) return Math.floor(gone / 3600) + ' h ago';
-  return Math.floor(gone / 86400) + ' d ago';
-}
 
 /** Whether the computer is up, from what its runner last reported. */
 export function status({ machine, runner, reports, running }: Computer): { words: string; state: 'up' | 'down' | 'unknown' | 'off' } {

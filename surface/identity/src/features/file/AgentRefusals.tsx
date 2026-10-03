@@ -2,8 +2,9 @@
 import { request, useLoad } from '../../api';
 import { DirectoryGate as Gate } from '../people/Words';
 import type { RefusalRecord, RefusalsView } from './policyContract';
+import { clockMs } from './time';
 
-const when = (ms: number) => new Date(ms).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', timeZoneName: 'short' });
+const when = clockMs;
 
 function lift(refusal: RefusalRecord): string {
   if (!refusal.grantable) return 'not grantable';

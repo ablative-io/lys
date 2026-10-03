@@ -4,6 +4,7 @@ import { operationId } from '../../api';
 import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import type { GoalItem } from './contract';
+import { clock } from '../file/time';
 
 type Props = { agent: string; kind?: 'agent' | 'team'; goals: GoalItem[]; changed: (words: string) => void };
 
@@ -50,7 +51,7 @@ function GoalRow({ agent, item, changed }: { agent: string; item: GoalItem; chan
       </form>
       <ChangeStatus change={reword} />
     </td>
-    <td>{goal.deadline === null ? 'No deadline' : new Date(goal.deadline * 1000).toLocaleString()}</td>
+    <td>{goal.deadline === null ? 'No deadline' : clock(goal.deadline)}</td>
     <td>{STANDING[item.standing]}</td>
     <td>
       <label className="tick">Active<input type="checkbox" aria-label={'Goal active ' + goal.id} checked={goal.active} disabled={blocked}

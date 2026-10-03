@@ -9,6 +9,7 @@ import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Refused, useLoad } from '../../api';
 import { clock } from '../file/time';
+import { IdentityName } from '../people/Words';
 import { Gate } from '../signin/Gate';
 import type {
   Recipients,
@@ -58,7 +59,7 @@ export function GrantRows({ listing }: { listing: SecretGrantListing }) {
   if (!listing.grants.length) return <p className="note">No grants were returned on the secrets you can see.</p>;
   return <table><thead><tr><th>Secret</th><th>Who</th><th>What they may do</th><th>Granted by</th></tr></thead>
     <tbody>{listing.grants.map((grant) => <tr key={grant.identity + '\u0000' + grant.secret + '\u0000' + grant.relation}>
-      <td>{grant.secret}</td><td>{grant.identity}</td><td>{RELATION_WORDS[grant.relation] ?? grant.relation}</td><td>{grant.granted_by ?? 'Not recorded'}</td>
+      <td>{grant.secret}</td><td><IdentityName id={grant.identity} /></td><td>{RELATION_WORDS[grant.relation] ?? grant.relation}</td><td>{grant.granted_by ? <IdentityName id={grant.granted_by} /> : 'Not recorded'}</td>
     </tr>)}</tbody>
   </table>;
 }
@@ -93,7 +94,7 @@ export function AuditRows({ log, check }: { log: SecretAuditLog; check?: (handle
   return <table><thead><tr><th>#</th><th>When</th><th>What</th><th>Secret</th><th>For</th><th>Handle id</th><th>Uses so far</th><th>Outcome</th>{check ? <th>Revocation</th> : null}</tr></thead>
     <tbody>{lines.map((line) => <tr key={line.index}>
       <td>{line.index}</td><td>{clock(Math.floor(line.at_ms / 1000))}</td><td>{KIND_WORDS[line.kind] ?? line.kind}</td>
-      <td>{line.secret ?? ''}</td><td>{line.identity ?? ''}</td><td>{line.handle ?? ''}</td>
+      <td>{line.secret ?? ''}</td><td>{line.identity ? <IdentityName id={line.identity} /> : ''}</td><td>{line.handle ?? ''}</td>
       <td>{line.uses === null ? '' : line.uses}</td><td>{line.outcome}</td>
       {check ? <td>{line.handle ? <RevocationCheck handle={line.handle} check={check} /> : null}</td> : null}
     </tr>)}</tbody>

@@ -4,6 +4,7 @@ import { request, useLoad } from '../../api';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
 import { DirectoryGate as Gate } from '../people/Words';
+import { clock } from '../file/time';
 
 interface ResourceSummary { kind: string; id: string; standing: number; ended: number; holders: number }
 interface ResourcesView { kinds: string[]; resources: ResourceSummary[]; revision: number; judged_at: number }
@@ -27,7 +28,7 @@ export function Resources() {
       return <>
         <AccessTabs on="resources" />
     <div className="head">
-          <div><h1>Resources</h1><p className="sub">Resources named in grants you may see. Counts were checked at {new Date(list.judged_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })} Melbourne time, grant revision {list.revision}.</p></div>
+          <div><h1>Resources</h1><p className="sub">Resources named in grants you may see. Counts were checked at {clock(list.judged_at)}, grant revision {list.revision}.</p></div>
         </div>
         <p className="note">Grant counts describe recorded grants. Check access for the permission engine's current decision.</p>
         {list.resources.length ? null : <p>No resources appear in your visible grants yet.</p>}

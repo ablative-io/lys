@@ -7,8 +7,7 @@ type Receipt = { operation: string; grant: string; receipt: { caller: string } }
 
 export function planOf(value: unknown): Plan {
   const plan = value as Plan;
-  if (!plan || plan.version !== 1 || !Array.isArray(plan.resources) || !Array.isArray(plan.agents)
-    || plan.resources.length > 250 || plan.agents.length > 100) throw new Error('Expected an estate approval plan');
+  if (!plan || plan.version !== 1 || !Array.isArray(plan.resources) || !Array.isArray(plan.agents)) throw new Error('Expected an estate approval plan');
   const names = new Set(plan.agents.map((agent) => agent.display_name));
   if (names.size !== plan.agents.length || [...names].some((name) => typeof name !== 'string' || !name.trim())) throw new Error('Invalid agent names');
   const seen = new Set<string>();

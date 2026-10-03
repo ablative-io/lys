@@ -1,6 +1,7 @@
 /** Configuration pages show effective server values and link to supported management screens. */
 import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
+import { duration } from '../file/time';
 
 interface Configuration {
   source: 'startup_configuration'; mutable_in_browser: false;
@@ -19,7 +20,7 @@ export function EffectiveSettings({ section }: { section?: string }) {
   const load = useLoad(() => request<Configuration>('/configuration'), 'effective-configuration');
   return <Gate load={load} title="Configuration" ok={(settings) => <>
     <p className="note">These are the settings this service started with. Changing startup configuration requires an administrator to update the service configuration and restart it. This screen does not pretend to apply those changes live.</p>
-    {show('signin') ? <><h2>Sign-in</h2><dl className="facts"><dt>Provider</dt><dd>{settings.sign_in.provider_origin}</dd><dt>Session duration</dt><dd>{settings.sign_in.session_seconds} seconds</dd><dt>HTTPS-only session cookie</dt><dd>{settings.sign_in.secure_cookie ? 'Yes' : 'No'}</dd></dl><p></p></> : null}
+    {show('signin') ? <><h2>Sign-in</h2><dl className="facts"><dt>Provider</dt><dd>{settings.sign_in.provider_origin}</dd><dt>Session duration</dt><dd>{duration(settings.sign_in.session_seconds)}</dd><dt>HTTPS-only session cookie</dt><dd>{settings.sign_in.secure_cookie ? 'Yes' : 'No'}</dd></dl><p></p></> : null}
     {show('directory') ? <><h2>Directory</h2><dl className="facts"><dt>Role records</dt><dd>{configured(settings.directory.roles_configured)}</dd></dl><p><a className="btn" href="#/roles">Roles and assignments</a></p></> : null}
     {show('permissions') ? <><h2>Permissions</h2><dl className="facts"><dt>Model version</dt><dd>{settings.permissions.model_version}</dd><dt>Permission projection</dt><dd>{settings.permissions.projection === 'spicedb' ? 'SpiceDB' : 'Local'}</dd></dl><p><a className="btn" href="#/model">Read permission model</a> <a className="btn" href="#/access">Check access</a> <a className="btn" href="#/requests">Access requests</a></p></> : null}
     {show('secrets') ? <><h2>Secrets</h2><p>Broker: {configured(settings.secrets.configured)}.</p><p>Credential values are never included in these settings.</p><a className="btn" href="#/secrets">Open secrets</a></> : null}

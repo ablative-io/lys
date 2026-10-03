@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { api, Refused, useLoad } from '../../api';
 import type { Load } from '../../api';
+import type { PeopleView } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { entries } from './directory';
 
@@ -39,10 +40,17 @@ export function DirectoryGate<T>({ load, title, ok }: { load: Load<T>; title: st
   return <Gate load={load} title={title} ok={ok} renderError={(problem) => <ErrorWords problem={problem} />} />;
 }
 
-export function IdentityName({ id }: { id: string }) {
+/** The one namer of a person or agent: its name linked to its file, never its raw identifier. A screen that already holds the directory passes it; any other reads it here. */
+export function IdentityName({ id, people }: { id: string; people?: PeopleView }) {
+  return people ? <Named id={id} name={entries(people).find((entry) => entry.id === id)?.display_name} waiting={false} /> : <ReadName id={id} />;
+}
+function Named({ id, name, waiting }: { id: string; name: string | undefined; waiting: boolean }) {
+  return <a href={'#/file/' + encodeURIComponent(id)} title={id}>{name ?? (waiting ? 'Reading name…' : 'Name unavailable')}</a>;
+}
+function ReadName({ id }: { id: string }) {
   const load = useLoad(api.people, 'identity-name');
   const name = load.status === 'ok' ? entries(load.data).find((entry) => entry.id === id)?.display_name : undefined;
-  return <><a href={'#/file/' + encodeURIComponent(id)} title={id}>{name ?? (load.status === 'loading' ? 'Reading name…' : 'Name unavailable')}</a>{load.status === 'refused' ? <small className="refusal-name"> {load.refused.refusal.refusal}</small> : null}</>;
+  return <><Named id={id} name={name} waiting={load.status === 'loading'} />{load.status === 'refused' ? <small className="refusal-name"> {load.refused.refusal.refusal}</small> : null}</>;
 }
 
 export const STATUS: Record<string, string> = { registered: 'Awaiting activation', active: 'Active', suspended: 'Access suspended', retired: 'Permanently retired' };

@@ -1,6 +1,7 @@
 /** Saved emergency-stop outcomes are history, never a claim that a runtime has stopped. */
 import { Refused, request, useLoad } from '../../api';
 import { DirectoryGate as Gate } from '../people/Words';
+import { clock } from './time';
 
 interface StopRecord {
   agent: string;
@@ -54,7 +55,7 @@ export function StopHistory({ id }: { id: string }) {
     <Gate load={load} title="Emergency-stop history" ok={(stops) => stops.length ? stops.map((stop) => <article className="card" key={stop.operation}>
       <h3>{stop.done ? 'Stop recorded' : 'Stop requested — outcome not confirmed'}</h3><p>{stop.reason}</p>
       <dl className="facts">
-        <dt>Recorded at</dt><dd>{new Date(stop.at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', timeZoneName: 'short' })}</dd>
+        <dt>Recorded at</dt><dd>{clock(stop.at)}</dd>
         <dt>Requested by</dt><dd><a href={'#/file/' + encodeURIComponent(stop.by)}>{stop.by}</a></dd>
         {stop.done ? <>
         <dt>Authority after this stop</dt><dd>Suspended</dd>

@@ -1,6 +1,5 @@
 /** Failures explain the next act; identifiers remain available only in details. */
 import { Refused } from '../../api';
-import type { PeopleView } from '../../generated';
 import type { RoleChange } from '../roles/useRoleChange';
 
 const REFUSALS: Record<string, string> = {
@@ -54,21 +53,7 @@ export function ReadFailure({ error, subject, administrator = false }: { error: 
   </div>;
 }
 
-/** The name is returned only when the directory actually supplied one. */
-export function identityName(id: string, people?: PeopleView): string | null {
-  for (const person of people?.people ?? []) {
-    if (person.id === id) return person.display_name;
-    const agent = person.agents.find((entry) => entry.id === id);
-    if (agent) return agent.display_name;
-  }
-  return null;
-}
-
-/** A missing name never makes a raw identifier the primary label. */
-export function IdentityName({ id, people }: { id: string; people?: PeopleView }) {
-  const name = identityName(id, people);
-  return <span title={id}>{name ?? 'Name unavailable'}</span>;
-}
+export { IdentityName } from '../people/Words';
 
 /** Checking a pending change sends its original request, with no new request identity. */
 export function ChangeResult({ change }: { change: RoleChange }) {

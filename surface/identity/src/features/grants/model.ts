@@ -83,8 +83,11 @@ export const resourceLabel = (r: ResourceRef): string => {
 /** The chain from the root grant down to `g`. */
 export function chainOf(w: GrantWorld, g: Grant): Grant[] {
   const out: Grant[] = [];
+  const seen = new Set<string>();
   let at: Grant | undefined = g;
-  while (at && out.length < 64) {
+  // A chain is as long as it is; a grant met twice ends the walk, since a loop has no root to reach.
+  while (at && !seen.has(at.id)) {
+    seen.add(at.id);
     out.unshift(at);
     at = at.source ? w.byId.get(at.source) : undefined;
   }

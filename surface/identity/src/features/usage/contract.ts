@@ -1,3 +1,4 @@
+import { clockMs } from '../file/time';
 /** The budget, usage and goal shapes the identity service answers for one agent. */
 export type Measure = 'context_percent' | 'tokens' | 'running_ms' | 'dollars' | 'plan_percent';
 export type BudgetAct = 'compact' | 'notice' | 'stop' | 'tell';
@@ -67,7 +68,7 @@ export function tracking(usage: UsageView): { complete: boolean; words: string }
   if (usage.last_reported_ms === null) {
     return { complete: false, words: 'Tracking is incomplete: no usage has been reported for this agent, so its budgets cannot be reached.' };
   }
-  return { complete: true, words: 'Usage last reported ' + new Date(usage.last_reported_ms).toLocaleString() + '.' };
+  return { complete: true, words: 'Usage last reported ' + clockMs(usage.last_reported_ms) + '.' };
 }
 
 /** The legacy confirmation retains its full provenance beside the current collection. */

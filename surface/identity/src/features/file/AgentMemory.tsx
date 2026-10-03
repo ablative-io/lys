@@ -1,6 +1,7 @@
 /** Agent home metadata shows provenance and context receipts without exposing memory notes or transcripts. */
 import { request, useLoad } from '../../api';
 import { DirectoryGate as Gate } from '../people/Words';
+import { clockOf } from './time';
 
 export interface MemoryAnswer {
   agent: string;
@@ -11,7 +12,7 @@ export interface MemoryAnswer {
   visible_to: { agent: string; responsible: string | null; administrator: boolean };
   notes_shown: false;
 }
-const date = (value: string) => new Date(value).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', timeZoneName: 'short' });
+const date = clockOf;
 export function AgentMemory({ id }: { id: string }) {
   const load = useLoad(async () => {
     const answer = await request<MemoryAnswer>('/agents/' + encodeURIComponent(id) + '/memory');
