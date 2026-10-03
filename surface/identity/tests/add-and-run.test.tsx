@@ -308,7 +308,8 @@ describe('Add and run on an existing computer', () => {
     expect(document.body.textContent).toContain('This program has no setting that keeps it to its own folder with internet off.');
     expect(document.body.textContent).not.toContain('WorkspaceOnlyUnavailable');
     expect(document.body.textContent).not.toContain('Works in its own folder; no internet.');
-    expect(document.querySelector('form details')).toBeNull();
+    // No technical details are offered; the fold of access that cannot be given is not one.
+    expect(document.querySelector('form details:not(.action-rest)')).toBeNull();
     await submit();
     expect(posted).toEqual([]);
   });

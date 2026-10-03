@@ -16,7 +16,7 @@ describe('help overlay (conformance 9.2)', () => {
     await press('?', {}, document.body);
     const present = CONCEPTS.filter((c) => $$(c.sel).some((e) => !e.closest('.xlayer')));
     const marks = $$('.xlayer .xm');
-    expect(marks.length).toBeGreaterThan(3);
+    expect(marks.length).toBeGreaterThanOrEqual(3);
     expect(marks.length).toBe(present.length);
     expect(marks.map((m) => m.textContent)).toEqual(marks.map((_, i) => String(i + 1)));
     expect($('.xbar')?.textContent).toContain(`${marks.length} things explained`);

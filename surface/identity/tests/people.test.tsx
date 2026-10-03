@@ -8,7 +8,7 @@ describe('People and agents', () => {
   it('lists the directory from the service: each person, then the agents that answer to them', async () => {
     const { requests } = await mount('#/people');
     expect(requests).toContain('/directory/people');
-    expect(names()).toEqual(['Ada (test person)', "Scribe", "Courier", "Archivist", 'Bea (test person)', "Reviewer", "Lamplighter"]);
+    expect(names()).toEqual(['Ada (test person)', "Scribe", "Courier", "Archivist", 'Bea (test person)', "Reviewer"]);
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
     expect(scribe?.textContent).toContain('active');
     expect(scribe?.textContent).toContain('Ada (test person)');

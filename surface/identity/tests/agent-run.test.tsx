@@ -183,7 +183,8 @@ describe('An agent\'s run on People and agents', () => {
     // Setting it up happens under its row on the front page; the person is not sent to another page.
     expect(location.hash).toBe('#/team/' + SCRIBE);
     expect($('.you-setup section[aria-label="Settings of this agent"]')).not.toBeNull();
-    await click(button('Close'));
+    // Earlier mounts in this case leave their own Close on the page, so the one under the form is named.
+    await click($$('.you-setup button').find((el) => el.textContent === 'Close') ?? null);
     expect($('.you-setup')).toBeNull();
   });
 
