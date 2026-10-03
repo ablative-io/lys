@@ -60,6 +60,28 @@ The fix is to make the Lys home the memory. A memory is a note against a thing, 
 
 **E4, in parallel if disk allows.** Import my session into a home and prove resume, which is the safety piece and independent of the rest.
 
+## Tom's rulings on the afternoon of 3 October (13:53 to 14:21), in his words where they matter
+
+- Curate the notes; never auto-extract. Extraction may only propose; a person or the seat that
+  lived it writes the note. Claude Code's own auto-memory is turned off and replaced with our
+  directive. (13:54, 13:56)
+- Every note carries YAML frontmatter with keywords and metadata: the referents (what the note is
+  about: a file, a symbol, a person, a card, a day). The index is generated from the frontmatter,
+  never hand-kept. (13:54)
+- The system prompt is never touched by any of this: it is the prompt cache. The memory index is
+  injected through the proxy, as a block the model is told about once, after each compaction and
+  every two hundred thousand tokens or so. (13:46, 14:21)
+- Short-term memory is hard-capped, with eviction and promotion: what is engaged with is promoted
+  to a note, what is not is evicted. Nothing accumulates by default. (13:59)
+- Vector hits are labelled "returned by vector matching, not guaranteed to be related", never
+  "related". Kinship is a band of its own below exact, structural and lexical, never blended. (14:06)
+- Sub-agents cannot judge which rules still stand; a still_true column from an agent is binned.
+  The audit table is kept for its referents and dates, not its verdicts. (14:13)
+- Embed every memory file and the session file itself; the meridian-life embed server is fine for
+  it, one pinned checkpoint, never two models' vectors compared. (14:14)
+- "Not my answer, not your answer, the right answer": the notebook's hypotheses are written before
+  the run and the numbers decide. Memory is efficiency; the measure is engagement, pull first. (13:49)
+
 ## Decisions that are Tom's
 
 Where the library lives: a home per seat with the canon as the shared tier, or one shared home. The push budget as a share of context. The embedding model, where bge-base is already in use and pinned. Whether the memory directive in my system prompt becomes the lantern command, which changes what every session is given and is recorded by the given record. And the standing question the Norn design has waited on since August: the log as the ruling of record.

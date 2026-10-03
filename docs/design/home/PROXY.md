@@ -71,6 +71,9 @@ of it.
 - Inject typed text into the stream for the model: a heads-up display, channel notifications,
   the result of background work, as structured blocks the model is told about once.
 - Compaction in the background, off the critical path, with the result injected.
+- The memory index (generated from the notes' frontmatter, see MEMORY.md) injected as one typed
+  block after each compaction and every two hundred thousand tokens or so; the system prompt is
+  never touched, because it is the prompt cache (Tom, 3 Oct 13:46 and 14:21).
 - Token by token to speech: Claude Code streams responses and tool-call input as fragments,
   so an observer can hand the words of a Dot say to speech while the call is still being
   written. Dot becomes an adapter on the stream.
