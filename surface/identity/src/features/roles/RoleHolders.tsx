@@ -66,7 +66,7 @@ export function RoleHolders({ role, person, admin, changed }: { role: Role; pers
       <h3><a href={'#/file/' + holder.holder}>{holder.display_name ?? 'Name unavailable'}</a> · Version {holder.version} · {holder.state}</h3>
       <p>{holder.ends_at === null ? 'No expiry.' : 'Until ' + clock(holder.ends_at) + '.'} {holder.behind ? 'A newer version is available.' : ''}</p>
       {admin && holder.state === 'holding' ? <div>{holder.behind ? <HolderAction role={role} holder={holder} person={person} action="move" changed={changed} /> : null}<HolderAction role={role} holder={holder} person={person} action="end" changed={changed} /></div> : null}
-      <details><summary>Assignment history</summary><p>Assigned {clock(holder.assigned_at)} by <IdentityName id={holder.assigned_by} />.</p>{holder.moves.map((move, index) => <p key={index}>Version {move.from} → {move.to}, {clock(move.at)}, by <IdentityName id={move.by} />.</p>)}{holder.ended_at !== null ? <p>Ended {clock(holder.ended_at)} by {holder.ended_by ? <IdentityName id={holder.ended_by} /> : 'Name unavailable'}.</p> : null}</details>
+      <div className="note"><p>Assigned {clock(holder.assigned_at)} by <IdentityName id={holder.assigned_by} />.</p>{holder.moves.map((move, index) => <p key={index}>Version {move.from} → {move.to}, {clock(move.at)}, by <IdentityName id={move.by} />.</p>)}{holder.ended_at !== null ? <p>Ended {clock(holder.ended_at)} by {holder.ended_by ? <IdentityName id={holder.ended_by} /> : 'Name unavailable'}.</p> : null}</div>
     </article>) : <p>No holders yet.</p>}
   </section>;
 }

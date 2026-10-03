@@ -624,7 +624,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     // The wider route was asked, refused, and the personal scope answered instead.
     expect(requests.filter((r) => r === '/directory/people').length).toBeGreaterThan(0);
     expect(requests).toContain('/people');
-    expect($('.why-not details')?.textContent).toContain('PersonNotVisible');
+    expect($('.why-not .refusal-name')?.textContent).toContain('PersonNotVisible');
     expect(text()).toContain('not among the records you may see');
     expect(document.body.innerHTML).not.toContain(BEA_ROOT_G);
     expect(grantIdsOnScreen()).toEqual([]);

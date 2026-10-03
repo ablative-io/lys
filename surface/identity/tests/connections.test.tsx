@@ -19,7 +19,7 @@ describe('Connections', () => {
     expect(text()).toContain('Not configured');
     expect(text()).toContain('does not confirm that service is reachable');
     expect(text()).toContain('http://localhost:18080');
-    expect($$('details[open]')).toHaveLength(0);
+    expect($$('details')).toHaveLength(0);
     expect(unreachable()).toEqual([]);
     expect(requests.filter((path) => path === '/connections')).toHaveLength(1);
     expect(posted).toEqual([]);

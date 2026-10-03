@@ -138,7 +138,7 @@ export function IdentityFile() {
       <div className="page">
         <h1>Not found</h1>
         <p className="sub">This person or agent is not in the directory, or is not among the records you can see. Ask the administrator to check your access.</p>
-        <ErrorWords problem={load.refused} /><details><summary>Requested file details</summary><code>{id}</code></details>
+        <ErrorWords problem={load.refused} /><p className="note mono">{id}</p>
       </div>
     );
   }

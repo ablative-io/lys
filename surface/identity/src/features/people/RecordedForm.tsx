@@ -117,11 +117,11 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
       {children}
       <button className="btn primary" type="submit">{submitLabel ?? title}</button>
     </fieldset>
-    {pending ? directory ? <div role="status"><p>Lys has not confirmed whether it saved this change. Do not submit this change again. Use the button below to check the saved request.</p><details><summary>Saved request details</summary><code>{typeof pending === 'string' ? pending : pending.operation}</code></details></div> : <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
+    {pending ? directory ? <div role="status"><p>Lys has not confirmed whether it saved this change. Do not submit this change again. Use the button below to check the saved request. <small className="refusal-name">{typeof pending === 'string' ? pending : pending.operation}</small></p></div> : <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
     {pending && typeof pending !== 'string' ? <button className="btn" type="button" onClick={recover}>{directory ? 'Check whether Lys saved it' : 'Check original change'}</button> : null}
     {failure ? directory ? <ErrorWords problem={failure} /> : <p className="why-not" role="alert">{failure}</p> : null}
     {message ? <p role="status">{message}</p> : null}
-    {answer ? <details><summary>Recorded receipt</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
+    {answer ? <><h4>Recorded receipt</h4><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></> : null}
   </form>;
 }
 

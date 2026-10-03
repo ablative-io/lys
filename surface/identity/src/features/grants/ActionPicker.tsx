@@ -61,11 +61,11 @@ function GroupedActionPicker({ model, groups, selected, change, disabled = false
         onChange={(event) => change(event.target.checked ? [...selected.filter((id) => !choiceIds.has(id)), ...all] : selected.filter((id) => !allIds.has(id)))} /> Everything here</label> : null}
       {/* Each label sits directly in the fieldset, as "Everything here" does, so one rule sets every checkbox beside its words. */}
       {available.map(row)}
-      {/* What cannot be ticked is kept, with its reason, behind one line: the form shows what can be done first. */}
-      {refusedChoices.length ? <details className="action-rest">
-        <summary>{refusedChoices.length === 1 ? '1 more cannot be given' : refusedChoices.length + ' more cannot be given'}</summary>
+      {/* What cannot be ticked is kept, with its reason, under what can: the form shows what can be done first. */}
+      {refusedChoices.length ? <div className="action-rest">
+        <p className="note">{refusedChoices.length === 1 ? '1 more cannot be given' : refusedChoices.length + ' more cannot be given'}</p>
         {refusedChoices.map(row)}
-      </details> : null}
+      </div> : null}
     </fieldset>;
   })}</>;
 }

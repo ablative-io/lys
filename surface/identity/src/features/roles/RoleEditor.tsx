@@ -38,7 +38,7 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
     <fieldset disabled={change.blocked} style={{ border: 0, padding: 0 }}>
       {!role ? <label className="field">Role name<input name="name" required maxLength={100} /></label> : null}
       {(['responsibilities', 'goals', 'practice'] as const).map((name) => <label className="field" key={name}>{name === 'responsibilities' ? 'Responsibilities' : name === 'goals' ? 'Goals' : 'How the work is done'}<textarea name={name} required maxLength={4000} defaultValue={current?.[name] ?? ''} /></label>)}
-      <details><summary>Starting instructions and suggested access</summary>
+      <h3>Starting instructions and suggested access</h3>
         <label className="field">Starting instructions for an agent<textarea name="profile" maxLength={4000} defaultValue={current?.profile ?? ''} /></label>
         {rows.map(({ id, template }) => <fieldset key={id}><legend>Access template {id + 1}</legend>
           <label className="field">Type of thing this access covers<input name={'kind-' + id} required defaultValue={template.resource.kind} /></label>
@@ -49,7 +49,7 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
           <button className="btn" type="button" onClick={() => setRows((values) => values.filter((row) => row.id !== id))}>Remove template</button>
         </fieldset>)}
         <button className="btn" type="button" onClick={() => setRows((values) => [...values, { id: Math.max(-1, ...values.map((value) => value.id)) + 1, template: { resource: { kind: '', id: '' }, relation: '', days: null } }])}>Add access template</button>
-      </details>
+      
       <label className="field">Reason for this version<textarea name="note" required maxLength={500} /></label>
       <button className="btn primary" type="submit">{role ? 'Save this version' : 'Create role'}</button>
     </fieldset>

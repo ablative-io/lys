@@ -50,9 +50,7 @@ async function fill(selector: string, value: string) {
 
 function visibleWords(element: Element = document.body): string {
   const copy = element.cloneNode(true) as Element;
-  for (const details of copy.querySelectorAll('details:not([open])')) {
-    details.replaceChildren(details.querySelector('summary')?.cloneNode(true) ?? document.createTextNode(''));
-  }
+  for (const small of copy.querySelectorAll('.refusal-name')) small.remove();
   return copy.textContent ?? '';
 }
 
@@ -119,7 +117,7 @@ describe('Directory words and write answers', () => {
     expect(visibleWords()).toContain('Credentials tab');
   });
 
-  it('explains a failed credential read and keeps its code in details', async () => {
+  it('explains a failed credential read and keeps its code small beside the sentence', async () => {
     await show(<AgentCredentials id={SCRIBE} />, { ['/secrets/handles?holder=' + SCRIBE]: refused(503, 'SecretsUnavailable', 'the broker cannot answer') });
     expect(visibleWords()).toContain('Ask the administrator');
     expect(visibleWords()).not.toContain('SecretsUnavailable');

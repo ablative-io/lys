@@ -32,6 +32,6 @@ export function AssignedRoles({ id }: { id: string }) {
           : <ErrorWords problem={"RoleVersionMissing: " + role.id + " assignment " + holder.assignment + " names missing version " + holder.version} />}
       </section>;
     })}
-    {past.length ? <details className="card"><summary>Past role assignments ({past.length})</summary>{past.map(({ role, holder }) => <p key={holder.assignment}><a href={'#/roles/' + encodeURIComponent(role.id)}>{role.name}</a> · Version {holder.version} · {holder.state}{holder.ended_at === null ? '' : ' · ended ' + clock(holder.ended_at)}</p>)}</details> : null}
+    {past.length ? <section className="card" aria-label="Past role assignments"><h3>Past role assignments ({past.length})</h3>{past.map(({ role, holder }) => <p key={holder.assignment}><a href={'#/roles/' + encodeURIComponent(role.id)}>{role.name}</a> · Version {holder.version} · {holder.state}{holder.ended_at === null ? '' : ' · ended ' + clock(holder.ended_at)}</p>)}</section> : null}
   </>;
 }

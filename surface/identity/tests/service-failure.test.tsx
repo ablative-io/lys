@@ -4,9 +4,9 @@ import { mount, text } from './harness';
 import { SERVICE, refused } from './fixtures';
 
 function errorDetails() {
-  const detail = [...document.querySelectorAll('details')].find((entry) => entry.querySelector('summary')?.textContent === 'Error details');
+  const detail = document.querySelector('.why-not .refusal-name');
   if (!detail) throw new Error('The error details are missing');
-  expect(detail.open).toBe(false);
+  expect(document.querySelector('details')).toBeNull();
   return detail;
 }
 

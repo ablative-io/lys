@@ -74,7 +74,6 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
       <span>
         {providerName(login.provider)} <span className="note">{current ? 'signs you in · this session' : 'signs you in'}</span>
       </span>
-      <details><summary>Account details</summary><span className="mono dim">{login.subject}</span></details>
     </div>
   );
 }
@@ -189,7 +188,7 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
         <tbody>
           {mine.length ? mine.map((g) => (
             <tr key={g.id}>
-              <td>{mayText(w, g)}<details><summary>Exactly</summary><span className="mono">{g.relation}</span> on <span className="mono">{onText(g)}</span></details></td>
+              <td>{mayText(w, g)}</td>
               <td className="sec">{g.source ? nameOf(w, w.byId.get(g.source)?.holder ?? g.issuer) : 'root'}</td>
               <td>{passesToAgents(g.pass_on) ? <span className="pass">yes</span> : <span className="dim">no</span>}</td>
               <td>
@@ -222,7 +221,7 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
         {me.service_accounts.length ? (
           me.service_accounts.map((s) => (
             <div className="row" style={{ alignItems: 'flex-start' }} key={s.id}>
-              <span>{s.name}<p className="note">{s.description}</p><details><summary>Account record</summary><p className="mono">{s.id}</p><p>Owner: {s.owner}</p></details></span>
+              <span>{s.name}<p className="note">{s.description}</p></span>
               <span>{s.state === 'retired' ? 'Retired' : s.state === 'active' ? 'Registered' : s.state}</span>
             </div>
           ))

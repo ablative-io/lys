@@ -79,9 +79,7 @@ export function SessionList({ person }: { person: string }) {
     <Gate load={load} title="the sign-in sessions" renderError={(error) => <ReadFailure error={error} subject="the sign-in sessions" administrator={Boolean(person)} />} ok={(view) => view.sessions.some((session) => !confirmedEnds.includes(session.id)) ? <table>
       <thead><tr><th>Session</th><th>Started</th><th>Expires</th><th>Action</th></tr></thead>
       <tbody>{view.sessions.filter((session) => !confirmedEnds.includes(session.id)).map((session) => <tr key={session.id}>
-        <td>{session.current ? 'This session' : 'Another signed-in session'}<details><summary>Sign-in details</summary>
-          <p>Provider: {session.login.issuer}</p><p>Account identifier: {session.login.subject}</p><p>Session identifier: {session.id}</p>
-        </details></td><td>{clock(session.started_at)}</td><td>{clock(session.ends_at)}</td>
+        <td>{session.current ? 'This session' : 'Another signed-in session'}<p className="note">Provider: {session.login.issuer}</p></td><td>{clock(session.started_at)}</td><td>{clock(session.ends_at)}</td>
         <td><button className="btn" disabled={busy || blockedId === session.id} onClick={() => setConfirm(session)}>{session.current ? 'Sign out' : 'End session'}</button></td>
       </tr>)}</tbody>
     </table> : <p className="note">No live sessions were returned for this person.</p>} />

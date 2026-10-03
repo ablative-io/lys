@@ -123,11 +123,10 @@ async function submit(twice = false) {
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); if (twice) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
 }
 function plain(stage: Stage, code = 'StepUnavailable') {
-  const details = [...document.querySelectorAll('details')].find((entry) => entry.textContent?.includes(code));
-  expect(details?.open).toBe(false);
+  const details = [...document.querySelectorAll('.refusal-name')].find((entry) => entry.textContent?.includes(code));
   expect(details?.textContent).toContain(code);
   const face = document.body.cloneNode(true) as HTMLElement;
-  for (const detail of face.querySelectorAll('details')) detail.remove();
+  for (const detail of face.querySelectorAll('.refusal-name')) detail.remove();
   expect(face.textContent).not.toContain(code);
   expect(face.textContent).toContain(words[stage]);
 }
@@ -245,7 +244,7 @@ describe('Add and run on the first computer', () => {
     server.routes['POST /agents/' + agent + '/start-command'] = () => refused(400, 'PolicyUnrepresentable', 'The settings file cannot express these permissions for this program.');
     await open(server.routes); await names(); await submit();
     const face = document.body.cloneNode(true) as HTMLElement;
-    for (const detail of face.querySelectorAll('details')) detail.remove();
+    for (const detail of face.querySelectorAll('.refusal-name')) detail.remove();
     expect(face.textContent).toContain('The settings file cannot express these permissions for this program.');
     expect(face.textContent).not.toContain('could not confirm');
     expect(face.textContent).not.toContain('PolicyUnrepresentable');
@@ -308,8 +307,8 @@ describe('Add and run on an existing computer', () => {
     expect(document.body.textContent).toContain('This program has no setting that keeps it to its own folder with internet off.');
     expect(document.body.textContent).not.toContain('WorkspaceOnlyUnavailable');
     expect(document.body.textContent).not.toContain('Works in its own folder; no internet.');
-    // No technical details are offered; the fold of access that cannot be given is not one.
-    expect(document.querySelector('form details:not(.action-rest)')).toBeNull();
+    // Nothing is folded away anywhere in the form.
+    expect(document.querySelector('form details')).toBeNull();
     await submit();
     expect(posted).toEqual([]);
   });

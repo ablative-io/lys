@@ -67,7 +67,7 @@ export function identityName(id: string, people?: PeopleView): string | null {
 /** A missing name never makes a raw identifier the primary label. */
 export function IdentityName({ id, people }: { id: string; people?: PeopleView }) {
   const name = identityName(id, people);
-  return <>{name ?? 'Name unavailable'}<details><summary>Account details</summary><p>Identifier: {id}</p></details></>;
+  return <span title={id}>{name ?? 'Name unavailable'}</span>;
 }
 
 /** Checking a pending change sends its original request, with no new request identity. */

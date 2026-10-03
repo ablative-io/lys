@@ -76,16 +76,12 @@ it('explains a secrets read failure and the next step without its refusal code',
   expect(view.textContent).not.toContain('scope');
 });
 
-it('puts a secret owner identifier behind a details toggle', async () => {
+it('names a secret owner and keeps the identifier out of the words on the page', async () => {
   const owner = ADA;
   vi.stubGlobal('fetch', directoryOnly);
   const view = await show(<MemoryRouter><Secrets read={async () => ({ secrets: [{ name: 'Calendar', class: 'credential', owner, sequence: 2, upstream: null, header: null }] })} /></MemoryRouter>);
-  const details = view.querySelectorAll('details');
-  const account = [...details].find((detail) => detail.textContent?.includes(owner));
-  expect(account).toBeDefined();
-  expect(view.textContent).toContain(DIRECTORY.people[0].display_name);
-  expect(account?.open).toBe(false);
-  for (const detail of details) detail.remove();
+  expect(view.querySelector('details')).toBeNull();
+  expect(view.querySelector('[title="' + owner + '"]')?.textContent).toBe(DIRECTORY.people[0].display_name);
   expect(view.textContent).not.toContain(owner);
 });
 

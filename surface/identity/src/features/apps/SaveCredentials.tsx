@@ -25,5 +25,5 @@ export function SaveCredentials({app, client, saved}:{app:string; client:ClientI
     {error?<div role="alert"><p>The save was not confirmed, so both secrets are still held on this page. Nothing is tried again on its own. Keep this page open and choose Save again: it sends the same two secrets and never replaces one already saved.</p><p className="sec">Lys said: {error}</p></div>:null}</section>;
 }
 export function SavedCredentials({answer}:{answer:StoredCredentials}) {
-  return <section role="status"><p>Credentials saved in Lys secrets, owned by you. Nobody can read them back. The app's key is only ever used by Lys secrets, which adds it to calls on behalf of someone you allow to use that secret.</p><details><summary>Their names in Lys secrets</summary><p>Sign-in secret: {answer.client_secret_ref}</p><p>Key for calling Lys: {answer.api_credential_ref}</p></details></section>;
+  return <section role="status"><p>Credentials saved in Lys secrets, owned by you. Nobody can read them back. The app's key is only ever used by Lys secrets, which adds it to calls on behalf of someone you allow to use that secret.</p><p className="note">Their names in Lys secrets: sign-in secret {answer.client_secret_ref}; key for calling Lys {answer.api_credential_ref}.</p></section>;
 }

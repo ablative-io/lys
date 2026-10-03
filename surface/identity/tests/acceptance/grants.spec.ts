@@ -314,7 +314,7 @@ describe('Deep linking (conformance 9.1)', () => {
     // A deep link to a record the caller may not see is refused by name, not shown empty.
     const closed = { ...ADMIN, '/directory/people': refused(403, 'NotAdmitted', 'the wider directory is for its administrators') };
     const { posted } = await mount(`#/file/${BEA}/access`, closed);
-    expect($('.why-not details')?.textContent).toContain('PersonNotVisible');
+    expect($('.why-not .refusal-name')?.textContent).toContain('PersonNotVisible');
     expect(document.body.innerHTML).not.toContain(BEA_ROOT_G);
     expect(posted).toEqual([]);
   });

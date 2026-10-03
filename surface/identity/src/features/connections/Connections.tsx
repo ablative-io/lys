@@ -24,7 +24,7 @@ export function Connections() {
       <p className="note">Configured means a service is selected in this installation. It does not confirm that service is reachable now.</p>
       {data.connections.length === 0 ? <p>The service returned no configured integrations.</p> : <div className="card-grid">{data.connections.map((connection) => <section className="card" key={connection.id}>
         <h2>{connection.name}</h2><p>{connection.purpose}</p>
-        {connection.endpoint ? <details><summary>Connection details</summary><p className="mono">{connection.endpoint}</p></details> : null}
+        {connection.endpoint ? <p className="note mono">{connection.endpoint}</p> : null}
         <span className={'pill' + (connection.state === 'unconfigured' ? '' : ' ok')}>{labels[connection.state]}</span>
       </section>)}</div>}
       <SignInProviders />

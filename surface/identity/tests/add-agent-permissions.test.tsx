@@ -130,10 +130,9 @@ describe('Add-agent reporting and permissions', () => {
     expect(sessionStorage.getItem(key)).toBe(saved);
     expect(location.hash).toBe('#/agents/new');
     expect(second.form.textContent).toContain('StorageUncertain');
-    const details = second.form.querySelector('details');
-    expect(details).not.toBeNull();
-    expect(details?.open).toBe(false);
-  });
+    expect([...second.form.querySelectorAll('.refusal-name')].some((entry) => entry.textContent?.includes('StorageUncertain'))).toBe(true);
+    expect(second.form.querySelector('details')).toBeNull();
+});
   it('refuses a mismatched grant receipt before claiming completion', async () => {
     const { form, posted } = await open({ 'POST /grants': ok({ operation: 'op-' + '0'.repeat(32), grant: grantId, receipt: { caller: ADA } }) });
     await tick(); await submit(form);

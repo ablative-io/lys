@@ -50,11 +50,10 @@ function tick(computer = id) {
 async function change(computer = id) { await act(async () => { tick(computer).click(); }); }
 
 function plain(code: string, words: string) {
-  const details = $$('details').find((entry) => entry.textContent?.includes(code));
+  const details = $$('.refusal-name').find((entry) => entry.textContent?.includes(code));
   expect(details?.textContent).toContain(code);
-  expect((details as HTMLDetailsElement | undefined)?.open).toBe(false);
   const face = document.body.cloneNode(true) as HTMLElement;
-  for (const detail of face.querySelectorAll('details')) detail.remove();
+  for (const detail of face.querySelectorAll('.refusal-name')) detail.remove();
   expect(face.textContent).not.toContain(code);
   expect(face.textContent).toContain(words);
 }

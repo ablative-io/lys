@@ -66,6 +66,6 @@ export function AddMachine({ person, agent, changed, cancel }: {
       <div className="chain"><button className="btn primary" type="submit">Add this computer</button><button className="btn" type="button" onClick={cancel}>Cancel</button></div>
     </fieldset>
     {pending ? <div role="status"><p>Adding {pending.body.name} is not confirmed. Its original request is kept.</p><button className="btn" type="button" disabled={busy} onClick={() => void send(pending, true)}>Check whether it was added</button></div> : null}
-    {failure ? <><p className="why-not" role="alert">Lys could not confirm this computer addition.</p><details><summary>Details</summary><p>{failure}</p></details></> : null}
+    {failure ? <><p className="why-not" role="alert">Lys could not confirm this computer addition.</p><p><small className="refusal-name">{failure}</small></p></> : null}
   </form>;
 }

@@ -61,11 +61,10 @@ async function retry() {
 }
 
 function plain(code: string) {
-  const details = [...document.querySelectorAll('details')].find((entry) => entry.textContent?.includes(code));
+  const details = [...document.querySelectorAll('.refusal-name')].find((entry) => entry.textContent?.includes(code));
   expect(details?.textContent).toContain(code);
-  expect(details?.open).toBe(false);
   const face = document.body.cloneNode(true) as HTMLElement;
-  for (const detail of face.querySelectorAll('details')) detail.remove();
+  for (const detail of face.querySelectorAll('.refusal-name')) detail.remove();
   expect(face.textContent).not.toContain(code);
   expect(face.textContent).toContain('Lys could not confirm this computer addition.');
 }

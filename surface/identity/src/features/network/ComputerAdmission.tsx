@@ -56,8 +56,8 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
     })}
     {!served ? <p className="hint">Changing existing computer permissions is coming.</p> : null}
     {!admin ? <p className="hint">An administrator changes computer permissions.</p> : null}
-    {capability.status === 'refused' ? <><p role="alert">Lys could not read the computer permission route.</p><details><summary>Details</summary><p>{capability.refused.refusal.refusal}: {capability.refused.message}</p></details></> : null}
-    {failure ? <><p role="alert">{initial.error ? 'Lys could not read the saved computer permission.' : 'Lys could not confirm this computer permission.'}</p><details><summary>Details</summary><p>{failure}</p></details></> : null}
+    {capability.status === 'refused' ? <><p role="alert">Lys could not read the computer permission route.</p><p><small className="refusal-name">{capability.refused.refusal.refusal}: {capability.refused.message}</small></p></> : null}
+    {failure ? <><p role="alert">{initial.error ? 'Lys could not read the saved computer permission.' : 'Lys could not confirm this computer permission.'}</p><p><small className="refusal-name">{failure}</small></p></> : null}
     {Object.keys(pending).filter((machine) => !computers.some((entry) => entry.id === machine)).map((machine) => <div key={machine}><p>A retained permission names a computer outside this list: {machine}.</p>{retry(machine)}</div>)}
     {notice ? <p role="status">{notice}</p> : null}
     {!computers.length && admin ? adding ? <AddMachine person={person} agent={agent} cancel={() => setAdding(false)} changed={(message, machine) => { setAdding(false); changed(machine); setNotice(message); setFailure(''); }} /> : <button className="btn" type="button" onClick={() => setAdding(true)}>Add this computer</button> : null}

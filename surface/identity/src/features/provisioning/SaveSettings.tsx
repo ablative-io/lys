@@ -105,10 +105,10 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then }
   };
   return <form className="save-settings" onSubmit={(event) => { event.preventDefault(); void run(); }}>
     {pending ? <p role="status">The last save has no confirmed answer. Press {label} to send that same request again.</p> : null}
-    {failure ? <><p role="alert" className="why-not">Lys could not confirm these settings were saved.</p><details><summary>Details</summary><p>{failure}</p></details></> : null}
+    {failure ? <><p role="alert" className="why-not">Lys could not confirm these settings were saved.</p><p><small className="refusal-name">{failure}</small></p></> : null}
     {saved && !failure ? <p role="status">Saved. {name} uses these settings the next time it starts. <a href={'#/team/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
     <button type="submit" className="btn primary" disabled={busy || Boolean(why)}>{busy ? 'Saving…' : label}</button>
     {why ? <p className="why-not">{why}{starting && !pending && !initial.error ? <> <a href={'#/team/' + encodeURIComponent(agent)}>Go to {name}</a></> : null}</p> : null}
-    {initial.error ? <details><summary>Details</summary><p>{initial.error}</p></details> : null}
+    {initial.error ? <p><small className="refusal-name">{initial.error}</small></p> : null}
   </form>;
 }

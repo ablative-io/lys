@@ -14,7 +14,6 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router';
 import { Refused, operationId, request } from '../../api';
 import { confirmReceipt } from '../people/recorded-receipt';
 import { SIGNED_IN, reasonOf } from '../sign-in/SignIn';
@@ -264,17 +263,13 @@ export function Setup({ completed }: { completed: () => void }) {
         {error ? <div role="alert" className="why-not">
           <b>Setup could not be confirmed.</b>
           <p>{saved.error ? 'Your saved setup request could not be restored. Keep this tab open and ask your administrator for help.' : pending ? 'Your request is saved. Choose Retry setup to check it safely.' : 'Your browser could not save the request. Nothing has been submitted. Check browser storage before trying again.'}</p>
-          <details><summary>Technical details</summary><p>{error}</p></details>
+          <p><small className="refusal-name">{error}</small></p>
         </div> : null}
         <button className="btn primary" type="submit" disabled={busy || Boolean(saved.error)}>
           {busy ? 'Finishing setup…' : pending ? 'Retry setup' : 'Finish setup'}
         </button>
         <p role="status" aria-live="polite">{busy ? 'Saving your account. You can stay on this page.' : ''}</p>
       </form>
-      <details><summary>Advanced</summary>
-        <p className="sec">Manage people, sign-in connections and lifecycle states individually.</p>
-        <Link to="/directory/manage?advanced=1">Open directory controls</Link>
-      </details>
     </div>
   </div>;
 }

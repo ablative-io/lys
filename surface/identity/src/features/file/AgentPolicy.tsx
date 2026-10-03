@@ -65,7 +65,7 @@ function Editor({ id, view, onKept }: { id: string; view: PolicyView; onKept: (a
       <section className="card">
         <h3>{view.policy ? 'Version ' + view.policy.version : 'No policy set'}</h3>
         <p className="note">A kept version {view.applies}.</p>
-        {view.digest ? <details><summary>Saved rules identifier</summary><p className="note mono">{view.digest}</p></details> : null}
+        {view.digest ? <p className="note">Saved rules <span className="mono">{view.digest}</span></p> : null}
         {rules.length ? (
           <table><thead><tr><th>Rule</th><th>Tool</th><th>Denies</th><th>Who can lift it</th><th /></tr></thead>
             <tbody>{rules.map((rule, index) => (

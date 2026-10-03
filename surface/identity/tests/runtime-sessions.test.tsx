@@ -29,12 +29,13 @@ describe('Runtime sessions', () => {
     expect(requests).toContain('/runtime/found'); expect(posted).toEqual([]);
     expect(text()).toContain('No agent attached'); expect(text()).toContain('Running, as its runner reported');
   });
-  it('names each session by its agent and computer, with the session id behind a toggle (#124)', async () => {
+  it('names each session by its agent and computer, with no session id shown beside a named agent (#124)', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [session] }) });
     const row = $('tbody tr');
     expect(row?.querySelector('td')?.textContent).toContain('Scribe');
     expect(row?.querySelector('td a')?.textContent).toBe('Scribe');
-    expect(row?.querySelector('td details summary')?.textContent).toBe('Session id');
+    expect(row?.querySelector('td details')).toBeNull();
+    expect(row?.textContent).not.toContain(session.session);
     expect(row?.querySelector('td > .mono')).toBeNull();
     expect(text()).not.toContain('Refresh runtime reports');
   });

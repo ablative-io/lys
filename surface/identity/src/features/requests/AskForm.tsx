@@ -190,10 +190,9 @@ export function AskForm({ person, resources, model, changed }: {
       {!advanced ? <label className="field">What do you need access to?<select value={resourceIndex} onChange={(event) => setResourceIndex(event.target.value)} required>
         <option value="">Choose what you need</option>{resources.map((resource, index) => <option key={JSON.stringify(resource)} value={index}>{resource.id} · {resource.kind}</option>)}
       </select></label> : null}
-      {!resources.length && !advanced ? <p className="note">No resources appear in your visible grants yet. Use Advanced if you have been given a resource's details.</p> : null}
-      <details onToggle={(event) => setAdvanced(event.currentTarget.open)}><summary>Advanced: enter another resource</summary>
+      {!resources.length && !advanced ? <p className="note">No resources appear in your visible grants yet. Tick the box below if you have been given a resource's details.</p> : null}
+      <label className="tick"><input type="checkbox" name="another" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />Enter another resource by its kind and ID</label>
         {advanced ? <><label className="field">Resource kind<input name="kind" required /></label><label className="field">Resource ID<input name="resource" required /></label></> : null}
-      </details>
       {(() => {
         const resource = advanced ? undefined : resources[Number(resourceIndex)];
         const offered = askable(model, resource);

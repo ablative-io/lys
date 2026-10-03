@@ -115,7 +115,7 @@ describe("An agent's file", () => {
   it('answers an agent that is not visible as not found, with the refusal', async () => {
     await mount('#/file/agent-' + 'f'.repeat(32), { ...SERVICE, ['/directory/agents/agent-' + 'f'.repeat(32)]: refused(404, 'AgentNotVisible', 'AgentNotVisible: no such agent is yours to see') });
     expect($('.page h1')?.textContent).toBe('Not found');
-    expect($('.why-not details')?.textContent).toContain('AgentNotVisible');
+    expect($('.why-not .refusal-name')?.textContent).toContain('AgentNotVisible');
     expect($('.why-not p')?.textContent).toContain('Ask its responsible person');
   });
 });

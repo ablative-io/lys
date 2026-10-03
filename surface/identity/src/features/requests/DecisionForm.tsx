@@ -81,7 +81,7 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
           <option value="">Choose how you can give this access</option>{canIssueRoot ? <option value="root">Give access directly as the administrator</option> : null}
           {entry.sources.map((source, index) => <option key={source} value={source}>Your permission {index + 1}</option>)}
         </select></label> : null}
-        {action === 'approve' && entry.sources.length ? <details><summary>Permission details</summary><ul>{entry.sources.map((source, index) => <li key={source}>Permission {index + 1}: {source}</li>)}</ul></details> : null}
+        {action === 'approve' && entry.sources.length ? <><p className="note">Permissions this approval draws on</p><ul>{entry.sources.map((source, index) => <li key={source}>Permission {index + 1}: {source}</li>)}</ul></> : null}
         <label className="field">Reason for your decision<textarea name="note" required maxLength={500} /></label>
         <button type="submit" className="btn primary" disabled={busy}>Confirm {action === 'approve' ? 'approval' : 'decline'}</button>{' '}
         <button type="button" className="btn" disabled={busy} onClick={() => setAction(null)}>Cancel</button>

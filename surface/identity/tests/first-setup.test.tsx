@@ -73,15 +73,11 @@ describe('First administrator setup', () => {
     expect(sessionStorage.getItem('lys.pending.first-setup')).toContain('Tom');
   });
 
-  it('retains full directory controls behind an explicit Advanced link', async () => {
+  it('folds nothing away on the setup page and links to no separate directory controls', async () => {
     const { posted } = await mount('#/people', { ...SERVICE, '/me': needsSetup });
-    const advanced = $('details');
-    expect(advanced?.querySelector('summary')?.textContent).toBe('Advanced');
-    await click(advanced?.querySelector('a') ?? null);
-    expect($('form[aria-label="Register a person"]')).not.toBeNull();
+    expect($('details')).toBeNull();
+    expect($('a[href*="directory/manage"]')).toBeNull();
     expect(posted).toHaveLength(0);
-    await click($('a[href="#/directory/manage?action=login&advanced=1"]'));
-    expect($('form[aria-label="Bind a sign-in identity"]')).not.toBeNull();
   });
 
   it('does not offer administrator setup to an unbound ordinary account', async () => {

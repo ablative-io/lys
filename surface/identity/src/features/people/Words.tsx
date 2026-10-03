@@ -32,7 +32,7 @@ export function problemWords(problem: unknown): string {
 
 export function ErrorWords({ problem }: { problem: unknown }) {
   const detail = problem instanceof Refused ? problem.refusal.refusal + ': ' + problem.refusal.reason : String(problem);
-  return <div className="why-not" role="alert"><p>{problemWords(problem)}</p><details><summary>Error details</summary><p style={{ overflowWrap: 'anywhere' }}>{detail}</p></details></div>;
+  return <div className="why-not" role="alert"><p>{problemWords(problem)} <small className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{detail}</small></p></div>;
 }
 
 export function DirectoryGate<T>({ load, title, ok }: { load: Load<T>; title: string; ok: (data: T) => ReactNode }) {
@@ -42,7 +42,7 @@ export function DirectoryGate<T>({ load, title, ok }: { load: Load<T>; title: st
 export function IdentityName({ id }: { id: string }) {
   const load = useLoad(api.people, 'identity-name');
   const name = load.status === 'ok' ? entries(load.data).find((entry) => entry.id === id)?.display_name : undefined;
-  return <><a href={'#/file/' + encodeURIComponent(id)}>{name ?? (load.status === 'loading' ? 'Reading name…' : 'Name unavailable')}</a><details><summary>Identity details</summary><code>{id}</code>{load.status === 'refused' ? <ErrorWords problem={load.refused} /> : null}</details></>;
+  return <><a href={'#/file/' + encodeURIComponent(id)} title={id}>{name ?? (load.status === 'loading' ? 'Reading name…' : 'Name unavailable')}</a>{load.status === 'refused' ? <small className="refusal-name"> {load.refused.refusal.refusal}</small> : null}</>;
 }
 
 export const STATUS: Record<string, string> = { registered: 'Awaiting activation', active: 'Active', suspended: 'Access suspended', retired: 'Permanently retired' };

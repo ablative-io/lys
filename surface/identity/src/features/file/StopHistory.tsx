@@ -65,7 +65,7 @@ export function StopHistory({ id }: { id: string }) {
       </dl>
       {!stop.done ? <p role="status">The request was saved, but its outcome has not been recorded. This does not confirm suspension, certificate withdrawal, credential expiry or a session ending. Keep the original request when checking its outcome.</p> : null}
       <p className="note">An end request does not confirm a session stopped. <a href={'#/file/' + encodeURIComponent(id) + '/sessions'}>Check runtime reports</a>.</p>
-      <details><summary>Operation details</summary><p className="mono">{stop.operation}</p></details>
+      <p className="note">Request <span className="mono">{stop.operation}</span></p>
     </article>) : <div className="card"><p>No emergency-stop requests have been recorded for this agent.</p></div>} />
   </section>;
 }

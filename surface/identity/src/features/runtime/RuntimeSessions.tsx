@@ -22,10 +22,10 @@ export function RuntimeSessions({ agent, found = false }: { agent?: string; foun
   }, path);
   return <section className="card"><p>{found ? 'Sessions a runner reported that belong to no agent in the directory. A report does not add an agent or give access.' : 'What each computer\'s Lys runner last reported about these sessions.'}</p>
     <Gate load={load} title="Sessions" ok={({ sessions, names }) => sessions.length ? <table><thead><tr><th>Agent</th><th>Computer</th><th>State</th><th>Last report</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.session}>
-      <td>{session.agent ? <a href={'#/file/' + session.agent}>{names.get(session.agent) ?? session.agent}</a> : 'No agent attached'}<details><summary>Session id</summary><span className="mono">{session.session}</span></details></td>
+      <td>{session.agent ? <a href={'#/file/' + session.agent}>{names.get(session.agent) ?? session.agent}</a> : <>No agent attached <span className="mono dim">{session.session}</span></>}</td>
       <td>{session.machine_name ?? session.machine}</td>
       <td>{session.shown === 'running' ? 'Running, as its runner reported' : session.shown === 'stopped' ? 'Stopped, as its runner confirmed' : 'Not yet confirmed by its runner'}{session.stopped ? <p>{session.stopped.confirmation}</p> : null}{session.stop_asked_at && !session.stopped ? <p className="why-not">Emergency stop asked {clock(session.stop_asked_at)}; its runner has not confirmed it ended.</p> : null}</td>
-      <td>{clock(session.last_report_at)}<p>{session.what}</p><details><summary>Report details</summary><dl className="facts"><dt>Reported by</dt><dd>{names.get(session.reported_by) ?? session.reported_by}</dd><dt>First report</dt><dd>{clock(session.first_report_at)}</dd><dt>Last state</dt><dd>{session.last_reported}</dd><dt>Computer id</dt><dd>{session.machine}</dd></dl></details></td>
+      <td>{clock(session.last_report_at)}<p>{session.what}</p><p className="note">Reported by {names.get(session.reported_by) ?? session.reported_by}. First report {clock(session.first_report_at)}. Last state: {session.last_reported}.</p></td>
     </tr>)}</tbody></table> : <p>No runner has reported a session here. That does not show whether a process is running.</p>} />
   </section>;
 }

@@ -15,8 +15,8 @@ export function AgentCredentials({ id }: { id: string }) {
   }, 'agent-handles:' + id);
   return <section className="card"><h2>Credential handles</h2><p>The agent uses handles, not secret values. Only handles on secrets you may discover are shown.</p>
     <Gate load={load} title="Credential handles" ok={({ handles }) => handles.length ? <table><thead><tr><th>Secret</th><th>Handle identifier</th><th>Value</th><th>Usage</th><th>Expires</th><th>Recorded state</th><th>Action</th></tr></thead><tbody>{handles.map((handle) => <tr key={handle.id}>
-      <td>{handle.secret}</td><td><span className="mono">{handle.id}</span>{handle.parent ? <details><summary>Parent handle</summary>{handle.parent}</details> : null}</td><td>Never shown</td>
-      <td>{handle.used} of {handle.max_uses} uses<details><summary>Spend accounting</summary><p>Settled: {handle.settled}</p><p>Recorded cap: {handle.spend_cap === null ? 'none' : handle.spend_cap}</p></details></td>
+      <td>{handle.secret}</td><td><span className="mono">{handle.id}</span>{handle.parent ? <p className="note">Derived from <span className="mono">{handle.parent}</span></p> : null}</td><td>Never shown</td>
+      <td>{handle.used} of {handle.max_uses} uses<p className="note">Settled: {handle.settled}. Recorded cap: {handle.spend_cap === null ? 'none' : handle.spend_cap}.</p></td>
       <td>{clock(Math.floor(handle.not_after_ms / 1000))}</td><td>{handle.dropped ? 'Dropped' : 'Not marked dropped'}</td><td>{caller.status === 'ok' ? <DropHandle handle={handle.id} person={caller.data.person.id} dropped={handle.dropped} /> : null}</td>
     </tr>)}</tbody></table> : <p>No handles visible to you were returned for this agent.</p>} />
     {caller.status === 'refused' ? <p className="why-not">{caller.refused.refusal.refusal}: {caller.refused.refusal.reason}</p> : null}
