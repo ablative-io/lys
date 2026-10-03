@@ -427,6 +427,7 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             cursor: None,
             follow: false,
         },
+        Act::Folders { under: None },
         Act::GrantChannel,
     ];
     let mut named = 0;
@@ -491,6 +492,10 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
                 entries: Vec::new(),
                 cursor: "c".to_owned(),
             },
+        },
+        Answer::Folders {
+            under: "/".to_owned(),
+            folders: Vec::new(),
         },
         Answer::GrantChannel,
         Answer::Refused {

@@ -223,6 +223,14 @@ pub enum Act {
         /// The act done for them.
         done: Box<Act>,
     },
+    /// Name the folders directly inside `under`, the runner's own home
+    /// folder when none is given, so a person chooses where an agent works
+    /// from what this computer holds.
+    Folders {
+        /// The folder looked in.
+        #[serde(default)]
+        under: Option<String>,
+    },
     /// Hold this connection as the live grant authority's channel: the
     /// runner answers `grant_channel`, then writes each grantable question
     /// as one line and reads the answer line to it, until the connection
@@ -389,6 +397,13 @@ pub enum Answer {
     Feed {
         /// The page.
         page: crate::tracking_store::FeedPage,
+    },
+    /// The folders directly inside one folder.
+    Folders {
+        /// The folder looked in, absolute.
+        under: String,
+        /// The name of each folder in it, in order.
+        folders: Vec<String>,
     },
     /// The connection is held as the grant channel from here on.
     GrantChannel,
