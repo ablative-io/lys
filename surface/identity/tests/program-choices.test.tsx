@@ -18,13 +18,17 @@ const routes = { ...SERVICE, [path]: ok(answer), '/harnesses': ok(programs), ['P
 const options = (select: Element | null | undefined) => [...(select?.querySelectorAll('option') ?? [])].map((option) => option.textContent);
 
 describe('A listed program', () => {
-  it('offers its own default model and mode, and no second default beside them', async () => {
+  it('offers its own default model and its modes as plain choices, and no second default beside them', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);
     const model = document.querySelector<HTMLSelectElement>('select[name="model"]');
     expect(options(model)).toEqual(['Default for this account', 'Opus']);
     expect(model?.value).toBe('default');
-    expect(options(document.querySelector('select[name="mode"]'))).toEqual(['default', 'acceptEdits']);
-    expect(document.querySelector('.mode-words')?.textContent).toBe('default Reads freely and asks before most changes and commands.This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.');
+    const modes = [...document.querySelectorAll<HTMLInputElement>('input[name="permission-mode"]')];
+    expect(modes.map((entry) => entry.value)).toEqual(['default', 'acceptEdits']);
+    expect(modes.filter((entry) => entry.checked).map((entry) => entry.value)).toEqual(['default']);
+    expect(document.querySelector('.permissions')?.textContent).toContain('Asks before it acts');
+    expect(document.querySelector('.permissions')?.textContent).toContain('Reads freely and asks before most changes and commands.');
+    expect(document.querySelector('.mode-words')?.textContent).toBe('This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.');
   });
   it('keeps the prompt textbox optional and behind a choice', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);

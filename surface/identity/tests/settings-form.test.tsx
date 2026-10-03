@@ -60,7 +60,8 @@ describe('The settings form', () => {
     const { posted } = await open(routes());
     expect(field('program')?.value).toBe('Claude Code');
     expect(field('model')?.value).toBe('default');
-    expect(field('mode')?.value).toBe('default');
+    expect(document.querySelector<HTMLInputElement>('input[name="permission-mode"]:checked')?.value).toBe('default');
+    expect(document.querySelector('section[aria-label="Settings of this agent"] select[name="mode"]')).toBeNull();
     expect(field('machine')).toBeNull();
     expect(document.querySelectorAll('section[aria-label="Settings of this agent"] input[required], section[aria-label="Settings of this agent"] textarea[required]')).toHaveLength(0);
     expect(document.querySelectorAll('section[aria-label="Settings of this agent"] button[type="submit"]')).toHaveLength(1);

@@ -16,11 +16,11 @@ export function lysDoes(program: string, mode: string): string[] {
   return [];
 }
 
-export function ModeWords({ program, mode }: { program: Program | undefined; mode: string }) {
+export function ModeWords({ program, mode, sentencesOnly = false }: { program: Program | undefined; mode: string; /** Leave the mode's own words out, where the picker above already shows them. */ sentencesOnly?: boolean }) {
   if (!program) return null;
   const meaning = program.modes.find((entry) => entry.id === mode)?.meaning;
   return <div className="mode-words">
-    {meaning ? <p><code>{mode}</code>{' ' + meaning}</p> : null}
+    {meaning && !sentencesOnly ? <p><code>{mode}</code>{' ' + meaning}</p> : null}
     {lysDoes(program.name, mode).map((sentence) => <p key={sentence}>{sentence}</p>)}
   </div>;
 }

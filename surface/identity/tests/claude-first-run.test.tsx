@@ -12,7 +12,9 @@ describe('Claude first run', () => {
     const html = renderToStaticMarkup(<ProfileFields profile={null} choices={choices} firstRun render={(fields, settings, refusal) => <form>{fields}<button disabled={Boolean(refusal)}>Add</button><output>{String((settings.permissions as { default_mode: string }).default_mode)}</output></form>} />);
     expect(html).toContain('<output>workspace-only</output>');
     expect(html).not.toContain('disabled=""');
-    expect(html).toContain('<code>workspace-only</code> Workspace only');
+    expect(html).toContain('Kept to its folder');
+    expect(html).toContain('Workspace only');
+    expect(html).not.toContain('<select name="mode"');
     expect(html).toContain('This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.');
     expect(html).not.toContain('Works in its own folder');
   });

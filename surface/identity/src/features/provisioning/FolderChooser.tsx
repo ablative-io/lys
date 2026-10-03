@@ -34,8 +34,10 @@ const inside = (under: string, name: string) => (under === '/' ? '' : under) + '
 const above = (under: string) => { const parent = under.slice(0, under.lastIndexOf('/')); return parent || null; };
 const nameOf = (folder: string) => folder.slice(folder.lastIndexOf('/') + 1) || folder;
 
-export function FolderChooser({ computers, preferred = '', chosen, choose, disabled = false }: {
+export function FolderChooser({ computers, preferred = '', chosen, choose, disabled = false, label, confirm = 'Work in' }: {
   computers: { id: string; name: string }[]; preferred?: string; chosen: string; choose: (folder: string) => void; disabled?: boolean;
+  /** The words on the button that opens the chooser, and the verb on the one that takes the folder, when the folder is not the one the agent works in. */
+  label?: string; confirm?: string;
 }) {
   const known = computers.some((entry) => entry.id === preferred) ? preferred : computers.length === 1 ? computers[0].id : '';
   const [picked, setPicked] = useState('');
@@ -67,7 +69,7 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
   if (!computers.length) return <p className="folder-chooser">You choose its folder once a computer with Lys running on it is added.</p>;
   const name = computers.find((entry) => entry.id === computer)?.name ?? '';
   if (!open) return <p className="folder-chooser">
-    <button type="button" className="btn" disabled={disabled} onClick={() => { setOpen(true); if (computer) void look(computer, chosen || undefined, true); }}>{chosen ? 'Choose another folder' : 'Choose a folder'}</button>
+    <button type="button" className="btn" disabled={disabled} onClick={() => { setOpen(true); if (computer) void look(computer, chosen || undefined, true); }}>{label ?? (chosen ? 'Choose another folder' : 'Choose a folder')}</button>
   </p>;
   const parent = list ? above(list.under) : null;
   const shown = list ? list.folders.filter((entry) => !entry.startsWith('.')) : [];
@@ -84,7 +86,7 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
       {shown.length ? <ul className="folders">{shown.map((entry) => <li key={entry}>
         <button type="button" className="btn" disabled={busy} onClick={() => { void look(list.machine, inside(list.under, entry)); }}>{entry}</button>
       </li>)}</ul> : <p>There are no folders inside this one.</p>}
-      <p><button type="button" className="btn primary" disabled={busy} onClick={() => { choose(list.under); setOpen(false); }}>Work in {nameOf(list.under)}</button></p>
+      <p><button type="button" className="btn primary" disabled={busy} onClick={() => { choose(list.under); setOpen(false); }}>{confirm} {nameOf(list.under)}</button></p>
     </> : null}
     {problem ? <p role="alert">Lys could not look at the folders there. {problem.reason} <small className="refusal-name">{problem.refusal}</small></p> : null}
     <p><button type="button" className="btn" disabled={busy} onClick={() => setOpen(false)}>Cancel</button></p>

@@ -51,3 +51,13 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; p
 .works-in code { font-family: "JetBrains Mono"; }
 .mode-words p { margin: 4px 0; color: var(--text-muted); }
 .mode-words code { font-family: "JetBrains Mono"; color: var(--text); }
+.permissions .mode-row { margin: 6px 0; }
+.permissions .mode-id, .permissions small code { font-family: "JetBrains Mono"; color: var(--text-muted); }
+.permissions .mode-meaning { margin: 2px 0 0 22px; color: var(--text-muted); }
+.permissions .mode-warn { color: var(--danger); }
+.permissions .choice-row { display: block; margin: 4px 0; }
+.permissions .rule-list h4 { margin: 10px 0 4px; }
+.permissions .rule-list ul { list-style: none; margin: 0; padding: 0; }
+.permissions .rule-row { margin: 4px 0; }
+.permissions .add-rule { border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 8px; }
+.permissions button.link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
