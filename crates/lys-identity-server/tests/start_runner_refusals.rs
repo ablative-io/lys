@@ -25,8 +25,10 @@ fn start_body(machine: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     Ok(json!({ "machine": machine, "operation": support::operation()? }))
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn a_malformed_start_keeps_the_runners_refusal_name() -> TestResult {
+/// Starts through the HTTP surface against a runner that answers `refused`,
+/// and checks the answer carries the runner's refusal `name` and `words`
+/// unchanged: the server neither renames nor rewords what the runner said.
+async fn the_runners_refusal_survives(refused: RunnerError, name: &str, words: &str) -> TestResult {
     let table = Table::set().await?;
     let socket = table.dir.path().join("refusing.sock");
     let listener = UnixListener::bind(&socket)?;
@@ -53,9 +55,6 @@ async fn a_malformed_start_keeps_the_runners_refusal_name() -> TestResult {
         if !matches!(act, Act::AsCaller { ref done, .. } if matches!(**done, Act::Start { .. })) {
             return Err("the service did not ask the runner to start".to_owned());
         }
-        let refused = RunnerError::Malformed {
-            reason: "the launch does not read".to_owned(),
-        };
         writeln!(writer, "{}", reply_line(Answer::refusal(&refused)))
             .map_err(|error| error.to_string())
     });
@@ -66,14 +65,76 @@ async fn a_malformed_start_keeps_the_runners_refusal_name() -> TestResult {
     table.close()?;
     let (status, refused) = sent?;
     assert_eq!(status, 409, "{refused}");
-    assert_eq!(refused["refusal"], "runner_request_malformed", "{refused}");
+    assert_eq!(refused["refusal"], name, "{refused}");
     assert!(
         refused["reason"]
             .as_str()
-            .is_some_and(|words| words.contains("the launch does not read")),
+            .is_some_and(|reason| reason.contains(words)),
         "{refused}"
     );
     Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_malformed_start_keeps_the_runners_refusal_name() -> TestResult {
+    let words = "the launch does not read";
+    let refused = RunnerError::Malformed {
+        reason: words.to_owned(),
+    };
+    the_runners_refusal_survives(refused, "runner_request_malformed", words).await
+}
+
+/// The runner refuses a launch that names no folder to start the run in
+/// (`pty.rs`), never starting it in its own folder or the login's home.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_launch_without_a_directory_keeps_the_runners_refusal_name() -> TestResult {
+    let words = "the launch names no working directory to start the run in";
+    let refused = RunnerError::refused("launch_without_directory", words);
+    the_runners_refusal_survives(refused, "launch_without_directory", words).await
+}
+
+/// The runner cannot find the harness's configuration home: the launch sets
+/// no `CLAUDE_CONFIG_DIR` and the runner has no `HOME` (`trust.rs`).
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unknown_trust_home_keeps_the_runners_refusal_name() -> TestResult {
+    let words = "the launch sets no CLAUDE_CONFIG_DIR and the runner has no HOME to find the harness's configuration in";
+    let refused = RunnerError::refused("trust_home_unknown", words);
+    the_runners_refusal_survives(refused, "trust_home_unknown", words).await
+}
+
+/// The harness's configuration file is there but is not the JSON object the
+/// trust row goes into; the runner leaves it as it is (`trust.rs`).
+#[tokio::test(flavor = "multi_thread")]
+async fn an_invalid_trust_file_keeps_the_runners_refusal_name() -> TestResult {
+    let words = "/home/seat/.claude.json is not a JSON object";
+    let refused = RunnerError::refused("trust_file_invalid", words);
+    the_runners_refusal_survives(refused, "trust_file_invalid", words).await
+}
+
+/// The harness's configuration file cannot be read (`trust.rs`).
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unreadable_trust_file_keeps_the_runners_refusal_name() -> TestResult {
+    let words = "/home/seat/.claude.json could not be read: Permission denied";
+    let refused = RunnerError::refused("trust_file_unreadable", words);
+    the_runners_refusal_survives(refused, "trust_file_unreadable", words).await
+}
+
+/// The trust row cannot be written beside the harness's configuration file
+/// (`trust.rs`).
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unwritable_trust_file_keeps_the_runners_refusal_name() -> TestResult {
+    let words = "/home/seat/.claude.json.lys-4242 could not be written: Read-only file system";
+    let refused = RunnerError::refused("trust_file_unwritable", words);
+    the_runners_refusal_survives(refused, "trust_file_unwritable", words).await
+}
+
+/// The thread that watches the run's first screen for the trust dialog could
+/// not be started (`session/trust_dialog.rs`).
+#[tokio::test(flavor = "multi_thread")]
+async fn a_failed_trust_watch_keeps_the_runners_refusal_name() -> TestResult {
+    let words = "Resource temporarily unavailable";
+    let refused = RunnerError::refused("trust_watch_failed", words);
+    the_runners_refusal_survives(refused, "trust_watch_failed", words).await
 }
 
 #[test]
@@ -107,6 +168,12 @@ fn the_start_contract_names_transport_policy_and_launch_refusals() -> TestResult
         "policy_target_uninspectable",
         "policy_digest_mismatch",
         "session_unknown",
+        "launch_without_directory",
+        "trust_file_invalid",
+        "trust_file_unreadable",
+        "trust_file_unwritable",
+        "trust_home_unknown",
+        "trust_watch_failed",
     ];
     let missing: Vec<_> = expected
         .into_iter()
