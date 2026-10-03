@@ -130,12 +130,19 @@ pub(super) fn install(
     // body the store refused by rename and by copy set NotPlaced above, and
     // that stands. A call unrecorded for its shape (an error body, no model)
     // with both bodies in the store still measures.
+    let both_bodies_stored =
+        ready.record.raw_request.is_some() && ready.record.raw_response.is_some();
+    // Recovery has no last arrival and keeps what the journal persisted.
     if let Some(arrived) = job.last_arrival
         && let Some(timing) = &mut ready.record.capture
         && timing.durable != DurableTime::NotPlaced
     {
-        timing.durable =
-            DurableTime::Measured(u64::try_from(arrived.elapsed().as_nanos()).unwrap_or(u64::MAX));
+        timing.durable = if both_bodies_stored {
+            DurableTime::Measured(u64::try_from(arrived.elapsed().as_nanos()).unwrap_or(u64::MAX))
+        } else {
+            // A body never captured (no spool was ever made) is not in the store either.
+            DurableTime::NotPlaced
+        };
     }
     Ok(())
 }
