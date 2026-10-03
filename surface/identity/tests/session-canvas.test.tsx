@@ -190,6 +190,16 @@ describe('Agent canvas', () => {
     expect(one.style.width).toBe('560px');
   });
 
+  it('keeps the place of a team card whose read was refused this visit', async () => {
+    const place = { x: 40, y: 400, w: 220, h: 64 };
+    localStorage.setItem('lys.canvas', JSON.stringify({ boxes: { 'team:team-a': place }, open: [], view: { x: 24, y: 24 } }));
+    await mount('#/runtime/canvas', { ...routes, '/teams': refused(503, 'TeamsUnavailable', 'Teams could not be read') });
+    expect(text()).toContain('TeamsUnavailable');
+    expect($('[data-node="team:team-a"]')).toBeNull();
+    const kept = JSON.parse(localStorage.getItem('lys.canvas') ?? 'null') as { boxes: Record<string, unknown> };
+    expect(kept.boxes['team:team-a']).toEqual(place);
+  });
+
   it('says on each window what it is', async () => {
     await mount('#/runtime/canvas', routes);
     expect([...document.querySelectorAll('.session-canvas-kind')].map((kind) => kind.textContent).sort()).toEqual(['Agent', 'Resource or recipient', 'Team or sender']);

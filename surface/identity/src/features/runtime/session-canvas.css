@@ -3,7 +3,7 @@
 .session-canvas-page > .head h1 { font-size: 16px; margin: 0; }
 .canvas-about, .canvas-connections { position: relative; font-size: 12.5px; color: var(--text-secondary); }
 .canvas-about > summary, .canvas-connections > summary { cursor: pointer; }
-.canvas-about[open] > p, .canvas-connections[open] > ul, .canvas-connections[open] > p { position: absolute; z-index: 20; top: 22px; left: 0; width: min(640px, 70vw); max-height: 50vh; overflow: auto; margin: 0; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.canvas-about[open] > p, .canvas-about[open] > div, .canvas-connections[open] > ul, .canvas-connections[open] > p { position: absolute; z-index: 20; top: 22px; left: 0; width: min(640px, 70vw); max-height: 50vh; overflow: auto; margin: 0; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
 .canvas-connections li { margin: 8px 0; overflow-wrap: anywhere; }
 .session-canvas-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 6px; font-size: 12.5px; }
 .session-canvas-strip > p { margin: 0; }

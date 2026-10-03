@@ -83,7 +83,7 @@ function Canvas({ graph }: { graph: SessionGraph }) {
   const { agent } = useParams();
   const [before] = useState(kept);
   // The agent the person came for, when the route names one: its terminal is open and in view whatever was kept.
-  const [asked] = useState(() => graph.nodes.find((node) => agent && node.session?.agent === agent)?.id ?? null);
+  const asked = graph.nodes.find((node) => agent && node.session?.agent === agent)?.id ?? null;
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set([...(before?.open ?? []), ...(asked ? [asked] : [])]));
   const [moved, setMoved] = useState<Record<string, Box>>(() => {
     const boxes = before?.boxes ?? {};
@@ -98,19 +98,27 @@ function Canvas({ graph }: { graph: SessionGraph }) {
   const drag = useRef<Drag | null>(null);
   const surface = useRef<HTMLDivElement>(null);
 
+  // On arriving, and again when the route names another agent: that agent's terminal is open, at the open size, in the middle of the view.
   useLayoutEffect(() => {
     const element = surface.current;
-    const box = asked ? placed(graph, moved, open)[asked] : undefined;
-    if (!element || !box) return;
+    if (!element || !asked) return;
+    const was = placed(graph, moved, open)[asked];
+    const box = open.has(asked) ? was : { ...was, w: OPENED[0], h: OPENED[1] };
+    if (!open.has(asked)) {
+      setOpen((now) => new Set([...now, asked]));
+      setMoved((all) => ({ ...all, [asked]: box }));
+    }
+    setFront(asked);
     setView({ x: element.clientWidth / 2 - (box.x + box.w / 2), y: element.clientHeight / 2 - (box.y + box.h / 2) });
-    // Once, on arriving: after that the view is the person's.
-  }, []);
+    // Only when the agent asked for changes: after that the view and the windows are the person's.
+  }, [asked]);
 
   // The arrangement is this browser's own: it is kept as it changes and is there on the next visit.
   useEffect(() => {
     const here = new Set(graph.nodes.map((node) => node.id));
-    // A window that is no longer here (a session that ended) keeps no place.
-    const boxes = Object.fromEntries(Object.entries(moved).filter(([id]) => here.has(id)));
+    // A session that is no longer here has ended and keeps no place. A team, resource or message card that is not here may
+    // only be missing because its read was refused this visit, so its place is kept.
+    const boxes = Object.fromEntries(Object.entries(moved).filter(([id]) => !id.startsWith('session:') || here.has(id)));
     // A browser may refuse to keep anything. The surface still works for this visit, and says that it will not be remembered.
     try {
       localStorage.setItem(KEPT, JSON.stringify({ boxes, open: [...open].filter((id) => here.has(id)), view } satisfies Kept));
@@ -237,7 +245,7 @@ function Whole({ graph, messages }: { graph: SessionGraph; messages: Load<Messag
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
       {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
-      {read ? <MessageConnections value={read} change={setLater} /> : null}
+      {read ? <details className="canvas-about"><summary>Message connections</summary><div><MessageConnections value={read} change={setLater} /></div></details> : null}
       <Connections graph={whole} />
     </div>
     <Canvas graph={whole} />
