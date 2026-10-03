@@ -5,10 +5,11 @@
  * CLEAN-START.md); a Codex run also reads the login's own Codex setup, so
  * for Codex this list is not the whole of it, and the screen says so.
  *
- * Each server is one row in plain words. One is added by choosing how it is
- * reached, then giving only what that needs: a web address, or a program on
- * the agent's computer with its arguments. What is typed here is what Lys
- * does not hold a list of; nothing is written as JSON.
+ * They are one table: the name, how it is reached in plain words, and Remove.
+ * Its last row adds one by choosing how it is reached, then giving only what
+ * that needs: a web address, or a program on the agent's computer with its
+ * arguments. What is typed here is what Lys does not hold a list of; nothing
+ * is written as JSON.
  */
 import { useState } from 'react';
 import type { McpServer } from './Provisioning';
@@ -45,30 +46,34 @@ export function serverWords(server: McpServer): string {
   return server.url ? 'Reached at ' + server.url : 'No address or program is recorded for it';
 }
 
-function AddServer({ kinds, taken, add, done }: { kinds: ServerKind[]; taken: string[]; add: (server: McpServer) => void; done: () => void }) {
-  const [kind, setKind] = useState<ServerKind | null>(kinds.length === 1 ? kinds[0] : null);
-  const [given, setGiven] = useState({ name: '', address: '', program: '', args: '' });
+/** The table's last row: a name, how the tools are reached, what that needs, and Add. */
+function AddServer({ kinds, taken, add }: { kinds: ServerKind[]; taken: string[]; add: (server: McpServer) => void }) {
+  const [kind, setKind] = useState<ServerKind | ''>(kinds.length === 1 ? kinds[0] : '');
+  const empty = { name: '', address: '', program: '', args: '' };
+  const [given, setGiven] = useState(empty);
   const built = kind ? serverFor(kind, given, taken) : null;
   const server = built && 'server' in built ? built.server : null;
+  const touched = Boolean(given.name || given.address || given.program || given.args);
   const set = (field: keyof typeof given) => (event: { target: { value: string } }) => setGiven({ ...given, [field]: event.target.value });
   const noSubmit = (event: { key: string; preventDefault: () => void }) => { if (event.key === 'Enter') event.preventDefault(); };
-  return <div className="add-rule" role="group" aria-label="Add connected tools">
-    <p><b>How are these tools reached?</b></p>
-    {kinds.includes('address') ? <label className="choice-row"><input type="radio" name="server-kind" value="address" checked={kind === 'address'} onChange={() => setKind('address')} /> At a web address</label> : null}
-    {kinds.includes('program') ? <label className="choice-row"><input type="radio" name="server-kind" value="program" checked={kind === 'program'} onChange={() => setKind('program')} /> By a program on the agent’s computer</label> : null}
-    {kind ? <label className="field">A short name for them<span className="hint">For example: notes</span><input name="server-name" value={given.name} onChange={set('name')} onKeyDown={noSubmit} autoComplete="off" /></label> : null}
-    {kind === 'address' ? <label className="field">Web address<span className="hint">For example: https://tools.example.org/mcp</span><input name="server-address" value={given.address} onChange={set('address')} onKeyDown={noSubmit} autoComplete="off" /></label> : null}
-    {kind === 'program' ? <>
-      <label className="field">The program’s full path<span className="hint">For example: /usr/local/bin/notes-mcp</span><input name="server-program" value={given.program} onChange={set('program')} onKeyDown={noSubmit} autoComplete="off" /></label>
-      <label className="field">What it is started with<span className="hint">The words that follow the program’s name when it is started, one on each line. Leave empty if there are none.</span><textarea name="server-args" rows={3} value={given.args} onChange={set('args')} /></label>
-    </> : null}
-    {server ? <p className="rule-row"><b>{server.name}</b> {serverWords(server)}</p> : null}
-    <p>
-      <button type="button" className="btn primary" disabled={!server} onClick={() => { if (server) { add(server); done(); } }}>Add these tools</button>{' '}
-      <button type="button" className="btn" onClick={done}>Cancel</button>
-    </p>
-    {!kind ? <p className="why-not">Choose how they are reached.</p> : built && 'problem' in built ? <p className="why-not">{built.problem}</p> : null}
-  </div>;
+  return <tr className="add-rule" role="group" aria-label="Add connected tools">
+    <td><input name="server-name" aria-label="A short name for them" placeholder="A short name, like notes" value={given.name} onChange={set('name')} onKeyDown={noSubmit} autoComplete="off" /></td>
+    <td>
+      <select name="server-kind" aria-label="How these tools are reached" value={kind} onChange={(event) => setKind(event.target.value as ServerKind | '')}>
+        {kinds.length === 1 ? null : <option value="">Choose how they are reached</option>}
+        {kinds.includes('address') ? <option value="address">At a web address</option> : null}
+        {kinds.includes('program') ? <option value="program">By a program on the agent’s computer</option> : null}
+      </select>
+      {kind === 'address' ? <input name="server-address" aria-label="Web address" placeholder="https://tools.example.org/mcp" value={given.address} onChange={set('address')} onKeyDown={noSubmit} autoComplete="off" /> : null}
+      {kind === 'program' ? <>
+        <input name="server-program" aria-label="The program’s full path" placeholder="/usr/local/bin/notes-mcp" value={given.program} onChange={set('program')} onKeyDown={noSubmit} autoComplete="off" />
+        <textarea name="server-args" aria-label="What it is started with, one word on each line" placeholder="What it is started with, one on each line. Leave empty if there are none." rows={3} value={given.args} onChange={set('args')} />
+      </> : null}
+      {server ? <p className="rule-row"><b>{server.name}</b> {serverWords(server)}</p> : null}
+      {touched && built && 'problem' in built ? <p className="why-not">{built.problem}</p> : null}
+    </td>
+    <td><button type="button" className="btn primary" disabled={!server} onClick={() => { if (server) { add(server); setGiven(empty); } }}>Add these tools</button></td>
+  </tr>;
 }
 
 /**
@@ -88,17 +93,22 @@ export function kindsFor(transports: string[] | undefined): ServerKind[] {
 }
 
 export function McpServers({ program, transports, value, change }: { program: string; transports: string[] | undefined; value: McpServer[]; change: (next: McpServer[]) => void }) {
-  const [adding, setAdding] = useState(false);
   const kinds = kindsFor(transports);
-  return <section className="rule-list mcp-servers" aria-label="Connected tools">
-    <p><b>Connected tools {program || 'this agent'} can use</b></p>
+  return <section className="mcp-servers wide" aria-label="Connected tools">
+    <table className="usage-table">
+      <colgroup><col style={{ width: '22%' }} /><col style={{ width: '64%' }} /><col style={{ width: '14%' }} /></colgroup>
+      <thead><tr><th>Connected tools {program || 'this agent'} can use</th><th>How they are reached</th><th>Change</th></tr></thead>
+      <tbody>
+        {value.map((server) => <tr key={server.name} className="rule-row">
+          <td><b>{server.name}</b></td>
+          <td>{serverWords(server)}{server.channel === 'wake' ? ', and its messages wake the agent' : ''}</td>
+          <td><button type="button" className="btn" aria-label={'Remove ' + server.name} onClick={() => change(value.filter((one) => one.name !== server.name))}>Remove</button></td>
+        </tr>)}
+        {value.length ? null : <tr><td colSpan={3} className="dim">None.</td></tr>}
+      </tbody>
+      {kinds.length ? <tfoot><AddServer kinds={kinds} taken={value.map((server) => server.name)} add={(server) => change([...value, server])} /></tfoot> : null}
+    </table>
+    {kinds.length === 0 ? <p className="dim">{program ? program + ' does not say how connected tools reach it, so none can be added here.' : 'Choose a program first.'}</p> : null}
     {others(program) ? <p className="dim">{others(program)}</p> : null}
-    {value.length ? <ul>{value.map((server) => <li key={server.name} className="rule-row">
-      <b>{server.name}</b> {serverWords(server)}{server.channel === 'wake' ? ', and its messages wake the agent' : ''}{' '}
-      <button type="button" className="btn" onClick={() => change(value.filter((one) => one.name !== server.name))}>Remove</button>
-    </li>)}</ul> : <p className="dim">None.</p>}
-    {kinds.length === 0 ? <p className="dim">{program ? program + ' does not say how connected tools reach it, so none can be added here.' : 'Choose a program first.'}</p>
-      : adding ? <AddServer kinds={kinds} taken={value.map((server) => server.name)} add={(server) => change([...value, server])} done={() => setAdding(false)} />
-      : <p><button type="button" className="btn" onClick={() => setAdding(true)}>Add connected tools</button></p>}
   </section>;
 }

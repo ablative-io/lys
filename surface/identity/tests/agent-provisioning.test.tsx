@@ -45,8 +45,8 @@ describe('Agent provisioning', () => {
   });
   it('shows an old profile’s connected tools in words and does not rewrite it just by reading them', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', routes);
-    expect(text()).toContain('Cambium Reached at http://localhost:6010, and its messages wake the agent');
-    expect(text()).toContain('Excalidraw Runs /opt/mcp/excalidraw --stdio');
+    expect(text()).toContain('CambiumReached at http://localhost:6010, and its messages wake the agent');
+    expect(text()).toContain('ExcalidrawRuns /opt/mcp/excalidraw --stdio');
     expect(text()).not.toContain('"command"');
     expect(posted).toEqual([]);
   });

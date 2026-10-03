@@ -46,6 +46,11 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [prompt, setPrompt] = useState(firstRun ? profile?.instructions_mode ?? firstPrompt(program) : strict ? profile?.instructions_mode ?? (program?.instructions_modes?.length === 1 ? program.instructions_modes[0] : '') : profile?.instructions ? profile.instructions_mode ?? 'append' : 'keep');
   const [promptChanged, setPromptChanged] = useState(false);
   const [folder, setFolder] = useState(profile?.working_folder ?? '');
+  // The computer it runs on is a saved setting like the rest; empty leaves it to be settled when the agent starts.
+  const [runsOn, setRunsOn] = useState(profile?.runs_on ?? '');
+  // Where folders are chosen: the computer the screen already knows, else the saved one.
+  const preferred = computer ?? runsOn;
+  const machines = usable(choices.machines);
   const [instructions, setInstructions] = useState(profile?.instructions ?? '');
   // What else the agent is given: the tools its settings name, the skills Lys keeps for it, and its connected tools.
   const [tools, setTools] = useState(profile?.tools ?? []);
@@ -76,15 +81,15 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     instructions: prompt === 'keep' ? !promptChanged && profile ? profile.instructions : '' : instructions.trim(), note: 'Settings saved from the settings form',
     harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
-    ...(profile?.runs_on ? { runs_on: profile.runs_on } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
+    ...(runsOn ? { runs_on: runsOn } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
     ...(folder ? { working_folder: folder } : {}),
     ...(profile?.session ? { session: profile.session } : {}),
   };
-  const where = <>
+  const where = <div className="wide">
     {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun && !folderFirst ? ' Choose one now, or when you start this agent.' : ''}</p>}
-    {canChoose ? <FolderChooser computers={usable(choices.machines)} preferred={computer ?? profile?.runs_on ?? ''} chosen={folder} choose={setFolder} /> : null}
-  </>;
-  const fields = <>
+    {canChoose ? <FolderChooser computers={machines} preferred={preferred} chosen={folder} choose={setFolder} /> : null}
+  </div>;
+  const fields = <div className="form-grid">
     {folderFirst ? where : null}
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
       const next = choices.programs?.find((entry) => entry.name === event.target.value);
@@ -98,16 +103,21 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {program ? <label className="field">Installed copy this agent uses<select name="build" value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose an installed copy</option>{builds.map((entry) => <option key={entry.program + '\n' + entry.package} value={entry.program + '\n' + entry.package}>{entry.name} — {entry.package}</option>)}<option value="another">Another program…</option></select></label> : null}
     {build === 'another' ? <label className="field">Program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}
     <label className="field">Model this agent uses<select name="model" value={model} onChange={(event) => setModel(event.target.value)}>{!program?.models.some((entry) => entry.id === model) ? <option value={model}>{model || 'Choose a model'}</option> : null}{program?.models.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
+    {computer !== undefined ? null : <label className="field">Computer this agent runs on<select name="runs_on" value={runsOn} disabled={!canChoose} onChange={(event) => setRunsOn(event.target.value)}>
+      <option value="">Settled when it starts</option>
+      {runsOn && !machines.some((entry) => entry.id === runsOn) ? <option value={runsOn}>A computer Lys no longer lists</option> : null}
+      {machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+    </select></label>}
     {firstRun && profile && !program?.modes.some((entry) => entry.id === mode) ? <p>The saved program settings are kept for this request.</p> : null}
-    <Permissions key={programName} agent={agent} program={program} value={permissions} change={setPermissions} tools={tools} computers={usable(choices.machines)} computer={computer ?? profile?.runs_on ?? ''} />
-    <ModeWords program={program} mode={mode} sentencesOnly />
+    <Permissions key={programName} agent={agent} program={program} value={permissions} change={setPermissions} tools={tools} computers={machines} computer={preferred} />
+    <div className="wide"><ModeWords program={program} mode={mode} sentencesOnly /></div>
     <ToolsNamed value={tools} change={setTools} />
     <McpServers key={'servers:' + programName} program={program?.name ?? ''} transports={program?.description?.mcp?.transports} value={servers} change={setServers} />
     <Skills program={program?.name ?? ''} kept={choices.skills} value={skills} change={setSkills} />
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
     {prompt ? <p className="dim prompt-words">{promptWords(prompt, prompt === 'keep' ? '' : instructions)}</p> : null}
-    {prompt && prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
+    {prompt && prompt !== 'keep' ? <label className="field wide">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
     {folderFirst ? null : where}
-  </>;
+  </div>;
   return render(fields, settings, refusal);
 }
