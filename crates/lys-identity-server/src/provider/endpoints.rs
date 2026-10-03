@@ -253,6 +253,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::ModelUnrepresentable { .. }
         | ServerError::HarnessUndeclared { .. }
         | ServerError::LaunchUnrenderable { .. }
+        | ServerError::WorkingFolderUnnamed
         | ServerError::McpCredentialInline { .. }
         | ServerError::McpSettingUnrepresentable { .. }
         | ServerError::McpHandleUnsupported { .. }
