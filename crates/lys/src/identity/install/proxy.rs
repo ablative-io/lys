@@ -27,6 +27,18 @@ use super::log_wait::{self, LogCursor};
 use super::ports::Ports;
 use super::services::{self, Environment};
 
+/// A base as the start line names it: scheme, host, port and path, without
+/// any user, password or query it carried.
+pub fn shown(base: &str) -> String {
+    let (scheme, rest) = base.split_once("://").unwrap_or(("", base));
+    let rest = rest.split(['?', '#']).next().unwrap_or_default();
+    let (authority, path) = rest.find('/').map_or((rest, ""), |at| rest.split_at(at));
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    format!("{scheme}://{host}{path}")
+}
+
 /// The words the proxy's start line carries once it listens.
 const LISTENING: &str = r#""proxy":"listening""#;
 
@@ -155,10 +167,16 @@ pub fn configure(
         )
     })?;
     let outcome = private_files::write(&file, &bytes)?;
-    say(if upstream.from == "login" {
-        "model proxy forwards to the login's own ANTHROPIC_BASE_URL"
+    say(&if upstream.from == "login" {
+        format!(
+            "model proxy forwards to the login's own ANTHROPIC_BASE_URL, {}",
+            shown(&upstream.anthropic)
+        )
     } else {
-        "model proxy forwards to Anthropic's API; the login names no ANTHROPIC_BASE_URL"
+        format!(
+            "model proxy forwards to Anthropic's API, {}; the login names no ANTHROPIC_BASE_URL",
+            shown(&upstream.anthropic)
+        )
     });
     Ok(outcome != Outcome::Unchanged)
 }

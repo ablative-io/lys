@@ -11,7 +11,7 @@ use serde_json::json;
 
 use crate::cli::ProxyCommand;
 use crate::commands::error::{CliError, CliResult};
-use crate::identity::install::proxy::{ANTHROPIC, Upstream};
+use crate::identity::install::proxy::{ANTHROPIC, Upstream, shown};
 
 /// The Anthropic upstream and where it came from: `--anthropic`, else the
 /// record `--upstream` names, else Anthropic's API. Never the environment.
@@ -38,22 +38,10 @@ pub fn anthropic_upstream(
     Ok((upstream.anthropic, upstream.from))
 }
 
-/// A base as the start line names it: scheme, host, port and path, without
-/// any user, password or query it carried.
-pub fn shown(base: &str) -> String {
-    let (scheme, rest) = base.split_once("://").unwrap_or(("", base));
-    let rest = rest.split(['?', '#']).next().unwrap_or_default();
-    let (authority, path) = rest.find('/').map_or((rest, ""), |at| rest.split_at(at));
-    let host = authority
-        .rsplit_once('@')
-        .map_or(authority, |(_, host)| host);
-    format!("{scheme}://{host}{path}")
-}
-
-/// Whether `base` names `listen` itself, which would send each call back
-/// into the proxy.
-pub fn names_itself(base: &str, listen: &str) -> bool {
-    let shown = shown(base);
+/// Whether the parsed `base` names `listen` itself, which would send each
+/// call back into the proxy.
+pub fn names_itself(base: &Base, listen: &str) -> bool {
+    let shown = shown(base.as_str());
     let authority = shown
         .split_once("://")
         .map_or(shown.as_str(), |(_, rest)| rest)
@@ -66,6 +54,18 @@ pub fn names_itself(base: &str, listen: &str) -> bool {
     ["127.0.0.1", "localhost", "[::1]", "0.0.0.0"]
         .iter()
         .any(|host| authority == format!("{host}:{port}"))
+}
+
+/// Parses an upstream, naming it in any refusal without the user, password
+/// or query it carried.
+fn parsed(base: &str) -> Result<Base, ProxyError> {
+    Base::parse(base).map_err(|error| match error {
+        ProxyError::BadUpstream { reason, .. } => ProxyError::BadUpstream {
+            base: shown(base),
+            reason,
+        },
+        other => other,
+    })
 }
 
 /// Runs `lys proxy`.
@@ -83,7 +83,10 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
     #[cfg(unix)]
     rustix::process::umask(rustix::fs::Mode::from_raw_mode(0o077));
     let (anthropic, source) = anthropic_upstream(anthropic, upstream.as_deref())?;
-    if names_itself(&anthropic, &listen) {
+    // An unparseable upstream is refused by name first; only a parsed one is
+    // asked whether it names the proxy itself.
+    let anthropic_base = parsed(&anthropic)?;
+    if names_itself(&anthropic_base, &listen) {
         return Err(ProxyError::BadUpstream {
             base: shown(&anthropic),
             reason: format!(
@@ -96,8 +99,8 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
     let config = ProxyConfig {
         home,
         state,
-        anthropic: Base::parse(&anthropic)?,
-        openai: Base::parse(&openai)?,
+        anthropic: anthropic_base,
+        openai: parsed(&openai)?,
         capture_slots: 64,
     };
     let start = json!({

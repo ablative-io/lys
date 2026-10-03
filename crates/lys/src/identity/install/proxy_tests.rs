@@ -105,6 +105,31 @@ fn the_upstream_is_the_login_shell_s_own_and_never_the_invoking_process_s()
         .mode();
     assert_eq!(mode & 0o777, 0o600);
     assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said[0].contains("https://gateway.example/anthropic"),
+        "{said:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_install_names_the_recorded_base_without_its_user_password_or_query()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let gateway = login_with(
+        dir.path(),
+        "export ANTHROPIC_BASE_URL='https://who:secret@gateway.example/anthropic?key=k'",
+    )?;
+    let layout = Layout::at(dir.path().join("root"));
+    std::fs::create_dir_all(layout.data_dir())?;
+    let mut said = Vec::new();
+    super::configure(&layout, &gateway, &mut |line| said.push(line.to_owned()))?;
+    assert_eq!(
+        said,
+        [
+            "model proxy forwards to the login's own ANTHROPIC_BASE_URL, https://gateway.example/anthropic"
+        ]
+    );
     Ok(())
 }
 

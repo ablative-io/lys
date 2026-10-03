@@ -1,4 +1,7 @@
-use super::{anthropic_upstream, names_itself, shown};
+use lys_home::proxy::forward::Base;
+
+use super::{anthropic_upstream, names_itself, parsed};
+use crate::identity::install::proxy::shown;
 
 #[test]
 fn the_upstream_is_the_flag_else_the_record_else_anthropic_and_never_the_environment()
@@ -41,10 +44,26 @@ fn a_named_upstream_never_shows_its_user_password_or_query() {
 }
 
 #[test]
-fn an_upstream_naming_the_proxy_itself_is_found() {
+fn an_upstream_naming_the_proxy_itself_is_found() -> Result<(), Box<dyn std::error::Error>> {
     let listen = "127.0.0.1:8484";
-    assert!(names_itself("http://127.0.0.1:8484/anthropic", listen));
-    assert!(names_itself("http://localhost:8484/anthropic", listen));
-    assert!(!names_itself("http://127.0.0.1:8485/anthropic", listen));
-    assert!(!names_itself("https://api.anthropic.com", listen));
+    let itself = |base: &str| -> Result<bool, lys_home::proxy::error::ProxyError> {
+        Ok(names_itself(&Base::parse(base)?, listen))
+    };
+    assert!(itself("http://127.0.0.1:8484/anthropic")?);
+    assert!(itself("http://localhost:8484/anthropic")?);
+    assert!(!itself("http://127.0.0.1:8485/anthropic")?);
+    assert!(!itself("https://api.anthropic.com")?);
+    Ok(())
+}
+
+#[test]
+fn an_upstream_with_no_scheme_is_refused_by_name_before_it_is_asked_anything() {
+    let refused = parsed("who:secret@127.0.0.1:8484/anthropic?key=k");
+    let Err(lys_home::proxy::error::ProxyError::BadUpstream { base, .. }) = refused else {
+        panic!("a base with no scheme parsed: {refused:?}");
+    };
+    assert!(
+        !base.contains("secret") && !base.contains("key=k"),
+        "{base}"
+    );
 }
