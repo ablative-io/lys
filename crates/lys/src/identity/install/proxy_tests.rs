@@ -19,6 +19,8 @@ fn the_proxy_unit_runs_lys_proxy_serve_on_the_recorded_listener_inside_the_root(
             "/root-fixture/data/proxy/home",
             "--state",
             "/root-fixture/data/proxy/state",
+            "--upstream",
+            "/root-fixture/data/proxy/upstream.json",
         ]
     );
     assert_eq!(unit.pid, layout.run_dir().join("proxy.pid"));
@@ -40,13 +42,15 @@ fn the_proxy_s_start_line_carries_the_words_its_unit_waits_for() {
     assert!(line.contains(LISTENING), "{line}");
 }
 
-/// A login whose shell is `profile` run before `/bin/sh` answers.
+/// A login whose shell, `name` in `dir`, runs `profile` before `/bin/sh`
+/// answers; each login keeps its own shell.
 fn login_with(
     dir: &std::path::Path,
+    name: &str,
     profile: &str,
 ) -> Result<crate::identity::install::services::Environment, Box<dyn std::error::Error>> {
     use std::os::unix::fs::PermissionsExt;
-    let shell = dir.join("login-shell");
+    let shell = dir.join(name);
     std::fs::write(
         &shell,
         format!("#!/bin/sh\necho 'noise from a profile'\n{profile}\n/bin/sh \"$@\"\necho 'bye'\n"),
@@ -70,13 +74,14 @@ fn the_upstream_is_the_login_shell_s_own_and_never_the_invoking_process_s()
     let dir = tempfile::tempdir()?;
     let gateway = login_with(
         dir.path(),
+        "gateway-shell",
         "export ANTHROPIC_BASE_URL=https://gateway.example/anthropic",
     )?;
     assert_eq!(
         super::login_base(&gateway)?.as_deref(),
         Some("https://gateway.example/anthropic")
     );
-    let plain = login_with(dir.path(), "unset ANTHROPIC_BASE_URL")?;
+    let plain = login_with(dir.path(), "plain-shell", "unset ANTHROPIC_BASE_URL")?;
     assert_eq!(super::login_base(&plain)?, None);
     let layout = Layout::at(dir.path().join("root"));
     std::fs::create_dir_all(layout.data_dir())?;
@@ -118,6 +123,7 @@ fn the_install_names_the_recorded_base_without_its_user_password_or_query()
     let dir = tempfile::tempdir()?;
     let gateway = login_with(
         dir.path(),
+        "credentialed-shell",
         "export ANTHROPIC_BASE_URL='https://who:secret@gateway.example/anthropic?key=k'",
     )?;
     let layout = Layout::at(dir.path().join("root"));
@@ -145,7 +151,7 @@ fn a_proxy_folder_others_can_read_is_refused_not_used() -> Result<(), Box<dyn st
         std::fs::Permissions::from_mode(0o700),
     )?;
     std::fs::set_permissions(&open, std::fs::Permissions::from_mode(0o755))?;
-    let environment = login_with(dir.path(), "unset ANTHROPIC_BASE_URL")?;
+    let environment = login_with(dir.path(), "plain-shell", "unset ANTHROPIC_BASE_URL")?;
     let Err(refusal) = super::configure(&layout, &environment, &mut |_| {}) else {
         return Err("a proxy home others can read was used".into());
     };
