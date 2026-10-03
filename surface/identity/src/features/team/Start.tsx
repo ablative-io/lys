@@ -1,6 +1,7 @@
 /** A stopped agent, started in place with one press. Where it runs is a saved setting: the computer its settings name, else the one computer allowed to run it; only when several are allowed and none is saved is each offered, as its own Start. What stops a start is said before the press, in one sentence with the one button that fixes it, and the button is never greyed without its reason beside it. */
 import { useEffect, useRef, useState } from 'react';
 import { Refused, api, operationId, request, useLoad } from '../../api';
+import { allowedToRun } from '../network/allowed';
 import type { Machine, NetworkView } from '../network/contract';
 import type { Entry } from '../people/directory';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
@@ -43,9 +44,7 @@ export function Start({ entry, me, admin, changed, settings }: {
 
   const data = load.status === 'ok' ? load.data : null;
   const profile = data?.profile ?? null;
-  const held = data ? data.roles.filter((role) => role.holders.some((holder) => holder.holder === agent && holder.state === 'holding')).map((role) => role.id) : [];
-  const allowed: Machine[] = data ? data.machines.filter((machine) => machine.state === 'in_use' && machine.runtime !== null &&
-    (machine.may_run.some((holder) => holder.id === agent) || Boolean(machine.may_run_roles?.some((role) => held.includes(role))))) : [];
+  const allowed: Machine[] = data ? allowedToRun(data.machines, data.roles, agent) : [];
   const saved = allowed.find((machine) => machine.id === profile?.runs_on);
   const choices = saved ? [saved] : allowed;
   const mayReview = admin || entry.person?.id === me;
