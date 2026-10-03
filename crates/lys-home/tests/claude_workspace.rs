@@ -132,9 +132,8 @@ fn a_named_mode_renders_the_permissions_exactly_as_written() -> Result<(), Box<d
 fn every_start_leaves_the_persons_own_setup_out() -> Result<(), Box<dyn Error>> {
     let mut template: Value = serde_json::from_str(include_str!("fixtures/launch/template.json"))?;
     template["slots"]["permissions"] = json!({"defaultMode": "acceptEdits"});
-    // The fixture's own flags already name one of the two; without them the
-    // count below is of what the renderer adds.
-    template["flags"] = json!([]);
+    // The fixture's own flags name one of the two; it is still written once.
+    assert_eq!(template["flags"], json!([ONLY_GIVEN_MCP]));
     for mode in [
         InstructionsMode::Keep,
         InstructionsMode::Append,

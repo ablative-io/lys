@@ -206,7 +206,7 @@ fn two_launches_write_the_recorded_files_the_launch_line_and_two_events_beside_t
             assert_eq!(f["sha256"], json!(hash));
         }
         let launch_line = format!(
-            "claude --resume {o}/{UUID}.jsonl --fork-session --mcp-config {o}/mcp.json --settings {o}/env.json --append-system-prompt-file {o}/instructions.md --strict-mcp-config",
+            "claude --resume {o}/{UUID}.jsonl --fork-session --mcp-config {o}/mcp.json --settings {o}/env.json --append-system-prompt-file {o}/instructions.md --setting-sources= --strict-mcp-config",
             o = out.display()
         );
         assert_eq!(report["launch"], json!(launch_line));

@@ -50,6 +50,13 @@ pub const NO_SETTING_SOURCES: &str = "--setting-sources=";
 /// Uses only the MCP servers in the file Lys passes.
 pub const ONLY_GIVEN_MCP: &str = "--strict-mcp-config";
 
+/// Whether a template's own flag is one every start already carries, so it
+/// is not written twice.
+#[must_use]
+pub fn always_given(flag: &str) -> bool {
+    flag == NO_SETTING_SOURCES || flag == ONLY_GIVEN_MCP
+}
+
 fn file(path: &str, text: String) -> File {
     File {
         path: path.to_owned(),
@@ -133,7 +140,12 @@ pub fn render(
         argument_files.insert(arguments.len(), "instructions.txt".to_owned());
         arguments.push("instructions.txt".to_owned());
     }
-    arguments.extend(template.flags);
+    arguments.extend(
+        template
+            .flags
+            .into_iter()
+            .filter(|flag| !always_given(flag)),
+    );
     Ok(Launch {
         program: program.to_owned(),
         arguments,

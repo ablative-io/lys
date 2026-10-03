@@ -48,6 +48,7 @@ use crate::harness::claude_code::launch_env::{
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::harness::claude_code::seed::seed_argument;
 use crate::harness::claude_code::template::{Template, read_template};
+use crate::harness::rendering_launch::{NO_SETTING_SOURCES, ONLY_GIVEN_MCP, always_given};
 use crate::harness::skills;
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_HARNESS_EVENT, EntryBody};
@@ -288,8 +289,11 @@ fn environment_names(template: &Template) -> Vec<String> {
 }
 
 /// The launch line: the rendered file resumed by path with `--fork-session`,
-/// the three files, then the template's flags in order, then the seed as
-/// the first prompt when the render wrote one. Never run here.
+/// the three files, the two flags that leave the person's own Claude Code
+/// setup out (as every fresh start carries them; sources in
+/// docs/harness/reference/claude-code/CLEAN-START.md), then the template's
+/// flags in order, then the seed as the first prompt when the render wrote
+/// one. Never run here.
 #[must_use]
 pub fn launch_line(
     template: &Template,
@@ -310,8 +314,16 @@ pub fn launch_line(
         shell_word(&env.display().to_string()),
         "--append-system-prompt-file".to_owned(),
         shell_word(&instructions.display().to_string()),
+        NO_SETTING_SOURCES.to_owned(),
+        ONLY_GIVEN_MCP.to_owned(),
     ];
-    words.extend(template.flags.iter().map(|flag| shell_word(flag)));
+    words.extend(
+        template
+            .flags
+            .iter()
+            .filter(|flag| !always_given(flag))
+            .map(|flag| shell_word(flag)),
+    );
     if let Some(seed) = seed {
         words.push(seed_argument(seed));
     }

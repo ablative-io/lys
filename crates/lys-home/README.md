@@ -71,7 +71,8 @@ path, naming the template hash, the session head hash and a manifest block
 of the written paths, without moving the head. The report carries the launch
 line, `claude --resume <out>/<uuid>.jsonl --fork-session --mcp-config
 <out>/mcp.json --settings <out>/env.json --append-system-prompt-file
-<out>/instructions.md` plus the template's flags; the tool never runs it. A
+<out>/instructions.md --setting-sources= --strict-mcp-config` plus the
+template's flags; the tool never runs it. A
 template marking a secret readable is refused naming `secret_reader_unbuilt`
 and SECRETS-002, since no broker reader exists yet. The same template and
 session write the same bytes twice. After the event, `render-launch` appends

@@ -353,7 +353,7 @@ fn render_launch(
 
 fn template_line(out: &Path) -> String {
     format!(
-        "claude --resume {o}/{UUID}.jsonl --fork-session --mcp-config {o}/mcp.json --settings {o}/env.json --append-system-prompt-file {o}/instructions.md --strict-mcp-config",
+        "claude --resume {o}/{UUID}.jsonl --fork-session --mcp-config {o}/mcp.json --settings {o}/env.json --append-system-prompt-file {o}/instructions.md --setting-sources= --strict-mcp-config",
         o = out.display()
     )
 }
