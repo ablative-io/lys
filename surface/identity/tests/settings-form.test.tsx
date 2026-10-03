@@ -157,8 +157,33 @@ describe('The settings form', () => {
   it('sends the supported replacement mode without inventing a program capability', async () => {
     const { posted } = await open({ ...routes(), '/harnesses': ok({ programs: [{ ...program, instructions_modes: ['keep', 'append', 'replace'] }] }) });
     await choose(field('prompt'), 'replace');
+    // A replaced prompt with no words is never saved: Codex refuses to start on one, and no agent should run on an empty prompt.
+    expect(text()).toContain('Type the prompt this agent uses instead');
     await click(button());
-    expect(posted[0].body).toMatchObject({ instructions_mode: 'replace', instructions: '' });
+    expect(posted).toHaveLength(0);
+    const box = document.querySelector<HTMLTextAreaElement>('textarea[name="instructions"]');
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box, 'Check every receipt'); box?.dispatchEvent(new Event('input', { bubbles: true })); });
+    expect(text()).toContain('used instead of the program’s own prompt');
+    await click(button());
+    expect(posted[0].body).toMatchObject({ instructions_mode: 'replace', instructions: 'Check every receipt' });
+  });
+  it('shows the connected tools, skills and named tools the agent has, and saves one removed', async () => {
+    const { posted } = await open({ ...routes(profile), '/skills': ok({ skills: [{ name: 'review' }, { name: 'triage' }] }) });
+    expect(text()).toContain('Kept service'); expect(text()).toContain('Reached at http://localhost:6010');
+    expect(text()).toContain('1 skill: review.');
+    expect(text()).toContain('This agent uses the program’s own prompt.');
+    await click([...document.querySelectorAll('button')].find((each) => each.textContent === 'Remove reader') ?? null);
+    await click(button());
+    expect(posted[0].body).toMatchObject({ tools: [], skills: ['review'], mcp_servers: [{ name: 'Kept service', url: 'http://localhost:6010' }] });
+  });
+  it('will not save a skill Lys does not keep, and says which', async () => {
+    const { posted } = await open({ ...routes(profile), '/skills': ok({ skills: [{ name: 'triage' }] }) });
+    expect(text()).toContain('Lys keeps no skill named review');
+    await click(button());
+    expect(posted).toHaveLength(0);
+    await click([...document.querySelectorAll('button')].find((each) => each.textContent === 'Remove review') ?? null);
+    await click(button());
+    expect(posted[0].body).toMatchObject({ skills: [] });
   });
   it('preserves saved session rotation options during a model change', async () => {
     const session = { accounts: { kind: 'single', account: 'kept-account' } };

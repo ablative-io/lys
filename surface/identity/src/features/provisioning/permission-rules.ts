@@ -76,6 +76,9 @@ export function wordsFor(rule: string): string {
   if ((tool === 'Read' || tool === 'Edit') && inside.startsWith('//') && inside.endsWith('/**')) {
     return (tool === 'Read' ? 'Read files under ' : 'Change files under ') + (inside.slice(1, -3) || '/');
   }
+  if ((tool === 'Read' || tool === 'Edit') && inside.startsWith('//') && inside.length > 2 && !/[*?[\]!\\]/.test(inside)) {
+    return (tool === 'Read' ? 'Read ' : 'Change ') + inside.slice(1) + ' itself';
+  }
   if (tool === 'Bash' && inside.endsWith(' *')) return 'Run commands that start with ' + inside.slice(0, -2);
   if (tool === 'Bash' && !inside.includes('*')) return 'Run the command ' + inside;
   if (tool === 'WebFetch' && inside.startsWith('domain:')) return 'Reach ' + inside.slice(7);

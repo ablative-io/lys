@@ -1,6 +1,6 @@
 /** A connected-tools server is built from a name and what reaches it, and read back in plain words. */
 import { describe, expect, it } from 'vitest';
-import { serverFor, serverWords } from '../src/features/provisioning/McpServers';
+import { kindsFor, serverFor, serverWords } from '../src/features/provisioning/McpServers';
 
 const blank = { name: '', address: '', program: '', args: '' };
 
@@ -19,9 +19,18 @@ describe('connected tools', () => {
     expect(serverFor('address', { ...blank, name: 'my notes' }, [])).toEqual({ problem: 'The name is letters, digits, _ and - only, with no spaces.' });
     expect(serverFor('address', { ...blank, name: 'notes', address: 'https://x.example' }, ['notes'])).toEqual({ problem: 'This agent already has connected tools named notes.' });
     expect(serverFor('address', { ...blank, name: 'notes' }, [])).toEqual({ problem: 'Type its web address.' });
+    expect(serverFor('address', { ...blank, name: 'lys', address: 'https://x.example' }, [])).toEqual({ problem: 'The name lys is taken by Lys’s own tools. Choose another name.' });
+    expect(serverFor('address', { ...blank, name: 'Lys', address: 'https://x.example' }, [])).toHaveProperty('problem');
     expect(serverFor('address', { ...blank, name: 'notes', address: 'tools.example.org' }, [])).toHaveProperty('problem');
     expect(serverFor('program', { ...blank, name: 'notes' }, [])).toHaveProperty('problem');
     expect(serverFor('program', { ...blank, name: 'notes', program: 'notes-mcp' }, [])).toHaveProperty('problem');
+  });
+
+  it('offers only the ways the program says a server can be reached', () => {
+    expect(kindsFor(['stdio', 'http'])).toEqual(['address', 'program']);
+    expect(kindsFor(['stdio'])).toEqual(['program']);
+    expect(kindsFor([])).toEqual([]);
+    expect(kindsFor(undefined)).toEqual([]);
   });
 
   it('says a server in one line of plain words', () => {

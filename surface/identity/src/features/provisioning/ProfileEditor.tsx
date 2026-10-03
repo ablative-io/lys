@@ -8,6 +8,8 @@ import { Permissions } from './Permissions';
 import type { Permissions as PermissionsValue } from './Provisioning';
 import { usable } from '../network/allowed';
 import { SaveSettings } from './SaveSettings';
+import { McpServers } from './McpServers';
+import { Skills, ToolsNamed, promptWords } from './Given';
 import type { PeopleView } from '../../generated';
 
 export function ProfileEditor({ id, profile, choices, people, readOnly = false }: {
@@ -41,6 +43,10 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [promptChanged, setPromptChanged] = useState(false);
   const [folder, setFolder] = useState(profile?.working_folder ?? '');
   const [instructions, setInstructions] = useState(profile?.instructions ?? '');
+  // What else the agent is given: the tools its settings name, the skills Lys keeps for it, and its connected tools.
+  const [tools, setTools] = useState(profile?.tools ?? []);
+  const [skills, setSkills] = useState(profile?.skills ?? []);
+  const [servers, setServers] = useState(profile?.mcp_servers ?? []);
   const builds = program?.builds ?? [];
   const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
   const heldListed = heldBuild && builds.some((entry) => entry.program === heldBuild.program && entry.package === heldBuild.package);
@@ -57,9 +63,11 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
   else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? 'This program has no setting that keeps it to its own folder with internet off.' : 'Choose a mode this program lists.';
   else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';
+  else if (prompt === 'replace' && !instructions.trim()) refusal = 'Type the prompt this agent uses instead, or choose another prompt setting.';
+  else if (choices.skills && skills.some((name) => !choices.skills?.includes(name))) refusal = 'Lys keeps no skill named ' + skills.find((name) => !choices.skills?.includes(name)) + '. Remove it from this agent’s skills.';
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],
-    tools: profile?.tools ?? [], skills: profile?.skills ?? [], mcp_servers: profile?.mcp_servers ?? [],
+    tools, skills, mcp_servers: servers,
     instructions: prompt === 'keep' ? !promptChanged && profile ? profile.instructions : '' : instructions.trim(), note: 'Settings saved from the settings form',
     harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
@@ -81,9 +89,13 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {build === 'another' ? <label className="field">Program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}
     <label className="field">Model this agent uses<select name="model" value={model} onChange={(event) => setModel(event.target.value)}>{!program?.models.some((entry) => entry.id === model) ? <option value={model}>{model || 'Choose a model'}</option> : null}{program?.models.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
     {firstRun && profile && !program?.modes.some((entry) => entry.id === mode) ? <p>The saved program settings are kept for this request.</p> : null}
-    <Permissions key={programName} agent={agent} program={program} value={permissions} change={setPermissions} tools={profile?.tools ?? []} computers={usable(choices.machines)} computer={computer ?? profile?.runs_on ?? ''} />
+    <Permissions key={programName} agent={agent} program={program} value={permissions} change={setPermissions} tools={tools} computers={usable(choices.machines)} computer={computer ?? profile?.runs_on ?? ''} />
     <ModeWords program={program} mode={mode} sentencesOnly />
+    <ToolsNamed value={tools} change={setTools} />
+    <McpServers key={'servers:' + programName} program={program?.name ?? ''} transports={program?.description?.mcp?.transports} value={servers} change={setServers} />
+    <Skills kept={choices.skills} value={skills} change={setSkills} />
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
+    {prompt ? <p className="dim prompt-words">{promptWords(prompt, prompt === 'keep' ? '' : instructions)}</p> : null}
     {prompt && prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
     {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun ? ' Choose one now, or when you start this agent.' : ''}</p>}
     {canChoose ? <FolderChooser computers={usable(choices.machines)} preferred={computer ?? profile?.runs_on ?? ''} chosen={folder} choose={setFolder} /> : null}

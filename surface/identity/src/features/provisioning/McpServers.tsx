@@ -22,6 +22,7 @@ export function serverFor(kind: ServerKind, given: { name: string; address: stri
   const name = given.name.trim();
   if (!name) return { problem: 'Give it a short name, like notes or tickets.' };
   if (!/^[A-Za-z0-9_-]+$/.test(name)) return { problem: 'The name is letters, digits, _ and - only, with no spaces.' };
+  if (name.toLowerCase() === 'lys') return { problem: 'The name lys is taken by Lys’s own tools. Choose another name.' };
   if (taken.includes(name)) return { problem: 'This agent already has connected tools named ' + name + '.' };
   if (kind === 'address') {
     const url = given.address.trim();
@@ -43,8 +44,8 @@ export function serverWords(server: McpServer): string {
   return server.url ? 'Reached at ' + server.url : 'No address or program is recorded for it';
 }
 
-function AddServer({ taken, add, done }: { taken: string[]; add: (server: McpServer) => void; done: () => void }) {
-  const [kind, setKind] = useState<ServerKind | null>(null);
+function AddServer({ kinds, taken, add, done }: { kinds: ServerKind[]; taken: string[]; add: (server: McpServer) => void; done: () => void }) {
+  const [kind, setKind] = useState<ServerKind | null>(kinds.length === 1 ? kinds[0] : null);
   const [given, setGiven] = useState({ name: '', address: '', program: '', args: '' });
   const built = kind ? serverFor(kind, given, taken) : null;
   const server = built && 'server' in built ? built.server : null;
@@ -52,8 +53,8 @@ function AddServer({ taken, add, done }: { taken: string[]; add: (server: McpSer
   const noSubmit = (event: { key: string; preventDefault: () => void }) => { if (event.key === 'Enter') event.preventDefault(); };
   return <div className="add-rule" role="group" aria-label="Add connected tools">
     <p><b>How are these tools reached?</b></p>
-    <label className="choice-row"><input type="radio" name="server-kind" value="address" checked={kind === 'address'} onChange={() => setKind('address')} /> At a web address</label>
-    <label className="choice-row"><input type="radio" name="server-kind" value="program" checked={kind === 'program'} onChange={() => setKind('program')} /> By a program on the agent’s computer</label>
+    {kinds.includes('address') ? <label className="choice-row"><input type="radio" name="server-kind" value="address" checked={kind === 'address'} onChange={() => setKind('address')} /> At a web address</label> : null}
+    {kinds.includes('program') ? <label className="choice-row"><input type="radio" name="server-kind" value="program" checked={kind === 'program'} onChange={() => setKind('program')} /> By a program on the agent’s computer</label> : null}
     {kind ? <label className="field">A short name for them<span className="hint">For example: notes</span><input name="server-name" value={given.name} onChange={set('name')} onKeyDown={noSubmit} autoComplete="off" /></label> : null}
     {kind === 'address' ? <label className="field">Web address<span className="hint">For example: https://tools.example.org/mcp</span><input name="server-address" value={given.address} onChange={set('address')} onKeyDown={noSubmit} autoComplete="off" /></label> : null}
     {kind === 'program' ? <>
@@ -69,8 +70,14 @@ function AddServer({ taken, add, done }: { taken: string[]; add: (server: McpSer
   </div>;
 }
 
-export function McpServers({ program, value, change }: { program: string; value: McpServer[]; change: (next: McpServer[]) => void }) {
+/** The ways a program's description says a server can be reached, as this screen offers them. */
+export function kindsFor(transports: string[] | undefined): ServerKind[] {
+  return [...(transports?.includes('http') ? ['address' as const] : []), ...(transports?.includes('stdio') ? ['program' as const] : [])];
+}
+
+export function McpServers({ program, transports, value, change }: { program: string; transports: string[] | undefined; value: McpServer[]; change: (next: McpServer[]) => void }) {
   const [adding, setAdding] = useState(false);
+  const kinds = kindsFor(transports);
   return <section className="rule-list mcp-servers" aria-label="Connected tools">
     <p><b>Connected tools {program || 'this agent'} can use</b></p>
     <p className="dim">Lys’s own tools are always there. These are the others, and the only others: nothing is taken from anyone’s own setup on the computer.</p>
@@ -78,7 +85,8 @@ export function McpServers({ program, value, change }: { program: string; value:
       <b>{server.name}</b> {serverWords(server)}{server.channel === 'wake' ? ', and its messages wake the agent' : ''}{' '}
       <button type="button" className="btn" onClick={() => change(value.filter((one) => one.name !== server.name))}>Remove</button>
     </li>)}</ul> : <p className="dim">None.</p>}
-    {adding ? <AddServer taken={value.map((server) => server.name)} add={(server) => change([...value, server])} done={() => setAdding(false)} />
+    {kinds.length === 0 ? <p className="dim">{program ? program + ' does not say how connected tools reach it, so none can be added here.' : 'Choose a program first.'}</p>
+      : adding ? <AddServer kinds={kinds} taken={value.map((server) => server.name)} add={(server) => change([...value, server])} done={() => setAdding(false)} />
       : <p><button type="button" className="btn" onClick={() => setAdding(true)}>Add connected tools</button></p>}
   </section>;
 }

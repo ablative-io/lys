@@ -33,6 +33,9 @@ describe('permission rules', () => {
     expect(wordsFor('Edit(//srv/site/**)')).toBe('Change files under /srv/site');
     expect(wordsFor('Read(///**)')).toBe('Read files under /');
     expect(wordsFor('Read(//**)')).toBe('Read files under /');
+    expect(wordsFor('Read(//srv)')).toBe('Read /srv itself');
+    expect(wordsFor('Edit(//srv/site)')).toBe('Change /srv/site itself');
+    expect(wordsFor('Read(//srv/*.env)')).toBe('The rule Read(//srv/*.env)');
     expect(wordsFor('Bash(git push *)')).toBe('Run commands that start with git push');
     expect(wordsFor('Bash(npm run build)')).toBe('Run the command npm run build');
     expect(wordsFor('WebFetch(domain:example.com)')).toBe('Reach example.com');
