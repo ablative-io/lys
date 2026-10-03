@@ -229,6 +229,12 @@ async fn a_unit_without_a_reported_source_is_unavailable_and_not_kept() -> TestR
     Ok(())
 }
 
+/// The number of leaves the log at `dir` holds, read through the store itself.
+fn leaf_count(dir: &Path) -> TestResult<u64> {
+    use lys_log_store::LeafStore;
+    Ok(FileLeafStore::open_read_only(dir)?.extent())
+}
+
 fn files(dir: &Path) -> TestResult<Files> {
     let mut found = BTreeMap::new();
     for entry in std::fs::read_dir(dir)? {
@@ -273,7 +279,7 @@ async fn an_old_install_keeps_each_limits_action_and_zone_without_rewriting_read
             }))?,
             &Ed25519Identity::load(&config.event_key_file)?,
         )?;
-        let leaves = files(&dir.join("leaves"))?;
+        let leaves = leaf_count(&dir)?;
         Ok((agent, dir, leaves))
     })
     .await?;
@@ -291,12 +297,12 @@ async fn an_old_install_keeps_each_limits_action_and_zone_without_rewriting_read
         "{read}"
     );
     assert_eq!(files(&dir)?, before, "a read must not rewrite the old log");
-    assert_eq!(files(&dir.join("leaves"))?, leaves);
+    assert_eq!(leaf_count(&dir)?, leaves);
     service.restart().await?;
     let (status, restored) = service.get(&path, Some(&cookie)).await?;
     assert_eq!(status, 200, "{restored}");
     assert_eq!(restored["limits"], read["limits"]);
-    assert_eq!(files(&dir.join("leaves"))?, leaves);
+    assert_eq!(leaf_count(&dir)?, leaves);
     Ok(())
 }
 

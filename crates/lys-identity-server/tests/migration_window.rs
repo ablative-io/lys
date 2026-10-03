@@ -39,10 +39,10 @@ fn files(dir: &Path) -> ResultOf<Files> {
     Ok(found)
 }
 
-fn leaf_count(dir: &Path) -> ResultOf<usize> {
-    Ok(std::fs::read_dir(dir.join("leaves"))?
-        .collect::<Result<Vec<_>, _>>()?
-        .len())
+/// The number of leaves the log at `dir` holds, read through the store itself.
+fn leaf_count(dir: &Path) -> ResultOf<u64> {
+    use lys_log_store::LeafStore;
+    Ok(FileLeafStore::open_read_only(dir)?.extent())
 }
 
 fn old_log(
