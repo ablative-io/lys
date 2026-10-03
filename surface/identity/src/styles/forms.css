@@ -41,3 +41,8 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; p
 .card-grid > .card .pill { align-self: flex-start; margin-top: auto; }
 .stack > * + * { margin-top: 18px; }
 .stack > .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Why an agent cannot start: the sentence open, its fix beside it, the refusal's name small at the end. */
+.cannot-start p { margin: 0 0 8px; }
+.cannot-start .btn { margin-right: 8px; }
+.refusal-name { color: var(--text-secondary); font-family: "JetBrains Mono"; font-size: 10.5px; }
