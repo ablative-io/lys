@@ -32,12 +32,14 @@ describe('Agent credential handles', () => {
 });
 
 describe('Agent provisioning', () => {
-  it('reads a saved profile without exposing the removed settings fields', async () => {
+  it('reads a saved profile without exposing the removed settings fields, and sends nothing', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', routes);
     for (const name of ['allow', 'ask', 'deny', 'writable', 'folders', 'note']) {
       expect(document.querySelector('[name="' + name + '"]')).toBeNull();
     }
-    expect(button('Save these settings')).toBeNull();
+    // Save is the form's one button; on a profile nobody has changed it is greyed, with the reason beside it.
+    expect(button('Save these settings')?.disabled).toBe(true);
+    expect(document.querySelector('form.save-settings .why-not')?.textContent).toBeTruthy();
     expect(button('Approve these settings')).toBeNull();
     expect(posted).toEqual([]);
   });
@@ -46,9 +48,10 @@ describe('Agent provisioning', () => {
     expect(text()).not.toContain('/opt/mcp/excalidraw');
     expect(posted).toEqual([]);
   });
-  it('does not offer the removed save action to a non-administrator', async () => {
+  it('greys Save for a non-administrator and says an administrator changes these settings', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'Not an administrator'), '/people': ok(OWN) });
-    expect(button('Save these settings')).toBeNull();
+    expect(button('Save these settings')?.disabled).toBe(true);
+    expect(text()).toContain('An administrator changes these settings.');
     expect(posted).toEqual([]);
   });
 });
