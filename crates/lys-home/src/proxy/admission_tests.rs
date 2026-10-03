@@ -10,7 +10,9 @@ use hyper::StatusCode;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
-use super::{CONNECTION_LIMIT, refusal, serve};
+use super::{refusal, serve};
+
+const CONNECTIONS: usize = 128;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -38,8 +40,8 @@ async fn all_connections_beyond_the_old_limit_are_answered() -> TestResult {
         seen.fetch_add(1, Ordering::SeqCst);
         async { refusal(StatusCode::OK, "forwarded") }
     }));
-    let mut slow = Vec::with_capacity(CONNECTION_LIMIT * 2);
-    for _ in 0..CONNECTION_LIMIT * 2 {
+    let mut slow = Vec::with_capacity(CONNECTIONS);
+    for _ in 0..CONNECTIONS {
         let mut stream = TcpStream::connect(address).await?;
         stream.write_all(b"GET / HTTP/1.1\r\nHost: ").await?;
         slow.push(stream);
@@ -51,7 +53,9 @@ async fn all_connections_beyond_the_old_limit_are_answered() -> TestResult {
     let mut completed = tokio::task::JoinSet::new();
     for mut stream in slow {
         completed.spawn(async move {
-            stream.write_all(b"localhost\r\nConnection: close\r\n\r\n").await?;
+            stream
+                .write_all(b"localhost\r\nConnection: close\r\n\r\n")
+                .await?;
             let mut answer = Vec::new();
             stream.read_to_end(&mut answer).await?;
             let answer = String::from_utf8(answer)?;
@@ -63,7 +67,7 @@ async fn all_connections_beyond_the_old_limit_are_answered() -> TestResult {
     while let Some(done) = completed.join_next().await {
         done??;
     }
-    assert_eq!(handled.load(Ordering::SeqCst), CONNECTION_LIMIT * 2 + 1);
+    assert_eq!(handled.load(Ordering::SeqCst), CONNECTIONS + 1);
     serving.abort();
     let stopped = serving.await;
     assert!(stopped.is_err_and(|error| error.is_cancelled()));
@@ -77,7 +81,7 @@ async fn completed_connections_leave_the_listener_ready() -> TestResult {
     let serving = tokio::spawn(serve(listener, |_| async {
         refusal(StatusCode::OK, "forwarded")
     }));
-    for _ in 0..CONNECTION_LIMIT * 2 {
+    for _ in 0..CONNECTIONS {
         let answer = String::from_utf8(request(address).await?)?;
         assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
         assert!(answer.ends_with("forwarded\n"), "{answer}");

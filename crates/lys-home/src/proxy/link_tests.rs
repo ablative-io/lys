@@ -1,6 +1,6 @@
 #![cfg(test)]
 //! Gates on linking: a call is linked by the key its own body carries, read
-//! as it passes with bounded memory, and by nothing else; a call without
+//! as it passes, and by nothing else; a call without
 //! one lands under the day's `unlinked` session whatever came before it.
 
 use hyper::StatusCode;
@@ -9,7 +9,7 @@ use serde_json::json;
 use crate::proxy::forward_tests::{
     Harness, KEY, Res, fake, message_response, messages_body, messages_request, send, whole,
 };
-use crate::proxy::link::{KeyScanner, Link, METADATA_BUDGET, session_key};
+use crate::proxy::link::{KeyScanner, Link, session_key};
 use crate::record::call::CallStatus;
 
 fn scan(body: &[u8], step: usize) -> Link {
@@ -58,7 +58,7 @@ fn both_spellings_of_the_key_are_read_and_an_unsafe_one_links_nothing() {
 
 #[test]
 fn a_metadata_value_beyond_the_old_budget_links_at_each_frame_split() {
-    let padding = "p".repeat(METADATA_BUDGET * 8);
+    let padding = "p".repeat(32768);
     let user_id = format!("user_{padding}_account_a1_session_{KEY}");
     let body = json!({"metadata": {"user_id": user_id}});
     let body = body.to_string();
@@ -130,10 +130,13 @@ async fn a_keyed_call_is_recorded_whole_without_a_capture_allowance() -> Res {
 fn long_other_keys_and_metadata_fields_do_not_hide_the_session() -> Res {
     let mut body = serde_json::Map::new();
     body.insert("a".repeat(65536), json!("unrelated"));
-    body.insert("metadata".to_owned(), json!({
-        "padding": "p".repeat(65536),
-        "user_id": format!("user_device_account_account_session_{KEY}"),
-    }));
+    body.insert(
+        "metadata".to_owned(),
+        json!({
+            "padding": "p".repeat(65536),
+            "user_id": format!("user_device_account_account_session_{KEY}"),
+        }),
+    );
     let bytes = serde_json::to_vec(&body)?;
     assert_eq!(scan(&bytes, 17), Link::Session(KEY.to_owned()));
     Ok(())

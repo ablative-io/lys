@@ -210,7 +210,7 @@ written refuses the call by name with nothing sent. The call's bodies are
 spooled under `<state>/capture` while they pass, without a capture-slot limit.
 When a call ends, it is recorded as one
 `lys.call` in the home. The session is the one named by the key in the
-call's own body (`metadata.user_id`, read as it passes with bounded memory),
+call's own body (`metadata.user_id`, read once as the body passes),
 or `unlinked-<day>` when the body carries no key; the proxy never infers a
 session. The status is `complete`, `cancelled`, `partial`, `unrecorded` or
 `lost`, and only `complete` carries response parts, which are assembled from

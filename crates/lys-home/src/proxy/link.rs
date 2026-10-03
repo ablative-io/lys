@@ -14,21 +14,12 @@
 //!   from timing, the client's address, a working directory or an earlier
 //!   call: a call without a key is [`Link::Unlinked`], whatever came before.
 //! - Headers are never read here. The key is taken from the body.
-//! - The body is read as it passes, by [`KeyScanner`], whose memory is
-//!   bounded ([`METADATA_BUDGET`] bytes of the `metadata` value and a short
-//!   key buffer) however large the body is, so the key is known on the
-//!   forwarding path even when no capture slot is free.
+//! - The body is scanned once as it passes. The complete top-level metadata
+//!   value is kept until the request ends, then parsed once and released.
 
 use serde_json::Value;
 
 use crate::record::safe_component;
-
-/// The most bytes of the top-level `metadata` value the scanner keeps. A
-/// longer value links nothing.
-pub const METADATA_BUDGET: usize = 4096;
-
-/// The longest top-level key the scanner compares; `metadata` is 8 bytes.
-const KEY_BUDGET: usize = 16;
 
 /// Which session a call belongs to.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -107,7 +98,7 @@ pub fn link_of_metadata(metadata: &Value) -> Link {
 }
 
 /// Reads a JSON body as it passes and keeps only its top-level `metadata`
-/// value, up to [`METADATA_BUDGET`] bytes. Strings, escapes and nesting are
+/// value. Strings, escapes and nesting are
 /// followed so a `metadata` key inside a message is never mistaken for the
 /// top-level one.
 #[derive(Debug, Default)]
@@ -117,12 +108,12 @@ pub struct KeyScanner {
     escaped: bool,
     expecting_key: bool,
     in_key: bool,
-    key: Vec<u8>,
-    key_over: bool,
+    key_offset: usize,
+    key_matches: bool,
     metadata_key: bool,
     capturing: bool,
     captured: Vec<u8>,
-    captured_over: bool,
+    resolved: Option<Link>,
     done: bool,
 }
 
@@ -133,20 +124,19 @@ impl KeyScanner {
         Self::default()
     }
 
-    /// Read the next bytes of the body.
+    /// Gate: scans the request frame until the complete metadata value is kept.
     pub fn feed(&mut self, bytes: &[u8]) {
         for &b in bytes {
+            if self.done {
+                break;
+            }
             self.step(b);
         }
     }
 
     fn step(&mut self, b: u8) {
         if self.capturing {
-            if self.captured.len() < METADATA_BUDGET {
-                self.captured.push(b);
-            } else {
-                self.captured_over = true;
-            }
+            self.captured.push(b);
         }
         if self.in_string {
             self.string_byte(b);
@@ -158,8 +148,8 @@ impl KeyScanner {
                 if self.depth == 1 && self.expecting_key {
                     self.expecting_key = false;
                     self.in_key = true;
-                    self.key.clear();
-                    self.key_over = false;
+                    self.key_offset = 0;
+                    self.key_matches = true;
                 }
             }
             b'{' => {
@@ -201,7 +191,7 @@ impl KeyScanner {
             self.in_string = false;
             if self.in_key {
                 self.in_key = false;
-                self.metadata_key = !self.done && !self.key_over && self.key == b"metadata";
+                self.metadata_key = self.key_matches && self.key_offset == b"metadata".len();
             }
         } else {
             self.key_byte(b);
@@ -209,13 +199,10 @@ impl KeyScanner {
     }
 
     fn key_byte(&mut self, b: u8) {
-        if !self.in_key {
-            return;
-        }
-        if self.key.len() < KEY_BUDGET {
-            self.key.push(b);
-        } else {
-            self.key_over = true;
+        // Compare the field name without retaining unrelated keys.
+        if self.in_key && self.key_matches {
+            self.key_matches = b"metadata".get(self.key_offset) == Some(&b);
+            self.key_offset += usize::from(self.key_matches);
         }
     }
 
@@ -226,14 +213,19 @@ impl KeyScanner {
         self.done = true;
     }
 
-    /// The link the body read so far gives: its top-level `metadata` value's
-    /// key when that value was read whole within the budget, else unlinked.
+    /// Gate: parses a completed metadata value once, keeping only its link.
     #[must_use]
-    pub fn link(&self) -> Link {
-        if !self.done || self.captured_over {
+    pub fn link(&mut self) -> Link {
+        if !self.done {
             return Link::Unlinked;
         }
-        serde_json::from_slice::<Value>(&self.captured)
-            .map_or(Link::Unlinked, |metadata| link_of_metadata(&metadata))
+        if self.resolved.is_none() {
+            self.resolved = Some(
+                serde_json::from_slice::<Value>(&self.captured)
+                    .map_or(Link::Unlinked, |metadata| link_of_metadata(&metadata)),
+            );
+            self.captured = Vec::new();
+        }
+        self.resolved.clone().unwrap_or(Link::Unlinked)
     }
 }

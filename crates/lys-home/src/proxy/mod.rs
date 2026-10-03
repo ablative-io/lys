@@ -8,7 +8,7 @@
 //!   the upstream's authority; one transport, never sending a request twice
 //!   ([`forward`]).
 //! - A call is linked only by the key in its own body, read as it passes
-//!   with bounded memory ([`link`]).
+//!   in one streaming pass ([`link`]).
 //! - Every call is captured; only a call that ended whole is `complete`
 //!   ([`capture`]).
 //! - A call is journalled durably before it is sent, and a call a previous
