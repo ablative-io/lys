@@ -58,13 +58,15 @@ fn codex_native_launch_preserves_model_sandbox_and_instruction_text() -> TestRes
         InstructionsMode::Append,
     )?;
     assert_eq!(launch.program, fields.harness.program);
-    for pair in [
-        ["--model", "gpt-6.1-sol"],
-        ["--sandbox", "workspace-write"],
-        ["--ask-for-approval", "on-request"],
-        ["-C", "."],
-    ] {
+    for pair in [["--model", "gpt-6.1-sol"], ["--sandbox", "workspace-write"]] {
         assert!(launch.arguments.windows(2).any(|args| args == pair));
+    }
+    // The run's approval policy and working directory are never forced.
+    for forced in ["--ask-for-approval", "-C", "--cd"] {
+        assert!(
+            !launch.arguments.iter().any(|arg| arg == forced),
+            "{forced}"
+        );
     }
     let encoded = format!(
         "developer_instructions={}",
@@ -77,26 +79,58 @@ fn codex_native_launch_preserves_model_sandbox_and_instruction_text() -> TestRes
             .any(|args| args == ["-c", &encoded])
     );
     assert_eq!(launch.environment["LYS_AGENT"], "agent-fixture");
-    assert_eq!(launch.environment_paths["CODEX_HOME"], "");
-    let file = launch
-        .files
-        .iter()
-        .find(|file| file.path == "config.toml")
-        .ok_or("native config missing")?;
-    let config: toml::Table = file.text.parse()?;
-    assert_eq!(
-        config["sandbox_workspace_write"]["network_access"].as_bool(),
-        Some(false)
+    // No config folder of the run's own and no native config file: the
+    // machine's Codex setup is used, with the sandbox and the MCP servers
+    // carried as command-line settings.
+    assert!(launch.environment_paths.is_empty());
+    assert!(!launch.files.iter().any(|file| file.path == "config.toml"));
+    for setting in [
+        "sandbox_workspace_write.network_access=false",
+        "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+        "sandbox_workspace_write.exclude_slash_tmp=true",
+        "web_search=\"disabled\"",
+    ] {
+        assert!(
+            launch
+                .arguments
+                .windows(2)
+                .any(|args| args == ["-c", setting]),
+            "{setting}"
+        );
+    }
+    // No profile servers, so no mcp_servers setting of any kind; the
+    // machine's own servers stand untouched.
+    assert!(
+        !launch
+            .arguments
+            .iter()
+            .any(|arg| arg.starts_with("mcp_servers"))
     );
-    assert_eq!(
-        config["sandbox_workspace_write"]["exclude_tmpdir_env_var"].as_bool(),
-        Some(true)
-    );
-    assert_eq!(
-        config["sandbox_workspace_write"]["exclude_slash_tmp"].as_bool(),
-        Some(true)
-    );
-    assert_eq!(config["web_search"].as_str(), Some("disabled"));
+    Ok(())
+}
+
+#[test]
+fn codex_refuses_a_server_name_that_is_not_a_bare_key_by_name() -> TestResult {
+    for name in ["http.service", "my server"] {
+        let mut fields = fields()?;
+        fields.mcp_servers = vec![LaunchMcp {
+            name: name.to_owned(),
+            transport: Transport::Http {
+                url: "https://example.test/mcp".to_owned(),
+            },
+            channel: Channel::Off,
+        }];
+        let rendered = render(&fields, &[], &permissions("workspace-write"), &[])?;
+        let error = rendering_launch::render(
+            "codex/template-v1",
+            &fields.harness.program,
+            &rendered.text,
+            InstructionsMode::Append,
+        )
+        .err()
+        .ok_or("a server name Codex cannot take was rendered")?;
+        assert!(error.contains(name), "{error}");
+    }
     Ok(())
 }
 
@@ -197,7 +231,7 @@ fn codex_native_mcp_configuration_preserves_each_transport_and_handle() -> TestR
     let mut fields = fields()?;
     fields.mcp_servers = vec![
         LaunchMcp {
-            name: "http.service".to_owned(),
+            name: "http-service".to_owned(),
             transport: Transport::Http {
                 url: "https://example.test/mcp".to_owned(),
             },
@@ -228,14 +262,18 @@ fn codex_native_mcp_configuration_preserves_each_transport_and_handle() -> TestR
         &rendered.text,
         InstructionsMode::Append,
     )?;
-    let file = launch
-        .files
-        .iter()
-        .find(|file| file.path == "config.toml")
-        .ok_or("native config missing")?;
-    let config: toml::Table = file.text.parse()?;
+    // Each profile server is its own `-c mcp_servers.<name>=` setting, so the
+    // machine's own servers stand beside them; read them back as one document.
+    let settings: Vec<String> = launch
+        .arguments
+        .windows(2)
+        .filter(|pair| pair[0] == "-c" && pair[1].starts_with("mcp_servers."))
+        .map(|pair| pair[1].replacen('=', " = ", 1))
+        .collect();
+    assert_eq!(settings.len(), 2, "{settings:?}");
+    let config: toml::Table = settings.join("\n").parse()?;
     assert_eq!(
-        config["mcp_servers"]["http.service"]["url"].as_str(),
+        config["mcp_servers"]["http-service"]["url"].as_str(),
         Some("https://example.test/mcp")
     );
     let command = &config["mcp_servers"]["command"];

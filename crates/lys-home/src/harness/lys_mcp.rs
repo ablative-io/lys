@@ -161,8 +161,8 @@ pub enum Refusal {
     /// The address or pass cannot be carried as an HTTP request.
     #[error("LysMcpInvalid: invalid MCP endpoint or run pass")]
     Invalid,
-    /// The signed root binding does not select exactly one native config.
-    #[error("LysMcpConfigMissing: one native config root is required")]
+    /// A Claude Code launch carries no `mcp.json` to take the entry.
+    #[error("LysMcpConfigMissing: the Claude Code launch carries no mcp.json")]
     ConfigMissing,
     /// The native file is missing, repeated or cannot be read or encoded.
     #[error("LysMcpConfigInvalid: the native config cannot carry the entry")]
@@ -176,9 +176,6 @@ pub enum Refusal {
     /// A native TOML parse failure, with contents kept out of diagnostics.
     #[error("LysMcpConfigInvalid: the native TOML config cannot be read")]
     Toml(toml::de::Error),
-    /// A native TOML encoding failure, with contents kept out of diagnostics.
-    #[error("LysMcpConfigInvalid: the native TOML config cannot be encoded")]
-    Encoding(toml::ser::Error),
 }
 
 impl fmt::Debug for Refusal {
@@ -194,9 +191,7 @@ impl Refusal {
             Self::Duplicate => "LysMcpDuplicate",
             Self::Invalid | Self::Address(_) => "LysMcpInvalid",
             Self::ConfigMissing => "LysMcpConfigMissing",
-            Self::ConfigInvalid | Self::Json(_) | Self::Toml(_) | Self::Encoding(_) => {
-                "LysMcpConfigInvalid"
-            }
+            Self::ConfigInvalid | Self::Json(_) | Self::Toml(_) => "LysMcpConfigInvalid",
         }
     }
 }
@@ -244,72 +239,116 @@ fn claude(text: &str, entry: &LysMcp) -> Result<String, Refusal> {
         .map_err(Refusal::Json)
 }
 
-fn codex_headers(entry: &LysMcp) -> Result<toml::Table, Refusal> {
+/// The variables a Codex run's pass and seat travel in: Codex reads each
+/// header's value from the named variable (`env_http_headers`), so neither
+/// value is ever on the command line.
+pub const CODEX_PASS_VARIABLE: &str = "LYS_AGENT_PASS";
+/// The variable the seat header travels in for a Codex run.
+pub const CODEX_SEAT_VARIABLE: &str = "LYS_SEAT";
+const CODEX_LYS_SETTING: &str = "mcp_servers.lys=";
+
+fn toml_string(text: &str) -> Result<String, Refusal> {
+    serde_json::to_string(text)
+        .map(|encoded| encoded.replace('\u{7f}', "\\u007f"))
+        .map_err(Refusal::Json)
+}
+
+/// `value` as one line of TOML, as a `-c` setting carries it. Floats and
+/// dates are refused: nothing here carries them, and a rendering that changed
+/// their type would be a silent change.
+fn inline(value: &toml::Value) -> Result<String, Refusal> {
+    match value {
+        toml::Value::String(text) => toml_string(text),
+        toml::Value::Integer(number) => Ok(number.to_string()),
+        toml::Value::Boolean(flag) => Ok(flag.to_string()),
+        toml::Value::Float(_) | toml::Value::Datetime(_) => Err(Refusal::ConfigInvalid),
+        toml::Value::Array(items) => Ok(format!(
+            "[{}]",
+            items
+                .iter()
+                .map(inline)
+                .collect::<Result<Vec<_>, _>>()?
+                .join(", ")
+        )),
+        toml::Value::Table(table) => Ok(format!(
+            "{{{}}}",
+            table
+                .iter()
+                .map(|(key, value)| Ok(format!("{} = {}", toml_string(key)?, inline(value)?)))
+                .collect::<Result<Vec<_>, Refusal>>()?
+                .join(", ")
+        )),
+    }
+}
+
+/// Codex reads the lys server from its own `-c mcp_servers.lys=` setting,
+/// beside the machine's own servers and the profile's, never from a config
+/// folder of the run's own; the pass and the seat header are read from two
+/// variables of the run's environment, so neither is on the command line.
+fn codex(
+    arguments: &mut Vec<String>,
+    environment: &mut BTreeMap<String, String>,
+    entry: &LysMcp,
+) -> Result<(), Refusal> {
+    if arguments
+        .iter()
+        .any(|argument| argument.starts_with(CODEX_LYS_SETTING))
+        || environment.contains_key(CODEX_PASS_VARIABLE)
+        || environment.contains_key(CODEX_SEAT_VARIABLE)
+    {
+        return Err(Refusal::Duplicate);
+    }
     let mut headers = toml::Table::from_iter([(
         "lys-agent-pass".to_owned(),
-        toml::Value::String(entry.pass.clone()),
+        toml::Value::String(CODEX_PASS_VARIABLE.to_owned()),
     )]);
+    environment.insert(CODEX_PASS_VARIABLE.to_owned(), entry.pass.clone());
     if let Some(seat) = &entry.seat {
         headers.insert(
             SEAT_HEADER.to_owned(),
-            toml::Value::String(seat_header(seat, &entry.pass)?),
+            toml::Value::String(CODEX_SEAT_VARIABLE.to_owned()),
+        );
+        environment.insert(
+            CODEX_SEAT_VARIABLE.to_owned(),
+            seat_header(seat, &entry.pass)?,
         );
     }
-    Ok(headers)
+    let server = toml::Value::Table(toml::Table::from_iter([
+        ("url".to_owned(), toml::Value::String(entry.url.clone())),
+        ("env_http_headers".to_owned(), toml::Value::Table(headers)),
+    ]));
+    arguments.extend([
+        "-c".to_owned(),
+        format!("{CODEX_LYS_SETTING}{}", inline(&server)?),
+    ]);
+    Ok(())
 }
 
-fn codex(text: &str, entry: &LysMcp) -> Result<String, Refusal> {
-    let mut root: toml::Value = toml::from_str(text).map_err(Refusal::Toml)?;
-    let root = root.as_table_mut().ok_or(Refusal::ConfigInvalid)?;
-    let servers = root
-        .entry("mcp_servers")
-        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-    let servers = servers.as_table_mut().ok_or(Refusal::ConfigInvalid)?;
-    if servers.contains_key("lys") {
-        return Err(Refusal::Duplicate);
-    }
-    servers.insert(
-        "lys".to_owned(),
-        toml::Value::Table(toml::Table::from_iter([
-            ("url".to_owned(), toml::Value::String(entry.url.clone())),
-            (
-                "http_headers".to_owned(),
-                toml::Value::Table(codex_headers(entry)?),
-            ),
-        ])),
-    );
-    toml::to_string(root).map_err(Refusal::Encoding)
-}
-
-/// Add the reserved entry to the single config selected by its native root.
-/// Other files and process inputs remain untouched; errors change no file.
+/// Add the reserved entry. A launch that names `--mcp-config` is Claude
+/// Code's and gets the entry in its `mcp.json`; any other launch is Codex's
+/// and gets a `-c mcp_servers.lys=` setting with the pass and seat in its
+/// environment. Other files and process inputs remain untouched; errors
+/// change nothing.
 ///
 /// # Errors
-/// Refuses invalid endpoints, passes, roots, config shapes or a duplicate lys.
+/// Refuses invalid endpoints, passes, config shapes, a Claude Code launch
+/// without its `mcp.json`, or a duplicate lys.
 pub fn render(
     files: &mut [File],
-    roots: &BTreeMap<String, String>,
+    arguments: &mut Vec<String>,
+    environment: &mut BTreeMap<String, String>,
     entry: &LysMcp,
 ) -> Result<(), Refusal> {
     check(entry)?;
-    let (path, claude_code) = match (
-        roots.get("CLAUDE_CONFIG_DIR").map(String::as_str),
-        roots.get("CODEX_HOME").map(String::as_str),
-    ) {
-        (Some(""), None) => ("mcp.json", true),
-        (None, Some("")) => ("config.toml", false),
-        _ => return Err(Refusal::ConfigMissing),
-    };
-    let mut selected = files.iter_mut().filter(|file| file.path == path);
-    let file = selected.next().ok_or(Refusal::ConfigInvalid)?;
+    if !arguments.iter().any(|argument| argument == "--mcp-config") {
+        return codex(arguments, environment, entry);
+    }
+    let mut selected = files.iter_mut().filter(|file| file.path == "mcp.json");
+    let file = selected.next().ok_or(Refusal::ConfigMissing)?;
     if selected.next().is_some() {
         return Err(Refusal::ConfigInvalid);
     }
-    let text = if claude_code {
-        claude(&file.text, entry)?
-    } else {
-        codex(&file.text, entry)?
-    };
+    let text = claude(&file.text, entry)?;
     Hash::of(text.as_bytes())
         .as_str()
         .clone_into(&mut file.sha256);

@@ -169,7 +169,7 @@ impl Table {
         let program = self.dir.path().join("declared-harness");
         std::fs::write(
             &program,
-            "#!/bin/sh\nprintf 'declared-program\\n'\nprintf '%s\\n' \"$@\"\ncat \"$CLAUDE_CONFIG_DIR/settings.json\" \"$CLAUDE_CONFIG_DIR/mcp.json\" \"$CLAUDE_CONFIG_DIR/instructions.txt\"\nprintf '\\nprofile-read\\n'\nexec cat\n",
+            "#!/bin/sh\nprintf 'declared-program\\n'\nprintf '%s\\n' \"$@\"\nwhile [ $# -gt 1 ]; do case \"$1\" in --settings) s=$2;; --mcp-config) m=$2;; --append-system-prompt-file|--system-prompt-file) i=$2;; esac; shift; done\ncat \"$s\" \"$m\" \"$i\"\nprintf '\\nprofile-read\\n'\nexec cat\n",
         )?;
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;
         Ok(())

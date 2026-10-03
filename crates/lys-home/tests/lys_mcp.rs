@@ -3,11 +3,12 @@
 
 use lys_core::Ed25519Identity;
 use lys_core::attestation::{sign_attestation, verify_attestation_bytes_by_signer};
+use std::collections::BTreeMap;
+
 use lys_home::harness::lys_mcp::{self, LysMcp, Seat};
 use lys_home::harness::rendering_launch::File;
 use lys_home::record::blocks::Hash;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
 use std::error::Error;
 
 const PASS: &str = "fixture-run-pass-only";
@@ -22,34 +23,33 @@ impl<T> std::fmt::Debug for Redacted<T> {
     }
 }
 
-fn fixture(codex: bool) -> (Vec<File>, BTreeMap<String, String>) {
-    let (path, root, text) = if codex {
-        (
-            "config.toml",
-            "CODEX_HOME",
-            "model = 'fixture-model'\nmcp_servers = { other = { url = 'https://other.invalid/mcp' } }\n",
-        )
-    } else {
-        (
-            "mcp.json",
-            "CLAUDE_CONFIG_DIR",
-            r#"{"mcpServers":{"other":{"type":"http","url":"https://other.invalid/mcp"}},"native":true}"#,
-        )
+type Fixture = (Vec<File>, Vec<String>, BTreeMap<String, String>);
+
+fn fixture(codex: bool) -> Fixture {
+    let instructions = File {
+        path: "instructions.txt".to_owned(),
+        text: "kept instructions".to_owned(),
+        sha256: "kept-digest".to_owned(),
     };
+    if codex {
+        return (
+            vec![instructions],
+            vec!["--model".to_owned(), "gpt-6.1-sol".to_owned()],
+            BTreeMap::new(),
+        );
+    }
+    let text = r#"{"mcpServers":{"other":{"type":"http","url":"https://other.invalid/mcp"}},"native":true}"#;
     (
         vec![
             File {
-                path: path.to_owned(),
+                path: "mcp.json".to_owned(),
                 text: text.to_owned(),
                 sha256: Hash::of(text.as_bytes()).as_str().to_owned(),
             },
-            File {
-                path: "instructions.txt".to_owned(),
-                text: "kept instructions".to_owned(),
-                sha256: "kept-digest".to_owned(),
-            },
+            instructions,
         ],
-        BTreeMap::from([(root.to_owned(), String::new())]),
+        vec!["--mcp-config".to_owned(), "mcp.json".to_owned()],
+        BTreeMap::new(),
     )
 }
 
@@ -73,10 +73,10 @@ fn generated_config_debug_does_not_show_its_contents() {
 
 #[test]
 fn claude_entry_is_exact_and_changes_no_other_member_or_file() -> TestResult {
-    let (mut files, roots) = fixture(false);
+    let (mut files, mut arguments, mut environment) = fixture(false);
     let before: Value = serde_json::from_str(&files[0].text)?;
     let other = files[1].clone();
-    lys_mcp::render(&mut files, &roots, &entry())?;
+    lys_mcp::render(&mut files, &mut arguments, &mut environment, &entry())?;
     let mut after: Value = serde_json::from_str(&files[0].text)?;
     let added = after["mcpServers"]
         .as_object_mut()
@@ -99,38 +99,36 @@ fn claude_entry_is_exact_and_changes_no_other_member_or_file() -> TestResult {
 
 #[test]
 fn codex_entry_is_exact_and_changes_no_other_member_or_file() -> TestResult {
-    let (mut files, roots) = fixture(true);
-    let before: toml::Value = toml::from_str(&files[0].text)
-        .map_err(|error: toml::de::Error| format!("invalid native TOML at {:?}", error.span()))?;
-    let other = files[1].clone();
-    lys_mcp::render(&mut files, &roots, &entry())?;
-    let mut after: toml::Value = toml::from_str(&files[0].text)
-        .map_err(|error: toml::de::Error| format!("invalid native TOML at {:?}", error.span()))?;
-    let added = after["mcp_servers"]
-        .as_table_mut()
-        .ok_or("no servers")?
-        .remove("lys")
-        .ok_or("no lys")?;
-    let expected_text = format!(
-        "url = 'https://service.invalid/api/mcp'\nhttp_headers = {{ lys-agent-pass = '{PASS}' }}\n"
+    let (mut files, mut arguments, mut environment) = fixture(true);
+    let before = (files.clone(), arguments.clone());
+    lys_mcp::render(&mut files, &mut arguments, &mut environment, &entry())?;
+    assert_eq!(files, before.0);
+    assert_eq!(arguments[..2], before.1[..]);
+    assert_eq!(
+        arguments[2..],
+        [
+            "-c".to_owned(),
+            "mcp_servers.lys={\"env_http_headers\" = {\"lys-agent-pass\" = \"LYS_AGENT_PASS\"}, \"url\" = \"https://service.invalid/api/mcp\"}".to_owned(),
+        ]
     );
-    let expected: toml::Value = toml::from_str(&expected_text)
-        .map_err(|error: toml::de::Error| format!("invalid expected TOML at {:?}", error.span()))?;
-    assert_eq!(Redacted(added), Redacted(expected));
-    assert_eq!(Redacted(after), Redacted(before));
-    assert_eq!(files[1], other);
-    assert_eq!(files[0].sha256, Hash::of(files[0].text.as_bytes()).as_str());
-    assert!(!format!("{files:?}").contains(PASS));
+    assert_eq!(
+        environment
+            .get(lys_mcp::CODEX_PASS_VARIABLE)
+            .map(String::as_str),
+        Some(PASS)
+    );
+    assert_eq!(environment.len(), 1);
+    assert!(!format!("{files:?} {arguments:?}").contains(PASS));
     Ok(())
 }
 
 #[test]
 fn duplicates_are_refused_atomically_for_both_harnesses() -> TestResult {
     for codex in [false, true] {
-        let (mut files, roots) = fixture(codex);
-        lys_mcp::render(&mut files, &roots, &entry())?;
+        let (mut files, mut arguments, mut environment) = fixture(codex);
+        lys_mcp::render(&mut files, &mut arguments, &mut environment, &entry())?;
         let before = files.clone();
-        let error = lys_mcp::render(&mut files, &roots, &entry())
+        let error = lys_mcp::render(&mut files, &mut arguments, &mut environment, &entry())
             .err()
             .ok_or("duplicate accepted")?;
         assert_eq!(error.name(), "LysMcpDuplicate");
@@ -144,22 +142,26 @@ fn duplicates_are_refused_atomically_for_both_harnesses() -> TestResult {
 fn invalid_inputs_and_configs_never_echo_the_pass_or_change_files() -> TestResult {
     for codex in [false, true] {
         for change in 0..6 {
-            let (mut files, mut roots) = fixture(codex);
+            let (mut files, mut arguments, mut environment) = fixture(codex);
             let mut entry = entry();
             match change {
                 0 => entry.url = format!("file:///{PASS}"),
                 1 => entry.pass.push('\n'),
-                2 => roots.clear(),
+                2 => entry.url = "https://service.invalid/other".to_owned(),
                 3 => {
-                    roots.insert("CODEX_HOME".to_owned(), "wrong".to_owned());
-                    roots.insert("CLAUDE_CONFIG_DIR".to_owned(), String::new());
+                    files.retain(|file| file.path != "mcp.json");
+                    environment.insert(lys_mcp::CODEX_PASS_VARIABLE.to_owned(), "x".to_owned());
                 }
+                4 if codex => arguments.extend(["-c".to_owned(), "mcp_servers.lys={}".to_owned()]),
                 4 => files[0].text = format!("broken {PASS}"),
+                5 if codex => {
+                    environment.insert(lys_mcp::CODEX_SEAT_VARIABLE.to_owned(), "x".to_owned());
+                }
                 5 => files.push(files[0].clone()),
                 _ => return Err("unknown fixture".into()),
             }
             let before = files.clone();
-            let error = lys_mcp::render(&mut files, &roots, &entry)
+            let error = lys_mcp::render(&mut files, &mut arguments, &mut environment, &entry)
                 .err()
                 .ok_or("invalid config accepted")?;
             assert!(!format!("{error:?} {error} {entry:?}").contains(PASS));
@@ -194,16 +196,16 @@ fn a_seated_run_carries_the_runners_signature_over_the_pass_and_never_its_key() 
         key: lys_mcp::hex(&seed),
     };
     for codex in [false, true] {
-        let (mut files, roots) = fixture(codex);
+        let (mut files, mut arguments, mut environment) = fixture(codex);
         let mut seated = entry();
         seated.seat = Some(seat.clone());
-        lys_mcp::render(&mut files, &roots, &seated)?;
+        lys_mcp::render(&mut files, &mut arguments, &mut environment, &seated)?;
         let text = files[0].text.clone();
         assert!(!text.contains(&seat.key), "the seat key is never written");
         let header = if codex {
-            let root: toml::Value = toml::from_str(&text)?;
-            root["mcp_servers"]["lys"]["http_headers"][lys_mcp::SEAT_HEADER]
-                .as_str()
+            assert!(!format!("{arguments:?}").contains(&seat.key));
+            environment
+                .get(lys_mcp::CODEX_SEAT_VARIABLE)
                 .ok_or("no seat header")?
                 .to_owned()
         } else {
@@ -249,7 +251,7 @@ fn a_seated_run_carries_the_runners_signature_over_the_pass_and_never_its_key() 
 
 #[test]
 fn a_seat_whose_key_is_not_a_seed_is_refused_and_no_file_changes() -> TestResult {
-    let (mut files, roots) = fixture(false);
+    let (mut files, mut arguments, mut environment) = fixture(false);
     let before = files.clone();
     let mut seated = entry();
     seated.seat = Some(Seat {
@@ -260,7 +262,7 @@ fn a_seat_whose_key_is_not_a_seed_is_refused_and_no_file_changes() -> TestResult
         delegation: "00".to_owned(),
         key: "not-hex".to_owned(),
     });
-    let refused = lys_mcp::render(&mut files, &roots, &seated)
+    let refused = lys_mcp::render(&mut files, &mut arguments, &mut environment, &seated)
         .err()
         .ok_or("a seat without a key was accepted")?;
     assert_eq!(refused.name(), "LysMcpInvalid");

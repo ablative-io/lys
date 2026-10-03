@@ -90,7 +90,7 @@ impl Table {
         let program = dir.path().join("claude");
         std::fs::write(
             &program,
-            "#!/bin/sh\nset -e\ncat \"$CLAUDE_CONFIG_DIR/settings.json\"\nprintf '\\nprofile-read\\n'\nexec cat\n",
+            "#!/bin/sh\nset -e\nwhile [ $# -gt 1 ]; do [ \"$1\" = --settings ] && cat \"$2\"; shift; done\nprintf '\\nprofile-read\\n'\nexec cat\n",
         )?;
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;
         Ok(Self {

@@ -93,17 +93,17 @@ pub fn render(
     for secret in template.use_only {
         environment.insert(secret.env, secret.handle);
     }
+    // The run uses the machine's own Claude Code setup: its config folder,
+    // settings, sign-in and MCP servers. Lys adds its own MCP file and
+    // settings file by path and sets no config folder (Tom, 3 Oct 2026).
     let mut arguments = vec![
         "--mcp-config".to_owned(),
         "mcp.json".to_owned(),
-        "--strict-mcp-config".to_owned(),
         "--settings".to_owned(),
         "settings.json".to_owned(),
-        "--setting-sources".to_owned(),
-        String::new(),
     ];
     let mut argument_files =
-        BTreeMap::from([(1, "mcp.json".to_owned()), (4, "settings.json".to_owned())]);
+        BTreeMap::from([(1, "mcp.json".to_owned()), (3, "settings.json".to_owned())]);
     let prompt_flag = match instructions_mode {
         InstructionsMode::Keep => None,
         InstructionsMode::Append => Some("--append-system-prompt-file"),
@@ -121,6 +121,6 @@ pub fn render(
         environment,
         files,
         argument_files,
-        environment_paths: BTreeMap::from([("CLAUDE_CONFIG_DIR".to_owned(), String::new())]),
+        environment_paths: BTreeMap::new(),
     })
 }

@@ -316,10 +316,13 @@ impl<T> std::fmt::Debug for Redacted<T> {
 fn mcp_launch(codex: bool) -> Launch {
     let mut launch = launch();
     launch.arguments = vec!["-c".to_owned(), "printf p77-ready; exec cat".to_owned()];
-    let (path, root, text) = if codex {
-        ("config.toml", "CODEX_HOME", "mcp_servers = {}\n")
+    let (path, text) = if codex {
+        ("instructions.txt", "kept instructions\n")
     } else {
-        ("mcp.json", "CLAUDE_CONFIG_DIR", r#"{"mcpServers":{}}"#)
+        launch
+            .arguments
+            .extend(["--mcp-config".to_owned(), "mcp.json".to_owned()]);
+        ("mcp.json", r#"{"mcpServers":{}}"#)
     };
     launch.config = Some(Config {
         files: vec![File {
@@ -328,7 +331,7 @@ fn mcp_launch(codex: bool) -> Launch {
             sha256: hex(&Sha256::digest(text.as_bytes())),
         }],
         argument_files: BTreeMap::new(),
-        environment_paths: BTreeMap::from([(root.to_owned(), String::new())]),
+        environment_paths: BTreeMap::new(),
         working_directory: true,
     });
     launch
@@ -383,13 +386,17 @@ fn signed_run_pass_reaches_only_the_generated_config_for_both_harnesses() -> Tes
         assert!(matches!(answer, Answer::Started { .. }));
         assert!(!format!("{answer:?}").contains(RUN_PASS));
         sessions.stop_all()?;
-        let name = if codex { "config.toml" } else { "mcp.json" };
-        let native = dir.path().join("sessions/config-session/config").join(name);
-        let text = std::fs::read_to_string(&native)?;
-        if codex {
-            assert!(text.contains("lys-agent-pass"));
-            assert!(text.contains(RUN_PASS));
+        let config = dir.path().join("sessions/config-session/config");
+        let native = config.join(if codex {
+            "instructions.txt"
         } else {
+            "mcp.json"
+        });
+        if codex {
+            // Codex gets the pass as a command-line setting, never a file.
+            assert!(!config.join("config.toml").exists());
+        } else {
+            let text = std::fs::read_to_string(config.join("mcp.json"))?;
             let config: serde_json::Value = serde_json::from_str(&text)?;
             assert_eq!(
                 Redacted(&config["mcpServers"]["lys"]),
@@ -400,6 +407,86 @@ fn signed_run_pass_reaches_only_the_generated_config_for_both_harnesses() -> Tes
         }
         check_records(dir.path(), &native)?;
     }
+    Ok(())
+}
+
+#[test]
+fn a_codex_launch_with_no_files_starts_with_its_pass_in_the_environment() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let sessions = Sessions::open(dir.path(), 1024)?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+    let greeting = Greeting::fresh("81");
+    let mut launch = mcp_launch(true);
+    launch.config.as_mut().ok_or("no config")?.files.clear();
+    launch.arguments = vec![
+        "-c".to_owned(),
+        "printf 'pass:%s\\n' \"$LYS_AGENT_PASS\"; exec cat".to_owned(),
+    ];
+    let act = Act::Start {
+        launch: Box::new(launch),
+        lys_mcp: Some(lys_runner::protocol::LysMcp {
+            url: "https://service.invalid/api/mcp".to_owned(),
+            pass: RUN_PASS.to_owned(),
+            seat: None,
+        }),
+    };
+    let answer = lys_runner::socket::dispatch(
+        &sessions,
+        &key.public_key_bytes(),
+        &greeting,
+        &sign_request(&key, &greeting, &act)?,
+        &std::sync::atomic::AtomicBool::new(false),
+    );
+    assert!(matches!(answer, Answer::Started { .. }), "{answer:?}");
+    assert!(!format!("{answer:?}").contains(RUN_PASS));
+    // The process read the pass from its environment: it is on its screen.
+    let again = Greeting::fresh("83");
+    let seen = lys_runner::socket::dispatch(
+        &sessions,
+        &key.public_key_bytes(),
+        &again,
+        &sign_request(
+            &key,
+            &again,
+            &Act::Wait {
+                session: "config-session".to_owned(),
+                cursor: Some(0),
+                pattern: format!("pass:{RUN_PASS}"),
+                regex: false,
+            },
+        )?,
+        &std::sync::atomic::AtomicBool::new(false),
+    );
+    assert!(matches!(seen, Answer::Matched { .. }), "{seen:?}");
+    sessions.stop_all()?;
+    let config = dir.path().join("sessions/config-session/config");
+    assert!(std::fs::read_dir(&config)?.next().is_none());
+    Ok(())
+}
+
+#[test]
+fn a_launch_naming_a_relative_directory_is_refused() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let sessions = Sessions::open(dir.path(), 1024)?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+    let greeting = Greeting::fresh("82");
+    let mut launch = mcp_launch(false);
+    launch.directory = "relative/folder".to_owned();
+    launch.config.as_mut().ok_or("no config")?.working_directory = false;
+    let act = Act::Start {
+        launch: Box::new(launch),
+        lys_mcp: None,
+    };
+    let answer = lys_runner::socket::dispatch(
+        &sessions,
+        &key.public_key_bytes(),
+        &greeting,
+        &sign_request(&key, &greeting, &act)?,
+        &std::sync::atomic::AtomicBool::new(false),
+    );
+    assert!(!matches!(answer, Answer::Started { .. }), "{answer:?}");
+    assert!(format!("{answer:?}").contains("not absolute"), "{answer:?}");
+    sessions.stop_all()?;
     Ok(())
 }
 

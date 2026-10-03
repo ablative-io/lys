@@ -419,7 +419,7 @@ pub fn kept_launch(
             files,
             argument_files: native.argument_files,
             environment_paths: native.environment_paths,
-            working_directory: true,
+            working_directory: false,
         }),
         columns: crate::runner_sessions::COLUMNS,
         rows: crate::runner_sessions::ROWS,

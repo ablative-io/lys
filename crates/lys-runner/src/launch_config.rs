@@ -63,9 +63,7 @@ fn relative(path: &str) -> bool {
 }
 
 fn checked(config: &Config, arguments: usize) -> Result<(), RunnerError> {
-    if config.files.is_empty() {
-        return Err(refused("the config carries no files"));
-    }
+    // A Codex run with no kept skills and no instructions file has no files.
     let mut paths = BTreeSet::new();
     for file in &config.files {
         if !relative(&file.path) || !paths.insert(file.path.as_str()) {
@@ -118,11 +116,17 @@ pub(crate) fn add_lys_mcp(
     launch: &mut Launch,
     entry: &crate::protocol::LysMcp,
 ) -> Result<(), RunnerError> {
-    let config = launch.config.as_mut().ok_or_else(|| {
+    let Launch {
+        config,
+        arguments,
+        environment,
+        ..
+    } = launch;
+    let config = config.as_mut().ok_or_else(|| {
         RunnerError::refused("LysMcpConfigMissing", "the launch carries no native config")
     })?;
-    checked(config, launch.arguments.len())?;
-    lys_home::harness::lys_mcp::render(&mut config.files, &config.environment_paths, entry)
+    checked(config, arguments.len())?;
+    lys_home::harness::lys_mcp::render(&mut config.files, arguments, environment, entry)
         .map_err(|error| RunnerError::refused(error.name(), error.to_string()))
 }
 
@@ -250,10 +254,22 @@ pub(crate) fn prepare(state: &Path, launch: &mut Launch) -> Result<(), RunnerErr
     checked(config, launch.arguments.len())?;
     let dir = publish(state, &launch.session, config)?;
     for (index, path) in &config.argument_files {
-        dir.join(path)
+        let bound = dir
+            .join(path)
             .to_str()
             .ok_or_else(|| refused("the config directory is not UTF-8"))?
-            .clone_into(&mut launch.arguments[*index]);
+            .to_owned();
+        // A setting of the form key="file" keeps its key and quotes the bound
+        // path as a TOML string; a bare file is replaced whole.
+        let argument = &mut launch.arguments[*index];
+        let quoted = format!("=\"{path}\"");
+        *argument = match argument.strip_suffix(quoted.as_str()) {
+            Some(key) => format!(
+                "{key}={}",
+                serde_json::to_string(&bound).map_err(|error| refused(error.to_string()))?
+            ),
+            None => bound,
+        };
     }
     for (name, path) in &config.environment_paths {
         launch.environment.insert(

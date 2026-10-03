@@ -89,7 +89,7 @@ impl Table {
         let program = dir.path().join("codex");
         std::fs::write(
             &program,
-            "#!/bin/sh\nset -e\ncat \"$CODEX_HOME/config.toml\"\nprintf '\\nprofile-read\\n'\nexec cat\n",
+            "#!/bin/sh\nset -e\nprintf '%s\\n' \"$@\"\nprintf '\\nprofile-read\\n'\nexec cat\n",
         )?;
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;
         Ok(Self {
@@ -193,25 +193,28 @@ async fn walk(table: &Table) -> Outcome {
             .windows(2)
             .any(|pair| pair == ["--model", "gpt-6.1-sol"])
     );
-    let config = launch
-        .files
-        .iter()
-        .find(|file| file.path == "config.toml")
-        .ok_or("no config")?;
-    let native: toml::Table = config.text.parse()?;
-    assert_eq!(
-        native["sandbox_workspace_write"]["network_access"].as_bool(),
-        Some(false)
+    assert!(launch.environment_paths.is_empty());
+    assert!(!launch.files.iter().any(|file| file.path == "config.toml"));
+    for setting in [
+        "sandbox_workspace_write.network_access=false",
+        "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+        "sandbox_workspace_write.exclude_slash_tmp=true",
+        "web_search=\"disabled\"",
+    ] {
+        assert!(
+            launch
+                .arguments
+                .windows(2)
+                .any(|args| args == ["-c", setting]),
+            "{setting}"
+        );
+    }
+    assert!(
+        !launch
+            .arguments
+            .iter()
+            .any(|arg| arg.starts_with("mcp_servers"))
     );
-    assert_eq!(
-        native["sandbox_workspace_write"]["exclude_tmpdir_env_var"].as_bool(),
-        Some(true)
-    );
-    assert_eq!(
-        native["sandbox_workspace_write"]["exclude_slash_tmp"].as_bool(),
-        Some(true)
-    );
-    assert_eq!(native["web_search"].as_str(), Some("disabled"));
     let session = started["session"].as_str().ok_or("no session")?;
     let client = Client::new(table.dir.path().join("runner.sock"), Arc::clone(&table.key));
     assert!(matches!(

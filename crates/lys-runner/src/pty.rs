@@ -98,18 +98,27 @@ pub fn spawn_isolated(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
 }
 
 fn spawn_with_environment(spawn: &Spawn<'_>, isolated: bool) -> Result<Spawned, RunnerError> {
+    // A run that names no directory starts where the login's own shell
+    // starts: its home. Never the runner's folder, never a folder of Lys's.
     let requested_directory = if spawn.directory.is_empty() {
-        std::env::current_dir().map_err(|error| failed("runner current directory", &error))?
+        std::env::var_os("HOME")
+            .map(std::path::PathBuf::from)
+            .filter(|home| home.is_absolute())
+            .ok_or_else(|| {
+                RunnerError::refused("spawn_failed", "the runner has no HOME to start the run in")
+            })?
     } else {
         std::path::PathBuf::from(spawn.directory)
     };
-    let requested_directory = if requested_directory.is_absolute() {
-        requested_directory
-    } else {
-        std::env::current_dir()
-            .map_err(|error| failed("runner current directory", &error))?
-            .join(requested_directory)
-    };
+    if !requested_directory.is_absolute() {
+        return Err(RunnerError::refused(
+            "spawn_failed",
+            format!(
+                "the run's directory {} is not absolute",
+                requested_directory.display()
+            ),
+        ));
+    }
     let directory = rustix::fs::open(
         &requested_directory,
         rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::CLOEXEC,

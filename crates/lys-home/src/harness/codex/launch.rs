@@ -79,25 +79,33 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         };
         servers.insert(server.name.clone(), value);
     }
-    let mut config = format!("mcp_servers = {}\n", native_value(&Value::Object(servers))?);
-    if template.permissions.default_mode.as_deref() == Some("workspace-write") {
-        config.push_str(
-            "web_search = \"disabled\"\n[sandbox_workspace_write]\nnetwork_access = false\nwritable_roots = []\nexclude_tmpdir_env_var = true\nexclude_slash_tmp = true\n",
-        );
-    }
-    let mut files = vec![file("config.toml", config)];
+    let mut files = Vec::new();
+    let mut argument_files = BTreeMap::new();
     for skill in &template.skills {
         let held = check(skill).map_err(|error| error.to_string())?;
         files.push(file(&held.path, skill.text.clone()));
     }
-    let mut arguments = vec![
-        "--model".to_owned(),
-        template.fields.models[0].clone(),
-        "--ask-for-approval".to_owned(),
-        "on-request".to_owned(),
-        "-C".to_owned(),
-        ".".to_owned(),
-    ];
+    // The approval policy and the working directory are the run's own: the
+    // machine's Codex config and the launch's directory (Tom, 3 Oct 2026).
+    // Codex runs on the machine's own setup, its own MCP servers included;
+    // each profile server is one `-c mcp_servers.<name>=` setting beside
+    // them, never a table that replaces them, never a config folder.
+    let mut arguments = vec!["--model".to_owned(), template.fields.models[0].clone()];
+    for (name, value) in &servers {
+        if name.is_empty()
+            || !name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(format!(
+                "mcp_servers: `{name}` is not a bare TOML key; use letters, digits, _ and -"
+            ));
+        }
+        arguments.extend([
+            "-c".to_owned(),
+            format!("mcp_servers.{name}={}", native_value(value)?),
+        ]);
+    }
     if let Some(sandbox) = template.permissions.default_mode {
         if sandbox == "workspace-write" {
             // Command-line settings keep project configuration from widening the boundary.
@@ -135,6 +143,7 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
                 "-c".to_owned(),
                 "model_instructions_file=\"instructions.txt\"".to_owned(),
             ]);
+            argument_files.insert(arguments.len() - 1, "instructions.txt".to_owned());
         }
         InstructionsMode::Keep | InstructionsMode::Append => {}
     }
@@ -143,7 +152,7 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         arguments,
         environment: template.environment,
         files,
-        argument_files: BTreeMap::new(),
-        environment_paths: BTreeMap::from([("CODEX_HOME".to_owned(), String::new())]),
+        argument_files,
+        environment_paths: BTreeMap::new(),
     })
 }
