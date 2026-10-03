@@ -31,7 +31,9 @@ unit.
   every agent added between 1 October 17:39 and 2 October 12:33 and has never taken it back. Ten of the
   fifteen policies on the installed Lys are that seed; the five newest are empty. (W16, V3, V4, agreed)
 - A tool refused by bare name is taken away from the model entirely: in that run's first real call Edit,
-  Read, WebFetch and Write were not among the 103 tools offered. Bash was. (W4, V9, agreed; seen by Archie
+  Read, WebFetch and Write were not among the 103 tools offered. Bash was. Glob and Grep were offered in
+  neither that run nor a run without the policy, so in this version of Claude Code the two rules that
+  refuse them by name refuse nothing, while Bash, which searches and reads files as well, was offered in both. (W4, V9, agreed; seen by Archie
   in the proxy's kept request, 20:31)
 
 **Lys has two permission systems and the screens show neither truthfully.**
