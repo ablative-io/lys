@@ -2,6 +2,7 @@
 import { Refused, request, useLoad } from '../../api';
 import { DirectoryGate as Gate } from '../people/Words';
 import { clock } from './time';
+import { IdentityName } from '../people/Words';
 
 interface StopRecord {
   agent: string;
@@ -56,7 +57,7 @@ export function StopHistory({ id }: { id: string }) {
       <h3>{stop.done ? 'Stop recorded' : 'Stop requested — outcome not confirmed'}</h3><p>{stop.reason}</p>
       <dl className="facts">
         <dt>Recorded at</dt><dd>{clock(stop.at)}</dd>
-        <dt>Requested by</dt><dd><a href={'#/file/' + encodeURIComponent(stop.by)}>{stop.by}</a></dd>
+        <dt>Requested by</dt><dd><IdentityName id={stop.by} /></dd>
         {stop.done ? <>
         <dt>Authority after this stop</dt><dd>Suspended</dd>
         <dt>Certificates withdrawn</dt><dd><Identifiers values={stop.certificates_withdrawn} empty="None recorded for this stop." /></dd>

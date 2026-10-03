@@ -4,6 +4,7 @@ import { IssueCertificate, WithdrawCertificate } from './CertificateChanges';
 import { api, request, useLoad } from '../../api';
 import { DirectoryGate as Gate } from '../people/Words';
 import { clock } from './time';
+import { IdentityName } from '../people/Words';
 export interface AgentCertificate {
   serial: string; person: string; claims: unknown; der: string; issued_at: number;
   withdrawn: null | { serial: string; by: string; reason: string; withdrawn_at: number };
@@ -21,7 +22,7 @@ export function AgentCertificates({ id }: { id: string }) {
   }, 'agent-certificates:' + id + ':' + revision);
   return <section><h2>Capability certificates</h2><p>A certificate records what held when it was issued. Current permissions are checked in <a href={'#/access/reach/' + id}>Access</a>.</p>
     <Gate load={load} title="Certificates" ok={(answer) => answer.certificates.length ? answer.certificates.map((certificate) => <section className="card" key={certificate.serial}>
-      <h3>Certificate <span className="mono">{certificate.serial}</span></h3><dl className="facts"><dt>Issued for</dt><dd><a href={'#/file/' + certificate.person}>{certificate.person}</a></dd><dt>Issued at</dt><dd>{clock(certificate.issued_at)}</dd><dt>Withdrawal record</dt><dd>{certificate.withdrawn ? <>Withdrawn at {clock(certificate.withdrawn.withdrawn_at)} by {certificate.withdrawn.by}: {certificate.withdrawn.reason}</> : 'No withdrawal recorded'}</dd><dt>Log entry</dt><dd>{certificate.entry.leaf} of {certificate.entry.tree_size} leaves</dd></dl>
+      <h3>Certificate <span className="mono">{certificate.serial}</span></h3><dl className="facts"><dt>Issued for</dt><dd><IdentityName id={certificate.person} /></dd><dt>Issued at</dt><dd>{clock(certificate.issued_at)}</dd><dt>Withdrawal record</dt><dd>{certificate.withdrawn ? <>Withdrawn at {clock(certificate.withdrawn.withdrawn_at)} by {certificate.withdrawn.by}: {certificate.withdrawn.reason}</> : 'No withdrawal recorded'}</dd><dt>Log entry</dt><dd>{certificate.entry.leaf} of {certificate.entry.tree_size} leaves</dd></dl>
       <h4>Claims at issuance</h4><pre>{JSON.stringify(certificate.claims, null, 2)}</pre>
       <h4>Certificate and inclusion proof</h4><p>These are the bytes returned by the certificate log. This screen has not independently verified their signatures or your trust in the issuer.</p><p>Root: <span className="mono">{certificate.entry.root}</span></p>
         <a className="btn" download="certificate.der" href={'data:application/pkix-cert;base64,' + certificate.der}>Download certificate</a>{' '}
