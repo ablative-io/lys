@@ -7,13 +7,14 @@ describe('What Lys says under a mode', () => {
     expect(lysDoes('Claude Code', 'default')).toEqual(['Lys starts Claude Code without this computer’s own settings, plugins, hooks and connected tools.', 'Instruction files (CLAUDE.md) and Claude Code’s own memory on this computer may still be read. Lys does not check each action.']);
   });
   it('says of Codex with no mode that Lys has set nothing', () => {
-    expect(lysDoes('Codex', '')).toEqual(['Lys has set nothing; this computer’s own Codex settings decide.']);
+    expect(lysDoes('Codex', '')).toEqual(['Lys has set nothing; this computer’s own Codex settings decide.', 'Codex also uses this computer’s own Codex settings, hooks, connected tools and instruction files.']);
   });
   it('says of Codex with a mode what Lys sets, and that it reads every file the login can', () => {
     const said = lysDoes('Codex', 'workspace-write').join(' ');
     expect(said).toContain('while they stay in the sandbox');
     expect(said).toContain('It can read every file this login can read.');
     expect(said).toContain('decided by this computer’s own Codex settings');
+    expect(said).toContain('Codex also uses this computer’s own Codex settings, hooks, connected tools and instruction files.');
   });
   it('claims nothing for a program the tables do not cover', () => {
     expect(lysDoes('Care program', 'default')).toEqual([]);
