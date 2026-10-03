@@ -259,8 +259,8 @@ fn run(
     for message in rx {
         #[cfg(test)]
         if let Message::Pause(ready, resume) = message {
-            if ready.send(()).is_ok() {
-                drop(resume.recv());
+            if ready.send(()).is_ok() && let Err(mpsc::RecvError) = resume.recv() {
+                continue;
             }
             continue;
         }
