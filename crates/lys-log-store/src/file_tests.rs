@@ -340,8 +340,8 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted() {
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
-    // Kill once real acts have landed and another is in flight.
-    let started = std::time::Instant::now();
+    // Kill once real acts have landed and another is in flight. A writer
+    // that exits on its own is named; a slow one is waited for.
     loop {
         let len = std::fs::metadata(&segment)
             .map(|meta| meta.len())
@@ -349,10 +349,9 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted() {
         if len > 12 * 1024 * 1024 {
             break;
         }
-        assert!(
-            started.elapsed() < std::time::Duration::from_secs(60),
-            "the writer wrote {len} bytes in a minute"
-        );
+        if let Some(status) = child.try_wait().unwrap() {
+            panic!("the writer exited on its own with {status} after {len} bytes");
+        }
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
     child.kill().unwrap();
