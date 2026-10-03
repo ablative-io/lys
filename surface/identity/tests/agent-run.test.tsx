@@ -1,4 +1,4 @@
-/** The front page: the real teams, people and live sessions as a tree of names, the first running agent opened by itself, a stopped agent started in its own pane with one press, and what stops a start said in one sentence with the button that fixes it. */
+/** People and agents is the front page, and an agent's run is beside the list there: a running agent's terminal with Stop and Restart, a stopped agent started in place with one press, and what stops a start said in one sentence with the button that fixes it. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, click, mount, text } from './harness';
 import { ADA, ARCHIVIST, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
@@ -33,44 +33,29 @@ const routes = {
 /** Scribe alone, stopped, with approved settings and one computer allowed to run it. */
 const stopped = { ...routes, '/teams': ok({ teams: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }), ...provisioning(SCRIBE, profile()) };
 
-describe('Team', () => {
+describe('An agent\'s run on People and agents', () => {
   beforeEach(() => { sessionStorage.clear(); });
 
-  it('is the front page, draws the tree of names and opens the first running agent by itself', async () => {
+  it('has no page of its own: the front page is People and agents, and an agent chosen there shows its terminal beside the list', async () => {
     await mount('#/', routes);
-    expect(location.hash).toBe('#/team/' + SCRIBE);
-    expect($$('.tree-name').map((el) => el.textContent)).toEqual(['Reviewer', 'Scribe', 'Courier', 'Archivist']);
-    expect($$('.tree-team').map((el) => el.textContent)).toEqual(['Ada team', 'Crew']);
-    expect(text()).not.toContain('Ada (test person)');
-    expect($('.tree-name[aria-current="page"]')?.textContent).toBe('Scribe');
+    expect($('h1')?.textContent).toBe('People and agents');
+    expect($('.team-screen')).toBeNull();
+    expect($('a[href="#/team"]')).toBeNull();
+    await mount('#/team/' + SCRIBE, routes);
+    expect($('h1')?.textContent).toBe('People and agents');
+    expect($('.detail h2')?.textContent).toBe('Scribe');
+    expect($('.detail .team-pane .terminal')).not.toBeNull();
     expect($('.team-foot')?.textContent).toContain('Lab');
-    expect($('.tree-new')?.getAttribute('href')).toBe('#/agents/new');
+    expect($$('.team-foot-act').find((el) => el.textContent === 'Settings')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
   });
 
-  it('folds a team away and back, and hides the tree from the foot line', async () => {
-    localStorage.clear();
-    await mount('#/team/' + SCRIBE, routes);
-    await click($$('.tree-team').find((el) => el.textContent === 'Crew') ?? null);
-    expect($$('.tree-name').map((el) => el.textContent)).toEqual(['Reviewer', 'Scribe']);
-    expect(localStorage.getItem('iam.team-folded')).toBe('team-2');
-    await click($$('.tree-team').find((el) => el.textContent === 'Crew2') ?? null);
-    expect($$('.tree-name').map((el) => el.textContent)).toEqual(['Reviewer', 'Scribe', 'Courier', 'Archivist']);
-    await click($('.team-foot-tree'));
-    expect($('.team-screen')?.getAttribute('data-tree')).toBe('hidden');
-    await click($('.team-foot-tree'));
-    expect($('.team-screen')?.getAttribute('data-tree')).toBe('shown');
-    localStorage.clear();
-  });
-
-  it('opens settings over the agent\'s own terminal and closes them from the button', async () => {
-    await mount('#/team/' + SCRIBE, routes);
-    expect($('.team-settings')).toBeNull();
-    await click($$('.team-foot-act').find((el) => el.textContent === 'Settings') ?? null);
-    expect($('.team-settings')?.getAttribute('aria-label')).toBe('Scribe settings');
-    expect(text()).toContain('Restart Scribe');
-    expect($('.team-pane .terminal')).not.toBeNull();
-    await click($$('.team-settings .btn').find((el) => el.textContent === 'Back to the terminal') ?? null);
-    expect($('.team-settings')).toBeNull();
+  it('restarts a running agent in place, after asking, with one request', async () => {
+    const { posted } = await mount('#/team/' + SCRIBE, { ...routes, ['POST /agents/' + SCRIBE + '/restart']: ok({}) });
+    await click($$('.team-foot-act').find((el) => el.textContent === 'Restart') ?? null);
+    expect(text()).toContain('Restart Scribe? This ends the run and starts it again in the same folder, on Lab.');
+    expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toEqual([]);
+    await click(button('Restart Scribe'));
+    expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toMatchObject([{ path: '/agents/' + SCRIBE + '/restart', body: { session: LIVE } }]);
   });
 
   it('stops a running agent by ending its run, after asking, and never by the emergency stop', async () => {
@@ -86,7 +71,7 @@ describe('Team', () => {
   it('starts a stopped agent in its own pane with one press, on its one allowed computer, in its saved folder', async () => {
     let live = false;
     const start = started(SCRIBE);
-    const { posted } = await mount('#/', {
+    const { posted } = await mount('#/team/' + SCRIBE, {
       ...stopped,
       '/runtime/live': () => ok({ sessions: live ? [running] : [], unanswered: [] }),
       ['POST /agents/' + SCRIBE + '/start-command']: (body) => { live = true; return start(body); },
@@ -151,7 +136,7 @@ describe('Team', () => {
     await mount('#/team/' + SCRIBE, { ...stopped, ...provisioning(SCRIBE, null) });
     expect(text()).toContain('Scribe has no program chosen yet.');
     await click(button('Choose its program'));
-    expect($('.team-settings')?.getAttribute('aria-label')).toBe('Scribe settings');
+    expect(location.hash).toBe('#/file/' + SCRIBE + '/provisioning');
   });
 
   it('says the service\'s own reason when it refuses the start, with Try again, and no greyed button', async () => {
@@ -167,10 +152,14 @@ describe('Team', () => {
   it('sends the old start address to the agent\'s pane on the front page', async () => {
     await mount('#/file/' + SCRIBE + '/start', stopped);
     expect(location.hash).toBe('#/team/' + SCRIBE);
+    expect($('h1')?.textContent).toBe('People and agents');
+    expect(text()).toContain('Scribe is not running.');
   });
 
-  it('names the refusal when the caller is not signed in', async () => {
-    await mount('#/team', { ...routes, '/teams': refused(401, 'NotSignedIn', 'sign in first') });
-    expect(text()).toContain('not signed in');
+  it('says so when it cannot read whether the agent is running, and offers no Start it cannot stand behind', async () => {
+    await mount('#/team/' + SCRIBE, { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'no reports store') });
+    expect(text()).toContain('Lys could not read whether Scribe is running');
+    expect(text()).toContain('RuntimeUnavailable');
+    expect(button('Start')).toBeNull();
   });
 });

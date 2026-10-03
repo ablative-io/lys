@@ -5,6 +5,7 @@ import type { Load } from '../../api';
 import { Reach } from './reach';
 import type { DirectoryReach } from './reach';
 import { Pill } from './Pill';
+import { AgentRun } from '../team/AgentRun';
 
 /** The selected row, without leaving the list. */
 export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach: Load<DirectoryReach> }) {
@@ -12,6 +13,7 @@ export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach
   const agent = x.kind === 'agent';
   return (
     <div className="card">
+      {agent ? <AgentRun key={x.id} entry={x} /> : null}
       <div className="row" style={{ padding: '0 0 8px' }}>
         <h2>{x.display_name}</h2>
         <span className={'state ' + x.state}>{x.state}</span>
@@ -42,9 +44,6 @@ export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         <a className="btn" href={'#/file/' + x.id}>Open file</a>
         <a className="btn" href={'#/graph/' + x.id}>Show in graph</a>
-        {agent && x.state === 'active' ? (
-          <a className="btn" data-act="start" href={'#/team/' + x.id}>Start</a>
-        ) : null}
       </div>
     </div>
   );

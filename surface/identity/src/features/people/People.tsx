@@ -3,7 +3,7 @@ import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { api, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
 import { Listing } from '../../shell/Listing';
@@ -94,6 +94,14 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
     shell.setRows(shown);
     return () => shell.setRows([]);
   }, [shown.join(',')]);
+  // An address that names an agent opens the list with that agent chosen, listing agents by themselves when it is folded under its person.
+  const wanted = useParams().agent;
+  useEffect(() => {
+    if (!wanted) return;
+    const at = shown.indexOf('#/file/' + wanted);
+    if (at >= 0) shell.setCursor(at);
+    else if (shown.length && shell.filterKind !== 'agent' && all.some((x) => x.id === wanted && x.kind === 'agent')) shell.setFilterKind('agent');
+  }, [wanted, shown.join(',')]);
   const selectedHref = shown[Math.min(shell.cursor, Math.max(0, shown.length - 1))] ?? null;
   const selected = all.find((x) => '#/file/' + x.id === selectedHref) ?? null;
   const active = (kind: string) => all.filter((x) => x.kind === kind && x.state === 'active').length;

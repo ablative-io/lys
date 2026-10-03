@@ -59,3 +59,8 @@
 .tree-new { display: flex; align-items: center; height: 32px; margin-top: 12px; padding: 0 8px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-size: 12.5px; }
 .tree-new:hover { background: var(--surface-hover); color: var(--text-primary); }
 .team-empty p { margin: 0 0 12px; }
+
+/* The run beside the list on People and agents: the pane gets room for a terminal when an agent is running. */
+.fill > .body:has(.agent-run[data-live="true"]) { grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); }
+.agent-run { margin-bottom: 12px; }
+.agent-run .team-pane { height: min(70vh, 640px); border-radius: 8px; overflow: hidden; }
