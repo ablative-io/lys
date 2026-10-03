@@ -213,7 +213,7 @@ impl Sink {
     pub(super) fn pause(&self) -> Result<mpsc::Sender<()>, Box<dyn std::error::Error + Send + Sync>> {
         let (ready, arrived) = mpsc::channel();
         let (release, resume) = mpsc::channel();
-        self.tx.send(Message::Pause(ready, resume))?;
+        self.tx.send(Message::Pause(ready, resume)).map_err(|error| std::io::Error::other(error.to_string()))?;
         arrived.recv()?;
         Ok(release)
     }
