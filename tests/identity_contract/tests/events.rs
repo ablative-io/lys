@@ -377,39 +377,54 @@ mod directory_events {
         Ok(())
     }
 
-    fn leaf_file(harness: &Harness, index: u64) -> std::path::PathBuf {
-        harness
-            .log_path()
-            .join("leaves")
-            .join(format!("{index:020}"))
-    }
-
     #[test]
-    fn a_torn_leaf_past_the_pin_is_refused_before_it_is_pinned() -> TestResult {
+    fn a_torn_record_past_the_pin_is_cut_and_named_never_pinned_or_served() -> TestResult {
+        use std::io::Write;
+
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
         directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         let whole = directory.log()?.leaf(0)?.ok_or("leaf missing")?;
         drop(directory);
-        std::fs::write(leaf_file(&harness, 1), &whole[..whole.len() / 2])?;
-        let refused = harness.open();
-        assert!(
-            matches!(
-                refused
-                    .as_ref()
-                    .map_err(|error| error.downcast_ref::<IdentityError>()),
-                Err(Some(IdentityError::LeafNotAnEvent { index: 1, .. }))
-            ),
-            "a torn leaf is refused by name"
-        );
-        let store = FileLeafStore::open(&harness.log_path())?;
+        // A second act killed mid-write: its record's length and half its
+        // leaf reached the segment, and its pin and checksum never did.
+        let segment = harness
+            .log_path()
+            .join("leaves")
+            .join("segments")
+            .join(format!("{:020}", 0));
+        let sound = std::fs::read(&segment)?;
+        let half = &whole[..whole.len() / 2];
+        let mut torn = std::fs::OpenOptions::new().append(true).open(&segment)?;
+        torn.write_all(&u32::try_from(whole.len())?.to_le_bytes())?;
+        torn.write_all(half)?;
+        drop(torn);
+
+        // A reader names the torn bytes, leaves them, and serves none of them.
+        let reader = FileLeafStore::open_read_only(&harness.log_path())?;
+        assert_eq!(reader.extent(), 1);
         assert_eq!(
-            store.pinned().tree_size,
+            reader.pinned().tree_size,
             1,
-            "the torn leaf was never pinned"
+            "the torn record was never pinned"
         );
-        std::fs::remove_file(leaf_file(&harness, 1))?;
-        assert_eq!(harness.open()?.projection()?.records().count(), 1);
+        let tail = reader.unfinished_tail().ok_or("the torn record is named")?;
+        assert_eq!(tail.segment, segment);
+        assert_eq!(tail.offset, u64::try_from(sound.len())?);
+        assert_eq!(tail.bytes, u64::try_from(4 + half.len())?);
+        assert_eq!(reader.leaf(1)?, None, "nothing of it is served");
+        drop(reader);
+
+        // The directory opens on the one event, and its writable open cut the
+        // torn bytes off the segment.
+        let directory = harness.open()?;
+        assert_eq!(directory.projection()?.records().count(), 1);
+        assert_eq!(directory.log()?.len()?, 1);
+        drop(directory);
+        assert_eq!(std::fs::read(&segment)?, sound, "the torn record was cut");
+        let store = FileLeafStore::open(&harness.log_path())?;
+        assert_eq!(store.pinned().tree_size, 1);
+        assert!(store.unfinished_tail().is_none());
         Ok(())
     }
 
