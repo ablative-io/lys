@@ -53,15 +53,15 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; p
 /* Why an agent cannot start: the sentence open, its fix beside it, the refusal's name small at the end. */
 .cannot-start p { margin: 0 0 8px; }
 .cannot-start .btn { margin-right: 8px; }
-.refusal-name { color: var(--text-secondary); font-family: "JetBrains Mono"; font-size: 10.5px; }
+.refusal-name { color: var(--text-secondary); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10.5px; }
 .folder-chooser { margin: 8px 0; }
 .folder-chooser .folders { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.works-in code { font-family: "JetBrains Mono"; }
+.works-in code { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .mode-words p { margin: 4px 0; color: var(--text-muted); }
-.mode-words code { font-family: "JetBrains Mono"; color: var(--text-primary); }
+.mode-words code { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--text-primary); }
 .permissions { margin: 0 0 14px; }
 .permissions table { margin: 0 0 14px; }
-.permissions .mode-id, .permissions small code { font-family: "JetBrains Mono"; color: var(--text-muted); }
+.permissions .mode-id, .permissions small code { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--text-muted); }
 .permissions .mode-meaning { color: var(--text-secondary); }
 .permissions .mode-warn { color: var(--danger); }
 .permissions label.tick { margin: 0; }

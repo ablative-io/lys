@@ -3,28 +3,28 @@
 .scrim.open { opacity: 1; pointer-events: auto; }
 .palette { position: fixed; left: 50%; top: 14vh; width: 560px; max-width: 92vw; transform: translate(-50%, -8px) scale(.98); opacity: 0; pointer-events: none; transition: all .22s var(--spring); background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 31; overflow: hidden; }
 .palette.open { opacity: 1; pointer-events: auto; transform: translate(-50%, 0) scale(1); }
-.palette input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--border-default); padding: 14px 16px; color: var(--text-primary); font: 14px "DM Sans"; outline: none; }
-.palette .grp { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); padding: 10px 16px 4px; }
+.palette input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--border-default); padding: 14px 16px; color: var(--text-primary); font: 14px "DM Sans", system-ui, sans-serif; outline: none; }
+.palette .grp { font: 500 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); padding: 10px 16px 4px; }
 .palette .it { padding: 7px 16px; display: flex; justify-content: space-between; cursor: pointer; }
 .palette .it.sel { background: rgba(212,151,90,.1); }
 .palette .list { max-height: 50vh; overflow: auto; padding-bottom: 6px; }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: all .3s var(--spring); background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 999px; padding: 6px 14px; font-size: 12px; box-shadow: var(--shadow-lg); z-index: 40; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
-.open-q { color: var(--accent); font: 10px "JetBrains Mono"; letter-spacing: .08em; border: 1px dashed rgba(212,151,90,.45); border-radius: 3px; padding: 0 5px; }
+.open-q { color: var(--accent); font: 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .08em; border: 1px dashed rgba(212,151,90,.45); border-radius: 3px; padding: 0 5px; }
 .set-grid { display: grid; grid-template-columns: 200px 1fr; gap: 24px; }
 .set-nav a { display: block; padding: 6px 10px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-size: 12.5px; }
 .set-nav a.on { background: var(--surface-hover); color: var(--text-primary); }
 .set-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; }
 .set-row + .set-row { border-top: 1px solid var(--border-subtle); }
 .set-row .d { color: var(--text-muted); font-size: 12px; }
-.rail .cnt { font: 10px "JetBrains Mono"; color: #17110b; background: var(--accent); border-radius: 8px; padding: 0 5px; margin-left: auto; }
+.rail .cnt { font: 10px "JetBrains Mono", ui-monospace, monospace; color: #17110b; background: var(--accent); border-radius: 8px; padding: 0 5px; margin-left: auto; }
 .rail:not(.open) .cnt { position: absolute; top: 3px; right: 3px; font-size: 8.5px; padding: 0 3.5px; }
 .rail.open .cnt + .kbd { margin-left: 6px; }
-.svc { font: 10px "JetBrains Mono"; letter-spacing: .06em; padding: 0 6px; border-radius: 3px; border: 1px solid var(--border-default); color: var(--text-secondary); white-space: nowrap; }
+.svc { font: 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .06em; padding: 0 6px; border-radius: 3px; border: 1px solid var(--border-default); color: var(--text-secondary); white-space: nowrap; }
 .svc.built-in { color: var(--accent); border-color: rgba(212,151,90,.3); }
 .enf { font-size: 12px; white-space: nowrap; }
 .enf.enforcing { color: var(--ok); } .enf.registered { color: var(--warn); } .enf.awaiting { color: var(--text-muted); }
-.meta-line { font: 11px "JetBrains Mono"; color: var(--text-muted); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+.meta-line { font: 11px "JetBrains Mono", ui-monospace, monospace; color: var(--text-muted); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
 .answer-box { margin-top: 12px; }
 .answer-box .answer { margin-top: 0; }
 .pass { color: var(--ok); } .fail { color: var(--danger); }

@@ -13,7 +13,6 @@ import { Settings } from './features/settings/Settings';
 import { People } from './features/people/People';
 import { AddAgent } from './features/people/AddAgent';
 import { AddPerson } from './features/people/AddPerson';
-import { IssueRoot } from './features/grants/IssueRoot';
 import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
@@ -29,7 +28,6 @@ export function AppRoutes() {
       <Route path="/network" element={<Network />} />
       <Route path="/service-accounts" element={<Navigate replace to="/people/view/accounts" />} />
       <Route path="/connections" element={<Connections />} />
-      <Route path="/access/issue" element={<IssueRoot />} />
       <Route path="/model" element={<Model />} />
       <Route path="/apps" element={<Apps />} />
       <Route path="/graph/:id?" element={<Graph />} />

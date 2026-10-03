@@ -13,7 +13,8 @@ import { DirectoryGate as Gate, problemWords } from '../people/Words';
 import { readTeams } from '../teams/Teams';
 import { reachMap } from '../grants/check';
 import { CheckBox, resourcesSeen } from '../grants/CheckBox';
-import { grantColumns } from '../grants/GrantTable';
+import { ActPanel, grantColumns } from '../grants/GrantTable';
+import { IssueRoot } from '../grants/IssueRoot';
 import { grantNo, nameOf, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import type { Grant } from '../../generated/grants';
@@ -87,6 +88,8 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
   const admin = w.people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<'all' | 'void'>('all');
+  const issuing = mode === 'issue';
+  const asking = mode !== '' && !issuing;
   const segs: [string, string][] = [['can', 'Can someone…'], ['reach', 'What can someone reach'], ['who', 'Who can reach something']];
   const seen = resourcesSeen(w);
   const resources = [...seen.keys()];
@@ -119,17 +122,18 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => nameOf(w, id));
   const columns = grantColumns(w);
   return <div className="page fill">
-    <AccessTabs on={mode ? 'ask' : 'grants'} />
+    <AccessTabs on={asking ? 'ask' : 'grants'} />
     <div className="head">
-      <div><h1>Access</h1><p className="sub">{mode ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}</p></div>
-      <a className="btn primary" href="#/access/issue">Issue root grant</a>
+      <div><h1>Access</h1><p className="sub">{asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}</p></div>
+      {asking ? null : <a className="btn primary" href={issuing ? '#/access' : '#/access/issue'}>{issuing ? 'Close the form' : 'Issue root grant'}</a>}
     </div>
-    {mode ? <div className="pane">
+    {asking ? <div className="pane">
       <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={mode === k ? 'on' : ''}>{l}</a>)}</div>
       <div className="check">{q}</div>
     </div> : <>
       {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
-      <div className="body one">
+      <div className="body one" style={issuing ? { gridTemplateRows: 'minmax(0, auto) minmax(0, 1fr)' } : undefined}>
+        {issuing ? <div className="pane"><ActPanel label="Issue root grant" close={() => navigate('/access')}><IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /></ActPanel></div> : null}
         <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
           words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceWords(g.resource)} noun="grants"
           holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' grant' : ' grants')}

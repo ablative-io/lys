@@ -1,4 +1,6 @@
 import { useLocation } from 'react-router';
+import { request, useLoad } from '../api';
+import { readTogether } from '../reads';
 import { RAIL } from './railItems';
 import { useShell } from './ShellContext';
 
@@ -11,8 +13,22 @@ export function railView(pathname: string): string {
   return view;
 }
 
+/** What waits under Access: requests awaiting a decision and grants due a review, as the service lists them for whoever is signed in. */
+function useWaiting(): { count: number; words: string } | { problem: string } | null {
+  const load = useLoad(() => readTogether({
+    requests: request<{ requests: { state: string }[] }>('/requests'),
+    reviews: request<{ due: unknown[] }>('/reviews'),
+  }), 'rail-waiting');
+  if (load.status === 'loading') return null;
+  if (load.status === 'refused') return { problem: load.refused.refusal.reason };
+  const waiting = load.data.requests.requests.filter((entry) => entry.state === 'waiting').length;
+  const due = load.data.reviews.due.length;
+  return { count: waiting + due, words: waiting + (waiting === 1 ? ' request waiting, ' : ' requests waiting, ') + due + (due === 1 ? ' grant to review' : ' grants to review') };
+}
+
 export function Rail() {
   const shell = useShell();
+  const waiting = useWaiting();
   const { pathname } = useLocation();
   const on = railView(pathname);
   const press = (id: string | undefined, dock: 'help' | 'assistant' | undefined) => {
@@ -34,7 +50,7 @@ export function Rail() {
           <>
             <svg viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: item.svg }} />
             <span className="lbl">{item.label}</span>
-            {item.cnt ? <span className="cnt" id={item.cnt} style={{ display: 'none' }} /> : null}
+            {item.nav === 'access' && waiting && ('problem' in waiting ? true : waiting.count > 0) ? <span className="cnt" title={'problem' in waiting ? 'What waits under Access could not be read: ' + waiting.problem : waiting.words}>{'problem' in waiting ? '?' : waiting.count}</span> : null}
             {item.kbd ? <span className="kbd lbl">{item.kbd}</span> : null}
           </>
         );

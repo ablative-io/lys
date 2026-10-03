@@ -13,9 +13,9 @@
 .concept:hover { background: var(--surface-hover); }
 .concept .t { font-size: 12.5px; } .concept .s { font-size: 11.5px; color: var(--text-muted); }
 .sheet p { color: var(--text-secondary); font-size: 12.5px; line-height: 1.6; margin: 0 0 10px; }
-.search { width: 100%; background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 10px; font: 12.5px "DM Sans"; }
+.search { width: 100%; background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 10px; font: 12.5px "DM Sans", system-ui, sans-serif; }
 .xlayer { position: fixed; inset: 0; pointer-events: none; z-index: 25; }
-.xm { pointer-events: auto; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #17110b; font: 600 10px "JetBrains Mono"; display: grid; place-items: center; box-shadow: 0 0 0 3px rgba(212,151,90,.18); animation: land .3s var(--spring); }
+.xm { pointer-events: auto; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #17110b; font: 600 10px "JetBrains Mono", ui-monospace, monospace; display: grid; place-items: center; box-shadow: 0 0 0 3px rgba(212,151,90,.18); animation: land .3s var(--spring); }
 .xm:hover, .xm:focus-visible { transform: scale(1.15); }
 .xcard { position: absolute; width: 260px; background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 10px 12px; box-shadow: var(--shadow-lg); font-size: 12px; }
 .xcard b { font-weight: 500; display: block; margin-bottom: 3px; }
@@ -26,9 +26,9 @@
 .msg.ai { color: var(--text-secondary); }
 .msg.ai b { color: var(--text-primary); font-weight: 500; }
 .consent { border: 1px solid rgba(212,151,90,.35); background: rgba(212,151,90,.06); border-radius: var(--radius-lg); padding: 10px 12px; margin: 8px 0 12px; font-size: 12px; }
-.ctx { display: inline-flex; gap: 6px; align-items: center; font: 10.5px "JetBrains Mono"; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 999px; padding: 1px 8px; }
+.ctx { display: inline-flex; gap: 6px; align-items: center; font: 10.5px "JetBrains Mono", ui-monospace, monospace; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 999px; padding: 1px 8px; }
 .composer { display: flex; gap: 8px; }
-.composer textarea { flex: 1; min-height: 38px; max-height: 120px; resize: vertical; background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 8px 10px; font: 12.5px/1.45 "DM Sans"; }
+.composer textarea { flex: 1; min-height: 38px; max-height: 120px; resize: vertical; background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 8px 10px; font: 12.5px/1.45 "DM Sans", system-ui, sans-serif; }
 .split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 .preview { position: sticky; top: 0; }
 .builder { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; align-items: start; }
@@ -36,16 +36,16 @@
 .listnav a.on { background: var(--surface-hover); color: var(--text-primary); box-shadow: inset 2px 0 0 var(--accent); }
 .listnav a:hover { background: var(--surface-hover); }
 .edit-list { display: grid; gap: 6px; }
-.edit-list input, .inline-in { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 9px; font: 12.5px "DM Sans"; width: 100%; }
+.edit-list input, .inline-in { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 9px; font: 12.5px "DM Sans", system-ui, sans-serif; width: 100%; }
 .chk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border-default); border-radius: 999px; margin: 3px 4px 3px 0; font-size: 12px; cursor: pointer; user-select: none; }
 .chk.on { border-color: rgba(212,151,90,.5); color: var(--accent); background: rgba(212,151,90,.07); }
 .var { color: var(--accent); }
-.path { font: 12px "JetBrains Mono"; }
+.path { font: 12px "JetBrains Mono", ui-monospace, monospace; }
 .path .dim { color: var(--text-muted); }
 .graph-wrap { position: relative; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; }
 .graph-wrap svg { display: block; width: 100%; height: 100%; }
 .gn { cursor: pointer; }
-.gn text { font: 11px "DM Sans"; fill: var(--text-secondary); pointer-events: none; }
+.gn text { font: 11px "DM Sans", system-ui, sans-serif; fill: var(--text-secondary); pointer-events: none; }
 .gn.dimmed { opacity: .18; } .ge.dimmed { opacity: .07; }
 .ge { stroke: rgba(255,255,255,.14); stroke-width: 1.2; fill: none; }
 .ge.grant { stroke: rgba(212,151,90,.55); }
@@ -61,11 +61,11 @@
 .future { opacity: .75; border-style: dashed !important; }
 .stat-strip { display: flex; gap: 10px; margin: 0 0 16px; flex-wrap: wrap; }
 .stat { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 8px 14px; min-width: 120px; }
-.stat .n { font: 500 18px "DM Sans"; letter-spacing: -.02em; }
+.stat .n { font: 500 18px "DM Sans", system-ui, sans-serif; letter-spacing: -.02em; }
 .stat .l { font-size: 11px; color: var(--text-muted); }
 input[type=radio] { accent-color: var(--accent); }
 body:has(.shell:not(.dock-right) .dock.open) #mockTag { right: 394px !important; }
 .shell:has(.dock.open) .split { grid-template-columns: minmax(0, 1fr); }
 .shell:has(.dock.open) .split > .preview { display: none; }
 .why-not { border-top: 1px solid var(--border-subtle); padding: 7px 0; font-size: 12px; }
-.why-not b { font-weight: 500; font-family: "JetBrains Mono"; font-size: 11.5px; }
+.why-not b { font-weight: 500; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; }

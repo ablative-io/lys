@@ -1,6 +1,6 @@
 /* Sign-in and first-run setup share the surface's page, field and button styling. */
 .sign-in { max-width: 420px; margin: 0 auto; padding-top: 64px; }
-.sign-in-mark { display: inline-grid; place-items: center; width: 36px; height: 36px; margin-bottom: 14px; border-radius: var(--radius-md); background: var(--accent); color: #17110b; font: 600 13px "JetBrains Mono"; }
+.sign-in-mark { display: inline-grid; place-items: center; width: 36px; height: 36px; margin-bottom: 14px; border-radius: var(--radius-md); background: var(--accent); color: #17110b; font: 600 13px "JetBrains Mono", ui-monospace, monospace; }
 .sign-in-form { display: grid; gap: 4px; }
 .sign-in-form .field input { width: 100%; box-sizing: border-box; }
 .sign-in-form .note { font-size: 12px; color: var(--text-secondary); margin: 4px 0 0; }
