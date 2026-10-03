@@ -417,7 +417,7 @@ mod directory_events {
 
         // The directory opens on the one event, and its writable open cut the
         // torn bytes off the segment.
-        let directory = harness.open()?;
+        let mut directory = harness.open()?;
         assert_eq!(directory.projection()?.records().count(), 1);
         assert_eq!(directory.log()?.len()?, 1);
         drop(directory);
