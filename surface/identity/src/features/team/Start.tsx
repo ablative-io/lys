@@ -7,8 +7,8 @@ import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotStart } from '../runtime/CannotStart';
 import type { StartRefusal } from '../runtime/CannotStart';
-import { pendingStartOf, profileRequest, startRequest } from '../runtime/StartAgent';
-import type { Pending } from '../runtime/StartAgent';
+import { pendingStartOf, profileRequest, startRequest } from '../runtime/start-requests';
+import type { Pending } from '../runtime/start-requests';
 
 /** A refusal as the service named it; a failure the screen found itself keeps the name it was thrown with. */
 function refusalOf(error: unknown): StartRefusal {
