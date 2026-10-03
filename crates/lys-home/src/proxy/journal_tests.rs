@@ -347,3 +347,15 @@ async fn closing_the_fixture_releases_the_proxy_before_returning() -> Res {
     assert!(proxy.upgrade().is_none(), "the fixture left its server owning the proxy");
     Ok(())
 }
+
+#[test]
+fn a_stopped_capture_worker_closes_its_reports_before_shutdown_returns() -> Res {
+    let dir = tempfile::tempdir()?;
+    let home = Home::open(dir.path().join("home"))?;
+    let journal = Journal::open(dir.path().join("journal"))?;
+    let (reports, received) = std::sync::mpsc::channel();
+    let sink = crate::proxy::journal::Sink::start(home, journal, reports);
+    sink.shutdown()?;
+    assert!(matches!(received.try_recv(), Err(std::sync::mpsc::TryRecvError::Disconnected)));
+    Ok(())
+}
