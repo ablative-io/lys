@@ -169,3 +169,42 @@ fn every_start_leaves_the_persons_own_setup_out() -> Result<(), Box<dyn Error>> 
     }
     Ok(())
 }
+
+/// A template flag that would bring the person's own setup back is refused
+/// in each form it can be written; the empty form Lys writes is admitted.
+#[test]
+fn a_template_flag_that_loads_the_persons_own_setup_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut template: Value = serde_json::from_str(include_str!("fixtures/launch/template.json"))?;
+    template["slots"]["permissions"] = json!({"defaultMode": "acceptEdits"});
+    let render_with = |flags: Value| {
+        let mut template = template.clone();
+        template["flags"] = flags;
+        render(
+            "claude-code/template-v1",
+            "/opt/seat/bin/claude",
+            &template.to_string(),
+            InstructionsMode::Keep,
+        )
+    };
+    for flags in [
+        json!(["--setting-sources=user"]),
+        json!(["--setting-sources=user,project,local"]),
+        json!(["--setting-sources", "user"]),
+        json!(["--setting-sources"]),
+        json!(["--model", "default", "--setting-sources", "user"]),
+    ] {
+        let error = render_with(flags.clone())
+            .err()
+            .ok_or_else(|| format!("admitted {flags}"))?;
+        assert!(error.contains("flags"), "{error}");
+        assert!(error.contains("--setting-sources"), "{error}");
+    }
+    let admitted = render_with(json!([NO_SETTING_SOURCES, "--model", "default"]))?;
+    let count = admitted
+        .arguments
+        .iter()
+        .filter(|one| *one == NO_SETTING_SOURCES)
+        .count();
+    assert_eq!(count, 1, "{:?}", admitted.arguments);
+    Ok(())
+}

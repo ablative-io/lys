@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use super::claude_code::launch_env::{confinement_named, env_settings};
+use super::claude_code::launch_env::{confinement_named, env_settings, own_setup_left_out};
 use super::claude_code::template::parse_template;
 use super::launch_fields::InstructionsMode;
 use crate::record::blocks::Hash;
@@ -69,8 +69,9 @@ fn file(path: &str, text: String) -> File {
 ///
 /// # Errors
 /// Refuses unknown contracts, invalid templates, invalid declared programs,
-/// and a Claude template that does not say how the agent is confined: it is
-/// never rendered unconfined, and the operator's file is never rewritten.
+/// a Claude template that does not say how the agent is confined (it is
+/// never rendered unconfined, and the operator's file is never rewritten),
+/// and one whose flags ask for the person's own Claude Code setup.
 pub fn render(
     contract: &str,
     program: &str,
@@ -88,6 +89,7 @@ pub fn render(
     }
     let template = parse_template(text.as_bytes()).map_err(|error| error.to_string())?;
     confinement_named(&template).map_err(|error| error.to_string())?;
+    own_setup_left_out(&template).map_err(|error| error.to_string())?;
     let settings = String::from_utf8(env_settings(&template).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?;
     let mcp =

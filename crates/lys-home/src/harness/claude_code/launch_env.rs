@@ -16,6 +16,30 @@ use crate::error::HomeError;
 use crate::harness::claude_code::template::Template;
 use crate::record::blocks::Hash;
 
+/// Refuse a template whose own flags would load the person's own Claude Code
+/// setup again. Every Lys start carries `--setting-sources=` (see
+/// `rendering_launch`), and a later `--setting-sources` with a value, or the
+/// two-word form whose value is the next flag, would take its place: the
+/// person's settings, hooks and plugins would be back while the screens say
+/// they are left out. The empty one-word form is the one Lys writes itself
+/// and is admitted.
+///
+/// # Errors
+/// `TemplateShape` naming `flags`.
+pub fn own_setup_left_out(template: &Template) -> Result<(), HomeError> {
+    let asks = template.flags.iter().map(String::as_str).any(|flag| {
+        flag == "--setting-sources"
+            || (flag.starts_with("--setting-sources=") && flag != "--setting-sources=")
+    });
+    if asks {
+        return Err(HomeError::TemplateShape {
+            field: "flags".to_owned(),
+            reason: "names --setting-sources: a Lys start does not load the person's own Claude Code setup",
+        });
+    }
+    Ok(())
+}
+
 /// Refuse a template that does not say how the agent is confined: a
 /// permissions slot that is absent, names no `defaultMode`, or names an empty
 /// one. Checked before anything is written, so nothing is ever rendered
