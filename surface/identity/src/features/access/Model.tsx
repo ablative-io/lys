@@ -1,3 +1,4 @@
+import { AccessTabs } from './AccessTabs';
 import { actionWords } from '../grants/action-words';
 /** The permission model actually in force, read from the service. */
 import { api, useLoad } from '../../api';
@@ -7,7 +8,8 @@ export function Model() {
   const load = useLoad(api.model, 'permission-model');
   return <div className="page fill">
     <Gate load={load} title="Model" ok={(model) => <>
-      <div className="head"><div><div className="eyebrow">Access</div><h1>Model</h1>
+      <AccessTabs on="model" />
+    <div className="head"><div><h1>Model</h1>
         <p className="sub">Permission model version {model.version}. Each relation carries the actions listed below.</p></div>
         <a className="btn" href="#/access">Check access</a></div>
       <div className="pane"><table><thead><tr><th>Relation</th><th>Actions</th></tr></thead><tbody>

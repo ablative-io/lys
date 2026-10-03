@@ -1,3 +1,4 @@
+import { AccessTabs } from '../access/AccessTabs';
 import { actionWords } from '../grants/action-words';
 import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
@@ -80,8 +81,9 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
   ];
   const count = (items: AccessRequest[]) => { const waiting = items.filter((entry) => entry.state === 'waiting').length; return waiting ? waiting + ' waiting' : items.length + ' decided'; };
   return <>
+    <AccessTabs on="requests" />
     <div className="head">
-      <div><div className="eyebrow">Access</div><h1>Requests</h1><p className="sub">Ask for permission to use something, and decide what others have asked for, oldest first.</p></div>
+      <div><h1>Requests</h1><p className="sub">Ask for permission to use something, and decide what others have asked for, oldest first.</p></div>
       {!ask ? <button className="btn primary" onClick={() => setAsking(true)}>+ Ask for access</button> : null}
     </div>
     {data.teams.refused ? <p className="why-not">Teams cannot be read, so requests are listed without their team. {data.teams.refused}</p> : null}

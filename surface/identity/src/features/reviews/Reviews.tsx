@@ -1,3 +1,4 @@
+import { AccessTabs } from '../access/AccessTabs';
 import { actionWords } from '../grants/action-words';
 import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
@@ -40,7 +41,8 @@ export function Reviews() {
   }), 'reviews');
   const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
   return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Access</div><h1>Reviews</h1>
+    <AccessTabs on="reviews" />
+    <div className="head"><div><h1>Reviews</h1>
       <p className="sub">Check what each agent can do, and withdraw access it no longer needs.</p></div></div>
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="agent access to review" renderError={(error) => <ReadFailure error={error} subject="agent access to review" />} ok={(data) => <Due {...data} confirmed={confirmed} kept={kept} />} />

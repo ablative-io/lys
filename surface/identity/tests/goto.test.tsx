@@ -1,19 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press } from './harness';
 
-// Every rail screen is one palette entry and one g letter away (index.v5.html:1085,
-// 1094, 1112, 1125-1126, 1177-1178). The screens and letters are written out here,
-// from the mock-up, rather than read from the shell's own tables.
+// Every screen is one palette entry and one g letter away. The letters and where each goes are written out here
+// rather than read from the shell's own tables. Access is one rail item whose views are its tabs, and Running is the canvas.
 
-const SCREENS = [
-  'me', 'people', 'roles', 'resources', 'access', 'graph', 'requests',
-  'reviews', 'secrets', 'connections', 'network', 'sessions', 'model', 'settings', 'canvas', 'runtime',
-];
-
-const LETTERS: Record<string, string> = {
-  p: 'people', o: 'roles', r: 'resources', a: 'access', q: 'requests', w: 'reviews', v: 'secrets',
-  n: 'connections', x: 'sessions', m: 'model', s: 'settings', h: 'graph', t: 'network', u: 'me', c: 'canvas', l: 'runtime',
+const LETTERS: Record<string, [string, string]> = {
+  p: ['#/people', 'people'], o: ['#/roles', 'roles'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/requests', 'access'], w: ['#/reviews', 'access'],
+  v: ['#/secrets', 'secrets'], n: ['#/connections', 'connections'], x: ['#/sessions', 'sessions'], m: ['#/model', 'access'], s: ['#/settings', 'settings'],
+  h: ['#/graph', 'access'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], l: ['#/canvas', 'canvas'],
 };
+const RAIL_ITEMS = ['me', 'people', 'canvas', 'roles', 'access', 'secrets', 'connections', 'network', 'sessions', 'settings'];
 
 const current = () => $('#rail a.on')?.dataset.nav;
 
@@ -29,39 +25,40 @@ function goToRows(): { row: HTMLElement; hash: string }[] {
 }
 
 describe('go-to keys and palette (conformance 9.1)', () => {
-  it('palette Go to reaches all 16 screens', async () => {
+  it('palette Go to reaches every screen, each row arriving at its own address with a rail item lit', async () => {
     await mount('#/people');
     await press('k', { metaKey: true }, document.body);
     const count = goToRows().length;
-    expect(count).toBeGreaterThanOrEqual(16);
+    expect(count).toBe(16);
     await press('Escape');
     const reached = new Set<string>();
+    const lit = new Set<string>();
     for (let n = 0; n < count; n += 1) {
       await press('k', { metaKey: true }, document.body);
       const entry = goToRows()[n];
       await click(entry.row);
       expect($('#palette')?.classList.contains('open')).toBe(false);
+      expect(location.hash, entry.hash).toBe(entry.hash);
+      reached.add(location.hash);
       const nav = current();
       expect(nav, entry.hash).toBeDefined();
-      if (nav) reached.add(nav);
+      if (nav) lit.add(nav);
     }
     expect(reached.size).toBe(16);
-    expect([...reached].sort()).toEqual([...SCREENS].sort());
+    expect([...lit].sort()).toEqual([...RAIL_ITEMS].sort());
   });
 
-  it('g letters reach all 16 screens', async () => {
+  it('g letters reach every screen', async () => {
     await mount('#/people');
-    const reached = new Map<string, string>();
-    for (const [letter, screen] of Object.entries(LETTERS)) {
+    const lit = new Set<string>();
+    for (const [letter, [hash, nav]] of Object.entries(LETTERS)) {
       await press('g', {}, document.body);
       await press(letter, {}, document.body);
-      const nav = current();
-      expect(nav, 'g ' + letter).toBe(screen);
-      if (nav) reached.set(letter, nav);
+      expect(location.hash, 'g ' + letter).toBe(hash);
+      expect(current(), 'g ' + letter).toBe(nav);
+      lit.add(nav);
     }
-    expect(reached.size).toBe(16);
-    expect(new Set(reached.values()).size).toBe(16);
-    expect([...new Set(reached.values())].sort()).toEqual([...SCREENS].sort());
+    expect([...lit].sort()).toEqual([...RAIL_ITEMS].sort());
   });
 
   it('g then an unmapped letter goes nowhere', async () => {

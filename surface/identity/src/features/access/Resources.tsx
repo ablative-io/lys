@@ -1,4 +1,5 @@
 /** Resources and grant counts judged by the server within the caller's visibility, grouped by kind; a row opens who can reach it. */
+import { AccessTabs } from './AccessTabs';
 import { request, useLoad } from '../../api';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -24,9 +25,9 @@ export function Resources() {
         { head: 'Current holders', cell: (resource) => resource.holders },
       ];
       return <>
-        <div className="head">
-          <div><div className="eyebrow">Access</div><h1>Resources</h1><p className="sub">Resources named in grants you may see. Counts were checked at {new Date(list.judged_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })} Melbourne time, grant revision {list.revision}.</p></div>
-          <a className="btn primary" href="#/access/issue">Issue root grant</a>
+        <AccessTabs on="resources" />
+    <div className="head">
+          <div><h1>Resources</h1><p className="sub">Resources named in grants you may see. Counts were checked at {new Date(list.judged_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })} Melbourne time, grant revision {list.revision}.</p></div>
         </div>
         <p className="note">Grant counts describe recorded grants. Check access for the permission engine's current decision.</p>
         {list.resources.length ? null : <p>No resources appear in your visible grants yet.</p>}

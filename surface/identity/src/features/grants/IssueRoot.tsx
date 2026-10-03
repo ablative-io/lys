@@ -1,4 +1,5 @@
 /** Root grants are requested explicitly; the server alone decides who may issue one. */
+import { AccessTabs } from '../access/AccessTabs';
 import { useState } from 'react';
 import { api, useLoad } from '../../api';
 import type { GrantModel } from '../../generated/grants';
@@ -45,7 +46,8 @@ async function read() {
 export function IssueRoot() {
   const load = useLoad(read, 'root-grant');
   return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Access</div><h1>Issue access</h1><p className="sub">Give a person a root grant on something, straight from the directory's authority.</p></div><a className="btn" href="#/access">Back to access</a></div>
+    <AccessTabs on="grants" />
+    <div className="head"><div><h1>Issue access</h1><p className="sub">Give a person a root grant on something, straight from the directory's authority.</p></div><a className="btn" href="#/access">Back to access</a></div>
     <div className="pane"><Gate load={load} title="Issue access" ok={(data) => <Form {...data} />} /></div>
   </div>;
 }

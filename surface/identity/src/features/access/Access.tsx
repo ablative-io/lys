@@ -3,6 +3,7 @@ import { readTogether } from '../../reads';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
+import { AccessTabs } from './AccessTabs';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
@@ -86,7 +87,6 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
   const admin = w.people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<'all' | 'void'>('all');
-  const [picked, setPicked] = useState<string | null>(null);
   const segs: [string, string][] = [['can', 'Can someone…'], ['reach', 'What can someone reach'], ['who', 'Who can reach something']];
   const seen = resourcesSeen(w);
   const resources = [...seen.keys()];
@@ -117,7 +117,6 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
   const held = (g: Grant): Held => ({ id: g.holder, person: w.who.get(g.holder)?.responsible ?? null });
   const scoped = w.list.grants.filter((g) => inWhose(whose, teams.list, w.me.person.id, held(g))).filter((g) => show === 'all' || voidOf(w, g) !== null);
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => nameOf(w, id));
-  const chosen = scoped.find((g) => g.id === picked) ?? null;
   const columns: Column<Grant>[] = [
     { head: 'Grant', cell: (g) => <span className="mono">{grantNo(g.id)}</span> },
     { head: 'Holder', cell: (g) => nameOf(w, g.holder) },
@@ -127,47 +126,38 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
     { head: 'May pass on', cell: (g) => <span className="sec">{passText(g.pass_on)}</span> },
     { head: 'Lasts', cell: (g) => <span className="sec">{lastsText(g)}</span> },
     { head: 'Last used', cell: (g) => <span className="sec">{g.last_use.seen ? lastUsedText(g) : <span className="dim">{lastUsedText(g)}</span>}</span> },
-    { head: 'Stands', cell: (g) => { const v = voidOf(w, g); return v === null ? <><span className="dot s-active" />yes</> : <span className="danger" title={v.why}>no</span>; } },
+    { head: 'Stands', cell: (g) => { const v = voidOf(w, g); return v === null ? <><span className="dot s-active" />yes</> : <span className="danger">no: {v.why}</span>; } },
   ];
   return <div className="page fill">
+    <AccessTabs on={mode ? 'ask' : 'grants'} />
     <div className="head">
-      <div><div className="eyebrow">Access</div><h1>Access</h1><p className="sub">Ask it any way round. Every answer traces to a person, or says why not.</p></div>
+      <div><h1>Access</h1><p className="sub">{mode ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}</p></div>
       <a className="btn primary" href="#/access/issue">Issue root grant</a>
     </div>
-    {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
-    <div className="body work">
-      <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
-        words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceWords(g.resource)} noun="grants"
-        holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' grant' : ' grants')}
-        selected={chosen?.id ?? null} select={(g) => setPicked(g.id)} open={(g) => navigate(`/file/${g.holder}/access`)}
-        tools={<>
-          <WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />
-          <div className="seg">{([['all', 'All'], ['void', 'Not standing']] as ['all' | 'void', string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
-        </>} />
-      <div className="detail">
-        <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={mode === k ? 'on' : ''}>{l}</a>)}</div>
-        <div className="check">{q}</div>
-        {chosen ? <GrantSummary w={w} g={chosen} /> : <p className="note">Last used is an exercise seen where access is enforced. Not seen means none was observed, never that it was never used.</p>}
+    {mode ? <div className="pane">
+      <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={mode === k ? 'on' : ''}>{l}</a>)}</div>
+      <div className="check">{q}</div>
+    </div> : <>
+      {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
+      <div className="body one">
+        <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
+          words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceWords(g.resource)} noun="grants"
+          holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' grant' : ' grants')}
+          selected={null} select={() => undefined} open={(g) => navigate(`/file/${g.holder}/access`)}
+          tools={<>
+            <WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />
+            <div className="seg">{([['all', 'All'], ['void', 'Not standing']] as ['all' | 'void', string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
+          </>} />
       </div>
-    </div>
+    </>}
   </div>;
-}
-
-function GrantSummary({ w, g }: { w: GrantWorld; g: Grant }) {
-  const v = voidOf(w, g);
-  return <article className="card" aria-label="Grant">
-    <h2>{grantNo(g.id)} · {nameOf(w, g.holder)}</h2>
-    <p><span className="mono">{g.relation}</span> on <span className="mono">{resourceWords(g.resource)}</span></p>
-    <p className="sec">{passText(g.pass_on)} · {lastsText(g)} · last used {lastUsedText(g)}</p>
-    {v === null ? <p><span className="dot s-active" />Stands.</p> : <p className="why-not">{v.why}</p>}
-    <a className="btn" href={`#/file/${g.holder}/access`}>Open {nameOf(w, g.holder)}'s access</a>
-  </article>;
 }
 
 type Teams = { list: OrgTeam[]; refused: string };
 
 export function Access() {
-  const { mode = 'can', arg } = useParams();
+  // No mode in the address is the Grants tab; a mode is one of the three questions on the Ask tab.
+  const { mode = '', arg } = useParams();
   const load = useLoad(() => readTogether({
     w: readGrantWorld(),
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),

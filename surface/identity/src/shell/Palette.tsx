@@ -15,10 +15,10 @@ interface Item {
 }
 
 export const PAGES: [string, string][] = [
-  ['People and agents', '#/people'], ['Roles', '#/roles'], ['Resources', '#/resources'], ['Access', '#/access'],
-  ['Requests', '#/requests'], ['Reviews', '#/reviews'], ['Credentials', '#/vault'], ['Connections', '#/connections'],
-  ['Sign-ins', '#/sessions'], ['Model', '#/model'], ['Try a change', '#/model/try'], ['Configuration', '#/settings'],
-  ['Graph', '#/graph'], ['Secrets', '#/secrets'], ['Computers', '#/network'], ['Running', '#/canvas'], ['You', '#/me'],
+  ['You', '#/me'], ['People and agents', '#/people'], ['Running', '#/canvas'], ['Roles', '#/roles'],
+  ['Access: grants', '#/access'], ['Access: ask', '#/access/can'], ['Access: requests', '#/requests'], ['Access: reviews', '#/reviews'],
+  ['Access: resources', '#/resources'], ['Access: graph', '#/graph'], ['Access: model', '#/model'],
+  ['Secrets', '#/secrets'], ['Connections', '#/connections'], ['Computers', '#/network'], ['Sign-ins', '#/sessions'], ['Configuration', '#/settings'],
 ];
 
 export function Palette() {

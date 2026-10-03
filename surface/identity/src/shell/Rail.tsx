@@ -7,6 +7,7 @@ export function railView(pathname: string): string {
   const view = (pathname.split('/')[1] || 'me').replace(/^team$/, 'me');
   if (view === 'file') return 'people';
   if (view === 'vault') return 'secrets';
+  if (['resources', 'graph', 'requests', 'reviews', 'model'].includes(view)) return 'access';
   return view;
 }
 

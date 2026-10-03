@@ -1,3 +1,4 @@
+import { AccessTabs } from './AccessTabs';
 import { actionWords, resourceFromText, resourceWords } from '../grants/action-words';
 /** Every person, agent and resource, and the relations between them, laid out by a small force simulation. */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -209,7 +210,8 @@ export function Graph() {
   const { id } = useParams();
   const load = useLoad(readGraph, 'identity-graph');
   return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Access</div><h1>Graph</h1>
+    <AccessTabs on="graph" />
+    <div className="head"><div><h1>Graph</h1>
       <p className="sub">Every person, agent and resource, and the relations between them. Answers are limited to the directory and resources you may see; these reads do not exercise a grant.</p></div></div>
     <Gate load={load} title="Graph" ok={({ world, installed }) => <>
       <Graphed world={world} installed={installed} focus={id} />
