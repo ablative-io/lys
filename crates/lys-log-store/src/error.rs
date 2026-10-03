@@ -370,6 +370,27 @@ pub enum StoreError {
         /// The number of leaves counted.
         extent: u64,
     },
+    /// A read-only open met a store still in the v1 per-leaf layout. Only a
+    /// writable open migrates it, once; a reader never changes a directory.
+    #[error(
+        "refusing to open the log store at {} read-only: it is in the v1 per-leaf layout, which only a writable open migrates",
+        path.display()
+    )]
+    MigrationPending {
+        /// The store's directory.
+        path: PathBuf,
+    },
+    /// The migration would keep the v1 directory aside under a name that is
+    /// already taken. Nothing is overwritten or removed; the operator moves
+    /// the earlier copy first.
+    #[error(
+        "refusing to migrate the log store: {} already exists, and the v1 directory is kept there, never replaced",
+        path.display()
+    )]
+    MigrationKeptExists {
+        /// The name the v1 directory would be kept under.
+        path: PathBuf,
+    },
 }
 
 /// Convenience alias for `Result<T, StoreError>`.

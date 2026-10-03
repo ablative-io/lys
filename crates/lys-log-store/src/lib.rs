@@ -65,6 +65,7 @@ pub mod file;
 pub mod frontier;
 pub mod frontier_log;
 pub mod log;
+pub mod migrate;
 pub mod snapshot;
 pub mod start;
 pub mod store;
@@ -74,6 +75,7 @@ pub use file::FileLeafStore;
 pub use frontier::Frontier;
 pub use frontier_log::{FrontierLog, Tail};
 pub use log::{Log, validate_origin};
+pub use migrate::{Migrated, migrate_v1};
 pub use snapshot::{SNAPSHOT_FORMAT, Snapshot, SnapshotRefusal, seal, unseal};
 pub use start::{Start, Started, open_with_snapshot};
 pub use store::{LeafStore, PinnedRoot};
@@ -82,5 +84,7 @@ pub use store::{LeafStore, PinnedRoot};
 mod append_tests;
 #[cfg(test)]
 mod leaf_count;
+#[cfg(test)]
+mod migrate_tests;
 #[cfg(test)]
 mod test_store;

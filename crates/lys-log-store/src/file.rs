@@ -139,12 +139,13 @@ use leaves::{
 
 mod left_behind;
 mod snapshot_slot;
+pub(crate) mod v1;
 
 pub use left_behind::LeftBehind;
 
 /// Detection marker in `log.json`. A local-state version tag, not a wire
 /// contract.
-const LOG_DIR_FORMAT: &str = "lys/log-dir/v1";
+pub(crate) const LOG_DIR_FORMAT: &str = "lys/log-dir/v1";
 
 /// Width of a leaf filename: `u64::MAX` has 20 decimal digits.
 const LEAF_NAME_WIDTH: usize = 20;
