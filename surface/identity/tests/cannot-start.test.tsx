@@ -230,6 +230,22 @@ describe('an agent with no folder to work in', () => {
     expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + other + '/folders']);
   });
 
+  it('looks on the one computer a role the agent holds allows it on, and not on one a role it no longer holds allowed', async () => {
+    const other = 'op-' + '2'.repeat(32);
+    const byRole = { ...machine(other, 'Ward desk'), may_run_roles: ['role-ward'] };
+    const byOldRole = { ...machine(computer, 'Ada’s laptop'), may_run_roles: ['role-old'] };
+    const roles = [{ id: 'role-ward', holders: [{ holder: SCRIBE, state: 'holding' }] }, { id: 'role-old', holders: [{ holder: SCRIBE, state: 'ended' }] }];
+    const { host, posted } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
+      '/network': ok({ machines: [byOldRole, byRole], reports_served: true }), '/roles': ok({ roles }),
+      [provisioning]: ok({ agent: SCRIBE, profile: { ...profile, runs_on: undefined }, versions: [], enforced: false }),
+      ['POST /network/machines/' + other + '/folders']: ok({ machine: other, under: '/home/ward', folders: ['notes'] }),
+    });
+    await click(button(host, 'Choose a folder'));
+    await settle();
+    expect(host.textContent).toContain('On Ward desk, in /home/ward');
+    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + other + '/folders']);
+  });
+
   it('sends every setting it read back unchanged, with the folder, when it saves', async () => {
     const full = { ...profile, tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Cambium', url: 'http://localhost:6010', channel: 'wake' }],
       instructions: 'Check every receipt', instructions_mode: 'append', session: { compact: 'compact' }, writable: '/srv/out',

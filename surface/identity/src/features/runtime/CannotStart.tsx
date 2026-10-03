@@ -13,12 +13,14 @@
  */
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, request, useLoad } from '../../api';
-import type { Machine, NetworkView } from '../network/contract';
+import { allowedToRun, usable } from '../network/allowed';
+import type { NetworkView } from '../network/contract';
 import { confirmAdmission } from '../network/machine-admission';
 import type { MachineAdmission } from '../network/machine-admission';
 import { FolderChooser } from '../provisioning/FolderChooser';
 import { saveFolder } from '../provisioning/working-folder';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
+import { readRoles } from '../roles/AssignedRoles';
 
 /** What refused a start: the refusal's name and its reason, as answered. */
 export interface StartRefusal { refusal: string; reason: string }
@@ -100,22 +102,19 @@ function TurnOn({ agent, name, label, transition, again }: {
   </>;
 }
 
-/** The computers that could run the agent: in use, with Lys running on them. */
-const usable = (machines: Machine[]): Machine[] => machines.filter((machine) => machine.state === 'in_use' && machine.runtime !== null);
-
 /**
  * The folder is a path on one computer, so it is chosen on the computer the
  * start will use: the one the agent's settings name, or else the one
- * computer that is allowed to run it. When neither settles it, the computer
+ * computer that is allowed to run it, by name or by a role it holds. When neither settles it, the computer
  * is the thing to settle first, and that is said. The folder is then saved
  * to the agent's settings and the start follows.
  */
 function ChooseFolder({ agent, name, again }: { agent: string; name: string; again: () => void }) {
   const load = useLoad(async () => {
-    const [network, held] = await Promise.all([request<NetworkView>('/network'), request<ProvisioningAnswer>('/agents/' + encodeURIComponent(agent) + '/provisioning')]);
-    const computers = usable(network.machines);
-    const named = computers.find((entry) => entry.id === held.profile?.runs_on);
-    const allowed = computers.filter((entry) => entry.may_run.some((one) => one.id === agent));
+    const [network, held, roles] = await Promise.all([request<NetworkView>('/network'), request<ProvisioningAnswer>('/agents/' + encodeURIComponent(agent) + '/provisioning'), readRoles()]);
+    const named = usable(network.machines).find((entry) => entry.id === held.profile?.runs_on);
+    // Allowed by its own name or by a role it holds now: the same rule Start uses, so the two never disagree.
+    const allowed = allowedToRun(network.machines, roles.roles, agent);
     return named ?? (allowed.length === 1 ? allowed[0] : null);
   }, 'cannot-start-folder:' + agent);
   const [busy, setBusy] = useState(false);
