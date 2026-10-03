@@ -123,6 +123,65 @@ describe('Agent canvas', () => {
     expect(kept.boxes['session:' + session].x).toBe(before + 16);
   });
 
+  it('opens the agent the route names even when its window was kept closed, at the open size', async () => {
+    const base = '/runtime/sessions/' + session;
+    localStorage.setItem('lys.canvas', JSON.stringify({ boxes: { ['session:' + session]: { x: 900, y: 700, w: 280, h: 34 } }, open: [], view: { x: 0, y: 0 } }));
+    await mount('#/canvas/' + SCRIBE, {
+      ...routes,
+      ['POST ' + base + '/resize']: ok({ receipt: { index: 1 } }),
+      ['POST ' + base + '/read-bytes']: ok({ session, answer: { kind: 'bytes', output: { session, from: 0, cursor: 0, oldest: 0, data: [], ended: { how: 'exited', at: 1, status: 0, signal: null } } }, receipt: { index: 2 } }),
+    });
+    const one = $('.session-canvas-node.sessions') as HTMLElement;
+    expect(one.querySelector('.terminal')).not.toBeNull();
+    expect([one.style.left, one.style.top, one.style.width, one.style.height]).toEqual(['900px', '700px', '760px', '480px']);
+  });
+
+  it('drags a window by its bar and drags the surface by its background', async () => {
+    await mount('#/runtime/canvas', routes);
+    const one = $('.session-canvas-node.sessions') as HTMLElement;
+    const surface = $('.session-canvas-scroll') as HTMLElement;
+    const pointer = (target: Element, type: string, x: number, y: number) => act(async () => { target.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y })); });
+    const [left, top] = [parseFloat(one.style.left), parseFloat(one.style.top)];
+    await pointer(one.querySelector('.session-canvas-bar') as Element, 'pointerdown', 10, 10);
+    await pointer(surface, 'pointermove', 50, 30);
+    await pointer(surface, 'pointerup', 50, 30);
+    expect([parseFloat(one.style.left), parseFloat(one.style.top)]).toEqual([left + 40, top + 20]);
+    const space = $('.session-canvas') as HTMLElement;
+    const before = space.style.transform;
+    await pointer(surface, 'pointerdown', 5, 5);
+    await pointer(surface, 'pointermove', 105, 55);
+    await pointer(surface, 'pointerup', 105, 55);
+    expect(before).toBe('translate(24px, 24px)');
+    expect(space.style.transform).toBe('translate(124px, 74px)');
+    expect([parseFloat(one.style.left), parseFloat(one.style.top)]).toEqual([left + 40, top + 20]);
+  });
+
+  it('still works, and says so, when the browser refuses to keep the arrangement', async () => {
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage is full'); });
+    await mount('#/runtime/canvas', routes);
+    expect(text()).toContain('This browser will not keep the arrangement: storage is full');
+    expect($('.session-canvas-node.sessions')).not.toBeNull();
+    set.mockRestore();
+  });
+
+  it('sizes an open terminal from the keyboard and never below the size its bar needs', async () => {
+    const base = '/runtime/sessions/' + session;
+    await mount('#/runtime/canvas', { ...routes, ['POST ' + base + '/resize']: ok({ receipt: { index: 1 } }),
+      ['POST ' + base + '/read-bytes']: ok({ session, answer: { kind: 'bytes', output: { session, from: 0, cursor: 0, oldest: 0, data: [], ended: { how: 'exited', at: 1, status: 0, signal: null } } }, receipt: { index: 2 } }) });
+    const one = $('.session-canvas-node.sessions') as HTMLElement;
+    await click(one.querySelector('button'));
+    const key = (name: string) => act(async () => { one.querySelector('.session-canvas-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key: name, shiftKey: true, bubbles: true })); });
+    await key('ArrowDown');
+    expect([one.style.width, one.style.height]).toEqual(['760px', '496px']);
+    for (let press = 0; press < 20; press += 1) await key('ArrowLeft');
+    expect(one.style.width).toBe('560px');
+  });
+
+  it('says on each window what it is', async () => {
+    await mount('#/runtime/canvas', routes);
+    expect([...document.querySelectorAll('.session-canvas-kind')].map((kind) => kind.textContent).sort()).toEqual(['Agent', 'Resource or recipient', 'Team or sender']);
+  });
+
   it('places every node once, leaves a moved one where it is, and joins two windows edge to edge', () => {
     const node = (id: string, column: 'teams' | 'sessions' | 'resources') => ({ id, column, title: id, detail: '' });
     const graph = { nodes: [node('t', 'teams'), node('a', 'sessions'), node('b', 'sessions'), node('r', 'resources')], edges: [], notices: [], unanswered: [], names: {} };

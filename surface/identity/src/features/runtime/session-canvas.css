@@ -11,8 +11,8 @@
 .session-canvas-scroll { position: relative; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); cursor: grab; touch-action: none; }
 .session-canvas-scroll:active { cursor: grabbing; }
 .session-canvas-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.session-canvas-tools { position: absolute; z-index: 10; top: 8px; right: 8px; display: flex; gap: 6px; }
-.session-canvas { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+.session-canvas-tools { position: absolute; z-index: 10; top: 8px; right: 8px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.session-canvas { position: absolute; left: 0; top: 0; width: 0; height: 0; }
 .session-canvas-lines { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; overflow: visible; }
 .session-canvas-lines path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
 .session-canvas-lines path[data-kind="membership"] { stroke: var(--text-muted); }
@@ -23,21 +23,30 @@
 .session-canvas-bar { flex: none; display: flex; align-items: center; gap: 10px; height: 34px; box-sizing: border-box; padding: 0 6px 0 12px; cursor: grab; user-select: none; white-space: nowrap; overflow: hidden; }
 .session-canvas-bar:active { cursor: grabbing; }
 .session-canvas-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.session-canvas-bar > h3 { margin: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
-.session-canvas-bar > .note { margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.session-canvas-bar > h3 { flex: 0 1 auto; min-width: 96px; margin: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.session-canvas-bar > .note { flex: 0 100 auto; min-width: 0; margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 .session-canvas-bar > .btn { margin-left: auto; padding: 3px 9px; font-size: 12px; }
-.session-canvas-node:not(.sessions) > .session-canvas-bar { height: 52px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
+.session-canvas-node:not(.sessions) > .session-canvas-bar { height: 100%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; }
 /* An open window has one bar: the terminal's own state and Stop sit in it, left of the close control, and its second name is not shown. */
 .session-canvas-node.open > .session-canvas-bar { padding-right: 6px; border-bottom: 1px solid var(--border-subtle); }
 .session-canvas-node .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; gap: 0; border: 0; border-radius: 0; }
 .session-canvas-slot { flex: none; width: 190px; margin-left: auto; }
 .session-canvas-node.open > .session-canvas-bar > .btn { flex: none; width: 150px; margin-left: 0; }
-.session-canvas-node .terminal-head { position: absolute; top: 0; right: 166px; width: 190px; height: 34px; justify-content: flex-end; gap: 10px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+.session-canvas-node .terminal-head { position: absolute; top: 0; right: 166px; width: 190px; height: 34px; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 10px; font-size: 12px; white-space: nowrap; overflow: hidden; }
 .session-canvas-node .terminal-state { margin: 0; overflow: hidden; text-overflow: ellipsis; }
 .session-canvas-node .terminal-head > div { display: none; }
 .session-canvas-node .terminal-head .btn { padding: 2px 9px; font-size: 12px; }
-.session-canvas-node .terminal-renderer { display: none; }
+.session-canvas-node .terminal-renderer { margin: 0; padding: 3px 12px; font-size: 12px; }
 .session-canvas-node .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .session-canvas-node .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
 .session-canvas-node .terminal-stop { margin: 6px; }
 .session-canvas-grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--border-default) 50%); }
+/* What a window is, said on it: a moved card is still known for a team, an agent or a resource. */
+.session-canvas-kind { flex: none; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.session-canvas-node.teams { border-left: 3px solid var(--text-muted); }
+.session-canvas-node.resources { border-left: 3px solid var(--accent); }
+.session-canvas-node:not(.sessions) > .session-canvas-bar > .session-canvas-kind { order: -1; }
+/* How a session ended is a sentence: it takes its own line under the bar and is read whole. */
+.session-canvas-node .terminal-head:has([data-ended="true"]) { position: static; width: auto; height: auto; padding: 4px 12px; justify-content: flex-start; white-space: normal; overflow: visible; }
+.session-canvas-node.open:has(.terminal-state[data-ended="true"]) .session-canvas-slot { display: none; }
+.session-canvas-node.open:has(.terminal-state[data-ended="true"]) > .session-canvas-bar > .btn { margin-left: auto; }

@@ -1,6 +1,6 @@
 import { refreshLive } from '../../live';
 /** A surface of windows: each permitted session and each thing it is connected to is a window a person drags, sizes and arranges, with as many live terminals open as they choose. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { useParams } from 'react-router';
 import { useLive, useLoad } from '../../api';
@@ -15,17 +15,21 @@ import './session-canvas.css';
 
 /** Where a window sits on the surface and how large it is, in the surface's own units. */
 export interface Box { x: number; y: number; w: number; h: number }
-/** The part of the surface the window shows: where its origin sits on the page, and how much it is magnified. */
-export interface View { x: number; y: number; k: number }
+/**
+ * The part of the surface the page shows: where the surface's origin sits. The surface is never magnified: a terminal
+ * counts its columns from its size on the screen, so a magnified window would resize the agent's real terminal.
+ */
+export interface View { x: number; y: number }
 interface Kept { boxes: Record<string, Box>; open: string[]; view: View }
 
 const KEPT = 'lys.canvas';
+const HOME: View = { x: 24, y: 24 };
 const BAR = 34;
-const CARD: [number, number] = [220, 52];
-const CLOSED: [number, number] = [280, BAR];
+const CARD: [number, number] = [220, 64];
+const CLOSED: [number, number] = [440, BAR];
 const OPENED: [number, number] = [760, 480];
-/** The smallest a terminal window is dragged to: its bar's controls still fit and a prompt can still be read. */
-const SMALLEST: [number, number] = [360, 180];
+/** The smallest a terminal window is dragged to: its bar still shows the agent's name beside state, Stop and close, and a prompt can still be read. */
+const SMALLEST: [number, number] = [560, 180];
 
 const isBox = (value: unknown): value is Box => !!value && typeof value === 'object' && ['x', 'y', 'w', 'h'].every((key) => Number.isFinite((value as Record<string, unknown>)[key]));
 
@@ -37,7 +41,7 @@ function kept(): Kept | null {
     const { boxes, open, view } = value as Record<string, unknown>;
     if (!boxes || typeof boxes !== 'object' || !Object.values(boxes).every(isBox)) return null;
     if (!Array.isArray(open) || !open.every((id) => typeof id === 'string')) return null;
-    if (!view || typeof view !== 'object' || !['x', 'y', 'k'].every((key) => Number.isFinite((view as Record<string, unknown>)[key])) || (view as View).k <= 0) return null;
+    if (!view || typeof view !== 'object' || !['x', 'y'].every((key) => Number.isFinite((view as Record<string, unknown>)[key]))) return null;
     return { boxes: boxes as Record<string, Box>, open, view: view as View };
   } catch { return null; }
 }
@@ -77,38 +81,51 @@ type Drag = { kind: 'pan'; from: [number, number]; view: View } | { kind: 'move'
 function Canvas({ graph }: { graph: SessionGraph }) {
   const { agent } = useParams();
   const [before] = useState(kept);
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => {
-    const asked = graph.nodes.find((node) => agent && node.session?.agent === agent)?.id;
-    return new Set([...(before?.open ?? []), ...(asked ? [asked] : [])]);
+  // The agent the person came for, when the route names one: its terminal is open and in view whatever was kept.
+  const [asked] = useState(() => graph.nodes.find((node) => agent && node.session?.agent === agent)?.id ?? null);
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set([...(before?.open ?? []), ...(asked ? [asked] : [])]));
+  const [moved, setMoved] = useState<Record<string, Box>>(() => {
+    const boxes = before?.boxes ?? {};
+    const was = asked ? boxes[asked] : undefined;
+    // A window kept closed is only its bar; opened by the route it takes the open size where it stands.
+    return asked && was && !before?.open.includes(asked) ? { ...boxes, [asked]: { ...was, w: OPENED[0], h: OPENED[1] } } : boxes;
   });
-  const [moved, setMoved] = useState<Record<string, Box>>(() => before?.boxes ?? {});
-  const [view, setView] = useState<View>(() => before?.view ?? { x: 24, y: 24, k: 1 });
+  const [view, setView] = useState<View>(() => before?.view ?? HOME);
+  const [unkept, setUnkept] = useState<string | null>(null);
   const [front, setFront] = useState<string | null>(null);
   const boxes = placed(graph, moved, open);
   const drag = useRef<Drag | null>(null);
   const surface = useRef<HTMLDivElement>(null);
 
+  useLayoutEffect(() => {
+    const element = surface.current;
+    const box = asked ? placed(graph, moved, open)[asked] : undefined;
+    if (!element || !box) return;
+    setView({ x: element.clientWidth / 2 - (box.x + box.w / 2), y: element.clientHeight / 2 - (box.y + box.h / 2) });
+    // Once, on arriving: after that the view is the person's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // The arrangement is this browser's own: it is kept as it changes and is there on the next visit.
   useEffect(() => {
     const here = new Set(graph.nodes.map((node) => node.id));
-    localStorage.setItem(KEPT, JSON.stringify({ boxes: moved, open: [...open].filter((id) => here.has(id)), view } satisfies Kept));
+    // A window that is no longer here (a session that ended) keeps no place.
+    const boxes = Object.fromEntries(Object.entries(moved).filter(([id]) => here.has(id)));
+    // A browser may refuse to keep anything. The surface still works for this visit, and says that it will not be remembered.
+    try {
+      localStorage.setItem(KEPT, JSON.stringify({ boxes, open: [...open].filter((id) => here.has(id)), view } satisfies Kept));
+      setUnkept(null);
+    } catch (error) { setUnkept(error instanceof Error ? error.message : String(error)); }
   }, [graph, moved, open, view]);
 
-  // The wheel moves the surface, and with Control or Command held it magnifies about the pointer. A terminal keeps its own wheel.
+  // The wheel moves the surface. A terminal keeps its own wheel.
   useEffect(() => {
     const element = surface.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
-      const magnify = event.ctrlKey || event.metaKey;
-      if (!magnify && event.target instanceof Element && event.target.closest('.terminal')) return;
+      if (event.ctrlKey || event.metaKey || (event.target instanceof Element && event.target.closest('.terminal'))) return;
       event.preventDefault();
-      const edge = element.getBoundingClientRect();
-      const [px, py] = [event.clientX - edge.left, event.clientY - edge.top];
-      setView((now) => {
-        if (!magnify) return { ...now, x: now.x - event.deltaX, y: now.y - event.deltaY };
-        const k = now.k * Math.exp(-event.deltaY / 400);
-        return { k, x: px - (px - now.x) * (k / now.k), y: py - (py - now.y) * (k / now.k) };
-      });
+      setView((now) => ({ x: now.x - event.deltaX, y: now.y - event.deltaY }));
     };
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
@@ -124,10 +141,10 @@ function Canvas({ graph }: { graph: SessionGraph }) {
     const now = drag.current;
     if (!now) return;
     const [dx, dy] = [event.clientX - now.from[0], event.clientY - now.from[1]];
-    if (now.kind === 'pan') { setView({ ...now.view, x: now.view.x + dx, y: now.view.y + dy }); return; }
+    if (now.kind === 'pan') { setView({ x: now.view.x + dx, y: now.view.y + dy }); return; }
     const box = now.kind === 'move'
-      ? { ...now.box, x: now.box.x + dx / view.k, y: now.box.y + dy / view.k }
-      : { ...now.box, w: Math.max(SMALLEST[0], now.box.w + dx / view.k), h: Math.max(SMALLEST[1], now.box.h + dy / view.k) };
+      ? { ...now.box, x: now.box.x + dx, y: now.box.y + dy }
+      : { ...now.box, w: Math.max(SMALLEST[0], now.box.w + dx), h: Math.max(SMALLEST[1], now.box.h + dy) };
     setMoved((all) => ({ ...all, [now.id]: box }));
   };
   const finish = () => { drag.current = null; };
@@ -135,7 +152,19 @@ function Canvas({ graph }: { graph: SessionGraph }) {
     const step = STEPS[event.key];
     if (!step || event.target !== event.currentTarget) return;
     event.preventDefault();
-    setMoved((all) => ({ ...all, [id]: { ...boxes[id], x: boxes[id].x + step[0], y: boxes[id].y + step[1] } }));
+    event.stopPropagation();
+    const box = boxes[id];
+    // Arrows move the window; with Shift they size an open terminal.
+    setMoved((all) => ({ ...all, [id]: event.shiftKey && open.has(id)
+      ? { ...box, w: Math.max(SMALLEST[0], box.w + step[0]), h: Math.max(SMALLEST[1], box.h + step[1]) }
+      : { ...box, x: box.x + step[0], y: box.y + step[1] } }));
+  };
+  /** With the surface itself focused, arrows move the surface. */
+  const travel = (event: KeyboardEvent) => {
+    const step = STEPS[event.key];
+    if (!step || event.target !== event.currentTarget) return;
+    event.preventDefault();
+    setView((now) => ({ x: now.x - step[0] * 4, y: now.y - step[1] * 4 }));
   };
   const toggle = (id: string) => {
     const opening = !open.has(id);
@@ -144,23 +173,19 @@ function Canvas({ graph }: { graph: SessionGraph }) {
     setMoved((all) => ({ ...all, [id]: { ...boxes[id], w, h } }));
     if (opening) setFront(id);
   };
-  const fit = () => {
-    const element = surface.current;
+  /** Brings the surface back so its topmost, leftmost window sits at the corner. */
+  const home = () => {
     const all = Object.values(boxes);
-    if (!element || !all.length) return;
-    const [left, top] = [Math.min(...all.map((box) => box.x)), Math.min(...all.map((box) => box.y))];
-    const [wide, tall] = [Math.max(...all.map((box) => box.x + box.w)) - left, Math.max(...all.map((box) => box.y + box.h)) - top];
-    const k = Math.min((element.clientWidth - 48) / wide, (element.clientHeight - 48) / tall, 1);
-    setView({ k, x: 24 - left * k, y: 24 - top * k });
+    if (all.length) setView({ x: HOME.x - Math.min(...all.map((box) => box.x)), y: HOME.y - Math.min(...all.map((box) => box.y)) });
   };
 
-  return <div className="session-canvas-scroll" role="region" aria-label="Agent connection canvas" tabIndex={0} ref={surface}
+  return <div className="session-canvas-scroll" role="region" aria-label="Agent connection canvas" tabIndex={0} ref={surface} onKeyDown={travel}
     onPointerDown={begin((from) => ({ kind: 'pan', from, view }))} onPointerMove={during} onPointerUp={finish} onPointerCancel={finish}>
     <div className="session-canvas-tools">
-      <button type="button" className="btn" data-act="fit" onClick={fit}>Fit</button>
-      <button type="button" className="btn" data-act="actual" onClick={() => setView({ x: 24, y: 24, k: 1 })}>100%</button>
+      {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}
+      <button type="button" className="btn" data-act="home" onClick={home}>Back to the windows</button>
     </div>
-    <div className="session-canvas" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})` }}>
+    <div className="session-canvas" style={{ transform: `translate(${view.x}px, ${view.y}px)` }}>
       <svg className="session-canvas-lines" aria-hidden="true">{graph.edges.flatMap((edge) => {
         const [from, to] = [boxes[edge.from], boxes[edge.to]];
         return from && to ? [<path key={edge.id} d={lineBetween(from, to)} data-kind={edge.kind} data-standing={edge.stands} />] : [];
@@ -168,13 +193,14 @@ function Canvas({ graph }: { graph: SessionGraph }) {
       {graph.nodes.map((node) => {
         const box = boxes[node.id], shown = open.has(node.id);
         const state = !node.session ? null : graph.unanswered.some((entry) => entry.session === node.session?.session) ? 'Runner did not answer; current state unknown' : node.session.shown === 'running' ? 'Running' : 'Starting, not yet confirmed';
-        return <article className={'session-canvas-node ' + node.column + (shown ? ' open' : '')} key={node.id} data-node={node.id}
+        const kind = node.column === 'sessions' ? 'Agent' : node.column === 'teams' ? 'Team or sender' : 'Resource or recipient';
+        return <article className={'session-canvas-node ' + node.column + (shown ? ' open' : '')} key={node.id} data-node={node.id} aria-label={kind + ': ' + node.title}
           style={{ left: box.x, top: box.y, width: box.w, height: box.h, zIndex: front === node.id ? 3 : node.session ? 2 : 1 }}
           onPointerDownCapture={() => setFront(node.id)}>
-          <header className="session-canvas-bar" tabIndex={0} aria-label={'Move ' + node.title + ' with the arrow keys'} onKeyDown={nudge(node.id)}
+          <header className="session-canvas-bar" tabIndex={0} aria-label={'Move ' + node.title + ' with the arrow keys' + (node.session ? '; with Shift, size its terminal' : '')} onKeyDown={nudge(node.id)}
             onPointerDown={begin((from) => ({ kind: 'move', id: node.id, from, box }))}>
-            <h3>{node.title}</h3><span className="note">{node.detail}</span>
-            {node.session && !shown ? <span className="note">{state}</span> : null}
+            <span className="session-canvas-kind">{kind}</span><h3>{node.title}</h3><span className="note">{node.detail}</span>
+            {node.session && !shown ? <span className="note" title={state ?? undefined}>{state}</span> : null}
             {node.session && shown ? <span className="session-canvas-slot" /> : null}
             {node.session ? <button className="btn" aria-expanded={shown} onClick={() => toggle(node.id)}>{shown ? 'Close terminal view' : 'Open terminal'}</button> : null}
           </header>
@@ -208,7 +234,7 @@ export function SessionCanvas() {
   return <div className="page fill session-canvas-page">
     <div className="head"><h1>Agent canvas</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}
       <details className="canvas-about"><summary>About this canvas</summary>
-        <p className="sub">Drag a window by its bar, drag its corner to size it, drag the background to move the surface; Control or Command with the wheel magnifies. Closing a terminal view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p>
+        <p className="sub">Drag a window by its bar, drag its corner to size it, drag the background or use the wheel to move the surface. With a bar focused, arrows move the window and Shift with arrows sizes its terminal; with the surface focused, arrows move the surface. Closing a terminal view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p>
       </details></div>
     <Gate load={load} title="Agent canvas" ok={(graph) => <>
       {graph.notices.length || graph.unanswered.length || messages.status !== 'ok' ? <div className="session-canvas-strip">

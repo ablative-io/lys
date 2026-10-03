@@ -48,7 +48,7 @@ export function Terminal({ session, agent, machine, bare = false }: { session: s
   return <section className="terminal" aria-label={'Terminal of ' + name}>
     {bare ? null : <div className="terminal-head">
       <div><h2 title={session}>{name}</h2>{machine ? <p className="sec">on {machine}</p> : null}</div>
-      <p className="terminal-state" role="status" data-ended={ended ? 'true' : 'false'}>{ended ? endWords(ended) : 'Running'}</p>
+      <p className="terminal-state" role="status" data-ended={ended ? 'true' : 'false'} title={ended ? endWords(ended) : undefined}>{ended ? endWords(ended) : 'Running'}</p>
       {!ended ? <button type="button" className="btn" data-act="stop" disabled={busy} onClick={() => setConfirming(true)}>Stop</button> : null}
     </div>}
     {confirming ? <div className="terminal-stop" role="alertdialog" aria-label={'Stop ' + name}>
