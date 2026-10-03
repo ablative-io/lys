@@ -242,7 +242,7 @@ function Agents({ data, reload }: { data: ActiveData; reload: () => void }) {
   return <div className="you-body">
     <div className="you-panel">
       <div className="section-h">
-        <span>Your agents</span><a href="#/agents/new">Add an agent</a>
+        <span>Your agents</span>
       </div>
       <div className="you-scroll">
         <table className="you-tree">
