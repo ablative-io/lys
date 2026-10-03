@@ -59,26 +59,20 @@ and HTTP.
 - **Safety.** No sandbox; `$.fs.write` is not atomic; a mod's timer runs between turns. A mod is as
   trusted as the person's own shell.
 
-## What this gives Lys, by place
+## What this gives Lys: form, not capability (Tom, 17:00)
 
-1. **Policy at the tool seam, in-process.** `tool.call` and `tool.check` do what the PreToolUse hook
-   does (the written-first gate on my seat) with a typed input, a result it can replace, and a
-   decision it can set, and `plugin.register` lets an organisation mod refuse any later mod. The
-   managed `prependPlugins` list is where a Lys policy mod would sit for every Lys-started run. That is
-   the "managed settings" slice from today's proxy findings (finding 3), with a stronger hand.
-2. **The memory index without touching the system prompt.** Tom's rule is never the system prompt (the
-   prompt cache). `prompt.context` is the per-conversation first-message context, and
-   `prompt.attachment` is Claude Code's own reminder channel; either carries the generated index
-   in-process, and `session.compact` tells a mod when a compaction is about to happen. This is the
-   same injection PROXY.md names, done inside the harness instead of on the wire; the proxy's version
-   stays for harnesses that are not Claude Code.
-3. **Waking a seat.** `$.prompt.submit({ text })` from a timer or an inbound message is exactly the
-   wake Brisket's seat lacked today; `session.receive` is where a Cambium bridge would hand a post to
-   the model, and `{ consumed }` is where it would keep notifications out of the transcript.
-4. **Facts for Geiger.** `session.measure`, `turn.complete`, `session.append` and `tool.call` are the
-   events a rule-checker mod would observe (RULES.md): facts, in-process, no scraping of scrollback.
-5. **Not for capture.** Nothing of PROXY.md's capture, timing or storage moves into a mod; a mod sees
-   text and decisions, the proxy sees bytes and time.
+Read against what we already have, every seam above is reachable today. The settings hooks (PreToolUse and
+the rest) already rewrite a tool's input, refuse a call, and inject text before and after a compaction; the
+written-first gate on my seat is one. A mod does the same with a typed event, a result it can replace and
+TypeScript instead of a shell script and JSON on stdin. That is candy on top: a nicer form of a seam we hold,
+not a seam we lack. Nothing in the mods API reaches what the proxy reaches (the wire, the body, the time to
+durable), and nothing in it moves a Codex seat, which has no mods. So for this week there is nothing in mods
+that Lys needs and cannot get another way; the proxy slices stay the work.
+
+Where a mod would still earn its place, later: an organisation policy mod under `prependPlugins` with
+`allowManagedModsOnly`, so a Lys-started Claude Code run cannot load a mod of its own that undoes the policy;
+and `session.receive` as the in-process door for a Cambium bridge. Both are form over the same policy the
+proxy and the settings hooks carry, and neither is this week.
 
 ## Decisions for Tom
 
