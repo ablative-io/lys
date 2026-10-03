@@ -138,7 +138,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect($('.file .head')?.textContent).toContain('Scribe is added. Choose Start to finish setting it up.');
     expect($('.file .head')?.textContent).not.toContain('Scribe is ready');
     expect($('[aria-label="Next steps"]')?.textContent).toContain('No computer lets Scribe run yet');
-    expect($('[aria-label="Next steps"] a')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    expect($('[aria-label="Next steps"] a')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
     expect(posted).toEqual([]);
   });
 
