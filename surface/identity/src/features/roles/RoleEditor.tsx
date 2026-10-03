@@ -1,7 +1,7 @@
 /** Create a role or publish a new version; existing holders are never moved by this form. */
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { operationId } from '../../api';
+import { operationId, request, useLoad } from '../../api';
 import type { GrantModel } from '../../generated/grants';
 import { field } from '../people/RecordedForm';
 import { roleWordsOf, sameWords } from './contract';
@@ -13,6 +13,9 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
   const current = role?.versions.find((version) => version.number === role.latest);
   const [rows, setRows] = useState((current?.grant_templates ?? []).map((template, id) => ({ id, template })));
   const [failure, setFailure] = useState('');
+  // The things already named in grants are offered for a template's kind and name; a new one may still be typed.
+  const known = useLoad(() => request<{ resources: { kind: string; id: string }[] }>('/resources'), 'role-template-resources');
+  const resources = known.status === 'ok' ? known.data.resources : [];
   const path = role ? '/roles/' + encodeURIComponent(role.id) + '/versions' : '/roles';
   const change = useRoleChange<Role>('lys.pending.role.' + person + '.' + (role?.id ?? 'new'), path, (answer, body) => {
     const words = roleWordsOf(body);
@@ -42,8 +45,8 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
       <table className="usage-table" aria-label="Access templates"><thead><tr><th>Type of thing</th><th>Name of the thing</th><th>Access level</th><th>Usual days</th><th>Change</th></tr></thead>
         <tbody>
           {rows.map(({ id, template }) => <tr key={id} aria-label={'Access template ' + (id + 1)}>
-            <td><input name={'kind-' + id} aria-label="Type of thing this access covers" required defaultValue={template.resource.kind} /></td>
-            <td><input name={'resource-' + id} aria-label="Name of the thing this access covers" required defaultValue={template.resource.id} /></td>
+            <td><input name={'kind-' + id} aria-label="Type of thing this access covers" required list="role-kinds" autoComplete="off" defaultValue={template.resource.kind} /></td>
+            <td><input name={'resource-' + id} aria-label="Name of the thing this access covers" required list="role-ids" autoComplete="off" defaultValue={template.resource.id} /></td>
             <td><select name={'relation-' + id} aria-label="Access level" required defaultValue={template.relation}><option value="">Choose access</option>{Object.entries(model.relations).map(([name, actions]) => <option key={name} value={name}>{name} · {actions.join(', ')}</option>)}</select></td>
             <td><input name={'days-' + id} aria-label="Usual duration in days, empty for no expiry of its own" type="number" min={1} step={1} defaultValue={template.days ?? ''} /></td>
             <td><button className="btn" type="button" onClick={() => setRows((values) => values.filter((row) => row.id !== id))}>Remove template</button></td>
@@ -52,6 +55,9 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
         </tbody>
         <tfoot><tr><td colSpan={5} className="usage-add"><button className="btn" type="button" onClick={() => setRows((values) => [...values, { id: Math.max(-1, ...values.map((value) => value.id)) + 1, template: { resource: { kind: '', id: '' }, relation: '', days: null } }])}>Add access template</button></td></tr></tfoot>
       </table>
+      <datalist id="role-kinds">{[...new Set(resources.map((resource) => resource.kind))].sort().map((kind) => <option key={kind} value={kind} />)}</datalist>
+      <datalist id="role-ids">{resources.map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} label={resource.kind} />)}</datalist>
+      {known.status === 'refused' ? <p className="note">The things already named in grants could not be read, so a template’s kind and name are typed. <small className="refusal-name">{known.refused.refusal.refusal}</small></p> : null}
       <label className="field wide">Reason for this version<textarea name="note" rows={2} required maxLength={500} /></label>
       <p><button className="btn primary" type="submit">{role ? 'Save this version' : 'Create role'}</button></p>
     </fieldset>

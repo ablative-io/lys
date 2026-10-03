@@ -234,7 +234,8 @@ const recipientsOf = (value: string): Recipients => offered(RECIPIENTS, value);
 
 const OWNER_NOTE = 'Only the secret\'s owner can change this. Anyone else is refused.';
 
-export function ScopeChange({ change, secret: initial = '', store = tabStore(), changed }: { change: (secret: string, kind: ScopeKind, name: string, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore; changed?: () => void }) {
+/** `people` and `teams`, when the screen has read them, are offered so a person is chosen by name and never typed as an id. */
+export function ScopeChange({ change, secret: initial = '', store = tabStore(), changed, people, teams }: { change: (secret: string, kind: ScopeKind, name: string, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore; changed?: () => void; people?: { id: string; name: string }[]; teams?: string[] }) {
   const [secret, setSecret] = useState(initial);
   const [kind, setKind] = useState<ScopeKind>('personal');
   const [name, setName] = useState('');
@@ -255,11 +256,15 @@ export function ScopeChange({ change, secret: initial = '', store = tabStore(), 
   return <form onSubmit={submit}>
     <h2>Who can see this secret</h2>
     <p className="note">{OWNER_NOTE}</p>
-    <label className="field">Secret<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={secret} onChange={(event) => { edited(); setSecret(event.target.value); }} /></label>
-    <label className="field">Kept for<select disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={kind} onChange={(event) => { edited(); setKind(scopeKindOf(event.target.value)); }}>
+    {initial ? null : <label className="field">Secret<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={secret} onChange={(event) => { edited(); setSecret(event.target.value); }} /></label>}
+    <label className="field">Kept for<select disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={kind} onChange={(event) => { edited(); setKind(scopeKindOf(event.target.value)); setName(''); }}>
       <option value="personal">One person</option><option value="team">A team</option><option value="organisation">An organisation</option>
     </select></label>
-    <label className="field">Name<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={name} onChange={(event) => { edited(); setName(event.target.value); }} placeholder={kind === 'personal' ? 'The person\'s id' : 'Its name'} /></label>
+    {kind === 'personal' && people ? <label className="field">Person<select disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={name} onChange={(event) => { edited(); setName(event.target.value); }}>
+      <option value="">Choose a person</option>{people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+    </select></label>
+      : <label className="field">Name<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={name} list={kind === 'team' && teams ? 'scope-teams' : undefined} onChange={(event) => { edited(); setName(event.target.value); }} placeholder={kind === 'personal' ? 'The person\'s id' : 'Its name'} /></label>}
+    {teams ? <datalist id="scope-teams">{teams.map((team) => <option key={team} value={team} />)}</datalist> : null}
     <button className="btn primary" type="submit" disabled={!maySend(outcome) || !ready}>Save</button>
     {retry ? <button className="btn" type="button" onClick={retry}>Retry original change</button> : null}
     <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${scopeWords(answer.scope)}.`} />
@@ -290,7 +295,7 @@ export function RecipientsChange({ change, secret: initial = '', store = tabStor
   return <form onSubmit={submit}>
     <h2>Who it can be handed to</h2>
     <p className="note">{OWNER_NOTE}</p>
-    <label className="field">Secret<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={secret} onChange={(event) => { edited(); setSecret(event.target.value); }} /></label>
+    {initial ? null : <label className="field">Secret<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={secret} onChange={(event) => { edited(); setSecret(event.target.value); }} /></label>}
     <label className="field">Can be handed to<select disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={recipients} onChange={(event) => { edited(); setRecipients(recipientsOf(event.target.value)); }}>
       <option value="anyone">Anyone who is permitted</option><option value="people_only">People only</option>
     </select></label>
