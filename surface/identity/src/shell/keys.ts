@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useShell } from './ShellContext';
-import { TABS } from '../features/file/tabs';
+import { tabsFor } from '../features/file/tabs';
 
 /** g then a letter goes to a screen, as the mock-up's key registry has it. */
 export const GO: Record<string, string> = {
@@ -83,7 +83,11 @@ export function useShellKeys(): void {
         return;
       }
       const [, view, id] = path.split('/');
-      if (view === 'file' && id && /^[1-7]$/.test(e.key)) return go(`/file/${id}/${TABS[Number(e.key) - 1][0]}`);
+      if (view === 'file' && id && /^[1-7]$/.test(e.key)) {
+        const to = tabsFor(id)[Number(e.key) - 1];
+        if (to) go(`/file/${id}/${to[0]}`);
+        return;
+      }
       if (s.rows.length && (e.key === 'j' || e.key === 'k')) {
         const next = Math.max(0, Math.min(s.rows.length - 1, s.cursor + (e.key === 'j' ? 1 : -1)));
         s.setCursor(next);

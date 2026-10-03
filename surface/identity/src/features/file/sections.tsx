@@ -202,25 +202,11 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':
-      return person ? <div className="dim">A person has no provisioning profile. Their own tools are their own.</div> : <Provisioning id={data.x.id} />;
-    case 'memory':
-      return person ? <p>A person’s memories are not kept in an agent home.</p> : <AgentMemory id={data.x.id} />;
+      return person ? <Profile data={data} /> : <><Provisioning id={data.x.id} /><AgentPolicy key={data.x.id} id={data.x.id} /><AgentRefusals key={'r' + data.x.id} id={data.x.id} /></>;
     case 'credentials':
-      return person ? <PersonCredentials id={data.x.id} /> : <AgentCredentials id={data.x.id} />;
+      return person ? <PersonCredentials id={data.x.id} /> : <><AgentCredentials id={data.x.id} /><AgentCertificates id={data.x.id} /></>;
     case 'sessions':
-      return person ? <PersonSessions id={data.x.id} /> : <RuntimeSessions agent={data.x.id} />;
-    case 'certificate':
-      return person ? (
-        <div className="card"><div className="sec">People sign in; they are not issued certificates here.</div></div>
-      ) : (
-        <AgentCertificates id={data.x.id} />
-      );
-    case 'policy':
-      return person ? (
-        <div className="card"><div className="sec">A person’s own tools are not judged by an agent policy.</div></div>
-      ) : (
-        <><AgentPolicy key={data.x.id} id={data.x.id} /><AgentRefusals key={'r' + data.x.id} id={data.x.id} /></>
-      );
+      return person ? <PersonSessions id={data.x.id} /> : <><RuntimeSessions agent={data.x.id} /><AgentMemory id={data.x.id} /></>;
     case 'record':
       return <><Record data={data} />{person ? null : <StopHistory key={data.x.id} id={data.x.id} />}</>;
     default:

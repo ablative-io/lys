@@ -10,7 +10,8 @@ import { fileNo } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';
 import { TabBody } from './sections';
-import { ACTIONS, TABS } from './tabs';
+import { ACTIONS, MERGED, tabsFor } from './tabs';
+import { RecordedForm } from '../people/RecordedForm';
 import { day } from './time';
 import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
@@ -70,6 +71,8 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
   const kind = x.kind;
   const person = x.person;
   const since = agent?.provenance.registration?.actor.authenticated_at;
+  /** What is being changed in the head: the name, or one lifecycle step. Nothing is sent until its form is. */
+  const [changing, setChanging] = useState<string | null>(null);
   const counts: Record<string, number | undefined> = {
     record: agent ? agent.provenance.events.length : undefined,
     access: data.grants.list.grants.filter((g) => g.holder === x.id).length,
@@ -96,22 +99,29 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
             </div>}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
+            <button type="button" className="btn" data-act="rename" aria-pressed={changing === 'name'} onClick={() => setChanging(changing === 'name' ? null : 'name')}>Edit name</button>
             <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
             {ACTIONS[x.state].map((a) => (
-              <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={() => { location.hash = '/directory/manage?action=status&identity=' + encodeURIComponent(x.id); }}>
+              <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} aria-pressed={changing === a} onClick={() => setChanging(changing === a ? null : a)}>
                 {ACTION[a]}
               </button>
             ))}
-            {agent ? <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a> : null}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
               <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
             ) : null}
           </div>
         </div>
+        {changing === 'name' ? <RecordedForm name="change-profile" title="Save name" heading="Edit name" description="Change the display name while keeping the same identity and audit history." done={reload}
+          change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/profile', body: { display_name: String(form.get('display_name') ?? '').trim() } })}>
+          <label className="field">Display name<input name="display_name" required defaultValue={x.display_name} /></label>
+        </RecordedForm> : null}
+        {changing && changing !== 'name' ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access. Retirement is permanent.' : changing === 'suspend' ? 'Suspending stops its access until it is restored.' : undefined} submitLabel={ACTION[changing]} done={reload}
+          change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/transitions', body: { transition: changing, reason: String(form.get('reason') ?? '').trim() } })}>
+          <label className="field">Reason<input name="reason" required /></label>
+        </RecordedForm> : null}
         {stop && stop.agent === x.id ? <StopReceipt answer={stop} /> : null}
         <nav className="tabs" aria-label={agent ? 'Agent sections' : 'Sections'}>
-          {TABS.map(([k, l]) => (
+          {tabsFor(x.id).map(([k, l]) => (
             <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''} aria-current={tab === k ? 'page' : undefined}>
               {agent && k === 'profile' ? 'Overview' : l}
               {counts[k] !== undefined ? <span className="n">{counts[k]}</span> : null}
@@ -129,7 +139,8 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
 }
 
 export function IdentityFile() {
-  const { id = '', tab = 'profile' } = useParams();
+  const { id = '', tab: asked = 'profile' } = useParams();
+  const tab = MERGED[asked] ?? asked;
   const [version, setVersion] = useState(0);
   const [stop, setStop] = useState<StopAnswer | null>(null);
   const load = useLoad(() => readFile(id), id + '#' + version);

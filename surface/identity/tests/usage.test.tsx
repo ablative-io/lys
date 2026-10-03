@@ -68,10 +68,10 @@ const reached = (stands: Receipt['acted']): Receipt[] => [{
 const tokens: Budget = { holder, measure: 'tokens', limit: 1000, period: { length: 'day', zone: 'UTC' }, act: 'stop', version: 1, by: SCRIBE, at: 1790000000 };
 
 describe('Usage', () => {
-  it('lives on the agent\'s own file: the old address opens its Budgets and goals tab, and the rail has no Usage page', async () => {
+  it('lives on the agent\'s own file: the old address opens its Limits and goals tab, and the rail has no Usage page', async () => {
     await mount('#/usage/' + SCRIBE, keeping());
     expect(location.hash).toBe(file);
-    expect($('.tabs a.on')?.textContent).toBe('Budgets and goals');
+    expect($('.tabs a.on')?.textContent).toBe('Limits and goals');
     expect($('section[aria-label="Budgets"]')).not.toBeNull();
     expect($('section[aria-label="Goals"]')).not.toBeNull();
     expect($('a[href="#/usage"]')).toBeNull();

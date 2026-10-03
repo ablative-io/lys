@@ -14,7 +14,7 @@ describe("An agent's file", () => {
     expect($('.file .head')?.textContent).toContain('since 22 Sep');
     expect($('.agent-details')).toBeNull();
     expect($('.file details')).toBeNull();
-    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Access1', 'Settings', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Tool policy', 'Record2', 'Budgets and goals']);
+    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Settings', 'Access1', 'Limits and goals', 'Sessions', 'Credentials', 'Record2']);
   });
 
   it('explains three next steps, keeps lifecycle controls in the head, in view, and preserves Emergency stop', async () => {
@@ -79,11 +79,12 @@ describe("An agent's file", () => {
 
   it('switches sections with keys 1 to 7, each its own address', async () => {
     await mount('#/file/' + SCRIBE);
-    await press('2', {}, document.body);
+    await press('3', {}, document.body);
     expect(location.hash).toBe(`#/file/${SCRIBE}/access`);
     expect($('.tabs a.on')?.textContent).toBe('Access1');
     await press('7', {}, document.body);
-    expect(location.hash).toBe(`#/file/${SCRIBE}/certificate`);
+    expect(location.hash).toBe(`#/file/${SCRIBE}/record`);
+    expect($('.tabs a.on')?.textContent).toBe('Record2');
     await press('1', {}, document.body);
     expect($('.tabs a.on')?.textContent).toBe('Overview');
   });
@@ -98,12 +99,23 @@ describe("An agent's file", () => {
     expect($$('.card a.mono').map((a) => a.getAttribute('href'))).toEqual(['/api/receipts/4', '/api/receipts/5']);
   });
 
-  it('opens the lifecycle form without changing identity state before submission', async () => {
+  it('opens the lifecycle form in the head of the file itself, without leaving the page or changing identity state before submission', async () => {
     const { posted } = await mount('#/file/' + SCRIBE);
     await click($('.file .head [data-act="suspend"]'));
-    expect(location.hash).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
-    expect(document.querySelector<HTMLInputElement>('input[type="hidden"][name="identity"]')?.value).toBe(SCRIBE);
-    expect($('form[aria-label="Record lifecycle change"]')).not.toBeNull();
+    expect(location.hash).toBe('#/file/' + SCRIBE);
+    const form = $('.file form[aria-label="Record lifecycle change"]');
+    expect(form).not.toBeNull();
+    expect(form?.querySelector('input[name="reason"]')).not.toBeNull();
+    expect(form?.querySelector('[name="identity"]')).toBeNull();
+    expect($('#state')?.textContent).toBe('Active');
+    expect(posted).toHaveLength(0);
+  });
+
+  it('edits the name in the head of the file itself', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE);
+    await click($('.file .head [data-act="rename"]'));
+    expect(location.hash).toBe('#/file/' + SCRIBE);
+    expect(document.querySelector<HTMLInputElement>('.file form[aria-label="Save name"] input[name="display_name"]')?.value).toBe('Scribe');
     expect(posted).toHaveLength(0);
   });
 
