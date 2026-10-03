@@ -58,6 +58,17 @@ fn serving(socket: &Path) -> Result<Arc<Mutex<Vec<Value>>>, Box<dyn Error>> {
                         json!({"id": id, "result": {"entries": [], "next_after": null, "asked": request["operation"]["params"]}})
                     }
                     "hang.up" => break,
+                    // An answer whose length claims more than the greeting said a frame holds.
+                    "too.long" => {
+                        let _ = stream.write_all(&2_000_000_u32.to_be_bytes());
+                        break;
+                    }
+                    // A length that claims more bytes than are ever sent.
+                    "cut.short" => {
+                        let _ = stream.write_all(&100_u32.to_be_bytes());
+                        let _ = stream.write_all(b"{\"id\":");
+                        break;
+                    }
                     other => {
                         json!({"id": id, "error": {"code": "not_available", "message": format!("no {other}")}})
                     }
@@ -213,6 +224,22 @@ async fn a_refusal_is_definite_and_silence_is_not_a_refusal() -> TestResult {
     assert_eq!(refused["reason"], "HaemRefused: not_available: no edge.out");
 
     let (status, refused) = ask("ablative", json!({"method": "hang.up"})).await?;
+    assert_eq!(
+        (status, &refused["refusal"]),
+        (502, &json!("HaemUnreachable"))
+    );
+
+    let (status, refused) = ask("ablative", json!({"method": "too.long"})).await?;
+    assert_eq!(
+        (status, &refused["refusal"]),
+        (502, &json!("HaemUnreachable"))
+    );
+    assert!(
+        refused["reason"].as_str().is_some_and(|reason| reason
+            .contains("claims 2000000 bytes and the service said its frames hold 1048576")),
+        "{refused}"
+    );
+    let (status, refused) = ask("ablative", json!({"method": "cut.short"})).await?;
     assert_eq!(
         (status, &refused["refusal"]),
         (502, &json!("HaemUnreachable"))

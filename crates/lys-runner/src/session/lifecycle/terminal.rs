@@ -45,8 +45,10 @@ impl Sessions {
                     // that has gone quiet; nothing here waits on a clock. A program
                     // that took the first hang-up and prints while it shuts down
                     // is hung up again as it prints: one whose handler stands
-                    // loses nothing, one whose handler was for a single signal is
-                    // ended there with what it had printed kept.
+                    // loses nothing; one whose handler was for a single signal is
+                    // ended there. Its output to that point is kept; shutdown work
+                    // that is not output, such as writing its own session file, is
+                    // lost with it.
                     if !tripped && !told {
                         continue;
                     }

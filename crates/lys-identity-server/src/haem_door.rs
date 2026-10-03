@@ -8,7 +8,9 @@
 //! reaches a store through Lys.
 //!
 //! The service's wire is one frame per message, four bytes of length, most
-//! significant first, then JSON. A connection greets with `hello` before any
+//! significant first, then JSON. The door sets no frame size of its own: the
+//! service states its bound in its greeting, and the verb's answer is held
+//! to that. A connection greets with `hello` before any
 //! other verb, so each request here is two exchanges on one connection: the
 //! greeting, then the verb. The verb's `result` is answered as it came. The
 //! service's own refusal is `HaemRefused`, carrying its code and its words:
@@ -36,11 +38,6 @@ use serde_json::{Value, json};
 use crate::error::ServerError;
 use crate::error_haem::HaemError;
 use crate::routes::{AppState, administrator, signed_in};
-
-/// The largest answer frame this door reads from a store's service. The
-/// service bounds its own frames below this; a frame that claims more is a
-/// broken wire, not an answer.
-const LARGEST_FRAME: u32 = 64 * 1024 * 1024;
 
 /// The door's routes.
 pub fn routes() -> Router<Arc<AppState>> {
@@ -146,28 +143,44 @@ fn write_frame(stream: &mut impl Write, value: &Value) -> Result<(), Exchange> {
         .map_err(|error| broken("writing to the socket", &error))
 }
 
-fn read_frame(stream: &mut impl Read) -> Result<Value, Exchange> {
+/// Read one frame. The door sets no size of its own: `stated` is the frame
+/// bound the service gave in its greeting, and an answer that claims more
+/// than the service said its frames hold is a broken wire. The greeting
+/// itself is read before any bound is known, so its body is taken as it
+/// arrives and never reserved from the length it claims.
+fn read_frame(stream: &mut impl Read, stated: Option<u64>) -> Result<Value, Exchange> {
     let mut header = [0_u8; 4];
     stream
         .read_exact(&mut header)
         .map_err(|error| broken("reading the answer's length", &error))?;
-    let length = u32::from_be_bytes(header);
-    if length > LARGEST_FRAME {
+    let length = u64::from(u32::from_be_bytes(header));
+    if let Some(bound) = stated.filter(|bound| length > *bound) {
         return Err(Exchange::Broken(format!(
-            "the answer claims {length} bytes, more than a frame holds"
+            "the answer claims {length} bytes and the service said its frames hold {bound}"
         )));
     }
-    let mut body = vec![0_u8; length as usize];
-    stream
-        .read_exact(&mut body)
+    let mut body = Vec::new();
+    let read = stream
+        .take(length)
+        .read_to_end(&mut body)
         .map_err(|error| broken("reading the answer", &error))?;
+    if u64::try_from(read).ok() != Some(length) {
+        return Err(Exchange::Broken(format!(
+            "the answer claims {length} bytes and the connection closed after {read}"
+        )));
+    }
     serde_json::from_slice(&body).map_err(|error| broken("the answer is not JSON", &error))
 }
 
 /// One request and its answer: the `result`, or the service's refusal.
-fn asked(stream: &mut (impl Read + Write), id: &str, operation: Value) -> Result<Value, Exchange> {
+fn asked(
+    stream: &mut (impl Read + Write),
+    id: &str,
+    operation: &Value,
+    stated: Option<u64>,
+) -> Result<Value, Exchange> {
     write_frame(stream, &json!({ "id": id, "operation": operation }))?;
-    let mut answer = read_frame(stream)?;
+    let mut answer = read_frame(stream, stated)?;
     if answer["id"] != id {
         return Err(Exchange::Broken(format!(
             "the answer is to {}, not to {id}",
@@ -192,7 +205,8 @@ fn asked(stream: &mut (impl Read + Write), id: &str, operation: Value) -> Result
 pub(crate) fn exchange(socket: &Path, verb: &HaemVerb) -> Result<Value, Exchange> {
     let mut stream =
         UnixStream::connect(socket).map_err(|error| broken("connecting to the socket", &error))?;
-    let greeting = asked(&mut stream, "hello", json!({ "method": "hello" }))?;
+    let greeting = asked(&mut stream, "hello", &json!({ "method": "hello" }), None)?;
+    let stated = greeting["max_frame"].as_u64();
     if verb.method == "hello" {
         return Ok(greeting);
     }
@@ -200,7 +214,7 @@ pub(crate) fn exchange(socket: &Path, verb: &HaemVerb) -> Result<Value, Exchange
         Some(params) => json!({ "method": verb.method, "params": params }),
         None => json!({ "method": verb.method }),
     };
-    asked(&mut stream, "verb", operation)
+    asked(&mut stream, "verb", &operation, stated)
 }
 
 /// The configured stores, each by an absolute socket path, or the entry at fault.
