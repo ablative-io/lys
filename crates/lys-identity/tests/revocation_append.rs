@@ -167,7 +167,8 @@ impl LeafStore for FailingStore {
             });
         }
         assert_eq!(index, self.extent(), "a write lands only at the extent");
-        self.leaves.extend(leaves.iter().map(|bytes| bytes.to_vec()));
+        self.leaves
+            .extend(leaves.iter().map(|bytes| bytes.to_vec()));
         self.pinned = pin;
         Ok(())
     }
