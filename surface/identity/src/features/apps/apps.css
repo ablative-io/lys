@@ -18,3 +18,8 @@
 .apps .app-refused { color: var(--danger); }
 .apps input, .apps textarea, .apps select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 10px; font: inherit; }
 .apps input:focus-visible, .apps textarea:focus-visible, .apps select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.schema-tables { display: grid; gap: 12px; margin: 6px 0 12px; }
+.schema-table { width: auto; }
+.schema-table th, .schema-table td { text-align: center; padding: 4px 10px; }
+.schema-table th:first-child { text-align: left; }
+.schema-table tfoot td { text-align: left; }

@@ -172,7 +172,10 @@ describe('the Apps screen', () => {
     });
     await render(<Apps />);
     expect(text()).toContain('https://app.example.test/signed-in');
-    expect(text()).toContain('fixture_notes.channel: its actions are read, write. poster may read, write. What is held on fixture_notes.workspace reaches it.');
+    const channel = document.querySelector('table[aria-label="Relations of fixture_notes.channel"]');
+    expect([...channel?.querySelectorAll('thead th') ?? []].map((cell) => cell.textContent)).toEqual(['fixture_notes.channel', 'read', 'write']);
+    expect([...channel?.querySelectorAll('tbody td') ?? []].map((cell) => cell.getAttribute('aria-label'))).toEqual(['poster may read', 'poster may write']);
+    expect(channel?.querySelector('tfoot')?.textContent).toBe('What is held on fixture_notes.workspace reaches it.');
     await click(button('Approve Notes fixture'));
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ operation: expect.stringMatching(/^op-/) });
     expect(labelled('Save app credentials')).not.toBeNull();

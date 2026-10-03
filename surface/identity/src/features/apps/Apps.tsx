@@ -56,21 +56,32 @@ function approvalAnswer(value: unknown, id: string): ApprovalAnswer {
 
 const LYS = 'lys';
 const who = (by: By) => (by.kind === 'operator' ? 'the install operator for ' + (by.login?.subject ?? 'the administrator') : by.kind === 'person' ? by.login?.subject ?? 'a person' : by.kind === 'service_account' ? 'service account ' + (by.id ?? '') : 'Lys at start');
-const listed = (items: string[]) => (items.length ? items.join(', ') : 'nothing');
 const path = (id: string, rest: string) => '/apps/' + encodeURIComponent(id) + rest;
 const refusalWords = (error: unknown) => (error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error));
 
-/** The schema of `app` in words, one line per kind, so it is read before it is approved. */
-export function schemaWords(app: string, schema: unknown): string[] {
-  const value = schema as { kinds?: Record<string, { actions?: string[]; relations?: Record<string, string[]>; parents?: string[] }>; relations?: Record<string, string[]> } | null;
-  if (app === LYS && value?.relations) {
-    return Object.entries(value.relations).map(([relation, actions]) => 'On every kind of Lys\'s own, ' + relation + ' may ' + listed(actions) + '.');
-  }
-  return Object.entries(value?.kinds ?? {}).map(([kind, body]) => {
-    const relations = Object.entries(body.relations ?? {}).map(([relation, actions]) => relation + ' may ' + listed(actions));
-    const parents = body.parents?.length ? ' What is held on ' + body.parents.join(' or ') + ' reaches it.' : '';
-    return kind + ': its actions are ' + listed(body.actions ?? []) + '. ' + (relations.length ? relations.join('; ') + '.' : 'It has no relation of its own.') + parents;
-  });
+type SchemaShape = { kinds?: Record<string, { actions?: string[]; relations?: Record<string, string[]>; parents?: string[] }>; relations?: Record<string, string[]> } | null;
+
+/** The schema of `app` as one table per kind: a row for each relation, a column for each action, a tick where the relation may do it. */
+export function SchemaTable({ app, schema, label }: { app: string; schema: unknown; label: string }) {
+  const value = schema as SchemaShape;
+  const kinds: [string, { actions?: string[]; relations?: Record<string, string[]>; parents?: string[] }][] = app === LYS && value?.relations
+    ? [['Every kind of Lys’s own', { actions: [...new Set(Object.values(value.relations).flat())], relations: value.relations }]]
+    : Object.entries(value?.kinds ?? {});
+  return <div className="schema-tables" aria-label={label}>
+    {kinds.map(([kind, body]) => {
+      const actions = body.actions ?? [];
+      const relations = Object.entries(body.relations ?? {});
+      return <table className="schema-table" key={kind} aria-label={'Relations of ' + kind}>
+        <thead><tr><th>{kind}</th>{actions.map((action) => <th key={action}>{action}</th>)}</tr></thead>
+        <tbody>
+          {relations.map(([relation, may]) => <tr key={relation}><th scope="row">{relation}</th>{actions.map((action) => <td key={action} aria-label={relation + (may.includes(action) ? ' may ' : ' may not ') + action}>{may.includes(action) ? '✓' : ''}</td>)}</tr>)}
+          {relations.length ? null : <tr><td colSpan={actions.length + 1} className="dim">It has no relation of its own.</td></tr>}
+        </tbody>
+        {body.parents?.length ? <tfoot><tr><td colSpan={actions.length + 1} className="note">What is held on {body.parents.join(' or ')} reaches it.</td></tr></tfoot> : null}
+      </table>;
+    })}
+    {kinds.length ? null : <p className="dim">It declares no kind.</p>}
+  </div>;
 }
 
 export function Apps() {
@@ -84,6 +95,7 @@ export function Apps() {
   const load = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps:' + revision);
   const changed = (message: string) => { setApproved({}); setNotice(message); setRegistering(false); setRevision((value) => value + 1); };
   const [picked, setPicked] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   return <div className="page fill apps">
     <ConfigTabs on="apps" />
     <div className="head"><div><h1>Apps</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
@@ -98,19 +110,24 @@ export function Apps() {
         { head: 'State', cell: (app) => <span className={'app-state app-' + app.state}>{app.state === 'pending' ? 'waiting for approval' : app.state}</span> },
         { head: 'Signs in to', cell: (app) => <span className="sec">{app.redirects.length} {app.redirects.length === 1 ? 'address' : 'addresses'}</span> },
       ];
+      const edited = apps.find((app) => app.id === editing);
+      if (registering) return <div className="body one"><div className="pane"><Register changed={changed} /></div></div>;
+      if (edited) return <div className="body one"><div className="pane"><section className="card" aria-label={'Permission template of ' + edited.id}>
+        <div className="row"><h3>Permission template of {edited.name}</h3><button type="button" className="btn" onClick={() => setEditing(null)}>Close the template</button></div>
+        <SchemaBuilder app={edited.id} version={edited.version} initial={edited.schema as SchemaJson} onSaved={(message) => { setEditing(null); changed(message); }} />
+      </section></div></div>;
       return <div className="body work">
         <Listing<AppRecord> groups={group} columns={columns} id={(app) => app.id} href={(app) => '#/apps?app=' + encodeURIComponent(app.id)} words={(app) => app.name + ' ' + app.id}
-          noun="apps" holds={(items) => items.length + ' apps'} selected={registering ? null : open?.id ?? null} select={() => undefined} open={(app) => { setPicked(app.id); setRegistering(false); }} />
+          noun="apps" holds={(items) => items.length + ' apps'} selected={open?.id ?? null} select={() => undefined} open={(app) => setPicked(app.id)} />
         <div className="detail">
-          {registering ? <Register changed={changed} /> : open ? <AppCard key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[open.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[open.id]:answer})); setIssued((held)=>{const next={...held};delete next[open.id];return next;}); }} issued={issued[open.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [open.id]: client }))} changed={changed} /> : <p>No app is registered.</p>}
+          {open ? <AppCard edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[open.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[open.id]:answer})); setIssued((held)=>{const next={...held};delete next[open.id];return next;}); }} issued={issued[open.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [open.id]: client }))} changed={changed} /> : <p>No app is registered.</p>}
         </div>
       </div>;
     }} />
   </div>;
 }
 
-function AppCard({ app, issued, issue, changed, stored, saved, approved }: { approved: (answer: AppRecord) => void; stored:StoredCredentials|null; saved:(answer:StoredCredentials)=>void; app: AppRecord; issued: ClientIssued | null; issue: (client: ClientIssued) => void; changed: (message: string) => void }) {
-  const [editing, setEditing] = useState(false);
+function AppCard({ app, issued, issue, changed, stored, saved, approved, edit }: { edit: () => void; approved: (answer: AppRecord) => void; stored:StoredCredentials|null; saved:(answer:StoredCredentials)=>void; app: AppRecord; issued: ClientIssued | null; issue: (client: ClientIssued) => void; changed: (message: string) => void }) {
   const [reason, setReason] = useState('');
   const [refusal, setRefusal] = useState('');
   const [busy, setBusy] = useState(false);
@@ -119,12 +136,11 @@ function AppCard({ app, issued, issue, changed, stored, saved, approved }: { app
     try { done(await send('POST', path(app.id, route), { operation: operationId(), ...body })); } catch (error) { setRefusal(refusalWords(error)); }
     setBusy(false);
   };
-  const words = schemaWords(app.id, app.schema);
   return <article className="card app-card" aria-label={'App ' + app.id}>
     <h3>{app.name} <span className="app-id mono">{app.id}</span> <span className={'app-state app-' + app.state}>{app.state}</span></h3>
     <p className="note">Registered by {who(app.registered_by)}{app.version ? ', schema version ' + app.version : ''}{app.client_id ? ', sign-in client ' + app.client_id : ''}{app.service_account ? ', acting as ' + app.service_account : ''}.</p>
     {app.redirects.length ? <div><b>Redirect addresses</b><ul className="app-list">{app.redirects.map((address) => <li className="mono" key={address}>{address}</li>)}</ul></div> : null}
-    <div><b>{app.state === 'pending' ? 'The schema it asks for' : 'Its schema'}</b><ul className="app-list" aria-label={'Schema of ' + app.id}>{words.map((line) => <li key={line}>{line}</li>)}</ul></div>
+    <div><b>{app.state === 'pending' ? 'The schema it asks for' : 'Its schema'}</b><SchemaTable app={app.id} schema={app.schema} label={'Schema of ' + app.id} /></div>
     {issued ? <SaveCredentials app={app.id} client={issued} saved={saved} /> : null}
     {stored ? <SavedCredentials answer={stored} /> : null}
     {app.state === 'pending' ? <div className="app-actions">
@@ -134,15 +150,14 @@ function AppCard({ app, issued, issue, changed, stored, saved, approved }: { app
     </div> : null}
     {app.pending ? <div className="app-waiting" aria-label={'Change waiting for ' + app.id}>
       <b>A change waits for you, replacing version {app.pending.replaces}, from {who(app.pending.by)}</b>
-      <ul className="app-list">{schemaWords(app.id, app.pending.schema).map((line) => <li key={line}>{line}</li>)}</ul>
+      <SchemaTable app={app.id} schema={app.pending.schema} label={'Schema waiting for ' + app.id} />
       <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/schema/approve', {}, () => changed('The change to ' + app.name + ' is approved.')); }}>Approve the change</button>
       <button type="button" className="btn danger" disabled={busy} onClick={() => { void act('/schema/decline', { reason }, () => changed('The change to ' + app.name + ' was declined.')); }}>Decline the change</button>
     </div> : null}
     {app.state === 'approved' && app.id !== LYS ? <div className="app-actions">
-      <button type="button" className="btn" onClick={() => setEditing(!editing)}>{editing ? 'Close the template' : 'Edit the permission template'}</button>
+      <button type="button" className="btn" onClick={edit}>Edit the permission template</button>
       <button type="button" className="btn danger" disabled={busy} onClick={() => { void act('/retire', { reason }, () => changed(app.name + ' is retired: its client is disabled, and its grants stay readable.')); }}>Retire {app.name}</button>
     </div> : null}
-    {editing ? <SchemaBuilder app={app.id} version={app.version} initial={app.schema as SchemaJson} onSaved={(message) => { setEditing(false); changed(message); }} /> : null}
     {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
   </article>;
 }
