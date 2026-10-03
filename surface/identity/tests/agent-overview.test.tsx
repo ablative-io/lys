@@ -173,6 +173,10 @@ describe('An agent page explains the agent before its controls', () => {
     expect(requests).toContain('/receipts/4');
     expect(requests).toContain('/receipts/5');
     expect($('.file .pane')?.textContent).toContain('registered, under its person');
+    // A line signed for the signed-in person's own sign-in names that person, not the account's subject.
+    await settle();
+    expect($('.file .pane')?.textContent).toContain('by Ada (test person)');
+    expect($('.file .pane')?.textContent).not.toContain('by ada');
     expect($('.file .head [data-act="suspend"]')).not.toBeNull();
     expect($('.file details.agent-details')).toBeNull();
     expect(posted).toEqual([]);

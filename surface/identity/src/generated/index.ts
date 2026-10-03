@@ -94,7 +94,7 @@ export interface Receipt {
   version: number;
   operation: string;
   /** `ReceiptActorView`: `authentication` says how the actor authenticated when it was not their own sign-in, e.g. `operator`. */
-  actor: { issuer: string; subject: string; authenticated_at: number; authentication?: string };
+  actor: { issuer: string; subject: string; authenticated_at: number; authentication?: string; agent?: string; service_account?: string; launch?: string };
   identity: IdentityId;
   change_kind: number;
   payload_commitment: string;

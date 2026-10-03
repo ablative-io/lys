@@ -19,6 +19,7 @@ import { validComputerName } from '../network/AddMachine';
 import { grantOptions, grantOptionKey, newAgentGrants, readGrantChoices } from './agent-grants';
 import type { GrantChoices } from './agent-grants';
 import { resourceNames, resourceWords } from './agent-resource-names';
+import { keepRecord, releaseRecord } from '../../kept';
 
 function reportingChoices(people: PeopleView) {
   return people.people.flatMap((person) => [{ ...person, kind: 'person', owner: person.id }, ...person.agents.map((agent) => ({ ...agent, kind: 'agent', owner: person.id }))]);
@@ -101,7 +102,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     : team && !activeTeams.some((entry) => entry.id === team) ? 'The chosen team is unavailable. Choose an active team or no team.' : '';
   const duplicate = taken ? chosen?.display_name + ' already has an agent named ' + taken + '. Choose another name.' : '';
   const retain = (where: string, next: PendingAgent | AddAndRun) => {
-    try { sessionStorage.setItem(where, JSON.stringify(next)); }
+    try { keepRecord(where, next); }
     catch { throw new Refused(0, { refusal: 'PendingAgentRetentionFailed', reason: 'This browser could not save the next request. It has not been sent; check the outcomes of earlier saved requests before continuing.' }); }
   };
   const keep = (next: PendingAgent) => { retain(key, next); setPending(next); };
@@ -118,10 +119,10 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
         if (!walk && !settings) throw new Refused(0, { refusal: 'SettingsUnavailable', reason: 'Choose the settings before adding this agent.' });
         const initial = walk ?? newAddAndRun(registration, settings ?? {}, computerName.trim(), me.person.id, selectedComputer);
         agent = await addAndRun(initial, me.signed_in, keepWalk);
-        sessionStorage.removeItem(runKey);
+        releaseRecord(runKey);
       } else {
         agent = await addAgent(registration, me.person.id, keep, me.signed_in);
-        sessionStorage.removeItem(key);
+        releaseRecord(key);
       }
       navigate('/file/' + encodeURIComponent(agent), { replace: true });
     } catch (problem) {
@@ -133,7 +134,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
         // which agent was added, and the refusal itself is shown below instead.
         try { added = readAddAndRun(runKey, me.person.id)?.registration.agent ?? null; } catch { added = null; }
       }
-      if (added) { sessionStorage.removeItem(runKey); navigate('/file/' + encodeURIComponent(added), { replace: true }); return; }
+      if (added) { releaseRecord(runKey); navigate('/file/' + encodeURIComponent(added), { replace: true }); return; }
       setRefusal(problem);
     }
     finally { working.current = false; setSending(false); }

@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { operationId, Refused, request } from '../../api';
-import { answeredNo, sendKept } from '../../kept';
+import { answeredNo, sendKept, releaseRecord } from '../../kept';
 import { confirmReceipt } from './recorded-receipt';
 import { ErrorWords } from './Words';
 import './recorded-form.css';
@@ -96,7 +96,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     try {
       const result = await request<unknown>(pending.path, { ...pending.body, operation: pending.operation });
       confirmReceipt(result, pending.operation, pending.path);
-      sessionStorage.removeItem(key);
+      releaseRecord(key);
       setPending(null);
       setAnswer(JSON.stringify(result, null, 2));
       setMessage(success?.(pending) ?? 'Change recorded.');

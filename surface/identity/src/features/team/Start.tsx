@@ -11,7 +11,7 @@ import { CannotStart } from '../runtime/CannotStart';
 import type { StartRefusal } from '../runtime/CannotStart';
 import { pendingStartOf, profileRequest, startRequest } from '../runtime/start-requests';
 import type { Pending } from '../runtime/start-requests';
-import { sendKept } from '../../kept';
+import { sendKept, releaseRecord } from '../../kept';
 
 /** A refusal as the service named it; a failure the screen found itself keeps the name it was thrown with. */
 function refusalOf(error: unknown): StartRefusal {
@@ -90,7 +90,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       // A kept request that cannot be read can never be sent again, so it is dropped, and said: the next press
       // sends a new one. That is safe here because Start is shown only while no run of this agent is live.
       const unreadable = error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('PendingStartUnreadable'));
-      if (unreadable) sessionStorage.removeItem(key);
+      if (unreadable) releaseRecord(key);
       setRefusal(unreadable ? { refusal: 'PendingStartUnreadable', reason: 'An earlier start from this tab could not be read back, so it was dropped. Try again sends a new one.' } : refusalOf(error));
     } finally { working.current = false; setBusy(false); }
   };

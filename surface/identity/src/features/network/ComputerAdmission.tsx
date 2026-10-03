@@ -5,6 +5,7 @@ import type { Role } from '../roles/contract';
 import { AddMachine } from './AddMachine';
 import { confirmAdmission, machineAdmissionServed, savedAdmissions } from './machine-admission';
 import type { MachineAdmission, PendingAdmissions } from './machine-admission';
+import { keepRecord, releaseRecord } from '../../kept';
 
 export function ComputerAdmission({ agent, name, person, admin, machines, roles, changed }: {
   agent: string; name: string; person: string; admin: boolean; machines: Machine[]; roles: Role[]; changed: (machine: Machine) => void;
@@ -26,7 +27,7 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
   const heldRoles = new Map(roles.filter((role) => role.holders.some((holder) => holder.holder === agent && holder.state === 'holding')).map((role) => [role.id, role.name]));
   const served = capability.status === 'ok' && capability.data;
   const keep = (next: PendingAdmissions) => {
-    if (Object.keys(next).length) sessionStorage.setItem(key, JSON.stringify(next)); else sessionStorage.removeItem(key);
+    if (Object.keys(next).length) keepRecord(key, next); else releaseRecord(key);
     retained.current = next; setPending(next);
   };
   const send = async (machine: string, body: MachineAdmission) => {

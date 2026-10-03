@@ -4,7 +4,7 @@ import { actionWords } from './action-words';
 import { pendingGrantKey, readPendingGrant, readPendingRest, restKey } from './pendingGrant';
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
-import { keptSend } from '../../kept';
+import { keptSend, keepRecord, releaseRecord } from '../../kept';
 import type { DelegateBody, Grant, PassOn } from '../../generated/grants';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
@@ -123,7 +123,7 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
   /** The requests still to send after the retained one, written whole so a reload finishes the run exactly as it was ticked, never twice. */
   const keepRest = (left: DelegateBody[]) => {
     // Storage first, then a copy into state: state says what storage says, never a rest the browser refused to keep.
-    if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
+    if (left.length) keepRecord(restKey(key), left); else releaseRecord(restKey(key));
     setRest(left.length ? { kind: 'held', bodies: [...left] } : { kind: 'empty' });
   };
 
@@ -133,7 +133,7 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
 
   /** Retain one body under the pending key: always before the rest is shortened, so no body is ever both forgotten and unsent. */
   const retain = (body: DelegateBody) => {
-    sessionStorage.setItem(key, JSON.stringify(body));
+    keepRecord(key, body);
     setPending({ kind: 'held', body });
   };
   const notRetained = (error: unknown) => setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'RequestNotRetained', reason: 'Nothing more was sent because this browser could not retain the grant request: ' + (error instanceof Error ? error.message : String(error)) }) });

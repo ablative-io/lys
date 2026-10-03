@@ -12,7 +12,8 @@ import { Provisioning } from '../provisioning/Provisioning';
 import { PersonCredentials, PersonSessions } from './PersonSecurity';
 import { AssignedRoles } from '../roles/AssignedRoles';
 import { api, Refused, request, useLoad } from '../../api';
-import type { ReceiptAnswer } from '../../generated';
+import type { MeView, ReceiptAnswer } from '../../generated';
+import { IdentityName } from '../people/Words';
 import { DirectoryGate as Gate } from '../people/Words';
 import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
@@ -142,7 +143,15 @@ function PersonRecord({ id }: { id: string }) {
   return <Gate load={load} title="Directory record" ok={(receipts) => <RecordView receipts={receipts} />} />;
 }
 
+/** Who a record line was signed for: an agent or the signed-in person by name; any other sign-in by the account name its provider gave, which is all the record holds. */
+function Actor({ actor, me }: { actor: ReceiptAnswer['receipt']['actor']; me: MeView | null }) {
+  if (actor.agent) return <IdentityName id={actor.agent} />;
+  if (me?.sign_in_identities.some((login) => login.provider === actor.issuer && login.subject === actor.subject)) return <IdentityName id={me.person.id} />;
+  return <>{actor.subject}</>;
+}
+
 function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
+  const me = useLoad(api.me, 'record-me');
   return (
     <div className="grid2">
       <div>
@@ -156,7 +165,7 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
                   <div className="when">{clock(r.receipt.actor.authenticated_at)}</div>
                   <div>
                     {CHANGE_KINDS[r.receipt.change_kind] ?? 'change ' + r.receipt.change_kind}
-                    <span className="note"> · by {r.receipt.actor.subject}{r.receipt.actor.authentication === 'operator' ? ', with the operator token' : ''}</span>
+                    <span className="note"> · by <Actor actor={r.receipt.actor} me={me.status === 'ok' ? me.data : null} />{r.receipt.actor.authentication === 'operator' ? ', with the operator token' : ''}</span>
                   </div>
                 </div>
               ))}

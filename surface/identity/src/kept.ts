@@ -10,6 +10,10 @@
  */
 import { Refused } from './api';
 
+/** The kept copy itself. Every pending record in this tab, a single change or a walk's place, is written and removed here. */
+export const keepRecord = (key: string, record: unknown): void => sessionStorage.setItem(key, JSON.stringify(record));
+export const releaseRecord = (key: string): void => sessionStorage.removeItem(key);
+
 /** The service's definite answer of no. */
 export const answeredNo = (error: unknown): boolean => error instanceof Refused && error.status >= 400 && error.status < 500;
 
@@ -41,7 +45,7 @@ export type Kept<T> =
   | { at: 'unknown'; error: unknown };
 
 export async function keptSend<T>(key: string, record: unknown, send: () => Promise<T>, noSettles: boolean): Promise<Kept<T>> {
-  try { sessionStorage.setItem(key, JSON.stringify(record)); } catch (error) { return { at: 'unkept', error }; }
+  try { keepRecord(key, record); } catch (error) { return { at: 'unkept', error }; }
   let answer: T;
   try { answer = await send(); } catch (error) {
     return noSettles && answeredNo(error) ? { at: 'refused', error, unreleased: release(key) } : { at: 'unknown', error };
@@ -50,5 +54,5 @@ export async function keptSend<T>(key: string, record: unknown, send: () => Prom
 }
 
 function release(key: string): Error | null {
-  try { sessionStorage.removeItem(key); return null; } catch (error) { return error instanceof Error ? error : new Error(String(error)); }
+  try { releaseRecord(key); return null; } catch (error) { return error instanceof Error ? error : new Error(String(error)); }
 }

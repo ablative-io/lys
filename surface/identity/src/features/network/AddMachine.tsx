@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 import { operationId, Refused, request } from '../../api';
 import { confirmRunner, matchesMachine, savedMachine } from './contract';
 import type { Machine, PendingMachine } from './contract';
-import { answeredNo } from '../../kept';
+import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 
 export async function recordComputer(initial: PendingMachine, person: string, keep: (next: PendingMachine) => void): Promise<Machine> {
   let current = initial;
@@ -35,18 +35,18 @@ export function AddMachine({ person, agent, changed, cancel }: {
   const [failure, setFailure] = useState(restored.error);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
-  const keep = (next: PendingMachine) => { sessionStorage.setItem(key, JSON.stringify({ version: 1, ...next })); setPending(next); };
+  const keep = (next: PendingMachine) => { keepRecord(key, { version: 1, ...next }); setPending(next); };
   const send = async (initial: PendingMachine, retry = false) => {
     if (working.current || restored.error) return;
     working.current = true; setBusy(true); setFailure('');
     let current = initial;
     try {
       const machine = await recordComputer(initial, person, (next) => { current = next; keep(next); });
-      sessionStorage.removeItem(key); setPending(null);
+      releaseRecord(key); setPending(null);
       changed(current.body.name + ' was added. Its runner is recorded.', machine);
     } catch (error) {
       if (!retry && current.phase === 'machine' && answeredNo(error) && error instanceof Refused && error.refusal.refusal !== 'Unanswered') {
-        sessionStorage.removeItem(key); setPending(null);
+        releaseRecord(key); setPending(null);
       }
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
     }

@@ -8,7 +8,7 @@ import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import { matchesAsk } from './contract';
 import type { AccessRequest, Ask } from './contract';
-import { keptSend } from '../../kept';
+import { keptSend, keepRecord, releaseRecord } from '../../kept';
 
 type Pending = { kind: 'empty' } | { kind: 'damaged' } | { kind: 'held'; asked: Ask };
 
@@ -81,19 +81,19 @@ export function AskForm({ person, resources, model, changed }: {
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const keepRest = (left: Ask[]) => {
     // Storage first, then a copy into state: state says what storage says, never a rest the browser refused to keep.
-    if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
+    if (left.length) keepRecord(restKey(key), left); else releaseRecord(restKey(key));
     setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
   };
   /** A queued ask found already recorded is released without sending. */
   const finish = (recorded: AccessRequest) => {
-    try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch {
+    try { releaseRecord(key); setPending({ kind: 'empty' }); } catch {
       setFailure('Recorded, but the browser could not release the retained request; Check original request will confirm it again, never record it twice.');
     }
     changed(recorded);
   };
   /** The queue's place: the next ask goes under the pending key before the rest is shortened, so no ask is ever both forgotten and unsent. */
   const retain = (asked: Ask) => {
-    sessionStorage.setItem(key, JSON.stringify(asked));
+    keepRecord(key, asked);
     setPending({ kind: 'held', asked });
   };
   /** One ask, kept before it is sent and released only on the service's confirmation; true when confirmed. */
