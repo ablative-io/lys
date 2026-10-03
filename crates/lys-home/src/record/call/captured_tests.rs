@@ -32,10 +32,7 @@ fn prepared_stream_parts_survive_without_a_second_body_parse()
             response_parts: Some(&parts),
             raw_request: None,
             raw_response: None,
-            timing: CaptureTiming {
-                admission_ns: Some(42),
-                durable: DurableTime::Interrupted,
-            },
+            timing: CaptureTiming::interrupted(Some(42)),
         },
     )?;
     std::fs::remove_file(&request)?;

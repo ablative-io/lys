@@ -249,6 +249,29 @@ async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all(
     assert_eq!(calls[0].status, CallStatus::Unrecorded);
     assert!(calls[0].response.is_empty());
     assert!(calls[0].raw_response.is_none());
+    assert!(report.held.is_none());
+    assert_eq!(report.spool_kept, 1);
+    assert!(!report.retired);
+    let timing = calls[0]
+        .capture
+        .as_ref()
+        .ok_or("capture measurements absent")?;
+    assert!(
+        timing
+            .refusals
+            .iter()
+            .any(|reason| reason.contains("Permission denied"))
+    );
+    let recovered = recover(
+        &harness.home()?,
+        &Journal::open(harness.state("journal"))?,
+        &capture,
+    )?;
+    assert_eq!(recovered.len(), 1);
+    assert!(recovered[0].already_recorded);
+    assert!(recovered[0].retired);
+    assert_eq!(std::fs::read_dir(capture)?.count(), 0);
+    assert_eq!(harness.calls(KEY)?.len(), 1);
     Ok(())
 }
 

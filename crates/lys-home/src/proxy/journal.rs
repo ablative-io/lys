@@ -170,6 +170,8 @@ pub struct Job {
     pub response_hash: Option<Hash>,
     /// Last frame arrival, absent for a recovered call.
     pub last_arrival: Option<std::time::Instant>,
+    /// Per-call worker measurements.
+    pub timing: crate::record::call::captured::CaptureTiming,
 }
 
 /// What the sink reports of each call: ids, a status and counts only.
@@ -294,7 +296,7 @@ fn run(
             if report.held.is_some() {
                 held.push(job);
             } else {
-                if !report.retired {
+                if !report.retired && report.spool_kept == 0 {
                     unretired.push(job.call.call_id.clone());
                 }
                 drop(job);
@@ -371,7 +373,7 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
             }
         }
     }
-    report.retired = journal.retire(&job.call.call_id).is_ok();
+    report.retired = report.spool_kept == 0 && journal.retire(&job.call.call_id).is_ok();
     report
 }
 
@@ -402,6 +404,7 @@ pub fn recover(
             request_hash: None,
             response_hash: None,
             last_arrival: None,
+            timing: crate::record::call::captured::CaptureTiming::interrupted(call.admission_ns),
             call,
         };
         let report = record(home, journal, &mut job);

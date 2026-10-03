@@ -121,6 +121,9 @@ pub(super) async fn capture_whole(
     assert_eq!(report.status, status);
     assert!(report.retired);
     let calls = harness.calls(KEY)?;
+    if sent.len() > 64 * 1024 * 1024 {
+        println!("capture_measurements={:?}", calls[0].capture);
+    }
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].status, status);
     assert!(calls[0].stream);

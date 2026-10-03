@@ -39,6 +39,11 @@ pub(super) fn add(stage: &AtomicU64, started: Instant) {
 pub(super) fn report() {
     let received = tick();
     println!(
+        "worker pending_at_last_bytes={} last_arrival_to_drained_ns={}",
+        PENDING_AT_LAST.load(Ordering::Relaxed),
+        DRAIN_LAG.load(Ordering::Relaxed)
+    );
+    println!(
         "spool writes={} bytes={} min={} max={}",
         WRITE_COUNT.load(Ordering::Relaxed),
         WRITE_BYTES.load(Ordering::Relaxed),
@@ -91,4 +96,29 @@ pub(super) fn write_size(size: usize) {
     WRITE_BYTES.fetch_add(size, Ordering::Relaxed);
     WRITE_MIN.fetch_min(size, Ordering::Relaxed);
     WRITE_MAX.fetch_max(size, Ordering::Relaxed);
+}
+
+static OFFERED_BYTES: AtomicU64 = AtomicU64::new(0);
+static SPOOLED_BYTES: AtomicU64 = AtomicU64::new(0);
+static PENDING_AT_LAST: AtomicU64 = AtomicU64::new(0);
+static DRAIN_LAG: AtomicU64 = AtomicU64::new(0);
+
+pub(super) fn offered(size: usize) {
+    let size = u64::try_from(size).unwrap_or(u64::MAX);
+    let offered = OFFERED_BYTES.fetch_add(size, Ordering::Relaxed) + size;
+    PENDING_AT_LAST.store(
+        offered.saturating_sub(SPOOLED_BYTES.load(Ordering::Relaxed)),
+        Ordering::Relaxed,
+    );
+}
+
+pub(super) fn spooled(size: usize) {
+    SPOOLED_BYTES.fetch_add(u64::try_from(size).unwrap_or(u64::MAX), Ordering::Relaxed);
+}
+
+pub(super) fn drained(arrived: Instant) {
+    DRAIN_LAG.store(
+        u64::try_from(arrived.elapsed().as_nanos()).unwrap_or(u64::MAX),
+        Ordering::Relaxed,
+    );
 }

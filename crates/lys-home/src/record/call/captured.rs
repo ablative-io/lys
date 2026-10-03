@@ -26,6 +26,13 @@ pub enum DurableTime {
     Measured(u64),
 }
 
+/// The path a captured body took into the block store.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Placement {
+    Rename,
+    Copy,
+}
+
 /// Measurements of admission and the asynchronous capture worker.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaptureTiming {
@@ -33,6 +40,49 @@ pub struct CaptureTiming {
     pub admission_ns: Option<u64>,
     /// Body durability measurement, with interrupted measurement distinguished explicitly.
     pub durable: DurableTime,
+    /// Named placement refusals; empty when the one-pass handoff succeeded.
+    pub refusals: Vec<String>,
+    /// Response bytes awaiting completion by the worker at the final arrival, including its current frame.
+    pub pending_bytes: u64,
+    /// Time from the final arrival until the worker drained the response bytes.
+    pub drain_ns: u64,
+    /// Spool write calls and successfully written bytes.
+    pub spool_writes: u64,
+    pub spool_bytes: u64,
+    /// Successful spool file syncs.
+    pub spool_syncs: u64,
+    /// Wall time in spool writes and streaming hashes, separately.
+    pub write_ns: u64,
+    pub hash_ns: u64,
+    /// Syncs counted by the block store during preparation and placement.
+    pub block_syncs: u64,
+    /// Placement and retained-spool state when the call was appended.
+    pub request_placement: Option<Placement>,
+    pub response_placement: Option<Placement>,
+    pub request_spool_kept: bool,
+    pub response_spool_kept: bool,
+}
+
+impl CaptureTiming {
+    pub(crate) fn interrupted(admission_ns: Option<u64>) -> Self {
+        Self {
+            admission_ns,
+            durable: DurableTime::Interrupted,
+            refusals: Vec::new(),
+            pending_bytes: 0,
+            drain_ns: 0,
+            spool_writes: 0,
+            spool_bytes: 0,
+            spool_syncs: 0,
+            write_ns: 0,
+            hash_ns: 0,
+            block_syncs: 0,
+            request_placement: None,
+            response_placement: None,
+            request_spool_kept: false,
+            response_spool_kept: false,
+        }
+    }
 }
 
 /// All references needed to append a call, without reading either body again.

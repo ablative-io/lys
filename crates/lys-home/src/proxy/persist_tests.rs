@@ -1,15 +1,30 @@
 use super::*;
 use crate::proxy::journal::{OpenCall, recover};
+use crate::record::call::captured::CaptureTiming;
 use crate::record::call::{Api, call_record};
 use crate::record::entries::CUSTOM_CALL;
 
 #[test]
 fn a_crash_after_body_rename_recovers_complete_without_reparsing()
 -> Result<(), Box<dyn std::error::Error>> {
-    for checkpoint in 0..3 {
-        recover_at(checkpoint)?;
-    }
-    Ok(())
+    recover_at(0)
+}
+
+#[test]
+fn both_renamed_bodies_recover_complete_before_the_append() -> Result<(), Box<dyn std::error::Error>>
+{
+    recover_at(1)
+}
+
+#[test]
+fn a_persisted_capture_duration_survives_recovery() -> Result<(), Box<dyn std::error::Error>> {
+    recover_at(2)
+}
+
+#[test]
+fn refused_renames_copy_whole_bodies_and_still_record_complete()
+-> Result<(), Box<dyn std::error::Error>> {
+    recover_at(3)
 }
 
 fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
@@ -49,10 +64,7 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
             response_parts: Some(&parts),
             raw_request: Some(req_hash.to_string()),
             raw_response: Some(resp_hash.to_string()),
-            timing: CaptureTiming {
-                admission_ns: Some(81),
-                durable: DurableTime::Interrupted,
-            },
+            timing: CaptureTiming::interrupted(Some(81)),
         },
     )?;
     let mut job = Job {
@@ -74,9 +86,24 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
         response_hash: Some(resp_hash),
         parts: Some(parts),
         last_arrival: Some(std::time::Instant::now()),
+        timing: CaptureTiming::interrupted(Some(81)),
     };
     journal.write(&job.call)?;
-    if checkpoint == 0 {
+    if checkpoint == 3 {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o500))?;
+        let result = ingest(&home, &journal, "unlinked-2000-01-01", &mut job);
+        std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o700))?;
+        let (status, report) = result?;
+        assert_eq!(status, CallStatus::Complete);
+        assert!(!report.already_recorded);
+        let ready = job.call.completed.as_ref().ok_or("manifest absent")?;
+        let timing = ready.record.capture.as_ref().ok_or("timing absent")?;
+        assert_eq!(timing.request_placement, Some(Placement::Copy));
+        assert_eq!(timing.response_placement, Some(Placement::Copy));
+        assert!(timing.request_spool_kept && timing.response_spool_kept);
+        assert_eq!(timing.refusals.len(), 2);
+    } else if checkpoint == 0 {
         blocks.admit_spool(&request, &Hash::of(req))?;
         assert!(!request.exists());
         assert!(response.exists());
@@ -109,7 +136,7 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
         .as_ref()
         .ok_or("capture timing absent")?
         .durable;
-    if checkpoint == 2 {
+    if checkpoint >= 2 {
         assert!(matches!(durable, DurableTime::Measured(_)));
     } else {
         assert_eq!(durable, &DurableTime::Interrupted);

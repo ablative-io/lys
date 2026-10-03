@@ -4,7 +4,7 @@ use crate::proxy::{
     error::ProxyError,
     journal::{Job, Journal},
 };
-use crate::record::call::captured::{CaptureTiming, Captured, DurableTime, PreparedCall};
+use crate::record::call::captured::{Captured, DurableTime, Placement, PreparedCall};
 use crate::record::{
     Home,
     blocks::{BlockStore, Hash},
@@ -47,10 +47,7 @@ pub(super) fn ingest(
                 response_parts: job.parts.as_deref(),
                 raw_request: request,
                 raw_response: response,
-                timing: CaptureTiming {
-                    admission_ns: job.call.admission_ns,
-                    durable: DurableTime::Interrupted,
-                },
+                timing: job.timing.clone(),
             },
         )?);
     }
@@ -102,31 +99,32 @@ pub(super) fn install(
             std::io::Error::other("capture manifest absent"),
         )
     })?;
-    for (path, text, suffix) in [
+    for (path, text, request) in [
         (
             job.request.as_deref(),
-            ready.record.raw_request.as_deref(),
-            "request",
+            ready.record.raw_request.clone(),
+            true,
         ),
         (
             job.response.as_deref(),
-            ready.record.raw_response.as_deref(),
-            "response",
+            ready.record.raw_response.clone(),
+            false,
         ),
     ] {
-        if let Some(text) = text {
-            let hash = Hash::parse(text)?;
-            if let Some(path) = path {
-                let put = blocks.admit_spool(path, &hash)?;
-                ready.raw_blocks += u64::from(put.new);
-            } else if !blocks.contains(&hash) {
-                return Err(ProxyError::io(
-                    "recovering a prepared body",
-                    journal.dir(),
-                    std::io::Error::other(format!("{suffix} block {hash} is absent")),
-                ));
-            }
+        let Some(text) = text else { continue };
+        let hash = Hash::parse(&text)?;
+        if let Some(path) = path {
+            place_body(blocks, path, &hash, ready, request);
+        } else if !blocks.contains(&hash) {
+            return Err(ProxyError::io(
+                "recovering a prepared body",
+                journal.dir(),
+                std::io::Error::other(format!("block {hash} is absent")),
+            ));
         }
+    }
+    if let Some(timing) = &mut ready.record.capture {
+        timing.block_syncs = blocks.syncs();
     }
     if let Some(arrived) = job.last_arrival
         && let Some(timing) = &mut ready.record.capture
@@ -147,4 +145,67 @@ fn sync_sources(job: &Job) -> Result<(), ProxyError> {
         crate::record::blocks::sync_dir(dir)?;
     }
     Ok(())
+}
+
+fn place_body(
+    blocks: &BlockStore,
+    path: &Path,
+    hash: &Hash,
+    ready: &mut PreparedCall,
+    request: bool,
+) {
+    let (placement, kept, refusal) = match blocks.admit_spool(path, hash) {
+        Ok(put) => {
+            ready.raw_blocks += u64::from(put.new);
+            (Some(Placement::Rename), false, None)
+        }
+        Err(error) => {
+            let reason = error.to_string();
+            eprintln!("lys-proxy: capture_placement_failed: {reason}");
+            let copied = match blocks.put_file(path) {
+                Ok(put) => {
+                    ready.raw_blocks += u64::from(put.new);
+                    true
+                }
+                Err(copy) => {
+                    ready.record.status = CallStatus::Unrecorded;
+                    ready.record.response.clear();
+                    if request {
+                        ready.record.raw_request = None;
+                    } else {
+                        ready.record.raw_response = None;
+                    }
+                    if let Some(timing) = &mut ready.record.capture {
+                        timing.refusals.push(copy.to_string());
+                    }
+                    false
+                }
+            };
+            let kept = if copied {
+                match std::fs::remove_file(path) {
+                    Ok(()) => false,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+                    Err(error) => {
+                        eprintln!("lys-proxy: spool_kept: {}: {error}", path.display());
+                        true
+                    }
+                }
+            } else {
+                true
+            };
+            (copied.then_some(Placement::Copy), kept, Some(reason))
+        }
+    };
+    if let Some(timing) = &mut ready.record.capture {
+        if request {
+            timing.request_placement = placement;
+            timing.request_spool_kept = kept;
+        } else {
+            timing.response_placement = placement;
+            timing.response_spool_kept = kept;
+        }
+        if let Some(reason) = refusal {
+            timing.refusals.push(reason);
+        }
+    }
 }

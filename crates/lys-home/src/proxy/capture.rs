@@ -15,7 +15,7 @@
 //! - The spools hold body bytes only; no header is written anywhere.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -29,6 +29,7 @@ use crate::proxy::forward::{End, Observer};
 use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
 use crate::proxy::link::{KeyScanner, Link};
 use crate::record::call::CallStatus;
+use crate::record::call::captured::CaptureTiming;
 
 /// What a call knows while it passes.
 #[derive(Debug, Default)]
@@ -42,6 +43,7 @@ struct CallState {
     stream: bool,
     finished: bool,
     last_arrival: Option<Instant>,
+    pending_bytes: u64,
 }
 
 /// One call in flight: its journal record, its capture and where it goes
@@ -56,6 +58,7 @@ pub struct Call {
     state: Mutex<CallState>,
     poisoned: AtomicBool,
     ended: AtomicBool,
+    processed: AtomicU64,
 }
 
 impl Call {
@@ -71,6 +74,7 @@ impl Call {
             state: Mutex::new(CallState::default()),
             poisoned: AtomicBool::new(false),
             ended: AtomicBool::new(false),
+            processed: AtomicU64::new(0),
         });
         call.enqueue(Event::Start);
         call
@@ -116,7 +120,10 @@ impl Call {
             headers.append(hyper::header::CONTENT_ENCODING, value.clone());
         }
         self.enqueue(Event::ResponseHead { stream, headers });
-        ResponseSide(Arc::clone(self))
+        ResponseSide {
+            call: Arc::clone(self),
+            offered: 0,
+        }
     }
 
     fn request_ended(&self) {
@@ -157,8 +164,22 @@ impl Call {
                 return None;
             }
             s.finished = true;
+            let mut timing = CaptureTiming::interrupted(self.open.admission_ns);
+            timing.pending_bytes = s.pending_bytes;
+            timing.drain_ns = s.last_arrival.map_or(0, |at| {
+                u64::try_from(at.elapsed().as_nanos()).unwrap_or(u64::MAX)
+            });
+            #[cfg(test)]
+            if let Some(arrived) = s.last_arrival {
+                super::timing::drained(arrived);
+            }
             for spool in [&mut s.request, &mut s.response].into_iter().flatten() {
                 spool.close(&mut s.capture_failed);
+                timing.spool_writes += spool.writes;
+                timing.spool_bytes += spool.bytes;
+                timing.spool_syncs += spool.syncs;
+                timing.write_ns += spool.write_ns;
+                timing.hash_ns += spool.hash_ns;
             }
             let parts = s.reader.take().and_then(|reader| {
                 if end != End::Complete {
@@ -196,6 +217,7 @@ impl Call {
                 response: s.response.take().map(|spool| spool.path),
                 last_arrival: Some(s.last_arrival.unwrap_or(ended_at)),
                 parts,
+                timing,
             })
         });
         // An interrupted capture keeps its durable open journal entry;
@@ -225,7 +247,7 @@ enum Event {
     Request(Bytes),
     RequestEnd,
     ResponseHead { stream: bool, headers: HeaderMap },
-    Response(Bytes, Instant),
+    Response(Bytes, Instant, u64),
     End(End, Instant),
 }
 
@@ -266,9 +288,10 @@ impl Work {
                     }
                 });
             }
-            Event::Response(bytes, arrived) => {
+            Event::Response(bytes, arrived, pending) => {
                 call.with(|s| {
                     s.last_arrival = Some(arrived);
+                    s.pending_bytes = pending;
                     #[cfg(test)]
                     let started = Instant::now();
                     if let Some(reader) = &mut s.reader
@@ -285,6 +308,12 @@ impl Work {
                     if let Some(spool) = &mut s.response {
                         spool.write(&bytes, &mut s.capture_failed);
                     }
+                    #[cfg(test)]
+                    super::timing::spooled(bytes.len());
+                    call.processed.fetch_add(
+                        u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                        Ordering::Relaxed,
+                    );
                 });
             }
             Event::End(end, at) => return call.complete(end, at),
@@ -314,19 +343,28 @@ impl Observer for RequestSide {
 /// Reads the response body as it goes to the client: the stream grammar,
 /// and the spool for the call; its end ends the call.
 #[derive(Debug)]
-pub struct ResponseSide(Arc<Call>);
+pub struct ResponseSide {
+    call: Arc<Call>,
+    offered: u64,
+}
 
 impl Observer for ResponseSide {
     /// Enqueue a shared byte handle and its arrival time; no decode, lock or disk work.
     fn data(&mut self, bytes: &Bytes) {
         #[cfg(test)]
         super::timing::arriving();
-        self.0
-            .enqueue(Event::Response(bytes.clone(), Instant::now()));
+        #[cfg(test)]
+        super::timing::offered(bytes.len());
+        self.offered += u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        let pending = self
+            .offered
+            .saturating_sub(self.call.processed.load(Ordering::Relaxed));
+        self.call
+            .enqueue(Event::Response(bytes.clone(), Instant::now(), pending));
     }
 
     fn ended(&mut self, end: End) {
-        self.0.finish(end);
+        self.call.finish(end);
     }
 }
 
