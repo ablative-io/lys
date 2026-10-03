@@ -50,3 +50,6 @@
 .session-canvas-node .terminal-head:has([data-ended="true"]) { position: static; width: auto; height: auto; padding: 4px 12px; justify-content: flex-start; white-space: normal; overflow: visible; }
 .session-canvas-node.open:has(.terminal-state[data-ended="true"]) .session-canvas-slot { display: none; }
 .session-canvas-node.open:has(.terminal-state[data-ended="true"]) > .session-canvas-bar > .btn { margin-left: auto; }
+/* A runner that did not answer: the window says so under its bar, and the terminal does not say Running over it. */
+.session-canvas-unanswered { flex: none; margin: 0; padding: 4px 12px; font-size: 12px; }
+.session-canvas-node.unanswered .terminal-state[data-ended="false"] { display: none; }

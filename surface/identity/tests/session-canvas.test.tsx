@@ -73,6 +73,18 @@ describe('Agent canvas', () => {
     expect(text()).toContain('runner_unreachable: Socket closed');
   });
 
+  it('keeps saying the runner did not answer in the window when its terminal is open', async () => {
+    const base = '/runtime/sessions/' + session;
+    await mount('#/runtime/canvas', { ...routes, '/runtime/live': ok({ sessions: [running], unanswered: [{ session, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'Socket closed' }] }),
+      ['POST ' + base + '/resize']: ok({ receipt: { index: 1 } }),
+      ['POST ' + base + '/read-bytes']: refused(503, 'runner_unreachable', 'Socket closed') });
+    const one = $('.session-canvas-node.sessions') as HTMLElement;
+    await click(one.querySelector('button'));
+    expect(one.querySelector('.terminal')).not.toBeNull();
+    expect(one.classList.contains('unanswered')).toBe(true);
+    expect(one.querySelector('.session-canvas-unanswered')?.textContent).toBe('Runner did not answer; current state unknown');
+  });
+
   it('opens the returned session terminal and closing the view never ends its process', async () => {
     const base = '/runtime/sessions/' + session;
     const { posted } = await mount('#/runtime/canvas', {
@@ -158,10 +170,11 @@ describe('Agent canvas', () => {
 
   it('still works, and says so, when the browser refuses to keep the arrangement', async () => {
     const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage is full'); });
-    await mount('#/runtime/canvas', routes);
-    expect(text()).toContain('This browser will not keep the arrangement: storage is full');
-    expect($('.session-canvas-node.sessions')).not.toBeNull();
-    set.mockRestore();
+    try {
+      await mount('#/runtime/canvas', routes);
+      expect(text()).toContain('This browser will not keep the arrangement: storage is full');
+      expect($('.session-canvas-node.sessions')).not.toBeNull();
+    } finally { set.mockRestore(); }
   });
 
   it('sizes an open terminal from the keyboard and never below the size its bar needs', async () => {

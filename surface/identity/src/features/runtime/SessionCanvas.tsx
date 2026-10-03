@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { useParams } from 'react-router';
 import { useLive, useLoad } from '../../api';
+import type { Load } from '../../api';
 import { Gate } from '../signin/Gate';
 import { Terminal } from './Terminal';
 import { readSessionGraph, withMessages } from './session-graph';
@@ -103,7 +104,6 @@ function Canvas({ graph }: { graph: SessionGraph }) {
     if (!element || !box) return;
     setView({ x: element.clientWidth / 2 - (box.x + box.w / 2), y: element.clientHeight / 2 - (box.y + box.h / 2) });
     // Once, on arriving: after that the view is the person's.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The arrangement is this browser's own: it is kept as it changes and is there on the next visit.
@@ -194,7 +194,8 @@ function Canvas({ graph }: { graph: SessionGraph }) {
         const box = boxes[node.id], shown = open.has(node.id);
         const state = !node.session ? null : graph.unanswered.some((entry) => entry.session === node.session?.session) ? 'Runner did not answer; current state unknown' : node.session.shown === 'running' ? 'Running' : 'Starting, not yet confirmed';
         const kind = node.column === 'sessions' ? 'Agent' : node.column === 'teams' ? 'Team or sender' : 'Resource or recipient';
-        return <article className={'session-canvas-node ' + node.column + (shown ? ' open' : '')} key={node.id} data-node={node.id} aria-label={kind + ': ' + node.title}
+        const unanswered = !!node.session && graph.unanswered.some((entry) => entry.session === node.session?.session);
+        return <article className={'session-canvas-node ' + node.column + (shown ? ' open' : '') + (unanswered ? ' unanswered' : '')} key={node.id} data-node={node.id} aria-label={kind + ': ' + node.title}
           style={{ left: box.x, top: box.y, width: box.w, height: box.h, zIndex: front === node.id ? 3 : node.session ? 2 : 1 }}
           onPointerDownCapture={() => setFront(node.id)}>
           <header className="session-canvas-bar" tabIndex={0} aria-label={'Move ' + node.title + ' with the arrow keys' + (node.session ? '; with Shift, size its terminal' : '')} onKeyDown={nudge(node.id)}
@@ -205,6 +206,7 @@ function Canvas({ graph }: { graph: SessionGraph }) {
             {node.session ? <button className="btn" aria-expanded={shown} onClick={() => toggle(node.id)}>{shown ? 'Close terminal view' : 'Open terminal'}</button> : null}
           </header>
           {node.session && shown ? <>
+            {unanswered ? <p className="why-not session-canvas-unanswered" role="status">{state}</p> : null}
             <Terminal key={node.session.session} session={node.session.session} agent={node.session.agent} />
             <span className="session-canvas-grip" aria-hidden="true" onPointerDown={begin((from) => ({ kind: 'size', id: node.id, from, box }))} />
           </> : null}
@@ -222,10 +224,24 @@ function Connections({ graph }: { graph: SessionGraph }) {
   </details>;
 }
 
-function MessageCanvas({ graph, first }: { graph: SessionGraph; first: MessageRead }) {
-  const [messages, setMessages] = useState(first);
-  const whole = withMessages(graph, messages.messages);
-  return <><div className="session-canvas-strip"><MessageConnections value={messages} change={setMessages} /><Connections graph={whole} /></div><Canvas graph={whole} /></>;
+/**
+ * The surface with whatever message connections have been read. It is one Canvas in one place whether the messages are
+ * still being read, were refused, or have arrived, so a terminal that is open stays open across that change.
+ */
+function Whole({ graph, messages }: { graph: SessionGraph; messages: Load<MessageRead> }) {
+  const [later, setLater] = useState<MessageRead | null>(null);
+  const read = later ?? (messages.status === 'ok' ? messages.data : null);
+  const whole = read ? withMessages(graph, read.messages) : graph;
+  return <>
+    <div className="session-canvas-strip">
+      {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
+      {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
+      {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
+      {read ? <MessageConnections value={read} change={setLater} /> : null}
+      <Connections graph={whole} />
+    </div>
+    <Canvas graph={whole} />
+  </>;
 }
 
 export function SessionCanvas() {
@@ -236,14 +252,10 @@ export function SessionCanvas() {
       <details className="canvas-about"><summary>About this canvas</summary>
         <p className="sub">Drag a window by its bar, drag its corner to size it, drag the background or use the wheel to move the surface. With a bar focused, arrows move the window and Shift with arrows sizes its terminal; with the surface focused, arrows move the surface. Closing a terminal view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p>
       </details></div>
-    <Gate load={load} title="Agent canvas" ok={(graph) => <>
-      {graph.notices.length || graph.unanswered.length || messages.status !== 'ok' ? <div className="session-canvas-strip">
-        {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
-        {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
-        {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
-        {messages.status !== 'ok' && graph.nodes.some((node) => node.session) ? <Connections graph={graph} /> : null}
-      </div> : null}
-      {graph.nodes.some((node) => node.session) ? messages.status === 'ok' ? <MessageCanvas graph={graph} first={messages.data} /> : <Canvas graph={graph} /> : <p>No running sessions were returned.</p>}
+    <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? <Whole graph={graph} messages={messages} /> : <>
+      {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
+      {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
+      <p>No running sessions were returned.</p>
     </>} />
   </div>;
 }
