@@ -21,6 +21,8 @@ impl Sessions {
         mut reader: Box<dyn Read + Send>,
     ) {
         let mut buffer = [0_u8; 8192];
+        // Whether this generation has been sent its hang-up at a usage limit.
+        let mut told = false;
         loop {
             let read = match reader.read(&mut buffer) {
                 Ok(0) => break,
@@ -32,7 +34,17 @@ impl Sessions {
                 }
             };
             match output.push(generation, &buffer[..read]) {
-                Ok(true) => {
+                Ok(tripped) => {
+                    // A program can drop one hang-up: a shell that is running a
+                    // command when it lands only notes it and goes back to
+                    // reading. Output from a generation already told to hang up
+                    // means its program is still running, so it is told again,
+                    // and the runner says so. Nothing is sent to a generation
+                    // that has gone quiet; nothing here waits on a clock.
+                    if !tripped && !told {
+                        continue;
+                    }
+                    let again = told;
                     let leader = {
                         let Some(mut table) = self.lock_logged() else {
                             return;
@@ -43,14 +55,22 @@ impl Sessions {
                             .filter(|session| session.generation == generation && !session.ending)
                             .and_then(|session| {
                                 let rotation = session.rotation.as_mut()?;
-                                if rotation.tripped() {
-                                    return None;
+                                if tripped {
+                                    if rotation.tripped() {
+                                        return None;
+                                    }
+                                    rotation.trip();
                                 }
-                                rotation.trip();
                                 session.guard.leader.clone()
                             })
                     };
                     if let Some(leader) = leader {
+                        told = true;
+                        if again {
+                            crate::error::said(&format!(
+                                "session {id}: rotation_signal_repeated: output came after the hang-up"
+                            ));
+                        }
                         if let Err(error) = crate::pty::end(&leader) {
                             crate::error::said(&format!(
                                 "session {id}: rotation_signal_failed: {error}"
@@ -58,7 +78,6 @@ impl Sessions {
                         }
                     }
                 }
-                Ok(false) => {}
                 Err(error) => {
                     crate::error::said(&format!("session {id}: output_record_failed: {error}"));
                     break;

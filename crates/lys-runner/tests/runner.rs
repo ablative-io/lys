@@ -498,6 +498,33 @@ fn a_usage_limit_moves_the_session_on_and_the_list_end_stops_it() -> TestResult 
     held.stop()
 }
 
+/// A program can drop one hang-up, as bash does when the signal lands while
+/// it runs a command. This stand-in drops exactly the first one, and prints
+/// after it: the output that follows the hang-up is what has it told again.
+#[test]
+fn a_program_that_drops_one_hang_up_is_told_again_when_it_prints() -> TestResult {
+    let mut held = Held::start(1 << 16)?;
+    let client = held.client();
+    let script = "trap 'trap - HUP; echo still-on-$LYS_ACCOUNT_HANDLE' HUP; \
+                  echo \"at $LYS_ACCOUNT_HANDLE: usage limit reached\"; \
+                  while :; do sleep 1; done";
+    let limit = Limit::Words {
+        words: vec!["usage limit reached".to_owned()],
+    };
+    started(&client, rotating("drops-one", script, limit))?;
+    let output = until_ended(&client, "drops-one")?;
+    assert!(
+        output.text.contains("still-on-h-account-one"),
+        "the first hang-up was dropped and the program printed: {output:?}"
+    );
+    assert!(output.text.contains("at h-account-two"), "{output:?}");
+    assert_eq!(
+        output.ended.ok_or("no end")?.how,
+        EndedHow::AccountsExhausted
+    );
+    held.stop()
+}
+
 #[test]
 fn words_the_harness_did_not_signal_move_nothing() -> TestResult {
     let mut held = Held::start(1 << 16)?;
