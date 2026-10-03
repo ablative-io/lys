@@ -11,11 +11,11 @@ export async function recordComputer(initial: PendingMachine, person: string, ke
   if (current.phase === 'machine') {
     const result = await request<unknown>('/network/machines', current.body);
     if (!matchesMachine(result, current.body, person)) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The answer did not confirm this computer was added. What you entered is kept.' });
-    current = { ...current, machine: result, phase: current.legacy ? 'read-runner' : 'runner' }; keep(current);
+    current = { ...current, machine: result, phase: 'runner' }; keep(current);
   }
   const path = '/network/machines/' + encodeURIComponent(current.body.operation) + '/runner';
-  const runner = await request<unknown>(path, current.phase === 'runner' ? { runner: { kind: 'lys' } } : undefined);
-  confirmRunner(runner, current.body.operation, !current.legacy);
+  const runner = await request<unknown>(path, { runner: { kind: 'lys' } });
+  confirmRunner(runner, current.body.operation, true);
   if (!current.machine) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The recorded computer is missing from this pending addition.' });
   return current.machine;
 }
@@ -56,7 +56,7 @@ export function AddMachine({ person, agent, changed, cancel }: {
     const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
     if (!validComputerName(name)) { setFailure('Give this computer a name of 1 to 100 characters without control characters.'); return; }
     if (agent !== undefined && !/^agent-[0-9a-f]{32}$/.test(agent)) { setFailure('AgentIdentifierMalformed: the agent for this addition could not be read.'); return; }
-    void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null });
+    void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : [], may_run_roles: [], may_reach: [] }, phase: 'machine', machine: null });
   };
   return <form className="recorded-form" aria-label="Add a computer" onSubmit={submit}>
     <h2>Add this computer</h2>

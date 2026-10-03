@@ -27,7 +27,7 @@ export function matchesMachine(machine: unknown, body: NameMachine, person: stri
     && JSON.stringify(machine.may_run_roles ?? []) === JSON.stringify(body.may_run_roles ?? [])
     && JSON.stringify(machine.may_reach) === JSON.stringify(body.may_reach);
 }
-export interface PendingMachine { body: NameMachine; phase: 'machine' | 'runner' | 'read-runner'; legacy: boolean; machine: Machine | null }
+export interface PendingMachine { body: NameMachine; phase: 'machine' | 'runner'; machine: Machine | null }
 function unreadable(): never { throw new Refused(0, { refusal: 'PendingMachineUnreadable', reason: 'The retained computer addition cannot be read. Resolve its original request before adding another computer.' }); }
 function machineBody(value: unknown): NameMachine {
   if (!isRecord(value) || typeof value.operation !== 'string' || !/^op-[0-9a-f]{32}$/.test(value.operation)
@@ -46,16 +46,13 @@ export function savedMachine(key: string): PendingMachine | null {
 }
 
 export function pendingMachineOf(value: unknown): PendingMachine | null {
-  if (isRecord(value) && 'body' in value) {
-    if (value.version !== 1 || !['machine', 'runner', 'read-runner'].includes(String(value.phase)) || typeof value.legacy !== 'boolean'
-      || (value.phase === 'runner' && value.legacy) || (value.phase === 'read-runner' && !value.legacy)) return unreadable();
-    const body = machineBody(value.body);
-    const machine = value.machine;
-    if (machine !== null && (!readableMachine(machine) || machine.id !== body.operation)) return unreadable();
-    if (value.phase !== 'machine' && machine === null) return unreadable();
-    return { body, phase: value.phase as PendingMachine['phase'], legacy: value.legacy, machine };
-  }
-  return { body: machineBody(value), phase: 'machine', legacy: true, machine: null };
+  // One format is read. A saved addition in any other shape is said to be unreadable, never rewritten into this one.
+  if (!isRecord(value) || !('body' in value) || value.version !== 1 || !['machine', 'runner'].includes(String(value.phase))) return unreadable();
+  const body = machineBody(value.body);
+  const machine = value.machine;
+  if (machine !== null && (!readableMachine(machine) || machine.id !== body.operation)) return unreadable();
+  if (value.phase !== 'machine' && machine === null) return unreadable();
+  return { body, phase: value.phase as PendingMachine['phase'], machine };
 }
 
 export function confirmRunner(value: unknown, machine: string, local: boolean): void {

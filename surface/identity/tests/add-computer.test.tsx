@@ -171,29 +171,12 @@ describe('Naming the computer Lys runs on', () => {
     expect(document.body.textContent).toContain('Ward computer was added.');
   });
 
-  it('migrates an old pending body without changing its agent, roles, hosts or operation and reads its runner', async () => {
-    sessionStorage.setItem(pendingKey, JSON.stringify(legacy));
-    const routes = service();
-    routes['/network/machines/' + legacy.operation + '/runner'] = ok({ machine: legacy.operation, runner: { kind: 'dialled', key: 'd'.repeat(64) } });
-    const { posted, requests } = await open(routes); await retry();
-    expect(posted).toEqual([{ path: '/network/machines', body: legacy }]);
-    expect(requests).toContain('/network/machines/' + legacy.operation + '/runner');
-    expect(sessionStorage.getItem(pendingKey)).toBeNull();
-    expect(document.body.textContent).toContain('Earlier computer was added.');
-  });
-
-  it.each([
-    { name: 'missing', answer: ok({ machine: legacy.operation, runner: null }) },
-    { name: 'unreadable', answer: ok({ machine: legacy.operation, runner: { kind: 'invented' } }) },
-  ])('keeps a legacy addition unresolved when its runner is $name', async ({ answer }) => {
-    sessionStorage.setItem(pendingKey, JSON.stringify(legacy));
-    const routes = service(); routes['/network/machines/' + legacy.operation + '/runner'] = answer;
-    const { posted } = await open(routes); await retry();
-    expect(posted).toEqual([{ path: '/network/machines', body: legacy }]);
-    expect(document.body.textContent).toContain('runner');
-    expect(document.body.textContent).not.toContain('Lys will start agents on it');
-    expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
-    plain('RunnerReceiptMismatch');
+  it('reads one saved format: an earlier saved addition is said to be unreadable, is kept as it was, and nothing is sent', async () => {
+    const raw = JSON.stringify(legacy); sessionStorage.setItem(pendingKey, raw);
+    const { posted } = await open(service());
+    expect(document.body.textContent).toContain('The retained computer addition cannot be read');
+    expect(posted).toEqual([]);
+    expect(sessionStorage.getItem(pendingKey)).toBe(raw);
   });
 
   it('does not clear the local-runner phase when its answer names another machine', async () => {

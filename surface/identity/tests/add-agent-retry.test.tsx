@@ -109,18 +109,13 @@ describe('Add-agent retry safety', () => {
     expect(sessionStorage.getItem('lys.add-agent.' + ADA)).toBeNull();
   });
 
-  it('replays a request saved by the earlier form without changing its operation or owner', async () => {
-    const register = 'op-' + '1'.repeat(32);
-    sessionStorage.setItem('lys.add-agent.' + ADA, JSON.stringify({ name: 'Earlier helper', register, activate: 'op-' + '2'.repeat(32), agent: null }));
-    const { entry, posted } = await form({
-      'POST /agents': (body) => ok({ agent: COURIER, responsible: ADA, receipt: receipt(body) }),
-      ['POST /identities/' + COURIER + '/transitions']: (body) => ok({ receipt: { ...receipt(body), change_kind: 5 } }),
-    }, '?answers_to=' + BEA);
-    await submit(entry);
-    expect(posted[0]).toEqual({ path: '/agents', body: { operation: register, display_name: 'Earlier helper' } });
-    expect(posted).toHaveLength(2);
-    expect(location.hash).toBe('#/file/' + COURIER);
-    expect(sessionStorage.getItem('lys.add-agent.' + ADA)).toBeNull();
+  it('reads one saved format: a request saved by the earlier form is said to be unreadable and nothing is sent', async () => {
+    const raw = JSON.stringify({ name: 'Earlier helper', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null });
+    sessionStorage.setItem('lys.add-agent.' + ADA, raw);
+    const { posted } = await form({}, '?answers_to=' + BEA);
+    expect(document.body.textContent).toContain('The saved registration cannot be read');
+    expect(posted).toEqual([]);
+    expect(sessionStorage.getItem('lys.add-agent.' + ADA)).toBe(raw);
   });
 
   it.each([

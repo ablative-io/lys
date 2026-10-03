@@ -52,7 +52,7 @@ function placementOf(value: unknown, registration: PendingAgent, step: AddAndRun
   if (value.kind === 'new') {
     if (!isRecord(value.machine) || 'computer' in value || 'admission' in value || step === 'admission') return unreadable();
     const machine = pendingMachineOf({ ...value.machine, version: 1 });
-    if (!machine || machine.legacy || !validComputerName(machine.body.name) || machine.body.kind !== 'Computer' || machine.body.runtime !== 'lys-runner'
+    if (!machine || !validComputerName(machine.body.name) || machine.body.kind !== 'Computer' || machine.body.runtime !== 'lys-runner'
       || machine.body.slots !== 0 || machine.body.may_reach.length || (machine.body.may_run_roles ?? []).length) return unreadable();
     if (step === 'registration' ? machine.phase !== 'machine' || machine.body.may_run.length
       : machine.body.may_run.length !== 1 || machine.body.may_run[0] !== registration.agent) return unreadable();
@@ -71,14 +71,13 @@ function placementOf(value: unknown, registration: PendingAgent, step: AddAndRun
   return { kind: 'existing', computer: value.computer, admission: null };
 }
 function addAndRunOf(value: unknown, person: string): AddAndRun {
-  if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3) || value.person !== person || !isRecord(value.settings)
-    || !['registration', 'profile', 'review', 'computer', 'admission', 'start'].includes(String(value.step))) return unreadable();
-  if (value.version === 3 && (!isRecord(value.registration) || value.registration.version !== 1)) return unreadable();
+  // One format is read. A saved request in any other shape is said to be unreadable, never rewritten into this one.
+  if (!isRecord(value) || value.version !== 3 || value.person !== person || !isRecord(value.settings) || 'machine' in value
+    || !['registration', 'profile', 'review', 'computer', 'admission', 'start'].includes(String(value.step))
+    || !isRecord(value.registration) || value.registration.version !== 1) return unreadable();
   const registration = agentRequestOf(value.registration, person); profileFromSettings(value.settings);
   const step = value.step as AddAndRun['step'];
-  if (value.version === 1 && (step === 'admission' || 'placement' in value)) return unreadable();
-  if (value.version !== 1 && 'machine' in value) return unreadable();
-  const placement = placementOf(value.version === 1 ? { kind: 'new', machine: value.machine } : value.placement, registration, step);
+  const placement = placementOf(value.placement, registration, step);
   if (step === 'registration') {
     if (value.pending !== null) return unreadable();
     return { version: 3, person, registration, settings: value.settings, step, placement, pending: null };
@@ -94,19 +93,13 @@ function addAndRunOf(value: unknown, person: string): AddAndRun {
 export function readAddAndRun(key: string, person: string): AddAndRun | null {
   const raw = sessionStorage.getItem(key);
   if (raw === null) return null;
-  let value: unknown; let current: AddAndRun;
-  try { value = JSON.parse(raw); current = addAndRunOf(value, person); }
+  try { return addAndRunOf(JSON.parse(raw), person); }
   catch { return unreadable(); }
-  if (isRecord(value) && value.version !== 3) {
-    try { sessionStorage.setItem(key, JSON.stringify(current)); }
-    catch { throw new Refused(0, { refusal: 'PendingAddAndRunMigrationFailed', reason: 'The earlier request could not be saved in the current format. No request has been sent; its original record is kept.' }); }
-  }
-  return current;
 }
 export function newAddAndRun(registration: PendingAgent, settings: Record<string, unknown>, name: string, person: string, computer?: Machine): AddAndRun {
   profileFromSettings(settings);
   const placement: Placement = computer ? placementOf({ kind: 'existing', computer, admission: null }, registration, 'registration')
-    : { kind: 'new', machine: { body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null } };
+    : { kind: 'new', machine: { body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] }, phase: 'machine', machine: null } };
   if (placement.kind === 'new' && !validComputerName(name)) return unreadable();
   return { version: 3, person, registration, settings, step: 'registration', pending: null, placement };
 }

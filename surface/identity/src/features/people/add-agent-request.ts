@@ -21,29 +21,24 @@ export function readAgentRequest(key: string, caller: string): PendingAgent | nu
 
 export function agentRequestOf(value: unknown, caller: string): PendingAgent {
   if (!/^person-[0-9a-f]{32}$/.test(caller)) throw new Error('SignedInPersonUnreadable: the caller is not a readable person. No request has been sent.');
-  if (!object(value) || typeof value.name !== 'string' || !value.name.trim()
+  // One format is read. A saved registration in any other shape is said to be unreadable, never rewritten into this one.
+  if (!object(value) || value.version !== 1 || typeof value.name !== 'string' || !value.name.trim()
     || !operation(value.register) || !operation(value.activate)
     || !(value.agent === null || (typeof value.agent === 'string' && /^agent-[0-9a-f]{32}$/.test(value.agent)))) {
     throw new Error('The saved registration cannot be read. Check its outcome before adding another agent.');
   }
   const base = { name: value.name, register: value.register, activate: value.activate, agent: value.agent };
-  const legacy = !('version' in value);
-  if (!('answersTo' in value) && !('team' in value) && !('membership' in value) && !('activated' in value)) {
-    if (!legacy || 'grants' in value || 'responsible' in value) throw new Error('The saved registration format cannot be read.');
-    return { ...base, version: 1, responsible: value.agent ? caller : null, grants: [], team: null, membership: null, activated: false };
-  }
   if ((value.answersTo !== undefined && (typeof value.answersTo !== 'string' || !/^(person|agent)-[0-9a-f]{32}$/.test(value.answersTo)))
     || !(value.team === null || operation(value.team)) || !(value.membership === null || operation(value.membership))
     || (value.team === null) !== (value.membership === null) || typeof value.activated !== 'boolean'
     || (value.activated && value.agent === null)) {
     throw new Error('The saved person or team choice cannot be read. Check the original request before adding another agent.');
   }
-  const responsible = legacy ? value.agent ? value.answersTo ?? caller : null : value.responsible;
-  if (legacy ? 'grants' in value || 'responsible' in value || typeof value.answersTo === 'string' && value.answersTo.startsWith('agent-')
-    : value.version !== 1 || !(responsible === null || typeof responsible === 'string' && /^person-[0-9a-f]{32}$/.test(responsible)) || (value.agent === null) !== (responsible === null)) {
+  const responsible = value.responsible;
+  if (!(responsible === null || typeof responsible === 'string' && /^person-[0-9a-f]{32}$/.test(responsible)) || (value.agent === null) !== (responsible === null)) {
     throw new Error('The saved registration format cannot be read.');
   }
-  const grants = legacy ? [] : agentGrantsOf(value.grants, value.agent, responsible as string | null);
+  const grants = agentGrantsOf(value.grants, value.agent, responsible as string | null);
   if (grants.some((entry) => entry.operation === value.register || entry.operation === value.activate || entry.operation === value.membership || !value.activated && entry.body !== null)) {
     throw new Error('The saved access request is not bound to this activation.');
   }

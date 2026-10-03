@@ -166,7 +166,7 @@ export type ChangeOutcome<T> =
 /** Whether a form in this outcome may send. Only an idle form or a definite refusal may. */
 export const maySend = (outcome: ChangeOutcome<unknown>): boolean => outcome.at === 'editing' || outcome.at === 'refused';
 
-const UNKNOWN_NOTE = 'It is not known whether this change was made. Its original request is retained. Retry original change checks that same operation without creating another change. Older requests without an operation id stay held.';
+const UNKNOWN_NOTE = 'It is not known whether this change was made. Its original request is retained. Retry original change checks that same operation without creating another change.';
 
 export function ChangeView<T>({ outcome, done }: { outcome: ChangeOutcome<T>; done: (answer: T) => string }) {
   switch (outcome.at) {

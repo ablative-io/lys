@@ -95,16 +95,14 @@ describe('Network', () => {
     await mount('#/network', { ...routes, '/network': refused(503, 'NetworkUnavailable', 'not configured') });
     expect(text()).toContain('NetworkUnavailable'); expect(button('+ Add a computer')).toBeNull();
   });
-  it('replays a legacy role declaration exactly and keeps the entry when the answer omits that role', async () => {
-    const role = { id: 'op-' + 'c'.repeat(32), name: 'Builder', holders: [], versions: [] };
-    const legacy: NameMachine = { operation: 'op-' + 'd'.repeat(32), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [role.id], may_reach: [] };
-    sessionStorage.setItem('lys.pending.machine.' + ADA, JSON.stringify(legacy));
-    const { posted } = await adding({ '/roles': ok({ roles: [role] }), 'POST /network/machines': (body) => ok({ ...recorded(body as NameMachine), may_run_roles: [] }) });
-    await click(button('Check whether it was added'));
-    expect(posted[0].body).toMatchObject({ may_run: [], may_run_roles: [role.id] });
-    expect(posted[0].body).toEqual(legacy);
-    expect(text()).toContain('What you entered is kept'); expect(sessionStorage.length).toBe(1);
+  it('reads one saved format: an earlier saved addition is said to be unreadable and nothing is sent', async () => {
+    const earlier: NameMachine = { operation: 'op-' + 'd'.repeat(32), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] };
+    sessionStorage.setItem('lys.pending.machine.' + ADA, JSON.stringify(earlier));
+    const { posted } = await adding({});
+    expect(text()).toContain('The retained computer addition cannot be read');
+    expect(posted).toEqual([]); expect(sessionStorage.length).toBe(1);
   });
+
 });
 
 describe('Computers at the size of a business', () => {

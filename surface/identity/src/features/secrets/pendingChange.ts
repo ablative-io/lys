@@ -1,4 +1,4 @@
-/** Retained legacy change descriptions stay held; keyed changes can be retried with their original operation. */
+/** A retained change is retried with its original operation; a record that cannot be read holds the form. */
 import { Refused } from '../../api';
 
 /** The part of Storage a pending change needs; sessionStorage in the browser. */
