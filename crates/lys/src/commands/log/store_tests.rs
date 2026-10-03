@@ -51,12 +51,23 @@ fn a_rejected_origin_stays_a_trust_error() {
     assert!(matches!(err, CliError::Trust(_)), "{err}");
 }
 
+/// The first segment file of the log at `dir` (LYSLOGSTORE-008 R1).
+fn first_segment(dir: &Path) -> std::path::PathBuf {
+    dir.join("leaves")
+        .join("segments")
+        .join(format!("{:020}", 0))
+}
+
 #[test]
 fn corruption_keeps_the_stores_specific_reason_and_path() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     init(&dir);
-    std::fs::write(dir.join("leaves").join(format!("{:020}", 1)), b"junk").unwrap();
+    std::fs::write(
+        dir.join("leaves").join("segments").join("stray.txt"),
+        b"junk",
+    )
+    .unwrap();
     let err = open(&dir).unwrap_err();
     match err {
         CliError::LogDirInvalid {
@@ -64,7 +75,7 @@ fn corruption_keeps_the_stores_specific_reason_and_path() {
             ref reason,
         } => {
             assert_eq!(path, &dir);
-            assert!(reason.contains("not contiguous"), "{reason}");
+            assert!(reason.contains("unexpected entry"), "{reason}");
         }
         other => panic!("expected LogDirInvalid, got {other}"),
     }
@@ -100,24 +111,40 @@ fn an_io_failure_keeps_its_context() {
     assert!(message.contains("device is on fire"), "{message}");
 }
 
-/// Opening a log with an interrupted append must succeed and repair it. The
+/// Opening a log with an unfinished append must succeed and cut it. The
 /// notice itself goes to stderr, which this layer owns; what is asserted here
-/// is that the CLI does not turn a recoverable log into a failure.
+/// is that the CLI does not turn a recoverable log into a failure, and that
+/// nothing acknowledged is lost.
 #[test]
-fn an_interrupted_append_still_opens_through_the_cli_path() {
+fn an_unfinished_append_still_opens_through_the_cli_path() {
+    use std::io::Write;
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     init(&dir);
     let mut log = open(&dir).unwrap();
     log.append(b"leaf-0").unwrap();
-    let state_after_one = std::fs::read(dir.join("state.json")).unwrap();
     log.append(b"leaf-1").unwrap();
-    std::fs::write(dir.join("state.json"), &state_after_one).unwrap();
+    drop(log);
+    // A torn tail: bytes of a record that never reached its flush.
+    let mut segment = std::fs::OpenOptions::new()
+        .append(true)
+        .open(first_segment(&dir))
+        .unwrap();
+    segment.write_all(&[7, 0, 0, 0, b'l', b'e', b'a']).unwrap();
+    drop(segment);
 
     let recovered = open(&dir).unwrap();
     assert_eq!(recovered.tree().len(), 2);
-    assert_eq!(recovered.recovered_to(), Some(2));
+    assert_eq!(recovered.recovered_to(), None);
     assert_eq!(recovered.store().extent(), 2);
+    assert_eq!(recovered.store().pinned().tree_size, 2);
+    assert!(recovered.store().unfinished_tail().is_none());
+    let read_only = lys_log_store::FileLeafStore::open_read_only(&dir).unwrap();
+    assert_eq!(read_only.extent(), 2);
+    assert!(
+        read_only.unfinished_tail().is_none(),
+        "the writable open cut it"
+    );
 }
 
 /// A tampered leaf must still read as a corrupt *log directory*, naming the
@@ -131,7 +158,14 @@ fn a_tampered_leaf_reads_as_an_invalid_log_directory() {
     init(&dir);
     let mut log = open(&dir).unwrap();
     log.append(b"leaf-0").unwrap();
-    std::fs::write(dir.join("leaves").join(format!("{:020}", 0)), b"leaf-X").unwrap();
+    log.append(b"leaf-1").unwrap();
+    drop(log);
+    // Byte 4 of the first segment is the first byte of leaf 0, inside the
+    // pinned prefix; flipping it fails that record's CRC.
+    let path = first_segment(&dir);
+    let mut bytes = std::fs::read(&path).unwrap();
+    bytes[4] ^= 0x01;
+    std::fs::write(&path, bytes).unwrap();
 
     let err = open(&dir).unwrap_err();
     match err {
@@ -141,7 +175,7 @@ fn a_tampered_leaf_reads_as_an_invalid_log_directory() {
         } => {
             assert_eq!(path, &dir);
             // The specific discrepancy survives the reframing.
-            assert!(reason.contains("rebuild to tree size"), "{reason}");
+            assert!(reason.starts_with("corrupt record: "), "{reason}");
         }
         other => panic!("expected LogDirInvalid, got {other}"),
     }

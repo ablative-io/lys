@@ -13,9 +13,10 @@
 //! prints it. The one thing neither may do is drop it: a silently repaired log
 //! is indistinguishable from one that never needed repairing.
 //!
-//! The leftover temporary leaf files [`FileLeafStore::open`] skipped are
-//! handled the same way: the store returns their names and this layer prints
-//! them, once, on stderr — never on stdout, where a `--json` consumer reads.
+//! An unfinished append the store cut at open (LYSLOGSTORE-008 R1: a torn
+//! tail after the last whole record carrying a pin) is handled the same way:
+//! the store returns what it cut and this layer prints it, once, on stderr —
+//! never on stdout, where a `--json` consumer reads.
 
 use std::path::Path;
 
@@ -23,7 +24,7 @@ use lys_log_store::{FileLeafStore, Log, StoreError};
 
 use crate::commands::error::{CliError, CliResult};
 
-/// The `lys` CLI's log: a Merkle log over a directory of leaf files.
+/// The `lys` CLI's log: a Merkle log over a directory of segment files.
 pub type LogStore = Log<FileLeafStore>;
 
 /// Creates and initializes a log directory at `dir` with the given origin.
@@ -38,9 +39,8 @@ pub fn init(dir: &Path, origin: &str) -> CliResult<()> {
     Ok(())
 }
 
-/// Opens and integrity-verifies the log directory at `dir`, reporting the
-/// leftover temporary leaf files the store skipped and an interrupted append
-/// that was repaired.
+/// Opens the log at `dir`, reporting on stderr an unfinished append the store
+/// cut and an interrupted append that was repaired.
 ///
 /// # Errors
 ///
@@ -50,7 +50,7 @@ pub fn init(dir: &Path, origin: &str) -> CliResult<()> {
 pub fn open(dir: &Path) -> CliResult<LogStore> {
     let store = FileLeafStore::open(dir)?;
     store.audit_leaves()?;
-    if let Some(line) = leftover_temporaries_line(&store.leftover_temporaries()?) {
+    if let Some(line) = unfinished_tail_line(store.unfinished_tail()) {
         eprintln!("{line}");
     }
     let log = Log::open(store).map_err(|err| integrity_failure(dir, err))?;
@@ -60,16 +60,20 @@ pub fn open(dir: &Path) -> CliResult<LogStore> {
     Ok(log)
 }
 
-/// The stderr line naming the leftover temporary leaf files a store skipped at
-/// open, in the order given, or `None` when there were none.
-fn leftover_temporaries_line(names: &[String]) -> Option<String> {
-    if names.is_empty() {
-        return None;
-    }
-    Some(format!(
-        "ignored leftover temporary leaf files: {}",
-        names.join(", ")
-    ))
+/// The stderr line naming the unfinished append a writable open cut, or
+/// `None` when the log ended on a whole record.
+///
+/// The same line `lys-anchor` prints, so an operator running both tools over
+/// the same kind of directory reads one sentence.
+fn unfinished_tail_line(tail: Option<&lys_log_store::UnfinishedTail>) -> Option<String> {
+    tail.map(|tail| {
+        format!(
+            "cut an unfinished append: {} bytes after offset {} of {}",
+            tail.bytes,
+            tail.offset,
+            tail.segment.display()
+        )
+    })
 }
 
 /// Attaches the log directory to an integrity failure that carries no path.
@@ -83,12 +87,12 @@ fn leftover_temporaries_line(names: &[String]) -> Option<String> {
 /// log directory reports.
 fn integrity_failure(dir: &Path, err: StoreError) -> CliError {
     match err {
-        err @ (StoreError::PinMismatch { .. } | StoreError::LeafMissingWithinExtent { .. }) => {
-            CliError::LogDirInvalid {
-                path: dir.to_path_buf(),
-                reason: err.to_string(),
-            }
-        }
+        err @ (StoreError::PinMismatch { .. }
+        | StoreError::LeafMissingWithinExtent { .. }
+        | StoreError::CorruptRecord { .. }) => CliError::LogDirInvalid {
+            path: dir.to_path_buf(),
+            reason: err.to_string(),
+        },
         other => other.into(),
     }
 }
