@@ -38,4 +38,3 @@
 .you-tree .you-asked td { padding: 4px 12px 14px; }
 .you-tree .you-asked .team-stopped, .you-tree .you-asked .team-start { align-items: flex-start; padding: 0; }
 .you-tree .you-asked .you-start-here { display: flex; align-items: flex-start; gap: 16px; }
-.you-tree .you-asked .you-setup { max-width: 720px; }

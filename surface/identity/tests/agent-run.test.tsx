@@ -59,20 +59,17 @@ describe('An agent\'s run on People and agents', () => {
     expect($$('.file nav.tabs a').map((el) => el.getAttribute('href'))).toContain('#/file/' + SCRIBE + '/provisioning');
   });
 
-  it('offers Set up, not Start, on the row of an agent with no program chosen, and sets it up under that row', async () => {
+  it('offers Set up, not Start, on the row of an agent with no program chosen, and Set up opens the Settings tab of its own page', async () => {
     await mount('#/', { ...stopped, ...provisioning(SCRIBE, null) });
     const row = () => $$('tr[data-href]').find((each) => each.textContent?.includes('Scribe'));
     expect(row()?.querySelector('[data-act="start"]')).toBeNull();
-    await click(row()?.querySelector('[data-act="setup"]') ?? null);
-    expect($('.you-setup section[aria-label="Settings of this agent"]')).not.toBeNull();
-    // One button under the form: it saves and goes on to the start. There is no second button to find afterwards.
-    expect(button('Save and start Scribe')).not.toBeNull();
-    expect(button('Save these settings')).toBeNull();
-    expect(button('Done, back to Start')).toBeNull();
-    expect(location.hash).toBe('#/');
-    await click(button('Close'));
+    expect(row()?.querySelector('[data-act="setup"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    // The settings form has one home. No copy of it opens under the row.
+    expect($('.you-setup')).toBeNull();
     expect($('.you-asked')).toBeNull();
-    expect(row()?.querySelector('[data-act="setup"]')).not.toBeNull();
+    await mount('#/file/' + SCRIBE + '/provisioning', { ...stopped, ...provisioning(SCRIBE, null) });
+    expect($('section[aria-label="Settings of this agent"]')).not.toBeNull();
+    expect($$('section[aria-label="Settings of this agent"] button[type="submit"]').map((el) => el.textContent)).toEqual(['Save these settings']);
   });
 
   it('stops a running agent from its row on the front page, after asking', async () => {
@@ -185,12 +182,10 @@ describe('An agent\'s run on People and agents', () => {
     await mount('#/team/' + SCRIBE, { ...stopped, ...provisioning(SCRIBE, null) });
     expect(text()).toContain('Scribe has no program chosen yet.');
     await click(button('Choose its program'));
-    // Setting it up happens under its row on the front page; the person is not sent to another page.
-    expect(location.hash).toBe('#/team/' + SCRIBE);
-    expect($('.you-setup section[aria-label="Settings of this agent"]')).not.toBeNull();
-    // Earlier mounts in this case leave their own Close on the page, so the one under the form is named.
-    await click($$('.you-setup button').find((el) => el.textContent === 'Close') ?? null);
+    // Its settings have one home: the Settings tab of its own page.
+    expect(location.hash).toBe('#/file/' + SCRIBE + '/provisioning');
     expect($('.you-setup')).toBeNull();
+    expect($('section[aria-label="Settings of this agent"]')).not.toBeNull();
   });
 
   it('says the service\'s own reason when it refuses the start, with Try again, and no greyed button', async () => {

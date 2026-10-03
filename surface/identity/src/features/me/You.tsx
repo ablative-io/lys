@@ -11,7 +11,6 @@ import { pref, setPref } from '../../shell/prefs';
 import { useShell } from '../../shell/ShellContext';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { Start } from '../team/Start';
-import { Provisioning } from '../provisioning/Provisioning';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { Stop } from '../team/AgentRun';
 import '../team/team.css';
@@ -92,22 +91,16 @@ const depth = (level: number) => ({ '--depth': level } as CSSProperties);
 function FragmentRows({ children }: { children: React.ReactNode }) { return <>{children}</>; }
 
 /** What the person asked of one agent from its row: start it, or stop it. Shown in a row of its own under the agent. */
-export interface Asked { agent: string; what: 'start' | 'stop' | 'started'; pressed: boolean; setup?: boolean }
+export interface Asked { agent: string; what: 'start' | 'stop' | 'started'; pressed: boolean }
 
-/** Start, where the agent is listed. Whether the person may approve its settings is read here, when it is first shown. */
-function StartHere({ entry, me, pressed, setupFirst, changed, close }: { entry: Entry; me: string; pressed: boolean; setupFirst: boolean; changed: () => void; close: () => void }) {
-  // Setting the agent up happens here, under its row: the person never leaves the page to choose its program, folder or computer.
-  const [setup, setSetup] = useState(setupFirst);
-  const [round, setRound] = useState(0);
+/** Start, where the agent is listed. Whether the person may approve its settings is read here, when it is first shown. Its settings have one home, the Settings tab of its own page. */
+function StartHere({ entry, me, pressed, changed, close }: { entry: Entry; me: string; pressed: boolean; changed: () => void; close: () => void }) {
+  const navigate = useNavigate();
   const load = useLoad(() => api.people(), 'you-start:' + entry.id);
   if (load.status === 'loading') return null;
-  if (setup) return <div className="you-setup">
-    <Provisioning id={entry.id} saved={() => { setSetup(false); setRound((value) => value + 1); }} />
-    <p><button type="button" className="btn" onClick={close}>Close</button></p>
-  </div>;
   return <div className="you-start-here">
-    <Start key={round} entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed || round > 0}
-      settings={() => setSetup(true)} />
+    <Start entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed}
+      settings={() => navigate('/file/' + encodeURIComponent(entry.id) + '/provisioning')} />
     <button type="button" className="you-watch" data-act="close" onClick={close}>Close</button>
   </div>;
 }
@@ -118,7 +111,7 @@ function RowStart({ entry, ask }: { entry: Entry; ask: (next: Asked) => void }) 
   if (load.status === 'loading') return null;
   const unset = load.status === 'ok' && !load.data.profile?.harness;
   return unset
-    ? <button type="button" className="you-watch you-start" data-act="setup" onClick={(event) => { event.stopPropagation(); ask({ agent: entry.id, what: 'start', pressed: false, setup: true }); }}>Set up</button>
+    ? <a className="you-watch you-start" data-act="setup" href={'#/file/' + encodeURIComponent(entry.id) + '/provisioning'} onClick={(event) => event.stopPropagation()}>Set up</a>
     : <button type="button" className="you-watch you-start" data-act="start" onClick={(event) => { event.stopPropagation(); ask({ agent: entry.id, what: 'start', pressed: true }); }}>Start</button>;
 }
 
@@ -157,7 +150,7 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
               : asked.what === 'started'
               // The start was answered; the row offers no second Start while the page reads where it is running.
               ? <p role="status" className="team-start-line">{member.entry.display_name} has started. Reading where it is running…</p>
-              : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '') + (asked.setup ? ':setup' : '')} entry={member.entry} me={me} pressed={asked.pressed} setupFirst={asked.setup === true} changed={() => { ask({ agent: member.entry.id, what: 'started', pressed: false }); changed(); }} close={() => ask(null)} />}
+              : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '')} entry={member.entry} me={me} pressed={asked.pressed} changed={() => { ask({ agent: member.entry.id, what: 'started', pressed: false }); changed(); }} close={() => ask(null)} />}
           </td></tr> : null}
           <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} watching={watching} toggleWatch={toggleWatch} me={me} asked={asked} ask={ask} changed={changed} />
         </FragmentRows>;

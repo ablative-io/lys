@@ -75,7 +75,7 @@ describe('The settings form', () => {
     expect(posted.map((entry) => entry.path)).toEqual([path]);
     expect(posted[0].body).toMatchObject({ from_version: 0, model_access: ['default'], permissions: { default_mode: 'default' }, harness, instructions: '', tools: [], skills: [], mcp_servers: [] });
     expect(text()).toContain('Saved.');
-    expect(document.querySelector('section[aria-label="Settings of this agent"] a[href="#/team/' + SCRIBE + '"]')).not.toBeNull();
+    expect(document.querySelector('section[aria-label="Settings of this agent"] a[href="#/file/' + SCRIBE + '"]')).not.toBeNull();
   });
   it('saves a second change from the version it just saved', async () => {
     const { posted } = await open(routes());
