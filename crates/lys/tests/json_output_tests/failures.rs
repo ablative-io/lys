@@ -108,8 +108,13 @@ fn a_refused_request_issuance_writes_no_certificate() {
         !leaf.exists(),
         "a refused issuance must not leave a leaf behind"
     );
-    let leaves = std::fs::read_dir(dir.join("log/leaves")).unwrap();
-    assert_eq!(leaves.count(), 0);
+    // Read through the store, never from the files under the directory.
+    let store = lys_log_store::FileLeafStore::open_read_only(&dir.join("log")).unwrap();
+    assert_eq!(
+        lys_log_store::LeafStore::extent(&store),
+        0,
+        "a refused issuance must not enter a leaf in the log"
+    );
 }
 
 /// A verification failure stays non-oracle in JSON mode.
