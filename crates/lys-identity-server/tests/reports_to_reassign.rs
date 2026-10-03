@@ -88,15 +88,12 @@ impl Table {
         code: &str,
     ) -> Result<Value, Box<dyn Error>> {
         let leaves = leaf_bytes(&self.service)?;
-        let state = std::fs::read(self.service.dir.path().join("log/state.json"))?;
+        let state = pinned(&self.service)?;
         let (status, answer) = self.post(route, Some(cookie), body).await?;
         assert!((400..500).contains(&status), "{status}: {answer}");
         assert_eq!(answer["refusal"], code);
         assert_eq!(leaf_bytes(&self.service)?, leaves);
-        assert_eq!(
-            std::fs::read(self.service.dir.path().join("log/state.json"))?,
-            state
-        );
+        assert_eq!(pinned(&self.service)?, state);
         Ok(answer)
     }
 
@@ -121,17 +118,29 @@ fn edge(target: &str) -> Result<Value, Box<dyn Error>> {
     Ok(json!({"operation": OperationId::generate()?.to_string(), "reports_to": target}))
 }
 
-fn leaf_bytes(service: &Service) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn Error>> {
+/// Every leaf of the service's log by index, read through the store.
+fn leaf_bytes(service: &Service) -> Result<BTreeMap<u64, Vec<u8>>, Box<dyn Error>> {
+    leaves_of(&service.dir.path().join("log"))
+}
+
+/// Every leaf of the log at `dir` by index, read through the store.
+fn leaves_of(dir: &std::path::Path) -> Result<BTreeMap<u64, Vec<u8>>, Box<dyn Error>> {
+    use lys_log_store::LeafStore;
+    let store = lys_log_store::FileLeafStore::open_read_only(dir)?;
     let mut leaves = BTreeMap::new();
-    for entry in std::fs::read_dir(service.dir.path().join("log/leaves"))? {
-        let entry = entry?;
-        let name = entry
-            .file_name()
-            .into_string()
-            .map_err(|error| format!("leaf name is not text: {error:?}"))?;
-        leaves.insert(name, std::fs::read(entry.path())?);
+    for index in 0..store.extent() {
+        let leaf = store
+            .leaf(index)?
+            .ok_or_else(|| format!("leaf {index} is within the extent but absent"))?;
+        leaves.insert(index, leaf);
     }
     Ok(leaves)
+}
+
+/// The log's pin, read through the store.
+fn pinned(service: &Service) -> Result<lys_log_store::PinnedRoot, Box<dyn Error>> {
+    use lys_log_store::LeafStore;
+    Ok(lys_log_store::FileLeafStore::open_read_only(&service.dir.path().join("log"))?.pinned())
 }
 
 #[tokio::test]
@@ -309,15 +318,7 @@ async fn an_old_directory_requires_migration_and_preserves_every_registration()
     let (service, (legacy, old_leaves, old_snapshot)) = Service::start_with(|config| {
         let legacy = before::write(config)?;
         let old_snapshot = std::fs::read(config.log_dir.join("snapshot.bin"))?;
-        let mut old_leaves = BTreeMap::new();
-        for entry in std::fs::read_dir(config.log_dir.join("leaves"))? {
-            let entry = entry?;
-            let name = entry
-                .file_name()
-                .into_string()
-                .map_err(|error| format!("leaf name is not text: {error:?}"))?;
-            old_leaves.insert(name, std::fs::read(entry.path())?);
-        }
+        let old_leaves = leaves_of(&config.log_dir)?;
         let path = config.log_dir.clone();
         let opened = lys_identity::Directory::open(
             Box::new(move || lys_log_store::FileLeafStore::open(&path)),

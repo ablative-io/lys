@@ -177,19 +177,22 @@ async fn admitted_choices(
     chosen.ok_or_else(|| "the chosen-person registration was not exercised".into())
 }
 
-type RegistrationBytes = (Vec<u8>, Vec<u8>);
+/// The log's pin and the registration's own leaf, read through the store so
+/// a test can say a later act changed neither.
+type RegistrationBytes = (lys_log_store::PinnedRoot, Vec<u8>);
 fn registration_bytes(
     service: &Service,
     answer: &serde_json::Value,
 ) -> Result<RegistrationBytes, Box<dyn Error>> {
+    use lys_log_store::LeafStore;
     let index = answer["receipt"]["log"]["index"]
         .as_u64()
         .ok_or("registration has no receipt index")?;
-    let log = service.dir.path().join("log");
-    Ok((
-        std::fs::read(log.join("state.json"))?,
-        std::fs::read(log.join("leaves").join(format!("{index:020}")))?,
-    ))
+    let store = lys_log_store::FileLeafStore::open_read_only(&service.dir.path().join("log"))?;
+    let leaf = store
+        .leaf(index)?
+        .ok_or("the registration's leaf is not in the log")?;
+    Ok((store.pinned(), leaf))
 }
 
 #[tokio::test]
