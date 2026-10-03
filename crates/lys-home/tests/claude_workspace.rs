@@ -2,7 +2,7 @@
 use std::error::Error;
 
 use lys_home::harness::launch_fields::InstructionsMode;
-use lys_home::harness::rendering_launch::render;
+use lys_home::harness::rendering_launch::{NO_SETTING_SOURCES, ONLY_GIVEN_MCP, render};
 use serde_json::{Value, json};
 
 #[test]
@@ -122,5 +122,51 @@ fn a_named_mode_renders_the_permissions_exactly_as_written() -> Result<(), Box<d
     )?;
     assert_eq!(settings["permissions"], written);
     assert!(settings.get("sandbox").is_none(), "{settings}");
+    Ok(())
+}
+
+/// A person's own settings, hooks, plugins, MCP servers and connectors are
+/// left out of every Claude Code start, in every prompt mode, and the two
+/// files Lys passes keep the positions the runner binds to paths.
+#[test]
+fn every_start_leaves_the_persons_own_setup_out() -> Result<(), Box<dyn Error>> {
+    let mut template: Value = serde_json::from_str(include_str!("fixtures/launch/template.json"))?;
+    template["slots"]["permissions"] = json!({"defaultMode": "acceptEdits"});
+    // The fixture's own flags already name one of the two; without them the
+    // count below is of what the renderer adds.
+    template["flags"] = json!([]);
+    for mode in [
+        InstructionsMode::Keep,
+        InstructionsMode::Append,
+        InstructionsMode::Replace,
+    ] {
+        let launch = render(
+            "claude-code/template-v1",
+            "/opt/seat/bin/claude",
+            &template.to_string(),
+            mode,
+        )?;
+        for flag in [NO_SETTING_SOURCES, ONLY_GIVEN_MCP] {
+            let count = launch.arguments.iter().filter(|one| *one == flag).count();
+            assert_eq!(count, 1, "{flag} in {:?}", launch.arguments);
+        }
+        assert_eq!(NO_SETTING_SOURCES, "--setting-sources=");
+        assert!(
+            !launch.arguments.iter().any(String::is_empty),
+            "an empty argument: {:?}",
+            launch.arguments
+        );
+        for (index, path) in &launch.argument_files {
+            assert_eq!(&launch.arguments[*index], path, "{:?}", launch.arguments);
+        }
+        assert_eq!(
+            launch.arguments[..4],
+            ["--mcp-config", "mcp.json", "--settings", "settings.json"]
+        );
+        assert!(
+            !launch.environment.contains_key("CLAUDE_CONFIG_DIR"),
+            "a config folder would sign the run out"
+        );
+    }
     Ok(())
 }

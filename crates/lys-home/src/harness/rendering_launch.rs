@@ -45,6 +45,11 @@ pub struct Launch {
     pub files: Vec<File>,
 }
 
+/// Loads none of the person's, the folder's or the folder's local settings.
+pub const NO_SETTING_SOURCES: &str = "--setting-sources=";
+/// Uses only the MCP servers in the file Lys passes.
+pub const ONLY_GIVEN_MCP: &str = "--strict-mcp-config";
+
 fn file(path: &str, text: String) -> File {
     File {
         path: path.to_owned(),
@@ -93,14 +98,28 @@ pub fn render(
     for secret in template.use_only {
         environment.insert(secret.env, secret.handle);
     }
-    // The run uses the machine's own Claude Code setup: its config folder,
-    // settings, sign-in and MCP servers. Lys adds its own MCP file and
-    // settings file by path and sets no config folder (Tom, 3 Oct 2026).
+    // The run keeps the machine's sign-in and nothing else of the person's
+    // own Claude Code setup (Tom, 3 Oct 2026 20:47): no config folder is set,
+    // because the sign-in lives under the login's own one, and two flags
+    // leave the rest out. Sources are in
+    // docs/harness/reference/claude-code/CLEAN-START.md.
     let mut arguments = vec![
         "--mcp-config".to_owned(),
         "mcp.json".to_owned(),
         "--settings".to_owned(),
         "settings.json".to_owned(),
+        // cli-reference.md line 129: "Comma-separated list of setting
+        // sources to load (`user`, `project`, `local`)". An empty list loads
+        // none of the three, so the person's settings, hooks, installed
+        // plugins and their skills and agents stay out; the `--settings`
+        // file above still applies. Written as one word so no empty
+        // argument has to survive a command line.
+        NO_SETTING_SOURCES.to_owned(),
+        // cli-reference.md line 131: "Only use MCP servers from
+        // `--mcp-config`, ignoring all other MCP configurations". That
+        // leaves out the person's MCP servers, plugin servers and claude.ai
+        // connectors; the servers in Lys's own mcp.json stay.
+        ONLY_GIVEN_MCP.to_owned(),
     ];
     let mut argument_files =
         BTreeMap::from([(1, "mcp.json".to_owned()), (3, "settings.json".to_owned())]);
