@@ -103,9 +103,9 @@ describe('People and agents', () => {
     await mount('#/people', { ...SERVICE, '/runtime/sessions': refused(503, 'RuntimeUnavailable', 'No reports store') });
     expect($$('.stat .n').slice(3).map((entry) => entry.textContent)).toEqual(['—', '—']); expect(text()).toContain('RuntimeUnavailable');
   });
-  it('takes the agent preview start action to the real profile screen', async () => {
+  it('takes the agent preview start action to the agent\'s pane on the front page', async () => {
     await mount('#/people'); await click($('[data-kind="agent"]'));
-    expect($('[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    expect($('[data-act="start"]')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
   });
 
 });

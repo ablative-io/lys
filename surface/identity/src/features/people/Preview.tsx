@@ -43,7 +43,7 @@ export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach
         <a className="btn" href={'#/file/' + x.id}>Open file</a>
         <a className="btn" href={'#/graph/' + x.id}>Show in graph</a>
         {agent && x.state === 'active' ? (
-          <a className="btn" data-act="start" href={'#/file/' + x.id + '/provisioning'}>Prepare start…</a>
+          <a className="btn" data-act="start" href={'#/team/' + x.id}>Start</a>
         ) : null}
       </div>
     </div>

@@ -19,9 +19,9 @@ describe("An agent's file", () => {
     await mount('#/file/' + SCRIBE);
     const next = $$('nav[aria-label="Next steps"] a');
     expect(next.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Start', 'Set limits', 'Give access']);
-    expect(next.map((entry) => entry.getAttribute('href'))).toEqual(['provisioning', 'budgets', 'access'].map((tab) => '#/file/' + SCRIBE + '/' + tab));
+    expect(next.map((entry) => entry.getAttribute('href'))).toEqual(['#/team/' + SCRIBE, '#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']);
     expect(next.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
-    expect($('.agent-next a[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    expect($('.agent-next a[data-act="start"]')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
     expect($('.agent-details [data-act="suspend"]')?.getAttribute('href')).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
     expect($('.file .head button[data-act="stop"]')).not.toBeNull();
     expect($('.agent-details [data-act="stop"]')).toBeNull();

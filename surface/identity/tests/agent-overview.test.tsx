@@ -60,7 +60,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect(overview?.textContent).toContain('Running, as its runner last reported');
     const actions = $$('[aria-label="Next steps"] a');
     expect(actions.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Start', 'Set limits', 'Give access']);
-    expect(actions.map((entry) => entry.getAttribute('href'))).toEqual(['provisioning', 'budgets', 'access'].map((part) => '#/file/' + SCRIBE + '/' + part));
+    expect(actions.map((entry) => entry.getAttribute('href'))).toEqual(['#/team/' + SCRIBE, '#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']);
     expect(actions.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
     expect(actions[0]?.textContent).toContain('Start Scribe on Ward computer with Model One.');
     expect(actions[0]?.textContent).not.toContain('Choose its computer and model');
@@ -150,7 +150,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect($('[aria-label="Next steps"]')?.textContent).toContain('Lys has no computer to run Scribe on yet.');
     const add = $$('[aria-label="Next steps"] a').find((link) => link.textContent === 'Add this computer') ?? null;
     expect(add?.getAttribute('href')).toBe('#/network?add=computer');
-    expect($('[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    expect($('[data-act="start"]')?.getAttribute('href')).toBe('#/team/' + SCRIBE);
     await follow(add);
     expect($('form[aria-label="Add a computer"]')).not.toBeNull();
     expect(posted).toEqual([]);
@@ -172,7 +172,7 @@ describe('An agent page explains the agent before its controls', () => {
   });
 
   it.each([
-    { tab: 'provisioning', control: '[aria-label="Start this agent"]' },
+    { tab: 'provisioning', control: '[aria-label="Settings of this agent"]' },
     { tab: 'budgets', control: 'section.usage' },
     { tab: 'access', control: '[data-act="grant"]' },
   ])('puts $tab before folded Details without reading receipts', async ({ tab, control }) => {
