@@ -88,7 +88,7 @@ describe('Usage', () => {
     const item: GoalItem = { goal: { id: 'op-standing-aim', kind: 'goal', words: 'Keep the directory available', deadline: null, active: true, evidence: null }, standing: 'open' };
     await mount(file, { ...keeping(), [goals]: ok({ goals: [item] }) });
     const row = $('section[aria-label="Goals"] tbody tr');
-    expect(row?.children[1]?.textContent).toBe(item.goal.words);
+    expect(row?.children[1]?.querySelector<HTMLInputElement>('input[name="words"]')?.value).toBe(item.goal.words);
     expect(row?.children[2]?.textContent).toBe('No deadline');
   });
 
@@ -110,23 +110,23 @@ describe('Usage', () => {
     const routes = keeping();
     await mount(file, routes);
     await type('textarea[name="words"]', 'Land the Usage screen');
-    await click([...document.querySelectorAll('button')].find((button) => button.textContent === 'Add a deadline') ?? null);
+    expect([...document.querySelectorAll('button')].some((button) => button.textContent === 'Add a deadline')).toBe(false);
     await type('input[name="deadline"]', '2026-10-01T12:00');
     await submit('Set a goal');
     await reload(routes);
-    expect($('section[aria-label="Goals"] table')?.textContent).toContain('Land the Usage screen');
+    expect([...document.querySelectorAll<HTMLInputElement>('section[aria-label="Goals"] tbody input[name="words"]')].map((input) => input.value)).toContain('Land the Usage screen');
     expect($('section[aria-label="Goals"] table')?.textContent).toContain('Open');
   });
 
-  it('keeps a goal set with no deadline, asking for none', async () => {
+  it('keeps a goal set with no deadline when the deadline box is left empty', async () => {
     const routes = keeping();
     await mount(file, routes);
     expect($('form[aria-label="Set a goal"] select')).toBeNull();
-    expect($('input[name="deadline"]')).toBeNull();
+    expect(document.querySelector<HTMLInputElement>('form[aria-label="Set a goal"] input[name="deadline"]')?.value).toBe('');
     await type('textarea[name="words"]', 'Answer every question in plain words');
     await submit('Set a goal');
     await reload(routes);
-    expect($('section[aria-label="Goals"] table')?.textContent).toContain('Answer every question in plain words');
+    expect([...document.querySelectorAll<HTMLInputElement>('section[aria-label="Goals"] tbody input[name="words"]')].map((input) => input.value)).toContain('Answer every question in plain words');
     expect($('section[aria-label="Goals"] table')?.textContent).toContain('No deadline');
   });
 

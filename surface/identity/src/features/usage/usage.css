@@ -13,3 +13,13 @@
 .usage form [role="status"],
 .usage form [role="alert"] { flex-basis: 100%; margin: 0; }
 .usage .why-not { color: var(--danger); }
+/* One table to put things into: fixed columns, inputs filling their cell, and the last row adding one in the same columns. */
+.usage-table { table-layout: fixed; }
+.usage-table td { white-space: normal; vertical-align: top; }
+.usage-table td input:not([type=checkbox]), .usage-table td select, .usage-table td textarea { width: 100%; }
+.usage-table td form { display: block; margin: 0; }
+.usage-table .usage-add { padding: 8px 0 0; border-bottom: 0; }
+.usage .usage-add-row { display: grid; gap: 0; align-items: start; margin: 0; }
+.usage .usage-add-row > * { margin: 0 10px; min-width: 0; }
+.usage .usage-add-row > [role="status"], .usage .usage-add-row > [role="alert"], .usage .usage-add-row > div { grid-column: 1 / -1; }
+.usage-table label.tick { margin: 0 0 6px; }
