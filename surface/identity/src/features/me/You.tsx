@@ -1,5 +1,5 @@
 /** The front page fills the screen and never scrolls as a whole: what waits for you on the top line, your agents as a tree under their teams on the left, the running ones as small live pictures on the right, and your account under a second tab. */
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { api, request, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
@@ -11,6 +11,8 @@ import { pref, setPref } from '../../shell/prefs';
 import { useShell } from '../../shell/ShellContext';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { Start } from '../team/Start';
+import { Provisioning } from '../provisioning/Provisioning';
+import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { Stop } from '../team/AgentRun';
 import '../team/team.css';
 import { Gate } from '../signin/Gate';
@@ -91,15 +93,35 @@ const depth = (level: number) => ({ '--depth': level } as CSSProperties);
 function FragmentRows({ children }: { children: React.ReactNode }) { return <>{children}</>; }
 
 /** What the person asked of one agent from its row: start it, or stop it. Shown in a row of its own under the agent. */
-export interface Asked { agent: string; what: 'start' | 'stop'; pressed: boolean }
+export interface Asked { agent: string; what: 'start' | 'stop'; pressed: boolean; setup?: boolean }
 
 /** Start, where the agent is listed. Whether the person may approve its settings is read here, when it is first shown. */
-function StartHere({ entry, me, pressed, changed }: { entry: Entry; me: string; pressed: boolean; changed: () => void }) {
-  const navigate = useNavigate();
+function StartHere({ entry, me, pressed, setupFirst, changed, close }: { entry: Entry; me: string; pressed: boolean; setupFirst: boolean; changed: () => void; close: () => void }) {
+  // Setting the agent up happens here, under its row: the person never leaves the page to choose its program, folder or computer.
+  const [setup, setSetup] = useState(setupFirst);
+  const [round, setRound] = useState(0);
   const load = useLoad(() => api.people(), 'you-start:' + entry.id);
   if (load.status === 'loading') return null;
-  return <Start entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed}
-    settings={() => navigate('/file/' + encodeURIComponent(entry.id) + '/provisioning')} />;
+  if (setup) return <div className="you-setup">
+    <Provisioning id={entry.id} />
+    <p><button type="button" className="btn primary" onClick={() => { setSetup(false); setRound((value) => value + 1); }}>Done, back to Start</button>{' '}
+      <button type="button" className="btn" onClick={close}>Close</button></p>
+  </div>;
+  return <div className="you-start-here">
+    <Start key={round} entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed && round === 0}
+      settings={() => setSetup(true)} />
+    <button type="button" className="you-watch" data-act="close" onClick={close}>Close</button>
+  </div>;
+}
+
+/** What a stopped agent's row offers: Start when it has a program chosen, Set up when it has none, so no button says Start that cannot start. */
+function RowStart({ entry, ask }: { entry: Entry; ask: (next: Asked) => void }) {
+  const load = useLoad(() => request<ProvisioningAnswer>('/agents/' + encodeURIComponent(entry.id) + '/provisioning'), 'you-row:' + entry.id);
+  if (load.status === 'loading') return null;
+  const unset = load.status === 'ok' && !load.data.profile?.harness;
+  return unset
+    ? <button type="button" className="you-watch you-start" data-act="setup" onClick={(event) => { event.stopPropagation(); ask({ agent: entry.id, what: 'start', pressed: false, setup: true }); }}>Set up</button>
+    : <button type="button" className="you-watch you-start" data-act="start" onClick={(event) => { event.stopPropagation(); ask({ agent: entry.id, what: 'start', pressed: true }); }}>Start</button>;
 }
 
 function AgentRows({ branches, level, sessions, held, folded, fold, open, watching, toggleWatch, me, asked, ask, changed }: {
@@ -129,12 +151,12 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
             <td className="you-act">{session ? <Fragment>
               <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={(event) => { event.stopPropagation(); toggleWatch(session, member.entry.display_name); }}>{watching(session.session) ? 'Watching' : 'Watch'}</button>
               <button type="button" className="you-watch" data-act="stop" onClick={(event) => { event.stopPropagation(); ask({ agent: member.entry.id, what: 'stop', pressed: true }); }}>Stop</button>
-            </Fragment> : asked?.agent === member.entry.id && asked.what === 'start' ? null : <button type="button" className="you-watch you-start" data-act="start" onClick={(event) => { event.stopPropagation(); ask({ agent: member.entry.id, what: 'start', pressed: true }); }}>Start</button>}</td>
+            </Fragment> : asked?.agent === member.entry.id && asked.what === 'start' ? null : <RowStart entry={member.entry} ask={ask} />}</td>
           </tr>
           {asked?.agent === member.entry.id && (asked.what === 'stop' ? session : !session) ? <tr className="you-asked"><td colSpan={4}>
             {asked.what === 'stop' && session
               ? <Stop entry={member.entry} session={session} changed={changed} done={() => ask(null)} />
-              : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '')} entry={member.entry} me={me} pressed={asked.pressed} changed={() => { ask(null); changed(); }} />}
+              : <StartHere key={member.entry.id + (asked.pressed ? ':pressed' : '') + (asked.setup ? ':setup' : '')} entry={member.entry} me={me} pressed={asked.pressed} setupFirst={asked.setup === true} changed={() => { ask(null); changed(); }} close={() => ask(null)} />}
           </td></tr> : null}
           <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} watching={watching} toggleWatch={toggleWatch} me={me} asked={asked} ask={ask} changed={changed} />
         </FragmentRows>;
@@ -311,6 +333,10 @@ function Registered({ me }: { me: MeView }) {
 
 export function You() {
   const [version, setVersion] = useState(0);
-  const load = useLoad(readYou, 'me' + version);
+  const read = useLoad(readYou, 'me' + version);
+  // While the page reads itself again after a start or a stop, what it last showed stays; it never blanks.
+  const last = useRef<typeof read | null>(null);
+  if (read.status === 'ok') last.current = read;
+  const load = read.status === 'loading' && last.current ? last.current : read;
   return <Gate load={load} title="Signed in as" ok={(data) => data.kind === 'registered' ? <Registered me={data.me} /> : <Page data={data} reload={() => setVersion((v) => v + 1)} />} />;
 }

@@ -54,6 +54,18 @@ describe('An agent\'s run on People and agents', () => {
     expect($$('.team-foot-act').find((el) => el.textContent === 'Settings')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
   });
 
+  it('offers Set up, not Start, on the row of an agent with no program chosen, and sets it up under that row', async () => {
+    await mount('#/', { ...stopped, ...provisioning(SCRIBE, null) });
+    const row = () => $$('tr[data-href]').find((each) => each.textContent?.includes('Scribe'));
+    expect(row()?.querySelector('[data-act="start"]')).toBeNull();
+    await click(row()?.querySelector('[data-act="setup"]') ?? null);
+    expect($('.you-setup section[aria-label="Settings of this agent"]')).not.toBeNull();
+    expect(location.hash).toBe('#/');
+    await click(button('Close'));
+    expect($('.you-asked')).toBeNull();
+    expect(row()?.querySelector('[data-act="setup"]')).not.toBeNull();
+  });
+
   it('stops a running agent from its row on the front page, after asking', async () => {
     const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
     await click($('button[data-act="stop"]'));
@@ -164,7 +176,12 @@ describe('An agent\'s run on People and agents', () => {
     await mount('#/team/' + SCRIBE, { ...stopped, ...provisioning(SCRIBE, null) });
     expect(text()).toContain('Scribe has no program chosen yet.');
     await click(button('Choose its program'));
-    expect(location.hash).toBe('#/file/' + SCRIBE + '/provisioning');
+    // Setting it up happens under its row on the front page; the person is not sent to another page.
+    expect(location.hash).toBe('#/team/' + SCRIBE);
+    expect($('.you-setup section[aria-label="Settings of this agent"]')).not.toBeNull();
+    await click(button('Done, back to Start'));
+    expect($('.you-setup')).toBeNull();
+    expect(text()).toContain('Scribe has no program chosen yet.');
   });
 
   it('says the service\'s own reason when it refuses the start, with Try again, and no greyed button', async () => {
