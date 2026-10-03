@@ -120,9 +120,10 @@ impl LeafStore for FaultStore {
     }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         match fault(&self.plan)? {
-            Fault::AfterLeaf => self.inner.pin(pin),
             Fault::AfterLeafUnreadable => Err(injected("pin write")),
-            Fault::None | Fault::BeforeLeaf | Fault::LeafStoredWriteFailed => self.inner.pin(pin),
+            Fault::None | Fault::BeforeLeaf | Fault::LeafStoredWriteFailed | Fault::AfterLeaf => {
+                self.inner.pin(pin)
+            }
         }
     }
     fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
