@@ -39,3 +39,91 @@ fn the_proxy_s_start_line_carries_the_words_its_unit_waits_for() {
     .to_string();
     assert!(line.contains(LISTENING), "{line}");
 }
+
+/// A login whose shell is `profile` run before `/bin/sh` answers.
+fn login_with(
+    dir: &std::path::Path,
+    profile: &str,
+) -> Result<crate::identity::install::services::Environment, Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let shell = dir.join("login-shell");
+    std::fs::write(
+        &shell,
+        format!("#!/bin/sh\necho 'noise from a profile'\n{profile}\n/bin/sh \"$@\"\necho 'bye'\n"),
+    )?;
+    std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700))?;
+    let mut process: Vec<(std::ffi::OsString, std::ffi::OsString)> = std::env::vars_os()
+        .filter(|(name, _)| name != "SHELL" && name != "ANTHROPIC_BASE_URL")
+        .collect();
+    process.push(("SHELL".into(), shell.into()));
+    process.push((
+        "ANTHROPIC_BASE_URL".into(),
+        "http://invoking.example".into(),
+    ));
+    Ok(crate::identity::install::services::login_from(process)?)
+}
+
+#[test]
+fn the_upstream_is_the_login_shell_s_own_and_never_the_invoking_process_s()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir()?;
+    let gateway = login_with(
+        dir.path(),
+        "export ANTHROPIC_BASE_URL=https://gateway.example/anthropic",
+    )?;
+    assert_eq!(
+        super::login_base(&gateway)?.as_deref(),
+        Some("https://gateway.example/anthropic")
+    );
+    let plain = login_with(dir.path(), "unset ANTHROPIC_BASE_URL")?;
+    assert_eq!(super::login_base(&plain)?, None);
+    let layout = Layout::at(dir.path().join("root"));
+    std::fs::create_dir_all(layout.data_dir())?;
+    let mut said = Vec::new();
+    assert!(super::configure(&layout, &gateway, &mut |line| said.push(line.to_owned()))?);
+    let record: super::Upstream =
+        serde_json::from_slice(&std::fs::read(super::upstream_file(&layout))?)?;
+    assert_eq!(record.anthropic, "https://gateway.example/anthropic");
+    assert_eq!(record.from, "login");
+    assert!(!super::configure(&layout, &gateway, &mut |_| {})?);
+    assert!(super::configure(&layout, &plain, &mut |_| {})?);
+    let record: super::Upstream =
+        serde_json::from_slice(&std::fs::read(super::upstream_file(&layout))?)?;
+    assert_eq!(
+        (record.anthropic.as_str(), record.from.as_str()),
+        (super::ANTHROPIC, "default")
+    );
+    for folder in ["proxy", "proxy/home", "proxy/state"] {
+        let mode = std::fs::metadata(layout.data_dir().join(folder))?
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o700, "{folder}");
+    }
+    let mode = std::fs::metadata(super::upstream_file(&layout))?
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o600);
+    assert_eq!(said.len(), 1, "{said:?}");
+    Ok(())
+}
+
+#[test]
+fn a_proxy_folder_others_can_read_is_refused_not_used() -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir()?;
+    let layout = Layout::at(dir.path().join("root"));
+    let open = layout.data_dir().join("proxy").join("home");
+    std::fs::create_dir_all(&open)?;
+    std::fs::set_permissions(
+        layout.data_dir().join("proxy"),
+        std::fs::Permissions::from_mode(0o700),
+    )?;
+    std::fs::set_permissions(&open, std::fs::Permissions::from_mode(0o755))?;
+    let environment = login_with(dir.path(), "unset ANTHROPIC_BASE_URL")?;
+    let Err(refusal) = super::configure(&layout, &environment, &mut |_| {}) else {
+        return Err("a proxy home others can read was used".into());
+    };
+    assert!(refusal.to_string().contains("home"), "{refusal}");
+    Ok(())
+}
