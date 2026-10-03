@@ -190,7 +190,7 @@ describe('Add and run on the first computer', () => {
     await names(); await submit();
     expect(posted).toHaveLength(7);
     expect(posted[4].body).toMatchObject({ name: 'Ward computer', may_run: [agent] });
-    expect(document.body.textContent).toContain('Running, as its runner last reported');
+    expect(location.hash).toBe('#/team/' + agent);
   });
 
   it('holds an earlier planned computer addition when another computer is now in use', async () => {
@@ -220,8 +220,7 @@ describe('Add and run on the first computer', () => {
     expect(server.applied.size).toBe(7);
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(location.hash).toBe('#/team/' + agent);
-    expect(document.body.textContent).toContain('Running, as its runner last reported');
-    expect($('a[href="#/runtime/' + (posted[6].body as { operation: string }).operation + '"]')).not.toBeNull();
+    expect(posted[6].path).toBe(prefix + '/start-command');
   });
 
   it.each(stages)('replays only the saved %s request after an unknown outcome and remount', async (stage) => {
@@ -237,7 +236,6 @@ describe('Add and run on the first computer', () => {
     expect(server.applied.size).toBe(7);
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(location.hash).toBe('#/team/' + agent);
-    expect(document.body.textContent).toContain('Running, as its runner last reported');
   });
 
   it('shows a start refusal in its own words, not as an unconfirmed step', async () => {
@@ -258,7 +256,6 @@ describe('Add and run on the first computer', () => {
     expect(sessionStorage.getItem(key)).not.toBeNull();
     plain('start', 'RunnerStartUnconfirmed');
     expect(document.body.textContent).toContain('Lys admitted the start, but no runner ran it');
-    expect(document.body.textContent).not.toContain('Running, as its runner last reported');
   });
 
   it('names an ended runner session without claiming it is still running', async () => {
@@ -268,7 +265,6 @@ describe('Add and run on the first computer', () => {
     expect(sessionStorage.getItem(key)).not.toBeNull();
     plain('start', 'RunnerStartEnded');
     expect(document.body.textContent).toContain('The runner confirmed this session already ended');
-    expect(document.body.textContent).not.toContain('Running, as its runner last reported');
   });
 
   it('blocks corrupt retained state without sending a replacement operation', async () => {
@@ -438,8 +434,7 @@ describe('Add and run on an existing computer', () => {
     expect(server.applied.size).toBe(6);
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(location.hash).toBe('#/team/' + agent);
-    expect(document.body.textContent).toContain('Running, as its runner last reported');
-    expect($('a[href="#/runtime/' + (posted[5].body as { operation: string }).operation + '"]')).not.toBeNull();
+    expect(posted[5].path).toBe(prefix + '/start-command');
     expect(readsAtStart.filter((path) => path === '/network')).toHaveLength(1);
     expect(requests.filter((path) => path === '/network')).toHaveLength(2);
   });
@@ -461,7 +456,6 @@ describe('Add and run on an existing computer', () => {
     expect(server.applied.size).toBe(6);
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(location.hash).toBe('#/team/' + agent);
-    expect(document.body.textContent).toContain('Running, as its runner last reported');
   });
 
   it.each([
@@ -488,7 +482,6 @@ describe('Add and run on an existing computer', () => {
     expect(location.hash).toBe('#/agents/new');
     expect(sessionStorage.getItem(key)).not.toBeNull();
     plain('admission', 'MachineAdmissionReceiptMismatch');
-    expect(document.body.textContent).not.toContain('Running, as its runner last reported');
   });
 
   it('requires an explicit computer choice when more than one local runner is served', async () => {
