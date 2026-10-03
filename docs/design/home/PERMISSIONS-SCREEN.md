@@ -1,108 +1,134 @@
-# What an agent may do: the permissions screen
+# What an agent may do: the truth today, and what has to change
 
-Written by Waffles, 3 October 2026, 20:25, for Tom to read before anything is built. Nothing on this
-page is built. It replaces item 5 of SCREENS-PLAN.md, which was wrong: it relabelled three vague choices.
+Waffles, 3 October 2026, rewritten 20:31 by the clock. The first version of this page (068c7c51) is
+withdrawn: it had claims from memory that the sources contradict. Nothing is built from this page until
+Tom has read it.
 
-## What Tom said
+Every line under "What is true today" names its rows in the three fact tables, where each claim sits
+beside the program's own documentation, Lys's code at a path and line, and what was seen for real:
+W = `docs/harness/reference/FACTS-waffles.md`, V = `docs/harness/reference/claude-code/FACTS.md` (Vesper),
+A = `docs/harness/reference/codex/FACTS.md` (Archie). **Agreed** means all three legs say the same.
+**Open** means one is missing, and nothing may be built on it until it is closed. Everything under
+"What I propose" is a proposal, not a fact.
 
-"How is somebody supposed to know what an agent can do with those things, like 'most things'. If I said,
-is this secure? And you said mostly. And I said, can you tell me any more? And you said, nah. You're
-fired. This is meant to be a serious permission system for agents." (20:11)
+## What Tom asked for
 
-"Those things are not the actual permissions. They need to be granular. If you want to have a thing like
-that, that needs to be a permissions profile." (20:09)
+"This is meant to be a serious permission system for agents." "They need to be granular. If you want to
+have a thing like that, that needs to be a permissions profile." "Not based on a single assumption."
+"This had better work for both of them." The test: the agent is running in a children's intensive care
+unit.
 
-## What is true in the code today
+## What is true today
 
-Read from the code, not from memory.
+**The screen said the opposite of what the run got.**
+- The settings form showed "Reads freely and asks before most changes and commands". Those are the
+  catalogue's words for Claude Code's `default` mode. (W2, agreed)
+- The file tonight's run of pancake was handed refused Read, Write, Edit, Glob, Grep and WebFetch by name,
+  and Read anywhere on the disk; allowed nothing; no sandbox; no hooks. (W3, V3, agreed)
+- Those refusals are pancake's own policy, version 1, seven hard rules. Nobody chose it: Lys wrote it for
+  every agent added between 1 October 17:39 and 2 October 12:33 and has never taken it back. Ten of the
+  fifteen policies on the installed Lys are that seed; the five newest are empty. (W16, V3, V4, agreed)
+- By Claude Code's page, a tool refused by bare name is taken away from the model entirely. What pancake
+  could then actually do was not watched. (W4, V9, open)
 
-1. Lys stores real rules for each agent, in its settings (a profile version): three lists, `allow`
-   (done without asking), `ask` (a person is asked first), `deny` (refused), plus `additional_directories`
-   (folders beyond its working folder) and one `default_mode`. (`lys-identity-server/src/launch_permissions.rs`)
-2. A rule names a tool and, for some tools, a target: `Read`, `Edit(/srv/site/**)`, `Bash(git push:*)`,
-   `WebFetch(domain:example.com)`. Which forms a program accepts is in its description (`rule_forms`), and
-   which modes it accepts (`modes`). (`lys-home/src/harness/description.rs`)
-3. A policy adds hard rules that the agent's own settings cannot loosen: a whole tool, a path under Read or
-   Edit, or a website under WebFetch. They are written as extra `deny` rules at start.
-   (`lys-home/src/harness/rendering_permissions.rs`)
-4. At start, Lys writes these lists into the program's own settings file. **The program (Claude Code or
-   Codex) is what enforces them. Lys does not check each tool call today.**
-5. The screen shows none of this. The settings form offers only the mode, as a dropdown with words like
-   "reads freely" and "asks before most changes". The add-an-agent form saves only the mode. The three
-   lists can be stored and are carried through a save, but a person can neither see nor change them.
+**Lys has two permission systems and the screens show neither truthfully.**
+- Per agent, in its settings: three lists (without asking, ask first, refused), extra folders, one mode.
+  The settings form shows only the mode; the add form saves only the mode. (W1, agreed)
+- Per agent, a policy: refusal rules only (a whole tool, a path and everything under it, a web host),
+  each either hard or liftable by a named grant. It has its own tab on the agent's file, with an add form
+  that is free text throughout. (W17; seen in code, not yet in a browser: open)
 
-So the defect is not wording. The store is granular; the screen hides it.
+**What actually enforces anything, for Claude Code.**
+- The three lists and the hard rules are written into a settings file and enforced by Claude Code itself.
+  (W1, W16, agreed as to what is written; that Claude Code then refuses a call has not been watched: V8, open)
+- Lys's own judge, which would check each tool call against the policy, is never installed on a start
+  made from the screen. A rule a grant may lift is therefore enforced by nothing. (W11, V1 agreed; V2 open
+  on the real leg, since no installed policy has such a rule)
+- Rules about shell commands match the command's text and, in the documentation's words, "aren't a
+  security boundary". Rules about reading files do not stop a script the agent runs. Only the sandbox is
+  enforced by the operating system, and only for shell commands. (W6, W7, W8: documentation only, open)
+- The sandbox is off in every mode but one. Lys's own `workspace-only` mode turns it on, with no network
+  and no way out; no run in that mode has been observed. (W10, V13, open)
+- The person's own Claude Code setup reaches a Lys run. A plugin's hook ran inside pancake's 19:19 run;
+  hooks run with the person's full access whatever the file says. (V5, V14, agreed) Whether the person's
+  own allow rules also widen what the agent may do is documentation and code only. (V6, open)
+- A path rule typed with one leading slash would mean "beside the settings file", not the top of the
+  disk. Lys's own hard rules come out right; nothing checks a rule a person types. (W9, V11)
 
-## What the screen becomes
+**For Codex.**
+- No Codex agent has ever been started by the installed Lys, so every row about a Lys Codex run is open
+  on the real leg. (A, O4)
+- A Codex agent cannot carry any rule about a tool, a file or a host: Lys refuses the start. A policy like
+  pancake's makes a Codex start refuse. (A14, A15, W-C1: code only, open)
+- With no mode chosen, Lys sets no sandbox and never sets when Codex asks; the run would use the login's
+  own Codex config, which Lys neither sets nor reads. (A2, A3, A4, open)
+- "Read-only" stops writes and the network. It does not stop reading: every mode reads the whole disk.
+  Seen with the installed Codex under the settings Lys writes. (A7, A8, agreed for the sandbox itself)
+- Lys's workspace-write settings do close `/tmp`, the temp folder and the network. Seen. (A9, agreed)
+- The confinement Lys has written for Codex is called only by a test, and as written would not run a
+  command and would not hold the network. (A16 agreed; A17, A18 seen)
+- No judge is installed for Codex, and Codex's own pages say such a hook is not a wall. (A23, A26)
+- The one place Codex offers a setting the login cannot undo is an administrator's requirements file.
+  Documentation only; no Lys code writes it; not observed. (A33, open)
 
-One section in an agent's settings, named **What this agent may do**. No dropdown of moods.
+**In one sentence:** today Lys can refuse a Claude Code agent whole tools and paths through the program's
+own settings file, and can box a Codex agent's writes and network; everything else the screens imply is
+either not enforced by anything, or enforced by something Lys does not control.
 
-**Every rule is a row.** A row says the thing and the answer, in words, with the program's own spelling of
-the rule small beside it for whoever debugs:
+## What I propose (for Tom to mark; none of it is built)
 
-| The thing | The answer |
-|---|---|
-| Read any file in its working folder | Without asking |
-| Change files under /srv/site | Asks a person first |
-| Run `git push` | Asks a person first |
-| Run `rm` | Refused |
-| Reach example.com | Without asking |
+**1. First, the screens stop saying anything untrue. Small, and safe.**
+- Remove the mode sentence. In its place, for the chosen program, show exactly what the next start will
+  be handed: every refused, ask-first and without-asking rule by name, the mode by its real name with the
+  documentation's own words for it, the extra folders, sandbox on or off. The server already renders this
+  for a start; the screen shows that rendering, not a description of it.
+- Under it, one plain block: "What enforces this". For Claude Code: the program enforces these rules;
+  Lys does not check each action; your own plugins and hooks on this computer also run. For Codex: only
+  the write and network box is enforced; it reads every file this login can read.
+- Show the policy on the settings form and the front page pane, not only on a tab of the file, with who
+  set each rule. A seeded rule says "written by Lys on <date>, chosen by nobody".
+- On each run, show what that run was handed, from the kept file.
 
-Rows are grouped by what a person would ask: files it reads, files it changes, commands it runs, websites
-it reaches, connected tools it uses, folders beyond its working folder. Each group has Add. Adding a row
-is a choice of thing (from what the chosen program accepts), a target where the thing takes one (a folder
-from the folder chooser, a website, a command), and one of the three answers. No free text where Lys
-knows the choices; no JSON.
+**2. Then the permissions are made real, as their own piece with its own design page.** The order I
+recommend, each to be proved by a watched run before the next:
+- Install the judge on every Claude Code start made from the screen, and refuse the start if it cannot be
+  installed. Its code exists; only the server's start path leaves it out.
+- Decide what a Lys run inherits from the person's own setup. Tom ruled on 3 October that a run uses the
+  machine's own Claude Code and Codex setup. That ruling and "a serious permission system" pull against
+  each other: a plugin hook with full access ran inside tonight's agent. This is Tom's call (question 1).
+- Turn the sandbox on by default for Claude Code agents, as `workspace-only` already does.
+- For Codex: always set the mode and the approval policy; fix or delete the unused confinement; observe a
+  requirements file holding against a looser login before leaning on it.
 
-**Anything not listed has one stated answer.** The mode is shown as exactly that sentence, per program,
-for example "Anything not listed here: asks a person first." If a program's mode means something broader
-(Claude Code's `bypassPermissions` means nothing is asked or refused except the Refused rows), the
-sentence says that, in those words, in red. No mode is ever shown as an adjective.
-
-**Rules a policy forces are shown and locked.** Each has the name of the policy that forces it. They
-cannot be removed here, and the row says so.
-
-**A permissions profile is a named, saved set of rows.** It is a record in Lys with a name, a version,
-who made it and when. Choosing one fills the rows, and the rows stay on the screen: a profile is never a
-label that hides its contents. Changing a row afterwards shows "Builder, with 2 changes" and lists the
-two. Profiles are made from an agent's rows ("Save these as a profile") or on their own page. Lys ships
-none that I have invented; which ones ship is Tom's call (question 1).
-
-**The same rows on the add-an-agent form.** A new agent starts from a profile or from no rows, and the
-form shows the rows before it is saved.
-
-**What a run was actually handed.** Each start already keeps its launch record. The screen for a run
-shows "This run started with these rules", the lists exactly as written into the program's settings file,
-hard rules included. The settings screen and the run cannot disagree without it being visible.
-
-**Changing a row is a new version of the agent's settings** and needs approval before the next start,
-as any settings change does today.
-
-## What this does not fix, said plainly
-
-Enforcement stays with the program. If Claude Code or Codex has a hole, or a mode that ignores the lists,
-Lys does not stop the call. Lys itself enforces today only: which computer may run the agent, which
-secrets it is handed, which models and accounts it draws on, and the policy's forced refusals as written
-into the settings file. A permission system that is serious in Tom's sense checks the call itself. The
-proxy design (PROXY.md) already has the place for it: a gate holds a model call, sees the tool use the
-model asked for, and can refuse it against these same rows. That is not written yet (question 2).
+**3. Granular rules and named profiles come on top of 2, not before it.** A permissions profile is a
+named, saved set of rules, shown in full wherever it is chosen. Rules are chosen from what the program
+accepts (tools by name from its own list, folders from the folder chooser, hosts), never typed as free
+text. For Codex the honest granular offer today is small (mode, extra folders); the screen says so.
+Building a rich editor before enforcement is real would be the same mistake again: a screen that
+promises what nothing holds.
 
 ## Questions for Tom
 
-1. Which permissions profiles ship with Lys, if any, and their exact rows. I will not invent them.
-2. Enforcement at the proxy gate against these rows: part of this piece, or the piece straight after the
-   screens are usable? My recommendation: straight after, as its own piece with its own design page, so
-   starting an agent from the screen is not held up by it; and until it lands, the screen carries one
-   sentence saying the program enforces these rules, not Lys.
-3. Codex takes a sandbox mode and fewer rule forms than Claude Code. The screen shows only what the chosen
-   program accepts and says what it cannot express. Say if that is wrong.
+1. Does a Lys-started agent keep running the person's own plugins, hooks and rules, or does a Lys run
+   start clean? Clean is the only answer I can defend for a ward; it reverses part of the 3 October ruling
+   and means Lys must hand the run everything it needs.
+2. The seeded policy on ten agents: remove it from all of them, or keep it and show it? I recommend
+   removing it, as one recorded act, because nobody chose it.
+3. Do proposals 1 and 2 go in that order, with the start-from-the-screen piece (already written, not
+   built) landing first so the product can be used at all?
 
-## How it gets built, once Tom has read this
+## Before anything in 2 or 3 is built, these are observed, not assumed
 
-1. Server: a route that reads and saves the three lists, extra folders and the mode as rows, checked
-   against the program's `rule_forms` and `modes`; permissions profiles as records (make, read, version).
-2. Screen: the rows, the groups, Add with the folder chooser, the not-listed sentence, locked policy rows,
-   profiles, on both the settings form and the add-an-agent form.
-3. Run screen: the rules a run was handed, from its launch record.
-4. All written and read, one battery, one install, then a walk in a browser with screenshots before any
-   claim that it works.
+- A Claude Code run watched refusing a refused call, and asking on an ask-first call. (V8, V12)
+- Which tools the model was actually offered in a real run. Archie is reading the proxy record. (W4)
+- Whether the person's own allow rules merge into a Lys run. (V6)
+- A run in `workspace-only`, with the sandbox seen to hold. (W10)
+- A Codex agent started by Lys at all, in each mode. (A2 to A15)
+- A requirements file refusing a looser login setting. (A33)
+
+## The worst credible failure
+
+If this were used in a hospital as it stands, the worst credible failure is that a person reads "asks
+before most changes" or "read-only", trusts it, and the agent, or a plugin running inside it with the
+person's full access, reads or changes records it was never meant to reach; and it could harm every
+patient whose records that login can read.
