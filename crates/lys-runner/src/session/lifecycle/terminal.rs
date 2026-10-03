@@ -72,9 +72,16 @@ impl Sessions {
                             ));
                         }
                         if let Err(error) = crate::pty::end(&leader) {
-                            crate::error::said(&format!(
-                                "session {id}: rotation_signal_failed: {error}"
-                            ));
+                            // On macOS a hang-up to a group whose leader has
+                            // exited and is not yet reaped is refused, so a
+                            // repeat that races the exit fails for a session
+                            // that ended properly. It is said for what it is.
+                            let word = if again {
+                                "rotation_repeat_undelivered"
+                            } else {
+                                "rotation_signal_failed"
+                            };
+                            crate::error::said(&format!("session {id}: {word}: {error}"));
                         }
                     }
                 }
