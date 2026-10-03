@@ -42,6 +42,7 @@ fn changing_only_a_complete_descriptions_name_keeps_the_render_byte_identical()
                 version,
                 skills: &[],
                 policy: None,
+                model_proxy: None,
             },
             &[],
         )
@@ -72,6 +73,7 @@ fn an_unknown_rendering_contract_is_refused_by_identifier() -> Result<(), Box<dy
         version: &version,
         skills: &[],
         policy: None,
+        model_proxy: None,
     };
     let error = render(&start, &[])
         .err()

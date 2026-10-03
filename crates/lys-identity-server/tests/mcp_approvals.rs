@@ -161,6 +161,7 @@ async fn the_approved_profile_renders_the_server_in_native_mcp_config() -> TestR
             version,
             skills: &[],
             policy: None,
+            model_proxy: None,
         },
         &[],
     )?;

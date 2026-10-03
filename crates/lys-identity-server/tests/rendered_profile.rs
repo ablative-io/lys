@@ -50,6 +50,7 @@ fn the_start_command_carries_the_declared_program_and_models() -> Result<(), Box
             version: &version,
             skills: &[],
             policy: None,
+            model_proxy: None,
         },
         &[],
     )?;
@@ -111,6 +112,7 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
             version: &version,
             skills: std::slice::from_ref(&skill),
             policy: None,
+            model_proxy: None,
         },
         &handles,
     )?;
@@ -222,6 +224,7 @@ fn instructions_mode_renders_only_the_reviewed_claude_prompt_flag() -> Result<()
                 version: &version,
                 skills: &[],
                 policy: None,
+                model_proxy: None,
             },
             &[],
         )?;

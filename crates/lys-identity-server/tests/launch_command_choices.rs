@@ -88,6 +88,7 @@ fn choosing_cdx_executes_its_path_with_the_codex_flags_unchanged() -> TestResult
             version: &version,
             skills: &[],
             policy: None,
+            model_proxy: None,
         },
         &[],
     )?;
