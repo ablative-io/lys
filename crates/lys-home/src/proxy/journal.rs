@@ -196,6 +196,8 @@ pub struct CallReport {
     pub spool_kept: u64,
     /// Why the call is held rather than recorded, when it is.
     pub held: Option<String>,
+    /// Nanoseconds from the last response frame until the durable entry append returned; absent on recovery.
+    pub time_to_record_ns: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -224,17 +226,30 @@ impl Sink {
         let worker = std::thread::spawn(move || run(&home, &journal, &rx, &reports));
         #[cfg(not(test))]
         drop(worker);
-        Self { tx, #[cfg(test)] worker: std::sync::Arc::new(std::sync::Mutex::new(Some(worker))) }
+        Self {
+            tx,
+            #[cfg(test)]
+            worker: std::sync::Arc::new(std::sync::Mutex::new(Some(worker))),
+        }
     }
 
     #[cfg(test)]
     pub(super) fn shutdown(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let worker = self.worker.lock().map_err(|error| std::io::Error::other(error.to_string()))?.take();
+        let worker = self
+            .worker
+            .lock()
+            .map_err(|error| std::io::Error::other(error.to_string()))?
+            .take();
         if let Some(worker) = worker {
-            let sent = self.tx.send(Message::Stop).map_err(|error| std::io::Error::other(error.to_string()));
-            let joined = worker.join().map_err(|_| std::io::Error::other("capture worker panicked"));
+            let sent = self
+                .tx
+                .send(Message::Stop)
+                .map_err(|error| std::io::Error::other(error.to_string()));
+            let joined = worker.join();
             sent?;
-            joined?;
+            if let Err(panic) = joined {
+                std::panic::resume_unwind(panic);
+            }
         }
         Ok(())
     }
@@ -351,6 +366,7 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
         retired: false,
         spool_kept: 0,
         held: None,
+        time_to_record_ns: None,
     };
     if let Err(error) = journal.write(&job.call) {
         // The journal cannot be written after the call was admitted: the call
@@ -370,6 +386,9 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
     }
     match ingested {
         Ok((status, ingested)) => {
+            report.time_to_record_ns = job
+                .last_arrival
+                .map(|at| u64::try_from(at.elapsed().as_nanos()).unwrap_or(u64::MAX));
             report.status = status;
             report.entry_id = Some(ingested.entry_id);
             report.already_recorded = ingested.already_recorded;

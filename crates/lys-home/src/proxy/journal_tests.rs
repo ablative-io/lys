@@ -331,10 +331,15 @@ async fn a_stalled_capture_worker_does_not_hold_or_spool_the_client_response() -
         .as_ref()
         .ok_or("capture measurements absent")?;
     assert!(timing.admission_ns.is_some());
-    assert!(matches!(
-        timing.durable,
-        crate::record::call::captured::DurableTime::Measured(_)
-    ));
+    let crate::record::call::captured::DurableTime::Measured(body_ns) = timing.durable else {
+        return Err("body durability measurement absent".into());
+    };
+    assert!(
+        report
+            .time_to_record_ns
+            .ok_or("entry append measurement absent")?
+            >= body_ns
+    );
     Ok(())
 }
 
@@ -344,7 +349,10 @@ async fn closing_the_fixture_releases_the_proxy_before_returning() -> Res {
     let harness = Harness::start(upstream).await?;
     let proxy = Arc::downgrade(&harness.proxy);
     drop(harness);
-    assert!(proxy.upgrade().is_none(), "the fixture left its server owning the proxy");
+    assert!(
+        proxy.upgrade().is_none(),
+        "the fixture left its server owning the proxy"
+    );
     Ok(())
 }
 
@@ -356,6 +364,9 @@ fn a_stopped_capture_worker_closes_its_reports_before_shutdown_returns() -> Res 
     let (reports, received) = std::sync::mpsc::channel();
     let sink = crate::proxy::journal::Sink::start(home, journal, reports);
     sink.shutdown()?;
-    assert!(matches!(received.try_recv(), Err(std::sync::mpsc::TryRecvError::Disconnected)));
+    assert!(matches!(
+        received.try_recv(),
+        Err(std::sync::mpsc::TryRecvError::Disconnected)
+    ));
     Ok(())
 }

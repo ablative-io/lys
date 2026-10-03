@@ -262,7 +262,11 @@ where
     serve_until(listener, handle, std::future::pending()).await
 }
 
-pub(super) async fn serve_until<H, F>(listener: TcpListener, handle: H, shutdown: impl Future<Output = ()>) -> Result<(), ProxyError>
+pub(super) async fn serve_until<H, F>(
+    listener: TcpListener,
+    handle: H,
+    shutdown: impl Future<Output = ()>,
+) -> Result<(), ProxyError>
 where
     H: Fn(Request<Incoming>) -> F + Send + Sync + 'static,
     F: Future<Output = Response<ProxyBody>> + Send + 'static,
@@ -298,7 +302,9 @@ where
     }
     connections.abort_all();
     while let Some(result) = connections.join_next().await {
-        if let Err(error) = result && !error.is_cancelled() {
+        if let Err(error) = result
+            && !error.is_cancelled()
+        {
             eprintln!("lys-proxy: proxy_connection_task_failed: {error}");
         }
     }
