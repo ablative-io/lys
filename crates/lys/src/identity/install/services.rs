@@ -10,10 +10,15 @@
 //! the process exits first. A stop waits on the exit itself, as
 //! [`super::exit_wait`] describes.
 
+use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
+
+use serde::Serialize;
 
 use super::super::config::DeploymentConfig;
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
@@ -354,16 +359,204 @@ pub fn stop_with(pid_file: &Path, alive: &mut dyn FnMut(&Path) -> bool) -> Ident
     Ok(true)
 }
 
+/// The variables a service keeps from the process that starts it: the
+/// login's identity, its temporary folder and its locale. Nothing else the
+/// invoking shell carries reaches a service or, through the runner, a run:
+/// not a harness's config folder, not a credential, not a proxy setting.
+/// `PATH` is not kept; it comes from the login shell, see [`login`].
+pub const KEPT: &[&str] = &[
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "LC_COLLATE",
+    "LC_CTYPE",
+    "LC_MESSAGES",
+    "LC_MONETARY",
+    "LC_NUMERIC",
+    "LC_TIME",
+];
+
+/// The environment every service and the runner start with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Environment {
+    kept: BTreeMap<String, String>,
+    path: String,
+}
+
+/// What the install record says about the services' environment: the names
+/// kept from the login and the `PATH` its login shell answered. Values of
+/// the kept variables are not recorded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EnvironmentRecord {
+    /// The names from [`KEPT`] the login had, in order.
+    pub kept: Vec<String>,
+    /// The `PATH` the login shell answered.
+    pub path: String,
+}
+
+impl Environment {
+    /// Every variable a service starts with, by name: the kept ones and `PATH`.
+    pub fn variables(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.kept
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+            .chain(std::iter::once(("PATH", self.path.as_str())))
+    }
+
+    /// What the install record says about this environment.
+    pub fn record(&self) -> EnvironmentRecord {
+        EnvironmentRecord {
+            kept: self.kept.keys().cloned().collect(),
+            path: self.path.clone(),
+        }
+    }
+}
+
+/// What the login shell prints before and after `PATH`, so that anything a
+/// login profile prints on its own, or a logout file prints after, is left
+/// outside it and never taken as PATH.
+const PATH_MARKER: &str = "LYS_LOGIN_PATH:";
+const PATH_END: &str = ":LYS_LOGIN_PATH_END";
+
+static LOGIN: OnceLock<Environment> = OnceLock::new();
+
+/// The login's environment, read once for this process: the [`KEPT`]
+/// variables this process has, and `PATH` as the login shell (`SHELL`,
+/// started as a login shell with only those variables) answers it. Refused
+/// when there is no `SHELL`, when the shell does not run, when it does not
+/// answer, or when it answers an empty `PATH`.
+pub fn login() -> IdentityResult<&'static Environment> {
+    if let Some(environment) = LOGIN.get() {
+        return Ok(environment);
+    }
+    let environment = login_from(std::env::vars_os())?;
+    Ok(LOGIN.get_or_init(|| environment))
+}
+
+/// [`login`] from `process` as the starting process's variables, read now,
+/// so a test can hand it variables it must drop.
+pub fn login_from(
+    process: impl IntoIterator<Item = (OsString, OsString)>,
+) -> IdentityResult<Environment> {
+    let mut kept = BTreeMap::new();
+    for (name, value) in process {
+        let Some(name) = name.to_str().filter(|name| KEPT.contains(name)) else {
+            continue;
+        };
+        let value = value.into_string().map_err(|value| {
+            refuse(
+                "read login",
+                "environment",
+                format!("{name} is not text: {}", value.to_string_lossy()),
+            )
+        })?;
+        kept.insert(name.to_string(), value);
+    }
+    let shell = kept
+        .get("SHELL")
+        .filter(|shell| !shell.is_empty())
+        .ok_or_else(|| {
+            refuse(
+                "read login",
+                "environment",
+                "SHELL is not set; start the install from a login",
+            )
+        })?;
+    let output = Command::new(shell)
+        .env_clear()
+        .envs(&kept)
+        .args([
+            "-l",
+            "-c",
+            &format!(r#"printf '\n%s%s%s' '{PATH_MARKER}' "$PATH" '{PATH_END}'"#),
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| {
+            refuse(
+                "read login",
+                "environment",
+                format!("login shell {shell} could not run: {error}"),
+            )
+        })?;
+    if !output.status.success() {
+        return Err(refuse(
+            "read login",
+            "environment",
+            format!(
+                "login shell {shell} exited {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+        ));
+    }
+    let answer = String::from_utf8(output.stdout).map_err(|error| {
+        refuse(
+            "read login",
+            "environment",
+            format!("login shell {shell} answered a PATH that is not text: {error}"),
+        )
+    })?;
+    let Some((_, after_mark)) = answer.rsplit_once(PATH_MARKER) else {
+        return Err(refuse(
+            "read login",
+            "environment",
+            format!(
+                "login shell {shell} did not answer its PATH: {}",
+                answer.trim()
+            ),
+        ));
+    };
+    let Some((path, _)) = after_mark.split_once(PATH_END) else {
+        return Err(refuse(
+            "read login",
+            "environment",
+            format!(
+                "login shell {shell} did not close its PATH answer: {}",
+                answer.trim()
+            ),
+        ));
+    };
+    if path.is_empty() {
+        return Err(refuse(
+            "read login",
+            "environment",
+            format!("login shell {shell} answered an empty PATH"),
+        ));
+    }
+    Ok(Environment {
+        kept,
+        path: path.to_string(),
+    })
+}
+
 /// Starts `program` detached, its output appended to `log`, its pid kept in
 /// `pid_file` and its exit lock held through its standard input. A process
 /// the pid file already names alive is left alone, unless `replace` asks
-/// for it to be stopped and started afresh.
+/// for it to be stopped and started afresh. It starts with the [`login`]
+/// environment and nothing of the invoking process's own.
 pub fn start_detached(
     program: &Path,
     args: &[String],
     log: &Path,
     pid_file: &Path,
     replace: bool,
+) -> IdentityResult<bool> {
+    start_detached_in(program, args, log, pid_file, replace, login()?)
+}
+
+/// [`start_detached`] with `environment` as the service's whole environment.
+pub fn start_detached_in(
+    program: &Path,
+    args: &[String],
+    log: &Path,
+    pid_file: &Path,
+    replace: bool,
+    environment: &Environment,
 ) -> IdentityResult<bool> {
     if alive(pid_file) {
         if !replace {
@@ -382,7 +575,13 @@ pub fn start_detached(
     let err = open(log)?;
     let lock = exit_wait::hold(pid_file)?;
     let mut command = Command::new(program);
-    command.args(args).stdin(lock).stdout(out).stderr(err);
+    command
+        .env_clear()
+        .envs(environment.variables())
+        .args(args)
+        .stdin(lock)
+        .stdout(out)
+        .stderr(err);
     detach(&mut command);
     let child = command.spawn().map_err(|error| {
         refuse(

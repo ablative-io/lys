@@ -259,6 +259,9 @@ pub struct BuildRecord {
     pub binaries: BTreeMap<String, String>,
     /// The placed screens, when there are any.
     pub surface: Option<SurfaceBuild>,
+    /// The environment the services were started with: the names kept
+    /// from the login and the login shell's `PATH`.
+    pub environment: services::EnvironmentRecord,
 }
 
 /// The placed screens package.
@@ -308,7 +311,17 @@ pub fn record_build(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(io("read screens", &manifest_path, &error)),
     };
-    let record = BuildRecord { binaries, surface };
+    let environment = services::login()?.record();
+    say(&format!(
+        "build environment keeps {} and PATH={}",
+        environment.kept.join(","),
+        environment.path
+    ));
+    let record = BuildRecord {
+        binaries,
+        surface,
+        environment,
+    };
     let text = serde_json::to_vec_pretty(&record).map_err(|error| {
         refuse(
             ErrorKind::RenderFailed,
