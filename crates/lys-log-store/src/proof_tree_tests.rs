@@ -31,7 +31,6 @@ fn disk_of(count: u64) -> (Disk, Frontier) {
         leaves,
         pinned: Some(pinned),
         snapshot: None,
-        batch_intent: None,
     };
     (disk, frontier)
 }

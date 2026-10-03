@@ -184,7 +184,14 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         };
         let (size, pinned) = (snapshot.frontier().size(), store.pinned().tree_size);
         if size > pinned {
-            return Ok(Err(SnapshotRefusal::BeyondLog { size, pinned }));
+            // LYSLOGSTORE-008 R2: the pin at `size` was acknowledged before the
+            // snapshot was written and its leaves are gone. A rebuild from the
+            // leaves present would present the shorter log as whole, so the
+            // open is refused by name instead.
+            return Err(store_down::<K>(&StoreError::SnapshotBeyondLog {
+                size,
+                pinned,
+            }));
         }
         let (frontier, state) = snapshot.into_parts();
         let (mut checkpoints, state) = match checkpoints::unwrap(&state, size) {

@@ -664,14 +664,3 @@ fn a_log_opened_at_its_pin_leaves_the_pin_and_refuses_to_append_while_a_repair_i
     assert_eq!(repaired.tree().len(), 3);
     assert_eq!(repaired.store().pinned().tree_size, 3);
 }
-
-#[test]
-fn a_store_without_batch_intent_support_refuses_before_writing() {
-    let mut log = Log::open(MemStore::new(ORIGIN)).unwrap();
-    assert!(matches!(
-        log.append_batch(&[b"first", b"second"]),
-        Err(StoreError::BatchIntentUnsupported { end: 2 })
-    ));
-    assert_eq!(log.store().extent(), 0);
-    assert_eq!(log.store().pinned().tree_size, 0);
-}

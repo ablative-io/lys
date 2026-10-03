@@ -122,13 +122,9 @@ fn every_refusal_opens_with_its_name() {
             "SnapshotSignatureInvalid:",
         ),
         (SnapshotRefusal::WrongRoot { size: 1 }, "SnapshotWrongRoot:"),
-        (
-            SnapshotRefusal::BeyondLog { size: 2, pinned: 1 },
-            "SnapshotBeyondLog:",
-        ),
     ];
     for (refusal, name) in &refusals {
         assert!(refusal.to_string().starts_with(name), "{refusal}");
     }
-    assert_eq!(refusals.len(), 5);
+    assert_eq!(refusals.len(), 4);
 }

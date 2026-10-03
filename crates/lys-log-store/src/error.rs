@@ -38,32 +38,30 @@ use std::path::PathBuf;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum StoreError {
-    /// This backend cannot durably record an interrupted batch's bound.
-    #[error("store cannot record durable batch intent ending at {end}")]
-    BatchIntentUnsupported {
-        /// The requested end of the batch.
+    /// An append offered a pin that is not the frontier of the leaves it
+    /// carries: its tree size is not the index after the last leaf.
+    #[error(
+        "the pin offered with an append is at tree size {tree_size}, but the leaves end at {end}"
+    )]
+    PinNotOfAppend {
+        /// The index after the last leaf of the append.
         end: u64,
+        /// The tree size the offered pin names.
+        tree_size: u64,
     },
-    /// An earlier batch's intent must be resolved before another starts.
-    #[error("batch intent ending at {end} requires reopen before another batch")]
-    BatchIntentPending {
-        /// The recorded end.
-        end: u64,
-    },
-    /// A batch must extend the current pinned tree.
-    #[error("batch end {end} must exceed the pinned tree size {pinned}")]
-    BatchIntentInvalid {
-        /// The held pinned tree size.
-        pinned: u64,
-        /// The requested end.
-        end: u64,
-    },
-    /// An intent cannot retroactively authorize an already unpinned tail.
-    #[error("cannot begin a batch with {extent} leaves and a pin covering {pinned}")]
-    BatchStartUnpinned {
-        /// The stored leaf count.
-        extent: u64,
-        /// The pinned tree size.
+    /// The snapshot, or a checkpoint it carries, names a tree size past the
+    /// last whole record. The pin at that size was acknowledged before the
+    /// snapshot was written, so leaves the log counted are gone; the open is
+    /// refused by name, writable and read-only, and nothing is rebuilt or
+    /// rewritten, because a shorter log folded from the leaves present would
+    /// be presented as whole (LYSLOGSTORE-008 R2).
+    #[error(
+        "refusing to open: the snapshot is at tree size {size}, past the last whole record at {pinned}; the leaves after {pinned} were acknowledged and are gone"
+    )]
+    SnapshotBeyondLog {
+        /// The tree size the snapshot or its checkpoint names.
+        size: u64,
+        /// The tree size of the last whole record.
         pinned: u64,
     },
     /// A stored tree size cannot be represented by this process's leaf buffer.
@@ -311,16 +309,14 @@ pub enum StoreError {
         leaves: u64,
     },
 
-    /// The log refused further use because an earlier append failed partway.
+    /// The log refused further use because an earlier append failed.
     ///
-    /// An append writes the leaf durably and *then* advances the pin. If the
-    /// pin write fails, storage is one leaf ahead of the pin — recoverable on
-    /// reopen, but only by exactly one leaf. Continuing to append on the same
-    /// handle would put storage two or more ahead, past what recovery can
-    /// repair, so the handle stops working instead. Reopen the log.
-    #[error(
-        "log handle is unusable: an earlier append failed after storing its leaf; reopen the log to recover"
-    )]
+    /// An append hands the store its leaves and their pin as one act, so a
+    /// failed append acknowledged nothing. What the store holds of it, if
+    /// anything, is the store's to say at its next open; this handle's view
+    /// of the store is uncertain from here, so it stops instead of building
+    /// on a guess. Reopen the log.
+    #[error("log handle is unusable: an earlier append failed; reopen the log to recover")]
     Poisoned,
 
     /// A `lys-core` operation failed — in practice, origin validation, since

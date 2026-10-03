@@ -13,8 +13,11 @@
 //!   refuses to replace an existing leaf. A leaf name therefore never refers
 //!   to a torn or unflushed file, and a leftover temporary file from a crash
 //!   is never counted as a leaf.
-//! - `state.json` — the pinned `(tree_size, root)`, rewritten atomically after
-//!   every append.
+//! - `state.json` — the pinned `(tree_size, root)`, rewritten atomically as
+//!   the last step of every append. In this layout the leaves and the pin are
+//!   separate files, so an append is one act to its caller (nothing is
+//!   acknowledged before the pin is durable) but not yet one flush; the segment
+//!   records of LYSLOGSTORE-008 R1 make it one and retire this file.
 //! - `snapshot.bin` — the log owner's signed snapshot, if one was written,
 //!   replaced atomically in the same way.
 //!
@@ -123,9 +126,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::{StoreError, StoreResult};
-use crate::store::{LeafStore, PinnedRoot};
+use crate::store::{LeafStore, PinnedRoot, batch_end};
 
-mod batch;
 mod leaves;
 
 #[cfg(test)]
@@ -165,9 +167,6 @@ struct LogState {
     tree_size: u64,
     /// Standard base64 (with padding) of the 32-byte RFC 6962 root hash.
     root_hash: String,
-    /// The exclusive end of an interrupted batch. Absence is the old state shape.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    batch_end: Option<u64>,
 }
 
 /// A directory-backed [`LeafStore`].
@@ -181,9 +180,9 @@ pub struct FileLeafStore {
     origin: String,
     extent: u64,
     pinned: PinnedRoot,
-    batch_intent: Option<u64>,
-    /// The leaf whose directory flush failed on this handle, if any. While set,
-    /// every append is refused until the store is reopened.
+    /// The leaf whose durability this handle could not confirm, if any: a
+    /// failed directory flush, or an append whose pin was not made durable.
+    /// While set, every write is refused until the store is reopened.
     durability_uncertain: Option<u64>,
     /// The temporary names this handle could not remove after a link, in the
     /// order it met them.
@@ -255,13 +254,12 @@ impl FileLeafStore {
         // it from the caller invites being handed a different one.
         let (root, tree_size) = AppendOnlyTree::<RawLeaf>::new().root().to_parts();
         let pinned = PinnedRoot { tree_size, root };
-        write_state(dir, pinned, None)?;
+        write_state(dir, pinned)?;
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
             extent: 0,
             pinned,
-            batch_intent: None,
             durability_uncertain: None,
             left_behind: Vec::new(),
             read_only: false,
@@ -284,7 +282,7 @@ impl FileLeafStore {
     /// `log.json`/`state.json`, an unexpected entry in `leaves/`, or a gap in
     /// the index set, and [`StoreError::Io`] on filesystem failure.
     pub fn open(dir: &Path) -> StoreResult<Self> {
-        let (config, pinned, batch_intent) = read_identity(dir)?;
+        let (config, pinned) = read_identity(dir)?;
         // A leaf name linked just before a crash may not yet be durable; the
         // flush makes every name counted below one that survives.
         fsync_dir(&dir.join("leaves"))?;
@@ -293,7 +291,6 @@ impl FileLeafStore {
             origin: config.origin,
             extent: probed_extent(dir, pinned.tree_size)?,
             pinned,
-            batch_intent,
             durability_uncertain: None,
             left_behind: Vec::new(),
             read_only: false,
@@ -307,23 +304,23 @@ impl FileLeafStore {
     /// and without creating, writing, renaming, linking or removing any file.
     ///
     /// The handle's `put_leaf`, `pin` and `put_snapshot` refuse with [`StoreError::ReadOnly`].
-    /// A store holding exactly one leaf past its pin is an interrupted append
-    /// that only a writable open repairs, so it is refused rather than served
-    /// at the pinned head. That is decided from the count and `state.json`
-    /// alone; no leaf bytes are read. Over any other count, `Log::open`
-    /// accepts a tree that matches the pin and refuses any other with
+    /// A store holding leaves past its pin is an interrupted append that only
+    /// a writable open repairs, so it is refused rather than served at the
+    /// pinned head, naming the cut still owed. That is decided from the count
+    /// and `state.json` alone; no leaf bytes are read. At the pin, `Log::open`
+    /// accepts a tree that matches it and refuses any other with
     /// [`StoreError::PinMismatch`] without pinning.
     ///
     /// # Errors
     ///
-    /// [`StoreError::RepairPending`] if the store holds exactly one leaf past
-    /// its pin, and otherwise the errors of [`FileLeafStore::open`]:
+    /// [`StoreError::RepairPending`] if the store holds leaves past its pin,
+    /// and otherwise the errors of [`FileLeafStore::open`]:
     /// [`StoreError::NotInitialized`], [`StoreError::Corrupt`] and
     /// [`StoreError::Io`].
     pub fn open_read_only(dir: &Path) -> StoreResult<Self> {
-        let (config, pinned, batch_intent) = read_identity(dir)?;
+        let (config, pinned) = read_identity(dir)?;
         let extent = probed_extent(dir, pinned.tree_size)?;
-        if pinned.tree_size.checked_add(1) == Some(extent) {
+        if extent > pinned.tree_size {
             return Err(StoreError::RepairPending {
                 path: dir.to_path_buf(),
                 pinned_size: pinned.tree_size,
@@ -335,7 +332,6 @@ impl FileLeafStore {
             origin: config.origin,
             extent,
             pinned,
-            batch_intent,
             durability_uncertain: None,
             left_behind: Vec::new(),
             read_only: true,
@@ -401,6 +397,28 @@ impl FileLeafStore {
     /// leaf named here is stored: only its temporary name is still there.
     pub fn left_behind(&self) -> &[LeftBehind] {
         &self.left_behind
+    }
+
+    /// The rules every offered pin meets before anything is written: it never
+    /// moves the size backwards, and at the held size it is the held root.
+    fn check_pin(&self, pin: PinnedRoot) -> StoreResult<()> {
+        if pin.tree_size < self.pinned.tree_size {
+            return Err(StoreError::PinWentBackwards {
+                pinned: self.pinned.tree_size,
+                requested: pin.tree_size,
+            });
+        }
+        // Monotonicity is about the size and says nothing about the root, so a
+        // second root at an already-pinned size passes it. That is equivocation
+        // arriving through the one operation allowed to repeat.
+        if pin.tree_size == self.pinned.tree_size && pin.root != self.pinned.root {
+            return Err(StoreError::PinRootChanged {
+                tree_size: pin.tree_size,
+                held: STANDARD.encode(self.pinned.root),
+                offered: STANDARD.encode(pin.root),
+            });
+        }
+        Ok(())
     }
 
     /// Path of the leaf file for `index`.
@@ -503,20 +521,70 @@ impl LeafStore for FileLeafStore {
         )
     }
 
-    fn put_leaves(&mut self, index: u64, leaves: &[&[u8]]) -> StoreResult<()> {
-        self.put_batch(index, leaves)
+    /// The leaves and their pin as one act to the caller: every leaf is
+    /// written and linked, the leaves directory is flushed once, then the pin
+    /// is made durable, and nothing is acknowledged before that last flush.
+    /// A failure anywhere after the first link leaves this handle refusing
+    /// every write until the store is reopened; the open then adopts the
+    /// whole leaves it finds ahead of the pin, or refuses them by name.
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
+        self.refuse_if_read_only("append leaves with their pin")?;
+        if let Some(uncertain) = self.durability_uncertain {
+            return Err(StoreError::ReopenRequired { index: uncertain });
+        }
+        let end = batch_end(index, leaves.len())?;
+        if index < self.extent {
+            return Err(StoreError::LeafAlreadyWritten { index });
+        }
+        if index > self.extent {
+            return Err(StoreError::LeafWouldLeaveGap {
+                index,
+                next: self.extent,
+            });
+        }
+        if pin.tree_size != end {
+            return Err(StoreError::PinNotOfAppend {
+                end,
+                tree_size: pin.tree_size,
+            });
+        }
+        self.check_pin(pin)?;
+        if leaves.is_empty() {
+            return self.pin(pin);
+        }
+        let directory = self.dir.join("leaves");
+        // Nothing is acknowledged until the pin is durable: from the first
+        // link to that flush, any failure holds this handle until a fresh open.
+        self.durability_uncertain = Some(index);
+        for (index, bytes) in (index..end).zip(leaves) {
+            let temporary = write_leaf_temp(
+                &directory,
+                index,
+                |file| file.write_all(bytes),
+                &mut next_process_sequence,
+            )?;
+            link_leaf(&temporary, &self.leaf_path(index), index)?;
+            self.extent = index + 1;
+            if let Err(source) = remove_file(&temporary) {
+                self.left_behind.push(LeftBehind {
+                    index,
+                    path: temporary,
+                    source,
+                });
+            }
+        }
+        sync_dir(&directory)
+            .map_err(|source| StoreError::LeafDurabilityUncertain { index, source })?;
+        self.pin_uncertain = true;
+        write_state(&self.dir, pin)?;
+        self.pin_uncertain = false;
+        self.pinned = pin;
+        self.durability_uncertain = None;
+        Ok(())
     }
 
     fn pinned(&self) -> PinnedRoot {
         self.pinned
-    }
-
-    fn batch_intent(&self) -> Option<u64> {
-        self.batch_intent
-    }
-
-    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
-        self.start_batch(end)
     }
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
@@ -524,30 +592,14 @@ impl LeafStore for FileLeafStore {
         if let Some(index) = self.durability_uncertain {
             return Err(StoreError::ReopenRequired { index });
         }
-        if pin.tree_size < self.pinned.tree_size {
-            return Err(StoreError::PinWentBackwards {
-                pinned: self.pinned.tree_size,
-                requested: pin.tree_size,
-            });
-        }
-        // Monotonicity is about the size and says nothing about the root, so a
-        // second root at an already-pinned size passes it. That is equivocation
-        // arriving through the one operation allowed to repeat.
-        if pin.tree_size == self.pinned.tree_size && pin.root != self.pinned.root {
-            return Err(StoreError::PinRootChanged {
-                tree_size: pin.tree_size,
-                held: STANDARD.encode(self.pinned.root),
-                offered: STANDARD.encode(pin.root),
-            });
-        }
-        if pin == self.pinned && !self.pin_uncertain && self.batch_intent.is_none() {
+        self.check_pin(pin)?;
+        if pin == self.pinned && !self.pin_uncertain {
             return Ok(());
         }
         self.pin_uncertain = true;
-        write_state(&self.dir, pin, None)?;
+        write_state(&self.dir, pin)?;
         self.pin_uncertain = false;
         self.pinned = pin;
-        self.batch_intent = None;
         Ok(())
     }
 
@@ -572,7 +624,7 @@ impl LeafStore for FileLeafStore {
 
 /// Reads `log.json` and `state.json` and returns the store's identity and pin:
 /// the checks both opens share, in the order they make them.
-fn read_identity(dir: &Path) -> StoreResult<(LogConfig, PinnedRoot, Option<u64>)> {
+fn read_identity(dir: &Path) -> StoreResult<(LogConfig, PinnedRoot)> {
     let config_path = dir.join("log.json");
     if !config_path.exists() {
         return Err(StoreError::NotInitialized {
@@ -594,13 +646,7 @@ fn read_identity(dir: &Path) -> StoreResult<(LogConfig, PinnedRoot, Option<u64>)
         tree_size: state.tree_size,
         root: decode_pinned_root(dir, &state.root_hash)?,
     };
-    if state.batch_end.is_some_and(|end| end <= pinned.tree_size) {
-        return Err(StoreError::Corrupt {
-            path: dir.to_path_buf(),
-            reason: "batch intent does not extend the pinned tree".to_owned(),
-        });
-    }
-    Ok((config, pinned, state.batch_end))
+    Ok((config, pinned))
 }
 
 /// The names in `leaves/` of the store's temporary-leaf form, in lexical
@@ -683,11 +729,10 @@ fn decode_pinned_root(dir: &Path, root_b64: &str) -> StoreResult<[u8; 32]> {
 /// Durably replaces `state.json`: write a sibling temp file, fsync it, rename
 /// over the target (atomic on POSIX), then fsync the directory so the rename
 /// itself survives a crash.
-fn write_state(dir: &Path, pin: PinnedRoot, batch_end: Option<u64>) -> StoreResult<()> {
+pub(crate) fn write_state(dir: &Path, pin: PinnedRoot) -> StoreResult<()> {
     let state = LogState {
         tree_size: pin.tree_size,
         root_hash: STANDARD.encode(pin.root),
-        batch_end,
     };
     let tmp_path = dir.join("state.json.tmp");
     write_durably(&tmp_path, &json_bytes(&state, "log state")?)?;

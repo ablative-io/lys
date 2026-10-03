@@ -93,15 +93,6 @@ pub enum SnapshotRefusal {
         size: u64,
     },
 
-    /// The snapshot claims more leaves than the log has pinned.
-    #[error("SnapshotBeyondLog: the snapshot is at tree size {size}, past the log's {pinned}")]
-    BeyondLog {
-        /// The tree size the snapshot claims.
-        size: u64,
-        /// The tree size the log has pinned.
-        pinned: u64,
-    },
-
     /// The owner could not read the state the snapshot carries.
     #[error("SnapshotStateUnreadable: {reason}")]
     StateUnreadable {

@@ -60,23 +60,29 @@ fn a_resumed_open_whose_frontier_is_another_logs_is_a_pin_mismatch() -> Outcome 
 }
 
 #[test]
-fn an_append_interrupted_before_its_pin_is_repaired_on_a_resumed_open() -> Outcome {
+fn an_append_whose_flush_fails_stores_nothing_and_holds_the_handle() -> Outcome {
     let disk = filled(5)?;
     let mut store = CountingStore::over(disk);
-    store.fail_next_pin();
+    store.fail_next_append();
     let (mut log, _) = FrontierLog::resume(store, Frontier::from_leaves((0..5).map(leaf)))?;
     let err = log.append(&leaf(5)).unwrap_err();
     assert!(matches!(err, StoreError::Io { .. }), "{err}");
+    assert_eq!(log.len(), 5, "nothing was acknowledged");
     assert!(matches!(log.append(&leaf(6)), Err(StoreError::Poisoned)));
     let disk = log.store.disk;
+    assert_eq!(
+        disk.leaves.len(),
+        5,
+        "the store kept no leaf of the failed append"
+    );
     assert_eq!(disk.pinned.map(|pin| pin.tree_size), Some(5));
     let (log, tail) = FrontierLog::resume(
         CountingStore::over(disk),
         Frontier::from_leaves((0..5).map(leaf)),
     )?;
-    assert_eq!(log.recovered_to(), Some(6));
-    assert_eq!(tail.leaves, vec![leaf(5)]);
-    assert_eq!(log.store().pinned().tree_size, 6);
+    assert_eq!(log.recovered_to(), None, "a reopen finds nothing to repair");
+    assert!(tail.leaves.is_empty());
+    assert_eq!(log.store().pinned().tree_size, 5);
     Ok(())
 }
 
@@ -128,7 +134,7 @@ fn a_poisoned_log_writes_no_snapshot() -> Outcome {
     let dir = tempfile::tempdir()?;
     let key = Ed25519Identity::load_or_generate(&dir.path().join("key"))?;
     let mut store = CountingStore::new();
-    store.fail_next_pin();
+    store.fail_next_append();
     let (mut log, _) = FrontierLog::open(store)?;
     assert!(log.append(&leaf(0)).is_err());
     let err = log

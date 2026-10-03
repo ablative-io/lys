@@ -25,11 +25,12 @@
 //! # The same integrity routine as `Log`
 //!
 //! Opening reconciles the tree with the store's pin exactly as
-//! [`Log::open`](crate::Log::open) does: equal is clean, and a verified tail
-//! is recoverable only as one leaf or within a durably recorded batch intent. It is
-//! repaired and reported, and anything else is
-//! [`StoreError::PinMismatch`]. Appends store the leaf before the pin, and a
-//! handle whose pin write failed is poisoned.
+//! [`Log::open`](crate::Log::open) does: equal is clean; a verified tail ahead
+//! of the pin, which only a backend that writes leaves before its pin can
+//! leave, is adopted, pinned and reported; anything else is
+//! [`StoreError::PinMismatch`]. An append computes the new frontier first and
+//! hands the store the leaf and its pin together as one act (LYSLOGSTORE-008
+//! R2); a handle whose append failed is held until reopen.
 //!
 //! # What a resumed open does not check
 //!
@@ -113,20 +114,15 @@ impl Reading {
     ///
     /// # Errors
     ///
-    /// [`StoreError::PinMismatch`] for any divergence but one interrupted
-    /// append.
-    pub(crate) fn reconcile(
-        &self,
-        pinned: PinnedRoot,
-        intent: Option<u64>,
-    ) -> StoreResult<Option<PinnedRoot>> {
+    /// [`StoreError::PinMismatch`] for any divergence but a tail ahead of the
+    /// pin that rebuilds from the pinned root: leaves a backend wrote before
+    /// their pin and never acknowledged, adopted here.
+    pub(crate) fn reconcile(&self, pinned: PinnedRoot) -> StoreResult<Option<PinnedRoot>> {
         let (size, root) = (self.frontier.size(), self.frontier.root());
         if size == pinned.tree_size && root == pinned.root {
-            return Ok(intent.map(|_| pinned));
+            return Ok(None);
         }
-        if crate::store::recoverable_tail(pinned.tree_size, size, intent)
-            && self.root_at_pin == Some(pinned.root)
-        {
+        if size > pinned.tree_size && self.root_at_pin == Some(pinned.root) {
             return Ok(Some(PinnedRoot {
                 tree_size: size,
                 root,
@@ -189,9 +185,9 @@ impl<S: LeafStore> FrontierLog<S> {
     }
 
     /// Builds the log from a reading, repairing the pin when the reading
-    /// found one interrupted append.
+    /// found leaves ahead of it.
     pub(crate) fn from_reading(mut store: S, reading: Reading) -> StoreResult<(Self, Tail)> {
-        let repair = reading.reconcile(store.pinned(), store.batch_intent())?;
+        let repair = reading.reconcile(store.pinned())?;
         let recovered_to = match repair {
             Some(pin) => {
                 store.pin(pin)?;
@@ -245,41 +241,36 @@ impl<S: LeafStore> FrontierLog<S> {
         &self.store
     }
 
-    /// Appends raw leaf bytes: stores the leaf durably, extends the tree,
-    /// then advances the pin. Returns the new leaf's index and its RFC 6962
-    /// leaf hash.
+    /// Appends raw leaf bytes: computes the frontier the leaf makes, hands the
+    /// store the leaf and that pin as one act, then extends the tree. Returns
+    /// the new leaf's index and its RFC 6962 leaf hash.
     ///
     /// # Errors
     ///
     /// As [`Log::append`](crate::Log::append).
     pub fn append(&mut self, leaf_bytes: &[u8]) -> StoreResult<(u64, [u8; 32])> {
-        if self.poisoned {
-            return Err(StoreError::Poisoned);
-        }
-        let index = self.frontier.size();
-        self.store.put_leaf(index, leaf_bytes)?;
-        // The leaf is durable and the pin is not yet advanced; a failure from
-        // here leaves the one-leaf-ahead state, so the handle is poisoned.
-        self.poisoned = true;
-        let leaf_hash = self.frontier.push(leaf_bytes);
-        if let Some(tree) = self.proofs.get_mut() {
-            tree.push_leaf_hash(leaf_hash);
-        }
-        self.store.pin(PinnedRoot {
-            tree_size: self.frontier.size(),
-            root: self.frontier.root(),
-        })?;
-        self.poisoned = false;
-        Ok((index, leaf_hash))
+        let appended = self.append_batch(&[leaf_bytes])?;
+        appended
+            .first()
+            .copied()
+            .ok_or(StoreError::LeafMissingWithinExtent {
+                index: self.frontier.size(),
+                extent: self.store.extent(),
+            })
     }
 
-    /// Record durable intent, append consecutive leaves, then advance the pin once.
-    /// An empty batch writes nothing; a failed batch holds this handle until reopen.
-    /// Recovery adopts only a verified tail within the recorded end.
+    /// Appends consecutive leaves with one flush (LYSLOGSTORE-008 R3): the
+    /// frontier after every leaf is computed first, then the store is handed
+    /// the leaves and the pin they make in one act, and only after it answers
+    /// is anything acknowledged. Answers every index and leaf hash, or an
+    /// error after which nothing in the batch is acknowledged and this handle
+    /// is held until reopen. An empty batch writes nothing.
     ///
     /// # Errors
-    /// As [`Self::append`], [`StoreError::BatchSizeOverflow`] before writing,
-    /// or a named intent-recording failure, including [`StoreError::BatchIntentUnsupported`].
+    ///
+    /// [`StoreError::Poisoned`] after an earlier failed append,
+    /// [`StoreError::BatchSizeOverflow`] before writing, and whatever the
+    /// store's [`append`](LeafStore::append) returns.
     pub fn append_batch(&mut self, leaves: &[&[u8]]) -> StoreResult<Vec<(u64, [u8; 32])>> {
         if self.poisoned {
             return Err(StoreError::Poisoned);
@@ -289,22 +280,27 @@ impl<S: LeafStore> FrontierLog<S> {
         if leaves.is_empty() {
             return Ok(Vec::new());
         }
-        self.poisoned = true;
-        self.store.begin_batch(end)?;
-        self.store.put_leaves(first, leaves)?;
+        let mut next = self.frontier.clone();
         let mut appended = Vec::with_capacity(leaves.len());
         for (index, bytes) in (first..end).zip(leaves) {
-            let hash = self.frontier.push(bytes);
-            if let Some(tree) = self.proofs.get_mut() {
-                tree.push_leaf_hash(hash);
-            }
-            appended.push((index, hash));
+            appended.push((index, next.push(bytes)));
         }
-        self.store.pin(PinnedRoot {
-            tree_size: self.frontier.size(),
-            root: self.frontier.root(),
-        })?;
-        self.poisoned = false;
+        let pin = PinnedRoot {
+            tree_size: next.size(),
+            root: next.root(),
+        };
+        if let Err(error) = self.store.append(first, leaves, pin) {
+            // Nothing was acknowledged. What the store kept of the attempt is
+            // the store's to say at its next open, so this handle stops here.
+            self.poisoned = true;
+            return Err(error);
+        }
+        self.frontier = next;
+        if let Some(tree) = self.proofs.get_mut() {
+            for (_index, hash) in &appended {
+                tree.push_leaf_hash(*hash);
+            }
+        }
         Ok(appended)
     }
 
@@ -397,8 +393,8 @@ impl<S: LeafStore> FrontierLog<S> {
     ///
     /// # Errors
     ///
-    /// [`StoreError::Poisoned`] while an append is half complete, and whatever
-    /// the store returns while writing.
+    /// [`StoreError::Poisoned`] after a failed append, and whatever the store
+    /// returns while writing.
     pub fn write_snapshot(
         &mut self,
         domain: &str,

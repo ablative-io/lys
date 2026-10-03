@@ -305,7 +305,6 @@ fn damaged(
         }
         "SnapshotWrongKind" => forge(world, "another/state", honest.frontier(), honest.state())?,
         "SnapshotWrongRoot" => forge(world, STATE_DOMAIN, &lines(len), honest.state())?,
-        "SnapshotBeyondLog" => forge(world, STATE_DOMAIN, &lines(len + 1), honest.state())?,
         "SnapshotStateUnreadable" => {
             forge(world, STATE_DOMAIN, honest.frontier(), b"not a state")?;
         }
@@ -322,7 +321,6 @@ fn a_snapshot_that_cannot_be_believed_is_refused_by_name_and_every_line_is_read(
         "SnapshotSignatureInvalid",
         "SnapshotWrongKind",
         "SnapshotWrongRoot",
-        "SnapshotBeyondLog",
         "SnapshotStateUnreadable",
     ] {
         let world = world()?;

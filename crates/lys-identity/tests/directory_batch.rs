@@ -185,24 +185,19 @@ impl LeafStore for Partial {
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
         self.store.put_leaf(index, bytes)
     }
-    fn put_leaves(&mut self, index: u64, bytes: &[&[u8]]) -> StoreResult<()> {
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         if self.fail.swap(false, std::sync::atomic::Ordering::SeqCst) {
-            self.store.put_leaves(index, &bytes[..2])?;
+            // The one flush that would have covered the batch fails: nothing
+            // of it is acknowledged (LYSLOGSTORE-008 R3).
             return Err(StoreError::Io {
-                context: "injected batch prefix failure".to_owned(),
-                source: std::io::Error::other("third event was refused"),
+                context: "injected batch flush failure".to_owned(),
+                source: std::io::Error::other("the batch was refused"),
             });
         }
-        self.store.put_leaves(index, bytes)
+        self.store.append(index, leaves, pin)
     }
     fn pinned(&self) -> PinnedRoot {
         self.store.pinned()
-    }
-    fn batch_intent(&self) -> Option<u64> {
-        self.store.batch_intent()
-    }
-    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
-        self.store.begin_batch(end)
     }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         self.store.pin(pin)
@@ -216,7 +211,7 @@ impl LeafStore for Partial {
 }
 
 #[test]
-fn failed_batch_adopts_only_its_prefix_and_retry_records_only_the_missing_event() -> Outcome {
+fn a_failed_batch_records_nothing_and_the_retry_records_every_event() -> Outcome {
     let (home, original) = world()?;
     drop(original);
     let key = Ed25519Identity::load(&home.path().join("key"))?;
@@ -236,7 +231,17 @@ fn failed_batch_adopts_only_its_prefix_and_retry_records_only_the_missing_event(
         directory.commit_batch(&changes),
         Err(IdentityError::LogUnavailable { .. })
     ));
-    assert_eq!(directory.log()?.len()?, 2);
+    assert_eq!(
+        directory.log()?.len()?,
+        0,
+        "nothing of the batch was acknowledged"
+    );
+    assert!(directory.record(changes[0].identity())?.is_none());
+    assert!(directory.record(changes[2].identity())?.is_none());
+    assert_eq!(FileLeafStore::open(&home.path().join("log"))?.extent(), 0);
+    let receipts = directory.commit_batch(&changes)?;
+    assert_eq!(receipts.len(), 3);
+    assert_eq!(directory.log()?.len()?, 3);
     assert_eq!(
         directory
             .record(changes[0].identity())?
@@ -244,22 +249,6 @@ fn failed_batch_adopts_only_its_prefix_and_retry_records_only_the_missing_event(
             .state(),
         LifecycleState::Active
     );
-    assert!(directory.record(changes[2].identity())?.is_none());
-    let recorded: Vec<_> = (0..2)
-        .map(|index| {
-            let (signed, coordinate) =
-                directory
-                    .log()?
-                    .entry(index)?
-                    .ok_or(IdentityError::LogUnavailable {
-                        reason: "prefix event missing".to_owned(),
-                    })?;
-            lys_identity::receipt::Receipt::of(&signed, coordinate)
-        })
-        .collect::<Result<_, IdentityError>>()?;
-    let receipts = directory.commit_batch(&changes)?;
-    assert_eq!(receipts[..2], recorded);
-    assert_eq!(directory.log()?.len()?, 3);
     assert!(directory.record(changes[2].identity())?.is_some());
     let mut reopened = open(&home)?;
     assert_eq!(reopened.commit_batch(&changes)?, receipts);

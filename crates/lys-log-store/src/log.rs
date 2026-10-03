@@ -12,17 +12,19 @@
 //! It cannot live in `lys-core` either: `lys-core` performs no I/O, and this
 //! routine is defined entirely by what durable storage can do to you.
 //!
-//! # Append order is load-bearing
+//! # The leaf and its pin are one act
 //!
-//! [`Log::append`] stores the leaf durably **before** advancing the pin, and
-//! never the reverse. That ordering is what makes "storage holds a contiguous tail
-//! ahead of the pin" the only divergence a crash can produce, and therefore the
-//! only one [`Log::open`] repairs.
+//! [`Log::append`] computes the frontier the leaf makes and hands the store
+//! the leaf and that pin together (LYSLOGSTORE-008 R2); the store acknowledges
+//! both after one flush or neither. A backend that still writes leaves before
+//! its pin can leave a contiguous tail ahead of the pin, which is the one
+//! divergence [`Log::open`] adopts, after checking it rebuilds from the pinned
+//! root.
 //!
-//! Pinning first would allow the opposite state — a pin ahead of the leaves —
-//! which is *not* repairable and must not be: a pin covering a leaf that was
-//! never stored describes a tree nobody can rebuild. Recovery deliberately has
-//! no case for it, so it surfaces as [`StoreError::PinMismatch`].
+//! A pin ahead of the leaves is *not* repairable and must not be: a pin
+//! covering a leaf that was never stored describes a tree nobody can rebuild.
+//! Recovery deliberately has no case for it, so it surfaces as
+//! [`StoreError::PinMismatch`].
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -30,6 +32,7 @@ use lys_core::checkpoint::CheckpointBody;
 use lys_core::merkle::{AppendOnlyTree, RawLeaf, raw_leaf_hash};
 
 use crate::error::{StoreError, StoreResult};
+use crate::frontier::Frontier;
 use crate::store::{LeafStore, PinnedRoot};
 
 /// Checks that `origin` satisfies the rules a signed checkpoint will impose.
@@ -59,6 +62,9 @@ pub struct Log<S: LeafStore> {
     store: S,
     leaves: Vec<Vec<u8>>,
     tree: AppendOnlyTree<RawLeaf>,
+    /// The tree's frontier, kept beside it so an append can compute the pin
+    /// its leaves make before anything is written.
+    frontier: Frontier,
     recovered_to: Option<u64>,
     poisoned: bool,
     /// The tree size a writable open would repair to, when this log was opened
@@ -85,11 +91,10 @@ impl<S: LeafStore> Log<S> {
     /// Opens a log over `store`: loads every leaf, rebuilds the tree, and
     /// reconciles it with the pinned root.
     ///
-    /// An interrupted append permits exactly one extra leaf. A durably recorded
-    /// batch intent permits a contiguous tail up to its exclusive end. Both
-    /// require the pinned-size prefix to rebuild to the pinned root. The
-    /// repair advances the pin, is reported by
-    /// [`recovered_to`](Self::recovered_to), and is never silent.
+    /// A contiguous tail ahead of the pin, which only a backend that writes
+    /// leaves before its pin can leave, is adopted when the pinned-size prefix
+    /// rebuilds to the pinned root. The repair advances the pin, is reported
+    /// by [`recovered_to`](Self::recovered_to), and is never silent.
     ///
     /// Anything else is a mismatch. In particular, a tampered leaf *inside* the
     /// pinned prefix does not qualify however many leaves are present, because
@@ -111,10 +116,12 @@ impl<S: LeafStore> Log<S> {
             leaves.push(leaf);
         }
         let tree = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&leaves);
+        let frontier = Frontier::from_leaves(&leaves);
         let mut log = Self {
             store,
             leaves,
             tree,
+            frontier,
             recovered_to: None,
             poisoned: false,
             pending_repair: None,
@@ -129,14 +136,11 @@ impl<S: LeafStore> Log<S> {
     ///
     /// For a reader, whose open must not change the store. When the rebuilt
     /// tree equals the pin, the log is the one [`Log::open`] returns. When the
-    /// store has a recoverable tail under the one-leaf rule or its recorded
-    /// batch intent, and the pinned prefix matches, the log holds the pinned
-    /// prefix only, reports the tree size a writable open
+    /// store holds leaves ahead of its pin and the pinned prefix matches, the
+    /// log holds the pinned prefix only, reports the tree size a writable open
     /// repairs to through [`pending_repair`](Self::pending_repair), and refuses
     /// every append with [`StoreError::AppendAwaitsRepair`]. The store's
     /// [`pin`](LeafStore::pin) is never called.
-    /// An intent left before any leaf was written also needs a writable open
-    /// to clear it; its pending repair size is the unchanged pinned size.
     ///
     /// # Errors
     ///
@@ -155,22 +159,20 @@ impl<S: LeafStore> Log<S> {
         let tree = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&leaves);
         let (rebuilt_root, rebuilt_size) = tree.root().to_parts();
         let pinned = store.pinned();
+        let frontier = Frontier::from_leaves(&leaves);
         let mut log = Self {
             store,
             leaves,
             tree,
+            frontier,
             recovered_to: None,
             poisoned: false,
             pending_repair: None,
         };
         if rebuilt_size == pinned.tree_size && rebuilt_root == pinned.root {
-            if log.store.batch_intent().is_some() {
-                log.pending_repair = Some(rebuilt_size);
-            }
             return Ok(log);
         }
-        if crate::store::recoverable_tail(pinned.tree_size, rebuilt_size, log.store.batch_intent())
-        {
+        if rebuilt_size > pinned.tree_size {
             let prefix = log.prefix_tree(pinned.tree_size)?;
             if prefix.root().to_parts().0 == pinned.root {
                 let count = usize::try_from(pinned.tree_size).map_err(|source| {
@@ -180,6 +182,7 @@ impl<S: LeafStore> Log<S> {
                     }
                 })?;
                 log.leaves.truncate(count);
+                log.frontier = Frontier::from_leaves(&log.leaves);
                 log.tree = prefix;
                 log.pending_repair = Some(rebuilt_size);
                 return Ok(log);
@@ -199,14 +202,9 @@ impl<S: LeafStore> Log<S> {
         let (rebuilt_root, rebuilt_size) = self.tree.root().to_parts();
         let pinned = self.store.pinned();
         if rebuilt_size == pinned.tree_size && rebuilt_root == pinned.root {
-            if self.store.batch_intent().is_some() {
-                self.store.pin(pinned)?;
-                self.recovered_to = Some(rebuilt_size);
-            }
             return Ok(());
         }
-        if crate::store::recoverable_tail(pinned.tree_size, rebuilt_size, self.store.batch_intent())
-        {
+        if rebuilt_size > pinned.tree_size {
             let prefix = self.prefix_tree(pinned.tree_size)?;
             let (prefix_root, _prefix_size) = prefix.root().to_parts();
             if prefix_root == pinned.root {
@@ -244,51 +242,38 @@ impl<S: LeafStore> Log<S> {
         self.pending_repair
     }
 
-    /// Appends raw leaf bytes: stores the leaf durably, extends the tree, then
-    /// advances the pin. Returns the new leaf's index and its RFC 6962 leaf
-    /// hash.
+    /// Appends raw leaf bytes: computes the frontier the leaf makes, hands the
+    /// store the leaf and that pin as one act, then extends the tree. Returns
+    /// the new leaf's index and its RFC 6962 leaf hash.
     ///
     /// # Errors
     ///
     /// Whatever the store returns — including
     /// [`StoreError::LeafAlreadyWritten`] if another writer took this index.
-    /// [`StoreError::Poisoned`] if an earlier append on this handle failed
-    /// after storing its leaf (see the module docs on append order).
-    /// [`StoreError::AppendAwaitsRepair`] if the log was opened at its pin with one
-    /// leaf standing ahead of it; see [`Log::open_at_pin`].
+    /// [`StoreError::Poisoned`] if an earlier append on this handle failed.
+    /// [`StoreError::AppendAwaitsRepair`] if the log was opened at its pin with
+    /// leaves standing ahead of it; see [`Log::open_at_pin`].
     pub fn append(&mut self, leaf_bytes: &[u8]) -> StoreResult<(u64, [u8; 32])> {
-        if let Some(leaves) = self.pending_repair {
-            return Err(StoreError::AppendAwaitsRepair {
-                pinned_tree_size: self.tree.len(),
-                leaves,
-            });
-        }
-        if self.poisoned {
-            return Err(StoreError::Poisoned);
-        }
-        let index = self.tree.len();
-        self.store.put_leaf(index, leaf_bytes)?;
-        // Past this point the leaf is durable but the pin is not yet advanced,
-        // so any failure leaves a recoverable tail. The handle is poisoned
-        // so no later operation is acknowledged while this outcome is uncertain.
-        self.poisoned = true;
-        self.tree.append_raw(leaf_bytes);
-        self.leaves.push(leaf_bytes.to_vec());
-        let (root, tree_size) = self.tree.root().to_parts();
-        self.store.pin(PinnedRoot { tree_size, root })?;
-        self.poisoned = false;
-        Ok((index, raw_leaf_hash(leaf_bytes)))
+        let appended = self.append_batch(&[leaf_bytes])?;
+        appended
+            .first()
+            .copied()
+            .ok_or(StoreError::LeafMissingWithinExtent {
+                index: self.tree.len(),
+                extent: self.store.extent(),
+            })
     }
 
-    /// Append consecutive leaves and acknowledge them only after one final pin.
-    /// A durable intent records the exclusive end before any leaf is written.
-    /// An empty batch performs no writes. A failed batch requires a fresh open;
-    /// its prefix is recovered only within that intent and the verified pin.
+    /// Appends consecutive leaves with one flush (LYSLOGSTORE-008 R3): the
+    /// frontier after every leaf is computed first, then the store is handed
+    /// the leaves and the pin they make in one act, and only after it answers
+    /// is anything acknowledged. An empty batch performs no writes. A failed
+    /// batch acknowledges nothing and holds this handle until a fresh open.
     ///
     /// # Errors
-    /// As [`Self::append`], [`StoreError::BatchSizeOverflow`] before writing,
-    /// or a named failure recording durable intent, including
-    /// [`StoreError::BatchIntentUnsupported`] for a backend without that support.
+    ///
+    /// As [`Self::append`], and [`StoreError::BatchSizeOverflow`] before
+    /// writing.
     pub fn append_batch(&mut self, leaves: &[&[u8]]) -> StoreResult<Vec<(u64, [u8; 32])>> {
         if let Some(leaves) = self.pending_repair {
             return Err(StoreError::AppendAwaitsRepair {
@@ -304,18 +289,27 @@ impl<S: LeafStore> Log<S> {
         if leaves.is_empty() {
             return Ok(Vec::new());
         }
-        self.poisoned = true;
-        self.store.begin_batch(end)?;
-        self.store.put_leaves(first, leaves)?;
+        let mut next = self.frontier.clone();
+        for bytes in leaves {
+            next.push(bytes);
+        }
+        let pin = PinnedRoot {
+            tree_size: next.size(),
+            root: next.root(),
+        };
+        if let Err(error) = self.store.append(first, leaves, pin) {
+            // Nothing was acknowledged; this handle's view of the store is
+            // uncertain from here, so it stops instead of building on a guess.
+            self.poisoned = true;
+            return Err(error);
+        }
+        self.frontier = next;
         let mut appended = Vec::with_capacity(leaves.len());
         for (index, bytes) in (first..end).zip(leaves) {
             self.tree.append_raw(bytes);
             self.leaves.push(bytes.to_vec());
             appended.push((index, raw_leaf_hash(bytes)));
         }
-        let (root, tree_size) = self.tree.root().to_parts();
-        self.store.pin(PinnedRoot { tree_size, root })?;
-        self.poisoned = false;
         Ok(appended)
     }
 

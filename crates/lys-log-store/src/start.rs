@@ -2,14 +2,22 @@
 //! whole log when the snapshot cannot be believed, and says which.
 //!
 //! A start reads the store's snapshot, checks it (see [`crate::snapshot`]),
-//! refuses one claiming more leaves than the log has pinned, and resumes the
-//! tree from its frontier through every leaf after it. The log must reach its
-//! pinned root from there. Any refusal is named in the [`Start`] the owner is
-//! handed, and the log is then opened from nothing, reading every leaf: a bad
-//! snapshot costs one full start and is never used, and the owner is expected
-//! to write a fresh one once it has folded the whole log.
+//! and resumes the tree from its frontier through every leaf after it. The
+//! log must reach its pinned root from there. Any refusal is named in the
+//! [`Start`] the owner is handed, and the log is then opened from nothing,
+//! reading every leaf: a bad snapshot costs one full start and is never used,
+//! and the owner is expected to write a fresh one once it has folded the whole
+//! log.
+//!
+//! One case is not a refusal of the snapshot but of the open
+//! (LYSLOGSTORE-008 R2): a snapshot naming a tree size past the last whole
+//! record. The pin at that size was acknowledged before the snapshot was
+//! written, so leaves the log counted are gone, and a rebuild from the leaves
+//! present would present the shorter log as whole. That is
+//! [`StoreError::SnapshotBeyondLog`], writable and read-only, and nothing is
+//! rebuilt or rewritten.
 
-use crate::error::StoreResult;
+use crate::error::{StoreError, StoreResult};
 use crate::frontier::Frontier;
 use crate::frontier_log::{FrontierLog, Reading, Tail};
 use crate::snapshot::{SnapshotRefusal, unseal};
@@ -79,10 +87,12 @@ pub struct Started<S: LeafStore> {
 ///
 /// # Errors
 ///
-/// Whatever the store returns while reading, and [`FrontierLog::open`]'s
-/// refusals when even the whole log does not reconcile with its pin. A
-/// snapshot that fails a check is never an error: it is refused by name in
-/// [`Started::start`].
+/// Whatever the store returns while reading, [`FrontierLog::open`]'s
+/// refusals when even the whole log does not reconcile with its pin, and
+/// [`StoreError::SnapshotBeyondLog`] for a snapshot past the last whole
+/// record, before anything is read or written. Every other snapshot that
+/// fails a check is refused by name in [`Started::start`] and never an
+/// error.
 pub fn open_with_snapshot<S: LeafStore>(
     store: S,
     domain: &str,
@@ -96,25 +106,21 @@ pub fn open_with_snapshot<S: LeafStore>(
                 let pinned = store.pinned().tree_size;
                 let size = snapshot.frontier().size();
                 if size > pinned {
-                    SnapshotRefusal::BeyondLog { size, pinned }
-                } else {
-                    let (frontier, state) = snapshot.into_parts();
-                    let reading = Reading::from(&store, frontier)?;
-                    if reading
-                        .reconcile(store.pinned(), store.batch_intent())
-                        .is_ok()
-                    {
-                        let replayed = reading.replayed();
-                        let (log, tail) = FrontierLog::from_reading(store, reading)?;
-                        return Ok(Started {
-                            log,
-                            state: Some(state),
-                            tail,
-                            start: Start::Resumed { size, replayed },
-                        });
-                    }
-                    SnapshotRefusal::WrongRoot { size }
+                    return Err(StoreError::SnapshotBeyondLog { size, pinned });
                 }
+                let (frontier, state) = snapshot.into_parts();
+                let reading = Reading::from(&store, frontier)?;
+                if reading.reconcile(store.pinned()).is_ok() {
+                    let replayed = reading.replayed();
+                    let (log, tail) = FrontierLog::from_reading(store, reading)?;
+                    return Ok(Started {
+                        log,
+                        state: Some(state),
+                        tail,
+                        start: Start::Resumed { size, replayed },
+                    });
+                }
+                SnapshotRefusal::WrongRoot { size }
             }
         },
     };

@@ -1,13 +1,15 @@
 #![cfg(test)]
-//! An in-memory [`LeafStore`] that counts the leaves read from it, so a test
-//! can say how much of a log a start touched rather than infer it from timing.
+//! An in-memory [`LeafStore`] that counts the leaves read from it and the
+//! appends made to it, so a test can say how much of a log a start touched
+//! and how many durable acts a batch cost, rather than infer either from
+//! timing.
 
 use std::cell::Cell;
 
 use lys_core::merkle::{AppendOnlyTree, RawLeaf};
 
 use crate::error::{StoreError, StoreResult};
-use crate::store::{LeafStore, PinnedRoot};
+use crate::store::{LeafStore, PinnedRoot, batch_end};
 
 pub(crate) const ORIGIN: &str = "example.com/lys/start-test";
 
@@ -18,13 +20,13 @@ pub(crate) struct Disk {
     pub(crate) leaves: Vec<Vec<u8>>,
     pub(crate) pinned: Option<PinnedRoot>,
     pub(crate) snapshot: Option<Vec<u8>>,
-    pub(crate) batch_intent: Option<u64>,
 }
 
 pub(crate) struct CountingStore {
     pub(crate) disk: Disk,
     reads: Cell<u64>,
-    fail_next_pin: bool,
+    appends: Cell<u64>,
+    fail_next_append: bool,
 }
 
 impl CountingStore {
@@ -36,7 +38,8 @@ impl CountingStore {
         Self {
             disk,
             reads: Cell::new(0),
-            fail_next_pin: false,
+            appends: Cell::new(0),
+            fail_next_append: false,
         }
     }
 
@@ -45,9 +48,16 @@ impl CountingStore {
         self.reads.get()
     }
 
-    /// Makes the next pin fail after its leaf was stored.
-    pub(crate) fn fail_next_pin(&mut self) {
-        self.fail_next_pin = true;
+    /// How many durable acts this handle was asked for: one per
+    /// [`LeafStore::append`], whatever the batch's size, as one flush is.
+    pub(crate) fn appends(&self) -> u64 {
+        self.appends.get()
+    }
+
+    /// Makes the next append fail at its one flush, so that nothing of it is
+    /// stored: the store's parts are as they were before the call.
+    pub(crate) fn fail_next_append(&mut self) {
+        self.fail_next_append = true;
     }
 }
 
@@ -79,6 +89,40 @@ impl LeafStore for CountingStore {
         Ok(())
     }
 
+    /// The leaves and their pin land together or not at all: the parts are
+    /// changed only after every check has passed and the flush has not been
+    /// made to fail.
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
+        self.appends.set(self.appends.get() + 1);
+        let end = batch_end(index, leaves.len())?;
+        if index < self.extent() {
+            return Err(StoreError::LeafAlreadyWritten { index });
+        }
+        if index > self.extent() {
+            return Err(StoreError::LeafWouldLeaveGap {
+                index,
+                next: self.extent(),
+            });
+        }
+        if pin.tree_size != end {
+            return Err(StoreError::PinNotOfAppend {
+                end,
+                tree_size: pin.tree_size,
+            });
+        }
+        if std::mem::take(&mut self.fail_next_append) {
+            return Err(StoreError::Io {
+                context: "simulated power cut at the append's one flush".to_string(),
+                source: std::io::Error::other("power cut"),
+            });
+        }
+        self.disk
+            .leaves
+            .extend(leaves.iter().map(|bytes| bytes.to_vec()));
+        self.disk.pinned = Some(pin);
+        Ok(())
+    }
+
     fn pinned(&self) -> PinnedRoot {
         self.disk.pinned.unwrap_or_else(|| {
             let (root, tree_size) = AppendOnlyTree::<RawLeaf>::new().root().to_parts();
@@ -87,23 +131,7 @@ impl LeafStore for CountingStore {
     }
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
-        if std::mem::take(&mut self.fail_next_pin) {
-            return Err(StoreError::Io {
-                context: "simulated crash before the pin".to_string(),
-                source: std::io::Error::other("power cut"),
-            });
-        }
         self.disk.pinned = Some(pin);
-        self.disk.batch_intent = None;
-        Ok(())
-    }
-
-    fn batch_intent(&self) -> Option<u64> {
-        self.disk.batch_intent
-    }
-
-    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
-        self.disk.batch_intent = Some(end);
         Ok(())
     }
 

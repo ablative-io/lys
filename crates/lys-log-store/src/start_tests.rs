@@ -7,6 +7,7 @@ use lys_core::Ed25519Identity;
 use super::*;
 use crate::file::FileLeafStore;
 use crate::snapshot::seal;
+use crate::store::PinnedRoot;
 use crate::test_store::{CountingStore, Disk, ORIGIN};
 
 const DOMAIN: &str = "example.com/lys/test-state/v1";
@@ -152,16 +153,121 @@ fn a_signed_snapshot_of_other_leaves_is_refused_as_the_wrong_root() {
 }
 
 #[test]
-fn a_snapshot_past_the_pinned_log_is_refused_as_beyond_it() {
+fn a_snapshot_past_the_pinned_log_refuses_the_open_by_name() {
     let dir = tempfile::tempdir().unwrap();
     let key = key(&dir, "key");
     let mut disk = logged(4, 4, &key);
     let ahead = Frontier::from_leaves((0..9).map(leaf));
     disk.snapshot = Some(seal(DOMAIN, ORIGIN, &ahead, b"ahead", &key));
-    assert_eq!(
-        refused(disk, &key, 4),
-        SnapshotRefusal::BeyondLog { size: 9, pinned: 4 }
+    let store = CountingStore::over(disk);
+    let err = open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).unwrap_err();
+    assert!(
+        matches!(err, StoreError::SnapshotBeyondLog { size: 9, pinned: 4 }),
+        "{err}"
     );
+}
+
+/// Every file under `dir` with its bytes, so a test can say a refused open
+/// added, removed and changed nothing.
+fn tree_bytes(dir: &std::path::Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    let mut files = std::collections::BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for entry in std::fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                let bytes = std::fs::read(&path).unwrap();
+                files.insert(path, bytes);
+            }
+        }
+    }
+    files
+}
+
+/// A file store of `count` leaves with a snapshot written at its head.
+fn file_logged(dir: &std::path::Path, count: u64, key: &Ed25519Identity) {
+    FileLeafStore::create(dir, ORIGIN).unwrap();
+    let (mut log, _tail) = FrontierLog::open(FileLeafStore::open(dir).unwrap()).unwrap();
+    for index in 0..count {
+        log.append(&leaf(index)).unwrap();
+    }
+    log.write_snapshot(DOMAIN, format!("state@{count}").as_bytes(), key)
+        .unwrap();
+}
+
+#[test]
+fn a_snapshot_one_past_the_last_whole_record_refuses_the_open_and_rewrites_nothing() {
+    // LYSLOGSTORE-008 R2: the snapshot names N+1 while the last whole record
+    // is N. The pin at N+1 was acknowledged before the snapshot was written,
+    // so a leaf the log counted is gone; the open is refused by name, writable
+    // and read-only, and no file is rebuilt or rewritten.
+    let tmp = tempfile::tempdir().unwrap();
+    let key = key(&tmp, "key");
+    let dir = tmp.path().join("log");
+    file_logged(&dir, 5, &key);
+    // The acknowledged frame at index 4 is lost: its leaf and its pin.
+    std::fs::remove_file(dir.join("leaves").join(format!("{:020}", 4))).unwrap();
+    let four = Frontier::from_leaves((0..4).map(leaf));
+    crate::file::write_state(
+        &dir,
+        PinnedRoot {
+            tree_size: four.size(),
+            root: four.root(),
+        },
+    )
+    .unwrap();
+    let before = tree_bytes(&dir);
+    for store in [
+        FileLeafStore::open(&dir).unwrap(),
+        FileLeafStore::open_read_only(&dir).unwrap(),
+    ] {
+        let err = open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).unwrap_err();
+        assert!(
+            matches!(err, StoreError::SnapshotBeyondLog { size: 5, pinned: 4 }),
+            "{err}"
+        );
+        assert_eq!(tree_bytes(&dir), before, "the refusal changed no file");
+    }
+}
+
+#[test]
+fn a_torn_last_leaf_alone_opens_at_the_pin_and_is_named_read_only() {
+    // LYSLOGSTORE-008 R2: the last frame alone is torn and the snapshot names
+    // N or less. In this layout a torn frame is a temporary leaf file never
+    // linked; a writable open answers at N, and a read-only open names the
+    // leftover rather than tidying it.
+    let tmp = tempfile::tempdir().unwrap();
+    let key = key(&tmp, "key");
+    let dir = tmp.path().join("log");
+    file_logged(&dir, 5, &key);
+    let torn = dir
+        .join("leaves")
+        .join(format!(".{}-{:020}-0.tmp", std::process::id() + 1, 5));
+    std::fs::write(&torn, b"leaf-5 cut sh").unwrap();
+    let started = open_with_snapshot(
+        FileLeafStore::open(&dir).unwrap(),
+        DOMAIN,
+        &key.public_key_bytes(),
+    )
+    .unwrap();
+    assert_eq!(
+        started.start,
+        Start::Resumed {
+            size: 5,
+            replayed: 0
+        }
+    );
+    assert_eq!(started.log.len(), 5);
+    assert_eq!(started.log.recovered_to(), None);
+    let read_only = FileLeafStore::open_read_only(&dir).unwrap();
+    assert_eq!(read_only.extent(), 5);
+    assert_eq!(
+        read_only.leftover_temporaries().unwrap(),
+        vec![torn.file_name().unwrap().to_str().unwrap().to_owned()]
+    );
+    assert_eq!(std::fs::read(&torn).unwrap(), b"leaf-5 cut sh");
 }
 
 #[test]
@@ -217,11 +323,11 @@ fn a_crash_after_appends_and_before_the_next_snapshot_resumes_from_the_last_one(
 }
 
 #[test]
-fn a_crash_between_a_leaf_and_its_pin_after_a_snapshot_is_repaired_on_resume() {
+fn a_failed_append_after_a_snapshot_leaves_the_store_at_the_snapshot_on_resume() {
     let dir = tempfile::tempdir().unwrap();
     let key = key(&dir, "key");
     let mut store = CountingStore::over(logged(5, 5, &key));
-    store.fail_next_pin();
+    store.fail_next_append();
     let (mut log, _tail) =
         FrontierLog::resume(store, Frontier::from_leaves((0..5).map(leaf))).unwrap();
     assert!(log.append(&leaf(5)).is_err());
@@ -230,11 +336,11 @@ fn a_crash_between_a_leaf_and_its_pin_after_a_snapshot_is_repaired_on_resume() {
         started.start,
         Start::Resumed {
             size: 5,
-            replayed: 1
+            replayed: 0
         }
     );
-    assert_eq!(started.log.recovered_to(), Some(6));
-    assert_eq!(started.tail.leaves, vec![leaf(5)]);
+    assert_eq!(started.log.recovered_to(), None);
+    assert!(started.tail.leaves.is_empty());
 }
 
 #[test]

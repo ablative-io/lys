@@ -60,9 +60,9 @@
 //! That situation cannot arise here, because **catching up happens when the log
 //! opens, before any write is attempted.** A [`Log`](crate::Log) does not
 //! persist its own tree length; it rebuilds the tree from stored leaves at open
-//! and reconciles it with the pin, which repairs the
-//! one-leaf tail or the tail within a recorded batch intent. By the time a caller can call
-//! `put_leaf` again, its tree already covers leaf `N`.
+//! and reconciles it with the pin, adopting a verified tail a backend that
+//! writes leaves before its pin may have left ahead of it. By the time a caller
+//! can call `put_leaf` again, its tree already covers leaf `N`.
 //!
 //! So a refusal at `N` means something else entirely: **another writer holds
 //! that position.** It is terminal for that call and it is not a state to
@@ -77,13 +77,6 @@ pub(crate) fn batch_end(index: u64, count: usize) -> StoreResult<u64> {
         .ok()
         .and_then(|count| index.checked_add(count))
         .ok_or(StoreError::BatchSizeOverflow { index, count })
-}
-
-pub(crate) fn recoverable_tail(pinned: u64, size: u64, intent: Option<u64>) -> bool {
-    match intent {
-        Some(end) => size > pinned && size <= end,
-        None => pinned.checked_add(1) == Some(size),
-    }
 }
 
 /// The pinned `(tree_size, root)` a store carries alongside its leaves.
@@ -113,8 +106,9 @@ pub struct PinnedRoot {
 ///
 /// # Contract an implementation must honour
 ///
-/// 1. **Durable on return.** When [`put_leaf`](Self::put_leaf) or
-///    [`pin`](Self::pin) returns `Ok`, the bytes have reached stable storage.
+/// 1. **Durable on return.** When [`append`](Self::append),
+///    [`put_leaf`](Self::put_leaf) or [`pin`](Self::pin) returns `Ok`, the
+///    bytes have reached stable storage.
 ///    Returning `Ok` for a write still sitting in a buffer is the defect this
 ///    contract exists to forbid: a caller that is told a leaf is durable will
 ///    build on it, and a crash then removes an entry the log has already
@@ -171,19 +165,32 @@ pub trait LeafStore {
     /// [`StoreError::Io`]: crate::StoreError::Io
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()>;
 
-    /// Store consecutive leaves, making every leaf durable before success.
-    /// An error may leave a contiguous prefix stored; reopen before retrying.
-    /// An empty batch writes nothing. The default uses individual durable writes.
+    /// Stores `leaves` at `index..` and `pin`, the frontier they make, as one
+    /// durable act (LYSLOGSTORE-008 R2 and R3): nothing is acknowledged before
+    /// the one flush that covers all of it, leaves and pin together, so after a
+    /// crash they are all there or none are, and no leaf is durable without
+    /// its pin. `index` is refused unless it is the next free one, as
+    /// [`Self::put_leaf`] refuses it; `pin.tree_size` is the index after the
+    /// last leaf given. An empty batch writes only the pin, which is then the
+    /// identical re-pin and a no-op.
+    ///
+    /// The default stores the leaves and then the pin as two acts, each durable
+    /// on its own: the per-leaf layout's cost, kept only for a backend that has
+    /// no one-frame write. Every backend that can write both in one frame
+    /// overrides it.
     ///
     /// # Errors
-    /// The errors from [`Self::put_leaf`], or [`StoreError::BatchSizeOverflow`]
-    /// before any write when the range cannot be represented.
-    fn put_leaves(&mut self, index: u64, leaves: &[&[u8]]) -> StoreResult<()> {
+    ///
+    /// The errors of [`Self::put_leaf`] and [`Self::pin`], and
+    /// [`StoreError::BatchSizeOverflow`] before any write.
+    ///
+    /// [`StoreError::BatchSizeOverflow`]: crate::StoreError::BatchSizeOverflow
+    fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
         let end = batch_end(index, leaves.len())?;
         for (index, bytes) in (index..end).zip(leaves) {
             self.put_leaf(index, bytes)?;
         }
-        Ok(())
+        self.pin(pin)
     }
 
     /// The currently pinned `(tree_size, root)`.
@@ -193,23 +200,9 @@ pub trait LeafStore {
     /// when opening, rather than a state callers must handle.
     fn pinned(&self) -> PinnedRoot;
 
-    /// The exclusive end of a durably recorded batch, or no batch in flight.
-    /// Stores predating batch support have no intent and retain one-leaf recovery.
-    fn batch_intent(&self) -> Option<u64> {
-        None
-    }
-
-    /// Durably record a batch's exclusive end before any of its leaves are written.
-    /// A successful [`Self::pin`] clears this intent in the same durable write.
-    ///
-    /// # Errors
-    /// [`StoreError::BatchIntentUnsupported`] when this backend has no durable
-    /// intent support, or the backend's named validation and persistence errors.
-    fn begin_batch(&mut self, end: u64) -> StoreResult<()> {
-        Err(StoreError::BatchIntentUnsupported { end })
-    }
-
-    /// Durably records a new pinned root.
+    /// Durably records a new pinned root on its own: the repair an open makes
+    /// when it adopts a verified tail, and the identical re-pin. An append's
+    /// own pin rides inside [`Self::append`].
     ///
     /// This is the **only** operation on a store that replaces previously
     /// stored data, and the only reason it is allowed to is that the pin is
