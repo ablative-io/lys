@@ -94,8 +94,9 @@ pub(super) enum Read1 {
     Whole(Record),
     /// The segment ends before the record does: `bytes` of it are there.
     Short { bytes: u64 },
-    /// The record is whole in length but its checksum or shape does not hold.
-    Damaged { bytes: u64, reason: String },
+    /// The record is whole in length but its checksum or shape does not
+    /// hold; `reason` says which, and how long the record is.
+    Damaged { reason: String },
 }
 
 /// Read the record at `offset` of the segment `file`, of length `len`.
@@ -125,8 +126,9 @@ pub(super) fn read_record(
         1 => PIN as u64,
         other => {
             return Ok(Read1::Damaged {
-                bytes: without_pin,
-                reason: format!("pin flag is {other}, not 0 or 1"),
+                reason: format!(
+                    "pin flag is {other}, not 0 or 1, in a record of {without_pin} bytes"
+                ),
             });
         }
     };
@@ -159,8 +161,7 @@ pub(super) fn read_record(
     }
     if crc32c(&checked) != u32::from_le_bytes(crc) {
         return Ok(Read1::Damaged {
-            bytes: total,
-            reason: "CRC-32C does not match the record".to_owned(),
+            reason: format!("CRC-32C does not match the record of {total} bytes"),
         });
     }
     Ok(Read1::Whole(Record {
@@ -298,11 +299,11 @@ pub(super) fn check_tail(segment: &Path, offsets: &Path) -> StoreResult<Checked>
             }
             Read1::Short { bytes } => {
                 if bytes > 0 {
-                    tail = Some((bytes, format!("{bytes} bytes short of a whole record")));
+                    tail = Some((bytes, format!("{bytes} bytes of a record cut short")));
                 }
                 break;
             }
-            Read1::Damaged { reason, .. } => {
+            Read1::Damaged { reason } => {
                 tail = Some((len - end, reason));
                 break;
             }
@@ -345,7 +346,7 @@ pub(super) fn pins_backwards(
                         reason: format!("the record is short: {bytes} bytes of it are there"),
                     });
                 }
-                Read1::Damaged { reason, .. } => {
+                Read1::Damaged { reason } => {
                     return Err(StoreError::CorruptRecord {
                         segment: segment.to_path_buf(),
                         offset: checked.offsets[position],

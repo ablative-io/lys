@@ -3,7 +3,7 @@
 //! folder the ended session's own start named: a restart never moves a run
 //! back to the profile's default folder. A kept start from before folders
 //! were named goes through naming none, and lands where a start naming none
-//! lands: the profile's working_folder, else refused by name.
+//! lands: the profile's `working_folder`, else refused by name.
 
 use std::str::FromStr;
 use std::sync::Arc;

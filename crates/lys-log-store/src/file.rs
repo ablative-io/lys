@@ -75,6 +75,9 @@ pub struct UnfinishedTail {
     pub offset: u64,
     /// How many bytes they are.
     pub bytes: u64,
+    /// What they are: whole records of an act never pinned, bytes of a
+    /// record cut short, a record whose checksum or shape fails, in order.
+    pub reason: String,
 }
 
 /// A directory-backed [`LeafStore`].
@@ -309,7 +312,7 @@ impl FileLeafStore {
                     Read1::Short { bytes } => {
                         return Err(short(&path, offset, bytes));
                     }
-                    Read1::Damaged { reason, .. } => {
+                    Read1::Damaged { reason } => {
                         return Err(StoreError::CorruptRecord {
                             segment: path,
                             offset,
@@ -441,7 +444,7 @@ impl LeafStore for FileLeafStore {
         match read_record(&mut file, offset, len).map_err(|source| reading(&path, source))? {
             Read1::Whole(record) => Ok(Some(record.leaf)),
             Read1::Short { bytes } => Err(short(&path, offset, bytes)),
-            Read1::Damaged { reason, .. } => Err(StoreError::CorruptRecord {
+            Read1::Damaged { reason } => Err(StoreError::CorruptRecord {
                 segment: path,
                 offset,
                 reason,

@@ -96,12 +96,25 @@ pub(super) fn scan(dir: &Path, read_only: bool) -> StoreResult<FileLeafStore> {
         }
     };
     let kept = head.map_or(0, |(position, _)| position + 1);
+    // What lies past the head: whole records of an act never pinned, then
+    // what check_tail found past the last whole record, if anything.
+    let whole_past_head = checked.offsets.len() - kept;
+    let mut reasons = Vec::new();
+    if whole_past_head > 0 {
+        reasons.push(format!(
+            "{whole_past_head} whole records of an act that was never pinned"
+        ));
+    }
+    if let Some((bytes, why)) = checked.tail {
+        reasons.push(format!("{bytes} bytes that are not a record: {why}"));
+    }
     let mut last_offsets = checked.offsets;
     last_offsets.truncate(kept);
     let unfinished_tail = (last_end < last_len).then(|| UnfinishedTail {
         segment: last_path,
         offset: last_end,
         bytes: last_len - last_end,
+        reason: reasons.join(", then "),
     });
     Ok(FileLeafStore {
         dir: dir.to_path_buf(),
@@ -258,7 +271,7 @@ fn sealed_pin(dir: &Path, first: u64) -> StoreResult<PinnedRoot> {
             reason: "the last record of a sealed segment carries no pin".to_owned(),
         }),
         Read1::Short { bytes } => Err(short(&path, offset, bytes)),
-        Read1::Damaged { reason, .. } => Err(StoreError::CorruptRecord {
+        Read1::Damaged { reason } => Err(StoreError::CorruptRecord {
             segment: path,
             offset,
             reason,

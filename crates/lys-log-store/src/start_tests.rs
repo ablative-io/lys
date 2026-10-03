@@ -260,6 +260,7 @@ fn a_torn_last_leaf_alone_opens_at_the_pin_and_is_named_read_only() {
             segment: segment.clone(),
             offset: whole,
             bytes: 13,
+            reason: "13 bytes that are not a record: 13 bytes of a record cut short".to_owned(),
         }),
         "a reader names the torn bytes and leaves them"
     );
