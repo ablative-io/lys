@@ -4,8 +4,9 @@
  * says a no settles it. Anything else (no answer, an answer that does not confirm, a fault) may have been carried
  * out, so the request stays kept and is sent again as it was.
  *
- * A walk of several requests (adding and running an agent, a queue of grants or asks, a computer and its runner)
- * keeps its own place between steps and sends each step through here.
+ * A queue of single requests (grants, asks) and a start's steps send each one through here. A walk whose kept
+ * record moves as it advances (adding and running an agent, a computer and its runner) keeps its own place and
+ * uses `answeredNo` here for what a definite no is.
  */
 import { Refused } from './api';
 
