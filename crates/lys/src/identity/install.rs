@@ -47,6 +47,7 @@ pub mod directory_key;
 pub mod exit_wait;
 pub mod layout;
 pub mod log_wait;
+pub mod login;
 pub mod ports;
 pub mod server_config;
 pub mod services;

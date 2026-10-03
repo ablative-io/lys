@@ -18,6 +18,7 @@ use super::super::scratch::{A, B, Behaviour, Fixed, Recorder, Scratch, TestResul
 use super::super::{Parts, Ready, Unit, upgrade, version};
 use crate::commands::error::CliError;
 use crate::identity::install::layout::{BINARIES, Layout};
+use crate::identity::install::login::KEPT;
 use crate::identity::install::{self, services};
 
 struct Running {
@@ -160,7 +161,9 @@ fn runner_binary(dir: &Path, commit: &str, refuses: bool) -> TestResult {
         "echo 'runner_already_running: replacement refused' >&2\nexit 3\n".to_owned()
     } else {
         let quoted = program.display().to_string().replace('\'', "'\\''");
-        format!("exec '{quoted}' \"$@\"\n")
+        let names = names_file(dir).display().to_string().replace('\'', "'\\''");
+        // The names of the runner's variables, never their values, then the real runner.
+        format!("env | cut -d= -f1 | sort > '{names}'\nexec '{quoted}' \"$@\"\n")
     };
     let file = dir.join("lys");
     std::fs::write(
@@ -170,6 +173,48 @@ fn runner_binary(dir: &Path, commit: &str, refuses: bool) -> TestResult {
         ),
     )?;
     std::fs::set_permissions(file, std::fs::Permissions::from_mode(0o755))?;
+    Ok(())
+}
+
+/// Where the fake runner in `dir` writes the names of its variables.
+fn names_file(dir: &Path) -> PathBuf {
+    dir.join("runner-env-names")
+}
+
+/// What /bin/sh sets for itself, beside what it is given.
+const SHELL_OWN: &[&str] = &["PATH", "PWD", "OLDPWD", "SHLVL", "_"];
+
+/// The runner started from `dir` carried the login's variables and nothing
+/// of the process that started it. Not vacuous: this process carries
+/// variables outside the login (the test runner's own, `LYS_UPGRADE_TEST_*`
+/// in the upgrade child), and none of them may reach the runner.
+fn runner_environment_is_the_login(dir: &Path) -> TestResult {
+    let foreign: Vec<String> = std::env::vars_os()
+        .filter_map(|(name, _)| name.into_string().ok())
+        .filter(|name| !KEPT.contains(&name.as_str()) && !SHELL_OWN.contains(&name.as_str()))
+        .collect();
+    assert!(
+        !foreign.is_empty(),
+        "the test process carries nothing but the login"
+    );
+    let written = std::fs::read_to_string(names_file(dir))?;
+    let seen: Vec<&str> = written.lines().collect();
+    assert!(
+        seen.contains(&"PATH") && seen.contains(&"HOME"),
+        "{written}"
+    );
+    for name in &foreign {
+        assert!(
+            !seen.contains(&name.as_str()),
+            "{name} reached the runner: {written}"
+        );
+    }
+    for name in &seen {
+        assert!(
+            SHELL_OWN.contains(name) || KEPT.contains(name),
+            "{name} reached the runner and is not a login variable: {written}"
+        );
+    }
     Ok(())
 }
 
@@ -197,6 +242,7 @@ fn upgrade_places_the_new_lys_and_restarts_the_runner_on_it() -> TestResult {
     let record: serde_json::Value =
         serde_json::from_slice(&std::fs::read(running.scratch.layout.build_record())?)?;
     assert_eq!(record["binaries"]["lys"], B);
+    runner_environment_is_the_login(&new)?;
     Ok(())
 }
 
@@ -494,6 +540,13 @@ fn recovery_after_lys_is_placed_restores_the_runner_starts_a_stopped_one_or_refu
             assert!(!layout.upgrade_intent().exists());
         }
         assert_eq!(running.keys()?, keys);
+        // Live: the placed replacement (from `new`) is what runs; otherwise
+        // recovery put the previous build back and restarted its runner.
+        if state == "live" {
+            runner_environment_is_the_login(&new)?;
+        } else {
+            runner_environment_is_the_login(&layout.bin_dir())?;
+        }
     }
     Ok(())
 }

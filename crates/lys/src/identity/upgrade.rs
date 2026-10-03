@@ -46,7 +46,7 @@ use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::install::layout::{BINARIES, Layout};
 use super::install::log_wait::{self, LogCursor};
 use super::install::ports::Ports;
-use super::install::{self, services, surface};
+use super::install::{self, login, services, surface};
 use super::private_files;
 use crate::commands::output::Emitter;
 
@@ -233,7 +233,10 @@ pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
     let unreadable = |detail: String| {
         refuse(ErrorKind::VersionUnreadable, "read version", name, detail).at(program)
     };
+    let environment = login::login()?;
     let output = Command::new(program)
+        .env_clear()
+        .envs(environment.variables())
         .arg("--version")
         .stdin(Stdio::null())
         .stderr(Stdio::null())
@@ -261,7 +264,7 @@ pub struct BuildRecord {
     pub surface: Option<SurfaceBuild>,
     /// The environment the services were started with: the names kept
     /// from the login and the login shell's `PATH`.
-    pub environment: services::EnvironmentRecord,
+    pub environment: login::EnvironmentRecord,
 }
 
 /// The placed screens package.
@@ -311,7 +314,7 @@ pub fn record_build(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(io("read screens", &manifest_path, &error)),
     };
-    let environment = services::login()?.record();
+    let environment = login::login()?.record();
     say(&format!(
         "build environment keeps {} and PATH={}",
         environment.kept.join(","),

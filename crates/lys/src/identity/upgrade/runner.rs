@@ -15,6 +15,7 @@ use super::super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::super::install::exit_wait::{self, ExitWatch};
 use super::super::install::layout::Layout;
 use super::super::install::log_wait::{self, LogCursor};
+use super::super::install::login;
 use super::super::private_files;
 use super::{Ready, Unit};
 
@@ -230,8 +231,13 @@ impl Restart {
             .try_clone()
             .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?;
         let lock = exit_wait::hold(&self.unit.pid)?;
+        // The runner starts with the login's environment, as every service
+        // does, never the shell that ran the upgrade.
+        let environment = login::login()?;
         let mut command = Command::new(layout.binary("lys"));
         command
+            .env_clear()
+            .envs(environment.variables())
             .args(&self.unit.args)
             .stdin(lock)
             .stdout(out)
