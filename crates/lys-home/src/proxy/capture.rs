@@ -61,6 +61,8 @@ impl Spool {
         }
         #[cfg(test)]
         super::timing::add(&super::timing::SPOOL_WRITE, started);
+        #[cfg(test)]
+        super::timing::write_size(bytes.len());
     }
 
     fn close(&mut self, failed: &mut bool) {

@@ -38,6 +38,7 @@ pub(super) fn add(stage: &AtomicU64, started: Instant) {
 
 pub(super) fn report() {
     let received = tick();
+    println!("spool writes={} bytes={} min={} max={}", WRITE_COUNT.load(Ordering::Relaxed), WRITE_BYTES.load(Ordering::Relaxed), WRITE_MIN.load(Ordering::Relaxed), WRITE_MAX.load(Ordering::Relaxed));
     for (name, stage) in [
         ("decode", &DECODE),
         ("spool_write", &SPOOL_WRITE),
@@ -71,4 +72,17 @@ pub(super) fn report() {
     ] {
         println!("stage={name} nanoseconds={}", end.saturating_sub(start));
     }
+}
+
+static WRITE_COUNT: AtomicU64 = AtomicU64::new(0);
+static WRITE_BYTES: AtomicU64 = AtomicU64::new(0);
+static WRITE_MIN: AtomicU64 = AtomicU64::new(u64::MAX);
+static WRITE_MAX: AtomicU64 = AtomicU64::new(0);
+
+pub(super) fn write_size(size: usize) {
+    let size = u64::try_from(size).unwrap_or(u64::MAX);
+    WRITE_COUNT.fetch_add(1, Ordering::Relaxed);
+    WRITE_BYTES.fetch_add(size, Ordering::Relaxed);
+    WRITE_MIN.fetch_min(size, Ordering::Relaxed);
+    WRITE_MAX.fetch_max(size, Ordering::Relaxed);
 }
