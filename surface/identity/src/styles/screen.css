@@ -22,7 +22,9 @@ h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
 
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-weight: 500; color: var(--text-secondary); font-size: 12.5px; padding: 8px 10px; border-bottom: 1px solid var(--border-default); white-space: nowrap; }
-td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+/* A cell wraps onto a second line rather than being cut; the head stays in view while its table scrolls. */
+td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-base); }
 tbody tr[data-href] { cursor: pointer; }
 tbody tr:hover td { background: rgba(255,255,255,.02); }
 tbody tr.cursor td { background: rgba(212,151,90,.07); }
@@ -102,7 +104,7 @@ ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
 .tools .search { width: 280px; }
 .tools .count { margin-left: auto; }
 .whose select, .tools select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 5px 8px; font: 12.5px "DM Sans"; }
-tr.group th { position: sticky; top: 0; z-index: 1; background: var(--surface-base); padding-top: 14px; font-weight: 400; }
+tr.group th { position: sticky; top: 34px; z-index: 1; background: var(--surface-base); padding-top: 14px; font-weight: 400; }
 tr.group .group-name { font-weight: 600; color: var(--text-primary); margin-right: 10px; }
 .btn.under { min-height: 0; padding: 0 8px; margin-left: 10px; font-size: 11.5px; }
 tr.more td { border-bottom: 0; }

@@ -1,5 +1,4 @@
-/** Resources and grant counts judged by the server within the caller's visibility, grouped by kind, one opened beside the list. */
-import { useState } from 'react';
+/** Resources and grant counts judged by the server within the caller's visibility, grouped by kind; a row opens who can reach it. */
 import { request, useLoad } from '../../api';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -11,7 +10,6 @@ const readResources = () => request<ResourcesView>('/resources');
 const keyOf = (resource: ResourceSummary) => resource.kind + ':' + resource.id;
 
 export function Resources() {
-  const [picked, setPicked] = useState<string | null>(null);
   const load = useLoad(readResources, 'resources');
   return <div className="page fill">
     <Gate load={load} title="Resources" ok={(list) => {
@@ -19,7 +17,6 @@ export function Resources() {
         const items = list.resources.filter((resource) => resource.kind === kind);
         return { id: kind, name: kind, lead: null, depth: 0, items, within: items };
       }).filter((group) => group.items.length);
-      const open = list.resources.find((resource) => keyOf(resource) === picked) ?? list.resources[0] ?? null;
       const columns: Column<ResourceSummary>[] = [
         { head: 'Resource', cell: (resource) => resource.id },
         { head: 'Standing grants', cell: (resource) => resource.standing },
@@ -31,19 +28,12 @@ export function Resources() {
           <div><div className="eyebrow">Access</div><h1>Resources</h1><p className="sub">Resources named in grants you may see. Counts were checked at {new Date(list.judged_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })} Melbourne time, grant revision {list.revision}.</p></div>
           <a className="btn primary" href="#/access/issue">Issue root grant</a>
         </div>
-        <div className="body">
+        <p className="note">Grant counts describe recorded grants. Check access for the permission engine's current decision.</p>
+        {list.resources.length ? null : <p>No resources appear in your visible grants yet.</p>}
+        <div className="body one">
           <Listing<ResourceSummary> groups={groups} columns={columns} id={keyOf} href={(resource) => '#/access/who/' + encodeURIComponent(keyOf(resource))}
             words={keyOf} noun="resources" holds={(items) => items.length + (items.length === 1 ? ' resource' : ' resources')}
-            selected={open ? keyOf(open) : null} select={(resource) => setPicked(keyOf(resource))} open={(resource) => setPicked(keyOf(resource))} />
-          <div className="detail">
-            {open ? <article className="card" aria-label="Resource">
-              <h2>{open.id}</h2>
-              <p className="sec">{open.kind}</p>
-              <p>{open.standing} standing {open.standing === 1 ? 'grant' : 'grants'}, {open.ended} ended, held now by {open.holders}.</p>
-              <a className="btn" href={'#/access/who/' + encodeURIComponent(keyOf(open))}>Who can reach this?</a>
-            </article> : <p>No resources appear in your visible grants yet.</p>}
-            <p className="note">Grant counts describe recorded grants. Check access for the permission engine's current decision.</p>
-          </div>
+            selected={null} select={() => undefined} />
         </div>
       </>;
     }} />

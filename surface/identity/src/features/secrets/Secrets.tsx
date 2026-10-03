@@ -1,6 +1,5 @@
 import { readTogether } from '../../reads';
 /** Metadata-only secrets listing; authentication and visibility belong to the broker adapter. */
-import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -45,27 +44,24 @@ export function Secrets({ read }: { read: () => Promise<SecretListing> }) {
 
 /** The secrets as the shared list: grouped by their owner's team, searched by name, kind or owner. */
 export function SecretRows({ listing, people, teams = [], me = '', whose = { kind: 'all' }, tools }: { listing: SecretListing; people?: PeopleView; teams?: OrgTeam[]; me?: string; whose?: Whose; tools?: ReactNode }) {
-  const [picked, setPicked] = useState<string | null>(null);
   const names = new Map(people ? entries(people).map((entry) => [entry.id, entry.display_name]) : []);
   const owners = new Map(people ? people.people.flatMap((person) => person.agents.map((agent) => [agent.id, person.id] as const)) : []);
   const held = (entry: Secret): Held => ({ id: entry.owner, person: owners.get(entry.owner) ?? null });
   const scoped = listing.secrets.filter((entry) => inWhose(whose, teams, me, held(entry)));
   const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
-  const open = listing.secrets.find((entry) => entry.name === picked) ?? null;
   const columns: Column<Secret>[] = [
     { head: 'Name', cell: (entry) => entry.name },
     { head: 'Kind', cell: (entry) => <span className="sec">{entry.class}</span> },
     { head: 'Owner', cell: (entry) => <IdentityName id={entry.owner} people={people} /> },
     { head: 'Recorded change', cell: (entry) => <span className="sec">{entry.sequence}</span> },
   ];
-  return <div className="body">
+  return <>
+    <p className="note">Seeing a secret here does not give permission to use it or share that permission. Its value is never shown.</p>
+    {!listing.secrets.length ? <p className="note">No secrets were returned for this account.</p> : null}
+    <div className="body one">
     <Listing<Secret> groups={groups} columns={columns} id={(entry) => entry.name} href={(entry) => '#/secrets/entries?secret=' + encodeURIComponent(entry.name)}
       words={(entry) => entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
-      selected={open?.name ?? null} select={() => undefined} open={(entry) => setPicked(entry.name)} tools={tools} />
-    <div className="detail">
-      {!listing.secrets.length ? <p className="note">No secrets were returned for this account.</p> : null}
-      {open ? <section className="card"><h2>{open.name}</h2><p className="sec">{open.class} · owned by <IdentityName id={open.owner} people={people} /></p><p className="note">Recorded change {open.sequence}.</p></section> : null}
-      <p className="note">Seeing a secret here does not give permission to use it or share that permission. Its value is never shown.</p>
+      selected={null} select={() => undefined} tools={tools} />
     </div>
-  </div>;
+  </>;
 }

@@ -24,28 +24,24 @@ function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
     setAccounts((view) => ({ ...view, service_accounts: view.service_accounts.some((account) => account.id === answer.id) ? view.service_accounts.map((account) => account.id === answer.id ? answer : account) : [...view.service_accounts, answer] }));
     setRevision((value) => value + 1);
   };
-  const [picked, setPicked] = useState<string | null>(null);
   const [adding, setAdding] = useState(() => initial.service_accounts.length === 0 || sessionStorage.getItem('lys.pending.service-create.' + me.person.id) !== null);
-  const open = accounts.service_accounts.find((account) => account.id === picked) ?? accounts.service_accounts[0] ?? null;
   const group = [{ id: '', name: 'Accounts', lead: null, depth: 0, items: accounts.service_accounts, within: accounts.service_accounts }];
   const columns: Column<ServiceAccount>[] = [
     { head: 'Account', cell: (account) => account.name },
     { head: 'State', cell: (account) => <span className="sec">{account.state === 'active' ? 'Registered' : account.state}</span> },
     { head: 'Owner', cell: (account) => <IdentityName id={account.owner} /> },
+    { head: 'What it is for', cell: (account) => account.description },
     { head: 'Created', cell: (account) => <span className="sec">{clock(account.created_at)}</span> },
+    { head: 'Retired', cell: (account) => account.retired_at !== null ? <span className="sec">{clock(account.retired_at)}</span> : <Retire key={account.id + ':' + revision} account={account} person={me.person.id} changed={changed} /> },
   ];
   return <>
     <div className="tools"><span className="note">{accounts.scope === 'directory' ? 'Showing the directory’s account records.' : 'Showing your own account records.'}</span>
       {!adding ? <button className="btn primary" onClick={() => setAdding(true)}>+ Register an account</button> : null}</div>
-    <div className="body">
+    {adding ? <Create key={me.person.id + ':' + revision} person={me.person.id} administrator={accounts.scope === 'directory'} changed={(answer) => { changed(answer); setAdding(false); }} /> : null}
+    {!adding && !accounts.service_accounts.length ? <p>No service-account records were returned.</p> : null}
+    <div className="body one">
       <Listing<ServiceAccount> groups={group} columns={columns} id={(account) => account.id} href={(account) => '#/service-accounts?account=' + account.id} words={(account) => account.name + ' ' + account.description}
-        noun="accounts" holds={(items) => items.length + ' accounts'} selected={adding ? null : open?.id ?? null} select={() => undefined} open={(account) => { setPicked(account.id); setAdding(false); }} />
-      <div className="detail">
-        {adding ? <Create key={me.person.id + ':' + revision} person={me.person.id} administrator={accounts.scope === 'directory'} changed={(answer) => { changed(answer); setPicked(answer.id); setAdding(false); }} />
-          : open ? <section className="card" key={open.id}><h2>{open.name}</h2><p>{open.description}</p><dl className="facts"><dt>State</dt><dd>{open.state === 'active' ? 'Registered' : open.state}</dd><dt>Owner</dt><dd><IdentityName id={open.owner} /></dd><dt>Created</dt><dd>{clock(open.created_at)}</dd>{open.retired_at !== null ? <><dt>Retired</dt><dd>{clock(open.retired_at)}</dd></> : null}</dl>
-            <Retire key={open.id + ':' + revision} account={open} person={me.person.id} changed={changed} />
-          </section> : <p>No service-account records were returned.</p>}
-      </div>
+        noun="accounts" holds={(items) => items.length + ' accounts'} selected={null} select={() => undefined} />
     </div>
   </>;
 }
@@ -54,8 +50,8 @@ function Create({ person, administrator, changed }: { person: string; administra
   const people = useLoad(api.people, 'service-account-owners');
   const [name, setName] = useState(''); const [description, setDescription] = useState('');
   const change = useRoleChange<ServiceAccount>('lys.pending.service-create.' + person, '/service-accounts', (answer, body) => answer.id === body.operation && answer.owner === (body.owner ?? person) && answer.name === body.name && answer.description === body.description, changed);
-  return <form className="card" aria-label="Register service account" onSubmit={(event) => { event.preventDefault(); if (name.trim()) change.submit({ operation: operationId(), name: name.trim(), description: description.trim(), ...(owner === person ? {} : { owner }) }); }}><h2>Register a service account</h2><p>You own this record unless an administrator selects another person.</p>
-    {administrator ? <details><summary>Choose a different owner</summary><Gate load={people} title="Account owners" ok={(view) => <div className="field">Responsible person<Picker name="owner" label="Find a person" options={view.people.filter((entry) => entry.state !== 'retired').map((entry) => ({ id: entry.id, name: entry.display_name + (entry.id === person ? ' (you)' : '') }))} onChange={(ids) => setOwner(ids[0] ?? person)} /></div>} /></details> : null}
+  return <form className="card form-grid" aria-label="Register service account" onSubmit={(event) => { event.preventDefault(); if (name.trim()) change.submit({ operation: operationId(), name: name.trim(), description: description.trim(), ...(owner === person ? {} : { owner }) }); }}><h2>Register a service account</h2><p>You own this record unless an administrator selects another person.</p>
+    {administrator ? <Gate load={people} title="Account owners" ok={(view) => <div className="field">Responsible person, if not you<Picker name="owner" label="Find a person" options={view.people.filter((entry) => entry.state !== 'retired').map((entry) => ({ id: entry.id, name: entry.display_name + (entry.id === person ? ' (you)' : '') }))} onChange={(ids) => setOwner(ids[0] ?? person)} /></div>} /> : null}
     <label className="field">Account name<input name="name" required maxLength={100} value={name} disabled={change.blocked} onChange={(event) => setName(event.target.value)} placeholder="For example, invoice processing" /></label>
     <label className="field">What it is for<input maxLength={500} value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
     <button className="btn primary" disabled={change.blocked || !name.trim()} type="submit">Register account</button><ChangeStatus change={change} />
