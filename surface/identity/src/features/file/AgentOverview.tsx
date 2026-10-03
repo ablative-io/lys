@@ -13,7 +13,7 @@ import './agent-overview.css';
 
 function reading<T>(load: Load<T>, subject: string) {
   if (load.status === 'loading') return <span className="dim">Reading {subject}…</span>;
-  if (load.status === 'refused') return <span className="why-not" role="alert">Lys could not read {subject} just now. Open Details for the reason.</span>;
+  if (load.status === 'refused') return <span className="why-not" role="alert">Lys could not read {subject} just now. The reason is below.</span>;
   return null;
 }
 

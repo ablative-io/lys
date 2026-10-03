@@ -56,33 +56,12 @@ function AgentEvidence({ data, tab, reload }: { data: FileData; tab: string; rel
   }, 'agent-evidence:' + data.x.id + ':' + (data.agent?.provenance.events.join(',') ?? ''));
   return <Gate load={load} title="recorded changes" ok={(answered) => <>
     <TabBody tab={tab} data={answered} reload={reload} />
-    {tab === 'profile' ? <TabBody tab="record" data={answered} reload={reload} /> : null}
   </>} />;
 }
 
-function FileTabs({ data, tab }: { data: FileData; tab: string }) {
-  return <nav className="tabs" aria-label="Agent sections">{TABS.map(([key, label]) => <a key={key} href={`#/file/${data.x.id}/${key}`} className={tab === key ? 'on' : ''}>
-    {label}{key === 'record' && data.agent ? <span className="n">{data.agent.provenance.events.length}</span> : key === 'access' ? <span className="n">{data.grants.list.grants.filter((grant) => grant.holder === data.x.id).length}</span> : null}
-  </a>)}</nav>;
-}
-
-function AgentDetails({ data, tab, reload, stop, problems = [] }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; problems?: Refused[] }) {
-  const [opened, setOpened] = useState(tab === 'record');
-  const x = data.x;
-  return <details className="agent-details" open={tab === 'record' || undefined} onToggle={(event) => { if (event.currentTarget.open) setOpened(true); }}>
-    <summary>Details</summary>
-    {problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <p key={index}><code>{problem.refusal.refusal}</code>: {problem.message}</p>)}</section> : null}
-    <p className="identity-id">Identity: <code>{x.id}</code></p>
-    <p>Access status: <span className={'state ' + x.state} id="state">{stop?.agent === x.id && stop.state === 'suspended' ? 'Suspended in this stop answer' : STATUS[x.state]}</span>. This says whether its identity may be used; it does not say a process is running.</p>
-    {data.agent?.provenance.registration ? <p>Registered since {day(data.agent.provenance.registration.actor.authenticated_at)}.</p> : null}
-    <div className="agent-detail-acts">
-      <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
-      {ACTIONS[x.state].map((action) => <a key={action} className={'btn ' + (action === 'suspend' || action === 'retire' ? 'danger' : '')} data-act={action} href={'#/directory/manage?action=status&identity=' + encodeURIComponent(x.id)}>{ACTION[action]}</a>)}
-      <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a>
-    </div>
-    <FileTabs data={data} tab={tab} />
-    {opened ? <AgentEvidence data={data} tab={tab === 'record' ? 'record' : 'profile'} reload={reload} /> : null}
-  </details>;
+/** Why parts of an agent's page could not be read, said in place. */
+function ReadProblems({ problems }: { problems: Refused[] }) {
+  return problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <p key={index}><code>{problem.refusal.refusal}</code>: {problem.message}</p>)}</section> : null;
 }
 
 function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void }) {
@@ -116,30 +95,33 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
             </div>}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {agent ? null : <><a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
+            <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
             <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
             {ACTIONS[x.state].map((a) => (
               <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={() => { location.hash = '/directory/manage?action=status&identity=' + encodeURIComponent(x.id); }}>
                 {ACTION[a]}
               </button>
-            ))}</>}
+            ))}
+            {agent ? <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a> : null}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
               <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
             ) : null}
           </div>
         </div>
         {stop && stop.agent === x.id ? <StopReceipt answer={stop} /> : null}
-        {agent ? <div className="pane">
-          {tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <><AssignedRoles id={x.id} /><AgentDetails data={{ ...data, x }} tab={tab} reload={reload} stop={stop} problems={problems} /></>} /> : <><p><a href={'#/file/' + encodeURIComponent(x.id)}>← About {x.display_name}</a></p>{tab !== 'record' ? <div className="agent-settings"><TabBody tab={tab} data={{ ...data, x }} reload={reload} /></div> : null}<AgentDetails key={x.id + ':' + tab} data={{ ...data, x }} tab={tab} reload={reload} stop={stop} /></>}
-        </div> : <><nav className="tabs">
+        <nav className="tabs" aria-label={agent ? 'Agent sections' : 'Sections'}>
           {TABS.map(([k, l]) => (
-            <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''}>
-              {l}
+            <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''} aria-current={tab === k ? 'page' : undefined}>
+              {agent && k === 'profile' ? 'Overview' : l}
               {counts[k] !== undefined ? <span className="n">{counts[k]}</span> : null}
             </a>
           ))}
         </nav>
-        <div className="pane"><TabBody tab={tab} data={data} reload={reload} /></div></>}
+        <div className="pane">
+          {agent && tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <><ReadProblems problems={problems} /><AssignedRoles id={x.id} /></>} />
+            : agent && tab === 'record' ? <AgentEvidence data={{ ...data, x }} tab="record" reload={reload} />
+            : <TabBody tab={tab} data={{ ...data, x }} reload={reload} />}
+        </div>
       </div>
     </div>
   );
