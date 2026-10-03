@@ -1,5 +1,5 @@
 /** The front page fills the screen and never scrolls as a whole: what waits for you on the top line, your agents as a tree under their teams on the left, the running ones as small live pictures on the right, and your account under a second tab. */
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { api, request, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
@@ -247,6 +247,8 @@ function Agents({ data, reload }: { data: ActiveData; reload: () => void }) {
   // An address that names an agent opens its Start under its row, waiting for the press.
   const named = useParams().agent;
   const [asked, setAsked] = useState<Asked | null>(named ? { agent: named, what: 'start', pressed: false } : null);
+  // A started row waits only for the next read of the page. When that read arrives the row says what is so: Watch and Stop if it runs, Start again if it does not.
+  useEffect(() => { setAsked((held) => held?.what === 'started' ? null : held); }, [data]);
   const { agents, tree, sessions, w } = data;
   const held = (id: string) =>
     w.list.grants.filter((g) => g.holder === id && g.standing.stands).map((g) => `${g.relation} of ${onText(g)}`).join('; ');
