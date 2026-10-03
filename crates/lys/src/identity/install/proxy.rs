@@ -103,6 +103,24 @@ pub fn login_base(environment: &Environment) -> IdentityResult<Option<String>> {
     Ok((!base.is_empty()).then(|| base.to_owned()))
 }
 
+/// Whether the service's configuration in place names a model proxy.
+pub fn configured(layout: &Layout) -> IdentityResult<bool> {
+    let path = layout.service_config();
+    let Some(bytes) = private_files::read(&path)? else {
+        return Ok(false);
+    };
+    let config: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::ConfigInvalid,
+            "read configuration",
+            "identity.json",
+            error.to_string(),
+        )
+        .at(&path)
+    })?;
+    Ok(config.get("model_proxy").is_some())
+}
+
 /// Records the proxy's upstream from the login, owner-only, and says where
 /// it came from. `true` when the record changed, so a running proxy is
 /// started again on it.

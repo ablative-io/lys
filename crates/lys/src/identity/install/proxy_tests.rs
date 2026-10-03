@@ -127,3 +127,22 @@ fn a_proxy_folder_others_can_read_is_refused_not_used() -> Result<(), Box<dyn st
     assert!(refusal.to_string().contains("home"), "{refusal}");
     Ok(())
 }
+
+#[test]
+fn a_proxy_is_started_only_when_the_configuration_in_place_names_one()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let layout = Layout::at(dir.path().to_path_buf());
+    assert!(!super::configured(&layout)?);
+    crate::identity::private_files::write(
+        &layout.service_config(),
+        br#"{"listen":"127.0.0.1:8490"}"#,
+    )?;
+    assert!(!super::configured(&layout)?);
+    crate::identity::private_files::write(
+        &layout.service_config(),
+        br#"{"model_proxy":"http://127.0.0.1:8484/anthropic"}"#,
+    )?;
+    assert!(super::configured(&layout)?);
+    Ok(())
+}
