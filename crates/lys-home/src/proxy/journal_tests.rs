@@ -336,3 +336,13 @@ async fn a_stalled_capture_worker_does_not_hold_or_spool_the_client_response() -
     ));
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn closing_the_fixture_releases_the_proxy_before_returning() -> Res {
+    let (upstream, _) = fake(|| async { whole(StatusCode::OK, &message_response()) }).await?;
+    let harness = Harness::start(upstream).await?;
+    let proxy = Arc::downgrade(&harness.proxy);
+    drop(harness);
+    assert!(proxy.upgrade().is_none(), "the fixture left its server owning the proxy");
+    Ok(())
+}
