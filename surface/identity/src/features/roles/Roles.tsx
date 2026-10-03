@@ -39,7 +39,7 @@ export function Roles() {
         { head: 'Version', cell: (entry) => <span className="sec">v{entry.latest}</span> },
         { head: 'Held by', cell: (entry) => <span className="sec">{entry.holders.filter((holder) => holder.state === 'holding').length}</span> },
       ];
-      return <div className="body">
+      return <div className="body work">
         <Listing<Role> groups={group} columns={columns} id={(entry) => entry.id} href={(entry) => '#/roles/' + encodeURIComponent(entry.id)} words={(entry) => entry.name}
           noun="roles" holds={(items) => items.length + ' roles'} selected={role?.id ?? null} select={() => undefined} open={(entry) => { location.hash = '/roles/' + encodeURIComponent(entry.id); }} />
         <div className="detail">

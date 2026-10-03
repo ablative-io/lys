@@ -11,9 +11,11 @@ import { changedFrom, profileRequest } from '../runtime/start-requests';
 import { Gate } from '../signin/Gate';
 import type { ProvisioningProfile } from './Provisioning';
 
-export function SaveSettings({ agent, profile, settings, refusal, canSave, people, machines }: {
+export function SaveSettings({ agent, profile, settings, refusal, canSave, people, machines, saved }: {
   agent: string; profile: ProvisioningProfile | null; settings: Record<string, unknown>; refusal: string; canSave: boolean;
   people: PeopleView; machines: Machine[];
+  /** When given, the button saves and then hands on to the start; with nothing changed it hands on at once. */
+  saved?: () => void;
 }) {
   const load = useLoad(async () => {
     const [me, roles] = await Promise.all([api.me(), readRoles()]);
@@ -22,7 +24,7 @@ export function SaveSettings({ agent, profile, settings, refusal, canSave, peopl
   return <Gate load={load} title="Settings" ok={({ me, roles }) => {
     const name = entries(people).find((entry) => entry.id === agent)?.display_name ?? agent;
     return <>
-      <Save key={agent} agent={agent} name={name} person={me.person.id} profile={profile} settings={settings} refusal={refusal} canSave={canSave} />
+      <Save key={agent} agent={agent} name={name} person={me.person.id} profile={profile} settings={settings} refusal={refusal} canSave={canSave} then={saved} />
       <Admission agent={agent} name={name} person={me.person.id} admin={people.scope === 'directory'} machines={machines} roles={roles.roles} />
     </>;
   }} />;
@@ -51,9 +53,10 @@ function keptSave(raw: string, path: string): KeptSave {
   return { path, body, version: body.from_version };
 }
 
-function Save({ agent, name, person, profile, settings, refusal, canSave }: {
-  agent: string; name: string; person: string; profile: ProvisioningProfile | null; settings: Record<string, unknown>; refusal: string; canSave: boolean;
+function Save({ agent, name, person, profile, settings, refusal, canSave, then }: {
+  agent: string; name: string; person: string; profile: ProvisioningProfile | null; settings: Record<string, unknown>; refusal: string; canSave: boolean; then?: () => void;
 }) {
+  const label = then ? 'Save and start ' + name : 'Save these settings';
   const path = '/agents/' + encodeURIComponent(agent) + '/provisioning';
   const key = 'lys.pending.settings-save.' + person + '.' + agent;
   // Start on the front page keeps its own unanswered request here; while one is kept, a new version would be saved under it.
@@ -79,10 +82,12 @@ function Save({ agent, name, person, profile, settings, refusal, canSave }: {
     : !canSave ? 'An administrator changes these settings.'
     : refusal ? refusal
     : base && !('session' in base) ? 'ProfileReadIncomplete: update Lys before changing these settings; the saved ones were not all returned.'
-    : !changed ? 'Nothing has changed.'
+    : !changed && !then ? 'Nothing has changed.'
     : '';
   const run = async () => {
     if (working.current || why) return;
+    // Nothing to save and no save outstanding: the settings stand as they are, so the start goes ahead.
+    if (then && !changed && !pending) { then(); return; }
     working.current = true; setBusy(true); setFailure(''); setSaved(false);
     const version = base?.version ?? 0;
     const current: KeptSave = pending ?? { path, body: { ...settings, operation: operationId(), from_version: version }, version };
@@ -90,7 +95,8 @@ function Save({ agent, name, person, profile, settings, refusal, canSave }: {
       sessionStorage.setItem(key, JSON.stringify(current)); setPending(current);
       // The computer is no part of a save; the request helper reads only the stage, the path, the body and the version.
       const confirmed = await profileRequest(agent, { stage: 'profile', path: current.path, body: current.body, version: current.version, machine: '' });
-      sessionStorage.removeItem(key); setPending(null); setBase(confirmed.profile); setSaved(true);
+      sessionStorage.removeItem(key); setPending(null); setBase(confirmed.profile);
+      if (then) then(); else setSaved(true);
     } catch (error) {
       // The service answered no: nothing of this request is outstanding. Anything else may have been carried out, so the request stays kept.
       if (error instanceof Refused && error.status >= 400 && error.status < 500) { sessionStorage.removeItem(key); setPending(null); }
@@ -98,10 +104,10 @@ function Save({ agent, name, person, profile, settings, refusal, canSave }: {
     } finally { working.current = false; setBusy(false); }
   };
   return <form className="save-settings" onSubmit={(event) => { event.preventDefault(); void run(); }}>
-    {pending ? <p role="status">The last save has no confirmed answer. Press Save these settings to send that same request again.</p> : null}
+    {pending ? <p role="status">The last save has no confirmed answer. Press {label} to send that same request again.</p> : null}
     {failure ? <><p role="alert" className="why-not">Lys could not confirm these settings were saved.</p><details><summary>Details</summary><p>{failure}</p></details></> : null}
     {saved && !failure ? <p role="status">Saved. {name} uses these settings the next time it starts. <a href={'#/team/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
-    <button type="submit" className="btn primary" disabled={busy || Boolean(why)}>{busy ? 'Saving…' : 'Save these settings'}</button>
+    <button type="submit" className="btn primary" disabled={busy || Boolean(why)}>{busy ? 'Saving…' : label}</button>
     {why ? <p className="why-not">{why}{starting && !pending && !initial.error ? <> <a href={'#/team/' + encodeURIComponent(agent)}>Go to {name}</a></> : null}</p> : null}
     {initial.error ? <details><summary>Details</summary><p>{initial.error}</p></details> : null}
   </form>;

@@ -12,16 +12,20 @@ import { McpServers } from './McpServers';
 import { Skills, ToolsNamed, promptWords } from './Given';
 import type { PeopleView } from '../../generated';
 
-export function ProfileEditor({ id, profile, choices, people, readOnly = false }: {
+export function ProfileEditor({ id, profile, choices, people, readOnly = false, saved }: {
   id: string; profile: ProvisioningProfile | null; choices: Choices; people: PeopleView; readOnly?: boolean;
+  /** Called once the settings are saved, when the form is the set-up before a start. */
+  saved?: () => void;
 }) {
-  return <ProfileFields profile={profile} choices={choices} canChoose={!readOnly} agent={id} render={(fields, settings, refusal) => <section className="card" aria-label="Settings of this agent">
-    {fields}<SaveSettings agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} people={people} machines={choices.machines} />
+  return <ProfileFields profile={profile} choices={choices} canChoose={!readOnly} agent={id} firstRun={Boolean(saved) && !profile?.harness} folderFirst={Boolean(saved)} render={(fields, settings, refusal) => <section className="card" aria-label="Settings of this agent">
+    {fields}<SaveSettings agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} people={people} machines={choices.machines} saved={saved} />
   </section>} />;
 }
 
-export function ProfileFields({ profile, choices, strict = false, firstRun = false, computer, canChoose = true, agent, render }: {
+export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, render }: {
   profile: ProvisioningProfile | null; choices: Choices; strict?: boolean; firstRun?: boolean;
+  /** The folder is asked first and must be chosen: the agent is started straight after the save. */
+  folderFirst?: boolean;
   /** The computer the agent is to run on, when the screen already knows it; the folder is chosen there. */
   computer?: string; canChoose?: boolean;
   /** The agent these settings belong to, when it exists; the rules its policy forces are shown for it. */
@@ -65,6 +69,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';
   else if (prompt === 'replace' && !instructions.trim()) refusal = 'Type the prompt this agent uses instead, or choose another prompt setting.';
   else if (choices.skills && skills.some((name) => !choices.skills?.includes(name))) refusal = 'Lys keeps no skill named ' + skills.find((name) => !choices.skills?.includes(name)) + '. Remove it from this agent’s skills.';
+  else if (folderFirst && !folder) refusal = 'Choose the folder this agent works in.';
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],
     tools, skills, mcp_servers: servers,
@@ -75,7 +80,12 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     ...(folder ? { working_folder: folder } : {}),
     ...(profile?.session ? { session: profile.session } : {}),
   };
+  const where = <>
+    {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun && !folderFirst ? ' Choose one now, or when you start this agent.' : ''}</p>}
+    {canChoose ? <FolderChooser computers={usable(choices.machines)} preferred={computer ?? profile?.runs_on ?? ''} chosen={folder} choose={setFolder} /> : null}
+  </>;
   const fields = <>
+    {folderFirst ? where : null}
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
       const next = choices.programs?.find((entry) => entry.name === event.target.value);
       setProgram(event.target.value); setModel(strict && next?.models.length !== 1 ? '' : next?.models[0]?.id ?? ''); setPermissions({ default_mode: firstMode(next), ...(permissions.additional_directories ? { additional_directories: permissions.additional_directories } : {}) }); setPrompt(firstRun ? firstPrompt(next) : strict ? next?.instructions_modes?.length === 1 ? next.instructions_modes[0] : '' : 'keep'); setPromptChanged(true);
@@ -97,8 +107,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
     {prompt ? <p className="dim prompt-words">{promptWords(prompt, prompt === 'keep' ? '' : instructions)}</p> : null}
     {prompt && prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
-    {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun ? ' Choose one now, or when you start this agent.' : ''}</p>}
-    {canChoose ? <FolderChooser computers={usable(choices.machines)} preferred={computer ?? profile?.runs_on ?? ''} chosen={folder} choose={setFolder} /> : null}
+    {folderFirst ? null : where}
   </>;
   return render(fields, settings, refusal);
 }

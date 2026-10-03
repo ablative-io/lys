@@ -135,7 +135,7 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
       <a className="btn primary" href="#/access/issue">Issue root grant</a>
     </div>
     {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
-    <div className="body">
+    <div className="body work">
       <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
         words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceWords(g.resource)} noun="grants"
         holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' grant' : ' grants')}

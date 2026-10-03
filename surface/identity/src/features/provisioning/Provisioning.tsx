@@ -19,13 +19,14 @@ export interface ProvisioningAnswer { agent: string; recorded?: { operation: str
 const pathOf = (id: string) => '/agents/' + encodeURIComponent(id) + '/provisioning';
 
 /** One start uses the choices the service answers and keeps the current profile's other settings. */
-export function Provisioning({ id }: { id: string }) {
+/** With `saved`, the form is the set-up under an agent's row: it opens filled, and its one button saves and goes on to the start. */
+export function Provisioning({ id, saved }: { id: string; saved?: () => void }) {
   const load = useLoad(async () => {
     const [answer, people, choices] = await Promise.all([request<ProvisioningAnswer>(pathOf(id)), api.people(), readChoices()]);
     if (answer.agent !== id || typeof answer.enforced !== 'boolean') throw new Error('Provisioning answer did not name this agent and its application state.');
     return { answer, people, choices };
   }, 'provisioning:' + id);
   return <Gate load={load} title="Start" ok={({ answer, people, choices }) =>
-    <ProfileEditor key={id} readOnly={people.scope !== 'directory'} id={id} profile={answer.profile} choices={choices} people={people} />
+    <ProfileEditor key={id} readOnly={people.scope !== 'directory'} id={id} profile={answer.profile} choices={choices} people={people} saved={saved} />
   } />;
 }

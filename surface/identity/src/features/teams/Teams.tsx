@@ -55,7 +55,7 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
       <button className="btn primary" onClick={() => { setCreating(true); setNotice(''); }}>+ Create a team</button>
       {notice ? <span role="status" className="note">{notice}</span> : null}
     </div>
-    <div className="body">
+    <div className="body work">
       <div className="pane">
         <table className="team-tree">
           <thead><tr><th>Team</th><th>Lead</th><th>Holds</th></tr></thead>

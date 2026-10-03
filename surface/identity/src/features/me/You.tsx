@@ -103,13 +103,11 @@ function StartHere({ entry, me, pressed, setupFirst, changed, close }: { entry: 
   const load = useLoad(() => api.people(), 'you-start:' + entry.id);
   if (load.status === 'loading') return null;
   if (setup) return <div className="you-setup">
-    <Provisioning id={entry.id} />
-    <p className="dim">Press Save these settings before you go back; what is not saved is not kept.</p>
-    <p><button type="button" className="btn primary" onClick={() => { setSetup(false); setRound((value) => value + 1); }}>Done, back to Start</button>{' '}
-      <button type="button" className="btn" onClick={close}>Close</button></p>
+    <Provisioning id={entry.id} saved={() => { setSetup(false); setRound((value) => value + 1); }} />
+    <p><button type="button" className="btn" onClick={close}>Close</button></p>
   </div>;
   return <div className="you-start-here">
-    <Start key={round} entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed && round === 0}
+    <Start key={round} entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed || round > 0}
       settings={() => setSetup(true)} />
     <button type="button" className="you-watch" data-act="close" onClick={close}>Close</button>
   </div>;

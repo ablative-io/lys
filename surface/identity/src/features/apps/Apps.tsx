@@ -96,7 +96,7 @@ export function Apps() {
         { head: 'State', cell: (app) => <span className={'app-state app-' + app.state}>{app.state === 'pending' ? 'waiting for approval' : app.state}</span> },
         { head: 'Signs in to', cell: (app) => <span className="sec">{app.redirects.length} {app.redirects.length === 1 ? 'address' : 'addresses'}</span> },
       ];
-      return <div className="body">
+      return <div className="body work">
         <Listing<AppRecord> groups={group} columns={columns} id={(app) => app.id} href={(app) => '#/apps?app=' + encodeURIComponent(app.id)} words={(app) => app.name + ' ' + app.id}
           noun="apps" holds={(items) => items.length + ' apps'} selected={registering ? null : open?.id ?? null} select={() => undefined} open={(app) => { setPicked(app.id); setRegistering(false); }} />
         <div className="detail">

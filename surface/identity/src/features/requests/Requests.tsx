@@ -85,7 +85,7 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
       {!ask ? <button className="btn primary" onClick={() => setAsking(true)}>+ Ask for access</button> : null}
     </div>
     {data.teams.refused ? <p className="why-not">Teams cannot be read, so requests are listed without their team. {data.teams.refused}</p> : null}
-    <div className="body">
+    <div className="body work">
       <Listing<AccessRequest> groups={groups} columns={columns} id={(entry) => entry.id} href={(entry) => '#/requests?request=' + entry.id}
         words={(entry) => (entry.asked_by_name ?? '') + ' ' + entry.relation + ' ' + entry.resource.id + ' ' + entry.why} noun="requests" holds={count}
         selected={open?.id ?? null} select={() => undefined} open={(entry) => { setPicked(entry.id); setAsking(false); }}

@@ -16,9 +16,11 @@ function ago(seconds: number): string {
 }
 
 /** Whether the computer is up, from what its runner last reported. */
-export function status({ machine, runner, reports }: Computer): { words: string; state: 'up' | 'down' | 'unknown' | 'off' } {
+export function status({ machine, runner, reports, running }: Computer): { words: string; state: 'up' | 'down' | 'unknown' | 'off' } {
   if (machine.state === 'retired') return { words: 'Retired', state: 'off' };
   if (machine.runtime === null) return { words: 'Does not run agents', state: 'off' };
+  // An agent running on it now is the plainest sign it is up, whatever the last report's age.
+  if (running?.length) return { words: 'Up, ' + running.length + (running.length === 1 ? ' agent running' : ' agents running'), state: 'up' };
   if (!runner) return { words: 'No runner connected', state: 'down' };
   if (!reports) return { words: 'Lys does not collect runner reports', state: 'unknown' };
   if (machine.last_report_at === null) return { words: 'Never heard from', state: 'down' };

@@ -60,6 +60,10 @@ describe('An agent\'s run on People and agents', () => {
     expect(row()?.querySelector('[data-act="start"]')).toBeNull();
     await click(row()?.querySelector('[data-act="setup"]') ?? null);
     expect($('.you-setup section[aria-label="Settings of this agent"]')).not.toBeNull();
+    // One button under the form: it saves and goes on to the start. There is no second button to find afterwards.
+    expect(button('Save and start Scribe')).not.toBeNull();
+    expect(button('Save these settings')).toBeNull();
+    expect(button('Done, back to Start')).toBeNull();
     expect(location.hash).toBe('#/');
     await click(button('Close'));
     expect($('.you-asked')).toBeNull();
@@ -179,9 +183,8 @@ describe('An agent\'s run on People and agents', () => {
     // Setting it up happens under its row on the front page; the person is not sent to another page.
     expect(location.hash).toBe('#/team/' + SCRIBE);
     expect($('.you-setup section[aria-label="Settings of this agent"]')).not.toBeNull();
-    await click(button('Done, back to Start'));
+    await click(button('Close'));
     expect($('.you-setup')).toBeNull();
-    expect(text()).toContain('Scribe has no program chosen yet.');
   });
 
   it('says the service\'s own reason when it refuses the start, with Try again, and no greyed button', async () => {

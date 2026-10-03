@@ -19,8 +19,12 @@ describe('People and agents', () => {
     await mount('#/people');
     const reviewer = $$('tbody tr').find((tr) => tr.textContent?.includes("Reviewer"));
     expect(reviewer?.textContent).toContain('(retired)');
-    const lamplighter = $$('tbody tr').find((tr) => tr.textContent?.includes("Lamplighter"));
-    expect(lamplighter?.textContent).not.toContain('(retired)');
+    // A retired agent is left out of the list until it is asked for.
+    const lamplighter = () => $$('tbody tr').find((tr) => tr.textContent?.includes("Lamplighter"));
+    expect(lamplighter()).toBeUndefined();
+    await click($$('.tools button').find((each) => each.textContent?.startsWith('Show retired (')) ?? null);
+    expect(lamplighter()).toBeDefined();
+    expect(lamplighter()?.textContent).not.toContain('(retired)');
   });
 
   it('flags an agent whose person is suspended, not only retired (conformance 3.1)', async () => {
@@ -64,7 +68,10 @@ describe('People and agents', () => {
   it('filters people and agents, and reads the teams registry', async () => {
     await mount('#/people', { ...SERVICE, '/teams': ok({ teams: [] }) });
     await click($('[data-kind="agent"]'));
+    expect(names()).toHaveLength(4);
+    await click($$('.tools button').find((each) => each.textContent?.startsWith('Show retired (')) ?? null);
     expect(names()).toHaveLength(5);
+    await click($$('.tools button').find((each) => each.textContent === 'Hide retired') ?? null);
     await click($('[data-kind="person"]'));
     expect(names()).toEqual(['Ada (test person)', 'Bea (test person)']);
     await click($('[data-kind="teams"]'));

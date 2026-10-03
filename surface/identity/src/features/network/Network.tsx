@@ -67,7 +67,9 @@ function Computers({ computers, people, me, teams, teamsRefused, notice, refresh
   const [picked, setPicked] = useState<string | null>(null);
   const names = new Map(people.people.flatMap((person) => [[person.id, person.display_name] as const, ...person.agents.map((agent) => [agent.id, agent.display_name] as const)]));
   const attention = (computer: Computer) => status(computer).state === 'down';
-  const scoped = computers.filter((computer) => inScope(whose, teams, me.person.id, people, computer)).filter((computer) => show === 'all' || attention(computer));
+  const [retired, setRetired] = useState(false);
+  const retiredCount = computers.filter((computer) => computer.machine.state === 'retired').length;
+  const scoped = computers.filter((computer) => inScope(whose, teams, me.person.id, people, computer)).filter((computer) => show === 'all' || attention(computer)).filter((computer) => retired || computer.machine.state !== 'retired');
   const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
   const selected = computers.find((computer) => computer.machine.id === picked) ?? scoped[0] ?? null;
   const count = (n: number) => n.toLocaleString('en-AU');
@@ -101,6 +103,7 @@ function Computers({ computers, people, me, teams, teamsRefused, notice, refresh
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />
           <div className="seg">{([['all', 'All'], ['attention', 'Not heard from']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
+          {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
         </>} />
       <div className="detail">
         {adding && admin ? <AddMachine person={me.person.id} changed={changed} cancel={() => setAdding(false)} />

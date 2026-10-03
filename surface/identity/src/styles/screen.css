@@ -91,6 +91,8 @@ ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
 .page.fill { height: 100%; box-sizing: border-box; padding-bottom: 18px; display: flex; flex-direction: column; overflow: hidden; }
 .fill > .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; }
 .fill > .body.one { grid-template-columns: minmax(0, 1fr); }
+/* Where the pane beside the list is where the work is done, it gets the larger share. */
+.fill > .body.work { grid-template-columns: minmax(0, 2fr) minmax(360px, 3fr); }
 .fill .listing { display: flex; flex-direction: column; min-height: 0; }
 .fill .pane, .fill .detail { overflow: auto; min-height: 0; overscroll-behavior: contain; }
 .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }

@@ -76,26 +76,14 @@ describe('Registration entry points', () => {
     expect(location.hash).toBe(target);
   });
 
-  it('carries the person from their row to registration', async () => {
+  it('keeps the rows to who is there: no row carries an Add agent link, and the one above the list is the way in', async () => {
     await directory();
-    const row = document.querySelector('tr[data-href="#/file/' + ADA + '"]');
-    if (!row) throw new Error('Missing person row');
-    await follow(link(row, 'Add agent under them'));
-    const query = new URLSearchParams(location.hash.split('?')[1]);
-    expect(location.hash.split('?')[0]).toBe('#/agents/new');
-    expect(query.get('answers_to')).toBe(ADA);
-    expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Add an agent');
+    for (const id of [ADA, COURIER]) {
+      const row = document.querySelector('tr[data-href="#/file/' + id + '"]');
+      if (!row) throw new Error('Missing row');
+      expect(row.querySelector('a[href^="#/agents/new"]')).toBeNull();
+    }
+    expect(document.querySelector('.page .head a[href="#/agents/new"]')).not.toBeNull();
   });
 
-  it('carries an agent and its team from its row to registration', async () => {
-    await directory();
-    const row = document.querySelector('tr[data-href="#/file/' + COURIER + '"]');
-    if (!row) throw new Error('Missing agent row');
-    await follow(link(row, 'Add agent under them'));
-    const query = new URLSearchParams(location.hash.split('?')[1]);
-    expect(location.hash.split('?')[0]).toBe('#/agents/new');
-    expect(query.get('team')).toBe('team-crew');
-    expect(query.get('answers_to')).toBe(COURIER);
-    expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Add an agent');
-  });
 });

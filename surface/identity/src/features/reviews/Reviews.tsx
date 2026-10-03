@@ -70,7 +70,7 @@ function Due({ model, view, me, people, teams, confirmed, kept }: { model: Grant
       {view.unanswered.map(({ agent, person }) => <p key={agent.id}><Link to={'/file/' + encodeURIComponent(agent.id)}>{agent.display_name}</Link> answers to {person.display_name}, whose account is {person.state}.</p>)}
     </section> : null}
     {teams.refused ? <p className="why-not">Teams cannot be read, so access is listed without its team. {teams.refused}</p> : null}
-    {view.due.length ? <div className="body">
+    {view.due.length ? <div className="body work">
       <Listing<Due> groups={groups} columns={columns} id={(due) => due.grant.id} href={(due) => '#/reviews?grant=' + due.grant.id}
         words={(due) => due.agent.display_name + ' ' + due.grant.resource.id + ' ' + due.reviewer.display_name} noun="grants to review"
         holds={(items) => items.length + (items.length === 1 ? ' grant' : ' grants')}

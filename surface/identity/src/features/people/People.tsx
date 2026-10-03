@@ -2,7 +2,7 @@ import { readTogether } from '../../reads';
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { api, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
@@ -62,8 +62,9 @@ function Stat({ n, l, warn }: { n: number; l: string; warn?: boolean }) {
 /** A person's row carries their agents folded under it; an agent's row names the person it answers to. */
 type Row = Entry & { agents: Entry[] };
 
-function rowsOf(view: PeopleView, kind: KindFilter): Row[] {
-  const all = entries(view);
+/** Retired records are left out until asked for. A retired person whose agents are not retired stays listed: those agents have no one answering. */
+function rowsOf(view: PeopleView, kind: KindFilter, retired: boolean): Row[] {
+  const all = entries(view).filter((x) => retired || x.state !== 'retired' || (x.kind === 'person' && entries(view).some((agent) => agent.kind === 'agent' && agent.person?.id === x.id && agent.state !== 'retired')));
   const agentsOf = (id: string) => all.filter((x) => x.kind === 'agent' && x.person?.id === id);
   if (kind === 'agent') return all.filter((x) => x.kind === 'agent').map((x) => ({ ...x, agents: [] }));
   return all.filter((x) => x.kind === 'person').map((x) => ({ ...x, agents: kind === 'person' ? [] : agentsOf(x.id) }));
@@ -87,7 +88,9 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
   const [whose, setWhose] = useWhose(admin);
   const all = entries(view);
   const names = new Map(all.map((x) => [x.id, x.display_name]));
-  const scoped = rowsOf(view, shell.filterKind).filter((x) => inWhose(whose, teams, me, held(x)));
+  const [retired, setRetired] = useState(false);
+  const retiredCount = all.filter((x) => x.state === 'retired').length;
+  const scoped = rowsOf(view, shell.filterKind, retired).filter((x) => inWhose(whose, teams, me, held(x)));
   const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
   const [shown, setShown] = useState<string[]>([]);
   useEffect(() => {
@@ -105,31 +108,11 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
   const selectedHref = shown[Math.min(shell.cursor, Math.max(0, shown.length - 1))] ?? null;
   const selected = all.find((x) => '#/file/' + x.id === selectedHref) ?? null;
   const active = (kind: string) => all.filter((x) => x.kind === kind && x.state === 'active').length;
-  const memberTeams = useMemo(() => {
-    const grouped = new Map<string, string[]>();
-    for (const team of teams) {
-      if (team.state !== 'active') continue;
-      for (const member of team.members) {
-        const ids = grouped.get(member);
-        if (ids) ids.push(team.id); else grouped.set(member, [team.id]);
-      }
-    }
-    return grouped;
-  }, [teams]);
-  const addUnder = (entry: Entry) => {
-    const person = entry.person?.id ?? entry.id;
-    const memberships = memberTeams.get(entry.id) ?? memberTeams.get(person) ?? [];
-    const team = whose.kind === 'team' && memberships.includes(whose.team) ? whose.team : memberships.length === 1 ? memberships[0] : '';
-    const query = new URLSearchParams({ answers_to: entry.id });
-    if (team) query.set('team', team);
-    return <a href={'#/agents/new?' + query.toString()} onClick={(event) => event.stopPropagation()}>Add agent under them</a>;
-  };
   const columns: Column<Row>[] = [
     { head: 'Name', cell: (x) => x.display_name },
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
     { head: 'State', cell: (x) => <><span className={'dot s-' + x.state} />{x.state}</> },
     { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}</span> : null },
-    { head: 'Add agent', cell: addUnder },
     { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
   ];
   return (
@@ -141,13 +124,13 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
         <RuntimeCounts />
       </div>
       {admin ? null : <p className="note">Your own records: you and the agents that answer to you. A directory administrator sees everyone through the directory&apos;s own routes.</p>}
-      <div className="body">
+      <div className="body work">
         <Listing<Row>
           groups={groups} columns={columns} id={(x) => x.id} href={(x) => '#/file/' + x.id} words={(x) => x.display_name}
           noun={shell.filterKind === 'agent' ? 'agents' : shell.filterKind === 'person' ? 'people' : 'people and agents'}
           holds={holds} under={shell.filterKind === 'all' ? (x) => x.agents.map((agent) => ({ ...agent, agents: [] })) : undefined} underNoun={(n) => n + (n === 1 ? ' agent' : ' agents')} underHead={shell.filterKind === 'all' ? 'Agents' : undefined}
           selected={selected?.id ?? null} select={(x) => shell.setCursor(Math.max(0, shown.indexOf('#/file/' + x.id)))} open={(x) => navigate('/file/' + x.id)}
-          tools={<WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />} shown={setShown}
+          tools={<><WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />{retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}</>} shown={setShown}
         />
         <div className="detail">{selected ? <Preview x={selected} roles={roles} reach={reach} /> : null}</div>
       </div>
