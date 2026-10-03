@@ -23,7 +23,8 @@ describe('A listed program', () => {
     const model = document.querySelector<HTMLSelectElement>('select[name="model"]');
     expect(options(model)).toEqual(['Default for this account', 'Opus']);
     expect(model?.value).toBe('default');
-    expect(options(document.querySelector('select[name="mode"]'))).toEqual(['Reads freely and asks before most changes and commands.', 'Reads and edits files without asking.']);
+    expect(options(document.querySelector('select[name="mode"]'))).toEqual(['default', 'acceptEdits']);
+    expect(document.querySelector('.mode-words')?.textContent).toBe('default Reads freely and asks before most changes and commands.This computer’s own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each action.');
   });
   it('keeps the prompt textbox optional and behind a choice', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);
