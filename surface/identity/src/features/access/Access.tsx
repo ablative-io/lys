@@ -61,7 +61,7 @@ function Reach({ w, id }: { w: GrantWorld; id: string }) {
       return rows.length ? (
         <table><tbody>
           {rows.map(([res, acts]) => (
-            <tr key={res}><td>{resourceWords(resourceFromText(res))}</td><td className="mono">{actionWords(w.model, resourceFromText(res), acts)}</td><td /></tr>
+            <tr key={res}><td>{resourceWords(resourceFromText(res))}</td><td>{actionWords(w.model, resourceFromText(res), acts)}</td></tr>
           ))}
         </tbody></table>
       ) : <div className="dim">Nothing.</div>;
