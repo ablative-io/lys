@@ -389,3 +389,87 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted() {
     }
     store.audit_leaves().unwrap();
 }
+
+/// One leaf offered at `index` behind `frontier`, as a writer whose view of
+/// the store ends there would offer it.
+fn offer(store: &mut FileLeafStore, frontier: &Frontier, index: u64) -> StoreResult<()> {
+    let mut ahead = frontier.clone();
+    ahead.push(b"the second writer's leaf");
+    let pin = PinnedRoot {
+        tree_size: ahead.size(),
+        root: ahead.root(),
+    };
+    store.append(index, &[b"the second writer's leaf".as_slice()], pin)
+}
+
+#[test]
+fn a_second_writers_act_at_a_taken_index_is_refused_with_nothing_written() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("store");
+    let mut first = create(&dir);
+    let mut frontier = Frontier::new();
+    fill(&mut first, &mut frontier, 2, 2);
+    // A second writable handle, opened before the first writes again: its
+    // view of the store ends at leaf 2.
+    let mut second = FileLeafStore::open(&dir).unwrap();
+    let stale = frontier.clone();
+    fill(&mut first, &mut frontier, 3, 1);
+    let before = std::fs::read(segment_file(&dir, 0)).unwrap();
+    let err = offer(&mut second, &stale, 2).unwrap_err();
+    assert!(
+        matches!(err, StoreError::LeafAlreadyWritten { index: 2 }),
+        "{err}"
+    );
+    assert_eq!(
+        std::fs::read(segment_file(&dir, 0)).unwrap(),
+        before,
+        "the refused act wrote no byte"
+    );
+    drop((first, second));
+    let reopened = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(reopened.extent(), 3);
+    assert_eq!(reopened.pinned().root, frontier.root());
+    assert!(reopened.unfinished_tail().is_none());
+}
+
+#[test]
+fn a_second_writers_act_behind_another_writers_roll_is_refused_with_nothing_written() {
+    // The first writer rolls at leaf 4, so the old segment is no longer than
+    // the second writer left it: only the new segment's name says the index
+    // is taken. The second writer is refused whether or not it would roll.
+    for second_rolls in [true, false] {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("store");
+        let mut first = create(&dir).with_roll_bytes(64);
+        let mut frontier = Frontier::new();
+        fill(&mut first, &mut frontier, 4, 4);
+        let mut second = FileLeafStore::open(&dir).unwrap();
+        if second_rolls {
+            second = second.with_roll_bytes(64);
+        }
+        let stale = frontier.clone();
+        fill(&mut first, &mut frontier, 5, 1);
+        assert_eq!(first.segments, [0, 4], "the first writer rolled at leaf 4");
+        let before = [
+            std::fs::read(segment_file(&dir, 0)).unwrap(),
+            std::fs::read(segment_file(&dir, 4)).unwrap(),
+        ];
+        let err = offer(&mut second, &stale, 4).unwrap_err();
+        assert!(
+            matches!(err, StoreError::LeafAlreadyWritten { index: 4 }),
+            "second_rolls {second_rolls}: {err}"
+        );
+        assert_eq!(
+            [
+                std::fs::read(segment_file(&dir, 0)).unwrap(),
+                std::fs::read(segment_file(&dir, 4)).unwrap(),
+            ],
+            before,
+            "second_rolls {second_rolls}: the refused act wrote no byte"
+        );
+        drop((first, second));
+        let reopened = FileLeafStore::open(&dir).unwrap();
+        assert_eq!(reopened.extent(), 5);
+        assert_eq!(reopened.pinned().root, frontier.root());
+    }
+}

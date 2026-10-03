@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-rust-version.workspace = true
+rust-version = "1.89" # std::fs::File::lock, the one writer at a time on a segment's head
 keywords = ["transparency", "merkle", "append-only", "storage", "log"]
 categories = ["cryptography", "database-implementations"]
 
