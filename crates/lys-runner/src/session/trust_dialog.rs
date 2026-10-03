@@ -18,10 +18,6 @@ pub(crate) const QUESTION: &[u8] = b"Do you trust the files in this folder?";
 /// The dialog's first option, painted after the folder it names; once this
 /// is on the screen the dialog is whole and its folder can be read.
 const OPTION: &[u8] = b"Yes, proceed";
-/// How much output counts as the harness's first screen. Past this much with
-/// no question, the harness is past its start and the watch ends; this is
-/// a bound on what the watch reads, not a wait.
-const FIRST_SCREEN_BYTES: u64 = 64 * 1024;
 /// The feed state: the dialog showed for the run's folder and was answered.
 pub(crate) const ANSWERED: &str = "trust_answered";
 /// The feed state: the dialog showed for another folder and was left alone.
@@ -33,7 +29,7 @@ enum Seen {
     Named,
     /// The dialog, naming some other folder.
     Other,
-    /// No dialog: the harness is past its start, or has ended.
+    /// No dialog before the process ended.
     Passed,
 }
 
@@ -65,28 +61,35 @@ impl Sessions {
     }
 
     /// Read session `id`'s output from the spawn until the dialog is whole
-    /// on the screen, the first screen has passed without it, or the process
-    /// has ended. The dialog naming `directory` is answered with Enter, the
-    /// selected `Yes, proceed`; one naming any other folder is left alone.
-    /// Either is said in the feed.
+    /// on the screen or the process has ended; nothing else ends the watch.
+    /// Each look reads only the bytes since the last, holding a
+    /// question's length of overlap, so a long run costs nothing. The dialog
+    /// naming `directory` is answered with Enter, the selected
+    /// `Yes, proceed`; one naming any other folder is left alone. Either is
+    /// said in the feed.
     fn answer_trust_dialog(&self, id: &str, directory: &str) -> Result<(), RunnerError> {
         let never_left = AtomicBool::new(false);
-        let mut from: Option<u64> = None;
+        let mut cursor: Option<u64> = None;
+        let mut held: Vec<u8> = Vec::new();
         let seen = self.until(id, &never_left, |state, _| {
             if state.ended().is_some() {
                 return Some(Ok(Seen::Passed));
             }
             let scrollback = state.scrollback();
-            let start = *from.get_or_insert(scrollback.oldest());
-            let kept = match scrollback.from(start.max(scrollback.oldest())) {
-                Ok(kept) => kept,
+            let from = cursor.get_or_insert(scrollback.oldest());
+            let fresh = match scrollback.from((*from).max(scrollback.oldest())) {
+                Ok(fresh) => fresh,
                 Err(expired) => return Some(Err(expired)),
             };
-            let Some(at) = find(&kept, QUESTION) else {
-                let read = u64::try_from(kept.len()).unwrap_or(u64::MAX);
-                return (read > FIRST_SCREEN_BYTES).then_some(Ok(Seen::Passed));
+            *from = scrollback.end();
+            held.extend_from_slice(&fresh);
+            let Some(at) = find(&held, QUESTION) else {
+                // Keep only what a question split across two looks needs.
+                let keep_from = held.len().saturating_sub(QUESTION.len() - 1);
+                held.drain(..keep_from);
+                return None;
             };
-            let dialog = &kept[at + QUESTION.len()..];
+            let dialog = &held[at + QUESTION.len()..];
             find(dialog, OPTION)?;
             let named = find(dialog, directory.as_bytes()).is_some();
             Some(Ok(if named { Seen::Named } else { Seen::Other }))
