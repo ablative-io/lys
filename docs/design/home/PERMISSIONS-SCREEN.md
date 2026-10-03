@@ -1,6 +1,6 @@
 # What an agent may do: the truth today, and what has to change
 
-Waffles, 3 October 2026, rewritten 20:31 by the clock; amended 20:32 from Vesper's read against her table (six sentences that said more than their rows) and Archie's observation of the tools a real run was offered. The first version of this page (068c7c51) is
+Waffles, 3 October 2026, rewritten 20:31 by the clock; amended 20:32 from Vesper's read against her table (six sentences that said more than their rows) and Archie's observation of the tools a real run was offered; amended again from Archie's read of the Codex part against his table (four findings). The first version of this page (068c7c51) is
 withdrawn: it had claims from memory that the sources contradict. Nothing is built from this page until
 Tom has read it.
 
@@ -79,19 +79,27 @@ unit.
   pancake's makes a Codex start refuse. (A14, A15, W-C1: code only, open)
 - With no mode chosen, Lys sets no sandbox and never sets when Codex asks; the run would use the login's
   own Codex config, which Lys neither sets nor reads. (A2, A3, A4, open)
-- "Read-only" stops writes and the network. It does not stop reading: every mode reads the whole disk.
-  Seen with the installed Codex under the settings Lys writes. (A7, A8, agreed for the sandbox itself)
+- "Read-only" stops commands writing and using the network while they stay in the sandbox. It does not
+  stop reading: every mode reads the whole disk. Seen with the installed Codex under the settings Lys
+  writes. (A7, A8, agreed for the sandbox itself) Web search is not turned off under read-only; Lys turns
+  it off only under workspace-write. (A11, open) And Codex itself tells the model to ask to rerun a blocked
+  command outside the sandbox; whether that is granted is decided by the login's own approval setting,
+  which Lys never sets. (A41, A3, open)
+- By its documentation Codex hands commands the login's environment with names containing KEY, SECRET or
+  TOKEN left in. (A34, documentation only, open)
 - Lys's workspace-write settings do close `/tmp`, the temp folder and the network. Seen. (A9, agreed)
 - The confinement Lys has written for Codex is called only by a test, and as written would not run a
   command and would not hold the network. (A16 agreed; A17, A18 seen)
 - No judge is installed for Codex, and Codex's own pages say such a hook is not a wall. (A23, A26)
 - Run with an empty config folder, the installed Codex still listed 32 of the login's own skills to the
-  model, and both instruction files reached it even in Lys's "replace" mode. (A37 to A40, seen; no Lys run)
+  model, and both instruction files reached it even in Lys's "replace" mode. (A37 to A40, seen; no Lys
+  run) So for Codex, giving a run its own config folder does not by itself make it start clean.
 - The one place Codex offers a setting the login cannot undo is an administrator's requirements file.
   Documentation only; no Lys code writes it; not observed. (A33, open)
 
 **In one sentence:** today Lys can refuse a Claude Code agent whole tools and paths through the program's
-own settings file, and can box a Codex agent's writes and network; everything else the screens imply is
+own settings file, and can box what a Codex agent's commands write and reach on the network while they
+stay in the sandbox; everything else the screens imply is
 either not enforced by anything, or enforced by something Lys does not control.
 
 ## What I propose (for Tom to mark; none of it is built)
@@ -103,8 +111,9 @@ either not enforced by anything, or enforced by something Lys does not control.
   this for a start; the screen shows that rendering, not a description of it.
 - Under it, one plain block that claims no more than the rows support. For Claude Code: "This computer's
   own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each
-  action." For Codex: "Lys sets where it may write and whether it may use the network. It can read every
-  file this login can read." Nothing on the screen says a rule is enforced until a run has been watched
+  action." For Codex: "Lys sets where its commands may write and whether they may use the network,
+  while they stay in the sandbox. It can read every file this login can read. Web search and leaving the
+  sandbox are decided by this computer's own Codex settings." Nothing on the screen says a rule is enforced until a run has been watched
   being refused (V8).
 - Show the policy on the settings form and the front page pane, not only on a tab of the file, with who
   set each rule. A seeded rule says "written by Lys on <date>, chosen by nobody".
@@ -118,8 +127,11 @@ recommend, each to be proved by a watched run before the next:
   machine's own Claude Code and Codex setup. That ruling and "a serious permission system" pull against
   each other: a plugin hook with full access ran inside tonight's agent. This is Tom's call (question 1).
 - Turn the sandbox on by default for Claude Code agents, as `workspace-only` already does.
-- For Codex: always set the mode and the approval policy; fix or delete the unused confinement; observe a
-  requirements file holding against a looser login before leaning on it.
+- For Codex: a choice between two things that by the documentation do not combine (A28, A29, not
+  observed): a sandbox mode, as today, or a permission profile, which is the only thing that can confine
+  reads (A8) and which Lys's unused code gets wrong (A17, A18). Either way set the approval policy, but
+  only once it has been seen what `never` does to a request to leave the sandbox (A41); and observe a
+  requirements file holding against a looser login before leaning on it (A33).
 
 **3. Granular rules and named profiles come on top of 2, not before it.** A permissions profile is a
 named, saved set of rules, shown in full wherever it is chosen. Rules are chosen from what the program
@@ -148,6 +160,8 @@ promises what nothing holds.
 - A run in `workspace-only`, with the sandbox seen to hold. (W10)
 - A Codex agent started by Lys at all, in each mode. (A2 to A15)
 - A requirements file refusing a looser login setting. (A33)
+- What Codex's approval setting `never` does to a request to leave the sandbox. (A41)
+- Whether a permission profile is ignored when a sandbox mode is given. (A28, A29)
 
 ## The worst credible failure
 
