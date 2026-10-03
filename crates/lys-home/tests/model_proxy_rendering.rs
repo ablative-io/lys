@@ -53,7 +53,7 @@ fn the_proxy_is_the_run_s_base_url_and_absent_without_one() -> TestResult {
     let proxied = render(&fields(Some(PROXY))?, &[], &permissions(), &[])?;
     let proxied_env = env(&proxied.text)?;
     assert_eq!(proxied_env[PROXY_VARIABLE], PROXY);
-    let mut without = proxied_env.clone();
+    let mut without = proxied_env;
     without
         .as_object_mut()
         .ok_or("env is not an object")?
