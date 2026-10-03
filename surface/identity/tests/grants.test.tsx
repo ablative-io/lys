@@ -471,13 +471,14 @@ describe('Who can reach this? (conformance 8.2)', () => {
 });
 
 describe('A grant card', () => {
-  it('shows a void grant of a suspended holder with the open question, and no Allows line', async () => {
+  it('shows a void grant of a suspended holder with its reason and no design note, and no Allows line', async () => {
     const suspend = (v: typeof DIRECTORY) => ({ ...v, people: v.people.map((p) => ({ ...p, agents: p.agents.map((a) => (a.id === SCRIBE ? { ...a, state: 'suspended' as const } : a)) })) });
     const reason = `IdentityNotActive: ${SCRIBE} is suspended, and only an active identity's grants are effective`;
     const refusedScribe = GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, standing: { stands: false as const, refusal: 'IdentityNotActive', grant: null, reason } } : g));
     await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: refusedScribe, revision: 7 }), '/directory/people': ok(suspend(DIRECTORY)), '/people': ok(suspend({ ...DIRECTORY, scope: 'personal', people: [DIRECTORY.people[0]] })) });
     const card = $$('.file .card').find((c) => c.querySelector('.verdict-mark.no'));
-    expect(card?.textContent).toContain(`${reason} what suspension refuses: open`);
+    expect(card?.textContent).toContain(reason);
+    expect(card?.textContent).not.toContain('what suspension refuses');
     expect(text()).not.toContain('Allows:');
     expect(card?.textContent).toContain('Last used: 27 Sep 12:00 · tool');
   });

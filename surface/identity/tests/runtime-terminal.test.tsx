@@ -1,7 +1,7 @@
 /** DIRECTORY-050 R7: the Sessions screen lists every running session, opens one to its live terminal, types a line, sends keys, asks before Stop by naming the agent, and names every refusal. */
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { $, $$, click, mount, settle, text } from './harness';
+import { $, $$, click, mount, text } from './harness';
 import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { RuntimeSession } from '../src/features/runtime/RuntimeSessions';
