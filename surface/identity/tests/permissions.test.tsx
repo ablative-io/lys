@@ -22,16 +22,16 @@ let host: HTMLElement | null = null;
 let latest: Value = {};
 afterEach(() => { if (root) act(() => root?.unmount()); root = null; host?.remove(); host = null; });
 
-function Held({ program, first, agent }: { program: Program; first: Value; agent?: string }) {
+function Held({ program, first, agent, tools }: { program: Program; first: Value; agent?: string; tools?: string[] }) {
   const [value, setValue] = useState(first);
   latest = value;
-  return <Permissions agent={agent} program={program} value={value} change={setValue} computers={[{ id: computer, name: 'Ada’s laptop' }]} computer={computer} />;
+  return <Permissions agent={agent} tools={tools} program={program} value={value} change={setValue} computers={[{ id: computer, name: 'Ada’s laptop' }]} computer={computer} />;
 }
-async function shown(program: Program, first: Value, agent?: string, routes = {}) {
+async function shown(program: Program, first: Value, agent?: string, routes = {}, tools?: string[]) {
   const posted: { path: string; body: unknown }[] = [];
   const requests = serve({ ...SERVICE, ...routes }, posted);
   const element = document.createElement('div'); document.body.append(element); host = element; root = createRoot(element);
-  await act(async () => { root?.render(<Held program={program} first={first} agent={agent} />); });
+  await act(async () => { root?.render(<Held program={program} first={first} agent={agent} tools={tools} />); });
   return { element, posted, requests };
 }
 const button = (scope: HTMLElement, label: string) => [...scope.querySelectorAll('button')].find((entry) => entry.textContent?.trim() === label) ?? null;
@@ -137,28 +137,60 @@ describe('The rules', () => {
     expect(button(step, 'Add this rule')?.disabled).toBe(true);
     expect(latest).toEqual({ default_mode: 'default' });
   });
-  it('shows the rules the agent’s policy forces, locked, read only when the lists are opened', async () => {
-    const policy = { agent: SCRIBE, digest: null, applies: '', policy: { version: 1, agent: SCRIBE, rules: [
-      { id: 'deny-Read', tool: 'Read', kind: 'tool', authority: 'hard' },
-      { id: 'deny-top', tool: 'Read', kind: 'path_prefix', target: '/srv/x', authority: 'hard' },
-      { id: 'liftable', tool: 'Bash', kind: 'tool', authority: { permission: { resource: { kind: 'agent', id: SCRIBE }, action: 'read' } } },
-    ] } };
-    const { element, requests } = await shown(claude, { default_mode: 'default' }, SCRIBE, { ['/agents/' + SCRIBE + '/policy']: ok(policy) });
-    expect(requests).toEqual([]);
-    await click(button(element, 'Show every rule'));
+  const hard = (id: string, tool: string, kind: string, target?: string) => ({ id, tool, kind, ...(target === undefined ? {} : { target }), authority: 'hard' });
+  const policyOf = (rules: unknown[]) => ({ ['/agents/' + SCRIBE + '/policy']: ok({ agent: SCRIBE, digest: null, applies: '', policy: { version: 1, agent: SCRIBE, rules } }) });
+  const seeded = [hard('deny-Read', 'Read', 'tool'), hard('deny-top', 'Read', 'path_prefix', '/srv/x'),
+    { id: 'liftable', tool: 'Bash', kind: 'tool', authority: { permission: { resource: { kind: 'agent', id: SCRIBE }, action: 'read' } } }];
+  it('never says there are no rules while the agent’s policy refuses things: the closed line carries the count', async () => {
+    const { element, requests } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf(seeded));
     await settle();
     expect(requests).toEqual(['/agents/' + SCRIBE + '/policy']);
+    expect(element.querySelector('.rules-summary')?.textContent).toContain('No extra rules. This agent’s policy refuses 3 things.');
+    expect(button(element, 'Show every rule')).not.toBeNull();
+    expect(element.querySelector('section[aria-label="Refused"]')).toBeNull();
+  });
+  it('shows the rules the policy forces in the Refused list, locked and said to be the policy’s', async () => {
+    const { element } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf(seeded));
+    await settle();
+    await click(button(element, 'Show every rule'));
     const locked = [...element.querySelectorAll('section[aria-label="Refused"] li.locked')];
     expect(locked.map((entry) => entry.querySelector('code')?.textContent)).toEqual(['Read', 'Read(//srv/x)', 'Read(//srv/x/**)']);
     expect(locked.every((entry) => entry.textContent?.includes('from this agent’s policy') && entry.querySelector('button') === null)).toBe(true);
+    expect(element.querySelector('section[aria-label="Refused"]')?.textContent).not.toContain('Nothing.');
   });
-  it('says so when the policy cannot be read, and still shows the agent’s own rules', async () => {
+  it('says in the closed line when the policy cannot be read, and still shows the agent’s own rules', async () => {
     const { element } = await shown(claude, { default_mode: 'default', deny: ['WebSearch'] }, SCRIBE);
-    await click(button(element, 'Show every rule'));
     await settle();
+    expect(element.querySelector('.rules-summary')?.textContent).toContain('Lys could not read this agent’s policy, so what it refuses is not shown.');
+    await click(button(element, 'Show every rule'));
     const refused = element.querySelector('section[aria-label="Refused"]');
     expect(refused?.textContent).toContain('Lys could not read this agent’s policy');
     expect(refused?.textContent).toContain('WebSearch');
+  });
+  it('names a policy rule the start cannot write, and says the agent will not start until it is changed', async () => {
+    const { element } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf([hard('deny-glob-path', 'Glob', 'path_prefix', '/srv'), hard('deny-Read', 'Read', 'tool')]));
+    await settle();
+    expect(element.textContent).toContain('This policy rule cannot be written for Claude Code, so the agent will not start until it is changed: deny-glob-path');
+    expect(element.querySelector('.rules-summary')?.textContent).toContain('This agent’s policy refuses 1 thing.');
+  });
+  it('says a Codex agent whose policy has rules will not start, and where to remove them', async () => {
+    const { element } = await shown(codex, { default_mode: 'workspace-write' }, SCRIBE, policyOf(seeded));
+    await settle();
+    expect(element.textContent).toContain('This agent’s policy has 2 rules. Codex cannot carry them, so this agent will not start until they are removed from its policy.');
+    expect(element.querySelector('a[href="#/file/' + SCRIBE + '/policy"]')).not.toBeNull();
+  });
+  it('says nothing of a policy to a Codex agent whose policy has no hard rule', async () => {
+    const { element } = await shown(codex, { default_mode: 'workspace-write' }, SCRIBE, policyOf([seeded[2]]));
+    await settle();
+    expect(element.textContent).not.toContain('will not start');
+  });
+  it('says what must be removed before an agent with rules, extra folders or tools can start as Kept to its folder', async () => {
+    const { element } = await shown(claude, { default_mode: 'workspace-only', allow: ['WebSearch'], additional_directories: ['/srv/a'] }, undefined, {}, ['reader']);
+    expect(element.textContent).toContain('Kept to its folder cannot carry rules that run without asking or extra folders. Remove these before it can start as Kept to its folder.');
+    expect(element.textContent).toContain('These settings list tools, so it cannot start as Kept to its folder.');
+    await click(radio(element, 'permission-mode', 'default'));
+    expect(element.textContent).not.toContain('cannot start as Kept to its folder');
+    expect(element.textContent).not.toContain('Remove these before');
   });
   it('says Kept to its folder cannot carry rules that run without asking or extra folders', async () => {
     const { element } = await shown(claude, { default_mode: 'workspace-only' });
@@ -201,13 +233,16 @@ describe('Codex', () => {
 });
 
 describe('What the policy forces', () => {
-  it('is only its hard rules, written as the start writes them', () => {
+  it('is only its hard rules, written as the start writes them, with the ones it cannot write named by id', () => {
     expect(forcedBy([
       { id: 'a', tool: 'WebFetch', kind: 'host', target: 'example.org', authority: 'hard' },
       { id: 'b', tool: 'Edit', kind: 'path_prefix', target: '/', authority: 'hard' },
       { id: 'c', tool: 'Glob', kind: 'path_prefix', target: '/srv', authority: 'hard' },
       { id: 'd', tool: 'Read', kind: 'path_prefix', target: '/srv/[x]', authority: 'hard' },
-    ])).toEqual(['WebFetch(domain:example.org)', 'Edit(//)', 'Edit(///**)']);
+      { id: 'e', tool: 'Read', kind: 'host', target: 'example.org', authority: 'hard' },
+      { id: 'f', tool: 'Read', kind: 'tool', target: '/x', authority: 'hard' },
+      { id: 'g', tool: 'Bash', kind: 'tool', authority: { permission: { resource: { kind: 'agent', id: 'x' }, action: 'read' } } },
+    ])).toEqual({ written: ['WebFetch(domain:example.org)', 'Edit(//)', 'Edit(///**)'], unwritable: ['c', 'd', 'e', 'f'], hard: 6 });
   });
   it('takes the first sentence of a mode’s words and keeps the rest', () => {
     expect(firstSentence('One thing. Another thing.')).toEqual({ first: 'One thing.', rest: 'Another thing.' });

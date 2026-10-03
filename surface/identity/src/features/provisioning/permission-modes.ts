@@ -28,17 +28,29 @@ export function firstSentence(meaning: string): { first: string; rest: string } 
   return end < 0 ? { first: meaning, rest: '' } : { first: meaning.slice(0, end + 1), rest: meaning.slice(end + 1).trim() };
 }
 
+/** What an agent's policy does to a start: the rules it writes into the Refused list, the rules the start cannot write at all, and how many hard rules there are. */
+export interface Forced { written: string[]; unwritable: string[]; hard: number }
+
+/** A tool name the settings file reads: letters, digits and underscores, not starting with a digit (rendering_permissions.rs, `expressible`). */
+const named = (tool: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(tool);
+
 /**
- * What the agent's policy forces into the Refused list at a start: only its
- * hard rules, written as crates/lys-home/src/harness/rendering_permissions.rs
- * (lines 44 to 55) writes them. A rule that file refuses to write is left out.
+ * Only the policy's hard rules reach a start, written as
+ * crates/lys-home/src/harness/rendering_permissions.rs (`denied`, lines 41 to
+ * 73) writes them. A hard rule that file refuses makes the start itself
+ * fail, so it is returned by its id and never left out in silence.
  */
-export function forcedBy(rules: PolicyRule[]): string[] {
-  return rules.flatMap((rule) => {
-    if (rule.authority !== 'hard') return [];
-    if (rule.kind === 'tool' && rule.target === undefined) return [rule.tool];
-    if (rule.kind === 'path_prefix' && rule.target !== undefined && (rule.tool === 'Read' || rule.tool === 'Edit') && !/[*?[\]()\\!]/.test(rule.target)) return [rule.tool + '(/' + rule.target + ')', rule.tool + '(/' + rule.target + '/**)'];
-    if (rule.kind === 'host' && rule.target !== undefined && rule.tool === 'WebFetch') return ['WebFetch(domain:' + rule.target + ')'];
-    return [];
-  });
+export function forcedBy(rules: PolicyRule[]): Forced {
+  const forced: Forced = { written: [], unwritable: [], hard: 0 };
+  for (const rule of rules) {
+    if (rule.authority !== 'hard') continue;
+    forced.hard += 1;
+    const target = rule.target;
+    if (!named(rule.tool)) forced.unwritable.push(rule.id);
+    else if (rule.kind === 'tool' && target === undefined) forced.written.push(rule.tool);
+    else if (rule.kind === 'path_prefix' && target !== undefined && (rule.tool === 'Read' || rule.tool === 'Edit') && !/[*?[\]()\\!]/.test(target)) forced.written.push(rule.tool + '(/' + target + ')', rule.tool + '(/' + target + '/**)');
+    else if (rule.kind === 'host' && target !== undefined && rule.tool === 'WebFetch' && !/[()]/.test(target)) forced.written.push('WebFetch(domain:' + target + ')');
+    else forced.unwritable.push(rule.id);
+  }
+  return forced;
 }
