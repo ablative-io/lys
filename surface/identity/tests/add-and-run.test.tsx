@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
-import { $, serve, type } from './harness';
+import { $, serve, type, leaveTheReachReadOutOfPosted } from './harness';
+// These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
+leaveTheReachReadOutOfPosted();
 import { ADA, RECEIPTS, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 import type { Answer, Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';

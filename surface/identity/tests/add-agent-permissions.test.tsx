@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { ADA, BEA, COURIER, DIRECTORY, GRANTS, MODEL, RECEIPTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
-import { serve } from './harness';
+import { serve, leaveTheReachReadOutOfPosted } from './harness';
+// These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
+leaveTheReachReadOutOfPosted();
 
 let root: Root | null = null;
 beforeEach(() => sessionStorage.clear());

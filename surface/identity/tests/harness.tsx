@@ -23,6 +23,14 @@ export interface Mounted {
  * Stub the service: each /api path answers from `routes`, a change under
  * its method, "POST /path" or "PUT /path"; anything else 404 with no refusal.
  */
+/**
+ * The reach question is a read the service takes as a POST. A test file that lists exactly what a flow
+ * changed calls this once; from then that read is left out of `posted` and stays in `requests`. The
+ * files that check the reach read itself (graph, roles) do not call it.
+ */
+let reachIsARead = false;
+export function leaveTheReachReadOutOfPosted(): void { reachIsARead = true; }
+
 export function serve(routes: Record<string, Route>, posted: { path: string; body: unknown }[] = []): string[] {
   const requests: string[] = [];
   vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
@@ -32,7 +40,7 @@ export function serve(routes: Record<string, Route>, posted: { path: string; bod
     const body: unknown = post ? JSON.parse(String(init?.body)) : undefined;
     const key = post ? method + ' ' + path : path;
     requests.push(key);
-    if (post) posted.push({ path: method === 'POST' ? path : key, body });
+    if (post && !(reachIsARead && key === 'POST /grants/reach')) posted.push({ path: method === 'POST' ? path : key, body });
     if (method === 'GET' && path.startsWith('/changes') && !routes[key]) {
       if (path === '/changes') return new Response(JSON.stringify({ generation: 'op-' + '0'.repeat(32) }), { headers: { 'content-type': 'application/json' } });
       return new Promise<Response>((...callbacks) => {

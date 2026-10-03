@@ -1,6 +1,8 @@
 /** People and agents is the front page, and an agent's run is beside the list there: a running agent's terminal with Stop and Restart, a stopped agent started in place with one press, and what stops a start said in one sentence with the button that fixes it. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { $, $$, click, mount, text } from './harness';
+import { $, $$, click, mount, text, leaveTheReachReadOutOfPosted } from './harness';
+// These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
+leaveTheReachReadOutOfPosted();
 import { ADA, ARCHIVIST, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 import { mockTerminal } from './terminal-double';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));

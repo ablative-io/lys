@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
 import { ADA, BEA, COURIER, DIRECTORY, ME, RECEIPTS, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
-import { serve, type } from './harness';
+import { serve, type, leaveTheReachReadOutOfPosted } from './harness';
+// These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
+leaveTheReachReadOutOfPosted();
 
 const schema = (supports: boolean) => ok({
   paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/RegistrationBody' } } } } } } },
