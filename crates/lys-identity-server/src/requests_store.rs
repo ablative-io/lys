@@ -39,7 +39,7 @@ use lys_log_store::{
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
-use crate::requests_state::{DOMAIN, Held, pin_unpinned};
+use crate::requests_state::{DOMAIN, Held};
 
 /// A request as it was asked.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,15 +176,13 @@ pub struct RequestStore<S: LeafStore = FileLeafStore> {
     log: FrontierLog<S>,
     held: Held,
     start: Start,
-    adopted: u64,
     since_snapshot: u64,
     snapshot_failure: Option<String>,
     uncertain: bool,
 }
 
-/// A log opened and folded: the log, what it folds to, how it started, and
-/// how many unpinned leaves it adopted.
-type Opened<S> = (FrontierLog<S>, Held, Start, u64);
+/// A log opened and folded: the log, what it folds to and how it started.
+type Opened<S> = (FrontierLog<S>, Held, Start);
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
     ServerError::RequestsUnavailable {
@@ -205,12 +203,6 @@ impl RequestStore<FileLeafStore> {
             return Ok(None);
         };
         let store = Self::open(dir, key)?;
-        if store.adopted() > 0 {
-            say(&format!(
-                "requests log pinned {} leaves written before leaves were pinned",
-                store.adopted()
-            ));
-        }
         say(&format!(
             "requests log {}, holding {} requests",
             store.start(),
@@ -234,14 +226,13 @@ impl<S: LeafStore> RequestStore<S> {
     /// The requests kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
-        let (log, held, start, adopted) = opened(&reopen, &key)?;
+        let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
             reopen,
             key,
             log,
             held,
             start: start.clone(),
-            adopted,
             since_snapshot: 0,
             snapshot_failure: None,
             uncertain: false,
@@ -254,11 +245,6 @@ impl<S: LeafStore> RequestStore<S> {
     /// the refusal that sent it there.
     pub fn start(&self) -> &Start {
         &self.start
-    }
-
-    /// How many leaves written before leaves were pinned were pinned at open.
-    pub fn adopted(&self) -> u64 {
-        self.adopted
     }
 
     /// Why the last snapshot could not be written, while no later one was.
@@ -298,11 +284,10 @@ impl<S: LeafStore> RequestStore<S> {
     /// answered from memory and nothing is appended.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            let (log, held, start, adopted) = opened(&self.reopen, &self.key)?;
+            let (log, held, start) = opened(&self.reopen, &self.key)?;
             self.log = log;
             self.held = held;
             self.start = start.clone();
-            self.adopted += adopted;
             self.uncertain = false;
             self.after_start(&start);
         }
@@ -442,26 +427,21 @@ fn opened<S: LeafStore>(
     reopen: &Reopen<S>,
     key: &Ed25519Identity,
 ) -> Result<Opened<S>, ServerError> {
-    let mut store = reopen().map_err(unavailable)?;
-    let adopted = pin_unpinned(&mut store).map_err(unavailable)?;
+    let store = reopen().map_err(unavailable)?;
     let started =
         open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
     let mut held = match started.state.as_deref().map(Held::decode) {
         None => Held::default(),
         Some(Ok(held)) => held,
-        Some(Err(reason)) => return rebuilt(reopen, reason, adopted),
+        Some(Err(reason)) => return rebuilt(reopen, reason),
     };
     held.fold(&started.tail).map_err(unavailable)?;
-    Ok((started.log, held, started.start, adopted))
+    Ok((started.log, held, started.start))
 }
 
 /// Open the log from every leaf, because the snapshot's state was refused
 /// for `reason`.
-fn rebuilt<S: LeafStore>(
-    reopen: &Reopen<S>,
-    reason: String,
-    adopted: u64,
-) -> Result<Opened<S>, ServerError> {
+fn rebuilt<S: LeafStore>(reopen: &Reopen<S>, reason: String) -> Result<Opened<S>, ServerError> {
     let (log, tail) = FrontierLog::open(reopen().map_err(unavailable)?).map_err(unavailable)?;
     let mut held = Held::default();
     held.fold(&tail).map_err(unavailable)?;
@@ -470,7 +450,7 @@ fn rebuilt<S: LeafStore>(
         refusal: SnapshotRefusal::StateUnreadable { reason },
         replayed,
     };
-    Ok((log, held, start, adopted))
+    Ok((log, held, start))
 }
 
 fn held(kept: &Intended) -> ServerError {

@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use lys_log_store::{Frontier, LeafStore, PinnedRoot, StoreError, StoreResult, Tail};
+use lys_log_store::Tail;
 use serde::{Deserialize, Serialize};
 
 use crate::requests_store::{Asked, Decided, Intended, Line};
@@ -123,26 +123,4 @@ impl Held {
         }
         Ok(sealed.held)
     }
-}
-
-/// Pin the leaves of a requests log written before its leaves were pinned:
-/// such a log holds leaves and no pin, and no snapshot. Answers how many
-/// leaves were pinned, zero when the log needed none.
-pub(crate) fn pin_unpinned<S: LeafStore>(store: &mut S) -> StoreResult<u64> {
-    let extent = store.extent();
-    if store.pinned().tree_size != 0 || extent < 2 || store.snapshot()?.is_some() {
-        return Ok(0);
-    }
-    let mut frontier = Frontier::new();
-    for index in 0..extent {
-        let bytes = store
-            .leaf(index)?
-            .ok_or(StoreError::LeafMissingWithinExtent { index, extent })?;
-        frontier.push(&bytes);
-    }
-    store.pin(PinnedRoot {
-        tree_size: frontier.size(),
-        root: frontier.root(),
-    })?;
-    Ok(extent)
 }

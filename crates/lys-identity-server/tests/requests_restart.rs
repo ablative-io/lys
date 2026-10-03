@@ -6,8 +6,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_identity_server::requests_store::{Asked, ORIGIN, RequestStore};
-use lys_log_store::{FileLeafStore, LeafStore, Start};
+use lys_identity_server::requests_store::{Asked, RequestStore};
+use lys_log_store::Start;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -85,30 +85,5 @@ fn a_snapshot_from_another_key_is_refused_and_every_leaf_is_read() -> TestResult
         store.start()
     );
     assert_eq!(store.requests().count(), 1);
-    Ok(())
-}
-
-#[test]
-fn leaves_written_before_pinning_are_pinned_once_and_kept() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let path = dir.path().join("requests");
-    let mut leaves = FileLeafStore::create(&path, ORIGIN)?;
-    for (index, id) in (0..).zip(["op-1", "op-2", "op-3"]) {
-        let mut line = serde_json::to_value(asked(id))?;
-        line.as_object_mut()
-            .ok_or("an asked request is an object")?
-            .insert("line".to_owned(), "asked".into());
-        leaves.put_leaf(index, &serde_json::to_vec(&line)?)?;
-    }
-    drop(leaves);
-
-    let store = RequestStore::open(&path, key(dir.path())?)?;
-    assert_eq!(store.adopted(), 3);
-    assert_eq!(store.requests().count(), 3);
-    drop(store);
-
-    let store = RequestStore::open(&path, key(dir.path())?)?;
-    assert_eq!(store.adopted(), 0);
-    assert_eq!(store.requests().count(), 3);
     Ok(())
 }
