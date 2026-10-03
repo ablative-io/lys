@@ -9,7 +9,7 @@ export interface StartAnswer {
 }
 export interface Pending {
   stage: 'profile' | 'review' | 'start'; path: string; body: Record<string, unknown>;
-  machine: string; version: number; legacyKey?: string;
+  machine: string; version: number;
 }
 function same(left: unknown, right: unknown): boolean {
   if (left === right) return true;
@@ -27,7 +27,8 @@ function fail(name: string, words: string): never { throw new Error(name + ': ' 
 function record(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
 function member(value: unknown, name: string): unknown { return record(value) ? value[name] : undefined; }
 
-export function pendingStartOf(value: unknown, key: string, prefix: string): Pending {
+/** A kept request read back: it must name this agent's own address for its stage, one operation, one computer and one version, or it is refused by name. */
+export function pendingStartOf(value: unknown, prefix: string): Pending {
   if (!record(value) || !record(value.body)) return fail('PendingStartUnreadable', 'The retained start is not a request.');
   if (value.stage !== 'profile' && value.stage !== 'review' && value.stage !== 'start') return fail('PendingStartUnreadable', 'The retained request has no recognized stage.');
   if (typeof value.version !== 'number' || !Number.isInteger(value.version) || value.version < 0) return fail('PendingStartUnreadable', 'The retained request has no valid version.');
@@ -35,10 +36,7 @@ export function pendingStartOf(value: unknown, key: string, prefix: string): Pen
   if (value.path !== path || typeof value.body.operation !== 'string' || !/^op-[0-9a-f]{32}$/.test(value.body.operation) || typeof value.machine !== 'string' || !value.machine) return fail('PendingStartUnreadable', 'The retained start must be resolved before another request.');
   if (value.stage === 'start' && value.body.machine !== value.machine) return fail('PendingStartUnreadable', 'The retained start names two different computers.');
   if (value.stage === 'profile' && value.body.from_version !== value.version) return fail('PendingStartUnreadable', 'The retained save names two different versions.');
-  if (value.legacyKey !== undefined && typeof value.legacyKey !== 'string') return fail('PendingStartUnreadable', 'The retained request names an unreadable record.');
-  const legacyKey = value.legacyKey;
-  if (legacyKey !== undefined && !['provisioning', 'profile-review', 'start'].some((kind) => legacyKey === key.replace('agent-start', kind))) return fail('PendingStartUnreadable', 'The retained request names an unrelated record.');
-  return { stage: value.stage, path, body: value.body, machine: value.machine, version: value.version, legacyKey };
+  return { stage: value.stage, path, body: value.body, machine: value.machine, version: value.version };
 
 }
 

@@ -50,17 +50,16 @@ describe('The start request', () => {
 });
 
 describe('A kept request read back', () => {
-  const key = 'lys.pending.agent-start.person.' + SCRIBE;
   it('is returned as it was kept', () => {
-    expect(pendingStartOf(JSON.parse(JSON.stringify(kept)), key, prefix)).toEqual({ ...kept, legacyKey: undefined });
+    expect(pendingStartOf(JSON.parse(JSON.stringify(kept)), prefix)).toEqual(kept);
   });
   it('is refused by name when it is not a request', () => {
-    expect(() => pendingStartOf(null, key, prefix)).toThrow('PendingStartUnreadable');
+    expect(() => pendingStartOf(null, prefix)).toThrow('PendingStartUnreadable');
   });
   it('is refused when it names another agent\'s address', () => {
-    expect(() => pendingStartOf({ ...kept, path: '/agents/other/start-command' }, key, prefix)).toThrow('PendingStartUnreadable');
+    expect(() => pendingStartOf({ ...kept, path: '/agents/other/start-command' }, prefix)).toThrow('PendingStartUnreadable');
   });
   it('is refused when its body and its record name two computers', () => {
-    expect(() => pendingStartOf({ ...kept, machine: 'machine-two' }, key, prefix)).toThrow('PendingStartUnreadable');
+    expect(() => pendingStartOf({ ...kept, machine: 'machine-two' }, prefix)).toThrow('PendingStartUnreadable');
   });
 });

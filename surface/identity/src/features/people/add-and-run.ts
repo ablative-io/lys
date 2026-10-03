@@ -85,9 +85,9 @@ function addAndRunOf(value: unknown, person: string): AddAndRun {
   }
   if (!registration.agent || !registration.activated || registration.grants.some((entry) => entry.granted === null)) return unreadable();
   const prefix = '/agents/' + encodeURIComponent(registration.agent);
-  const pending = pendingStartOf(value.pending, 'lys.pending.agent-start.' + person + '.' + registration.agent, prefix);
+  const pending = pendingStartOf(value.pending, prefix);
   const expected = step === 'computer' || step === 'admission' ? 'start' : step;
-  if (pending.stage !== expected || pending.machine !== placementComputer(placement).id || pending.legacyKey !== undefined
+  if (pending.stage !== expected || pending.machine !== placementComputer(placement).id
     || placement.kind === 'existing' && placement.admission?.operation === pending.body.operation) return unreadable();
   return { version: 3, person, registration, settings: value.settings, step, placement, pending };
 }
