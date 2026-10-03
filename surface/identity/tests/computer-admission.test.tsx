@@ -59,20 +59,6 @@ function plain(code: string, words: string) {
   expect(face.textContent).toContain(words);
 }
 
-function startService(runner: boolean) {
-  const description = { models: { minimum: 1, maximum: null, further_encoding: { kind: 'array' } }, permissions: { modes: ['default'], rule_forms: [] }, mcp: { transports: ['stdio'], working_directory: false, handle_variables: false, channel_policies: ['off'] }, rendering_contract: 'test' };
-  const harness = { name: 'Program', description, program: '/opt/bin/program', package: 'program' };
-  const profile = { version: 1, operation: 'op-' + 'a'.repeat(32), harness, model_access: ['default'], permissions: { default_mode: 'default' }, instructions: '', tools: [], skills: [], mcp_servers: [], note: '', set_by: ADA, set_at: 1, reviewed_by: ADA, session: null };
-  return service({ '/network': ok({ machines: [{ ...machine, may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] }], reports_served: true }),
-    '/harnesses': ok({ programs: [{ name: harness.name, description, models: [{ id: 'default', label: 'Default' }], modes: [{ id: 'default', meaning: 'Default' }], builds: [{ name: 'Installed', program: harness.program, package: harness.package, from: 'profile' }] }] }),
-    [prefix + '/provisioning']: ok({ agent: SCRIBE, profile, versions: [], enforced: false }),
-    ['POST ' + prefix + '/start-command']: (body) => {
-      const session = (body as Body).operation;
-      return ok({ agent: SCRIBE, machine: id, runtime: 'lys-runner', session, provisioning_version: 1, harness: 'Program', executed: false, command: 'program', left_out: [], ...(runner ? { runner: { session, state: 'running', pid: 42, started_at: 1 } } : {}) });
-    },
-  });
-}
-
 describe('Choosing where an agent can run', () => {
   it('lists every in-use computer by name, leaves retired computers out and explains one without a runtime', async () => {
     const { posted, requests } = await open(service({ '/network': ok({ machines: [machine, { ...machine, id: 'op-' + '2'.repeat(32), name: 'Second computer', may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] }, { ...machine, id: 'op-' + '3'.repeat(32), name: 'No runtime', runtime: null }, { ...machine, id: 'op-' + '4'.repeat(32), name: 'Retired computer', state: 'retired' }], reports_served: true }) }));
@@ -194,7 +180,7 @@ describe('Choosing where an agent can run', () => {
     };
     const { posted } = await open(routes);
     const add = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Add this computer');
-    if (!add) throw new Error('The empty Start page has no add-computer action');
+    if (!add) throw new Error('The settings page with no computer has no add-computer action');
     await act(async () => { add.click(); });
     const form = $('form[aria-label="Add a computer"]');
     const input = form?.querySelector<HTMLInputElement>('[name="name"]');
@@ -206,32 +192,9 @@ describe('Choosing where an agent can run', () => {
     expect(posted[0].body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Ward computer', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [SCRIBE], may_run_roles: [], may_reach: [] });
     const computer = (posted[0].body as NameMachine).operation;
     expect(posted[1]).toEqual({ path: '/network/machines/' + computer + '/runner', body: { runner: { kind: 'lys' } } });
-    expect($('select[name="machine"]')?.getAttribute('name')).toBe('machine');
-    expect(($('select[name="machine"]') as HTMLSelectElement | null)?.value).toBe(computer);
+    expect(tick(computer).checked).toBe(true);
+    expect($('select[name="machine"]')).toBeNull();
     expect($('form[aria-label="Add a computer"]')).toBeNull();
     expect(location.hash).toBe('#/file/' + SCRIBE + '/provisioning');
-  });
-
-  it('says no runner ran an admitted start when the start answer has no runner', async () => {
-    const { posted } = await open(startService(false));
-    const button = $('[aria-label="Start this agent"] button[type="submit"]');
-    if (!button) throw new Error('The Start button is missing');
-    await act(async () => { button.click(); });
-    expect(posted).toHaveLength(1);
-    expect(document.body.textContent).toContain('Lys admitted the start, but no runner ran it');
-    expect(document.body.textContent).toContain('RunnerStartUnconfirmed');
-    expect(document.body.textContent).not.toContain('Started on');
-    plain('RunnerStartUnconfirmed', 'Lys admitted the start, but no runner ran it');
-  });
-
-  it('shows started only with the confirmed runner session and links that exact session', async () => {
-    const { posted } = await open(startService(true));
-    const button = $('[aria-label="Start this agent"] button[type="submit"]');
-    if (!button) throw new Error('The Start button is missing');
-    await act(async () => { button.click(); });
-    expect(posted).toHaveLength(1);
-    expect(document.body.textContent).toContain('Started on Ward computer. Its Lys runner has it running.');
-    expect($('[aria-label="Start this agent"] a[href^="#/runtime/"]')?.getAttribute('href')).toBe('#/runtime/' + (posted[0].body as Body).operation);
-    expect(document.body.textContent).not.toContain('no runner ran it');
   });
 });

@@ -3,14 +3,14 @@ import type { ReactNode } from 'react';
 import type { Choices } from './choices';
 import type { ProvisioningProfile } from './Provisioning';
 import { FolderChooser } from './FolderChooser';
-import { StartAgent } from '../runtime/StartAgent';
+import { SaveSettings } from './SaveSettings';
 import type { PeopleView } from '../../generated';
 
 export function ProfileEditor({ id, profile, choices, people, readOnly = false }: {
   id: string; profile: ProvisioningProfile | null; choices: Choices; people: PeopleView; readOnly?: boolean;
 }) {
-  return <ProfileFields profile={profile} choices={choices} canChoose={!readOnly} render={(fields, settings, refusal) => <section className="card" aria-label="Start this agent">
-    {fields}<StartAgent agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} known={{ people, machines: choices.machines }} />
+  return <ProfileFields profile={profile} choices={choices} canChoose={!readOnly} render={(fields, settings, refusal) => <section className="card" aria-label="Settings of this agent">
+    {fields}<SaveSettings agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} people={people} machines={choices.machines} />
   </section>} />;
 }
 
@@ -53,7 +53,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],
     tools: profile?.tools ?? [], skills: profile?.skills ?? [], mcp_servers: profile?.mcp_servers ?? [],
-    instructions: prompt === 'keep' ? !promptChanged && profile ? profile.instructions : '' : instructions.trim(), note: 'Start this agent',
+    instructions: prompt === 'keep' ? !promptChanged && profile ? profile.instructions : '' : instructions.trim(), note: 'Settings saved from the settings form',
     harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
     ...(profile?.runs_on ? { runs_on: profile.runs_on } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),

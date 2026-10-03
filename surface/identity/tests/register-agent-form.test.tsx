@@ -37,7 +37,7 @@ async function registration(start = false) {
   const mounted = createRoot(container);
   root = mounted;
   await act(async () => { mounted.render(<App />); });
-  const form = document.querySelector<HTMLElement>(start ? 'section[aria-label="Start this agent"]' : 'form[aria-label="Add an agent"]');
+  const form = document.querySelector<HTMLElement>(start ? 'section[aria-label="Settings of this agent"]' : 'form[aria-label="Add an agent"]');
   if (!form) throw new Error('Registration form is missing');
   return { form, posted };
 }
@@ -60,9 +60,9 @@ describe('Agent registration choices', () => {
     expect(posted).toEqual([]);
   });
 
-  it('offers the real computer and model on Start', async () => {
+  it('offers the real model on the settings form, and no computer to start on', async () => {
     const { form, posted } = await registration(true);
-    expect(choice(form, 'machine', 'Computer this agent runs on').value).toBe(computer);
+    expect(form.querySelector('select[name="machine"]')).toBeNull();
     expect(choice(form, 'model', 'Model this agent uses').textContent).toContain('Care model');
     expect(form.textContent).not.toContain(computer);
     expect(posted).toEqual([]);
