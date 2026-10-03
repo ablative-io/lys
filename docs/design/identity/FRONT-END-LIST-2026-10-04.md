@@ -20,8 +20,8 @@ C. Limits and goals as tables
 12. Remove the 64-limit cap and the 500-character cap in the page unless you say keep them.
 
 D. Nothing scrolls; the page is used
-13. Remove `.screen {overflow:auto}` and the scrolling panes. Every page fits 1440x900 and reflows to the window.
-14. Lists page by the height they have (previous / next, page n of m) in place of "Show 25 more" and scrolling.
+13. No page scrolls as a whole, ever (Tom, 4 Oct: "I don't want to see any free scrolling page… it should be only individual components that scroll"). The screen never scrolls; every page fills the window; only a component inside it (a table, a list, a form's pane, a terminal) scrolls on its own.
+14. A long list scrolls inside its own component with its header kept in view; the page around it stays still.
 15. Tables wrap or drop to a second line rather than being cut by a side pane; the side pane that only repeats the selected row is deleted on every page (People, Access, Resources, Requests, Reviews, Secrets, Computers, Service accounts).
 16. Every `<details>` fold (44 in 29 files) is removed: its content shown in place or deleted. Errors use the one-sentence-one-button pattern already in CannotStart.
 

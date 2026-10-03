@@ -1,6 +1,10 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
-.screen { flex: 1; overflow: auto; overscroll-behavior: none; position: relative; }
-.page { padding: 26px 32px 64px; }
+/* No page scrolls as a whole (Tom, 4 Oct 2026). The screen never scrolls; every page fills the window, and only a component inside it (a table, a list, a form's pane, a terminal) scrolls on its own. */
+.screen { flex: 1; min-width: 0; overflow: hidden; overscroll-behavior: none; position: relative; }
+.page { height: 100%; box-sizing: border-box; padding: 26px 32px 18px; display: flex; flex-direction: column; overflow: hidden; }
+.page > .head, .page > .eyebrow, .page > h1, .page > .sub, .page > .tabs, .page > .stat-strip, .page > .tools, .page > a { flex: none; }
+/* What a page holds below its head is its one scrolling component unless the page lays out its own. */
+.page:not(.fill) > form, .page:not(.fill) > .pane, .page:not(.fill) > .card, .page:not(.fill) > section, .page:not(.fill) > .directory-editor, .page:not(.fill) > [data-page-body] { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .eyebrow { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); }
 .eyebrow a { text-decoration: none; }
 h1 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; margin: 6px 0 4px; }
@@ -87,8 +91,7 @@ ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
 .check .answer { min-height: 40px; display: flex; gap: 14px; align-items: center; margin-top: 12px; }
 .check .why { color: var(--text-secondary); font-size: 12px; }
 
-/* A page fills the window and never scrolls; its list and its detail each scroll on their own. */
-.page.fill { height: 100%; box-sizing: border-box; padding-bottom: 18px; display: flex; flex-direction: column; overflow: hidden; }
+/* A page's list and its detail each scroll on their own. */
 .fill > .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; }
 .fill > .body.one { grid-template-columns: minmax(0, 1fr); }
 /* Where the pane beside the list is where the work is done, it gets the larger share. */
