@@ -10,7 +10,7 @@ import { CannotStart } from '../runtime/CannotStart';
 import type { StartRefusal } from '../runtime/CannotStart';
 import { pendingStartOf, profileRequest, startRequest } from '../runtime/start-requests';
 import type { Pending } from '../runtime/start-requests';
-import { answeredNo } from '../../kept';
+import { sendKept } from '../../kept';
 
 /** A refusal as the service named it; a failure the screen found itself keeps the name it was thrown with. */
 function refusalOf(error: unknown): StartRefusal {
@@ -74,21 +74,20 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
         : pendingStartOf(JSON.parse(raw), prefix);
       for (;;) {
         if (current.stage === 'review' && !mayReview) throw new Error('NotAdmitted: The person it answers to or an administrator must approve its settings before it starts.');
-        sessionStorage.setItem(key, JSON.stringify(current));
-        if (current.stage === 'start') {
-          const receipt = await startRequest(agent, current);
-          sessionStorage.removeItem(key);
+        const sent = current;
+        if (sent.stage === 'start') {
+          const receipt = await sendKept(key, sent, () => startRequest(agent, sent), true);
           if (receipt.runner?.state === 'running') changed(); else setEnded(receipt.session);
           return;
         }
-        const confirmed = await profileRequest(agent, current);
+        const confirmed = await sendKept(key, sent, () => profileRequest(agent, sent), true);
         current = current.stage === 'profile' && !confirmed.profile.reviewed_by ? review(confirmed.version, current.machine) : start(confirmed.version, current.machine);
       }
     } catch (error) {
       // A kept request that cannot be read can never be sent again, so it is dropped, and said: the next press
       // sends a new one. That is safe here because Start is shown only while no run of this agent is live.
       const unreadable = error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('PendingStartUnreadable'));
-      if (answeredNo(error) || unreadable) sessionStorage.removeItem(key);
+      if (unreadable) sessionStorage.removeItem(key);
       setRefusal(unreadable ? { refusal: 'PendingStartUnreadable', reason: 'An earlier start from this tab could not be read back, so it was dropped. Try again sends a new one.' } : refusalOf(error));
     } finally { working.current = false; setBusy(false); }
   };

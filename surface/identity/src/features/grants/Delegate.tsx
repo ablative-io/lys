@@ -4,6 +4,7 @@ import { actionWords } from './action-words';
 import { pendingGrantKey, readPendingGrant, readPendingRest, restKey } from './pendingGrant';
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
+import { keptSend } from '../../kept';
 import type { DelegateBody, Grant, PassOn } from '../../generated/grants';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
@@ -29,8 +30,6 @@ type Outcome =
   | { at: 'refused'; refused: Refused }
   | { at: 'pending'; reason: string };
 
-/** Whether a failure leaves the change uncertain: kept pending under its operation, never retried as new. */
-const uncertain = (r: Refused) => r.status < 400 || r.status >= 500;
 
 /**
  * Give part of a grant to one of your agents, or to a person (conformance 2.1
@@ -95,33 +94,30 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
    */
   const sendOne = async (body: DelegateBody, retry: boolean): Promise<boolean> => {
     setOutcome({ at: 'sending' });
-    let submitted = false;
-    try {
-      sessionStorage.setItem(key, JSON.stringify(body));
+    const kept = await keptSend(key, body, async () => {
       setPending({ kind: 'held', body });
-      submitted = true;
       const answer = await api.delegate(body);
       if (answer.operation !== body.operation || answer.receipt?.caller !== me
         || typeof answer.grant !== 'string' || !/^grant-[0-9a-f]{32}$/.test(answer.grant)) {
         throw new Refused(200, { refusal: 'UnconfirmedAnswer', reason: 'The service did not confirm this grant operation. Its original details remain retained.' });
       }
-      try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch { unreleased.current = true; }
+      return answer;
+    }, !retry);
+    if (kept.at === 'confirmed') {
+      if (kept.unreleased) unreleased.current = true; else setPending({ kind: 'empty' });
       return true;
-    } catch (error) {
-      let refused = error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
-      if (!submitted && !retry) {
-        setPending({ kind: 'empty' });
-        setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'RequestNotRetained', reason: 'Nothing was sent because this browser could not retain the grant request: ' + refused.message }) });
-      } else if (retry || uncertain(refused)) {
-        setOutcome({ at: 'pending', reason: refused.refusal.reason });
-      } else {
-        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (release) {
-          refused = new Refused(refused.status, { refusal: refused.refusal.refusal, reason: refused.refusal.reason + ' The browser could not release the retained request; Check original grant will answer this same refusal, never a second grant: ' + String(release) });
-        }
-        setOutcome({ at: 'refused', refused });
-      }
-      return false;
     }
+    const refused = kept.error instanceof Refused ? kept.error : new Refused(0, { refusal: 'Unanswered', reason: String(kept.error) });
+    if (kept.at === 'unkept' && !retry) {
+      setPending({ kind: 'empty' });
+      setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'RequestNotRetained', reason: 'Nothing was sent because this browser could not retain the grant request: ' + refused.message }) });
+    } else if (kept.at === 'refused') {
+      if (!kept.unreleased) setPending({ kind: 'empty' });
+      setOutcome({ at: 'refused', refused: kept.unreleased ? new Refused(refused.status, { refusal: refused.refusal.refusal, reason: refused.refusal.reason + ' The browser could not release the retained request; Check original grant will answer this same refusal, never a second grant: ' + String(kept.unreleased) }) : refused });
+    } else {
+      setOutcome({ at: 'pending', reason: refused.refusal.reason });
+    }
+    return false;
   };
 
   /** The requests still to send after the retained one, written whole so a reload finishes the run exactly as it was ticked, never twice. */

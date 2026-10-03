@@ -8,7 +8,7 @@ import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import { matchesAsk } from './contract';
 import type { AccessRequest, Ask } from './contract';
-import { answeredNo } from '../../kept';
+import { keptSend } from '../../kept';
 
 type Pending = { kind: 'empty' } | { kind: 'damaged' } | { kind: 'held'; asked: Ask };
 
@@ -84,34 +84,38 @@ export function AskForm({ person, resources, model, changed }: {
     if (left.length) sessionStorage.setItem(restKey(key), JSON.stringify(left)); else sessionStorage.removeItem(restKey(key));
     setRest(left.length ? { kind: 'held', asks: [...left] } : { kind: 'empty' });
   };
+  /** A queued ask found already recorded is released without sending. */
   const finish = (recorded: AccessRequest) => {
     try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch {
       setFailure('Recorded, but the browser could not release the retained request; Check original request will confirm it again, never record it twice.');
     }
     changed(recorded);
   };
-  /** Retain one ask under the pending key: always before the rest is shortened, so no ask is ever both forgotten and unsent. */
+  /** The queue's place: the next ask goes under the pending key before the rest is shortened, so no ask is ever both forgotten and unsent. */
   const retain = (asked: Ask) => {
     sessionStorage.setItem(key, JSON.stringify(asked));
     setPending({ kind: 'held', asked });
   };
-  /** One ask, retained before it is sent and released only on the service's confirmation; true when confirmed. */
+  /** One ask, kept before it is sent and released only on the service's confirmation; true when confirmed. */
   const sendOne = async (asked: Ask, retry: boolean): Promise<boolean> => {
-    try {
-      retain(asked);
+    const kept = await keptSend(key, asked, async () => {
+      setPending({ kind: 'held', asked });
       const recorded = await request<AccessRequest>('/requests', asked);
       if (!matchesAsk(recorded, asked, person)) throw new Error('The answer did not confirm the request. Its original details are retained.');
-      finish(recorded);
+      return recorded;
+    }, !retry);
+    if (kept.at === 'confirmed') {
+      if (kept.unreleased) setFailure('Recorded, but the browser could not release the retained request; Check original request will confirm it again, never record it twice.');
+      else setPending({ kind: 'empty' });
+      changed(kept.answer);
       return true;
-    } catch (error) {
-      // A later refusal cannot undo an earlier uncertain admission.
-      let release = '';
-      if (!retry && answeredNo(error)) {
-        try { sessionStorage.removeItem(key); setPending({ kind: 'empty' }); } catch (failed) { release = ' The browser could not release the retained request; Check original request will answer this same refusal, never record a second: ' + String(failed); }
-      }
-      setFailure(failureWords(error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.') + release);
-      return false;
     }
+    // A later refusal cannot undo an earlier uncertain admission: only a first sending's no releases the request.
+    const unreleased = kept.at === 'refused' ? kept.unreleased : null;
+    if (kept.at === 'refused' && !unreleased) setPending({ kind: 'empty' });
+    setFailure(failureWords(kept.error, 'Check the request details. If its result is unconfirmed, choose Check original request; do not make a second request.')
+      + (unreleased ? ' The browser could not release the retained request; Check original request will answer this same refusal, never record a second: ' + String(unreleased) : ''));
+    return false;
   };
   /** The retained ask first, exactly as sent, then the rest exactly as ticked; stops at the first unconfirmed answer and keeps the rest for the retry. */
   const send = async (asked: Ask, retry: boolean, more: Ask[]) => {

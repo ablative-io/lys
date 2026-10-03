@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Refused, operationId, request } from '../../api';
+import { sendKept } from '../../kept';
 import { confirmReceipt } from '../people/recorded-receipt';
 import { SIGNED_IN, reasonOf } from '../sign-in/SignIn';
 import '../people/recorded-form.css';
@@ -222,17 +223,17 @@ export function Setup({ completed }: { completed: () => void }) {
     setError('');
     try {
       const body = pending ?? { operation: operationId(), display_name: name };
-      sessionStorage.setItem(STORAGE, JSON.stringify(body));
-      setPending(body);
-      const answer = await request<unknown>('/setup', body);
-      confirmReceipt(answer, body.operation, '/setup');
-      if (!answer || typeof answer !== 'object' || !('person' in answer) || !('receipt' in answer)
-        || !answer.receipt || typeof answer.receipt !== 'object' || !('identity' in answer.receipt)
-        || !('change_kind' in answer.receipt) || answer.person !== answer.receipt.identity
-        || answer.receipt.change_kind !== 7) {
-        throw new Error('The setup confirmation did not match your request. Retry to check the same request safely.');
-      }
-      sessionStorage.removeItem(STORAGE);
+      await sendKept(STORAGE, body, async () => {
+        setPending(body);
+        const answer = await request<unknown>('/setup', body);
+        confirmReceipt(answer, body.operation, '/setup');
+        if (!answer || typeof answer !== 'object' || !('person' in answer) || !('receipt' in answer)
+          || !answer.receipt || typeof answer.receipt !== 'object' || !('identity' in answer.receipt)
+          || !('change_kind' in answer.receipt) || answer.person !== answer.receipt.identity
+          || answer.receipt.change_kind !== 7) {
+          throw new Error('The setup confirmation did not match your request. Retry to check the same request safely.');
+        }
+      }, false);
       completed();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
