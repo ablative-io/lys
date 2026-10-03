@@ -39,6 +39,14 @@ async fn profile(table: &Table, agent: &str) -> Result<Value, Box<dyn Error>> {
         .as_object()
         .ok_or("fixture profile has no declared harness")?;
     let path = format!("/agents/{agent}/provisioning");
+    // The folder is named per agent and must exist: the runner starts the run
+    // in it and refuses an empty name rather than falling back to its own.
+    let working_folder = table.dir.path().join("work");
+    std::fs::create_dir_all(&working_folder)?;
+    let working_folder = working_folder
+        .to_str()
+        .ok_or("the working folder's path is not UTF-8")?
+        .to_owned();
     table
         .ok(
             &path,
@@ -47,6 +55,7 @@ async fn profile(table: &Table, agent: &str) -> Result<Value, Box<dyn Error>> {
                 "model_access": ["claude-fable-5-1"], "tools": [], "skills": [], "mcp_servers": [],
                 "instructions": "", "instructions_mode": "keep", "note": "Start this agent",
                 "harness": harness, "permissions": { "default_mode": "plan" },
+                "working_folder": working_folder,
             }),
         )
         .await?;
