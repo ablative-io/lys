@@ -16,7 +16,7 @@
 //! code — and explicitly not *platform*: one machine, one toolchain, one
 //! dependency resolution.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use lys_core::Ed25519Identity;
@@ -516,26 +516,34 @@ fn ok_keys(output: &Output) -> Vec<String> {
     keys
 }
 
+/// The first segment file of the anchor's log (LYSLOGSTORE-008 R1).
+fn first_segment(dir: &Path) -> std::path::PathBuf {
+    dir.join("leaves")
+        .join("segments")
+        .join(format!("{:020}", 0))
+}
+
 #[test]
-fn status_names_a_leftover_temporary_leaf_file_on_stderr_only() {
+fn status_names_a_cut_unfinished_append_on_stderr_only() {
+    use std::io::Write;
     let fixture = example_anchor();
     let clean_keys = ok_keys(&status(&fixture, true));
     let clean = status(&fixture, false);
     assert_eq!(clean.status.code(), Some(0));
     assert!(
-        stderr_lines_starting(&clean, "ignored leftover temporary leaf files").is_empty(),
+        stderr_lines_starting(&clean, "cut an unfinished append").is_empty(),
         "{}",
         String::from_utf8_lossy(&clean.stderr)
     );
 
-    std::fs::write(
-        fixture
-            .dir
-            .join("leaves")
-            .join(".4242-00000000000000000001-0.tmp"),
-        b"partial",
-    )
-    .unwrap();
+    // Seven bytes of a record that never reached its flush.
+    let segment = first_segment(&fixture.dir);
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&segment)
+        .unwrap();
+    file.write_all(&[7, 0, 0, 0, b'l', b'e', b'a']).unwrap();
+    drop(file);
     let planted = status(&fixture, false);
     assert_eq!(
         planted.status.code(),
@@ -543,37 +551,54 @@ fn status_names_a_leftover_temporary_leaf_file_on_stderr_only() {
         "{}",
         String::from_utf8_lossy(&planted.stderr)
     );
-    assert_eq!(
-        stderr_lines_starting(&planted, "ignored leftover temporary leaf files"),
-        ["ignored leftover temporary leaf files: .4242-00000000000000000001-0.tmp"]
+    let notices = stderr_lines_starting(&planted, "cut an unfinished append");
+    assert_eq!(notices.len(), 1, "{notices:?}");
+    assert!(
+        notices[0].contains("7 bytes after offset"),
+        "{}",
+        notices[0]
     );
     assert!(
-        !String::from_utf8_lossy(&planted.stdout).contains("ignored leftover"),
+        !String::from_utf8_lossy(&planted.stdout).contains("cut an unfinished"),
         "the notice goes to stderr only"
     );
 
+    let again = status(&fixture, false);
+    assert!(
+        stderr_lines_starting(&again, "cut an unfinished append").is_empty(),
+        "the cut was made once: {}",
+        String::from_utf8_lossy(&again.stderr)
+    );
     let planted_json = status(&fixture, true);
     assert_eq!(
         ok_keys(&planted_json),
         clean_keys,
-        "a leftover temporary file adds no --json field"
+        "a cut tail adds no --json field"
     );
 }
 
 #[test]
-fn status_refuses_a_torn_genesis_leaf_inside_the_pinned_prefix() {
+fn status_refuses_a_damaged_genesis_record_and_says_what_it_cut() {
+    // The genesis leaf is the only record, so damaging one byte of it fails
+    // the last record's CRC; the open cuts it by the brief's rule, says so on
+    // stderr, and the anchor is then refused for having no genesis leaf. The
+    // one thing that never happens is a quiet open over a damaged record.
     let fixture = example_anchor();
-    std::fs::write(
-        fixture.dir.join("leaves").join(format!("{:020}", 0)),
-        b"gen",
-    )
-    .unwrap();
-    let state_before = std::fs::read(fixture.dir.join("state.json")).unwrap();
+    let segment = first_segment(&fixture.dir);
+    let mut bytes = std::fs::read(&segment).unwrap();
+    bytes[4] ^= 0x01;
+    std::fs::write(&segment, bytes).unwrap();
     let refused = status(&fixture, false);
-    let state_after = std::fs::read(fixture.dir.join("state.json")).unwrap();
     assert_eq!(
         refused.status.code(),
         Some(1),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    let notices = stderr_lines_starting(&refused, "cut an unfinished append");
+    assert_eq!(
+        notices.len(),
+        1,
         "{}",
         String::from_utf8_lossy(&refused.stderr)
     );
@@ -584,15 +609,5 @@ fn status_refuses_a_torn_genesis_leaf_inside_the_pinned_prefix() {
         "{}",
         String::from_utf8_lossy(&refused.stderr)
     );
-    let expected_start = format!(
-        "error: anchor directory invalid: {}: stored leaves rebuild to tree size 1 with root ",
-        fixture.dir.display()
-    );
-    assert!(errors[0].starts_with(&expected_start), "{}", errors[0]);
-    assert!(
-        errors[0].contains(", but the pinned state is tree size 1 with root "),
-        "{}",
-        errors[0]
-    );
-    assert_eq!(state_before, state_after, "a refused open writes no pin");
+    assert!(errors[0].contains("genesis"), "{}", errors[0]);
 }

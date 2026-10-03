@@ -24,14 +24,14 @@
 //! the success object — always present, `null` when the log opened clean, so a
 //! consumer can tell "no repair" from "an older binary that never reported one".
 //!
-//! # Leftover temporary leaf files go to stderr only
+//! # An unfinished append the open cut goes to stderr only
 //!
-//! `FileLeafStore::open` returns the names of the temporary leaf files an
-//! interrupted append left in `leaves/`, and this layer prints them in one
-//! stderr line, straight after the store opens. Unlike `recovered_to` they are
-//! **not** a `--json` field: the success object's keys are a contract with its
-//! consumers, and a leftover temporary file changes nothing about the anchor —
-//! it is not a leaf, not an error, and not removed.
+//! `FileLeafStore::open` cuts the torn tail after the last whole record that
+//! carries a pin (LYSLOGSTORE-008 R1) and answers what it cut, and this layer
+//! prints it in one stderr line, straight after the store opens. Unlike
+//! `recovered_to` it is **not** a `--json` field: the success object's keys
+//! are a contract with its consumers, and a cut tail changes nothing about
+//! the anchor — nothing in it was ever acknowledged.
 //!
 //! # The disclosure this module carries, and why it is a constant
 //!
@@ -114,8 +114,8 @@ pub fn create<P: AdmissionPolicy>(
         .map_err(|err| anchor_failure(dir, err))
 }
 
-/// Opens the anchor at `dir`, reporting the leftover temporary leaf files the
-/// store skipped and an interrupted append that was repaired.
+/// Opens the anchor at `dir`, reporting the unfinished append the store cut
+/// and an interrupted append that was repaired.
 ///
 /// # Errors
 ///
@@ -125,7 +125,7 @@ pub fn create<P: AdmissionPolicy>(
 /// genesis leaf, and [`CliError::Io`] on filesystem failure.
 pub fn open<P: AdmissionPolicy>(dir: &Path, key: &Path, policy: P) -> CliResult<FileAnchor<P>> {
     let store = FileLeafStore::open(dir)?;
-    if let Some(line) = leftover_temporaries_line(&store.leftover_temporaries()?) {
+    if let Some(line) = unfinished_tail_line(store.unfinished_tail()) {
         eprintln!("{line}");
     }
     let signer = FileSigner::load(key)?;
@@ -137,19 +137,20 @@ pub fn open<P: AdmissionPolicy>(dir: &Path, key: &Path, policy: P) -> CliResult<
     Ok(anchor)
 }
 
-/// The stderr line naming the leftover temporary leaf files a store skipped at
-/// open, in the order given, or `None` when there were none.
+/// The stderr line naming the unfinished append a writable open cut, or
+/// `None` when the log ended on a whole record.
 ///
 /// The same line `lys log` prints, so an operator running both tools over the
 /// same kind of directory reads one sentence.
-fn leftover_temporaries_line(names: &[String]) -> Option<String> {
-    if names.is_empty() {
-        return None;
-    }
-    Some(format!(
-        "ignored leftover temporary leaf files: {}",
-        names.join(", ")
-    ))
+fn unfinished_tail_line(tail: Option<&lys_log_store::UnfinishedTail>) -> Option<String> {
+    tail.map(|tail| {
+        format!(
+            "cut an unfinished append: {} bytes after offset {} of {}",
+            tail.bytes,
+            tail.offset,
+            tail.segment.display()
+        )
+    })
 }
 
 /// The signed-note verifier key string a third party needs to check anything
