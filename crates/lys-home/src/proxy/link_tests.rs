@@ -57,11 +57,14 @@ fn both_spellings_of_the_key_are_read_and_an_unsafe_one_links_nothing() {
 }
 
 #[test]
-fn a_metadata_value_over_the_budget_links_nothing() {
-    let padding = "p".repeat(METADATA_BUDGET);
+fn a_metadata_value_beyond_the_old_budget_links_at_each_frame_split() {
+    let padding = "p".repeat(METADATA_BUDGET * 8);
     let user_id = format!("user_{padding}_account_a1_session_{KEY}");
     let body = json!({"metadata": {"user_id": user_id}});
-    assert_eq!(scan(body.to_string().as_bytes(), 64), Link::Unlinked);
+    let body = body.to_string();
+    for step in [1, 64, 4096, body.len()] {
+        assert_eq!(scan(body.as_bytes(), step), Link::Session(KEY.to_owned()));
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -121,4 +124,27 @@ async fn a_keyed_call_is_recorded_whole_without_a_capture_allowance() -> Res {
     );
     assert_eq!(harness.home()?.session_ids()?, vec![KEY.to_owned()]);
     Ok(())
+}
+
+#[test]
+fn long_other_keys_and_metadata_fields_do_not_hide_the_session() -> Res {
+    let mut body = serde_json::Map::new();
+    body.insert("a".repeat(65536), json!("unrelated"));
+    body.insert("metadata".to_owned(), json!({
+        "padding": "p".repeat(65536),
+        "user_id": format!("user_device_account_account_session_{KEY}"),
+    }));
+    let bytes = serde_json::to_vec(&body)?;
+    assert_eq!(scan(&bytes, 17), Link::Session(KEY.to_owned()));
+    Ok(())
+}
+
+#[test]
+fn the_first_metadata_value_keeps_its_link_when_more_frames_arrive() {
+    let first = format!("{{\"metadata\":{{\"user_id\":\"user_device_session_{KEY}\"}},");
+    let mut scanner = KeyScanner::new();
+    scanner.feed(first.as_bytes());
+    assert_eq!(scanner.link(), Link::Session(KEY.to_owned()));
+    scanner.feed(b"\"metadata\":{\"user_id\":\"invalid\"}}");
+    assert_eq!(scanner.link(), Link::Session(KEY.to_owned()));
 }

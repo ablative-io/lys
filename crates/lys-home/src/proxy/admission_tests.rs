@@ -29,7 +29,7 @@ async fn request(address: SocketAddr) -> TestResult<Vec<u8>> {
 }
 
 #[tokio::test]
-async fn slow_connections_have_a_fixed_bound_and_saturation_is_named() -> TestResult {
+async fn all_connections_beyond_the_old_limit_are_answered() -> TestResult {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let handled = Arc::new(AtomicUsize::new(0));
@@ -38,26 +38,40 @@ async fn slow_connections_have_a_fixed_bound_and_saturation_is_named() -> TestRe
         seen.fetch_add(1, Ordering::SeqCst);
         async { refusal(StatusCode::OK, "forwarded") }
     }));
-    let mut slow = Vec::with_capacity(CONNECTION_LIMIT);
-    for _ in 0..CONNECTION_LIMIT {
+    let mut slow = Vec::with_capacity(CONNECTION_LIMIT * 2);
+    for _ in 0..CONNECTION_LIMIT * 2 {
         let mut stream = TcpStream::connect(address).await?;
         stream.write_all(b"GET / HTTP/1.1\r\nHost: ").await?;
         slow.push(stream);
     }
     let answer = request(address).await?;
-    drop(slow);
+    let answer = String::from_utf8(answer)?;
+    assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+    assert!(answer.ends_with("forwarded\n"), "{answer}");
+    let mut completed = tokio::task::JoinSet::new();
+    for mut stream in slow {
+        completed.spawn(async move {
+            stream.write_all(b"localhost\r\nConnection: close\r\n\r\n").await?;
+            let mut answer = Vec::new();
+            stream.read_to_end(&mut answer).await?;
+            let answer = String::from_utf8(answer)?;
+            assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+            assert!(answer.ends_with("forwarded\n"), "{answer}");
+            TestResult::Ok(())
+        });
+    }
+    while let Some(done) = completed.join_next().await {
+        done??;
+    }
+    assert_eq!(handled.load(Ordering::SeqCst), CONNECTION_LIMIT * 2 + 1);
     serving.abort();
     let stopped = serving.await;
     assert!(stopped.is_err_and(|error| error.is_cancelled()));
-    let answer = String::from_utf8(answer)?;
-    assert!(answer.starts_with("HTTP/1.1 503"), "{answer}");
-    assert!(answer.contains("proxy_connections_full"), "{answer}");
-    assert_eq!(handled.load(Ordering::SeqCst), 0);
     Ok(())
 }
 
 #[tokio::test]
-async fn completed_connections_return_their_slots() -> TestResult {
+async fn completed_connections_leave_the_listener_ready() -> TestResult {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let serving = tokio::spawn(serve(listener, |_| async {
