@@ -21,6 +21,7 @@ use crate::record::Session;
 use crate::record::blocks::{BlockStore, Hash, Put};
 use crate::record::entries::{CUSTOM_CALL, EntryBody};
 
+pub(crate) mod captured;
 mod parts;
 
 use parts::{complete_response_parts, read_json, request_parts_of};
@@ -101,6 +102,8 @@ pub struct CallRecord {
     pub duration_ms: Option<u64>,
     /// Whether the response was streamed.
     pub stream: bool,
+    /// Capture measurements; absent for calls imported outside the proxy.
+    pub capture: Option<captured::CaptureTiming>,
 }
 
 /// What an ingest reported: counts only.
@@ -205,6 +208,7 @@ pub fn ingest_call(
         started_at: meta.started_at.clone(),
         duration_ms: Some(meta.duration_ms),
         stream: meta.stream,
+        capture: None,
     };
     finish_ingest(
         session,
@@ -251,6 +255,7 @@ pub fn ingest_call_files(
         started_at: meta.started_at.clone(),
         duration_ms: Some(meta.duration_ms),
         stream: meta.stream,
+        capture: None,
     };
     finish_ingest(
         session,
@@ -314,6 +319,7 @@ pub fn ingest_outcome(
         started_at: meta.started_at.clone(),
         duration_ms: meta.duration_ms,
         stream: meta.stream,
+        capture: None,
     };
     finish_ingest_counted(session, blocks, record, &req, &[], raw_new)
 }

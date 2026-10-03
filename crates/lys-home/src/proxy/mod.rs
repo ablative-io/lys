@@ -31,6 +31,8 @@ mod journal_tests;
 pub mod link;
 #[cfg(test)]
 mod link_tests;
+mod persist;
+mod spool;
 pub mod stream;
 pub mod stream_chat;
 pub mod stream_messages;

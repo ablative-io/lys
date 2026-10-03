@@ -3,8 +3,8 @@
 //! Before a call is sent upstream its id is written to the journal, one
 //! durable file per open call; after the sink has recorded the call's
 //! `lys.call` entry, the file is removed. On a start, every file still in
-//! the journal is a call the process did not see to its end, and is recorded
-//! once through the outcome ingest as `lost` ([`recover`]).
+//! the journal is recovered once: its prepared outcome when present, otherwise
+//! `lost` because capture did not finish ([`recover`]).
 //!
 //! Invariants:
 //! - A journal record is durable (written, synced, renamed into place and its
@@ -26,13 +26,13 @@ use std::sync::mpsc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::HomeError;
+use super::capture::Work;
 use crate::proxy::error::ProxyError;
 use crate::proxy::link::{Link, day_of};
-use crate::record::call::{
-    Api, CallMeta, CallStatus, IngestReport, OutcomeMeta, ingest_call_files, ingest_outcome,
-};
-use crate::record::{Home, Session};
+use crate::record::Home;
+use crate::record::blocks::Hash;
+use crate::record::call::captured::PreparedCall;
+use crate::record::call::{Api, CallStatus};
 
 /// What the journal keeps of an open call: ids and names only.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,6 +47,10 @@ pub struct OpenCall {
     pub started_at: String,
     /// The session it is linked to, once its key was read.
     pub session: Option<String>,
+    /// Admission hold, absent only until the measured gate has returned.
+    pub admission_ns: Option<u64>,
+    /// Prepared references, absent while capture has not completed.
+    pub(crate) completed: Option<PreparedCall>,
 }
 
 /// The open-call journal: a directory of one record per open call.
@@ -160,6 +164,12 @@ pub struct Job {
     pub response: Option<PathBuf>,
     /// The response parts the proxy assembled from an event stream.
     pub parts: Option<Vec<serde_json::Value>>,
+    /// Raw-body hashes computed during spooling.
+    pub request_hash: Option<Hash>,
+    /// Raw response hash computed during spooling.
+    pub response_hash: Option<Hash>,
+    /// Last frame arrival, absent for a recovered call.
+    pub last_arrival: Option<std::time::Instant>,
 }
 
 /// What the sink reports of each call: ids, a status and counts only.
@@ -188,7 +198,7 @@ pub struct CallReport {
 
 #[derive(Debug)]
 enum Message {
-    Job(Box<Job>),
+    Capture(Work),
     Settle,
     #[cfg(test)]
     Pause(mpsc::Sender<()>, mpsc::Receiver<()>),
@@ -210,18 +220,21 @@ impl Sink {
     }
 
     #[cfg(test)]
-    pub(super) fn pause(&self) -> Result<mpsc::Sender<()>, Box<dyn std::error::Error + Send + Sync>> {
+    pub(super) fn pause(
+        &self,
+    ) -> Result<mpsc::Sender<()>, Box<dyn std::error::Error + Send + Sync>> {
         let (ready, arrived) = mpsc::channel();
         let (release, resume) = mpsc::channel();
-        self.tx.send(Message::Pause(ready, resume)).map_err(|error| std::io::Error::other(error.to_string()))?;
+        self.tx
+            .send(Message::Pause(ready, resume))
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
         arrived.recv()?;
         Ok(release)
     }
 
-    /// Hand a finished call to the sink.
-    pub fn send(&self, job: Job) -> Result<(), ProxyError> {
+    pub(super) fn capture(&self, work: Work) -> Result<(), ProxyError> {
         self.tx
-            .send(Message::Job(Box::new(job)))
+            .send(Message::Capture(work))
             .map_err(|unsent| ProxyError::SinkStopped {
                 what: unsent.0.name(),
             })
@@ -240,7 +253,7 @@ impl Sink {
 impl Message {
     fn name(&self) -> String {
         match self {
-            Self::Job(job) => format!("call {}", job.call.call_id),
+            Self::Capture(..) => String::from("a capture event"),
             Self::Settle => String::from("a settle request"),
             #[cfg(test)]
             Self::Pause(..) => String::from("a worker barrier"),
@@ -259,13 +272,21 @@ fn run(
     for message in rx {
         #[cfg(test)]
         if let Message::Pause(ready, resume) = message {
-            if ready.send(()).is_ok() && let Err(mpsc::RecvError) = resume.recv() {
+            if ready.send(()).is_ok()
+                && let Err(mpsc::RecvError) = resume.recv()
+            {
                 continue;
             }
             continue;
         }
-        if let Message::Job(job) = message {
-            held.push(*job);
+        match message {
+            Message::Capture(work) => match work.run() {
+                Some(job) => held.push(job),
+                None => continue,
+            },
+            Message::Settle => {}
+            #[cfg(test)]
+            Message::Pause(..) => continue,
         }
         unretired.retain(|call_id| journal.retire(call_id).is_err());
         for mut job in std::mem::take(&mut held) {
@@ -317,7 +338,7 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
     }
     #[cfg(test)]
     let started = std::time::Instant::now();
-    let ingested = ingest(home, &session_id, job);
+    let ingested = super::persist::ingest(home, journal, &session_id, job);
     #[cfg(test)]
     {
         super::timing::add(&super::timing::INGEST, started);
@@ -338,81 +359,23 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
         .into_iter()
         .flatten()
     {
-        if std::fs::remove_file(&path).is_err() {
-            report.spool_kept += 1;
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                eprintln!(
+                    "lys-proxy: spool_remove_failed: {}: {error}",
+                    path.display()
+                );
+                report.spool_kept += 1;
+            }
         }
     }
     report.retired = journal.retire(&job.call.call_id).is_ok();
     report
 }
 
-fn open_or_create(home: &Home, session_id: &str) -> Result<Session, HomeError> {
-    if home.session_path(session_id)?.is_file() {
-        home.open_session(session_id)
-    } else {
-        home.create_session(session_id, "", None)
-    }
-}
-
-fn ingest(
-    home: &Home,
-    session_id: &str,
-    job: &Job,
-) -> Result<(CallStatus, IngestReport), ProxyError> {
-    let mut session = open_or_create(home, session_id)?;
-    let blocks = home.blocks()?;
-    if job.status == CallStatus::Complete
-        && let (Some(request), Some(response)) = (&job.request, &job.response)
-        && let Some(model) = model_of(request)
-    {
-        let meta = CallMeta {
-            call_id: job.call.call_id.clone(),
-            provider: job.call.provider.clone(),
-            api: job.call.api,
-            model,
-            started_at: job.call.started_at.clone(),
-            duration_ms: job.duration_ms,
-            stream: job.stream,
-        };
-        let parts = job.parts.clone();
-        match ingest_call_files(&mut session, &blocks, &meta, request, response, parts) {
-            Ok(report) => return Ok((CallStatus::Complete, report)),
-            // A body the sink refuses as a complete response (an error body,
-            // one without the api's parts) is recorded, never as complete.
-            Err(HomeError::BodyShape { .. } | HomeError::Json { .. }) => {}
-            Err(other) => return Err(other.into()),
-        }
-    }
-    let status = match job.status {
-        CallStatus::Complete => CallStatus::Unrecorded,
-        other => other,
-    };
-    let meta = OutcomeMeta {
-        call_id: job.call.call_id.clone(),
-        provider: job.call.provider.clone(),
-        api: job.call.api,
-        status,
-        started_at: job.call.started_at.clone(),
-        duration_ms: Some(job.duration_ms),
-        stream: job.stream,
-    };
-    let report = ingest_outcome(
-        &mut session,
-        &blocks,
-        &meta,
-        job.request.as_deref(),
-        job.response.as_deref(),
-    )?;
-    Ok((status, report))
-}
-
-fn model_of(request: &Path) -> Option<String> {
-    let bytes = std::fs::read(request).ok()?;
-    let body: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    crate::record::call::request_model(&body)
-}
-
-/// Record every call left open in the journal as `lost`, once: a call whose
+/// Recover a prepared outcome, or an unfinished call as `lost`, once: a call whose
 /// outcome was already recorded is answered as such and nothing is written.
 /// Spool files the call left in `capture` are the bodies that exist.
 pub fn recover(
@@ -424,15 +387,21 @@ pub fn recover(
     for call in journal.open_calls()? {
         let spooled = |suffix: &str| {
             let path = capture.join(format!("{}.{suffix}", call.call_id));
-            path.is_file().then_some(path)
+            (path.is_file() || call.completed.is_some()).then_some(path)
         };
         let mut job = Job {
-            status: CallStatus::Lost,
+            status: call
+                .completed
+                .as_ref()
+                .map_or(CallStatus::Lost, |ready| ready.record.status),
             duration_ms: 0,
             stream: false,
             request: spooled("request"),
             response: spooled("response"),
             parts: None,
+            request_hash: None,
+            response_hash: None,
+            last_arrival: None,
             call,
         };
         let report = record(home, journal, &mut job);

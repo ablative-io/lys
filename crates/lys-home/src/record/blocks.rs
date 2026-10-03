@@ -34,6 +34,10 @@ impl Hash {
         }
     }
 
+    pub(crate) fn from_digest(bytes: [u8; 32]) -> Self {
+        Self(hex_of(&bytes))
+    }
+
     /// The hex text.
     #[must_use]
     pub fn as_str(&self) -> &str {
@@ -191,6 +195,36 @@ impl BlockStore {
         sync_dir(&dir)?;
         self.syncs.add();
         Ok(Put { hash, new: true })
+    }
+
+    /// Install an exclusively owned, already synced and hashed spool by rename.
+    /// The caller computed the hash while writing; this route never reads the body.
+    pub(crate) fn admit_spool(&self, source: &Path, hash: &Hash) -> Result<Put, HomeError> {
+        let path = self.path_of(hash);
+        let dir = self.root.join(&hash.as_str()[..2]);
+        let mut new = false;
+        if path.is_file() {
+            discard(source)?;
+        } else {
+            fs::create_dir_all(&dir)
+                .map_err(|e| HomeError::io("creating a block directory", &dir, e))?;
+            fs::rename(source, &path)
+                .map_err(|e| HomeError::io("placing a captured block", source, e))?;
+            new = true;
+        }
+        // Sync again on replay: a prior rename may have preceded an interrupted sync.
+        sync_dir(&dir)?;
+        self.syncs.add();
+        sync_dir(&self.root)?;
+        self.syncs.add();
+        if let Some(parent) = source.parent() {
+            sync_dir(parent)?;
+            self.syncs.add();
+        }
+        Ok(Put {
+            hash: hash.clone(),
+            new,
+        })
     }
 
     /// Whether a block of this hash is held.

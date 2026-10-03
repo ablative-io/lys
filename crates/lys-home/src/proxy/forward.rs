@@ -194,7 +194,7 @@ impl<O: Observer> Body for Tee<O> {
     type Data = Bytes;
     type Error = hyper::Error;
 
-    /// Gate: holds the frame for the observer's decode and spool write.
+    /// Pass the frame after enqueueing the observer event. Capture runs on its worker.
     fn poll_frame(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -409,19 +409,24 @@ impl Proxy {
                 Err(error) => refusal(StatusCode::BAD_GATEWAY, &format!("lys-proxy: {error}")),
             };
         };
-        let open = OpenCall {
+        let mut open = OpenCall {
             call_id: fresh_id(),
             provider: provider.to_owned(),
             api,
             started_at: now(),
             session: None,
+            admission_ns: None,
+            completed: None,
         };
+        // Admission gate: the request waits for the journal file and directory sync.
+        let admission = std::time::Instant::now();
         if let Err(error) = self.journal.write(&open) {
             return refusal(
                 StatusCode::SERVICE_UNAVAILABLE,
                 &format!("lys-proxy refused the call: {error}"),
             );
         }
+        open.admission_ns = Some(u64::try_from(admission.elapsed().as_nanos()).unwrap_or(u64::MAX));
         let call = Call::admit(open, &self.capture, self.journal.clone(), self.sink.clone());
         let request = request.map(|body| Tee::new(body, call.request_side()).boxed_unsync());
         match self.upstream.send(base, &rest, request).await {

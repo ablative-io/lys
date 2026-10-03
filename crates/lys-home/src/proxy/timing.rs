@@ -38,7 +38,13 @@ pub(super) fn add(stage: &AtomicU64, started: Instant) {
 
 pub(super) fn report() {
     let received = tick();
-    println!("spool writes={} bytes={} min={} max={}", WRITE_COUNT.load(Ordering::Relaxed), WRITE_BYTES.load(Ordering::Relaxed), WRITE_MIN.load(Ordering::Relaxed), WRITE_MAX.load(Ordering::Relaxed));
+    println!(
+        "spool writes={} bytes={} min={} max={}",
+        WRITE_COUNT.load(Ordering::Relaxed),
+        WRITE_BYTES.load(Ordering::Relaxed),
+        WRITE_MIN.load(Ordering::Relaxed),
+        WRITE_MAX.load(Ordering::Relaxed)
+    );
     for (name, stage) in [
         ("decode", &DECODE),
         ("spool_write", &SPOOL_WRITE),

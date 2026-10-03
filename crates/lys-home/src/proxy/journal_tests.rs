@@ -28,6 +28,8 @@ fn open_call(call_id: &str, session: Option<&str>) -> OpenCall {
         api: Api::Messages,
         started_at: "2026-09-28T10:00:00.000Z".to_owned(),
         session: session.map(str::to_owned),
+        admission_ns: None,
+        completed: None,
     }
 }
 
@@ -113,6 +115,7 @@ async fn a_call_open_when_the_proxy_stops_is_recorded_lost_by_the_next_start() -
         .recv()
         .await
         .ok_or("the upstream saw no request")?;
+    drop(harness.proxy.sink().pause()?);
     assert_eq!(std::fs::read_dir(harness.state("journal"))?.count(), 1);
     let base = Base::parse(&format!("http://{upstream}"))?;
     let restarted = Proxy::start(ProxyConfig {
@@ -288,9 +291,25 @@ async fn a_stalled_capture_worker_does_not_hold_or_spool_the_client_response() -
     let spools = std::fs::read_dir(harness.state("capture"))?.count();
     drop(release);
     let report = harness.report()?;
-    drop(connection);
-    assert_eq!(received, hyper::body::Bytes::from(message_response().to_string()));
-    assert_eq!(spools, 0, "forwarding must do no spool work while the worker is stopped");
+    connection.await?;
+    assert_eq!(
+        received,
+        hyper::body::Bytes::from(message_response().to_string())
+    );
+    assert_eq!(
+        spools, 0,
+        "forwarding must do no spool work while the worker is stopped"
+    );
     assert_eq!(report.status, CallStatus::Complete);
+    let calls = harness.calls(KEY)?;
+    let timing = calls[0]
+        .capture
+        .as_ref()
+        .ok_or("capture measurements absent")?;
+    assert!(timing.admission_ns.is_some());
+    assert!(matches!(
+        timing.durable,
+        crate::record::call::captured::DurableTime::Measured(_)
+    ));
     Ok(())
 }

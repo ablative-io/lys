@@ -72,3 +72,27 @@ fn every_block_hashes_to_its_name() {
     drop(store);
     dir.close().unwrap();
 }
+
+#[test]
+fn a_hashed_spool_is_renamed_without_rewriting_its_inode() -> Result<(), Box<dyn std::error::Error>>
+{
+    use std::os::unix::fs::MetadataExt;
+    let dir = tempfile::tempdir()?;
+    let source = dir.path().join("spool");
+    let bytes = b"already hashed during capture";
+    std::fs::write(&source, bytes)?;
+    std::fs::File::open(&source)?.sync_all()?;
+    let inode = std::fs::metadata(&source)?.ino();
+    let store = BlockStore::open(dir.path().join("blocks"))?;
+    let hash = Hash::of(bytes);
+    let first = store.admit_spool(&source, &hash)?;
+    assert!(first.new);
+    assert!(!source.exists());
+    let target = store.root().join(&hash.as_str()[..2]).join(hash.as_str());
+    assert_eq!(std::fs::metadata(target)?.ino(), inode);
+    assert_eq!(store.get(&hash)?, bytes);
+    let again = store.admit_spool(&source, &hash)?;
+    assert!(!again.new);
+    assert_eq!(store.syncs(), 6);
+    Ok(())
+}

@@ -1,5 +1,5 @@
 //! Capture: the request and response bodies spooled to files while
-//! they are forwarded, the session key read from the request as it passes,
+//! the sink worker receives shared byte handles, the session key read once,
 //! the event stream read as it passes, and the call handed to the sink when
 //! it ends.
 //!
@@ -14,13 +14,13 @@
 //!   other path reports a call complete.
 //! - The spools hold body bytes only; no header is written anywhere.
 
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use super::spool::Spool;
+use hyper::HeaderMap;
 use hyper::body::Bytes;
 use hyper::header::{GetAll, HeaderValue};
 
@@ -29,54 +29,6 @@ use crate::proxy::forward::{End, Observer};
 use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
 use crate::proxy::link::{KeyScanner, Link};
 use crate::record::call::CallStatus;
-
-/// A body spooled to a file.
-#[derive(Debug)]
-struct Spool {
-    path: PathBuf,
-    file: Option<File>,
-}
-
-impl Spool {
-    fn create(path: PathBuf) -> Option<Self> {
-        let file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .ok()?;
-        Some(Self {
-            path,
-            file: Some(file),
-        })
-    }
-
-    fn write(&mut self, bytes: &[u8], failed: &mut bool) {
-        #[cfg(test)]
-        let started = Instant::now();
-        if let Some(file) = &mut self.file
-            && file.write_all(bytes).is_err()
-        {
-            self.file = None;
-            *failed = true;
-        }
-        #[cfg(test)]
-        super::timing::add(&super::timing::SPOOL_WRITE, started);
-        #[cfg(test)]
-        super::timing::write_size(bytes.len());
-    }
-
-    fn close(&mut self, failed: &mut bool) {
-        #[cfg(test)]
-        let started = Instant::now();
-        if let Some(file) = self.file.take()
-            && file.sync_all().is_err()
-        {
-            *failed = true;
-        }
-        #[cfg(test)]
-        super::timing::add(&super::timing::SPOOL_SYNC, started);
-    }
-}
 
 /// What a call knows while it passes.
 #[derive(Debug, Default)]
@@ -89,6 +41,7 @@ struct CallState {
     reader: Option<Reader>,
     stream: bool,
     finished: bool,
+    last_arrival: Option<Instant>,
 }
 
 /// One call in flight: its journal record, its capture and where it goes
@@ -106,25 +59,21 @@ pub struct Call {
 }
 
 impl Call {
-    /// Gate: creates the request spool after durable admission.
+    /// Queue capture after the measured durable admission gate.
     #[must_use]
     pub fn admit(open: OpenCall, capture: &Path, journal: Journal, sink: Sink) -> Arc<Self> {
-        let request = Spool::create(capture.join(format!("{}.request", open.call_id)));
-        let state = CallState {
-            capture_failed: request.is_none(),
-            request,
-            ..CallState::default()
-        };
-        Arc::new(Self {
+        let call = Arc::new(Self {
             open,
             started: Instant::now(),
             capture: capture.to_path_buf(),
             journal,
             sink,
-            state: Mutex::new(state),
+            state: Mutex::new(CallState::default()),
             poisoned: AtomicBool::new(false),
             ended: AtomicBool::new(false),
-        })
+        });
+        call.enqueue(Event::Start);
+        call
     }
 
     /// The proxy's id for the call.
@@ -155,48 +104,54 @@ impl Call {
     }
 
     /// The observer of the response body on its way to the client; the
-    /// response spool is created now, as its head has arrived.
+    /// response head queues decoder and spool creation on the worker.
     #[must_use]
     pub fn response_side(
         self: &Arc<Self>,
         stream: bool,
         encodings: GetAll<'_, HeaderValue>,
     ) -> ResponseSide {
-        let api = self.open.api;
-        let spool = self.capture.join(format!("{}.response", self.open.call_id));
-        self.with(|s| {
-            s.stream = stream;
-            s.reader = stream.then(|| Reader::for_api(api, encodings));
-            if !s.capture_failed {
-                s.response = Spool::create(spool);
-                s.capture_failed = s.response.is_none();
-            }
-        });
+        let mut headers = HeaderMap::new();
+        for value in encodings {
+            headers.append(hyper::header::CONTENT_ENCODING, value.clone());
+        }
+        self.enqueue(Event::ResponseHead { stream, headers });
         ResponseSide(Arc::clone(self))
     }
 
     fn request_ended(&self) {
-        let link = self.with(|s| {
-            if let Some(spool) = &mut s.request {
-                spool.close(&mut s.capture_failed);
-            }
-            s.scanner.link()
-        });
+        let link = self
+            .with(|s| {
+                if s.finished {
+                    return None;
+                }
+                if let Some(spool) = &mut s.request {
+                    spool.close(&mut s.capture_failed);
+                }
+                Some(s.scanner.link())
+            })
+            .flatten();
         if let Some(link) = link.filter(Link::is_linked) {
             let mut open = self.open.clone();
             open.session = link.to_record();
-            if self.journal.write(&open).is_err() {
+            if let Err(error) = self.journal.write(&open) {
+                eprintln!("lys-proxy: {error}");
                 self.with(|s| s.journal_failed = true);
             }
         }
     }
 
     /// End the call and hand it to the sink; a second end does nothing.
-    pub fn finish(&self, end: End) {
+    pub fn finish(self: &Arc<Self>, end: End) {
         if self.ended.swap(true, Ordering::AcqRel) {
             return;
         }
-        let duration_ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        self.enqueue(Event::End(end, Instant::now()));
+    }
+
+    fn complete(&self, end: End, ended_at: Instant) -> Option<Job> {
+        let duration_ms =
+            u64::try_from(ended_at.duration_since(self.started).as_millis()).unwrap_or(u64::MAX);
         let job = self.with(|s| {
             if s.finished {
                 return None;
@@ -235,18 +190,106 @@ impl Call {
                 status,
                 duration_ms,
                 stream: s.stream,
+                request_hash: s.request.as_ref().and_then(|spool| spool.hash.clone()),
+                response_hash: s.response.as_ref().and_then(|spool| spool.hash.clone()),
                 request: s.request.take().map(|spool| spool.path),
                 response: s.response.take().map(|spool| spool.path),
+                last_arrival: Some(s.last_arrival.unwrap_or(ended_at)),
                 parts,
             })
         });
         // An interrupted capture keeps its durable open journal entry;
         // recovery records the lost call without trusting its partial state.
-        if let Some(job) = job.flatten()
-            && let Err(error) = self.sink.send(job)
-        {
+        job.flatten()
+    }
+
+    fn enqueue(self: &Arc<Self>, event: Event) {
+        if let Err(error) = self.sink.capture(Work {
+            call: Arc::clone(self),
+            event,
+        }) {
             eprintln!("lys-proxy: {error}");
         }
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct Work {
+    call: Arc<Call>,
+    event: Event,
+}
+
+#[derive(Debug)]
+enum Event {
+    Start,
+    Request(Bytes),
+    RequestEnd,
+    ResponseHead { stream: bool, headers: HeaderMap },
+    Response(Bytes, Instant),
+    End(End, Instant),
+}
+
+impl Work {
+    pub(super) fn run(self) -> Option<Job> {
+        let call = self.call;
+        match self.event {
+            Event::Start => {
+                call.with(|s| {
+                    s.request =
+                        Spool::create(call.capture.join(format!("{}.request", call.open.call_id)));
+                    s.capture_failed = s.request.is_none();
+                });
+            }
+            Event::Request(bytes) => {
+                call.with(|s| {
+                    s.scanner.feed(&bytes);
+                    if let Some(spool) = &mut s.request {
+                        spool.write(&bytes, &mut s.capture_failed);
+                    }
+                });
+            }
+            Event::RequestEnd => call.request_ended(),
+            Event::ResponseHead { stream, headers } => {
+                call.with(|s| {
+                    s.stream = stream;
+                    s.reader = stream.then(|| {
+                        Reader::for_api(
+                            call.open.api,
+                            headers.get_all(hyper::header::CONTENT_ENCODING),
+                        )
+                    });
+                    if !s.capture_failed {
+                        s.response = Spool::create(
+                            call.capture.join(format!("{}.response", call.open.call_id)),
+                        );
+                        s.capture_failed = s.response.is_none();
+                    }
+                });
+            }
+            Event::Response(bytes, arrived) => {
+                call.with(|s| {
+                    s.last_arrival = Some(arrived);
+                    #[cfg(test)]
+                    let started = Instant::now();
+                    if let Some(reader) = &mut s.reader
+                        && let Err(error) = reader.feed(&bytes)
+                    {
+                        eprintln!(
+                            "lys-proxy: response_decode_failed: call {}: {error}",
+                            call.open.call_id
+                        );
+                        s.reader = None;
+                    }
+                    #[cfg(test)]
+                    super::timing::add(&super::timing::DECODE, started);
+                    if let Some(spool) = &mut s.response {
+                        spool.write(&bytes, &mut s.capture_failed);
+                    }
+                });
+            }
+            Event::End(end, at) => return call.complete(end, at),
+        }
+        None
     }
 }
 
@@ -256,19 +299,14 @@ impl Call {
 pub struct RequestSide(Arc<Call>);
 
 impl Observer for RequestSide {
-    /// Gate: holds the frame for session scanning and spool write.
+    /// Enqueue a shared byte handle without waiting for capture.
     fn data(&mut self, bytes: &Bytes) {
-        self.0.with(|s| {
-            s.scanner.feed(bytes);
-            if let Some(spool) = &mut s.request {
-                spool.write(bytes, &mut s.capture_failed);
-            }
-        });
+        self.0.enqueue(Event::Request(bytes.clone()));
     }
 
     fn ended(&mut self, end: End) {
         if end == End::Complete {
-            self.0.request_ended();
+            self.0.enqueue(Event::RequestEnd);
         }
     }
 }
@@ -279,28 +317,12 @@ impl Observer for RequestSide {
 pub struct ResponseSide(Arc<Call>);
 
 impl Observer for ResponseSide {
-    /// Gate: holds the frame for decode and spool write under the call state lock.
+    /// Enqueue a shared byte handle and its arrival time; no decode, lock or disk work.
     fn data(&mut self, bytes: &Bytes) {
         #[cfg(test)]
         super::timing::arriving();
-        self.0.with(|s| {
-            #[cfg(test)]
-            let started = Instant::now();
-            if let Some(reader) = &mut s.reader
-                && let Err(error) = reader.feed(bytes)
-            {
-                eprintln!(
-                    "lys-proxy: response_decode_failed: call {}: {error}",
-                    self.0.open.call_id
-                );
-                s.reader = None;
-            }
-            #[cfg(test)]
-            super::timing::add(&super::timing::DECODE, started);
-            if let Some(spool) = &mut s.response {
-                spool.write(bytes, &mut s.capture_failed);
-            }
-        });
+        self.0
+            .enqueue(Event::Response(bytes.clone(), Instant::now()));
     }
 
     fn ended(&mut self, end: End) {
@@ -327,6 +349,8 @@ mod poison_tests {
             api: Api::Messages,
             started_at: "2000-01-01T00:00:00Z".to_owned(),
             session: None,
+            admission_ns: None,
+            completed: None,
         };
         journal.write(&open)?;
         let (reports, received) = mpsc::channel();
