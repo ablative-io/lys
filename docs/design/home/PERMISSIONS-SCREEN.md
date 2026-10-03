@@ -1,6 +1,6 @@
 # What an agent may do: the truth today, and what has to change
 
-Waffles, 3 October 2026, rewritten 20:31 by the clock. The first version of this page (068c7c51) is
+Waffles, 3 October 2026, rewritten 20:31 by the clock; amended 20:33 from Vesper's read against her table (six sentences that said more than their rows) and Archie's observation of the tools a real run was offered. The first version of this page (068c7c51) is
 withdrawn: it had claims from memory that the sources contradict. Nothing is built from this page until
 Tom has read it.
 
@@ -24,7 +24,9 @@ unit.
 - The settings form showed "Reads freely and asks before most changes and commands". Those are the
   catalogue's words for Claude Code's `default` mode. (W2, agreed)
 - The file tonight's run of pancake was handed refused Read, Write, Edit, Glob, Grep and WebFetch by name,
-  and Read anywhere on the disk; allowed nothing; no sandbox; no hooks. (W3, V3, agreed)
+  and was written to refuse Read anywhere on the disk (`Read(//)`, `Read(///**)`); allowed nothing; no
+  sandbox; no hooks. (W3, V3, agreed as to what the file holds) Whether Claude Code reads the second of
+  those two path rules as a rule or silently skips it was not seen. (V11, open)
 - Those refusals are pancake's own policy, version 1, seven hard rules. Nobody chose it: Lys wrote it for
   every agent added between 1 October 17:39 and 2 October 12:33 and has never taken it back. Ten of the
   fifteen policies on the installed Lys are that seed; the five newest are empty. (W16, V3, V4, agreed)
@@ -48,16 +50,27 @@ unit.
 - Rules about shell commands match the command's text and, in the documentation's words, "aren't a
   security boundary". Rules about reading files do not stop a script the agent runs. Only the sandbox is
   enforced by the operating system, and only for shell commands. (W6, W7, W8: documentation only, open)
-- The sandbox is off in every mode but one. Lys's own `workspace-only` mode turns it on, with no network
-  and no way out; no run in that mode has been observed. (W10, V13, open)
+- Lys turns the sandbox on in one mode only: its own `workspace-only`, with no network and no way out. No
+  run in that mode has been observed, and this computer's own settings may set the sandbox either way.
+  (W10, V13, V6, open)
+- By one page of the documentation, an installed mod can approve a call a refusal rule refuses, on a
+  computer with no managed settings and no Team or Enterprise sign-in; another page says a refusal holds
+  in every mode with no exception. The pages disagree, and nobody has looked at whether Tom's Mac has a
+  mod. So even "refused" is not yet known to hold. (V15, W13, open)
 - The person's own Claude Code setup reaches a Lys run. A plugin's hook ran inside pancake's 19:19 run;
-  hooks run with the person's full access whatever the file says. (V5, V14, agreed) And 70 of the 103 tools
+  hooks run with the person's full access whatever the file says. (V5, V14: seen and in code; the
+  documentation is silent on which sources' hooks run when a settings file is passed) And 70 of the 103 tools
   that run was offered came from Tom's own setup, not from Lys: 62 from his Argus plugin, 8 from his
   claude.ai connector. They include tools that type into and start other sessions on the computer. No Lys
   record names them. (W12, agreed; whether a call to one would have been allowed was not seen) Whether the
   person's own allow rules also widen what the agent may do is documentation and code only. (V6, open)
 - A path rule typed with one leading slash would mean "beside the settings file", not the top of the
-  disk. Lys's own hard rules come out right; nothing checks a rule a person types. (W9, V11)
+  disk. Lys writes its hard rules in the documentation's absolute form; nothing checks a rule a person
+  types. (W9; V11 open as above)
+- This arrangement is a choice made on 3 October, not how it has to be. Until some time that day a run
+  had its own config folder, apart from Tom's: the 08:09 run's folder holds Claude Code's own state and no
+  later run's does. The code's comment names Tom's ruling. (V7: seen; the earlier code is history not yet
+  read, open)
 
 **For Codex.**
 - No Codex agent has ever been started by the installed Lys, so every row about a Lys Codex run is open
@@ -84,13 +97,15 @@ either not enforced by anything, or enforced by something Lys does not control.
 ## What I propose (for Tom to mark; none of it is built)
 
 **1. First, the screens stop saying anything untrue. Small, and safe.**
-- Remove the mode sentence. In its place, for the chosen program, show exactly what the next start will
-  be handed: every refused, ask-first and without-asking rule by name, the mode by its real name with the
-  documentation's own words for it, the extra folders, sandbox on or off. The server already renders this
-  for a start; the screen shows that rendering, not a description of it.
-- Under it, one plain block: "What enforces this". For Claude Code: the program enforces these rules;
-  Lys does not check each action; your own plugins and hooks on this computer also run. For Codex: only
-  the write and network box is enforced; it reads every file this login can read.
+- Remove the mode sentence. In its place, for the chosen program, show "What Lys hands the program" at
+  the next start: every refused, ask-first and without-asking rule by name, the mode by its real name with
+  the documentation's own words for it, the extra folders, sandbox on or off. The server already renders
+  this for a start; the screen shows that rendering, not a description of it.
+- Under it, one plain block that claims no more than the rows support. For Claude Code: "This computer's
+  own Claude Code settings, plugins and hooks also apply. Lys does not read them and does not check each
+  action." For Codex: "Lys sets where it may write and whether it may use the network. It can read every
+  file this login can read." Nothing on the screen says a rule is enforced until a run has been watched
+  being refused (V8).
 - Show the policy on the settings form and the front page pane, not only on a tab of the file, with who
   set each rule. A seeded rule says "written by Lys on <date>, chosen by nobody".
 - On each run, show what that run was handed, from the kept file.
@@ -128,6 +143,8 @@ promises what nothing holds.
 - A Claude Code run watched refusing a refused call, and asking on an ask-first call. (V8, V12)
 - Whether a call to one of the person's own tools is allowed in a Lys run. (W12)
 - Whether the person's own allow rules merge into a Lys run. (V6)
+- Whether this Mac has a mod, and whether a mod can lift a refusal. (V15)
+- Whether `Read(///**)` is read as a rule. (V11)
 - A run in `workspace-only`, with the sandbox seen to hold. (W10)
 - A Codex agent started by Lys at all, in each mode. (A2 to A15)
 - A requirements file refusing a looser login setting. (A33)
