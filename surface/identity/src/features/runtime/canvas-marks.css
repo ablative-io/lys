@@ -166,3 +166,13 @@
 .canvas-lock-shackle { transform-origin: 16px 11px; transform: rotate(38deg) translateY(-1px); transition: transform .28s cubic-bezier(.3, 1.4, .5, 1); }
 .canvas-widget-lock[aria-pressed="true"] .canvas-lock-shackle { transform: none; }
 .canvas-widget-turn:disabled { opacity: .3; cursor: default; }
+/* Typing to several agents at once: one small form over the top of the canvas, under the view swap. A window chosen for it shows it. */
+.canvas-together { position: absolute; z-index: 9; top: 56px; left: 50%; transform: translateX(-50%); width: min(620px, calc(100% - 48px)); display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-card); box-shadow: 0 10px 28px rgba(0, 0, 0, .45); font-size: 12.5px; }
+.canvas-together-whom { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.canvas-together-whom .btn { padding: 2px 9px; font-size: 11.5px; }
+.canvas-together-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 9px; border-radius: 999px; background: var(--accent-glow, var(--surface-default)); color: var(--accent); }
+.canvas-together-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0 4px; font-size: 13px; line-height: 1; }
+.canvas-together-line { display: flex; align-items: flex-end; gap: 6px; }
+.canvas-together-line textarea { flex: 1; resize: none; box-sizing: border-box; padding: 6px 8px; font: inherit; }
+.canvas-together p { margin: 0; }
+.session-canvas-node.together { outline: 2px solid var(--accent); outline-offset: 2px; }

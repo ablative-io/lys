@@ -1,7 +1,7 @@
 /** Widgets on the canvas: what Lys holds about agents, placed by the person, fed by the lines drawn to them. */
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { $, $$, click, mount, press, text } from './harness';
+import { $, $$, click, mount, press, settle, text, unmountAll } from './harness';
 import { COURIER, SCRIBE, SERVICE, dashboard, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { mockTerminal } from './terminal-double';
@@ -275,6 +275,58 @@ describe('Widgets on the canvas', () => {
     // After the last colour comes Lys's own again: no colour is kept.
     await click($('.canvas-note [data-act="colour"]'));
     expect(keptMarks().notes[0].colour).toBeUndefined();
+  });
+});
+
+describe('Typing to several agents at once', () => {
+  /** Writes into the form's one field, the way typing does. */
+  const write = (value: string) => act(async () => {
+    const field = $('.canvas-together textarea') as HTMLTextAreaElement;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  it('types what was written once into each chosen agent\'s terminal, then Enter, and says by name who it did not reach', async () => {
+    const other = { ...running, session: 'op-' + '8'.repeat(32), agent: COURIER };
+    const sent: Record<string, number[][]> = {};
+    const input = (session: string, answer?: Route): Record<string, Route> => ({ ['POST /runtime/sessions/' + session + '/input-bytes']: answer ?? ((body) => {
+      (sent[session] ??= []).push((body as { data: number[] }).data);
+      return ok({ session, answer: { kind: 'delivered', session }, receipt: { index: 7 } });
+    }) });
+    start();
+    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session) });
+    const bar = (id: string) => $('[data-node="session:' + id + '"] .session-canvas-bar');
+    const hold = (target: Element | null) => act(async () => { target?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, metaKey: true, clientX: 300, clientY: 210 })); });
+    expect($('.canvas-together')).toBeNull();
+    // A press on a window's bar with Command held chooses it; the form says who it types to, and the window shows it is chosen.
+    await hold(bar(session));
+    expect([$('.canvas-together')?.getAttribute('aria-label'), $('[data-node="' + node + '"]')?.className.includes('together')]).toEqual(['Type to 1 agent', true]);
+    await click($('[data-act="together-all"]'));
+    expect([$$('[data-together]').map((each) => each.textContent), $('[data-act="together-all"]')]).toEqual([['Scribe×', 'Courier×'], null]);
+    await write('Run the tests.');
+    await act(async () => { $('.canvas-together textarea')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
+    await settle();
+    const words = Array.from(new TextEncoder().encode('Run the tests.'));
+    expect(sent).toEqual({ [session]: [words, [13]], [other.session]: [words, [13]] });
+    expect([$('.canvas-together [role="status"]')?.textContent, ($('.canvas-together textarea') as HTMLTextAreaElement).value]).toEqual(['Typed to 2 agents.', '']);
+    // One left out is not typed to; pressed again with Command held, a window leaves; Done puts the form away.
+    await click($('[data-together="session:' + other.session + '"] button'));
+    expect($$('[data-together]').map((each) => each.textContent)).toEqual(['Scribe×']);
+    await hold(bar(session));
+    expect($('.canvas-together')).toBeNull();
+    // An agent it did not reach is said by name with why, and the words stay to be sent again by the person, never by the page.
+    unmountAll();
+    document.body.innerHTML = '';
+    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session, refused(409, 'RuntimeSessionEnded', 'the session has ended')) });
+    await hold(bar(session));
+    await hold(bar(other.session));
+    await write('Stop.');
+    await click($('.canvas-together button[type="submit"]'));
+    await settle();
+    expect($('.canvas-together [role="alert"]')?.textContent).toContain('Not typed to Courier: ');
+    expect($('.canvas-together [role="alert"]')?.textContent).toContain('Typed to Scribe.');
+    expect(($('.canvas-together textarea') as HTMLTextAreaElement).value).toBe('Stop.');
+    await click($('[data-act="together-clear"]'));
+    expect($('.canvas-together')).toBeNull();
   });
 });
 

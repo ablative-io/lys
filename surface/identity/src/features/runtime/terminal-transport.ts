@@ -61,6 +61,13 @@ export function motionReport(data: Uint8Array): boolean {
   return sgr !== null && (Number(sgr[1]) & 32) !== 0;
 }
 
+/** Sends bytes to a session as typed input, and takes nothing less than its confirmed delivery for an answer. */
+export async function typed(session: string, data: number[]): Promise<void> {
+  const value = await terminalRequest('/runtime/sessions/' + encodeURIComponent(session) + '/input-bytes', { data });
+  const answer = record(value.answer);
+  if (value.session !== session || answer.kind !== 'delivered' || answer.session !== session) throw new Error('Terminal input was not confirmed. Do not resend it.');
+}
+
 export function terminalStreams(session: string, controller: AbortController, ended: (value: SessionEnd) => void) {
   const base = '/runtime/sessions/' + encodeURIComponent(session);
   let cursor: number | null = null;
@@ -75,9 +82,7 @@ export function terminalStreams(session: string, controller: AbortController, en
       if (finished) throw new Error('The session has ended. The input queued for it was not sent.');
       const batch = queued;
       queued = [];
-      const value = await terminalRequest(base + '/input-bytes', { data: batch.flatMap((entry) => Array.from(entry.data)) });
-      const answer = record(value.answer);
-      if (value.session !== session || answer.kind !== 'delivered' || answer.session !== session) throw new Error('Terminal input was not confirmed. Do not resend it.');
+      await typed(session, batch.flatMap((entry) => Array.from(entry.data)));
     }
     queued = [];
     sending = false;

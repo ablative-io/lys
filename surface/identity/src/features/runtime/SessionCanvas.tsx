@@ -23,6 +23,7 @@ import type { Panel, Tool } from './CanvasDock';
 import { Anchors, GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
 import { HOME, ZOOM, useWheel, zoomOf, zoomed } from './canvas-view';
 import type { View } from './canvas-view';
+import { TypeTogether } from './CanvasTogether';
 import { WidgetCard, heldOf } from './CanvasWidgets';
 import { AGENT, KINDS } from './canvas-widgets';
 import { readBoard } from '../dashboard/board';
@@ -126,6 +127,9 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
   const [chosen, setChosen] = useState<string | null>(null);
   // The widget that has just changed view: it moves between its two sizes, and nothing else on the surface does.
   const [morph, setMorph] = useState<string | null>(null);
+  // The agents' windows chosen to be typed to together: a press on a window's bar with Command, Control or Shift held puts it in or takes it out.
+  const [together, setTogether] = useState<string[]>([]);
+  const running = graph.nodes.flatMap((node) => node.session ? [{ node: node.id, session: node.session.session, name: node.title }] : []);
   // The line being dragged from a thing's dot: where it started and where the pointer is, on the surface.
   const [dragged, setDragged] = useState<{ from: string; side: Side; to: [number, number] } | null>(null);
   const [layouts, setLayouts] = useState<SavedLayout[]>(keeping.layouts);
@@ -445,7 +449,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
         const state = !node.session ? null : graph.unanswered.some((entry) => entry.session === node.session?.session) ? 'Runner did not answer; current state unknown' : node.session.shown === 'running' ? 'Running' : 'Starting, not yet confirmed';
         const kind = node.column === 'sessions' ? 'Agent' : node.column === 'teams' ? 'Team or sender' : 'Resource or recipient';
         const unanswered = !!node.session && graph.unanswered.some((entry) => entry.session === node.session?.session);
-        return <article className={'session-canvas-node ' + node.column + (shown ? ' open' : '') + (unanswered ? ' unanswered' : '') + (menu === node.id ? ' menu-open' : '')} key={node.id} data-node={node.id} aria-label={kind + ': ' + node.title}
+        return <article className={'session-canvas-node ' + node.column + (shown ? ' open' : '') + (unanswered ? ' unanswered' : '') + (menu === node.id ? ' menu-open' : '') + (together.includes(node.id) ? ' together' : '')} key={node.id} data-node={node.id} aria-label={kind + ': ' + node.title}
           style={{ left: box.x, top: box.y, width: box.w, height: box.h, zIndex: front === node.id ? 3 : node.session ? 2 : 1 }}
           onPointerDownCapture={(event) => {
             if (pick) pick(node.id)(event);
@@ -454,7 +458,8 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
             else setFront(node.id);
           }}>
           <header className="session-canvas-bar" tabIndex={0} aria-label={'Move ' + node.title + ' with the arrow keys' + (node.session ? '; with Shift, size its terminal' : '')} onKeyDown={nudge(node.id)}
-            onPointerDown={moving(node.id)} onDoubleClick={(event) => { if (!(event.target instanceof Element && event.target.closest('button, a'))) zoomTo(node.id); }}>
+            onPointerDown={(event) => { if (node.session && (event.metaKey || event.ctrlKey || event.shiftKey)) { event.stopPropagation(); event.preventDefault(); setTogether((now) => now.includes(node.id) ? now.filter((id) => id !== node.id) : [...now, node.id]); } else moving(node.id)(event); }}
+            onContextMenu={(event) => { if (event.ctrlKey) event.preventDefault(); }} onDoubleClick={(event) => { if (!(event.target instanceof Element && event.target.closest('button, a'))) zoomTo(node.id); }}>
             <span className="session-canvas-kind">{kind}</span><h3>{node.title}</h3><span className="note">{node.detail}</span>
             {node.session ? <span className="note" title={state ?? undefined}>{state}</span> : null}
             {/* One slim bar: a closed window opens from it; an open one keeps its controls in a small menu over the window. */}
@@ -493,6 +498,8 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
       {chosen && at(chosen) ? <div className="canvas-chosen" aria-hidden="true" style={{ left: at(chosen)!.x, top: at(chosen)!.y, width: at(chosen)!.w, height: at(chosen)!.h }} /> : null}
     </div>
   </div>
+  {together.length ? <TypeTogether chosen={running.filter((each) => together.includes(each.node))} drop={(node) => setTogether((now) => now.filter((id) => id !== node))} clear={() => setTogether([])}
+    all={running.every((each) => together.includes(each.node)) ? null : () => setTogether(running.map((each) => each.node))} /> : null}
   <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} panel={panel} setPanel={setPanel}
     zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} connections={connections} kind={kind} place={(next) => { setKind(next); setTool('widget'); setPanel(null); }} drop={drop} keeping={keeping} layouts={layouts} save={save} remove={remove}
     says={<>
