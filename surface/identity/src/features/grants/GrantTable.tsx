@@ -71,9 +71,10 @@ export function ActPanel({ label, opener, close, children, className }: { label:
   return <section className={className ? 'act-panel ' + className : 'act-panel'} aria-label={label} ref={panel} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>{children}</section>;
 }
 
-export function GrantTable({ w, grants, done, give = true, empty = 'No grants.' }: { w: GrantWorld; grants: Grant[]; done: () => void; give?: boolean; empty?: string }) {
+/** `omit` names the columns a page already says once for every row, as You does with the holder: they are not repeated on each row. */
+export function GrantTable({ w, grants, done, give = true, empty = 'No grants.', omit = [] }: { w: GrantWorld; grants: Grant[]; done: () => void; give?: boolean; empty?: string; omit?: string[] }) {
   const [open, setOpen] = useState<Open | null>(null);
-  const columns = grantColumns(w);
+  const columns = grantColumns(w).filter((column) => !omit.includes(column.head));
   const close = () => setOpen(null);
   return <table className="usage-table grant-table grant-cols" aria-label="Grants">
     <thead><tr>{columns.map((column) => <th key={column.head}>{column.head}</th>)}<th>Change</th></tr></thead>

@@ -1,4 +1,4 @@
-/** You: who is signed in, what they hold across the page's width, and their account's own pieces in one row under it. The page fills the screen; each part scrolls inside itself. Their agents are on the Dashboard. */
+/** You: who is signed in, their account's own pieces in one row, and what they hold across the page's width under it. The page fills the screen; each part scrolls inside itself. Their agents are on the Dashboard. */
 import { useRef, useState } from 'react';
 import { api, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
@@ -47,23 +47,23 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
 }
 
 /**
- * Your account: what you hold across the page's full width, its table scrolling inside its own box, and the
- * account's own pieces as one row of sections under it. Secrets have their own place on the rail, so they are not
- * repeated here; service accounts are linked from here because nothing else on the page reaches them.
+ * Your account first, as one row of equal height: the account's changes as rows, the signed-in sessions, and the two
+ * short records one over the other; each scrolls inside itself. Under it, what you hold across the page's full width,
+ * so a grant is one line. Every row of What you hold is yours and stands, so neither is said again on each row.
+ * Secrets have their own place on the rail, so they are not repeated here; service accounts are linked from here
+ * because nothing else on the page reaches them.
  */
 function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
   const { me, agents, w } = data;
   const mine = w.list.grants.filter((g) => g.holder === me.person.id && g.standing.stands);
   const same = (a: Login) => a.provider === me.signed_in.provider && a.subject === me.signed_in.subject;
   return <div className="you-account">
-    <section className="you-holds-pane" aria-label="What you hold">
-      <div className="section-h" style={{ marginTop: 0 }}><span>What you hold</span></div>
-      <div className="you-holds-scroll">
-        <GrantTable w={w} grants={mine} done={reload} give={agents.length > 0} empty="Nothing yet." />
-      </div>
-    </section>
     <div className="you-account-row">
       <OwnAccount />
+      <section className="card you-sessions" aria-label="Your signed-in sessions">
+        <h2>Your signed-in sessions</h2>
+        <div className="you-sessions-scroll"><SessionList person="" /></div>
+      </section>
       <div className="card" id="signin-identities">
         <h2>Sign-in identities</h2>
         <div className="note" style={{ margin: '2px 0 6px' }}>Accounts that prove you are you. Never lent to an agent.</div>
@@ -71,10 +71,6 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
           <SignInIdentity key={login.provider + ' ' + login.subject} login={login} current={same(login)} />
         ))}
       </div>
-      <section className="card" aria-label="Your signed-in sessions">
-        <h2>Your signed-in sessions</h2>
-        <SessionList person="" />
-      </section>
       <div className="card" id="service-accounts">
         <h2>Your service-account records</h2><a className="btn" href="#/people/view/accounts">Manage service accounts</a>
         <div className="note" style={{ margin: '2px 0 6px' }}>These records name accounts. Permission to use or lend their credentials is checked separately.</div>
@@ -90,6 +86,12 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
         )}
       </div>
     </div>
+    <section className="you-holds-pane" aria-label="What you hold">
+      <div className="section-h" style={{ marginTop: 0 }}><span>What you hold</span><b className="you-count">{mine.length}</b></div>
+      <div className="you-holds-scroll">
+        <GrantTable w={w} grants={mine} done={reload} give={agents.length > 0} empty="Nothing yet." omit={['Holder', 'Stands']} />
+      </div>
+    </section>
   </div>;
 }
 

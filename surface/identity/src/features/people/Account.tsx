@@ -29,11 +29,13 @@ function useAccount(path: string) {
 }
 
 /** One change of an account: a form whose fields are read on submit and cleared after. */
-function Change({ label, submit, children, action }: {
+function Change({ label, submit, children, action, row }: {
   label: string;
   submit: (form: FormData) => Promise<string>;
   children: ReactNode;
   action: string;
+  /** What this change is of, when the form is one row of a table of changes: its fields then sit in a line, with the button at the row's end. */
+  row?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -53,10 +55,18 @@ function Change({ label, submit, children, action }: {
       setBusy(false);
     }
   }
-  return <form className="recorded-form" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
-    {children}
+  const said = <>
     {status?.kind === 'done' ? <p role="status">{status.words}</p> : null}
     {status?.kind === 'refused' ? <p role="alert" className="why-not">{status.words}</p> : null}
+  </>;
+  if (row) return <form className="recorded-form account-row" role="row" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
+    <span className="account-row-of" role="rowheader">{row}</span>
+    <div className="account-row-fields" role="cell">{children}{said}</div>
+    <span role="cell"><button className="btn" type="submit" disabled={busy}>{busy ? 'Saving…' : action}</button></span>
+  </form>;
+  return <form className="recorded-form" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
+    {children}
+    {said}
     <button className="btn" type="submit" disabled={busy}>{busy ? 'Saving…' : action}</button>
   </form>;
 }
@@ -83,7 +93,7 @@ export function OwnAccount({ readOnly = false }: { readOnly?: boolean }) {
   return <div className="card" id="lys-account">
     <h2>Your Lys account</h2>
     <p className="note">You sign in to Lys with {account?.email ?? 'your email'}.</p>
-    {readOnly ? null : <><Change label="Change your email" action="Change email" submit={async (form) => {
+    {readOnly ? null : <div className="account-rows" role="table" aria-label="Changes to your Lys account"><Change row="Email" label="Change your email" action="Change email" submit={async (form) => {
       const changed = await request<AccountView>('/me/account/email', { email: text(form, 'account-email').trim(), password: text(form, 'account-password') });
       setAccount(changed);
       return `You now sign in with ${changed.email ?? 'your new email'}.`;
@@ -91,14 +101,14 @@ export function OwnAccount({ readOnly = false }: { readOnly?: boolean }) {
       <Field id="account-email" label="New email" type="email" autoComplete="email" />
       <Field id="account-password" label="Your password, to confirm" type="password" autoComplete="current-password" />
     </Change>
-    <Change label="Change your password" action="Change password" submit={async (form) => {
+    <Change row="Password" label="Change your password" action="Change password" submit={async (form) => {
       await request<AccountView>('/me/account/password', { current: text(form, 'account-current-password'), password: samePasswords(form) });
       return 'Your password is changed.';
     }}>
       <Field id="account-current-password" label="Current password" type="password" autoComplete="current-password" />
       <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
       <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
-    </Change></>}
+    </Change></div>}
   </div>;
 }
 

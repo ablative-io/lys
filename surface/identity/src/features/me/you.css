@@ -1,15 +1,36 @@
-/* You fills the screen and never scrolls as a whole: what you hold across the width and your account under it, each scrolling inside itself. */
-.you-page { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 26px; }
+/* You fills the screen and never scrolls as a whole: the account's pieces as one row, what you hold across the width under it, each part scrolling inside itself. */
+.you-page { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 20px; }
 .you-page > .head { flex: none; margin-bottom: 8px; }
-/* Account: what you hold across the full width, scrolling in its own box; the account's sections as one row under it, scrolling in theirs. */
-.you-account { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
-.you-holds-pane { flex: 1 1 55%; min-height: 0; display: flex; flex-direction: column; }
+.you-account { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+/* The account's row: its changes as rows on the left, the signed-in sessions in the middle, the two short records one over the other on the right. All three are as tall as the account's changes; the others scroll inside themselves. */
+.you-account-row { flex: none; min-width: 0; display: grid; grid-template-columns: minmax(560px, 1.2fr) minmax(480px, 1.2fr) minmax(220px, .6fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; height: 248px; }
+.you-page .you-account-row > .card { margin: 0; min-width: 0; min-height: 0; padding: 12px 14px; overflow: auto; overscroll-behavior: contain; }
+.you-account-row > #lys-account { grid-column: 1; grid-row: 1 / span 2; }
+.you-account-row > .you-sessions { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; overflow: hidden; }
+.you-account-row > #signin-identities { grid-column: 3; grid-row: 1; }
+.you-account-row > #service-accounts { grid-column: 3; grid-row: 2; }
+.you-sessions-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.you-sessions-scroll td, .you-sessions-scroll th { padding: 5px 8px; }
+.you-sessions-scroll td:first-child { min-width: 170px; }
+.you-sessions-scroll td .note { margin: 0; overflow-wrap: anywhere; }
+.you-sessions-scroll td:nth-child(2), .you-sessions-scroll td:nth-child(3), .you-sessions-scroll .btn { white-space: nowrap; }
+.you-sessions-scroll .btn { padding: 3px 9px; font-size: 12px; }
+.you-holds-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .you-holds-pane > .section-h { flex: none; }
+.you-count { margin-left: 8px; font-weight: 500; color: var(--text-muted); }
 .you-holds-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.you-account-row { flex: 0 1 auto; max-height: 45%; min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(440px, 1.6fr) minmax(260px, 1fr); grid-template-rows: auto 1fr; gap: 16px; align-items: start; }
-/* The account's own form on the left, the signed-in sessions table in the wide middle, the two short records stacked on the right. */
-.you-account-row > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
-.you-account-row > :nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
-.you-account-row > :nth-child(2) { grid-column: 3; grid-row: 1; }
-.you-account-row > :nth-child(4) { grid-column: 3; grid-row: 2; }
-.you-account-row > .card { margin: 0; min-width: 0; }
+/* A grant is one line: its two changes sit side by side, and its window and last use do not wrap. */
+.you-holds-scroll .grant-cols .g-change { flex-wrap: nowrap; }
+.you-holds-scroll .grant-cols .g-change .btn { padding: 3px 9px; font-size: 12px; }
+.you-holds-scroll td[data-col="Window"], .you-holds-scroll td[data-col="Last used"], .you-holds-scroll td[data-col="May pass on"] { white-space: nowrap; }
+.you-holds-scroll thead th { position: sticky; top: 0; z-index: 1; }
+/* A change of the account is one row: what it changes, its fields in a line, its button at the end. */
+.account-rows { display: flex; flex-direction: column; }
+.account-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; align-items: end; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border-subtle); }
+.account-row-of { align-self: end; padding-bottom: 8px; font-size: 12.5px; color: var(--text-secondary); }
+.account-row-fields { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.account-row-fields .field { flex: 1 1 84px; min-width: 0; margin: 0; }
+.account-row-fields .field label { display: block; margin-bottom: 3px; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-row-fields .field input { width: 100%; box-sizing: border-box; padding: 5px 8px; }
+.account-row-fields > p { flex: 1 1 100%; margin: 0; }
+.recorded-form.account-row button[type="submit"] { margin-top: 0; white-space: nowrap; }
