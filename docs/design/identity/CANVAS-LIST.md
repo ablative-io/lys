@@ -42,6 +42,13 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - A call made on a joined computer is listed, and its body answers `CallKeptElsewhere`: the service reads
   only the proxy home on its own computer.
 - A Chat Completions stream reports no usage to the proxy's reader.
+- A call the provider refused (Claude Code's start-up probe is refused with HTTP 429 at a limit) carried no
+  figures, and one call of unknown spend made the day's and the week's tokens "Not reported", and would
+  refuse a start under a token cap. Written 5 October: the usage line carries the provider's HTTP status,
+  and a call refused at its head is a spend of nought. Uses kept before that install stay as they were
+  kept: an agent with an earlier refused probe shows its tokens from the next day and the next week.
+- Shown on the install of 0feba1e8, 5 October: two calls with tokens on the Proxy screen and the account's
+  two windows on the usage widget. A context percent still needs a window declared for the model.
 - The proxy's admission write is on the call's path without a disk sync since a4f6eff3: 0.57 ms on the one
   call read. Whether that is "no latency" is Tom's to say; the figure is on every record (`admission_ns`).
 - Dollars and running time. Tom, 4 October 20:20: "The cost in US dollars is definitely there... I'm pretty

@@ -149,6 +149,43 @@ fn a_call_whose_spend_is_not_known_is_still_on_the_record_with_how_it_ended() {
 }
 
 #[test]
+fn a_call_the_provider_refused_spent_nothing_and_that_is_known() {
+    // A start-up probe refused at a limit: an error at the head, no figures.
+    let mut refused = line("anthropic-messages", "unrecorded", None);
+    refused["http"] = json!(429);
+    let bodies = read(&refused);
+    assert!(states(&bodies).is_empty(), "{bodies:?}");
+    let [record] = usage(&bodies)[..] else {
+        panic!("one record: {bodies:?}");
+    };
+    assert_eq!(
+        (
+            record.figures.input_tokens,
+            record.figures.output_tokens,
+            record.figures.cache_creation_tokens,
+            record.figures.cache_read_tokens,
+        ),
+        (Some(0), Some(0), Some(0), Some(0))
+    );
+    assert_eq!(
+        record.record.as_ref().map(|kept| kept.status.as_str()),
+        Some("unrecorded")
+    );
+    // A response the provider did answer, whose figures could not be read,
+    // is still unknown; so is a call lost in flight, whatever head it had.
+    for (status, http, state) in [
+        ("unrecorded", 200, "usage_unreported"),
+        ("lost", 500, "call_lost"),
+    ] {
+        let mut unknown = line("anthropic-messages", status, None);
+        unknown["http"] = json!(http);
+        let bodies = read(&unknown);
+        assert_eq!(states(&bodies), vec![state], "{status}");
+        assert_eq!(usage(&bodies)[0].figures, Figures::default(), "{status}");
+    }
+}
+
+#[test]
 fn a_line_of_another_run_or_one_that_does_not_read_is_never_a_record() {
     let mut other = line("anthropic-messages", "complete", Some(json!({"input": 1})));
     other["run"] = json!("ffffffffffffffffffffffffffffffff");

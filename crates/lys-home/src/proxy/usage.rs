@@ -28,6 +28,9 @@
 //!   whose length is not known (one lost in flight).
 //! - `status`: how the call ended, as on its record: `complete`,
 //!   `cancelled`, `partial`, `unrecorded` or `lost`.
+//! - `http`: the provider's HTTP status; absent when no response head
+//!   arrived. A reader tells a call the provider refused (400 and above,
+//!   which spent nothing) from one whose figures could not be read.
 //!
 //! A call whose path carried no run key has no line in any file; its record
 //! holds its figures.
@@ -89,6 +92,9 @@ pub struct UsageLine {
     pub ended_at: Option<String>,
     /// How the call ended.
     pub status: CallStatus,
+    /// The provider's HTTP status; absent when no response head arrived.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http: Option<u16>,
     /// The home session the call is recorded under: the linked session's
     /// own id, or the day's unlinked one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -147,6 +153,7 @@ impl UsageLine {
             started_at: record.started_at.clone(),
             ended_at: ended_at(&record.started_at, record.duration_ms),
             status: record.status,
+            http: head.and_then(|head| head.status),
             record: None,
             entry: None,
         })

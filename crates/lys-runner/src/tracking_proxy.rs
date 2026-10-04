@@ -20,6 +20,10 @@
 //!   call lost in flight is a `call_lost` one, each beside a spend record of
 //!   the call's id that carries no figure: every call that passed is on the
 //!   record with how it ended, and neither is counted as nothing spent.
+//! - A call the provider refused at its head (an HTTP status of 400 or above,
+//!   with no figures) did spend nothing, and that is known: it is a spend
+//!   record of nought, with no coverage entry. A harness's start-up probe
+//!   refused at a limit is one, and must not make a day's total unknown.
 //! - Every spend record names where the proxy keeps the call whole.
 //! - The account windows the response's headers reported are one snapshot
 //!   record, id `<call id>:plan`, kept only when the windows or the account
@@ -37,6 +41,15 @@ use crate::tracking::{Measure, RECORD_VERSION, UsageRecord};
 use crate::tracking_budget::PlanWindow;
 use crate::tracking_fields::{Figures, Unavailable, note};
 use crate::tracking_store::{Body, Coverage, SourceState};
+
+/// What a call the provider refused spent: nought of each.
+const NOTHING_SPENT: Tokens = Tokens {
+    input: Some(0),
+    output: Some(0),
+    cache_creation: Some(0),
+    cache_read: Some(0),
+    reasoning: None,
+};
 
 /// The proxy adapter: the proxy's per-run usage file.
 pub const PROXY_ADAPTER: &str = "lys-proxy-usage/1";
@@ -219,6 +232,11 @@ impl ProxyReading<'_> {
         // A call whose spend is not known is still one record, with no
         // figure, beside the coverage entry that says why: every call that
         // passed is on the record, and none is counted as nothing spent.
+        // The provider answered an error at the head and reported no figure:
+        // nothing was spent.
+        let refused = line.usage.is_none()
+            && line.status != CallStatus::Lost
+            && line.http.is_some_and(|status| status >= 400);
         let unknown = if line.status == CallStatus::Lost {
             Some((
                 "call_lost",
@@ -227,7 +245,7 @@ impl ProxyReading<'_> {
                     line.call_id
                 ),
             ))
-        } else if line.usage.is_none() {
+        } else if line.usage.is_none() && !refused {
             Some((
                 "usage_unreported",
                 format!(
@@ -240,6 +258,7 @@ impl ProxyReading<'_> {
         };
         let (figures, unavailable) = match (&unknown, line.usage.as_ref()) {
             (None, Some(usage)) => spend(line.api, usage),
+            (None, None) if refused => spend(line.api, &NOTHING_SPENT),
             // No figure, each named as unreported.
             _ => spend(line.api, &Tokens::default()),
         };
