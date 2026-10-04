@@ -34,6 +34,7 @@ const SYMBOLS = {
   out: <path d="M6 12h12" />,
   in: <path d="M6 12h12M12 6v12" />,
   tidy: <><rect x="3" y="4" width="10.5" height="7" rx="1.2" /><path d="M16.5 5.5h4.5M16.5 9.5h4.5" /><rect x="3" y="13" width="10.5" height="7" rx="1.2" /><path d="M16.5 14.5h4.5M16.5 18.5h4.5" /></>,
+  teams: <><rect x="3" y="4" width="18" height="16" rx="2" strokeDasharray="3 2.5" /><rect x="6.5" y="10" width="11" height="7" rx="1.5" strokeDasharray="2 2" /><path d="M6 7.5h5" /></>,
   home: <><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" /><rect x="9" y="9" width="6" height="6" rx="1" /></>,
 };
 
@@ -175,13 +176,15 @@ function Grip({ bar, at, move, drag }: { bar: Bar; at: Corner; move: (to: Corner
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v.01M15 6v.01M9 12v.01M15 12v.01M9 18v.01M15 18v.01" /></svg></button>;
 }
 
-export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, tidy, says, connections, kind, place, drop, ...layouts }: {
+export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, tidy, teams, says, connections, kind, place, drop, ...layouts }: {
   graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean;
   panel: Panel; setPanel: (panel: Panel) => void;
   /** How far the surface is zoomed, in percent; `zoomBy` steps it, or with null puts it back to actual size; `home` brings the windows back into view. */
   zoom: number; zoomBy: (factor: number | null) => void; home: () => void;
   /** Puts everything on the canvas into rows. */
   tidy: () => void;
+  /** Draws a box round each team and tidies; null when no team has an agent running. */
+  teams: (() => void) | null;
   /** What went wrong that the person has to know, each said once over the bar. */
   says: ReactNode;
   connections: ReactNode;
@@ -223,6 +226,7 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
       <Symbol act="layouts" says="Layouts: save this one, or open a saved one" on={slide('layouts')} expanded={panel === 'layouts'} />
       <Symbol act="connections" says="Connections, in words" on={slide('connections')} expanded={panel === 'connections'} />
       <Symbol act="tidy" says="Tidy: put every window, widget, note and box into rows" on={tidy} />
+      {teams ? <Symbol act="teams" says="Teams: draw a box round each team's agents, a team's own teams inside it, and tidy" on={teams} /> : null}
     </div>,
   };
   // The panel, and what has to be said, stand by the bar they belong to: the widgets and a held tool by the drawing bar, the rest by the tools.

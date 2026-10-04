@@ -15,7 +15,11 @@ export interface SessionNode {
 }
 export interface SessionEdge { id: string; from: string; to: string; label: string; kind: 'membership' | 'grant' | 'message' | 'identity'; stands: boolean }
 /** `names` is null when the names could not be read; the notices say why. */
-export interface SessionGraph { nodes: SessionNode[]; edges: SessionEdge[]; notices: string[]; unanswered: Unanswered[]; names: Record<string, string> | null }
+export interface SessionGraph {
+  nodes: SessionNode[]; edges: SessionEdge[]; notices: string[]; unanswered: Unanswered[]; names: Record<string, string> | null;
+  /** Every team by its id, with the team it is one of; absent when the teams could not be read (the notices say why). */
+  teams?: Record<string, { name: string; parent: string | null }>;
+}
 
 /**
  * An identity whose name the canvas cannot show, said without its raw id: outside the caller's view when the names
@@ -105,7 +109,8 @@ export async function readSessionGraph(): Promise<SessionGraph> {
   }
   if (teams.status === 'fulfilled' && !Array.isArray(teams.value.teams)) throw new Error('The service did not return a team list.');
   const graph = graphFromRecords(live.value.sessions, teams.status === 'fulfilled' ? teams.value.teams : [], world.status === 'fulfilled' ? world.value : null);
-  return { ...graph, names: world.status === 'fulfilled' ? Object.fromEntries([...world.value.who].map(([id, person]) => [id, person.name])) : null, unanswered: live.value.unanswered, notices: [
+  const known = teams.status === 'fulfilled' ? Object.fromEntries(teams.value.teams.map((team) => [team.id, { name: team.name, parent: team.parent ?? null }])) : undefined;
+  return { ...graph, ...(known ? { teams: known } : {}), names: world.status === 'fulfilled' ? Object.fromEntries([...world.value.who].map(([id, person]) => [id, person.name])) : null, unanswered: live.value.unanswered, notices: [
     ...(teams.status === 'rejected' ? [unavailable('Team connections', teams.reason)] : []),
     ...(world.status === 'rejected' ? [unavailable('Names and grant connections', world.reason)] : []),
   ] };

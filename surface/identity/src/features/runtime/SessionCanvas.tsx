@@ -22,6 +22,7 @@ import { CanvasDock, KindSymbol, PANELS } from './CanvasDock';
 import type { Panel, Tool } from './CanvasDock';
 import { Anchors, GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
 import { HOME, around, framed, useWheel, zoomOf, zoomed } from './canvas-view';
+import { teamBoxed } from './canvas-teams';
 import { tidied } from './canvas-tidy';
 import type { View } from './canvas-view';
 import { TypeTogether } from './CanvasTogether';
@@ -204,10 +205,10 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
   };
   // Tidy puts everything into rows and brings the whole into view, no nearer than actual size. Until the person changes something else, it can be put back as it was.
   const [untidy, setUntidy] = useState<{ moved: Record<string, Box>; marks: Marks; view: View; at: number } | null>(null);
-  const tidy = () => {
+  const tidy = (from: { boxes: Record<string, Box>; marks: Marks } = { boxes, marks }) => {
     const element = surface.current;
     if (!element?.clientWidth || !element.clientHeight) return;
-    const next = tidied(boxes, marks, Object.fromEntries(graph.nodes.map((node) => [node.id, node.column])), hereName(graph), element.clientWidth / element.clientHeight);
+    const next = tidied(from.boxes, from.marks, Object.fromEntries(graph.nodes.map((node) => [node.id, node.column])), hereName(graph), element.clientWidth / element.clientHeight);
     setUntidy({ moved, marks, view, at: changes + 1 });
     setMoved((all) => ({ ...all, ...next.boxes }));
     setMarks((all) => ({ ...all, groups: next.groups, notes: next.notes, widgets: next.widgets }));
@@ -483,7 +484,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
   {together.length ? <TypeTogether chosen={running.filter((each) => together.includes(each.node))} drop={(node) => setTogether((now) => now.filter((id) => id !== node))} clear={() => setTogether([])}
     all={running.every((each) => together.includes(each.node)) ? null : () => setTogether(running.map((each) => each.node))} /> : null}
   <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} panel={panel} setPanel={setPanel}
-    zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} tidy={tidy} connections={connections} kind={kind} place={(next) => { setKind(next); setTool('widget'); setPanel(null); }} drop={drop} keeping={keeping} layouts={layouts} save={save} remove={remove}
+    zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} tidy={() => tidy()} teams={teamBoxed(graph, boxes, marks) ? () => tidy(teamBoxed(graph, boxes, marks)!) : null} connections={connections} kind={kind} place={(next) => { setKind(next); setTool('widget'); setPanel(null); }} drop={drop} keeping={keeping} layouts={layouts} save={save} remove={remove}
     says={<>
       {untidy?.at === changes ? <span role="status">Tidied. <button type="button" className="btn" data-act="untidy" onClick={putBack}>Put it back</button></span> : null}
       {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}

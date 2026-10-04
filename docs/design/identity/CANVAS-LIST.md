@@ -6,7 +6,12 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 
 ## The canvas
 
-- A box around each team, drawn for the person.
+- A box around each team, drawn for the person. Tom, 5 October, 07:4x: "draw a box around, yeah, each team,
+  that's fine. Don't overthink it too much, but yeah, child boxes inside parents, that'd be good." Written
+  5 October: one press on the tools bar (shown when a team has an agent running) draws a box named for each
+  such team round its card and its agents' windows, a team's own teams inside it, and tidies; "Put it back"
+  undoes it; the boxes are ordinary boxes after. An agent in several teams stands in the one furthest down.
+  Leaves this list when installed and walked.
 - Widgets for everything Lys holds about an agent that has none yet: tasks, git branch, commits, worktrees,
   pull requests, reviews, jobs and tickets.
 - The HUD on an agent's window: compact, set a goal, add a task.
