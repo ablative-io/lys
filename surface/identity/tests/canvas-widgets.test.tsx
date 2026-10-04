@@ -5,7 +5,7 @@ import { $, $$, click, mount, press, text } from './harness';
 import { COURIER, SCRIBE, SERVICE, dashboard, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { mockTerminal } from './terminal-double';
-import { accountsOf, scopeOf, summed } from '../src/features/runtime/canvas-widgets';
+import { accountsOf, combined, scopeOf, summed } from '../src/features/runtime/canvas-widgets';
 import { stood } from '../src/features/runtime/canvas-marks';
 import type { DashboardAgent } from '../src/features/dashboard/contract';
 import { windowWords } from '../src/features/runtime/CanvasWidgets';
@@ -47,8 +47,8 @@ describe('Widgets on the canvas', () => {
     await mount('#/canvas', routes);
     await click($('[data-act="draw-widget"]'));
     expect(location.hash).toContain('panel=widgets');
-    expect($$('[data-act="place-widget"]').map((each) => each.textContent)).toEqual(['Usage', 'Budget', 'Goals', 'Requests', 'Drafts']);
-    expect($$('[data-act="place-widget"] svg')).toHaveLength(5);
+    expect($$('[data-act="place-widget"]').map((each) => each.textContent)).toEqual(['Usage', 'Budget', 'Goals', 'Requests', 'Drafts', 'Formula']);
+    expect($$('[data-act="place-widget"] svg')).toHaveLength(6);
     await click($('[data-act="place-widget"][data-kind="goals"]'));
     expect($('[data-act="draw-widget"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(location.hash).not.toContain('panel=');
@@ -218,6 +218,43 @@ describe('Widgets on the canvas', () => {
     expect($('[data-widget]')).toBeNull();
   });
 
+  it('combines the figures of the widgets a line joins a formula to, the way the person chose, and says when they cannot be combined', async () => {
+    const tokens = (id: string, y: number) => ({ id, kind: 'usage', shows: 'tokens/day', x: 700, y, w: 340, h: 250 });
+    start({
+      widgets: [tokens('widget:s', 100), tokens('widget:c', 150), { id: 'widget:g', kind: 'goals', x: 700, y: 200, w: 340, h: 190 }, { id: 'widget:f', kind: 'formula', x: 1100, y: 100, w: 320, h: 150 }, { id: 'widget:t', kind: 'formula', shows: 'highest', x: 1100, y: 300, w: 320, h: 150 },
+        { id: 'widget:m', kind: 'formula', x: 1100, y: 500, w: 320, h: 150 }, { id: 'widget:n', kind: 'formula', x: 1100, y: 600, w: 320, h: 150 }],
+      // One usage widget is fed by Scribe; the other, fed by no line and in no box, counts every agent.
+      links: [{ id: 'l1', from: 'agent:' + SCRIBE, to: 'widget:s' }, { id: 'l3', from: 'widget:s', to: 'widget:f' }, { id: 'l4', from: 'widget:f', to: 'widget:c' },
+        { id: 'l6', from: 'widget:s', to: 'widget:m' }, { id: 'l7', from: 'widget:g', to: 'widget:m' },
+        // A formula feeds another only by a line drawn from it: the second is fed by the first, and never the first by the second.
+        { id: 'l5', from: 'widget:f', to: 'widget:t' }],
+    });
+    await mount('#/canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, [used('tokens', 'day', 120000)]) }, [COURIER]: { usage: usage(COURIER, [used('tokens', 'day', 30000)]) } })) });
+    const card = (id: string) => $('[data-widget="' + id + '"]') as HTMLElement;
+    const figure = (id: string) => card(id).querySelector('.canvas-widget-figure')?.textContent;
+    // Fed whichever way the line was drawn; it adds until the person chooses another way.
+    expect([card('widget:f').getAttribute('aria-label'), figure('widget:f'), figure('widget:t')]).toEqual(['Formula of 2 inputs', '270,000 tokens', '270,000 tokens']);
+    // Tokens and a count of goals are not one number; a formula nothing feeds says so.
+    expect([figure('widget:m'), figure('widget:n'), card('widget:n').getAttribute('aria-label')]).toEqual(['Mixed units', 'No input', 'Formula of 0 inputs']);
+    // It has no medium face: its button opens it out to what feeds it, then its settings.
+    await click(card('widget:f').querySelector('[data-act="widget-view"]'));
+    expect(card('widget:f').dataset.view).toBe('detail');
+    expect($$('[data-widget="widget:f"] tr[data-input]').map((row) => row.textContent)).toEqual(['Usage of Scribe120,000 tokens today', 'Usage of Every agent150,000 tokens today']);
+    expect($('[data-widget="widget:f"] tr[data-result]')?.textContent).toBe('Sum270,000 tokens');
+    await click(card('widget:f').querySelector('[data-act="widget-view"]'));
+    expect($$('[data-widget="widget:f"] [data-variant]').map((each) => [each.textContent, each.getAttribute('aria-pressed')])).toEqual([['Sum', 'true'], ['Average', 'false'], ['Highest', 'false'], ['Lowest', 'false'], ['How many', 'false']]);
+    expect([$('[data-widget="widget:f"] [data-face]'), $('[data-widget="widget:f"] a[href]')]).toEqual([null, null]);
+    await click($('[data-widget="widget:f"] [data-variant="average"]'));
+    expect([figure('widget:f'), figure('widget:t'), kept().widgets.find((each) => each.id === 'widget:f')?.shows]).toEqual(['135,000 tokens', '135,000 tokens', 'average']);
+    await click($('[data-widget="widget:f"] [data-variant="lowest"]'));
+    expect(figure('widget:f')).toBe('120,000 tokens');
+    await click($('[data-widget="widget:f"] [data-variant="count"]'));
+    expect(figure('widget:f')).toBe('2');
+    // No widget beside an agent's window offers a formula: it is fed by widgets, not by an agent.
+    await click($('.session-canvas-node.sessions h3'));
+    expect($('[data-add-widget="formula"]')).toBeNull();
+  });
+
   it('says by name what could not be read, and that a kind is not known', async () => {
     start({ widgets: [{ id: 'widget:b', kind: 'weather', x: 700, y: 520, w: 340, h: 180, view: 'detail' }] });
     await mount('#/canvas', routes);
@@ -286,6 +323,14 @@ describe('What a widget counts', () => {
       ['open', 100, 200], ['a', 310, 34], ['b', 354, 34], ['beside', 144, 34], ['above', 40, 34]]);
     // As pills, each stands where the person put it, even one laid over another.
     expect(places([{ ...open, view: undefined }, pill('a', 100, 110)])).toEqual([['open', 100, 34], ['a', 110, 34]]);
+  });
+
+  it('combines figures of one kind and refuses to make one number of different kinds', () => {
+    const tokens = (amount: number) => ({ amount, unit: 'tokens' });
+    expect(['sum', 'average', 'highest', 'lowest', 'count'].map((by) => combined(by, [tokens(10), tokens(40), tokens(100)]))).toEqual(
+      [tokens(150), tokens(50), tokens(100), tokens(10), { amount: 3, unit: 'count' }]);
+    expect(combined('sum', [tokens(10), { amount: 2, unit: 'dollars' }])).toBe('mixed');
+    expect([combined('sum', []), combined('count', [])]).toEqual(['none', { amount: 0, unit: 'count' }]);
   });
 
   it('adds amounts over the agents, shows levels at their highest, and counts who did not report with the reason', () => {

@@ -23,8 +23,8 @@ import type { Panel, Tool } from './CanvasDock';
 import { Anchors, GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
 import { HOME, ZOOM, useWheel, zoomOf, zoomed } from './canvas-view';
 import type { View } from './canvas-view';
-import { WidgetCard } from './CanvasWidgets';
-import { AGENT, KINDS, scopeOf } from './canvas-widgets';
+import { WidgetCard, heldOf } from './CanvasWidgets';
+import { AGENT, KINDS } from './canvas-widgets';
 import { readBoard } from '../dashboard/board';
 import type { Board } from '../dashboard/board';
 import './session-canvas.css';
@@ -478,14 +478,14 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
           <Anchors from={linking(node.id)} />
           {/* The agent's window in front holds out each kind of widget beside it: one press adds that widget, fed by a line from this agent. */}
           {node.session?.agent && front === node.id && !tool ? <div className="canvas-adders" role="toolbar" aria-label={'Add a widget for ' + node.title}>
-            {Object.entries(KINDS).map(([named, each]) => <button key={named} type="button" className="canvas-symbol" data-add-widget={named} aria-label={'Add ' + each.label + ' for ' + node.title} title={'Add ' + each.label}
+            {Object.entries(KINDS).filter(([, each]) => !each.takes).map(([named, each]) => <button key={named} type="button" className="canvas-symbol" data-add-widget={named} aria-label={'Add ' + each.label + ' for ' + node.title} title={'Add ' + each.label}
               onClick={() => addFor(node.id, named)}><KindSymbol kind={named} /></button>)}
           </div> : null}
         </article>;
       })}
       {marks.notes.map((note) => <NoteCard key={note.id} note={note} fresh={fresh === note.id} pick={pick?.(note.id)} move={moving(note.id)} size={sizing(note.id, SMALLEST_MARK)} link={linking(note.id)}
         change={(text) => reworded(note.id, text)} colour={() => recoloured(note.id)} remove={() => removeMark(note.id)} />)}
-      {widgets.map((widget) => <WidgetCard key={widget.id} widget={widget} board={board} morph={morph === widget.id} chosen={chosen === widget.id} scope={board.status === 'ok' ? scopeOf(widget, marks.links, marks.groups, windows, board.data.rows) : null}
+      {widgets.map((widget) => <WidgetCard key={widget.id} widget={widget} board={board} morph={morph === widget.id} chosen={chosen === widget.id} held={board.status === 'ok' ? heldOf(widget, { widgets, links: marks.links, groups: marks.groups, windows, board: board.data }) : null}
         pick={pick?.(widget.id)} move={moving(widget.id)} link={linking(widget.id)} remove={() => removeMark(widget.id)}
         fit={(h) => setMarks((all) => ({ ...all, widgets: all.widgets.map((each) => each.id === widget.id ? { ...each, h } : each) }))}
         set={(change) => { setMarks((all) => ({ ...all, widgets: all.widgets.map((each) => each.id === widget.id ? { ...each, ...change } : each) })); if ('view' in change) setMorph(widget.id); changed(); }} />)}

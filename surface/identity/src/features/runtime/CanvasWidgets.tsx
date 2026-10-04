@@ -18,9 +18,10 @@ import type { AccountWindows, Measure } from '../usage/contract';
 import { KindSymbol } from './CanvasDock';
 import { Anchors } from './CanvasMarks';
 import { COLOURS, nextView, standing, tint } from './canvas-marks';
-import type { Side, Widget } from './canvas-marks';
-import { KINDS, accountsOf, summed } from './canvas-widgets';
-import type { Scope, Summed } from './canvas-widgets';
+import type { Group, Link, Side, Widget } from './canvas-marks';
+import { counted } from '../../shell/count';
+import { COMBINES, KINDS, accountsOf, combined, scopeOf, summed } from './canvas-widgets';
+import type { AgentWindow, Scope, Summed, Value } from './canvas-widgets';
 import '../dashboard/dashboard.css';
 
 const FIGURE: Record<Measure, string> = { context_percent: 'Context', tokens: 'Tokens', running_ms: 'Running', dollars: 'Dollars', plan_percent: 'Plan' };
@@ -49,7 +50,7 @@ export function Dial({ percent, face, children }: { percent: number; face?: 'mid
 }
 
 /** A figure as a face holds it: its number, what it is in words, its level when it is one, and how a pill ends it. */
-interface Figure { key: string; figure: string; says: string; percent: number | null; tail: string; more?: ReactNode }
+interface Figure { key: string; figure: string; says: string; percent: number | null; tail: string; value: Value; more?: ReactNode }
 
 const level = (unit: Measure) => unit === 'context_percent' || unit === 'plan_percent';
 
@@ -61,12 +62,12 @@ function figuresOf(key: string, lines: Summed[], accounts: AccountWindows[], sev
   if (key.startsWith('window/')) {
     const minutes = Number(key.slice('window/'.length));
     return accounts.flatMap((account) => account.windows.filter((each) => each.duration_minutes === minutes).map((each) => ({ key: key + '/' + account.account,
-      figure: amount('plan_percent', each.used_percent), says: windowWords(minutes) + ' window of ' + account.account + ', resets ' + clockMs(each.resets_at_ms), percent: each.used_percent, tail: ' of ' + windowWords(minutes) })));
+      figure: amount('plan_percent', each.used_percent), says: windowWords(minutes) + ' window of ' + account.account + ', resets ' + clockMs(each.resets_at_ms), percent: each.used_percent, tail: ' of ' + windowWords(minutes), value: { amount: each.used_percent, unit: 'plan_percent' } })));
   }
   const line = lines.find((each) => each.unit + '/' + (each.period ?? '') === key);
   if (!line || line.figure === null) return [];
   return [{ key, figure: amount(line.unit, line.figure), says: FIGURE[line.unit] + ' ' + (line.period ? THIS[line.period] : 'now') + (several && level(line.unit) ? ', highest' : ''),
-    percent: level(line.unit) ? line.figure : null, tail: line.unit === 'context_percent' ? ' context' : line.period ? ' ' + THIS[line.period] : '',
+    percent: level(line.unit) ? line.figure : null, tail: line.unit === 'context_percent' ? ' context' : line.period ? ' ' + THIS[line.period] : '', value: { amount: line.figure, unit: line.unit },
     more: several && line.missing.length ? <span className="dim" title={line.missing.join('\n')}> ({line.reported} of {line.reported + line.missing.length} reporting)</span> : undefined }];
 }
 
@@ -76,7 +77,14 @@ const stat = (each: Figure, look: Look, face: 'mid' | 'large') => <div className
   <span className="sec">{each.says}{each.more}</span>{each.percent !== null && look === 'bar' ? bar(each.percent, each.figure) : null}</div>;
 
 /** What a widget holds: the part the Dashboard shows, and for a kind with figures to choose among, its medium face. */
-export interface Held extends Part { /** The medium face: the chosen figures side by side. */ faces?: ReactNode; /** One of the figures it shows is a level, so how a level is drawn can be chosen. */ levelled?: boolean }
+export interface Held extends Part {
+  /** The medium face: the chosen figures side by side. */
+  faces?: ReactNode;
+  /** One of the figures it shows is a level, so how a level is drawn can be chosen. */
+  levelled?: boolean;
+  /** Its one figure as a number, when it has one: what a formula it feeds works on. Several accounts' windows feed their highest. */
+  value?: Value;
+}
 type Chosen = Pick<Widget, 'shows' | 'faces' | 'look'>;
 
 /**
@@ -103,6 +111,8 @@ function usagePart(scope: Scope, { shows, faces, look }: Chosen): Held {
   const why = (key: string) => lines.find((each) => each.unit + '/' + (each.period ?? '') === key)?.missing.join('\n');
   return { label: 'Usage', href: '#/people', count, ...(small ? { figure: small.length ? small.map((each) => each.figure).join(', ') + small[0].tail : 'Not reported' } : {}),
     percent: small ? (levels.length ? Math.max(...levels) : undefined) : context?.figure ?? undefined,
+    value: small ? (small.length ? { amount: Math.max(...small.map((each) => each.value.amount)), unit: small[0].value.unit } : undefined)
+      : context?.figure != null ? { amount: context.figure, unit: 'context_percent' } : tokens?.figure != null ? { amount: tokens.figure, unit: 'tokens' } : undefined,
     levelled: medium.some((each) => each.held.some((held) => held.percent !== null)),
     faces: !scope.rows.length ? <p className="dim canvas-stat-none">No agent is counted here.</p>
       : !medium.length ? <p className="dim canvas-stat-none">No figure is chosen for this face.</p>
@@ -136,19 +146,69 @@ export function partOf(kind: string, scope: Scope, board: Board, chosen: Chosen 
   const none = (part: Part, words: string, any: boolean): Part => any ? part : { ...part, figure: words };
   if (kind === 'budget') {
     const near = scope.rows.flatMap((row) => refusedPart(row.budget) ? [] : [tightest(row.budget)]).filter((each): each is number => each !== null);
-    return { ...none(budgetPart({ rows: scope.rows }), 'No limit', scope.rows.some((row) => refusedPart(row.budget) || row.budget.limits.length > 0)), ...(near.length ? { percent: Math.max(...near) * 100 } : {}) };
+    return { ...none(budgetPart({ rows: scope.rows }), 'No limit', scope.rows.some((row) => refusedPart(row.budget) || row.budget.limits.length > 0)), ...(near.length ? { percent: Math.max(...near) * 100, value: { amount: Math.max(...near) * 100, unit: 'percent' } } : {}) };
   }
-  if (kind === 'goals') return none(goalsPart({ rows: scope.rows }), 'No goal', scope.rows.some((row) => refusedPart(row.goals) || row.goals.goals.some((item) => item.goal.active)));
+  const many = (amount: number): Value => ({ amount, unit: 'count' });
+  if (kind === 'goals') {
+    const active = scope.rows.flatMap((row) => refusedPart(row.goals) ? [] : row.goals.goals.filter((item) => item.goal.active));
+    return { ...none(goalsPart({ rows: scope.rows }), 'No goal', scope.rows.some((row) => refusedPart(row.goals)) || active.length > 0), value: many(active.length) };
+  }
   // Of every agent, a list of what waits is the whole list; of one agent or a box, only what those agents asked for or prepared.
   if (kind === 'requests') {
     const requests = board.requests instanceof Refused || scope.everyone ? board.requests : board.requests.filter((each) => theirs.has(each.asked_by));
-    return none(requestsPart({ me: board.me, requests }), 'None waiting', requests instanceof Refused || requests.some((each) => each.state === 'waiting'));
+    return { ...none(requestsPart({ me: board.me, requests }), 'None waiting', requests instanceof Refused || requests.some((each) => each.state === 'waiting')), ...(requests instanceof Refused ? {} : { value: many(requests.filter((each) => each.state === 'waiting').length) }) };
   }
   if (kind === 'drafts') {
     const drafts = board.drafts instanceof Refused || scope.everyone ? board.drafts : board.drafts.filter((each) => each.agent !== null && theirs.has(each.agent.id));
-    return none(draftsPart({ drafts }), 'None waiting', drafts instanceof Refused || drafts.length > 0);
+    return { ...none(draftsPart({ drafts }), 'None waiting', drafts instanceof Refused || drafts.length > 0), ...(drafts instanceof Refused ? {} : { value: many(drafts.length) }) };
   }
   return null;
+}
+
+const LEVELS: ReadonlySet<string> = new Set(['context_percent', 'plan_percent', 'percent']);
+/** A combined figure in words: an amount in its own unit's words, a count as its number. */
+const said = (value: Value): string => value.unit === 'count' ? value.amount.toLocaleString('en-AU', { maximumFractionDigits: 1 })
+  : value.unit === 'percent' ? Math.round(value.amount) + '%' : amount(value.unit as Measure, value.amount);
+
+/** A widget that feeds a formula: what it is, whose it is, its figure in words and as a number. */
+interface Input { id: string; label: string; whose: string; figure: ReactNode; value?: Value }
+
+/** What a formula holds: the figures of the widgets fed to it, combined the way the person chose. */
+function formulaPart(by: string, inputs: Input[]): Held {
+  const result = combined(by, inputs.flatMap((each) => each.value ?? []));
+  const figure = result === 'none' ? (inputs.length ? 'Nothing reported' : 'No input') : result === 'mixed' ? 'Mixed units' : said(result);
+  const value = typeof result === 'object' ? result : undefined;
+  return { label: 'Formula', href: '', count: '', figure, value, ...(value && LEVELS.has(value.unit) ? { percent: value.amount } : {}),
+    body: <table className="dash-table"><tbody>
+      {inputs.map((each) => <tr key={each.id} data-input={each.id}><td>{each.label}{each.whose ? ' of ' + each.whose : ''}</td><td className="sec">{each.figure}</td></tr>)}
+      {inputs.length ? null : <tr className="empty"><td className="dim" colSpan={2}>Draw a line from a widget to this one to feed it.</td></tr>}
+      <tr data-result={by}><td>{COMBINES[by] ?? COMBINES.sum}</td><td className="sec"><b>{figure}</b>{result === 'mixed' ? <span className="dim"> Figures of different kinds are not combined.</span> : null}</td></tr>
+    </tbody></table> };
+}
+
+/** Everything on the surface a widget's figure can come from. */
+export interface Surface { widgets: Widget[]; links: Link[]; groups: Group[]; windows: AgentWindow[]; board: Board }
+/** A widget as it stands: whose it is in words, and what it holds; nothing held for a kind this page does not know. */
+export interface Standing { whose: string; part: Held | null }
+
+/**
+ * What a widget holds. A formula holds the figures of the widgets a line joins it to: any widget feeds it whichever way
+ * the line was drawn, and another formula feeds it only by a line drawn from that formula to this one, so two formulas
+ * never feed each other round in a ring.
+ */
+export function heldOf(widget: Widget, on: Surface, within: ReadonlySet<string> = new Set()): Standing {
+  if (KINDS[widget.kind]?.takes !== 'widgets') {
+    const scope = scopeOf(widget, on.links, on.groups, on.windows, on.board.rows);
+    return { whose: scope.whose, part: partOf(widget.kind, scope, on.board, widget) };
+  }
+  const inside = new Set([...within, widget.id]);
+  const inputs = on.links.flatMap((link): Input[] => {
+    const fed = on.widgets.find((each) => each.id === (link.to === widget.id ? link.from : link.from === widget.id ? link.to : null));
+    if (!fed || inside.has(fed.id) || (KINDS[fed.kind]?.takes === 'widgets' && link.to !== widget.id)) return [];
+    const held = heldOf(fed, on, inside);
+    return [{ id: fed.id, label: KINDS[fed.kind]?.label ?? fed.kind, whose: held.whose, value: held.part?.value, figure: held.part ? held.part.figure ?? held.part.count : 'Unknown kind' }];
+  });
+  return { whose: counted(inputs.length, 'inputs'), part: formulaPart(widget.shows ?? 'sum', inputs) };
 }
 
 type Press = (event: PointerEvent<HTMLElement>) => void;
@@ -159,8 +219,10 @@ type Press = (event: PointerEvent<HTMLElement>) => void;
  * (everything it holds), then its settings, then a pill again. Pressing it anywhere else only chooses it and moves it.
  * It is as large as what it holds; it is not dragged to a size.
  */
-export function WidgetCard({ widget, scope, board, morph, chosen, pick, move, link, remove, set, fit }: {
-  widget: Widget; scope: Scope | null; board: Load<Board>;
+export function WidgetCard({ widget, held, board, morph, chosen, pick, move, link, remove, set, fit }: {
+  widget: Widget;
+  /** Whose it is and what it holds, once the board is read. */
+  held: Standing | null; board: Load<Board>;
   /** It has just changed view, and moves between the two sizes. */
   morph: boolean;
   /** It was the last thing pressed: it holds out the small cross that takes it away. */
@@ -177,18 +239,21 @@ export function WidgetCard({ widget, scope, board, morph, chosen, pick, move, li
     if (widget.view && height > 0 && height !== widget.h) fit(height);
   });
   const label = KINDS[widget.kind]?.label ?? 'Widget';
-  const part = scope && board.status === 'ok' ? partOf(widget.kind, scope, board.data, widget) : null;
-  const choices = KINDS[widget.kind]?.choices;
-  const whose = scope?.whose ?? '';
+  const part = held?.part ?? null;
+  const kind = KINDS[widget.kind];
+  const choices = kind?.choices;
+  // A kind that names no way of choosing none always has one chosen: its first, until the person chooses.
+  const shown = widget.shows ?? (kind?.unset === undefined ? Object.keys(choices ?? {})[0] : '');
+  const whose = held?.whose ?? '';
   const now = standing(widget);
   let body: ReactNode;
   if (board.status === 'loading') body = <p role="status">Reading…</p>;
   else if (board.status === 'refused') body = <p className="why-not" role="alert">This could not be read. <small className="refusal-name" title={board.refused.refusal.reason}>{board.refused.refusal.refusal}</small></p>;
   else body = part ? part.body : <p className="why-not" role="alert">This page does not know a widget of the kind “{widget.kind}”.</p>;
   const figure = board.status === 'refused' ? board.refused.refusal.refusal : part ? part.figure ?? part.count : board.status === 'loading' ? '…' : 'Unknown kind';
-  const turned = nextView(widget.view, !!choices);
+  const turned = nextView(widget.view, !!kind?.faces);
   const next = turned === 'faces' ? 'Medium face' : turned === 'detail' ? 'Large face' : turned === 'settings' ? 'Its settings' : 'Small face';
-  const medium = widget.faces ?? KINDS[widget.kind]?.faces ?? [];
+  const medium = widget.faces ?? kind?.faces ?? [];
   // Chosen figures stay in the order the kind offers them, whichever was pressed first.
   const faced = (key: string) => Object.keys(choices ?? {}).filter((each) => each === key ? !medium.includes(key) : medium.includes(each));
   return <article className={'canvas-widget' + (widget.view ? ' wide' : '') + (morph ? ' morph' : '') + (pick ? ' picking' : '')} data-widget={widget.id} data-kind={widget.kind} data-view={widget.view ?? 'pill'}
@@ -206,16 +271,16 @@ export function WidgetCard({ widget, scope, board, morph, chosen, pick, move, li
       <table className="dash-table"><tbody>
         <tr><td>Widget</td><td className="sec">{label}</td></tr>
         <tr><td>Counts</td><td className="sec">{whose || 'Nothing yet'}</td></tr>
-        {choices ? <tr><td>Small face</td><td><div className="canvas-widget-variants" role="toolbar" aria-label={'The one figure this ' + label + ' widget shows as a pill'}>
-          {[['', 'First reported'], ...Object.entries(choices)].map(([key, name]) => <button key={key} type="button" data-variant={key} aria-pressed={(widget.shows ?? '') === key} onClick={() => set({ shows: key || undefined })}>{name}</button>)}
+        {choices ? <tr><td>{kind?.chooses ?? 'Shows'}</td><td><div className="canvas-widget-variants" role="toolbar" aria-label={(kind?.chooses ?? 'Shows') + ', of this ' + label + ' widget'}>
+          {[...(kind?.unset === undefined ? [] : [['', kind.unset]]), ...Object.entries(choices)].map(([key, name]) => <button key={key} type="button" data-variant={key} aria-pressed={shown === key} onClick={() => set({ shows: key || undefined })}>{name}</button>)}
         </div></td></tr> : null}
-        {choices ? <tr><td>Medium face</td><td><div className="canvas-widget-variants" role="toolbar" aria-label={'The figures this ' + label + ' widget shows side by side'}>
+        {choices && kind?.faces ? <tr><td>Medium face</td><td><div className="canvas-widget-variants" role="toolbar" aria-label={'The figures this ' + label + ' widget shows side by side'}>
           {Object.entries(choices).map(([key, name]) => <button key={key} type="button" data-face={key} aria-pressed={medium.includes(key)} onClick={() => set({ faces: faced(key) })}>{name}</button>)}
         </div></td></tr> : null}
         {part?.percent !== undefined || part?.levelled ? <tr><td>Drawn as</td><td><div className="canvas-widget-variants" role="toolbar" aria-label="How its level is drawn">
           {([[undefined, 'Number'], ['bar', 'Bar'], ['dial', 'Dial']] as const).map(([key, name]) => <button key={name} type="button" data-look={key ?? 'number'} aria-pressed={widget.look === key} onClick={() => set({ look: key })}>{name}</button>)}
         </div></td></tr> : null}
-        {part ? <tr><td>Whole page</td><td><a href={part.href}>Open {label.toLowerCase()}</a></td></tr> : null}
+        {part?.href ? <tr><td>Whole page</td><td><a href={part.href}>Open {label.toLowerCase()}</a></td></tr> : null}
         <tr><td>Colour</td><td><div className="canvas-swatches" role="toolbar" aria-label="Its colour">
           {[undefined, ...Object.keys(COLOURS)].map((key) => <button key={key ?? 'own'} type="button" className="canvas-swatch" data-colour={key ?? 'own'} aria-label={key ?? 'Lys’s own'} title={key ?? 'Lys’s own'} aria-pressed={widget.colour === key} style={tint(key)} onClick={() => set({ colour: key })} />)}
         </div></td></tr>

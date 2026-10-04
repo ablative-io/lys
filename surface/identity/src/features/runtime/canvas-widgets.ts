@@ -21,17 +21,41 @@ export interface Kind {
   choices?: Record<string, string>;
   /** The figures its medium face holds until the person chooses their own. */
   faces?: string[];
+  /** What its settings call the choice among `choices`, and the name of choosing none; a kind with no such name always has one chosen, the first until the person chooses. */
+  chooses?: string;
+  unset?: string;
+  /** It is fed by other widgets, not by agents: it works on their figures. */
+  takes?: 'widgets';
 }
+/** The ways a formula combines the figures fed to it, each by its name. */
+export const COMBINES: Record<string, string> = { sum: 'Sum', average: 'Average', highest: 'Highest', lowest: 'Lowest', count: 'How many' };
 /** Every kind of widget, in the order the bar offers them. */
 export const KINDS: Record<string, Kind> = {
   usage: { label: 'Usage', size: [340, 250], symbol: 'M4 17a8 8 0 1 1 16 0M12 17l4.5-6',
     choices: { 'context_percent/': 'Context', 'tokens/day': 'Tokens today', 'tokens/week': 'Tokens this week', 'dollars/day': 'Dollars today', 'dollars/week': 'Dollars this week', 'running_ms/day': 'Running today', 'running_ms/week': 'Running this week', 'window/300': '5-hour window', 'window/10080': '7-day window' },
-    faces: ['context_percent/', 'tokens/day', 'window/300'] },
+    faces: ['context_percent/', 'tokens/day', 'window/300'], chooses: 'Small face', unset: 'First reported' },
   budget: { label: 'Budget', size: [340, 170], symbol: 'M12 3v18M16.5 7.5C15.8 6.2 14.2 5.5 12 5.5c-2.6 0-4.5 1.2-4.5 3.2S9.300 11.5 12 12s4.500 1.300 4.500 3.300-1.900 3.200-4.500 3.200c-2.200 0-3.800-.700-4.500-2' },
   goals: { label: 'Goals', size: [340, 190], symbol: 'M6 21V4M6 4.500h11l-2.500 4 2.500 4H6' },
   requests: { label: 'Requests', size: [360, 190], symbol: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.600 9.500a2.500 2.500 0 1 1 3.900 2c-.900.600-1.500 1.200-1.500 2.300M12 17.200v.100' },
   drafts: { label: 'Drafts', size: [360, 190], symbol: 'M7 3h7l4 4v14H7zM14 3v4h4M10 13h5M10 17h5' },
+  formula: { label: 'Formula', size: [320, 150], symbol: 'M17 5H7l6 7-6 7h10', choices: COMBINES, chooses: 'Combines by', takes: 'widgets' },
 };
+
+/** A widget's one figure as a number, for a widget that works on others' figures: the amount, and what it is an amount of. */
+export interface Value { amount: number; unit: string }
+
+/**
+ * The figures fed to a formula, combined into one. Figures of different kinds are not combined, since there is no one
+ * number for dollars and tokens together: that is said. How many there are is always a number.
+ */
+export function combined(by: string, values: Value[]): Value | 'none' | 'mixed' {
+  if (by === 'count') return { amount: values.length, unit: 'count' };
+  if (!values.length) return 'none';
+  if (values.some((each) => each.unit !== values[0].unit)) return 'mixed';
+  const amounts = values.map((each) => each.amount);
+  const total = amounts.reduce((sum, each) => sum + each, 0);
+  return { amount: by === 'average' ? total / amounts.length : by === 'highest' ? Math.max(...amounts) : by === 'lowest' ? Math.min(...amounts) : total, unit: values[0].unit };
+}
 
 /** A window on the surface that is an agent's: the name it has on the surface now, its agent, and where it stands. */
 export interface AgentWindow { id: string; agent: string; box: Box }
