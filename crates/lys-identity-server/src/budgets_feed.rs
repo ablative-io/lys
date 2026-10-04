@@ -27,6 +27,7 @@ pub async fn keep_page(
         return Err(refused("runner feed format or cursor is invalid"));
     }
     let mut refusals = Vec::new();
+    let mut kept = false;
     // Read once for the page, before any use is kept.
     let windows = crate::configuration_api::organisation(state)?.model_windows;
     for entry in page.entries {
@@ -55,6 +56,7 @@ pub async fn keep_page(
                     convert(machine, &agent, &record, store.held(), &windows)
                 })?;
                 crate::budgets_enforce::keep(state, usage).await?;
+                kept = true;
             }
             Body::Refusal(record) => refusals.push(record),
             Body::Coverage(_) | Body::Boundary(_) | Body::Operation(_) | Body::Injection(_) => {}
@@ -65,7 +67,13 @@ pub async fn keep_page(
     }
     with_budgets_mut(state, |store| {
         store.read_feed(machine, refusals, page.cursor)
-    })
+    })?;
+    if kept {
+        // A use arrives on the runner's feed, not on a request: a screen
+        // showing an agent's usage or its calls asks again, once for the page.
+        state.changes.signal()?;
+    }
+    Ok(())
 }
 
 /// The context windows a person declared, by model: a window in tokens, or
