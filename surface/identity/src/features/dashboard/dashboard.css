@@ -1,0 +1,59 @@
+/* The Dashboard fills the screen: the agents in the wide left panel, what waits and what runs stacked on the right, each scrolling inside itself; the picture sits over the bottom right corner. */
+.dash-page { position: relative; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 26px; }
+.dash-page > .head { flex: none; margin-bottom: 8px; }
+.dash-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); gap: 24px; }
+.dash-agents { min-height: 0; }
+.dash-side { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 20px; }
+.dash-side > .you-panel { min-height: 0; }
+.you-tree thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-default); padding: 6px 10px; text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.dash-table { width: 100%; }
+.dash-table td { padding: 7px 10px; }
+.dash-table .dash-num { width: 3ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.dash-table a { color: var(--text-primary); }
+.dash-table .you-act { text-align: right; white-space: nowrap; }
+.dash-table .you-asked td { padding: 4px 12px 14px; }
+.dash-picture { position: absolute; right: 20px; bottom: 20px; z-index: 30; width: min(560px, 46vw); height: min(360px, 48vh); display: flex; flex-direction: column; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgb(0 0 0 / 0.28); overflow: hidden; }
+.dash-picture-bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border-subtle); }
+.dash-picture-bar h2 { margin: 0; font-size: 13px; }
+.dash-picture-bar .sec { flex: 1; font-size: 12px; }
+.dash-picture .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; gap: 0; }
+.dash-picture .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dash-picture .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
+/* The agents table, moved here with its rows from You. */
+.you-panel { min-height: 0; display: flex; flex-direction: column; }
+.you-panel > .section-h { flex: none; margin: 0 0 8px; }
+.you-scroll { flex: 1; min-height: 0; overflow: auto; }
+.you-tree { width: 100%; }
+.you-tree td { border-bottom: 0; padding: 0; }
+.you-tree tr[data-href] td { padding: 7px 10px; }
+.you-tree tr[data-href] td:first-child { padding-left: calc(var(--depth, 0) * 18px + 10px); }
+.you-tree tr[data-href]:hover td, .you-tree tr[data-href]:focus-visible td { background: var(--surface-hover); }
+.you-tree tr[data-href] td:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.you-tree tr[data-href] td:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.you-agent .dot { margin-right: 8px; }
+.you-where { white-space: normal; }
+.you-team td { padding: 10px 0 2px calc(var(--depth, 0) * 18px); }
+.you-fold { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.you-fold:hover { color: var(--text-primary); background: var(--surface-hover); }
+.you-chevron { width: 6px; height: 6px; margin: 0 2px 2px 0; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); transition: transform .12s; }
+.you-fold[aria-expanded="true"] .you-chevron { transform: rotate(45deg); }
+.you-count { font-weight: 400; color: var(--text-muted); }
+.you-watch { align-self: flex-start; height: 28px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; }
+.you-watch:hover { color: var(--text-primary); background: var(--surface-hover); }
+.you-watch[aria-pressed="true"] { color: var(--text-primary); }
+.you-tree .you-act { text-align: right; }
+/* Start and Stop sit in the agent's own row; what they need to say opens in a row under it. */
+.you-tree .you-act { white-space: nowrap; }
+.you-tree .you-asked td { padding: 4px 12px 14px; }
+.you-tree .you-asked .team-stopped, .you-tree .you-asked .team-start { align-items: flex-start; padding: 0; }
+.you-tree .you-asked .you-start-here { display: flex; align-items: flex-start; gap: 16px; }
+/* An agent with several live sessions says each on its own line, with that session's own Watch and Stop beside it. */
+.you-tree .dash-line, .you-tree .dash-acts { display: block; }
+.you-tree .dash-acts + .dash-acts { margin-top: 2px; }
+/* The master off switch: one line across the top while everything is stopped, and its question as a row of Running now. */
+.dash-cord-line { flex: none; display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--danger); border-radius: var(--radius-md); color: var(--text-primary); }
+.dash-cord-line p { margin: 0; flex: 1; }
+.dash-table .dash-cord td { padding: 8px 12px 14px; }
+.dash-cord form { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.dash-cord p { margin: 0 0 6px; }
+.section-h .btn.danger { font: inherit; letter-spacing: 0; text-transform: none; }

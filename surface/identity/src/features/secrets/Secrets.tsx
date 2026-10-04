@@ -1,4 +1,6 @@
 import { SecretControls } from './SecretControls';
+import { AddSecretRow } from './AddSecretRow';
+import { useState } from 'react';
 import { readTogether } from '../../reads';
 /** Metadata-only secrets listing; authentication and visibility belong to the broker adapter. */
 import type { ReactNode } from 'react';
@@ -29,21 +31,25 @@ export interface SecretListing {
 type Secret = SecretListing['secrets'][number];
 
 export function Secrets({ read }: { read: () => Promise<SecretListing> }) {
-  const load = useLoad(read, 'secrets');
+  const [revision, setRevision] = useState(0);
+  const [notice, setNotice] = useState('');
+  const changed = (message: string) => { setNotice(message); setRevision((value) => value + 1); };
+  const load = useLoad(read, 'secrets:' + revision);
   const people = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().catch(() => []) }), 'secret-people');
   const admin = people.status === 'ok' && people.data.view.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   return <>
     {people.status === 'refused' ? <ReadFailure error={people.refused} subject="secret owners’ names" /> : null}
+    {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="your secrets" renderError={(error) => <ReadFailure error={error} subject="your secrets" administrator={admin} />} ok={(listing) => people.status === 'ok'
-      ? <SecretRows listing={listing} people={people.data.view} teams={people.data.teams} me={people.data.me.person.id} whose={whose}
+      ? <SecretRows listing={listing} people={people.data.view} teams={people.data.teams} me={people.data.me.person.id} whose={whose} changed={changed}
         tools={<WhoseSelect whose={whose} set={setWhose} teams={people.data.teams} admin={admin} />} />
       : <SecretRows listing={listing} />} />
   </>;
 }
 
 /** The secrets as the shared list: grouped by their owner's team, searched by name, kind or owner. */
-export function SecretRows({ listing, people, teams = [], me = '', whose = { kind: 'all' }, tools }: { listing: SecretListing; people?: PeopleView; teams?: OrgTeam[]; me?: string; whose?: Whose; tools?: ReactNode }) {
+export function SecretRows({ listing, people, teams = [], me = '', whose = { kind: 'all' }, tools, changed }: { listing: SecretListing; people?: PeopleView; teams?: OrgTeam[]; me?: string; whose?: Whose; tools?: ReactNode; changed?: (message: string) => void }) {
   const names = new Map(people ? entries(people).map((entry) => [entry.id, entry.display_name]) : []);
   const owners = new Map(people ? people.people.flatMap((person) => person.agents.map((agent) => [agent.id, person.id] as const)) : []);
   const held = (entry: Secret): Held => ({ id: entry.owner, person: owners.get(entry.owner) ?? null });
@@ -59,11 +65,12 @@ export function SecretRows({ listing, people, teams = [], me = '', whose = { kin
   return <>
     {/* One line of explanation; an empty list says so once, in the table body. */}
     <p className="sub">A secret's value is never shown, and seeing it here does not give permission to use it.</p>
-    <SecretControls listing={listing} />
+    <SecretControls listing={listing} changed={changed} />
     <div className="body one">
     <Listing<Secret> groups={groups} columns={columns} id={(entry) => entry.name} href={(entry) => '#/secrets/entries?secret=' + encodeURIComponent(entry.name)}
       words={(entry) => entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" empty="No secret is visible to this account." holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
-      selected={null} select={() => undefined} tools={tools} />
+      selected={null} select={() => undefined} tools={tools}
+      foot={me && changed ? <AddSecretRow person={me} changed={changed} /> : undefined} />
     </div>
   </>;
 }

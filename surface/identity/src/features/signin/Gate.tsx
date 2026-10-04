@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { API, api } from '../../api';
 import type { Load, Refused } from '../../api';
+import { useSignedOutScreen } from '../../shell/ShellContext';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (
@@ -11,12 +12,16 @@ export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   );
 }
 
-/** What a caller with no session is shown: the title and one button that signs in through the service's configured issuer. The service keeps the session; the running build is under Configuration. */
+/** What a caller with no session is shown: a small card in the middle of the screen with the Lys mark, the title and one button that signs in through the service's configured issuer. The shell beside it shows nothing that needs a session. The service keeps the session; the running build is under Configuration. */
 export function SignIn() {
+  useSignedOutScreen();
   return (
-    <div className="page">
-      <h1>Sign in</h1>
-      <div><a className="btn primary" href={API + '/login'}>Sign in</a></div>
+    <div className="page signed-out">
+      <div className="card">
+        <div className="mark"><span className="seal">L</span><span>Lys</span></div>
+        <h1>Sign in</h1>
+        <div><a className="btn primary" href={API + '/login'}>Sign in</a></div>
+      </div>
     </div>
   );
 }
@@ -55,7 +60,7 @@ export function Callback() {
     let live = true;
     exchange.current ??= api.callback(location.search);
     exchange.current.then(
-      () => { if (live) location.replace('/#/me'); },
+      () => { if (live) location.replace('/#/'); },
       (error: Refused) => { if (live) setRefused(error); },
     );
     return () => { live = false; };

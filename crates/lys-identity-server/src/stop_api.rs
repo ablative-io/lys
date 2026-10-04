@@ -129,6 +129,7 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/agents/{id}/stop", post(stop))
         .route("/agents/{id}/stops", get(stops))
+        .merge(crate::cord_api::routes())
 }
 
 /// The answer of `GET /agents/{id}/stops`.
@@ -512,7 +513,7 @@ fn ask_sessions(
 /// id made from the stop's, so a stop cut off and sent again ends nothing
 /// twice; a handle ended by this stop counts, one ended by anyone else does
 /// not.
-async fn end_handles(
+pub(crate) async fn end_handles(
     state: &AppState,
     headers: &HeaderMap,
     agent: &str,

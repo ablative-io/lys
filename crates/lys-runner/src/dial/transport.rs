@@ -92,7 +92,7 @@ impl Response {
 }
 
 /// The host `authority` names, without its port.
-fn host(authority: &str) -> &str {
+pub(super) fn host(authority: &str) -> &str {
     match authority.strip_prefix('[') {
         Some(bracketed) => bracketed
             .split_once(']')
@@ -103,7 +103,7 @@ fn host(authority: &str) -> &str {
     }
 }
 
-fn loopback(host: &str) -> bool {
+pub(super) fn loopback(host: &str) -> bool {
     host.eq_ignore_ascii_case("localhost")
         || host
             .parse::<IpAddr>()

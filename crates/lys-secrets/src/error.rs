@@ -136,6 +136,15 @@ pub enum SecretsError {
         /// The name.
         name: String,
     },
+    /// A secret of that name was retired, and a retired name is never used
+    /// again, so its audit lines keep naming one secret.
+    #[error(
+        "SecretRetired: the secret named {name} was retired, and a retired name is never used again (act: choose another name)"
+    )]
+    SecretRetired {
+        /// The name.
+        name: String,
+    },
     /// No secret of that name exists.
     #[error("SecretUnknown: no secret named {name} (act: add the secret first)")]
     SecretUnknown {

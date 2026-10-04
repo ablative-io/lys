@@ -122,3 +122,8 @@ tr.more td { border-bottom: 0; }
 .fill > .file > .pane { flex: 1; min-height: 0; }
 .fill > .pane { flex: 1; min-height: 0; }
 .listing tr.empty td { border-bottom: 0; padding: 14px 10px; }
+/* Signed out: one small card in the middle of the screen. */
+.page.signed-out { align-items: center; justify-content: center; }
+.page.signed-out > .card { flex: none; overflow: visible; width: 280px; display: grid; justify-items: center; gap: 12px; padding: 28px 24px; }
+.page.signed-out .mark { margin: 0; }
+.page.signed-out h1 { margin: 0; }

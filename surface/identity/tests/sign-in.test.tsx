@@ -58,7 +58,7 @@ describe('Lys sign-in page', () => {
     await fill({ email: 'ada@example.test', password: 'Analytical-Engine-1843' });
     await submit('Sign in');
     expect(posted).toEqual([{ path: '/sign-in', body: { email: 'ada@example.test', password: 'Analytical-Engine-1843' } }]);
-    expect(location.hash).toBe('#/me');
+    expect(location.hash).toBe('#/');
   });
 
   it('says a wrong email or password in one sentence that names neither', async () => {

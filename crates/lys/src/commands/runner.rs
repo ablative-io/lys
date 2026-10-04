@@ -29,24 +29,9 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
                 state,
                 scrollback,
             })?;
-            let id = runner.sessions().runner().to_owned();
-            let mut said = Ok(());
-            runner.serve_until_stopped(|| {
-                let mut out = std::io::stdout();
-                said = writeln!(out, "listening {} as runner {id}", socket.display())
-                    .and_then(|()| out.flush());
-                if let Err(error) = &said {
-                    lys_runner::error::said(&format!(
-                        "listening on {}, and that could not be written: {error}",
-                        socket.display()
-                    ));
-                }
-            })?;
-            said.map_err(|source| crate::commands::error::CliError::Io {
-                context: "writing that the runner listens".to_owned(),
-                source,
-            })
+            serve(runner, &socket)
         }
+
         RunnerCommand::Dial {
             socket,
             server,
@@ -65,8 +50,36 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
             .bridge()?;
             Ok(())
         }
+        RunnerCommand::Join {
+            server,
+            machine,
+            server_ca,
+            scrollback,
+        } => crate::commands::runner_join::run(&server, &machine, server_ca, scrollback),
         RunnerCommand::Judge { socket, harness } => judge(&socket, harness),
     }
+}
+
+/// Serve `runner` on `socket` until it is asked to stop, saying once it
+/// listens; the line a starter waits for.
+fn serve(runner: Runner, socket: &Path) -> CliResult<()> {
+    let id = runner.sessions().runner().to_owned();
+    let mut said = Ok(());
+    runner.serve_until_stopped(|| {
+        let mut out = std::io::stdout();
+        said = writeln!(out, "listening {} as runner {id}", socket.display())
+            .and_then(|()| out.flush());
+        if let Err(error) = &said {
+            lys_runner::error::said(&format!(
+                "listening on {}, and that could not be written: {error}",
+                socket.display()
+            ));
+        }
+    })?;
+    said.map_err(|source| crate::commands::error::CliError::Io {
+        context: "writing that the runner listens".to_owned(),
+        source,
+    })
 }
 
 /// Runs `lys runner judge`: the hook's answer, a deny on any failure.

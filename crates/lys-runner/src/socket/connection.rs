@@ -112,8 +112,10 @@ impl Command {
     }
 
     pub(super) fn control(&self) -> bool {
-        matches!(self, Self::Server(Act::Status { .. }, _))
-            || matches!(self,
+        matches!(
+            self,
+            Self::Server(Act::Status { .. } | Act::StopEverything { .. }, _)
+        ) || matches!(self,
             Self::Server(Act::Operate { operation }, _) if operation.request == crate::operations::OperationRequest::Stop)
     }
 }

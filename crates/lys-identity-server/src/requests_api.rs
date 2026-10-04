@@ -290,16 +290,25 @@ async fn list(
     headers: HeaderMap,
     query: crate::list_page::Input,
 ) -> Result<Json<RequestList>, ServerError> {
-    with_grants(&state, |judged| {
-        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+    listed(&state, &headers, query).map(Json)
+}
+
+/// What `GET /requests` answers the caller for `query`.
+pub(crate) fn listed(
+    state: &AppState,
+    headers: &HeaderMap,
+    query: crate::list_page::Input,
+) -> Result<RequestList, ServerError> {
+    with_grants(state, |judged| {
+        let caller = crate::service_account_grants::caller(state, headers, &judged)?;
         let page = crate::list_page::Page::read(query, "/requests")?;
         let members = page
             .as_ref()
-            .map(|page| page.members(&state))
+            .map(|page| page.members(state))
             .transpose()?
             .flatten();
         let at = now();
-        with_requests(&state, |store| {
+        with_requests(state, |store| {
             let (requests, totals) = if let Some(page) = &page {
                 let filtered = page.filtered() || !is_root(caller, judged.root);
                 let after = if filtered {
@@ -354,10 +363,10 @@ async fn list(
                 }
                 (requests, None)
             };
-            Ok(Json(RequestList {
+            Ok(RequestList {
                 requests,
                 page: totals,
-            }))
+            })
         })
     })
 }

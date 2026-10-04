@@ -69,6 +69,38 @@ pub enum RunnerCommand {
         #[arg(long)]
         machine_key: PathBuf,
     },
+    /// Join this computer to Lys as the runner of a computer Lys names, with
+    /// the connection code Lys gave for it, then serve and dial as `lys
+    /// runner serve` and `lys runner dial` do, for as long as this command
+    /// runs.
+    ///
+    /// The code is read from standard input, never from the command line,
+    /// so it stays out of shell history and the process list. This
+    /// computer's own key is made here when it has none, and its private
+    /// half never leaves it. The server's address must be one another
+    /// computer can reach: https://, and not a loopback address; any other
+    /// is refused `runner_join_unreachable` before anything is sent. Files
+    /// are kept where `lys identity install` keeps the runner's, under
+    /// `LYS_IDENTITY_HOME` when it is set.
+    Join {
+        /// The server's address: https://host:port and any path prefix, as
+        /// Lys gave it.
+        #[arg(long)]
+        server: String,
+
+        /// This computer's id, as Lys names it.
+        #[arg(long)]
+        machine: String,
+
+        /// A certificate authority, in PEM, trusted for the server beside
+        /// the public roots.
+        #[arg(long)]
+        server_ca: Option<PathBuf>,
+
+        /// Each session's scrollback, in bytes.
+        #[arg(long, default_value_t = SCROLLBACK)]
+        scrollback: usize,
+    },
     /// Judge one tool call for a session's harness: the `PreToolUse` hook
     /// command. Reads the hook's input on standard input, asks the runner on
     /// --socket, and writes the harness's answer on standard output. Any

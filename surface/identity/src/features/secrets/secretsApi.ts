@@ -108,6 +108,50 @@ export interface SecretSettings {
 /** The scope a change asks for, written `<kind>:<name>` as the broker reads it. */
 export const scopeText = (kind: ScopeKind, name: string): string => `${kind}:${name}`;
 
+/** The kinds of secret a person adds a value under. */
+export type AddedClass = 'credential' | 'key';
+
+/** POST /secrets/add: a secret with its value and where it is used. The value is sent once and never kept or shown. */
+export interface SecretAdded {
+  secret: string;
+  class: AddedClass;
+  owner: string;
+  sequence: number;
+  operation: string;
+  repeated: boolean;
+}
+
+/** POST /secrets/replace: the secret's new recorded change. */
+export interface SecretReplaced { secret: string; sequence: number; operation: string; repeated: boolean }
+
+/** POST /secrets/retire: when the secret was retired, in milliseconds since the epoch. */
+export interface SecretRetired { secret: string; retired_at: number; operation: string; repeated: boolean }
+
+/** What a new secret is, without its value: what a pending addition keeps. */
+export interface SecretAsked { name: string; class: AddedClass; upstream: string; header: string; prefix: string }
+
+/** One identity's draws on a model account: the calls the broker counted and the draws still live. */
+export interface ModelDraw { identity: string; calls: number; live: number }
+
+/** One model account as GET /model-accounts lists it. No token. */
+export interface ModelAccount {
+  account: string;
+  name: string;
+  harness: string;
+  registered_by: string;
+  registered_at: number;
+  retired_at: number | null;
+  draws: ModelDraw[];
+}
+
+/** POST /model-accounts: the account registered. */
+export interface ModelRegistered {
+  account: string; name: string; harness: string; registered_by: string; registered_at: number; operation: string; repeated: boolean;
+}
+
+/** POST /model-accounts/retire. */
+export interface ModelRetired { account: string; name: string; retired_at: number; operation: string; repeated: boolean }
+
 export const secretsApi = {
   settings: (secret: string) => request<SecretSettings>('/secrets/settings?secret=' + encodeURIComponent(secret)),
   grants: () => request<SecretGrantListing>('/secrets/grants'),
@@ -117,4 +161,15 @@ export const secretsApi = {
     request<ScopeChanged>('/secrets/scope', { secret, scope: scopeText(kind, name), operation }),
   recipients: (secret: string, recipients: Recipients, operation: string) =>
     request<RecipientsChanged>('/secrets/recipients', { secret, recipients, operation }),
+  add: (asked: SecretAsked, value: string, operation: string) =>
+    request<SecretAdded>('/secrets/add', { operation, ...asked, value }),
+  replace: (secret: string, value: string, operation: string) =>
+    request<SecretReplaced>('/secrets/replace', { operation, secret, value }),
+  retire: (secret: string, operation: string) =>
+    request<SecretRetired>('/secrets/retire', { operation, secret }),
+  accounts: () => request<{ accounts: ModelAccount[] }>('/model-accounts'),
+  register: (name: string, harness: string, token: string, operation: string) =>
+    request<ModelRegistered>('/model-accounts', { operation, name, harness, token }),
+  retireAccount: (account: string, operation: string) =>
+    request<ModelRetired>('/model-accounts/retire', { operation, account }),
 };

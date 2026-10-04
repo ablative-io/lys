@@ -75,6 +75,9 @@ pub enum ErrorKind {
     /// The upgrade was run by a `lys` of another build than the one it
     /// places, so its templates are not the new build's.
     UpgradeBuildDiffers,
+    /// A stop of everything did some of its parts and not others; each
+    /// failed part is named.
+    StopIncomplete,
 }
 
 impl ErrorKind {
@@ -112,6 +115,7 @@ impl ErrorKind {
             Self::UpgradeFailed => "upgrade_failed",
             Self::InstallBuildDiffers => "install_build_differs",
             Self::UpgradeBuildDiffers => "upgrade_build_differs",
+            Self::StopIncomplete => "stop_incomplete",
         }
     }
 

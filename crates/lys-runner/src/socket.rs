@@ -155,6 +155,12 @@ impl Runner {
         });
         let (serving, name) = asked?;
         crate::error::said(&format!("asked to stop by {name}: ending every session"));
+        if let Err(error) = serving
+            .sessions()
+            .stopping_because(&format!("the runner was asked to stop by {name}"))
+        {
+            crate::error::said(&format!("the stop's words were not kept: {error}"));
+        }
         serving.stop()
     }
 

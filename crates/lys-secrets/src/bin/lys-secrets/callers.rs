@@ -51,6 +51,9 @@ pub fn refused(error: &SecretsError) -> (StatusCode, String) {
         | SecretsError::PresentationUnsigned { .. }
         | SecretsError::PresentationInvalid { .. }
         | SecretsError::OperationIdTooShort { .. } => StatusCode::BAD_REQUEST,
+        SecretsError::SecretExists { .. } | SecretsError::SecretRetired { .. } => {
+            StatusCode::CONFLICT
+        }
         SecretsError::Lending(_)
         | SecretsError::Lease(_)
         | SecretsError::OAuth(_)

@@ -68,6 +68,11 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         }
     }
     let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
+    let cord = crate::cord_store::CordStore::open(
+        &config.log_dir.with_file_name("cord"),
+        Arc::clone(&key),
+    )?;
+    say(&format!("cord log {}", cord.start()));
     let acts = crate::runner_acts::ActStore::open(
         &config.log_dir.with_file_name("runner-acts"),
         Arc::clone(&key),
@@ -144,6 +149,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         requests: requests.map(Mutex::new),
         mcp_requests,
         network: network.map(Mutex::new),
+        joins: crate::network_join::JoinStore::configured(config)?.map(Mutex::new),
         roles: roles.map(Mutex::new),
         provisioning: provisioning.map(Mutex::new),
         certificates: certificates.map(Mutex::new),
@@ -152,6 +158,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
+        cord: Mutex::new(cord),
         budgets: budgets.map(Mutex::new),
         configuration: Mutex::new(configuration),
         policies: policies.map(Mutex::new),

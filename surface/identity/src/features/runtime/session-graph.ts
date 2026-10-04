@@ -1,8 +1,9 @@
 import { actionWords, resourceWords } from '../grants/action-words';
 /** Canvas connections are recorded membership and grants, never inferred message delivery or authority. */
 import { Refused, request } from '../../api';
-import { readGrantWorld } from '../grants/model';
+import { named, readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
+import type { ResourceRef } from '../../generated/grants';
 import type { Team } from '../teams/contract';
 import type { RuntimeSession } from './RuntimeSessions';
 import type { Unanswered } from './Sessions';
@@ -13,14 +14,36 @@ export interface SessionNode {
   session?: RuntimeSession;
 }
 export interface SessionEdge { id: string; from: string; to: string; label: string; kind: 'membership' | 'grant' | 'message' | 'identity'; stands: boolean }
-export interface SessionGraph { nodes: SessionNode[]; edges: SessionEdge[]; notices: string[]; unanswered: Unanswered[]; names: Record<string, string> }
+/** `names` is null when the names could not be read; the notices say why. */
+export interface SessionGraph { nodes: SessionNode[]; edges: SessionEdge[]; notices: string[]; unanswered: Unanswered[]; names: Record<string, string> | null }
+
+/**
+ * An identity whose name the canvas cannot show, said without its raw id: outside the caller's view when the names
+ * were read, unread when they were not (the notices say why).
+ */
+export function unnamed(id: string, read: boolean): string {
+  const who = id.startsWith('agent-') ? 'an agent' : id.startsWith('person-') ? 'someone' : 'an account';
+  return who + (read ? ' outside your view' : ' whose name could not be read');
+}
+
+/** An identity's or an operation's id, which a person never reads as a label. */
+const rawId = /^(?:person|agent|grant|op)-/;
+
+/** A resource by its kind in words: an identity in view by its name, any other by its own id only when that is not an identity or operation id. */
+export function resourceTitle(world: GrantWorld, resource: ResourceRef): string {
+  if (resource.kind === 'directory') return resourceWords(resource);
+  const kind = resource.kind.replace(/_/g, ' ');
+  const who = world.who.get(resource.id);
+  if (who) return kind + ' ' + who.name;
+  return rawId.test(resource.id) ? kind : kind + ' ' + resource.id;
+}
 
 export function withMessages(graph: SessionGraph, messages: MessageConnection[]): SessionGraph {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
   const identity = (id: string, column: 'teams' | 'resources') => {
     const key = 'identity:' + id;
-    if (!nodes.has(key)) nodes.set(key, { id: key, column, title: graph.names[id] ?? id, detail: 'Message identity (not a terminal delivery)' });
+    if (!nodes.has(key)) nodes.set(key, { id: key, column, title: graph.names?.[id] ?? unnamed(id, graph.names !== null), detail: 'Message identity (not a terminal delivery)' });
     for (const node of graph.nodes) if (node.session?.agent === id) {
       const edgeId = key + ':' + node.id;
       edges.set(edgeId, { id: edgeId, from: key, to: node.id, kind: 'identity', label: 'Session belongs to this identity', stands: true });
@@ -42,7 +65,7 @@ export function graphFromRecords(sessions: RuntimeSession[], teams: Team[], worl
   for (const session of sessions) {
     const id = 'session:' + session.session;
     nodes.set(id, { id, column: 'sessions', session,
-      title: session.agent ? world?.who.get(session.agent)?.name ?? session.agent : 'Unattached session',
+      title: session.agent ? world?.who.get(session.agent)?.name ?? unnamed(session.agent, world !== null) : 'Unattached session',
       detail: session.machine_name ?? session.machine,
     });
     if (!session.agent) continue;
@@ -56,9 +79,9 @@ export function graphFromRecords(sessions: RuntimeSession[], teams: Team[], worl
     for (const grant of world.list.grants) {
       if (grant.holder !== session.agent) continue;
       const resourceId = 'resource:' + JSON.stringify([grant.resource.kind, grant.resource.id]);
-      nodes.set(resourceId, { id: resourceId, column: 'resources', title: grant.resource.id, detail: grant.resource.kind });
+      nodes.set(resourceId, { id: resourceId, column: 'resources', title: resourceTitle(world, grant.resource), detail: '' });
       edges.push({ id: grant.id + ':' + id, from: id, to: resourceId,
-        label: actionWords(world.model, grant.resource, grant.actions) + ' on ' + resourceWords(grant.resource) + (grant.standing.stands ? '' : ' — ' + grant.standing.refusal + ': ' + grant.standing.reason),
+        label: actionWords(world.model, grant.resource, grant.actions) + ' on ' + resourceTitle(world, grant.resource) + (grant.standing.stands ? '' : ' — ' + grant.standing.refusal + ': ' + named(world, grant.standing.reason)),
         kind: 'grant', stands: grant.standing.stands,
       });
     }
@@ -82,7 +105,7 @@ export async function readSessionGraph(): Promise<SessionGraph> {
   }
   if (teams.status === 'fulfilled' && !Array.isArray(teams.value.teams)) throw new Error('The service did not return a team list.');
   const graph = graphFromRecords(live.value.sessions, teams.status === 'fulfilled' ? teams.value.teams : [], world.status === 'fulfilled' ? world.value : null);
-  return { ...graph, names: world.status === 'fulfilled' ? Object.fromEntries([...world.value.who].map(([id, person]) => [id, person.name])) : {}, unanswered: live.value.unanswered, notices: [
+  return { ...graph, names: world.status === 'fulfilled' ? Object.fromEntries([...world.value.who].map(([id, person]) => [id, person.name])) : null, unanswered: live.value.unanswered, notices: [
     ...(teams.status === 'rejected' ? [unavailable('Team connections', teams.reason)] : []),
     ...(world.status === 'rejected' ? [unavailable('Names and grant connections', world.reason)] : []),
   ] };

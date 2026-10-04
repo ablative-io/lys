@@ -68,6 +68,12 @@ fn main() -> ExitCode {
             identity::IdentityCommand::SetupCode { root } => {
                 identity::install::setup_code::run(root, json)
             }
+            identity::IdentityCommand::Stop { reason, kill, root } => {
+                identity::stop::run(&identity::stop::StopOptions { root, reason, kill }, json)
+            }
+            identity::IdentityCommand::Start { root } => {
+                identity::stop::start(&identity::stop::StartOptions { root }, json)
+            }
             identity::IdentityCommand::Install {
                 service_port,
                 broker_port,

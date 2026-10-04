@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, click, mount, text, leaveTheReachReadOutOfPosted, unmountAll } from './harness';
 // These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
 leaveTheReachReadOutOfPosted();
-import { ADA, ARCHIVIST, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
+import { ADA, ARCHIVIST, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, dashboard, ok, refused } from './fixtures';
 import { mockTerminal } from './terminal-double';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
@@ -29,19 +29,20 @@ const routes = {
   ...SERVICE,
   '/teams': ok({ teams: [team('team-1', ADA, 'Ada team', [REVIEWER]), team('team-2', SCRIBE, 'Crew', [COURIER, ARCHIVIST])] }),
   '/runtime/live': ok({ sessions: [running], unanswered: [] }),
+  '/dashboard': ok(dashboard({ [SCRIBE]: { sessions: [running] } })),
   '/network': ok({ machines: [machine(LAB, 'Lab', 'lys-runner', [SCRIBE]), machine(SHED, 'Shed', null, [])], reports_served: true }),
   ['POST /runtime/sessions/' + LIVE + '/resize']: receipt({ kind: 'resized' }),
   ['POST /runtime/sessions/' + LIVE + '/read-bytes']: refused(502, 'runner_unreachable', 'the read was closed'),
 };
 /** Scribe alone, stopped, with approved settings and one computer allowed to run it. */
-const stopped = { ...routes, '/teams': ok({ teams: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }), ...provisioning(SCRIBE, profile()) };
+const stopped = { ...routes, '/teams': ok({ teams: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }), '/dashboard': ok(dashboard()), ...provisioning(SCRIBE, profile()) };
 
 describe('An agent\'s run on People and agents', () => {
   beforeEach(() => { sessionStorage.clear(); });
 
-  it('has no page of its own: the front page is your agents, each with Start or Stop in its own row, and the agent\'s own page says where it runs with its acts, with no terminal and no side pane on People and agents', async () => {
+  it('has no page of its own: the Dashboard lists your agents, each with Start or Stop in its own row, and the agent\'s own page says where it runs with its acts, with no terminal and no side pane on People and agents', async () => {
     await mount('#/', routes);
-    expect(text()).toContain('Your agents');
+    expect($('section[aria-label="Agents"] .section-h')?.textContent).toBe('Agents');
     expect($('.team-screen')).toBeNull();
     expect($('a[href="#/team"]')).toBeNull();
     expect($$('tr[data-href]').find((row) => row.textContent?.includes('Scribe'))?.querySelector('[data-act="stop"]')).not.toBeNull();
@@ -88,6 +89,7 @@ describe('An agent\'s run on People and agents', () => {
     const { posted } = await mount('#/', {
       ...stopped,
       '/runtime/live': () => ok({ sessions: live ? [running] : [], unanswered: [] }),
+      '/dashboard': () => ok(dashboard(live ? { [SCRIBE]: { sessions: [running] } } : {})),
       ['POST /agents/' + SCRIBE + '/start-command']: (body) => { live = true; return start(body); },
     });
     await click($$('tr[data-href]').find((row) => row.textContent?.includes('Scribe'))?.querySelector('[data-act="start"]') ?? null);
@@ -122,6 +124,7 @@ describe('An agent\'s run on People and agents', () => {
     const { posted } = await mount('#/file/' + SCRIBE, {
       ...stopped,
       '/runtime/live': () => ok({ sessions: live ? [running] : [], unanswered: [] }),
+      '/dashboard': () => ok(dashboard(live ? { [SCRIBE]: { sessions: [running] } } : {})),
       ['POST /agents/' + SCRIBE + '/start-command']: (body) => { live = true; return start(body); },
     });
     expect(location.hash).toBe('#/file/' + SCRIBE);

@@ -9,6 +9,8 @@ import { Navigate, Route, Routes, useParams } from 'react-router';
 import { Access } from './features/access/Access';
 import { IdentityFile } from './features/file/IdentityFile';
 import { You } from './features/me/You';
+import { Dashboard } from './features/dashboard/Dashboard';
+import { Drafts } from './features/drafts/Drafts';
 import { Settings } from './features/settings/Settings';
 import { People } from './features/people/People';
 import { AddAgent } from './features/people/AddAgent';
@@ -24,6 +26,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/access/import" element={<EstateApproval />} />
+      <Route path="/access/drafts" element={<Drafts />} />
       <Route path="/roles/:id?" element={<Roles />} />
       <Route path="/network" element={<Network />} />
       <Route path="/service-accounts" element={<Navigate replace to="/people/view/accounts" />} />
@@ -48,11 +51,12 @@ export function AppRoutes() {
       <Route path="/people" element={<People />} />
       <Route path="/file/:id/start" element={<OneStart />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
+      <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/me" element={<You />} />
       <Route path="/account/:id" element={<AccountMoved />} />
       <Route path="/settings/:sec?" element={<Settings />} />
       <Route path="/access/:mode?/:arg?" element={<Access />} />
-      <Route path="*" element={<You />} />
+      <Route path="*" element={<Dashboard />} />
     </Routes>
   );
 }
@@ -73,5 +77,5 @@ function AccountMoved() {
 function OneStart() {
   const { id, agent } = useParams();
   const named = id ?? agent;
-  return <Navigate replace to={named ? '/file/' + encodeURIComponent(named) : '/me'} />;
+  return <Navigate replace to={named ? '/file/' + encodeURIComponent(named) : '/dashboard'} />;
 }

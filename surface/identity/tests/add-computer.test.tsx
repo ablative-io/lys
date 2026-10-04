@@ -222,3 +222,106 @@ describe('Naming the computer Lys runs on', () => {
     expect(sessionStorage.getItem(pendingKey)).toBeNull();
   });
 });
+
+describe('Adding another computer', () => {
+  const CODE = '7'.repeat(64);
+  const command = (id: string) => 'lys runner join --server https://lys.example.test --machine ' + id;
+  /** The service as `service()` serves it, with a join-code route for every computer named that answers `code`. */
+  function remote(code: (id: string) => Route = (id) => ok({ machine: id, server: 'https://lys.example.test', command: command(id), code: CODE })) {
+    const routes = service();
+    const name = routes['POST /network/machines'];
+    routes['POST /network/machines'] = (body) => {
+      const id = (body as NameMachine).operation;
+      routes['POST /network/machines/' + id + '/join-code'] = code(id);
+      return typeof name === 'function' ? name(body) : name;
+    };
+    return routes;
+  }
+  const choose = async (label: string) => {
+    const choice = [...document.querySelectorAll('[aria-label="Which computer"] button')].find((each) => each.textContent === label);
+    if (!(choice instanceof HTMLElement)) throw new Error('The choice ' + label + ' is missing');
+    await act(async () => { choice.click(); });
+  };
+  const kept = () => Object.keys(sessionStorage).map((key) => sessionStorage.getItem(key) ?? '').join('\n');
+  const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+
+  it('offers this computer or another in a cell of its own, this one chosen first', async () => {
+    await open(service());
+    const cells = [...($('tr[data-add="computer"]')?.children ?? [])];
+    const choice = cells[2]?.querySelector('[aria-label="Which computer"]');
+    expect([...choice?.querySelectorAll('button') ?? []].map((each) => each.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+    await choose('Another computer');
+    expect([...choice?.querySelectorAll('button') ?? []].map((each) => each.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+    expect(cells[3]?.textContent).toBe('Add and get its code');
+  });
+
+  it('names it, asks for its code, and shows the command and the code once, each with Copy, keeping neither', async () => {
+    const writes: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { writes.push(value); } } });
+    const { posted } = await open(remote());
+    await choose('Another computer');
+    await submit();
+    const id = (posted[0].body as NameMachine).operation;
+    expect(posted[0].body).toMatchObject({ name: 'Ward computer', runtime: 'lys-runner' });
+    expect(posted[1]).toEqual({ path: '/network/machines/' + id + '/join-code', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } });
+    expect(posted).toHaveLength(2);
+    expect(posted.some((entry) => entry.path.endsWith('/runner'))).toBe(false);
+    const row = $('tr[data-add="connect"]');
+    expect(row?.textContent).toContain('Run this on that computer. The code works once and is not shown again.');
+    expect(row?.querySelector('[data-join="command"]')?.textContent).toBe(command(id));
+    expect(row?.querySelector('[data-join="code"]')?.textContent).toBe(CODE);
+    expect([...row?.querySelectorAll('button') ?? []].filter((each) => each.textContent === 'Copy')).toHaveLength(2);
+    await act(async () => { $('button[aria-label="Copy the command"]')?.click(); });
+    await act(async () => { $('button[aria-label="Copy the code"]')?.click(); });
+    expect(writes).toEqual([command(id), CODE]);
+    expect(kept()).not.toContain(CODE);
+    expect(sessionStorage.getItem(pendingKey)).toBeNull();
+    await act(async () => { button('Done')?.click(); });
+    expect(document.body.textContent).not.toContain(CODE);
+  });
+
+  it('keeps an unanswered naming by its operation and asks for the code only once it is confirmed', async () => {
+    const routes = remote();
+    const name = routes['POST /network/machines'];
+    routes['POST /network/machines'] = refused(503, 'NetworkUnavailable', 'The outcome is unknown');
+    const { posted } = await open(routes);
+    await choose('Another computer');
+    await submit();
+    expect(posted).toHaveLength(1);
+    expect(JSON.parse(sessionStorage.getItem(pendingKey) ?? '{}')).toMatchObject({ phase: 'machine', remote: true });
+    routes['POST /network/machines'] = name;
+    await retry();
+    const id = (posted[0].body as NameMachine).operation;
+    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines', '/network/machines', '/network/machines/' + id + '/join-code']);
+    expect(posted[1].body).toEqual(posted[0].body);
+    expect(sessionStorage.getItem(pendingKey)).toBeNull();
+    expect($('tr[data-add="connect"] [data-join="code"]')?.textContent).toBe(CODE);
+  });
+
+  it('offers a new code when the answer with the code is lost, and the new one replaces it', async () => {
+    let answer: Route = refused(503, 'NetworkUnavailable', 'The answer was lost');
+    const { posted } = await open(remote(() => (body) => typeof answer === 'function' ? answer(body) : answer));
+    await choose('Another computer');
+    await submit();
+    expect(posted).toHaveLength(2);
+    const row = $('tr[data-add="connect"]');
+    expect(row?.textContent).toContain('If one was given, it is not shown again: a new code replaces it.');
+    expect(row?.querySelector('[data-join="code"]')).toBeNull();
+    const id = (posted[0].body as NameMachine).operation;
+    answer = ok({ machine: id, server: 'https://lys.example.test', command: command(id), code: CODE });
+    await act(async () => { button('Get a new connection code')?.click(); });
+    expect(posted).toHaveLength(3);
+    expect(posted[2].path).toBe('/network/machines/' + id + '/join-code');
+    expect((posted[2].body as { operation: string }).operation).not.toBe((posted[1].body as { operation: string }).operation);
+    expect($('tr[data-add="connect"] [data-join="code"]')?.textContent).toBe(CODE);
+    expect(kept()).not.toContain(CODE);
+  });
+
+  it('reads a kept addition of another computer in one format only', async () => {
+    const raw = JSON.stringify({ version: 1, body: legacy, phase: 'runner', machine: recorded(legacy), remote: true });
+    sessionStorage.setItem(pendingKey, raw);
+    const { posted } = await open(service());
+    expect(document.body.textContent).toContain('PendingMachineUnreadable');
+    expect(posted).toEqual([]);
+  });
+});

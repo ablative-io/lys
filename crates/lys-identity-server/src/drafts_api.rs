@@ -6,12 +6,13 @@ use std::sync::Arc;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Uri, header};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::draft_event::{
     Approved, Correction, Created, DraftEvent, Refused, RequestEvidence, RequestSignature, Target,
 };
-use lys_identity::{Actor, AuthMethod, Directory, IdentityId, OperationId, Provenance};
+use lys_identity::projection::draft::DraftRecord;
+use lys_identity::{Actor, AuthMethod, Directory, IdentityId, OperationId, PersonId, Provenance};
 use lys_log_store::FileLeafStore;
 use serde::{Deserialize, Serialize};
 
@@ -79,10 +80,10 @@ pub struct DraftAnswer {
     replacement: Option<String>,
 }
 
-/// The four draft mutations.
+/// The four draft mutations and the list of drafts a person may decide.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/drafts", post(create))
+        .route("/drafts", get(crate::drafts_list::list).post(create))
         .route("/drafts/{id}/approve", post(approve))
         .route("/drafts/{id}/refuse", post(refuse))
         .route("/drafts/{id}/correct", post(correct))
@@ -91,6 +92,12 @@ pub fn routes() -> Router<Arc<AppState>> {
 pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<crate::openapi_types::Entry> {
     let answer = api.schema::<DraftAnswer>();
     vec![
+        (
+            lys_openapi::Method::Get,
+            "/drafts",
+            Some(api.schema::<crate::drafts_list::DraftsQuery>()),
+            Some(api.schema::<crate::drafts_list::DraftList>()),
+        ),
         (
             lys_openapi::Method::Post,
             "/drafts",
@@ -317,7 +324,9 @@ async fn create(
     })
 }
 
-fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
+/// The signed-in person's own session, the only caller who may decide a
+/// draft or list the drafts they may decide.
+pub(crate) fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
     signature_boundary(headers)?;
     if headers.contains_key(crate::agent_signature::HEADER) {
         return Err(ServerError::AgentSignatureRefused {
@@ -333,6 +342,11 @@ fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError>
     Ok(actor)
 }
 
+/// Whether `person` may decide `held`: they are its responsible person.
+pub(crate) fn decides(held: &DraftRecord, person: PersonId) -> bool {
+    held.created.reviewer == IdentityId::Person(person)
+}
+
 fn responsible(
     directory: &mut Directory<FileLeafStore>,
     actor: &Actor,
@@ -346,7 +360,7 @@ fn responsible(
             .ok_or_else(|| lys_identity::IdentityError::DraftNotFound {
                 draft: draft.to_string(),
             })?;
-    if held.created.reviewer != IdentityId::Person(person) {
+    if !decides(held, person) {
         return Err(ServerError::NotAdmitted {
             reason: "only the draft's responsible person may decide it",
         });

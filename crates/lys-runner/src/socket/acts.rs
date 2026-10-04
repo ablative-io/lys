@@ -156,6 +156,12 @@ pub(super) fn perform(
         Act::Outcome { operation } => sessions
             .outcome(&operation)
             .map(|outcome| Answer::Operation { outcome }),
+        Act::StopEverything { by, reason, kill } => sessions
+            .stop_everything(&by, &reason, kill, left)
+            .map(|stopped| Answer::StoppedEverything {
+                sessions: stopped.sessions,
+                running: stopped.running,
+            }),
     }
 }
 

@@ -25,7 +25,7 @@ describe('Secrets routes', () => {
 
   it('requires a named selection before showing owner controls and makes no automatic change', async () => {
     const { posted } = await mount('#/secrets/entries?secret=Calendar', routes);
-    expect(document.querySelectorAll('section[aria-label="Controls of Calendar"] form')).toHaveLength(2);
+    expect(document.querySelectorAll('section[aria-label="Controls of Calendar"] form')).toHaveLength(4);
     expect(posted).toHaveLength(0);
     expect(text()).toContain('owner can change this');
     expect(text()).toContain('Who it can be handed to');

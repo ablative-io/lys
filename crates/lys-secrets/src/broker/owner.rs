@@ -21,6 +21,12 @@ const CHANGE_DOMAIN: &str = "lys-secrets/owner-change/v1";
 pub(super) const SCOPE: &str = "scope ";
 /// How an applied recipients change's outcome opens.
 pub(super) const RECIPIENTS: &str = "recipients ";
+/// How a secret added by its owner's word opens its outcome.
+pub(super) const ADDED: &str = "added ";
+/// How a value replaced by its owner's word opens its outcome.
+pub(super) const REPLACED: &str = "replaced ";
+/// How a secret retired by its owner's word opens its outcome.
+pub(super) const RETIRED: &str = "retired ";
 /// The shortest operation id: an id made once per change must not collide,
 /// so it carries at least 16 characters. No longest is set.
 const SHORTEST: usize = 16;
@@ -72,7 +78,11 @@ pub(super) fn fold(owners: &mut Owners, line: &AuditLine) {
     let Some(secret) = &line.secret else {
         return;
     };
-    if !(line.outcome.starts_with(SCOPE) || line.outcome.starts_with(RECIPIENTS)) {
+    let owned = [SCOPE, RECIPIENTS, ADDED, REPLACED, RETIRED];
+    if !owned
+        .iter()
+        .any(|opening| line.outcome.starts_with(opening))
+    {
         return;
     }
     let operations = owners.entry(secret.clone()).or_default();

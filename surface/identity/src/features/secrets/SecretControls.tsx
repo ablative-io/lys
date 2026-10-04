@@ -9,8 +9,9 @@ import type { SecretListing } from './Secrets';
 import { RecipientsChange, ScopeChange } from './SecretsDetail';
 import { secretsApi } from './secretsApi';
 import { CurrentSettings } from './CurrentSettings';
+import { ReplaceValue, RetireSecret } from './ValueChange';
 
-export function SecretControls({ listing }: { listing: SecretListing }) {
+export function SecretControls({ listing, changed: listed }: { listing: SecretListing; changed?: (message: string) => void }) {
   const [params, setParams] = useSearchParams();
   const selected = params.get('secret') ?? '';
   const [revision, setRevision] = useState(0);
@@ -27,6 +28,8 @@ export function SecretControls({ listing }: { listing: SecretListing }) {
         teams={names.status === 'ok' ? names.data.teams.filter((team) => team.state === 'active').map((team) => team.name) : undefined} />
         {names.status === 'refused' ? <><p className="note">People and teams could not be read, so the name is typed.</p><ErrorWords problem={names.refused} /></> : null}</section>
       <section className="card"><RecipientsChange secret={selected} change={secretsApi.recipients} changed={changed} /></section>
+      <section className="card"><ReplaceValue secret={selected} changed={() => { changed(); listed?.(selected + '’s value was changed.'); }} /></section>
+      <section className="card"><RetireSecret secret={selected} retired={(message) => { setParams({}); listed?.(message); }} /></section>
     </div>
   </section>;
 }

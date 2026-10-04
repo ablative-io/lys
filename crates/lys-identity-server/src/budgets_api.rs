@@ -196,13 +196,23 @@ async fn read(
     headers: HeaderMap,
     Path((kind, id)): Path<(String, String)>,
 ) -> Result<Json<BudgetsView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
+    holder_budget(&state, &headers, &kind, id).map(Json)
+}
+
+/// What `GET /budgets/{kind}/{id}` answers the caller.
+pub(crate) fn holder_budget(
+    state: &AppState,
+    headers: &HeaderMap,
+    kind: &str,
+    id: String,
+) -> Result<BudgetsView, ServerError> {
+    let actor = signed_in(state, headers)?;
     let holder = Holder {
-        kind: kind_of(&kind)?,
+        kind: kind_of(kind)?,
         id,
     };
-    authorised(&state, &actor, &holder)?;
-    view(&state, &holder).map(Json)
+    authorised(state, &actor, &holder)?;
+    view(state, &holder)
 }
 
 async fn set(

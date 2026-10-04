@@ -84,6 +84,9 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/secrets/scope", post(scope))
         .route("/secrets/recipients", post(recipients))
         .route("/secrets/drop", post(drop_handle))
+        .route("/secrets/add", post(add))
+        .route("/secrets/replace", post(replace))
+        .route("/secrets/retire", post(retire))
 }
 
 /// The person the session speaks for, as the broker names people.
@@ -265,6 +268,40 @@ async fn drop_handle(
     body: Bytes,
 ) -> Result<Json<Value>, ServerError> {
     let answer = ask(&state, &headers, Method::POST, "/_lys/drop", body).await?;
+    Ok(Json(answer))
+}
+
+/// Adds a secret as the signed-in person, who owns it. The body carries
+/// the value, and is forwarded to the broker unread: this service never
+/// parses, keeps, logs or returns it, and the broker seals it.
+async fn add(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, ServerError> {
+    let answer = ask(&state, &headers, Method::POST, "/_lys/add", body).await?;
+    Ok(Json(answer))
+}
+
+/// Replaces a secret's value as its owner; the body, which carries the new
+/// value, is forwarded to the broker unread.
+async fn replace(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, ServerError> {
+    let answer = ask(&state, &headers, Method::POST, "/_lys/replace", body).await?;
+    Ok(Json(answer))
+}
+
+/// Retires a secret as its owner; its name is never used again. The body
+/// is forwarded unchanged.
+async fn retire(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, ServerError> {
+    let answer = ask(&state, &headers, Method::POST, "/_lys/retire", body).await?;
     Ok(Json(answer))
 }
 

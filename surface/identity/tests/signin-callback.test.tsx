@@ -66,7 +66,7 @@ describe('Sign-in callback', () => {
     const { replace } = await mountCallback(pathname);
     expect(callback.mock.calls).toEqual([['?code=once&state=bound']]);
     await act(async () => answer.resolve(signedIn));
-    expect(replace.mock.calls).toEqual([['/#/me']]);
+    expect(replace.mock.calls).toEqual([['/#/']]);
   });
 
   it('shows the original exchange refusal without attempting the consumed code again', async () => {

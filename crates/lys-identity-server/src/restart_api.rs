@@ -59,6 +59,8 @@ async fn restart(
         reason: format!("the restart agent does not read: {error}"),
     })?;
     let caller = start_caller(&state, &headers, &actor, &agent.to_string())?;
+    // A restart starts again, so while everything is stopped it ends nothing.
+    crate::cord_api::refuse_start(&state)?;
     let Json(given) = given.map_err(|error| ServerError::RequestMalformed {
         reason: error.body_text(),
     })?;

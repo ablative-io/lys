@@ -217,35 +217,24 @@ impl<S: LeafStore> RuntimeStore<S> {
         Ok(())
     }
 
-    /// Append one report as one leaf. A failed append is settled by reading
-    /// back: the report is kept only if the leaf store holds exactly it.
-    fn append(&mut self, report: Report) -> Result<(), ServerError> {
-        let bytes = serde_json::to_vec(&report).map_err(unavailable)?;
-        let index = self.log.len();
-        let Err(failure) = self.log.append(&bytes) else {
-            let transition = report
-                .agent
-                .as_ref()
-                .filter(|_| matches!(report.state, Reported::Starting | Reported::Stopped))
-                .map(|agent| {
-                    (
-                        agent.clone(),
-                        report.session.clone(),
-                        report.state,
-                        report.at,
-                    )
-                });
-            if let Err(reason) = self.held.hold(report) {
-                self.uncertain = true;
-                return Err(unavailable(reason));
+    /// Append reports as consecutive leaves in one durable write, with one
+    /// flush. A failed append is settled by reading back: the reports are
+    /// kept only if the leaf store holds exactly them.
+    fn append(&mut self, reports: Vec<Report>) -> Result<(), ServerError> {
+        if reports.is_empty() {
+            return Ok(());
+        }
+        let leaves = reports
+            .iter()
+            .map(serde_json::to_vec)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(unavailable)?;
+        let first = self.log.len();
+        let slices: Vec<&[u8]> = leaves.iter().map(Vec::as_slice).collect();
+        let Err(failure) = self.log.append_batch(&slices) else {
+            for report in reports {
+                self.fold_kept(report)?;
             }
-            if let Some((agent, session, state, at)) = transition
-                && let Err(error) = self.session_transition(agent, session, state, at)
-            {
-                self.uncertain = true;
-                return Err(error);
-            }
-            self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
                 self.write_snapshot();
             }
@@ -253,13 +242,46 @@ impl<S: LeafStore> RuntimeStore<S> {
         };
         self.uncertain = true;
         self.settle()?;
-        match self.log.leaf_bytes(index).map_err(unavailable)? {
-            Some(held) if held == bytes => Ok(()),
-            Some(_) => Err(unavailable(format!(
-                "leaf {index} was written by another writer: {failure}"
-            ))),
-            None => Err(unavailable(failure)),
+        for (index, bytes) in (first..).zip(&leaves) {
+            match self.log.leaf_bytes(index).map_err(unavailable)? {
+                Some(held) if held == *bytes => {}
+                Some(_) => {
+                    return Err(unavailable(format!(
+                        "leaf {index} was written by another writer: {failure}"
+                    )));
+                }
+                None => return Err(unavailable(failure)),
+            }
         }
+        Ok(())
+    }
+
+    /// Fold one report its leaf now holds into memory and the session index.
+    fn fold_kept(&mut self, report: Report) -> Result<(), ServerError> {
+        let transition = report
+            .agent
+            .as_ref()
+            .filter(|_| matches!(report.state, Reported::Starting | Reported::Stopped))
+            .map(|agent| {
+                (
+                    agent.clone(),
+                    report.session.clone(),
+                    report.state,
+                    report.at,
+                )
+            });
+        if let Err(reason) = self.held.hold(report) {
+            self.uncertain = true;
+            return Err(unavailable(reason));
+        }
+        if let Some((agent, session, state, at)) = transition
+            && let Err(error) = self.session_transition(agent, session, state, at)
+        {
+            self.uncertain = true;
+            return Err(error);
+        }
+        self.since_snapshot += 1;
+        Ok(())
     }
 
     /// Every session, in the order first reported.
@@ -356,6 +378,45 @@ impl<S: LeafStore> RuntimeStore<S> {
             }
             return self.standing(&report.session);
         }
+        self.admits(&report)?;
+        let session = report.session.clone();
+        self.append(vec![report])?;
+        self.standing(&session)
+    }
+
+    /// Keep every report of `reports` not already kept, all in one durable
+    /// write. A report kept before in the same words is passed over; the
+    /// same operation in other words, a session named twice, or a report its
+    /// session as it stands does not take refuses the whole batch before
+    /// anything is written.
+    pub fn report_all(&mut self, reports: Vec<Report>) -> Result<(), ServerError> {
+        self.settle()?;
+        let mut fresh: Vec<Report> = Vec::new();
+        for report in reports {
+            if let Some(kept) = self.held.operation(&report.operation) {
+                if !same_words(kept, &report) {
+                    return Err(ServerError::RuntimeReportReused {
+                        operation: report.operation,
+                    });
+                }
+                continue;
+            }
+            if fresh.iter().any(|held| held.session == report.session) {
+                return Err(ServerError::RequestMalformed {
+                    reason: format!(
+                        "session `{}` is named twice in one batch of reports",
+                        report.session
+                    ),
+                });
+            }
+            self.admits(&report)?;
+            fresh.push(report);
+        }
+        self.append(fresh)
+    }
+
+    /// Whether the session as it stands takes `report`, refused by name.
+    fn admits(&self, report: &Report) -> Result<(), ServerError> {
         match self.held.session(&report.session) {
             None => {
                 let begins = match report.agent {
@@ -372,12 +433,12 @@ impl<S: LeafStore> RuntimeStore<S> {
                 }
                 if tracked.stopped() {
                     return Err(ServerError::RuntimeSessionStopped {
-                        session: report.session,
+                        session: report.session.clone(),
                     });
                 }
                 if report.state == Reported::Starting {
                     return Err(ServerError::RuntimeSessionStarted {
-                        session: report.session,
+                        session: report.session.clone(),
                     });
                 }
                 if tracked.machine != report.machine {
@@ -390,9 +451,7 @@ impl<S: LeafStore> RuntimeStore<S> {
                 }
             }
         }
-        let session = report.session.clone();
-        self.append(report)?;
-        self.standing(&session)
+        Ok(())
     }
 
     /// Observe whole-index copies; the private index is updated in place.

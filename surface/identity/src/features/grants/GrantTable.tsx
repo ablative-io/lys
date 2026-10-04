@@ -3,7 +3,6 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Grant } from '../../generated/grants';
 import type { Column } from '../../shell/Listing';
-import { clock } from '../file/time';
 import { Delegate } from './Delegate';
 import { Chain } from './Chain';
 import { chainOf, grantNo, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
@@ -35,7 +34,7 @@ export function grantColumns(w: GrantWorld): Column<Grant>[] {
     { head: 'Stands', cell: (g) => {
       const v = voidOf(w, g);
       if (v === null) return <><span className="dot s-active" />yes</>;
-      return <span className="danger"><span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>void</span> {breakable(v.why)}{g.revoked && g.revoked_at !== null && g.revoked_revision !== null ? ` Revoked ${clock(g.revoked_at)}, change ${g.revoked_revision}; every check from here on refuses.` : ''}</span>;
+      return <span className="danger" title={v.title}><span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>void</span> {breakable(v.why)}</span>;
     } },
   ];
 }

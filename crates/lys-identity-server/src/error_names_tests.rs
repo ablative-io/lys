@@ -9,6 +9,7 @@ use lys_identity::{IdentityError, LifecycleState, Transition};
 use crate::apps_error::{AppError, Strand};
 use crate::error::ServerError;
 use crate::error_budget::BudgetError;
+use crate::error_cord::CordError;
 use crate::error_team::TeamError;
 use crate::goals_types::GoalError;
 
@@ -212,6 +213,22 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
                 operation: detail.to_owned(),
             }),
             "MachineAgentsReused",
+        ),
+        (
+            ServerError::Machine(crate::error_machine::MachineError::JoinOperationReused {
+                operation: detail.to_owned(),
+            }),
+            "RunnerJoinOperationReused",
+        ),
+        (
+            ServerError::Machine(crate::error_machine::MachineError::JoinUnreachable {
+                reason: detail.to_owned(),
+            }),
+            "RunnerJoinUnreachable",
+        ),
+        (
+            ServerError::Machine(crate::error_machine::MachineError::JoinRefused),
+            "RunnerJoinRefused",
         ),
         (
             ServerError::SessionsUnavailable {
@@ -471,6 +488,25 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
                 operation: detail.to_owned(),
             },
             "StopReused",
+        ),
+        (
+            ServerError::Cord(CordError::EverythingStopped {
+                words: detail.to_owned(),
+            }),
+            "everything_stopped",
+        ),
+        (
+            ServerError::Cord(CordError::Reused {
+                operation: detail.to_owned(),
+            }),
+            "cord_reused",
+        ),
+        (ServerError::Cord(CordError::NotPulled), "cord_not_pulled"),
+        (
+            ServerError::Cord(CordError::Unavailable {
+                reason: detail.to_owned(),
+            }),
+            "cord_unavailable",
         ),
         (
             ServerError::ReviewsUnavailable {

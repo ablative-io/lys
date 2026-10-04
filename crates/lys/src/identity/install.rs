@@ -236,6 +236,41 @@ pub(super) fn start_runner(
     Ok(())
 }
 
+/// Start whatever of the install under `layout` is down, with the steps the
+/// install starts it with, leaving running whatever runs: an upgrade stopped
+/// part-way is ended first, then the compose services, the broker and the
+/// service, the runner and the model proxy, each waited on until ready.
+/// The inverse of `lys identity stop`.
+pub fn start_installed(
+    layout: &Layout,
+    ports: ports::Ports,
+    units: &[upgrade::Unit],
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<()> {
+    swap::recover(layout, units, &mut Compose, say)?;
+    services::require_docker(Path::new("docker"))?;
+    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
+    services::compose_up(layout, &config)?;
+    say("database, sign-in and permission services up");
+    services::wait_ready(layout, &config, &mut |line| say(&in_lys_words(line)))?;
+    say("database, sign-in and permission services ready");
+    for unit in units {
+        let started = upgrade::launch(layout, unit, false)?;
+        say(&format!(
+            "{} {}",
+            unit.binary,
+            if started {
+                "started"
+            } else {
+                "already running"
+            }
+        ));
+    }
+    let key = Arc::new(service_key(layout)?);
+    start_runner(layout, &key, &layout.binary("lys"), say)?;
+    proxy::start(layout, ports, &layout.binary("lys"), say)
+}
+
 /// Makes every file the directory service reads from the state folder that
 /// is not there yet, leaving each one that is: the grant model, the
 /// providers' key, the provider signing key and the service key. Install

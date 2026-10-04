@@ -156,6 +156,18 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
         (POST, "/runner/dial/{machine}/next", None, None),
         (POST, "/runner/dial/{machine}/replies/{ticket}", None, None),
         (
+            POST,
+            "/network/machines/{id}/join-code",
+            Some(api.schema::<crate::network_join::JoinCodeBody>()),
+            Some(api.schema::<crate::network_join::JoinCodeGiven>()),
+        ),
+        (
+            POST,
+            "/runner/join",
+            Some(api.schema::<crate::network_join::RunnerJoinBody>()),
+            Some(api.schema::<crate::network_join::RunnerJoined>()),
+        ),
+        (
             GET,
             "/runner-receipts/{index}",
             None,

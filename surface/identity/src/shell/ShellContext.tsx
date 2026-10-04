@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { pref, setPref } from './prefs';
 
@@ -35,6 +35,10 @@ export interface Shell {
   setCursor: (cursor: number) => void;
   filterKind: KindFilter;
   setFilterKind: (kind: KindFilter) => void;
+  /** Nobody is signed in: the shell shows no rail, help or palette, none of which can work. */
+  signedOut: boolean;
+  /** Mark the screen signed out until the returned function is called. */
+  markSignedOut: () => () => void;
 }
 
 const ShellContext = createContext<Shell | null>(null);
@@ -43,6 +47,12 @@ export function useShell(): Shell {
   const shell = useContext(ShellContext);
   if (!shell) throw new Error('useShell outside ShellProvider');
   return shell;
+}
+
+/** While mounted, the shell shows nothing that needs a session. Outside the shell (the sign-in callback) it does nothing. */
+export function useSignedOutScreen(): void {
+  const mark = useContext(ShellContext)?.markSignedOut;
+  useEffect(() => mark?.(), [mark]);
 }
 
 const screen = () => document.getElementById('screen');
@@ -64,6 +74,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<string[]>([]);
   const [cursor, setCursor] = useState(0);
   const [filterKind, setFilterKind] = useState<KindFilter>('all');
+  const [signedOutScreens, setSignedOutScreens] = useState(0);
   const opener = useRef<Element | null>(null);
   const explainOpener = useRef<Element | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -139,16 +150,23 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     toastTimer.current = setTimeout(() => setToastShown(false), 2600);
   }, []);
 
+  const markSignedOut = useCallback(() => {
+    setSignedOutScreens((count) => count + 1);
+    return () => setSignedOutScreens((count) => count - 1);
+  }, []);
+  const signedOut = signedOutScreens > 0;
+
   const value = useMemo<Shell>(
     () => ({
       labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide,
       dockMode, toggleDock, openDock, closeDock, helpSel, showHelp,
       paletteOpen, openPalette, explaining, explainOn, explainOff, closeAll,
       toastText, toastShown, toast, rows, cursor, setRows, setCursor, filterKind, setFilterKind,
+      signedOut, markSignedOut,
     }),
     [labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide, dockMode, toggleDock, openDock,
       closeDock, helpSel, showHelp, paletteOpen, openPalette, explaining, explainOn, explainOff,
-      closeAll, toastText, toastShown, toast, rows, cursor, filterKind],
+      closeAll, toastText, toastShown, toast, rows, cursor, filterKind, signedOut, markSignedOut],
   );
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;
 }

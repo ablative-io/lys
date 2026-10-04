@@ -36,6 +36,14 @@ impl Changes {
         self.generation.send_replace(next);
     }
 
+    /// Tell every waiting reader that something changed outside a request
+    /// that is answered now: a dialled runner connecting for the first time
+    /// does so on a request that stays open.
+    pub(crate) fn signal(&self) -> Result<(), ServerError> {
+        self.publish(OperationId::generate()?);
+        Ok(())
+    }
+
     async fn checked_after(
         &self,
         after: Option<OperationId>,

@@ -4,7 +4,9 @@
 //! whole, however long. A caller whose credential is judged over the body
 //! has no more than 2 MiB read before it is verified, and a longer body is
 //! refused `BodyTooLarge` at 413 before the credential is looked at, valid
-//! or not. A short body with a credential is served as it always was.
+//! or not. A short body with a credential is served as it always was. A
+//! caller refused before its body, signed out or bearing a refused pass,
+//! receives its refusal however long the body it sends.
 
 use identity_contract::apps::{
     Auth, BEA, NOTES, TestResult, check, login, ok, post, refused, registered, root, seeded,
@@ -113,5 +115,39 @@ async fn a_short_body_with_a_credential_is_served_as_before() -> TestResult {
     assert_eq!(answer["results"][0]["allowed"], json!(true), "{answer}");
     assert_eq!(answer["results"][1]["allowed"], json!(false), "{answer}");
     assert_eq!(answer["results"][1]["refusal"], "NotHeld", "{answer}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_signed_out_caller_sending_a_long_body_receives_the_sign_in_refusal() -> TestResult {
+    let service = Service::start().await?;
+    let long = json!({"responsibilities": "r".repeat(LONG)});
+    // Refused before the body is read; the body is read to its end and
+    // dropped first, so the refusal arrives in place of a reset.
+    refused(
+        &post(&service, "/roles", Auth::Nobody, &long).await?,
+        401,
+        "NotSignedIn",
+    )?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_run_pass_sending_a_long_body_receives_its_refusal() -> TestResult {
+    let service = Service::start().await?;
+    let long = json!({"responsibilities": "r".repeat(LONG)}).to_string();
+    // A run pass beside a session cookie is refused before the body is read.
+    let (status, answer) = service
+        .post_carrying(
+            "/roles",
+            &[
+                ("lys-agent-pass", "a-pass"),
+                ("cookie", "lys_session=a-session"),
+            ],
+            long.into_bytes(),
+        )
+        .await?;
+    assert_eq!(status, 401, "{answer}");
+    assert_eq!(answer["refusal"], "AgentPassRefused", "{answer}");
     Ok(())
 }

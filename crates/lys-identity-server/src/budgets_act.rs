@@ -104,7 +104,7 @@ async fn report(
         ..Usage::default()
     };
     crate::budgets_enforce::keep(&state, usage).await?;
-    view(&state, &agent)
+    view(&state, &agent).map(Json)
 }
 
 async fn read(
@@ -114,10 +114,23 @@ async fn read(
 ) -> Result<Json<UsageView>, ServerError> {
     operator(&state, &headers, &agent, "usage")?;
     settle_for(&state, &agent).await?;
-    view(&state, &agent)
+    view(&state, &agent).map(Json)
 }
 
-fn view(state: &AppState, agent: &str) -> Result<Json<UsageView>, ServerError> {
+/// The usage recorded for `agent`, as the caller may read it, computed as
+/// `GET /agents/{id}/usage` computes its answer but without first asking
+/// runners to settle the crossings still unsettled: each receipt stands as
+/// last kept.
+pub(crate) fn recorded(
+    state: &AppState,
+    headers: &HeaderMap,
+    agent: &str,
+) -> Result<UsageView, ServerError> {
+    operator(state, headers, agent, "usage")?;
+    view(state, agent)
+}
+
+fn view(state: &AppState, agent: &str) -> Result<UsageView, ServerError> {
     let budget = crate::budgets_api::view(
         state,
         &crate::budgets_state::Holder {
@@ -126,12 +139,12 @@ fn view(state: &AppState, agent: &str) -> Result<Json<UsageView>, ServerError> {
         },
     )?;
     with_budgets(state, |store| {
-        Ok(Json(UsageView {
+        Ok(UsageView {
             agent: agent.to_owned(),
             receipts: store.held().crossings.of_agent(agent),
             last_reported_ms: store.held().index.last_reported(agent),
             used: budget.used,
-        }))
+        })
     })
 }
 

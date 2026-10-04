@@ -466,3 +466,6 @@ async fn an_unknown_a_decided_and_an_invalid_draft_are_refused_and_a_large_one_k
 
 #[path = "drafts_mcp_tests.rs"]
 mod mcp;
+
+#[path = "drafts_list_tests.rs"]
+mod list;

@@ -1,0 +1,15 @@
+/* Drafts: one table filling the page and scrolling inside its pane; an opened row shows the prepared request whole, scrolling inside its own block. */
+.drafts-page > .tools { flex: none; display: flex; align-items: center; gap: 14px; margin: 10px 0; }
+.drafts-page > .tools .why-not { margin: 0; }
+.drafts-page > .pane { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.drafts { width: 100%; }
+.drafts thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-default); }
+.drafts tr[data-draft] { cursor: pointer; }
+.drafts tr[data-draft]:hover td, .drafts tr[data-draft]:focus-visible td { background: var(--surface-hover); }
+.drafts .draft-note { white-space: normal; overflow-wrap: anywhere; }
+.drafts .draft-reason { display: block; color: var(--text-secondary); white-space: normal; }
+.draft-decide { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; cursor: default; }
+.draft-decide form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.draft-decide [role="status"] p, .draft-decide .why-not p { margin: 0; }
+.draft-open td { padding: 4px 12px 14px; }
+.draft-request { margin: 4px 0 0; max-height: 40vh; overflow: auto; overscroll-behavior: contain; padding: 10px 12px; background: var(--surface-code); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }

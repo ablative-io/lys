@@ -54,7 +54,7 @@ pub use oauth::{OAuthGrant, Provenance, REFRESH_MARGIN_MS};
 pub use permission::{Denied, PermissionCheck, Permitted, Relation};
 pub use secret::Secret;
 pub use service::{OnBehalf, SERVICE_DOMAIN, ServiceKey, ServiceWindow};
-pub use store::{AccountView, EntryClass, EntryView, Recipients, Scope, SecretStore};
+pub use store::{AccountView, EntryClass, EntryView, Recipients, Retired, Scope, SecretStore};
 pub use teams::team_ids;
 
 /// `bytes` as lowercase hex.

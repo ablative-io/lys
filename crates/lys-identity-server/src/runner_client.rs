@@ -382,6 +382,12 @@ impl Runners {
         }
     }
 
+    /// The public half of the key every request to a runner is signed with:
+    /// the key a runner acts on, as `runner-server.pub` holds it.
+    pub fn public_key(&self) -> [u8; 32] {
+        self.key.public_key_bytes()
+    }
+
     /// Where requests for dialled runners wait.
     pub fn hub(&self) -> &DialHub {
         &self.hub

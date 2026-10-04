@@ -146,6 +146,21 @@ impl Layout {
         let bytes = serde_json::to_vec_pretty(&routes).map_err(json_error("routes file"))?;
         self.routes.write(&bytes)
     }
+
+    /// Takes `secret`'s route out, so no use of it is sent anywhere; a
+    /// secret with no route is left as it is.
+    pub fn remove_route(&self, secret: &str) -> Result<(), SecretsError> {
+        let mut routes: BTreeMap<String, Route> = self
+            .routes()?
+            .iter()
+            .map(|(name, held)| (name.clone(), Route::clone(held)))
+            .collect();
+        if routes.remove(secret).is_none() {
+            return Ok(());
+        }
+        let bytes = serde_json::to_vec_pretty(&routes).map_err(json_error("routes file"))?;
+        self.routes.write(&bytes)
+    }
 }
 
 const ROUTES: &str = "routes.json";

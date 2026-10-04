@@ -150,6 +150,14 @@ pub fn compose_recreate(layout: &Layout, config: &DeploymentConfig) -> IdentityR
     run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
 }
 
+/// `docker compose stop` for the deployment under `layout`: the database,
+/// the sign-in service and the permission service stop and keep their data.
+pub fn compose_stop(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
+    let mut args = compose_args(layout, config);
+    args.push("stop".to_string());
+    run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
+}
+
 /// The `docker compose up` arguments, recreating every service when asked.
 pub fn up_args(layout: &Layout, config: &DeploymentConfig, recreate: bool) -> Vec<String> {
     let mut args = compose_args(layout, config);

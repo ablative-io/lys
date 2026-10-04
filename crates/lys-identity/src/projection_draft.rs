@@ -61,6 +61,12 @@ impl Projection {
         self.drafts.get(&operation).map(Arc::as_ref)
     }
 
+    /// Every draft held, originals and corrections' own changes alike, in
+    /// operation id order (the order of their text form), without reading leaves.
+    pub fn drafts(&self) -> impl Iterator<Item = &DraftRecord> {
+        self.drafts.values().map(Arc::as_ref)
+    }
+
     /// Validate a draft act before signing or appending it.
     pub fn check_draft(&self, event: &DraftEvent) -> Result<(), IdentityError> {
         event.validate()?;

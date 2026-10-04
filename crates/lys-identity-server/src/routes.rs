@@ -84,6 +84,9 @@ pub struct AppState {
     pub mcp_requests: Option<Box<Mutex<crate::mcp_requests_store::McpRequestStore>>>,
     /// The machines, when the configuration names their file.
     pub network: Option<Mutex<crate::network_store::NetworkStore>>,
+    /// The digests of the computers' connection codes, kept beside the
+    /// machines' file when the configuration names it.
+    pub joins: Option<Mutex<crate::network_join::JoinStore>>,
     /// The roles, when the configuration names their file.
     pub roles: Option<Mutex<crate::roles_store::RolesStore>>,
     /// The provisioning profiles, when the configuration names their file.
@@ -107,6 +110,9 @@ pub struct AppState {
     pub policies: Option<Mutex<crate::agent_policy_store::PolicyStore>>,
     /// The emergency stops, when the configuration names their directory.
     pub stops: Option<Mutex<crate::stops_store::StopStore>>,
+    /// The master off switch, kept beside the directory log: always open,
+    /// since every start asks it.
+    pub cord: Mutex<crate::cord_store::CordStore>,
     /// The goals and their reminders, when the configuration names their directory.
     pub goals: Option<crate::goals_store::Goals>,
     /// The apps, kept beside the grant log: always open, holding at least

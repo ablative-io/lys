@@ -35,3 +35,5 @@ table.wrap td { white-space: normal; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: opacity .15s !important; } }
 
 .act-panel { border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); padding: 14px 16px; margin: 6px 0 12px; }
+/* Said once, at the top, when the service answers a build other than the one this page loaded. */
+.upgraded { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 8px 10px 8px 14px; font-size: 13px; box-shadow: var(--shadow-lg); z-index: 45; }

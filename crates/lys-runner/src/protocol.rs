@@ -25,8 +25,8 @@
 //! runner is, even one trusting the same server key. Nothing is remembered
 //! to refuse a replay: the challenge is what cannot recur.
 //!
-//! The acts are `start`, `input`, `keys`, `read`, `wait`, `resize`, `end`
-//! and `status`, tagged by `act`. A reply is `{"version":1,"answer":..}`,
+//! The acts are `start`, `input`, `keys`, `read`, `wait`, `resize`, `end`,
+//! `status` and `stop_everything`, among others, tagged by `act`. A reply is `{"version":1,"answer":..}`,
 //! the answer tagged by `kind`; a refusal is the kind `refused` with its
 //! name and words. A reply in another version is refused
 //! `runner_protocol_mismatch` before anything else in it is read.
@@ -40,6 +40,7 @@ use crate::admitted::{Admitted, JudgedUnder};
 use crate::error::RunnerError;
 pub use crate::protocol_key::Key;
 pub use crate::protocol_request::Request;
+pub use crate::protocol_stop::Stopped;
 use crate::rotation::{Move, Rotation};
 pub use lys_home::harness::lys_mcp::LysMcp;
 
@@ -236,6 +237,19 @@ pub enum Act {
     /// as one line and reads the answer line to it, until the connection
     /// closes.
     GrantChannel,
+    /// End every running session this runner holds, recording on each who
+    /// asked and why. The first ask hangs each session up and answers once
+    /// every exit is seen; `kill`, or an ask while sessions stopped by an
+    /// earlier one still run, ends each proved process group at once.
+    StopEverything {
+        /// Who pulled the cord, as the server verified them.
+        by: String,
+        /// Why, in their words.
+        reason: String,
+        /// Whether each proved process group is ended at once.
+        #[serde(default)]
+        kill: bool,
+    },
 }
 
 /// How a session ended.
@@ -248,6 +262,9 @@ pub enum EndedHow {
     EndedByRunnerRestart,
     /// It reached a usage limit on the last account of its list.
     AccountsExhausted,
+    /// It was stopped by a stop of everything, or by the runner's own stop;
+    /// `stopped` names who and why.
+    Stopped,
 }
 
 /// A session's end.
@@ -266,6 +283,9 @@ pub struct Ended {
     /// Why a restart did not signal a group it could not prove it owned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// Who stopped it and why, when a stop of everything ended it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stopped: Option<crate::protocol_stop::Stopped>,
 }
 
 /// Output read from a session.
@@ -407,6 +427,14 @@ pub enum Answer {
     },
     /// The connection is held as the grant channel from here on.
     GrantChannel,
+    /// A stop of everything: the sessions it ended, each recorded with who
+    /// and why, and those not ended when it answered.
+    StoppedEverything {
+        /// Every session this act ended.
+        sessions: Vec<String>,
+        /// Every session asked to end that had not when the act answered.
+        running: Vec<String>,
+    },
     /// The act was refused, by name.
     Refused {
         /// The refusal's name.

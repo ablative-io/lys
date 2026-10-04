@@ -25,6 +25,7 @@ mod accounts;
 mod index_commit;
 mod lock;
 mod policy;
+mod retired;
 mod scope;
 
 #[cfg(test)]
@@ -32,6 +33,7 @@ mod name_tests;
 
 pub use accounts::AccountView;
 pub use policy::Recipients;
+pub use retired::Retired;
 pub use scope::Scope;
 
 const INDEX: &str = "index.json";
@@ -92,6 +94,10 @@ struct Index {
     recipients: BTreeMap<String, policy::Recipients>,
     #[serde(default)]
     scopes: BTreeMap<String, scope::Scope>,
+    /// Each retired name, and who retired it when: a retired name is never
+    /// sealed again.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    retired: BTreeMap<String, retired::Retired>,
 }
 
 /// The sealed store, held open by one broker at a time.
@@ -125,6 +131,7 @@ impl SecretStore {
                 accounts: BTreeMap::new(),
                 recipients: BTreeMap::new(),
                 scopes: BTreeMap::new(),
+                retired: BTreeMap::new(),
             },
             _lock: lock,
         };
@@ -223,6 +230,11 @@ impl SecretStore {
     ) -> Result<EntryView, SecretsError> {
         check_name("secret name", name)?;
         check_name("owner", owner)?;
+        if self.index.retired.contains_key(name) {
+            return Err(SecretsError::SecretRetired {
+                name: name.to_owned(),
+            });
+        }
         if self.index.entries.contains_key(name) {
             return Err(SecretsError::SecretExists {
                 name: name.to_owned(),

@@ -200,7 +200,8 @@ async fn team_goals(
     read(&state, &headers, HolderKind::Team, &id)
 }
 
-fn read(
+/// What `GET /agents/{id}/goals` or `GET /teams/{id}/goals` answers the caller.
+pub(crate) fn read(
     state: &AppState,
     headers: &HeaderMap,
     kind: HolderKind,

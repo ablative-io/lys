@@ -120,6 +120,6 @@ function GrantFacts({ w, g, agent }: { w: GrantWorld; g: Grant; agent: AgentSumm
     <dt>Path to a person</dt><dd><Chain w={w} chain={chainOf(w, g)} /></dd>
     <dt>Window</dt><dd>{windowText(g)}</dd>
     <dt>Last used</dt><dd className={g.last_use.seen ? undefined : 'dim'}>{lastUsedText(g)}</dd>
-    <dt>Stands</dt><dd>{v === null ? <><span className="dot s-active" />yes</> : <span className="danger">no: {v.why}</span>}</dd>
+    <dt>Stands</dt><dd>{v === null ? <><span className="dot s-active" />yes</> : <span className="danger" title={v.title}>no: {v.why}</span>}</dd>
   </dl>;
 }

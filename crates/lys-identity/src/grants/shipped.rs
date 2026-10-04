@@ -8,7 +8,7 @@
 //! only adds.
 
 /// The shipped model's version. Raise it whenever [`ACTIONS`] gains one.
-pub const SHIPPED_VERSION: u64 = 2;
+pub const SHIPPED_VERSION: u64 = 3;
 
 /// The acts the first model named, kept so every grant made under it
 /// still resolves.
@@ -77,8 +77,12 @@ pub const ACTIONS: &[&str] = &[
     "runtime-session.input-bytes",
     "runtime-session.keys",
     "runtime-session.resize",
+    "runtime.stop-everything",
+    "secret.add",
     "secret.drop",
     "secret.recipients",
+    "secret.replace",
+    "secret.retire",
     "secret.scope",
     "service-account.create",
     "service-account.retire",
@@ -122,8 +126,12 @@ pub const WITHHELD_FROM_AGENTS: &[&str] = &[
     "role.holder.end",
     "role.holder.move",
     "role.revise",
+    "runtime.stop-everything",
+    "secret.add",
     "secret.drop",
     "secret.recipients",
+    "secret.replace",
+    "secret.retire",
     "secret.scope",
     "service-account.create",
     "service-account.retire",
@@ -286,8 +294,15 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
     ),
     ("runtime-session.keys", "Send keys to this agent"),
     ("runtime-session.resize", "Resize this agent’s terminal"),
+    (
+        "runtime.stop-everything",
+        "Stop every running agent on every computer, and let agents start again",
+    ),
+    ("secret.add", "Add a secret"),
     ("secret.drop", "Remove this secret"),
     ("secret.recipients", "Choose who receives this secret"),
+    ("secret.replace", "Change this secret’s value"),
+    ("secret.retire", "Retire this secret"),
     ("secret.scope", "Change this secret’s scope"),
     ("service-account.create", "Register a service account"),
     ("service-account.retire", "Retire this service account"),

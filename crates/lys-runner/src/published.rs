@@ -12,7 +12,7 @@ use crate::dial::{
 use crate::protocol::{PROTOCOL_VERSION, REQUEST_DOMAIN};
 
 /// Every act the protocol defines, by its tag.
-pub const ACTS: [&str; 15] = [
+pub const ACTS: [&str; 16] = [
     "read_bytes",
     "input_bytes",
     "start",
@@ -28,10 +28,11 @@ pub const ACTS: [&str; 15] = [
     "feed",
     "folders",
     "grant_channel",
+    "stop_everything",
 ];
 
 /// Every answer the protocol defines, by its kind.
-pub const ANSWERS: [&str; 12] = [
+pub const ANSWERS: [&str; 13] = [
     "bytes",
     "feed",
     "folders",
@@ -43,6 +44,7 @@ pub const ANSWERS: [&str; 12] = [
     "ended",
     "status",
     "operation",
+    "stopped_everything",
     "refused",
 ];
 
@@ -101,15 +103,16 @@ pub fn section() -> Value {
                 "feed": {"cursor": "optional string: the last page's cursor", "follow": "bool: answer once an entry is committed after the cursor"},
                 "folders": {"under": "optional string: an absolute folder on this computer, the runner's own home folder when absent; answered as folders {under, folders}, the name of each folder directly inside it"},
                 "grant_channel": {"description": "the connection becomes the grant channel: each question is written as one line, and its answer is read as one line"},
+                "stop_everything": {"by": "string: who pulled the cord", "reason": "string: why", "kill": "bool: end each proved process group at once; an ask while sessions an earlier one stopped still run does so too", "answered": "stopped_everything {sessions, running}: every session this act ended, each recorded ended stopped with {by, reason, at}, and those not ended when it answered, only when the caller left before every exit was seen"},
             },
             "act_tag": "act",
             "reply": {"version": PROTOCOL_VERSION, "answer": "tagged by kind"},
             "answers": ANSWERS,
             "bytes": {"output": {"session": "string", "from": "u64", "cursor": "u64", "oldest": "u64", "data": "array of u8, exact PTY bytes", "ended": "observed end or null"}},
             "request_refusals": REQUEST_REFUSALS,
-            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "launch_without_directory", "trust_file_invalid", "trust_file_unreadable", "trust_file_unwritable", "trust_home_unknown", "trust_watch_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left", "operation_reused", "operation_unknown", "policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous", "policy_target_uninspectable", "policy_digest_mismatch", "cursor_invalid", "grant_channel_unheld", "home_unknown", "folder_invalid", "folder_unreadable"],
+            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "launch_without_directory", "trust_file_invalid", "trust_file_unreadable", "trust_file_unwritable", "trust_home_unknown", "trust_watch_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "stop_words_missing", "caller_left", "operation_reused", "operation_unknown", "policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous", "policy_target_uninspectable", "policy_digest_mismatch", "cursor_invalid", "grant_channel_unheld", "home_unknown", "folder_invalid", "folder_unreadable"],
             "judged_under": "a status's session names the policy its launch carried as policy {version, digest}; absent when none was carried",
-            "ended": {"how": ["exited", "ended_by_runner_restart", "accounts_exhausted"], "at": "milliseconds since the Unix epoch", "status": "the exit status seen, or null: never invented", "signal": "string or null"},
+            "ended": {"how": ["exited", "ended_by_runner_restart", "accounts_exhausted", "stopped"], "at": "milliseconds since the Unix epoch", "status": "the exit status seen, or null: never invented", "signal": "string or null", "reason": "optional string: why a restart ended it", "stopped": "optional {by, reason, at}: who stopped it and why"},
             "dial": {
                 "description": "A runner on another machine is reached through a bridge that dials the server; the server never dials it. The bridge carries its runner connection's greeting to next, and the request it is answered is signed over it. TLS for https://; cleartext http:// only to the machine's own loopback address.",
                 "epoch": format!("GET {EPOCH_ROUTE}: made fresh each time the server starts"),

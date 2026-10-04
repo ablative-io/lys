@@ -17,7 +17,8 @@
 //!   status request, `false` with the `refusal` and the `reason` when it did
 //!   not, and `null` when the machine names no runner. A dialled runner none
 //!   of whose bridges is dialled in is not asked: it answers `false`,
-//!   `runner_not_dialled_in`
+//!   `runner_not_dialled_in`. `joining` is `true` while a connection code
+//!   given for the machine waits to be used (`network_join.rs`)
 //! - `POST /network/machines/{id}/runner`: name a machine's runner
 //! - `POST /network/machines/{id}/folders`: the folders its runner names
 //!   (`machine_folders.rs`)
@@ -133,6 +134,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/runner/protocol", get(protocol))
         .merge(crate::machine_folders::routes())
         .merge(crate::runner_dial::routes())
+        .merge(crate::network_join::routes())
         .merge(crate::runner_bytes_api::routes())
 }
 
@@ -526,9 +528,10 @@ async fn runner(
         store.machine(&id).ok_or(ServerError::MachineUnknown)?;
         Ok(store.runner(&id).cloned())
     })?;
+    let joining = crate::network_join::joining(&state, &id)?;
     let Some(record) = runner.clone() else {
         return Ok(Json(
-            json!({ "machine": id, "runner": runner, "answers": null }),
+            json!({ "machine": id, "runner": runner, "answers": null, "joining": joining }),
         ));
     };
     let asked =
@@ -543,13 +546,13 @@ async fn runner(
                 .map(drop)
         };
     Ok(Json(match asked {
-        Ok(()) => json!({ "machine": id, "runner": runner, "answers": true }),
+        Ok(()) => json!({ "machine": id, "runner": runner, "answers": true, "joining": joining }),
         Err(refused) => {
             let reason = match &refused {
                 ServerError::Runner { words, .. } => words.clone(),
                 other => other.to_string(),
             };
-            json!({ "machine": id, "runner": runner, "answers": false,
+            json!({ "machine": id, "runner": runner, "answers": false, "joining": joining,
                 "refusal": refused.name(), "reason": reason })
         }
     }))

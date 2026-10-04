@@ -166,13 +166,18 @@ fn pinned(state: &AppState, machine: &str, runner: &str) -> Result<(), ServerErr
         }) => Err(refused(format!(
             "the greeting names runner `{runner}`, and machine `{machine}`'s record pins runner `{held}`: name the machine's runner again to pin another"
         ))),
-        Some(RunnerRecord::Dialled { key, runner: None }) => store.name_runner(
-            machine,
-            Some(RunnerRecord::Dialled {
-                key,
-                runner: Some(runner.to_owned()),
-            }),
-        ),
+        Some(RunnerRecord::Dialled { key, runner: None }) => {
+            store.name_runner(
+                machine,
+                Some(RunnerRecord::Dialled {
+                    key,
+                    runner: Some(runner.to_owned()),
+                }),
+            )?;
+            // Its runner has connected for the first time: a screen waiting
+            // for it asks again.
+            state.changes.signal()
+        }
         _ => Err(refused(format!(
             "machine `{machine}` names no dialled runner"
         ))),

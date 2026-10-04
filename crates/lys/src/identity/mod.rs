@@ -14,6 +14,7 @@ pub mod loopback_http;
 pub mod prepare;
 pub mod private_files;
 pub mod rauthy;
+pub mod stop;
 pub mod themes;
 pub mod upgrade;
 

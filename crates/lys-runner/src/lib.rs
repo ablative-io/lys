@@ -62,6 +62,7 @@ pub mod peer;
 pub mod protocol;
 mod protocol_key;
 mod protocol_request;
+mod protocol_stop;
 pub mod pty;
 mod pty_command;
 #[cfg(test)]
@@ -85,7 +86,7 @@ mod trust_tests;
 
 pub use client::{Client, Closer, Connection, GrantChannel, connect};
 pub use error::RunnerError;
-pub use protocol::{Act, Answer, Ended, EndedHow, Key, Launch, PROTOCOL_VERSION};
+pub use protocol::{Act, Answer, Ended, EndedHow, Key, Launch, PROTOCOL_VERSION, Stopped};
 pub use rotation::{Limit, Rotation};
 pub use session::Sessions;
 pub use socket::{Options, Runner, Serving};

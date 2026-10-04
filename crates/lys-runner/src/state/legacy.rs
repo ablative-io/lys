@@ -58,6 +58,7 @@ pub(super) fn migrate(value: Value) -> Result<Kept, serde_json::Error> {
                 status: ended.status,
                 signal: ended.signal,
                 reason: None,
+                stopped: None,
             }),
         })
         .collect();

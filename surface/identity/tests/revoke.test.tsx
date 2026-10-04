@@ -60,21 +60,26 @@ describe('Revoke', () => {
     expect($('.act-panel')).toBeNull();
     const card = $(`tr[data-grant="${ROOT_G}"]`);
     expect(card?.textContent).toContain('void');
-    expect(card?.textContent).toMatch(/Revoked .*, change 8; every check from here on refuses\./);
+    // One sentence, said once: when it was revoked, and what follows.
+    expect(card?.textContent).toMatch(/void Revoked [^;]+; every check from here on refuses\.$/);
+    expect(card?.textContent?.split('Revoked')).toHaveLength(2);
+    // The service's fuller reason, naming the grant, and the change it was revoked at, are the cell's title.
+    const stands = card?.querySelector('.danger');
+    expect(stands?.getAttribute('title')).toBe(revokedReason(`G/${ROOT_G.slice(6, 14)}`) + ' (change 8)');
     expect(card?.querySelector('[data-act="revoke"]')).toBeNull();
     location.hash = `#/file/${SCRIBE}/access`;
     await press('Escape', {}, document.body);
     const derived = $(`tr[data-grant="${SCRIBE_G}"]`);
     expect(derived?.textContent).toContain('void');
-    expect(derived?.textContent).toContain('which no longer stands');
-    // The service's reason, its raw grant id put as the grant's short name.
-    expect(derived?.textContent).toContain(revokedReason(`G/${ROOT_G.slice(6, 14)}`));
+    // What voided it: the grant it derives from, by its short name.
+    expect(derived?.textContent).toContain(`It derives from G/${ROOT_G.slice(6, 14)}, which no longer stands.`);
+    // The service's reason, its raw grant id put as the grant's short name, is the title.
+    expect(derived?.querySelector('.danger')?.getAttribute('title')).toBe(revokedReason(`G/${ROOT_G.slice(6, 14)}`));
     expect(derived?.textContent).not.toContain(ROOT_G);
-    location.hash = '#/me';
-    await press('Escape', {}, document.body);
-    const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
-    expect(scribe?.textContent).not.toContain('viewer of project:identity');
-    expect(scribe?.textContent).toContain('no access');
+    expect(derived?.innerHTML).not.toContain(ROOT_G);
+    // What Scribe holds is read where it lives, its own Access tab: nothing of it stands any more.
+    expect(scribeHolds()).not.toContain('viewer of project:identity');
+    expect(scribeHolds()).toEqual([]);
   });
 
   it('shows the refusal by the service name, and nothing is withdrawn', async () => {
@@ -132,15 +137,16 @@ function handbook(): Record<string, Route> {
 /** What you hold on You, each row by its relation and resource only. */
 const held = () => [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`);
 
-/** What Scribe holds, as its row under Your agents on You carries it: the list in the cell's title, the count in its text. */
-const scribeHolds = () => ($(`tr[data-href="#/file/${SCRIBE}"]`)?.querySelectorAll('td')[2].getAttribute('title') ?? '').split('; ');
+/** What Scribe holds, as its own Access tab lists it: the grants that stand, each by its relation and resource. */
+const scribeHolds = () => [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].filter((tr) => !tr.textContent?.includes('void'))
+  .map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`);
 
 describe('What you hold after a revoke', () => {
   it('row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one', async () => {
     const routes = handbook();
     await mount('#/me?tab=account', routes);
     expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger', 'editor of project:handbook', 'viewer of project:handbook']);
-    location.hash = '#/me';
+    location.hash = `#/file/${SCRIBE}/access`;
     await settle();
     expect(scribeHolds()).toEqual(['viewer of project:identity', 'viewer of project:handbook']);
 
@@ -153,7 +159,7 @@ describe('What you hold after a revoke', () => {
     unmountAll();
     await mount('#/me?tab=account', routes);
     expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger']);
-    location.hash = '#/me';
+    location.hash = `#/file/${SCRIBE}/access`;
     await settle();
     expect(scribeHolds()).toEqual(['viewer of project:identity']);
   });

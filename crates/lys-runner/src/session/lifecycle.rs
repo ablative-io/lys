@@ -373,6 +373,7 @@ impl Sessions {
                     "{failure}; cancelled_spawn_cleanup_failed: {signal}; cancelled_spawn_exit_unconfirmed: {wait}"
                 ),
             }),
+            stopped: None,
         };
         let mut table = match self.lock() {
             Ok(table) => table,

@@ -68,7 +68,16 @@ fn malformed(reason: impl Into<String>) -> ServerError {
 
 impl Page {
     pub(crate) fn read(input: Input, route: &'static str) -> Result<Option<Self>, ServerError> {
-        let Query(mut query) = input.map_err(|refused| malformed(refused.body_text()))?;
+        let Query(query) = input.map_err(|refused| malformed(refused.body_text()))?;
+        Self::of(query, route)
+    }
+
+    /// The page `query` asks of `route`, for a list whose query carries
+    /// members of its own beside the shared ones.
+    pub(crate) fn of(
+        mut query: ListQuery,
+        route: &'static str,
+    ) -> Result<Option<Self>, ServerError> {
         if query.q.is_none()
             && query.team.is_none()
             && query.after.is_none()
@@ -222,20 +231,22 @@ pub(crate) fn document_query(document: &mut serde_json::Value) -> Result<(), Ser
     let invalid = || ServerError::ConfigInvalid {
         reason: "the list query schema or operation is missing from OpenAPI".to_owned(),
     };
-    let properties = document
-        .pointer("/components/schemas/ListQuery/properties")
-        .and_then(serde_json::Value::as_object)
-        .ok_or_else(invalid)?;
-    let parameters: Vec<serde_json::Value> = properties.iter().map(|(name, schema)| {
-        serde_json::json!({ "name":name, "in":"query", "required":false, "schema":schema })
-    }).collect();
-    for path in [
-        "/people",
-        "/directory/people",
-        "/network",
-        "/runtime/live",
-        "/requests",
+    for (path, schema) in [
+        ("/people", "ListQuery"),
+        ("/directory/people", "ListQuery"),
+        ("/network", "ListQuery"),
+        ("/runtime/live", "ListQuery"),
+        ("/requests", "ListQuery"),
+        ("/dashboard", "ListQuery"),
+        ("/drafts", "DraftsQuery"),
     ] {
+        let properties = document
+            .pointer(&format!("/components/schemas/{schema}/properties"))
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(invalid)?;
+        let parameters: Vec<serde_json::Value> = properties.iter().map(|(name, schema)| {
+            serde_json::json!({ "name":name, "in":"query", "required":false, "schema":schema })
+        }).collect();
         let operation = document
             .get_mut("paths")
             .and_then(|paths| paths.get_mut(path))
@@ -245,7 +256,7 @@ pub(crate) fn document_query(document: &mut serde_json::Value) -> Result<(), Ser
         operation.remove("requestBody");
         operation.insert(
             "parameters".to_owned(),
-            serde_json::Value::Array(parameters.clone()),
+            serde_json::Value::Array(parameters),
         );
     }
     Ok(())

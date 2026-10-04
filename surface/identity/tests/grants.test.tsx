@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, choose, click, mount, press, text, unmountAll, unreachable, settle } from './harness';
 import {
   ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE as BEA_BASE, DIRECTORY, GRANTS, LEDGER_G,
-  AGENT_MODEL as MODEL, ME, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused,
+  AGENT_MODEL as MODEL, ME, REVIEWER, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused,
 } from './fixtures';
 import type { DelegateBody, LastUse } from '../src/generated/grants';
 
@@ -580,11 +580,13 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect($('h1')?.textContent).toBe('Bea (test person)');
     expect(holdText()).toEqual([['Edit this resource; View this resource', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
     expect(grantIdsOnScreen()).toEqual(['delegate:' + BEA_ROOT_G, 'revoke:' + BEA_ROOT_G]);
-    // Her agent, and what it holds under her root grant, not Ada's.
-    location.hash = '#/me';
+    // Her agent, and what it holds under her root grant, not Ada's, on its own Access tab where what an agent holds lives.
+    location.hash = '#/dashboard';
     await settle();
     expect(text()).toContain('Reviewer');
-    expect($$('tr[data-href]').map((tr) => tr.querySelectorAll('td')[2].getAttribute('title'))).toContain('viewer of project:ledger');
+    location.hash = '#/file/' + REVIEWER + '/access';
+    await settle();
+    expect([...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`)).toContain('viewer of project:ledger');
     location.hash = '#/me?tab=account';
     await settle();
     await click($(`[data-act="delegate"][data-g="${BEA_ROOT_G}"]`));

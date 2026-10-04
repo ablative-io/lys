@@ -16,8 +16,12 @@
 //! pass, has its body read whole, however long. Any other caller, one whose
 //! credential or signature the route judges over the body or one on a
 //! public route, has no more than [`UNVERIFIED_BODY_LIMIT`] bytes kept, and
-//! a longer body is refused `BodyTooLarge` before any route reads it; its
-//! rest is read and dropped so the caller receives the refusal.
+//! a longer body is refused `BodyTooLarge` before any route reads it.
+//!
+//! Every refusal answered here first reads the rest of the body and drops
+//! it, so the caller finishes sending and receives the refusal: answering
+//! while the caller still sends closes the connection under it, and the
+//! caller sees a reset in place of the refusal.
 
 use std::collections::HashMap;
 use std::future::poll_fn;
@@ -76,7 +80,7 @@ async fn check(
 ) -> Response {
     if request.headers().contains_key(crate::agent_pass::HEADER) {
         if let Err(error) = pass_credentials(request.headers()) {
-            return error.into_response();
+            return refuse(request, error.into_response()).await;
         }
         let method = pass_method(request.method());
         let path = request
@@ -87,7 +91,7 @@ async fn check(
         if let Err(refusal) =
             crate::route_actions::admit(&doors.state, method, path, request.headers())
         {
-            return *refusal;
+            return refuse(request, *refusal).await;
         }
         // The pass, its seat and its grant are judged before the body.
         return next.run(request).await;
@@ -126,7 +130,7 @@ async fn check(
     let whole = match named {
         Some(auth) => match admitted(&doors.state, auth, request.headers()) {
             Ok(whole) => whole,
-            Err(refusal) => return refusal.into_response(),
+            Err(refusal) => return refuse(request, refusal.into_response()).await,
         },
         None => judged(&doors.state, request.headers()),
     };
@@ -187,42 +191,38 @@ async fn unverified(request: Request, next: Next) -> Response {
 
 /// The bytes of `body`, refused `BodyTooLarge` when a frame would take them
 /// past [`UNVERIFIED_BODY_LIMIT`]. From that frame on nothing is kept: what
-/// was read is dropped, and the rest of the body is read and dropped too, so
-/// the caller finishes sending and receives the refusal. Answering while the
-/// caller still sends closes the connection under it, and the caller sees a
-/// reset in place of the refusal. A frame that is not data, a trailer, is
-/// not kept: no route reads one.
+/// was read is dropped, and the rest of the body is [`drained`], so the
+/// caller receives the refusal. A frame that is not data, a trailer, is not
+/// kept: no route reads one.
 async fn bounded(mut body: Body) -> Result<Bytes, ServerError> {
     let mut read = Vec::new();
-    let mut over = false;
     while let Some(frame) = poll_fn(|context| Pin::new(&mut body).poll_frame(context)).await {
-        let frame = match frame {
-            Ok(frame) => frame,
-            // The body is already refused for its length; how its rest ends
-            // changes nothing.
-            Err(_) if over => break,
-            Err(error) => {
-                return Err(ServerError::RequestMalformed {
-                    reason: format!("the request body could not be read: {error}"),
-                });
-            }
-        };
-        if over {
-            continue;
-        }
+        let frame = frame.map_err(|error| ServerError::RequestMalformed {
+            reason: format!("the request body could not be read: {error}"),
+        })?;
         if let Ok(data) = frame.into_data() {
             if data.len() > UNVERIFIED_BODY_LIMIT - read.len() {
-                over = true;
-                read = Vec::new();
-                continue;
+                drop(read);
+                drained(body).await;
+                return Err(ServerError::BodyTooLarge);
             }
             read.extend_from_slice(&data);
         }
     }
-    if over {
-        return Err(ServerError::BodyTooLarge);
-    }
     Ok(Bytes::from(read))
+}
+
+/// `refusal`, answered once the body of `request` is [`drained`].
+async fn refuse(request: Request, refusal: Response) -> Response {
+    drained(request.into_body()).await;
+    refusal
+}
+
+/// Read `body` to its end, one frame at a time, keeping none of it, so the
+/// caller finishes sending before it is answered. The body is refused
+/// already; how its rest ends changes nothing, so an error ends the read.
+async fn drained(mut body: Body) {
+    while let Some(Ok(_)) = poll_fn(|context| Pin::new(&mut body).poll_frame(context)).await {}
 }
 
 fn pass_credentials(headers: &HeaderMap) -> Result<(), ServerError> {

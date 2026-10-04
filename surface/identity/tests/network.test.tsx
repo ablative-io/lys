@@ -5,6 +5,7 @@ import { $, $$, click, mount, settle, text, unmountAll } from './harness';
 import { ADA, ME, OWN, REVIEWER, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
+import { refreshLive } from '../src/live';
 
 beforeEach(() => sessionStorage.clear());
 const machine: Machine = { id: 'op-' + 'a'.repeat(32), name: 'Workshop laptop', kind: 'laptop', runtime: null, slots: 0, may_run: [], may_reach: [], named_by: ADA, named_at: 1790000000, state: 'in_use', retired_at: null, last_report_at: null };
@@ -152,7 +153,9 @@ describe('Network', () => {
     const form = cells[0].querySelector('form[aria-label="Add a computer"]');
     expect(form?.querySelector('input[name="name"]')).not.toBeNull();
     expect(cells[1].textContent).toBe('');
-    expect(cells[2].textContent).toBe('');
+    // Which computer is a choice in a cell of its own, this one first, and no part of the form's own inputs.
+    const choice = cells[2].querySelector('[role="group"][aria-label="Which computer"]');
+    expect([...choice?.querySelectorAll('button') ?? []].map((each) => [each.textContent, each.getAttribute('aria-pressed')])).toEqual([['This computer', 'true'], ['Another computer', 'false']]);
     expect(cells[3].querySelector('button[type="submit"]')?.getAttribute('form')).toBe(form?.id);
     expect($$('form[aria-label="Add a computer"]')).toHaveLength(1);
     expect($('.recorded-form')).toBeNull();
@@ -232,12 +235,82 @@ describe('Network', () => {
 
 });
 
+describe('Another computer, connected with a code that works once', () => {
+  const remote: Machine = { ...machine, runtime: 'lys-runner' };
+  const runnerPath = '/network/machines/' + remote.id + '/runner';
+  const codePath = '/network/machines/' + remote.id + '/join-code';
+  const given = (code: string) => ok({ machine: remote.id, server: 'https://lys.example.test', command: 'lys runner join --server https://lys.example.test --machine ' + remote.id, code });
+  const served = (runner: object, extra: Record<string, Route> = {}): Record<string, Route> => ({ ...routes, '/network': ok({ machines: [remote], reports_served: true }), [runnerPath]: ok({ machine: remote.id, ...runner }), ...extra });
+  const shown = () => $$('#screen tbody tr[data-href]')[0]?.children[1]?.textContent;
+  const panel = () => $('section[aria-label="Workshop laptop"]');
+  const kept = () => Object.keys(sessionStorage).map((key) => sessionStorage.getItem(key) ?? '').join('\n');
+
+  it('reads Waiting for its runner to connect while its code waits, and Up once its runner answers', async () => {
+    const answers = served({ runner: null, answers: null, joining: true });
+    await mount('#/network', answers);
+    expect(shown()).toBe('Waiting for its runner to connect');
+    expect($$('.stat .n').map((n) => n.textContent)).toEqual(['0', '0', '0']);
+    expect(panel()?.textContent).toContain('A connection code was given.');
+    answers[runnerPath] = ok({ machine: remote.id, runner: { kind: 'dialled', key: 'ab12cd34'.repeat(8) }, answers: false, refusal: 'runner_not_dialled_in', reason: 'this computer\'s runner is not connected to Lys right now', joining: false });
+    await act(async () => { refreshLive(); });
+    await settle();
+    expect(shown()).toBe('Waiting for its runner to connect');
+    expect(panel()?.textContent).not.toContain('Its runner did not answer');
+    answers[runnerPath] = ok({ machine: remote.id, runner: { kind: 'dialled', key: 'ab12cd34'.repeat(8), runner: 'c'.repeat(32) }, answers: true, joining: false });
+    await act(async () => { refreshLive(); });
+    await settle();
+    expect(shown()).toBe('Up');
+  });
+
+  it('says its runner connects from that computer and never shows its key', async () => {
+    await mount('#/network', served({ runner: { kind: 'dialled', key: 'ab12cd34'.repeat(8), runner: 'c'.repeat(32) }, answers: true, joining: false }));
+    expect(panel()?.textContent).toContain('Its runner connects to Lys from that computer.');
+    expect(text()).not.toContain('ab12cd34');
+    expect(text()).not.toContain('with key');
+  });
+
+  it('gives the administrator a new code in the panel, says it replaces the old one, and shows each code once with Copy', async () => {
+    const writes: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { writes.push(value); } } });
+    const answers = served({ runner: null, answers: null, joining: true }, { ['POST ' + codePath]: given('1'.repeat(64)) });
+    const { posted } = await mount('#/network', answers);
+    expect(panel()?.textContent).toContain('A new code replaces any code given before, and the earlier one stops working.');
+    await click(button('Get a new connection code'));
+    expect(posted).toEqual([{ path: codePath, body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } }]);
+    expect(panel()?.textContent).toContain('Run this on that computer. The code works once and is not shown again.');
+    expect(panel()?.querySelector('[data-join="code"]')?.textContent).toBe('1'.repeat(64));
+    expect(panel()?.querySelector('[data-join="command"]')?.textContent).toBe('lys runner join --server https://lys.example.test --machine ' + remote.id);
+    await click($('button[aria-label="Copy the code"]'));
+    await click($('button[aria-label="Copy the command"]'));
+    expect(writes).toEqual(['1'.repeat(64), 'lys runner join --server https://lys.example.test --machine ' + remote.id]);
+    answers['POST ' + codePath] = given('2'.repeat(64));
+    await click(button('Get a new connection code'));
+    expect(posted).toHaveLength(2);
+    expect((posted[1].body as { operation: string }).operation).not.toBe((posted[0].body as { operation: string }).operation);
+    expect(text()).toContain('2'.repeat(64));
+    expect(text()).not.toContain('1'.repeat(64));
+    expect(kept()).not.toContain('1'.repeat(64));
+    expect(kept()).not.toContain('2'.repeat(64));
+    await click(button('Done'));
+    expect(text()).not.toContain('2'.repeat(64));
+  });
+
+  it('offers no new code to a person who is not the administrator, nor for the computer Lys runs on', async () => {
+    await mount('#/network', { ...served({ runner: null, answers: null, joining: true }), '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
+    expect(button('Get a new connection code')).toBeNull();
+    unmountAll(); document.body.innerHTML = '';
+    await mount('#/network', served({ runner: { kind: 'lys' }, answers: true, joining: false }));
+    expect(button('Get a new connection code')).toBeNull();
+  });
+});
+
 describe('Computers at the size of a business', () => {
   const team = (n: number, members: string[]) => ({ id: 'op-' + String(n).padStart(32, '0'), name: 'Team ' + n, owner: ADA, parent: null, lead: null, members, held: [], description: '', state: 'active', created_by: ME.signed_in, created_at: 1, retired_at: null });
   const now = Math.floor(Date.now() / 1000);
   const fleet: Machine[] = Array.from({ length: 60 }, (_, n) => ({ ...machine, id: 'op-' + String(n).padStart(32, 'a'), name: 'Builder ' + String(n).padStart(2, '0'), runtime: 'lys-runner', may_run: [{ id: n % 2 ? SCRIBE : REVIEWER, display_name: n % 2 ? 'Scribe' : 'Reviewer', state: 'active' }], last_report_at: n < 55 ? now : now - 86400 }));
   const big = { ...routes, '/teams': ok({ teams: [team(1, [SCRIBE]), team(2, [REVIEWER])] }), '/network': ok({ machines: fleet, reports_served: true }),
-    ...Object.fromEntries(fleet.map((each, n) => ['/network/machines/' + each.id + '/runner', ok({ machine: each.id, runner: { kind: 'dialled', key: 'a'.repeat(64) },
+    // Each has connected before, so its runner is pinned: one not answering now is down, not waiting to connect.
+    ...Object.fromEntries(fleet.map((each, n) => ['/network/machines/' + each.id + '/runner', ok({ machine: each.id, runner: { kind: 'dialled', key: 'a'.repeat(64), runner: 'b'.repeat(32) },
       ...(n < 55 ? { answers: true } : { answers: false, refusal: 'runner_not_dialled_in', reason: 'no bridge of this machine is dialled in to this server' }) })])) };
   it('groups computers by the teams whose agents start there, and counts what is up', async () => {
     await mount('#/network', big);

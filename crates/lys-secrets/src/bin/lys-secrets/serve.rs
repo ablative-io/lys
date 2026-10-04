@@ -14,7 +14,6 @@
 
 use std::sync::{Arc, Mutex};
 
-use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
@@ -82,55 +81,7 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
                 source,
             })?;
         println!("lys-secrets proxy listening on {listen}");
-        let app = Router::new()
-            .route(
-                "/_lys/apps/prepare",
-                axum::routing::post(crate::save_app::save),
-            )
-            .route(
-                "/_lys/apps/save",
-                axum::routing::post(crate::save_app::save),
-            )
-            .route("/_lys/secrets", axum::routing::get(crate::view::secrets))
-            .route("/_lys/audit", axum::routing::get(crate::view::audit))
-            .route("/_lys/grants", axum::routing::get(crate::view::grants))
-            .route("/_lys/handles", axum::routing::get(crate::view::handles))
-            .route("/_lys/next-account", axum::routing::post(next_account))
-            .route(
-                "/_lys/sign/{secret}",
-                axum::routing::post(crate::signing::sign),
-            )
-            .route("/_lys/scope", axum::routing::post(crate::manage::scope))
-            .route(
-                "/_lys/recipients",
-                axum::routing::post(crate::manage::recipients),
-            )
-            .route(
-                "/_lys/settings",
-                axum::routing::get(crate::manage::settings),
-            )
-            .route(
-                "/_lys/revocation",
-                axum::routing::get(crate::manage::revocation),
-            )
-            .route(
-                "/_lys/drop",
-                axum::routing::post(crate::manage::drop_handle),
-            )
-            .route(
-                "/_lys/leases/{lease_id}",
-                axum::routing::get(crate::manage::lease),
-            )
-            .route(
-                "/_lys/leases/{lease_id}/revoke",
-                axum::routing::post(crate::manage::revoke),
-            )
-            .route(
-                "/_lys/leases/{lease_id}/relinquish",
-                axum::routing::post(crate::manage::relinquish),
-            )
-            .fallback(proxy)
-            .with_state(shared);
+        let app = crate::router::routes(shared);
         axum::serve(listener, app)
             .await
             .map_err(|source| SecretsError::Io {
@@ -183,15 +134,24 @@ pub(crate) async fn ask(shared: &Shared, asks: &[Ask]) -> Result<Checked, Secret
     answered.await
 }
 
+/// The header the broker names its own refusal in, so a caller tells the
+/// broker's refusal from an answer the upstream gave.
+pub(crate) const REFUSAL_HEADER: &str = "lys-refusal";
+
 fn refusal(status: StatusCode, error: &SecretsError) -> Response {
-    (status, format!("{error}\n")).into_response()
+    (
+        status,
+        [(REFUSAL_HEADER, error.name())],
+        format!("{error}\n"),
+    )
+        .into_response()
 }
 
 fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers.get(name).and_then(|value| value.to_str().ok())
 }
 
-async fn proxy(State(shared): State<Arc<Shared>>, request: Request) -> Response {
+pub(crate) async fn proxy(State(shared): State<Arc<Shared>>, request: Request) -> Response {
     match forward(&shared, request).await {
         Ok(response) => response,
         Err((status, error)) => refusal(status, &error),
@@ -244,7 +204,7 @@ pub(crate) fn signed_for(
 /// The holder of a handle asks for the secret's next account, for example
 /// at the current one's usage limit. The answer names the account, never
 /// its value.
-async fn next_account(State(shared): State<Arc<Shared>>, request: Request) -> Response {
+pub(crate) async fn next_account(State(shared): State<Arc<Shared>>, request: Request) -> Response {
     let (parts, body) = request.into_parts();
     let asked = async {
         // Guarded: read before the caller is known, as the caller's signature covers it.

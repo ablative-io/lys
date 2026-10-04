@@ -35,10 +35,21 @@ async fn check(
     if request.method() != Method::POST
         || !matches!(
             path,
-            Some("/agents/{id}/start" | "/agents/{id}/start-command")
+            Some(
+                "/agents/{id}/start"
+                    | "/agents/{id}/start-command"
+                    | "/launch-records/{id}/start-again"
+            )
         )
-        || state.budgets.is_none()
     {
+        return next.run(request).await;
+    }
+    // While everything is stopped no start reaches its handler, so nothing
+    // of it is kept or asked of a runner.
+    if let Err(error) = crate::cord_api::refuse_start(&state) {
+        return error.into_response();
+    }
+    if path == Some("/launch-records/{id}/start-again") || state.budgets.is_none() {
         return next.run(request).await;
     }
     let agent = match parameters {

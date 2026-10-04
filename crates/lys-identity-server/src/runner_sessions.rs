@@ -220,6 +220,7 @@ pub fn confirmation(ended: &Ended) -> String {
         EndedHow::AccountsExhausted => {
             "accounts_exhausted: a usage limit on the last account of its list"
         }
+        EndedHow::Stopped => "stopped: everything was stopped, or the runner was",
     };
     let status = match (&ended.status, &ended.signal) {
         (Some(status), _) => format!("exit status {status}"),
@@ -283,6 +284,7 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Feed { .. } => "feed",
         Answer::Folders { .. } => "folders",
         Answer::GrantChannel => "grant_channel",
+        Answer::StoppedEverything { .. } => "stopped_everything",
         Answer::Refused { .. } => "refused",
     }
 }
@@ -306,6 +308,8 @@ pub async fn run_on_runner(
     (agent, machine, caller): (&str, &str, &str),
     launch: Launch,
 ) -> Result<Value, ServerError> {
+    // Every start a runner is asked for comes here: none while everything is stopped.
+    crate::cord_api::refuse_start(state)?;
     let runner = machine_runner(state, machine)?.ok_or(ServerError::MachineWithoutRunner)?;
     let driven = Driven {
         session: launch.session.clone(),
@@ -462,6 +466,9 @@ impl Launcher for DirectoryLauncher {
     fn launch<'a>(&'a self, given: &'a Given, caller: &'a str) -> LaunchFuture<'a> {
         Box::pin(async move {
             let record = &given.record;
+            if let Err(refused) = crate::cord_api::refuse_start(&self.0) {
+                return Some(Err(refused));
+            }
             let runner = match machine_runner(&self.0, &record.machine) {
                 Ok(Some(runner)) => runner,
                 Ok(None) => return None,

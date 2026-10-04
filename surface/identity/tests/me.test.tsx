@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, mount, press, text, unmountAll, unreachable } from './harness';
-import { ADA, BEA, DIRECTORY, GRANTS, ISSUER, LEDGER_G, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, COURIER, DIRECTORY, GRANTS, ISSUER, LEDGER_G, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Grant } from '../src/generated/grants';
+
+/** The grants that stand on an agent's Access tab, each by its relation and resource. */
+const standing = () => [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].filter((tr) => !tr.textContent?.includes('void'))
+  .map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`);
 
 describe('You', () => {
   it('shows the signed-in person from /me', async () => {
@@ -24,18 +28,23 @@ describe('You', () => {
     expect(signIn?.contains(service ?? null)).toBe(false);
   });
 
-  it('lists your agents that still stand, with what each holds', async () => {
-    await mount('#/me');
+  it('lists your agents that still stand on the Dashboard, and what each holds on its own page', async () => {
+    await mount('#/dashboard');
     const agents = $$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent);
     expect(agents).toEqual(["Scribe", "Courier", "Archivist"]);
-    expect($$('tr[data-href]')[0].querySelectorAll('td')[2].getAttribute('title')).toBe('viewer of project:identity');
-    expect($$('tr[data-href]')[0].textContent).toContain('1 grant');
-    expect($$('tr[data-href]')[1].textContent).toContain('no access');
     expect(text()).not.toContain('finance-readonly');
+    unmountAll();
+    // What an agent holds has one home, the Access tab of its own page; the Dashboard does not repeat it.
+    await mount('#/file/' + SCRIBE + '/access');
+    expect(standing()).toEqual(['viewer of project:identity']);
+    expect(text()).not.toContain('finance-readonly');
+    unmountAll();
+    await mount('#/file/' + COURIER + '/access');
+    expect(standing()).toEqual([]);
   });
 
-  it('opens an agent from the keyboard, and every control is reachable (9.3)', async () => {
-    await mount('#/me');
+  it('opens an agent from the keyboard on the Dashboard, and every control is reachable (9.3)', async () => {
+    await mount('#/dashboard');
     expect(unreachable()).toEqual([]);
     $(`tr[data-href="#/file/${SCRIBE}"]`)?.focus();
     await press('Enter');
@@ -77,7 +86,7 @@ describe('Personal scope', () => {
     expect(names).toContain('Bea (test person)');
 
     unmountAll();
-    await mount('#/me', routes);
+    await mount('#/dashboard', routes);
     expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe', 'Courier', 'Archivist']);
     unmountAll();
     await mount('#/me?tab=account', routes);

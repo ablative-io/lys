@@ -138,6 +138,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]] scope("person", "person.create", []);
     POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]] scope("agent", "agent.create", []);
     POST "/drafts" "Record an agent's immutable draft" G [SIGNED_BODY, AGENT, &["NoPerson", "NotAdmitted", "DraftChangeInvalid", "OperationReused"]];
+    GET "/drafts" "The drafts the signed-in person may decide" C [SIGNED, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
+    GET "/dashboard" "The caller's own agents, how each is going, and what waits on the caller" C [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     POST "/drafts/{id}/approve" "Record approval without applying the action" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
     POST "/drafts/{id}/refuse" "Refuse one immutable draft" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
     POST "/drafts/{id}/correct" "Refuse and save the responsible person's correction" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
@@ -202,8 +204,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/skills" "The skills Lys keeps" S [SIGNED] scope("skill", "read", []);
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY] scope("skill", "skill.keep", []);
     POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, PROFILE_REVIEW] scope("agent", "agent.provisioning.review", ["id"]);
-    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted", "WorkingFolderUnnamed"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], &["SecretsUnavailable"], START_RUNNER, START_BUDGET] scope("agent", "agent.start-command", ["id"]);
-    POST "/agents/{id}/restart" "Restart an agent on its latest reviewed profile" S [SIGNED_BODY, RESTART] scope("agent", "agent.restart", ["id"]);
+    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted", "WorkingFolderUnnamed"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], &["SecretsUnavailable"], START_RUNNER, START_BUDGET, &["everything_stopped"]] scope("agent", "agent.start-command", ["id"]);
+    POST "/agents/{id}/restart" "Restart an agent on its latest reviewed profile" S [SIGNED_BODY, RESTART, &["everything_stopped"]] scope("agent", "agent.restart", ["id"]);
     POST "/agents/{id}/runtime/sessions/{session}/reports" "A runtime report" G [AGENT, &["NotAdmitted"], &["AgentNotVisible", "RequestMalformed", "RuntimeSessionUnknown"]] scope("agent", "agent.runtime.report", ["id"]);
     GET "/agents/{id}/runtime/sessions" "An agent's runtime sessions" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     GET "/runtime/sessions" "Every runtime session" S [ADMIN] scope("runtime-session", "read", []);
@@ -212,6 +214,9 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runtime/found" "The sessions found" S [ADMIN] scope("runtime-session", "read", []);
     POST "/agents/{id}/stop" "Stop an agent" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]] scope("agent", "agent.stop", ["id"]);
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
+    GET "/runtime/stop-everything" "Whether everything is stopped, by whom, when and why" S [SIGNED, &["cord_unavailable"]] scope("runtime-session", "read", []);
+    POST "/runtime/stop-everything" "Stop every session on every computer and refuse every start" S [ADMIN_BODY, &["IdentifierMalformed", "cord_reused", "cord_unavailable", "RuntimeUnavailable"]] scope("runtime-session", "runtime.stop-everything", []);
+    POST "/runtime/stop-everything/release" "Let agents start again" S [ADMIN_BODY, &["IdentifierMalformed", "cord_not_pulled", "cord_reused", "cord_unavailable"]] scope("runtime-session", "runtime.stop-everything", []);
     POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
     GET "/budgets/{kind}/{id}" "A holder's limits and measured usage" S [SIGNED, BUDGET_READ] scope("budget", "read", ["kind", "id"]);
     PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" G [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]] scope("budget", "budget.set", ["kind", "id"]);
@@ -235,6 +240,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runner/protocol" "The runner protocol" P [];
     POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
     POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
+    POST "/network/machines/{id}/join-code" "Give a one-time connection code for another computer" S [ADMIN_BODY, &["NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "NetworkUnavailable", "RunnerJoinUnreachable", "RunnerJoinOperationReused"]] scope("machine", "machine.runner.set", ["id"]);
+    POST "/runner/join" "Join another computer's runner with its connection code" P [&["RequestMalformed", "RunnerJoinRefused", "MachineRetired", "NetworkUnavailable"]];
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
     GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown", "RuntimeUnavailable", "ProvisioningUnavailable"]] scope("agent", "agent.usage.report", ["id"]);
@@ -295,6 +302,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/secrets/scope" "Scope a secret" S [SIGNED_BODY, &["LendingNotPermitted"]] scope("secret", "secret.scope", []);
     POST "/secrets/recipients" "A secret's recipients" S [SIGNED_BODY] scope("secret", "secret.recipients", []);
     POST "/secrets/drop" "Drop a secret handle" S [SIGNED_BODY] scope("secret", "secret.drop", []);
+    POST "/secrets/add" "Add a secret with its value" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "SecretExists", "SecretRetired", "OperationReused", "RouteInvalid", "ValueEmpty"]] scope("secret", "secret.add", []);
+    POST "/secrets/replace" "Change a secret's value" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "LendingNotPermitted", "ValueEmpty"]] scope("secret", "secret.replace", []);
+    POST "/secrets/retire" "Retire a secret" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "LendingNotPermitted"]] scope("secret", "secret.retire", []);
     GET "/sessions" "The caller's sessions" S [SIGNED, &["NoPerson"]];
     POST "/sessions/{id}/end" "End one's own session" S [SIGNED, &["SessionUnknown"], &["NoPerson"]];
     GET "/directory/people/{id}/sessions" "A person's sessions" S [ADMIN, &["IdentityUnknown"]] scope("person", "read", ["id"]);
@@ -305,8 +315,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn", "CertificatesUnavailable"], &["CertificateWithdrawn"]] scope("agent", "agent.certificate.withdraw", ["id"]);
-    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable"]] scope("agent", "agent.start", ["id"]);
-    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable"]] scope("launch-record", "launch-record.start-again", ["id"]);
+    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable", "everything_stopped"]] scope("agent", "agent.start", ["id"]);
+    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable", "everything_stopped"]] scope("launch-record", "launch-record.start-again", ["id"]);
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY] scope("launch-record", "launch-record.withdraw", ["id"]);
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED] scope("launch-record", "read", ["id"]);
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]] scope("change", "read", []);

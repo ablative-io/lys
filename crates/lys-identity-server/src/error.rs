@@ -2,8 +2,6 @@
 //! to its HTTP answer.
 
 use axum::http::StatusCode;
-use lys_identity::IdentityError;
-use lys_identity::grants::GrantError;
 
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
@@ -27,10 +25,10 @@ pub enum ServerError {
     },
     /// A directory refusal.
     #[error(transparent)]
-    Identity(#[from] IdentityError),
+    Identity(#[from] lys_identity::IdentityError),
     /// A grant refusal, from the grants' one authority owner.
     #[error(transparent)]
-    Grant(#[from] GrantError),
+    Grant(#[from] lys_identity::grants::GrantError),
     /// An apps refusal: a registration, a schema, a kind or an app's credential.
     #[error(transparent)]
     App(#[from] crate::apps_error::AppError),
@@ -242,6 +240,9 @@ pub enum ServerError {
     /// A machine act's operation id already names a different act.
     #[error(transparent)]
     Machine(#[from] crate::error_machine::MachineError),
+    /// A refusal of the master off switch, or of a start it holds back.
+    #[error(transparent)]
+    Cord(#[from] crate::error_cord::CordError),
     /// The signed-in sessions could not be kept or read back.
     #[error("SessionsUnavailable: {reason}")]
     SessionsUnavailable {

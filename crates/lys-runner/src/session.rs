@@ -38,7 +38,7 @@ use crate::input::Input;
 use crate::judge::Policy;
 use crate::operations::Operations;
 use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Launch, SessionView};
+use crate::protocol::{Ended, EndedHow, Launch, SessionView, Stopped};
 use crate::refusals::Desk;
 use crate::rotation::RotationState;
 use crate::state::{Kept, KeptSession, StateFile};
@@ -57,6 +57,7 @@ mod lifecycle;
 pub(crate) mod output;
 mod owned;
 mod restart;
+mod stop;
 mod trust_dialog;
 
 #[cfg(test)]
@@ -73,6 +74,7 @@ type SpawnProbe = Box<dyn FnOnce() + Send>;
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
 pub(crate) use lifecycle::{Wake, accounts, append, transcript_parent, window_limit};
+pub use stop::StoppedEverything;
 
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
@@ -153,6 +155,7 @@ pub(crate) struct Session {
     pub(crate) guard: Guard,
     pub(crate) follower: Option<mpsc::Sender<Wake>>,
     pub(crate) pending_status: Option<crate::collector::status::PendingStatus>,
+    pub(crate) stopped: Option<Stopped>,
 }
 
 impl Session {
@@ -320,6 +323,7 @@ impl Sessions {
                     status: None,
                     signal,
                     reason,
+                    stopped: None,
                 }
             };
             table.sessions.insert(
@@ -340,6 +344,7 @@ impl Sessions {
                     guard: Guard::default(),
                     follower: None,
                     pending_status: None,
+                    stopped: None,
                 },
             );
         }
@@ -546,6 +551,7 @@ impl Sessions {
             },
             follower: None,
             pending_status: None,
+            stopped: None,
         };
         let prepared = self.run(&lifecycle::plan(&session, false)?)?;
         let pending = Self::install(&mut session, prepared)?;

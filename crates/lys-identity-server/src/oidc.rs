@@ -128,6 +128,12 @@ impl Oidc {
         &self.public_origin
     }
 
+    /// The address the issuer sends a person back to, from configuration:
+    /// this service's own public address, with its callback path.
+    pub(crate) fn redirect_url(&self) -> &str {
+        self.redirect.as_str()
+    }
+
     /// Begin a sign-in, answering the issuer URL to send the browser to.
     pub fn begin(&self, address: IpAddr) -> Result<String, ServerError> {
         self.begin_in(address, &self.in_flight)

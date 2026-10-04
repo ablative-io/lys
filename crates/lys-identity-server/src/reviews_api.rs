@@ -195,8 +195,16 @@ async fn reviews(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<ReviewView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    with_grants(&state, |judged| {
+    review_view(&state, &headers).map(Json)
+}
+
+/// What `GET /reviews` answers the caller.
+pub(crate) fn review_view(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<ReviewView, ServerError> {
+    let actor = signed_in(state, headers)?;
+    with_grants(state, |judged| {
         let caller = crate::caller_admission::active_caller(judged.directory, &actor)?;
         let pass = crate::routes::admitted_agent(judged.directory, &actor)?;
         let whole = pass || is_root(caller, judged.root);
@@ -206,7 +214,7 @@ async fn reviews(
             Some(own_person(judged.directory, &actor)?)
         };
         let judged_at = now();
-        let kept = decisions(&state)?;
+        let kept = decisions(state)?;
         let book = judged.grants.book();
         let due = book
             .records()
@@ -238,14 +246,14 @@ async fn reviews(
                 })
             })
             .collect::<Result<_, ServerError>>()?;
-        Ok(Json(ReviewView {
+        Ok(ReviewView {
             scope: if whole { "directory" } else { "personal" }.to_owned(),
             due,
             unanswered,
             revision: judged.grants.revision(),
             judged_at,
             decisions_recorded: kept.is_some(),
-        }))
+        })
     })
 }
 

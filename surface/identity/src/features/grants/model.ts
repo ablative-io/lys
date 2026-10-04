@@ -94,6 +94,15 @@ export function named(w: GrantWorld, text: string): string {
 }
 
 /**
+ * A title for a sentence of the service's: who each identity it names is, by whoTitle, so two of one name are told
+ * apart. Undefined when the sentence names nobody.
+ */
+export function namesTitle(w: GrantWorld, text: string): string | undefined {
+  const ids = [...new Set(text.match(rawId) ?? [])].filter((id) => w.who.has(id) || /^(?:person|agent)-/.test(id));
+  return ids.length ? ids.map((id) => whoTitle(w, id)).join('; ') : undefined;
+}
+
+/**
  * What `g` lets its holder do: the actions the grant itself carries, which are
  * the actions the service checks when it is exercised, widest first as the model
  * carries them. Only the actions: the resource is the grant's On, and is said there.
@@ -135,22 +144,32 @@ export function chainOf(w: GrantWorld, g: Grant): Grant[] {
 
 /** Why a grant does not stand, as the service judged it over its whole chain. */
 export interface Void {
+  /** One plain sentence, said once. */
   why: string;
+  /** For the sentence's title: the service's fuller reason with names for its raw ids, and who each name is. */
+  title: string;
   /** What a suspension refuses is an open question, so a suspended holder's refusal says so. */
   open: boolean;
 }
 
 /**
- * Why `g` does not stand, in the service's words with names for its raw ids, or null when the service
- * answers that it stands. Nothing here walks a chain, reads a clock or decides
- * standing from a holder's state: the service's standing is the only answer.
+ * Why `g` does not stand, or null when the service answers that it stands: a grant revoked itself says when; one
+ * whose source no longer stands names that grant; any other says the service's sentence with names for its raw ids.
+ * The service's fuller reason is the title. Nothing here walks a chain, reads a clock or decides standing from a
+ * holder's state: the service's standing is the only answer.
  */
 export function voidOf(w: GrantWorld, g: Grant): Void | null {
   const s = g.standing;
   if (s.stands) return null;
+  const reason = named(w, s.reason);
   const upstream = s.grant !== null && s.grant !== g.id;
-  const why = upstream ? `it derives from ${grantNo(s.grant ?? '')}, which no longer stands (${named(w, s.reason)})` : named(w, s.reason);
-  return { why, open: s.refusal === 'IdentityNotActive' && w.who.get(g.holder)?.state === 'suspended' };
+  const why = g.revoked && g.revoked_at !== null
+    ? `Revoked ${clock(g.revoked_at)}; every check from here on refuses.`
+    : upstream ? `It derives from ${grantNo(s.grant ?? '')}, which no longer stands.` : reason;
+  const change = g.revoked && g.revoked_revision !== null ? ` (change ${g.revoked_revision})` : '';
+  const names = namesTitle(w, s.reason);
+  const title = reason + change + (names ? '. ' + names : '');
+  return { why, title, open: s.refusal === 'IdentityNotActive' && w.who.get(g.holder)?.state === 'suspended' };
 }
 
 /** "Passable", in the mock-up's words: to whom it may be passed on, or `not passable`. */

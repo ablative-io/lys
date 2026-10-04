@@ -10,7 +10,7 @@ import { ShellProvider } from './shell/ShellContext';
 /** Lys's own sign-in page, outside the signed-in shell. */
 function SignInScreen() {
   const navigate = useNavigate();
-  return <SignIn signedIn={() => navigate('/me')} />;
+  return <SignIn signedIn={() => navigate('/')} />;
 }
 
 export function App() {

@@ -56,6 +56,7 @@ pub use sign::{Signature, SigningRefusal};
 mod sign_tests;
 mod spawn;
 mod using;
+mod values;
 
 pub use using::{Admitted, Settled, Ticket};
 

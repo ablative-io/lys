@@ -172,6 +172,33 @@ export type Route = Answer | ((body: unknown) => Answer);
 export const ok = (body: unknown): Answer => ({ status: 200, body });
 export const refused = (status: number, refusal: string, reason: string): Answer => ({ status, body: { refusal, reason } });
 
+/** One agent's row of GET /dashboard: not running, no limit, no goal, unless a test says otherwise. */
+export const dashboardRow = (agent: { id: string; display_name: string; state: string }, more: Record<string, unknown> = {}) => ({
+  agent, teams: [], sessions: [],
+  usage: { agent: agent.id, used: [], receipts: [], last_reported_ms: null },
+  budget: { holder: { kind: 'agent', id: agent.id }, limits: [], warn_at: null, zone: 'UTC', version: 0, by: null, at: null, used: [], unavailable: [], within: [], unconfirmed: [] },
+  goals: { goals: [] },
+  ...more,
+});
+
+/** GET /dashboard for Ada: her own agents, in the directory's order, and nothing waiting, unless a test says otherwise. */
+export const dashboard = (rows: Record<string, Record<string, unknown>> = {}, waiting: Partial<Record<'requests' | 'drafts' | 'reviews', number>> = {}) => ({
+  agents: OWN.people[0].agents.map((agent) => dashboardRow(agent, rows[agent.id])),
+  waiting: { requests: 0, drafts: 0, reviews: 0, ...waiting },
+});
+
+/** GET /runtime/stop-everything while agents may start, read by the administrator. */
+export const CORD = { pulled: null, last: null, released: null, may_pull: true };
+
+/** POST /runtime/stop-everything when nothing was running: the pull Ada sent, and nothing stopped. */
+export const pulledNothing = (body: unknown) => {
+  const asked = body as { operation: string; reason: string; kill?: boolean };
+  return {
+    operation: asked.operation, pulled: { operation: asked.operation, by: ADA, by_name: 'Ada (test person)', reason: asked.reason, kill: asked.kill ?? false, at: 1790000000 },
+    stopped: [], still_running: [], unreached: [], handles_ended: [], handles_refused: [],
+  };
+};
+
 /** The commit the stubbed service says it was built from. */
 export const BUILD = '0123456789abcdef0123456789abcdef01234567';
 
@@ -188,6 +215,12 @@ export const SERVICE: Record<string, Route> = {
   '/roles': ok({ roles: [] }),
   '/teams': ok({ teams: [] }),
   '/runtime/live': ok({ sessions: [], unanswered: [] }),
+  '/dashboard': ok(dashboard()),
+  '/runtime/stop-everything': ok(CORD),
+  'POST /runtime/stop-everything': (body) => ok(pulledNothing(body)),
+  'POST /runtime/stop-everything/release': refused(409, 'cord_not_pulled', 'cord_not_pulled: nothing is stopped, so there is nothing to let start again'),
+  '/drafts?state=waiting': ok({ drafts: [] }),
+  '/drafts?state=decided': ok({ drafts: [] }),
   '/requests': ok({ requests: [] }),
   '/reviews': ok({ scope: 'personal', due: [], unanswered: [], revision: 0, judged_at: 1790000000 }),
   '/runtime/found': ok({ sessions: [] }),
@@ -260,4 +293,5 @@ export const BEA_SERVICE: Record<string, Route> = {
   '/people': ok(BEA_OWN),
   '/directory/people': ok(BEA_DIRECTORY),
   '/grants': ok({ grants: BEA_GRANTS, revision: 9 }),
+  '/dashboard': ok({ agents: BEA_PERSON.agents.map((agent) => dashboardRow(agent)), waiting: { requests: 0, drafts: 0, reviews: 0 } }),
 };

@@ -27,7 +27,8 @@ export function matchesMachine(machine: unknown, body: NameMachine, person: stri
     && JSON.stringify(machine.may_run_roles ?? []) === JSON.stringify(body.may_run_roles ?? [])
     && JSON.stringify(machine.may_reach) === JSON.stringify(body.may_reach);
 }
-export interface PendingMachine { body: NameMachine; phase: 'machine' | 'runner'; machine: Machine | null }
+/** A computer addition kept until its outcome is known. `remote` marks another computer: once it is named, it is given a connection code, never kept. */
+export interface PendingMachine { body: NameMachine; phase: 'machine' | 'runner'; machine: Machine | null; remote?: true }
 function unreadable(): never { throw new Refused(0, { refusal: 'PendingMachineUnreadable', reason: 'The retained computer addition cannot be read. Resolve its original request before adding another computer.' }); }
 function machineBody(value: unknown): NameMachine {
   if (!isRecord(value) || typeof value.operation !== 'string' || !/^op-[0-9a-f]{32}$/.test(value.operation)
@@ -52,7 +53,9 @@ export function pendingMachineOf(value: unknown): PendingMachine | null {
   const machine = value.machine;
   if (machine !== null && (!readableMachine(machine) || machine.id !== body.operation)) return unreadable();
   if (value.phase !== 'machine' && machine === null) return unreadable();
-  return { body, phase: value.phase as PendingMachine['phase'], machine };
+  // Another computer is kept only while it is being named.
+  if (value.remote !== undefined && (value.remote !== true || value.phase !== 'machine')) return unreadable();
+  return { body, phase: value.phase as PendingMachine['phase'], machine, ...(value.remote === true ? { remote: true as const } : {}) };
 }
 
 export function confirmRunner(value: unknown, machine: string, local: boolean): void {

@@ -268,6 +268,7 @@ impl ServerError {
             Self::Budget(error) => error.status(),
             Self::Holding(error) => error.status(),
             Self::Machine(error) => error.status(),
+            Self::Cord(error) => error.status(),
         }
     }
 }

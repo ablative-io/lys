@@ -8,32 +8,45 @@ import { ago } from '../file/time';
 import { counted } from '../../shell/count';
 import type { Computer } from './Network';
 import type { Machine } from './contract';
+import { NewCode } from './JoinCode';
+import type { Connecting } from './JoinCode';
 
 export type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
 
 /** Whether the computer is up, by its runner's own answer when Lys asked it just now; never guessed from a report's age. */
-export function status({ machine, asked, runner, answers, running }: Computer): { words: string; state: 'up' | 'down' | 'unknown' | 'off' } {
+export function status({ machine, asked, runner, answers, joining, running }: Computer): { words: string; state: 'up' | 'down' | 'unknown' | 'off' } {
   if (machine.state === 'retired') return { words: 'Retired', state: 'off' };
   if (machine.runtime === null) return { words: 'Does not run agents', state: 'off' };
   if (running?.length) return { words: 'Up, ' + counted(running.length, 'agents') + ' running', state: 'up' };
   // Until its runner is asked, nothing is said of it: it counts neither as up nor as not answering.
   if (asked === 'asking') return { words: 'Asking its runner…', state: 'unknown' };
   if (asked === 'unread') return { words: 'Lys could not ask its runner', state: 'unknown' };
-  if (!runner) return { words: 'No runner connected', state: 'down' };
   if (answers === true) return { words: 'Up', state: 'up' };
+  if (waiting({ runner, joining })) return { words: 'Waiting for its runner to connect', state: 'unknown' };
+  if (!runner) return { words: 'No runner connected', state: 'down' };
   return { words: 'Runner not answering' + (machine.last_report_at === null ? '' : ', last heard ' + ago(machine.last_report_at)), state: 'down' };
 }
 
+/** Whether a computer's runner has yet to connect: a connection code waits to be used, or it joined and has never connected since. */
+export const waiting = ({ runner, joining }: { runner: RunnerRecord | null; joining: boolean }): boolean =>
+  joining || (runner?.kind === 'dialled' && !runner.runner);
+
 /** How Lys reaches it. */
-function reached(machine: Machine, runner: RunnerRecord | null): string {
+function reached(machine: Machine, runner: RunnerRecord | null, joining: boolean): string {
   if (machine.runtime === null) return 'Lys does not start agents here.';
   if (runner?.kind === 'lys') return 'This is the computer Lys runs on; Lys starts agents through its own runner.';
-  if (runner?.kind === 'dialled') return 'Its runner connects to Lys with key ' + runner.key.slice(0, 8) + '….';
+  if (joining) return 'A connection code was given. Its runner connects once the command is run on that computer.';
+  if (runner?.kind === 'dialled') return 'Its runner connects to Lys from that computer.';
   if (runner?.kind === 'socket') return 'Lys starts agents through the runner at ' + runner.path + '.';
   return 'No runner is connected, so Lys cannot start agents here.';
 }
 
-export function MachineDetail({ computer, admin, me, teams, names, changed }: { computer: Computer; admin: boolean; me: string; teams: OrgTeam[]; names: Map<string, string>; changed: (message: string) => void }) {
+/** Another computer's runner can be connected from the panel: one that runs agents and is not the computer Lys runs on, nor a runner at a socket here. */
+const connectable = ({ machine, asked, runner }: Computer): boolean =>
+  machine.state === 'in_use' && machine.runtime !== null && asked === 'answered' && (runner === null || runner.kind === 'dialled');
+
+export function MachineDetail({ computer, admin, me, teams, names, changed, connecting, connect, done }: { computer: Computer; admin: boolean; me: string; teams: OrgTeam[]; names: Map<string, string>; changed: (message: string) => void;
+  connecting: Connecting | null; connect: (next: Connecting) => void; done: () => void }) {
   const { machine, runner, running } = computer;
   const now = status(computer);
   return <section className="card" aria-label={machine.name}>
@@ -52,9 +65,10 @@ export function MachineDetail({ computer, admin, me, teams, names, changed }: { 
       {!machine.may_run.length && !(machine.may_run_roles ?? []).length ? <tr><td colSpan={2} className="dim">No agent may start here yet.</td></tr> : null}
     </tbody></table>}
     <div className="section-h">How Lys reaches it</div>
-    {computer.asked === 'answered' || machine.runtime === null ? <p>{reached(machine, runner)}</p> : computer.asked === 'asking' ? <p className="dim">Asking its runner…</p> : null}
-    {computer.answers === false && computer.reason ? <p className="why-not">Its runner did not answer: {computer.reason}</p> : null}
+    {computer.asked === 'answered' || machine.runtime === null ? <p>{reached(machine, runner, computer.joining)}</p> : computer.asked === 'asking' ? <p className="dim">Asking its runner…</p> : null}
+    {computer.answers === false && computer.reason && !waiting(computer) ? <p className="why-not">Its runner did not answer: {computer.reason}</p> : null}
     {computer.asked === 'unread' ? <p className="why-not">Lys could not ask its runner: {computer.reason}</p> : null}
+    {admin && connectable(computer) ? <NewCode machine={machine.id} name={machine.name} connecting={connecting?.machine === machine.id && connecting.at === 'panel' ? connecting : null} connect={connect} done={done} /> : null}
     <p className="sec">Websites its agents' services may connect to: {machine.may_reach.join(', ') || 'none'}.</p>
     {admin && machine.state !== 'retired' ? <Retire machine={machine} changed={changed} /> : null}
   </section>;

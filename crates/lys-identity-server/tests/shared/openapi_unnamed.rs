@@ -154,6 +154,18 @@ pub(crate) const OPEN_ANSWERS: &[(&str, &str)] = &[
         "the secrets broker's own answer, forwarded",
     ),
     (
+        "post /secrets/add",
+        "the secrets broker's own answer, forwarded",
+    ),
+    (
+        "post /secrets/replace",
+        "the secrets broker's own answer, forwarded",
+    ),
+    (
+        "post /secrets/retire",
+        "the secrets broker's own answer, forwarded",
+    ),
+    (
         "post /agents/{id}/start",
         "the start owners' own rendered JSON, which this crate holds no type for",
     ),
@@ -286,6 +298,18 @@ pub(crate) const NO_BODY: &[(&str, &str)] = &[
     ),
     (
         "post /secrets/drop",
+        "forwards its bytes to the secrets broker unread",
+    ),
+    (
+        "post /secrets/add",
+        "forwards its bytes to the secrets broker unread",
+    ),
+    (
+        "post /secrets/replace",
+        "forwards its bytes to the secrets broker unread",
+    ),
+    (
+        "post /secrets/retire",
         "forwards its bytes to the secrets broker unread",
     ),
     (

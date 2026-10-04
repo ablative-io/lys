@@ -20,6 +20,7 @@ impl SecretsError {
             Self::EntryRolledBack { .. } => "EntryRolledBack",
             Self::EntryUnsealFailed { .. } => "EntryUnsealFailed",
             Self::SecretExists { .. } => "SecretExists",
+            Self::SecretRetired { .. } => "SecretRetired",
             Self::SecretUnknown { .. } => "SecretUnknown",
             Self::AccountUnknown { .. } => "AccountUnknown",
             Self::AccountExists { .. } => "AccountExists",

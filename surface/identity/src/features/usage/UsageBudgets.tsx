@@ -5,7 +5,7 @@ import { Refused, request } from '../../api';
 import { ACTS, kept, shown, standing } from './contract';
 import type { BudgetsView, BudgetBody, BudgetAct, Length, Measure, Receipt } from './contract';
 import { PERIODS, confirmsBudget, validAmount } from './budgetForm';
-import { PERIOD_WORDS, UNITS, limitWords, usedWords } from './budgetWords';
+import { PERIOD_WORDS, UNITS, limitWords, usedAgainst } from './budgetWords';
 import { answeredNo } from '../../kept';
 import { plain, reasons } from './reasons';
 import type { Named } from './reasons';
@@ -85,7 +85,7 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
               <input name={'amount-' + index} aria-label={'Amount of ' + limitWords(limit)} type="number" min={0} max={limit.unit.includes('percent') ? 100 : undefined} step="any" required disabled={busy} value={rows[index].amount} onChange={(event) => edit(index, { amount: event.target.value })} />
               <span>{UNITS[limit.unit]}{limit.period ? ' a ' + PERIOD_WORDS[limit.period] : ', at any moment'}</span>
             </div></td>
-            <td className="usage-used">{usedWords(limit, budgets.used[index]) ?? 'Nothing reported yet'}</td>
+            <td className="usage-used">{usedAgainst(budgets, index) ?? 'Nothing reported yet'}</td>
             <td><select name={'act-' + index} aria-label={'When ' + limitWords(limit) + ' is hit'} disabled={busy} value={rows[index].act} onChange={(event) => edit(index, { act: event.target.value as BudgetAct })}>{Object.entries(ACTS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select></td>
             <td>{words}</td>
             <td><button className="btn" type="button" disabled={busy} aria-label={'Remove ' + limitWords(limit)} onClick={() => remove(index)}>Remove</button></td>

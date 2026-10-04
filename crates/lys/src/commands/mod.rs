@@ -18,5 +18,6 @@ pub mod output;
 pub mod pem;
 pub mod proxy;
 pub mod runner;
+pub mod runner_join;
 pub mod seal;
 pub mod verify;

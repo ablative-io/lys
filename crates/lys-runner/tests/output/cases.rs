@@ -153,6 +153,7 @@ fn words_cross_chunks_once_and_stale_generations_keep_nothing() -> Result<(), Bo
             status: Some(0),
             signal: None,
             reason: None,
+            stopped: None,
         },
     )?;
     assert!(output.lock()?.ended().is_none());

@@ -114,6 +114,36 @@ pub enum IdentityCommand {
         message_service: Option<PathBuf>,
     },
 
+    /// Turn off everything Lys started: ask the service to stop every
+    /// session on every computer it drives, recording on each who pulled
+    /// the cord and why; tell this computer's runner the same; stop the
+    /// runner, the model proxy, the service and the broker; then stop the
+    /// database, sign-in and permission services, keeping their data. Every
+    /// part is done whatever an earlier part answered, and each that failed
+    /// is named. Sessions are hung up and waited on until each has ended;
+    /// --kill, or a second stop while sessions still run, ends them at once.
+    Stop {
+        /// Why everything is stopped, in your words; kept on every session.
+        #[arg(long)]
+        reason: String,
+        /// End each session's process group at once instead of hanging it up.
+        #[arg(long)]
+        kill: bool,
+        /// The data root; the platform's application data path when absent.
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+
+    /// Start whatever of the install is down, as the install starts it, and
+    /// leave running whatever runs: the inverse of stop. A stop of
+    /// everything pulled in the service stays pulled until the
+    /// administrator lets agents start again.
+    Start {
+        /// The data root; the platform's application data path when absent.
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+
     /// Write a fresh one-time setup code and open the setup page with it, so
     /// the administrator sets a new password; or, before first-run setup
     /// has finished, a fresh first-run code. The code is never printed: it

@@ -12,7 +12,7 @@ import '../people/recorded-form.css';
 import './sign-in.css';
 
 /** Where a person lands once signed in. */
-export const SIGNED_IN = '/#/me';
+export const SIGNED_IN = '/#/';
 
 /** A refusal in the words a person reads, without its name. */
 export function reasonOf(failure: unknown): string {

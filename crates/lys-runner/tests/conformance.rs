@@ -429,6 +429,11 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         },
         Act::Folders { under: None },
         Act::GrantChannel,
+        Act::StopEverything {
+            by: "person".to_owned(),
+            reason: "why".to_owned(),
+            kill: false,
+        },
     ];
     let mut named = 0;
     for act in &every_act {
@@ -498,6 +503,10 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             folders: Vec::new(),
         },
         Answer::GrantChannel,
+        Answer::StoppedEverything {
+            sessions: Vec::new(),
+            running: Vec::new(),
+        },
         Answer::Refused {
             refusal: "r".to_owned(),
             words: String::new(),

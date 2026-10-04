@@ -220,12 +220,21 @@ impl Sessions {
                 how = EndedHow::AccountsExhausted;
             }
         }
+        let stopped = table
+            .sessions
+            .get(id)
+            .filter(|session| session.generation == generation)
+            .and_then(|session| session.stopped.clone());
+        if stopped.is_some() && how == EndedHow::Exited {
+            how = EndedHow::Stopped;
+        }
         let ended = Ended {
             how,
             at,
             status,
             signal,
             reason: None,
+            stopped,
         };
         let Some(session) = table
             .sessions
