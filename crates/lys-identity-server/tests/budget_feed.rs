@@ -72,6 +72,8 @@ fn record(session: &str, id: &str, measure: Measure, at: u64, figures: Figures) 
         account_unknown: None,
         context_window: 100,
         profile_version: 1,
+        run: None,
+        record: None,
     }
 }
 

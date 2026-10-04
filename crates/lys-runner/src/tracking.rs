@@ -219,6 +219,15 @@ pub struct UsageRecord {
     pub context_window: u64,
     /// The profile version that declared it.
     pub profile_version: u32,
+    /// The run key of the model call this record counts, when it was read
+    /// from the proxy's usage file: with `record`, where the call is kept
+    /// whole on the machine it was made on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
+    /// The name of the proxy's record file that holds the call whole (the
+    /// harness's own session id), when the call named one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record: Option<String>,
 }
 
 /// The rotation evidence a record is attributed by.
@@ -343,6 +352,8 @@ impl Reading<'_> {
             account_unknown,
             context_window: self.tracking.context_window,
             profile_version: self.tracking.profile_version,
+            run: None,
+            record: None,
         })
     }
 

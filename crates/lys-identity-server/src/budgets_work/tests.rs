@@ -105,6 +105,8 @@ fn unrelated_history_does_not_add_running_baseline_visits() -> TestResult {
         account_unknown: None,
         context_window: 100,
         profile_version: 1,
+        run: None,
+        record: None,
     };
     for size in [0, 512] {
         let held = history(size)?;
