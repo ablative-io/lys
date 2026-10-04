@@ -495,11 +495,7 @@ pub fn run_key(path_and_query: &str) -> (Option<&str>, &str) {
         return (None, path_and_query);
     };
     let (first, rest) = after.split_at(end);
-    let plain = !first.is_empty()
-        && first
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_');
-    if !plain || PROVIDERS.contains(&first) {
+    if !super::usage::is_run_key(first) || PROVIDERS.contains(&first) {
         return (None, path_and_query);
     }
     (Some(first), rest)

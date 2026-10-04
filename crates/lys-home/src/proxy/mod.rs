@@ -41,6 +41,7 @@ pub mod stream_responses;
 pub mod stream_sse;
 #[cfg(test)]
 mod stream_tests;
+pub mod usage;
 
 #[cfg(test)]
 mod timing;

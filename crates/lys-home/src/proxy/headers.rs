@@ -36,10 +36,11 @@ const NEVER_VALUED: [&str; 5] = [
 ];
 
 /// Request headers whose values are kept, by exact name.
-const ASKED: [&str; 6] = [
+const ASKED: [&str; 7] = [
     "accept-encoding",
     "anthropic-beta",
     "anthropic-version",
+    "chatgpt-account-id",
     "content-encoding",
     "content-type",
     "user-agent",

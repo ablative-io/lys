@@ -18,6 +18,10 @@
 //!   ingests; a call whose record cannot be rewritten is recorded
 //!   `unrecorded`, and is held, with nothing ingested, until the journal can
 //!   be written again ([`Sink::settle`] asks the sink to look again).
+//! - A call whose path carried a run key has its usage line appended to the
+//!   run's file after its entry is durable and before its journal file is
+//!   removed ([`super::usage`]); a start that finds the journal file writes
+//!   the line, so a death between the entry and the line loses no line.
 //! - The sink writes no body byte anywhere but the home's block store, and
 //!   of the headers only their names and the kept values (`proxy::headers`),
 //!   on the call's record;
@@ -79,6 +83,13 @@ impl Journal {
     #[must_use]
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// Where the per-run usage files live: `usage`, beside the journal in
+    /// the proxy's state ([`super::usage`]).
+    #[must_use]
+    pub fn usage_dir(&self) -> PathBuf {
+        self.dir.parent().unwrap_or(&self.dir).join("usage")
     }
 
     fn path_of(&self, call_id: &str) -> PathBuf {
@@ -410,6 +421,14 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
             return report;
         }
     }
+    // The record is durable and the journal still holds the call: a death
+    // before this line is written is a line written by the next start.
+    if let Err(error) = super::usage::append(&journal.usage_dir(), &job.call) {
+        report.held = Some(format!(
+            "the call's usage line could not be written: {error}"
+        ));
+        return report;
+    }
     for path in [job.request.take(), job.response.take()]
         .into_iter()
         .flatten()
@@ -458,8 +477,12 @@ pub fn recover(
             response_hash: None,
             last_arrival: None,
             timing: crate::record::call::captured::CaptureTiming::interrupted(call.admission_ns),
-            // Nothing read in flight survives the process; a prepared record keeps its own.
-            seen: crate::record::call::captured::Seen::default(),
+            // Nothing read in flight survives the process but the journalled
+            // run key; a prepared record keeps its own.
+            seen: crate::record::call::captured::Seen {
+                run: call.run.clone(),
+                ..Default::default()
+            },
             call,
         };
         let report = record(home, journal, &mut job);
