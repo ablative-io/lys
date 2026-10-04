@@ -121,17 +121,28 @@ pub async fn guard(
     axum::extract::State(state): axum::extract::State<std::sync::Arc<AppState>>,
     request: axum::extract::Request,
     next: axum::middleware::Next,
-) -> Result<axum::response::Response, ServerError> {
-    if actor(&state, request.headers())?.is_some() {
-        let path = request.uri().path();
-        let path = path.strip_prefix("/api").unwrap_or(path);
-        if path == "/me" || path.starts_with("/me/") {
-            return Err(ServerError::OperatorRefused {
+) -> axum::response::Response {
+    let refused = match actor(&state, request.headers()) {
+        Ok(Some(_)) => {
+            let path = request.uri().path();
+            let path = path.strip_prefix("/api").unwrap_or(path);
+            (path == "/me" || path.starts_with("/me/")).then_some(ServerError::OperatorRefused {
                 reason: "the operator has no personal account",
-            });
+            })
         }
+        Ok(None) => None,
+        Err(error) => Some(error),
+    };
+    // A refusal here comes before the body is read: the rest of the body is
+    // read and dropped first, so the caller receives the refusal, never a
+    // reset under it.
+    match refused {
+        Some(error) => {
+            crate::signed_first::refuse(request, axum::response::IntoResponse::into_response(error))
+                .await
+        }
+        None => next.run(request).await,
     }
-    Ok(next.run(request).await)
 }
 
 /// Whether the managed install is still in its reversible upgrade window.

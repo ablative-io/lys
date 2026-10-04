@@ -212,8 +212,10 @@ async fn bounded(mut body: Body) -> Result<Bytes, ServerError> {
     Ok(Bytes::from(read))
 }
 
-/// `refusal`, answered once the body of `request` is [`drained`].
-async fn refuse(request: Request, refusal: Response) -> Response {
+/// `refusal`, answered once the body of `request` is [`drained`]. Every
+/// guard that refuses a request before its body is read answers through
+/// this.
+pub(crate) async fn refuse(request: Request, refusal: Response) -> Response {
     drained(request.into_body()).await;
     refusal
 }

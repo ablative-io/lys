@@ -7,7 +7,7 @@ use std::sync::Arc;
 use axum::extract::{MatchedPath, Request, State};
 use axum::http::Method;
 use axum::middleware::Next;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use lys_identity::projection::Projection;
 use lys_identity::{Actor, IdentityId};
 
@@ -35,19 +35,22 @@ fn bound_caller(
 
 /// Refuse an inactive authenticated caller before any route can bypass a
 /// person check through an administrator shortcut or swallow a refusal.
-pub async fn guard(
-    State(state): State<Arc<AppState>>,
-    request: Request,
-    next: Next,
-) -> Result<Response, ServerError> {
-    match signed_in(&state, request.headers()) {
+pub async fn guard(State(state): State<Arc<AppState>>, request: Request, next: Next) -> Response {
+    let refused = match signed_in(&state, request.headers()) {
         Ok(actor) => with_directory(&state, |directory| {
             bound_caller(directory.projection()?, &actor, own_account_route(&request))
-        })?,
-        Err(ServerError::NotSignedIn) => {}
-        Err(error) => return Err(error),
+        })
+        .err(),
+        Err(ServerError::NotSignedIn) => None,
+        Err(error) => Some(error),
+    };
+    // A refusal here comes before the body is read: the rest of the body is
+    // read and dropped first, so the caller finishes sending and receives
+    // the refusal, never a reset under it.
+    match refused {
+        Some(error) => crate::signed_first::refuse(request, error.into_response()).await,
+        None => next.run(request).await,
     }
-    Ok(next.run(request).await)
 }
 
 /// Begin a session while its bound identity may authenticate, serialized
