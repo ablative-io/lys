@@ -157,6 +157,14 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         .iter()
         .map(|server| server_fields(server, handles))
         .collect::<Result<Vec<_>, _>>()?;
+    let model_proxy = start
+        .model_proxy
+        .filter(|_| harness_is_claude)
+        .map(str::to_owned);
+    // Every start is rendered from these fields, so every start that is
+    // given the proxy is given it under a key minted here for it alone: no
+    // start path can give a run the proxy without one.
+    let run = model_proxy.as_ref().map(|_| lys_home::record::fresh_id());
     Ok(LaunchFields {
         identity: LaunchIdentity {
             agent: start.agent.to_owned(),
@@ -169,10 +177,8 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         models: settings.model_access.clone(),
         mcp_servers,
         skills: skills(settings)?,
-        model_proxy: start
-            .model_proxy
-            .filter(|_| harness_is_claude)
-            .map(str::to_owned),
+        model_proxy,
+        run,
     })
 }
 

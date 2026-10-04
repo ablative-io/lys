@@ -118,3 +118,78 @@ fn failed_pass_end_and_receipt_both_name_their_failure() {
     assert!(error.contains("durable ending failed"));
     assert!(error.contains("receipt append failed"));
 }
+#[path = "../tests/support/harness_description.rs"]
+mod harness_description;
+/// The start-command path: the start is rendered, kept as a view, and the
+/// launch the runner is sent is built from that kept view alone.
+#[test]
+fn a_start_kept_from_the_start_command_tells_the_runner_its_run_key() -> TestResult {
+    use crate::launch_template::{Start, render};
+    use crate::provisioning_store::{ProvisioningStore, Version};
+    use serde_json::json;
+    let dir = tempfile::tempdir()?;
+    let version: Version = serde_json::from_value(json!({
+        "number": 1, "operation": "op-fixture-profile", "settings": {
+            "model_access": ["fixture-model"], "tools": [], "skills": [], "mcp_servers": [],
+            "permissions": {"default_mode": "plan"},
+            "instructions": "", "note": "", "harness": harness_description::declared()
+        }, "set_by": "fixture-person", "set_at": 1,
+        "reviewed": {"operation": "op-fixture-review", "by": "fixture-person", "at": 1}
+    }))?;
+    let mut store = ProvisioningStore::open(&dir.path().join("profiles.json"))?;
+    store.set("agent-fixture", 0, version.clone())?;
+    let view = |session: &str| -> Result<serde_json::Value, Box<dyn Error>> {
+        let rendered = render(
+            &Start {
+                agent: "agent-fixture",
+                session,
+                machine: "machine-fixture",
+                runtime: "sh",
+                version: &version,
+                skills: &[],
+                policy: None,
+                model_proxy: Some("http://127.0.0.1:18484/anthropic"),
+            },
+            &[],
+        )?;
+        let kept = json!({"agent": "agent-fixture", "session": session, "directory": "/srv/agent",
+            "provisioning_version": 1, "handles": [],
+            "template": rendered.template, "template_sha256": rendered.template_sha256});
+        Ok(kept)
+    };
+    let kept = view("session-keyed")?;
+    let launch = crate::launch_api::kept_launch(&store, &kept)?;
+    let run = launch
+        .environment
+        .get("LYS_RUN")
+        .cloned()
+        .ok_or("the kept start names no run key")?;
+    assert_eq!(
+        launch.environment.get("ANTHROPIC_BASE_URL"),
+        Some(&format!("http://127.0.0.1:18484/{run}/anthropic"))
+    );
+    // The kept start replays under the key it was first given, and another
+    // start is given another.
+    let again = crate::launch_api::kept_launch(&store, &kept)?;
+    assert_eq!(again.environment.get("LYS_RUN"), Some(&run));
+    let other = crate::launch_api::kept_launch(&store, &view("session-other")?)?;
+    assert_ne!(other.environment.get("LYS_RUN"), Some(&run));
+    let mut passes = Passes::open(dir.path().join("passes.json"))?;
+    let selected = act(
+        &mut passes,
+        AgentId::from_bytes([1; 16]),
+        "http://fixture.test",
+        launch,
+        None,
+    )?;
+    let Act::Start {
+        proxy: Some(tracking),
+        ..
+    } = selected
+    else {
+        return Err("the start told the runner no run key".into());
+    };
+    assert_eq!(tracking.run, run);
+    assert_eq!(tracking.profile_version, 1);
+    Ok(())
+}

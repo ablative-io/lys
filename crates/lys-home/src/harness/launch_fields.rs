@@ -185,4 +185,10 @@ pub struct LaunchFields {
     /// machine's own setup says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_proxy: Option<String>,
+    /// The key minted for this start alone. With a model proxy, the run is
+    /// given the proxy's address with this key first on its path, and the
+    /// key itself in its environment, so the proxy says which run made each
+    /// call. It says nothing without a model proxy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
 }

@@ -33,6 +33,7 @@ fn fields() -> Result<LaunchFields, Box<dyn Error>> {
         mcp_servers: Vec::new(),
         skills: Vec::new(),
         model_proxy: None,
+        run: None,
     })
 }
 

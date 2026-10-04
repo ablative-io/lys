@@ -55,8 +55,9 @@ pub(super) fn refused(
 /// The variable a run's model calls are sent to Lys's proxy through.
 pub const PROXY_VARIABLE: &str = "ANTHROPIC_BASE_URL";
 
-/// The variable a launch says a run's key in: the key it put first on the
-/// path of the proxy's address it gave the run.
+/// The variable a rendered template says a run's key in: the key put first
+/// on the path of the proxy's address the run is given
+/// ([`LaunchFields::run`]).
 pub const RUN_VARIABLE: &str = "LYS_RUN";
 
 /// The proxy's address with `run` put first on its path:
@@ -217,7 +218,29 @@ fn native_template(
                  remove it from the profile, or start this agent where no model proxy is configured",
             ));
         }
-        body["slots"]["env"][PROXY_VARIABLE] = json!(proxy);
+        match &fields.run {
+            // The run's key goes first on the proxy's path and in the run's
+            // environment, from which the start tells the runner the key.
+            Some(run) => {
+                if !crate::proxy::usage::is_run_key(run) {
+                    return Err(refused(
+                        fields,
+                        "run",
+                        "a run key is one or more letters, digits, '-' or '_'",
+                    ));
+                }
+                let address = keyed(proxy, run).ok_or_else(|| {
+                    refused(
+                        fields,
+                        "model_proxy",
+                        "the model proxy's address has no host a run key can follow",
+                    )
+                })?;
+                body["slots"]["env"][PROXY_VARIABLE] = json!(address);
+                body["slots"]["env"][RUN_VARIABLE] = json!(run);
+            }
+            None => body["slots"]["env"][PROXY_VARIABLE] = json!(proxy),
+        }
     }
     if !skills.is_empty() {
         body["slots"]["skills"] = json!(skills);
