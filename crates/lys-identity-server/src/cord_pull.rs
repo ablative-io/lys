@@ -71,7 +71,7 @@ pub(crate) async fn pull(
     for machine in machines {
         let (state, pull) = (Arc::clone(state), pull.clone());
         asking.spawn(async move {
-            let answer = ask_runner(&state, &machine, &pull).await;
+            let answer = ask_runner(&state, &machine, &pull, Asking::Pull).await;
             (machine, answer)
         });
     }
@@ -173,9 +173,21 @@ fn ask_sessions(state: &AppState, pull: &Pull) -> Result<Vec<Open>, ServerError>
     })
 }
 
+/// Who an ask of a runner is for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Asking {
+    /// A person pulled the cord: asked again while what an earlier ask
+    /// stopped still runs, the runner ends it at once.
+    Pull,
+    /// The server is settling a start that crossed the pull in force: a
+    /// session the pull already asked is left as it is, never killed for a
+    /// second ask no person made.
+    Settling,
+}
+
 /// Ask `machine`'s runner to stop everything it holds, answering what it
 /// ended and what still runs, or the refusal and its words.
-async fn ask_runner(state: &Arc<AppState>, machine: &str, pull: &Pull) -> Asked {
+async fn ask_runner(state: &Arc<AppState>, machine: &str, pull: &Pull, asking: Asking) -> Asked {
     let named = |error: &ServerError| match error {
         ServerError::Runner { refusal, words } => (refusal.clone(), words.clone()),
         other => (other.name(), other.to_string()),
@@ -206,6 +218,7 @@ async fn ask_runner(state: &Arc<AppState>, machine: &str, pull: &Pull) -> Asked 
         by: pull.by.clone(),
         reason: pull.reason.clone(),
         kill: pull.kill,
+        settling: asking == Asking::Settling,
     };
     match crate::runner_client::ask(state, machine, runner, act).await {
         Ok(Answer::StoppedEverything { sessions, running }) => Ok((sessions, running)),
@@ -247,7 +260,7 @@ pub(crate) async fn end_late_start(
     let Some(pull) = with_cord(state, CordStore::standing)? else {
         return Ok(());
     };
-    let (stopped, _) = ask_runner(state, machine, &pull)
+    let (stopped, _) = ask_runner(state, machine, &pull, Asking::Settling)
         .await
         .map_err(|(refusal, words)| ServerError::Runner { refusal, words })?;
     let ended: Vec<(String, String)> = stopped
@@ -283,7 +296,7 @@ pub(crate) async fn settle_refused_start(
     if !open {
         return Ok(());
     }
-    let (stopped, running) = ask_runner(state, machine, &pull)
+    let (stopped, running) = ask_runner(state, machine, &pull, Asking::Settling)
         .await
         .map_err(|(refusal, words)| ServerError::Runner { refusal, words })?;
     let held = stopped.iter().chain(&running).any(|each| each == session);

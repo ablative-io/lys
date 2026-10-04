@@ -246,6 +246,13 @@ pub enum Act {
     /// asked and why. The first ask hangs each session up and answers once
     /// every exit is seen; `kill`, or an ask while sessions stopped by an
     /// earlier one still run, ends each proved process group at once.
+    ///
+    /// A `settling` ask is the server's own, sent again under a pull in
+    /// force for a start that crossed it; it is never a person's second
+    /// pull. A session an earlier ask already stopped is left as it is: no
+    /// signal and no kill, and the answer does not wait for its exit but
+    /// names it ended or running as it stands. A session not yet asked is
+    /// asked as the pull says.
     StopEverything {
         /// Who pulled the cord, as the server verified them.
         by: String,
@@ -254,6 +261,10 @@ pub enum Act {
         /// Whether each proved process group is ended at once.
         #[serde(default)]
         kill: bool,
+        /// Whether the server is settling a start under a pull in force,
+        /// so a session already asked is left as that ask has it.
+        #[serde(default)]
+        settling: bool,
     },
 }
 

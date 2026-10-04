@@ -5,7 +5,7 @@ use crate::admitted::Admitted;
 use crate::error::RunnerError;
 use crate::protocol::{Act, Answer, Greeting, Output, verify_request};
 use crate::scrollback::whole_text;
-use crate::session::Sessions;
+use crate::session::{Ask, Sessions};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
@@ -160,8 +160,13 @@ pub(super) fn perform(
         Act::Outcome { operation } => sessions
             .outcome(&operation)
             .map(|outcome| Answer::Operation { outcome }),
-        Act::StopEverything { by, reason, kill } => sessions
-            .stop_everything(&by, &reason, kill, left)
+        Act::StopEverything {
+            by,
+            reason,
+            kill,
+            settling,
+        } => sessions
+            .stop_everything(&by, &reason, Ask { kill, settling }, left)
             .map(|stopped| Answer::StoppedEverything {
                 sessions: stopped.sessions,
                 running: stopped.running,

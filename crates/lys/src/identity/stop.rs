@@ -195,6 +195,8 @@ fn stop_runner_sessions(
         by: by.to_owned(),
         reason: reason.to_owned(),
         kill,
+        // A person at this computer asked: never the server settling a start.
+        settling: false,
     };
     match client.ask(&act) {
         Ok(Answer::StoppedEverything { sessions, running }) if running.is_empty() => Ok(format!(
