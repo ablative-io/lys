@@ -12,10 +12,12 @@ import { refusedPart } from '../dashboard/contract';
 import { clockOf } from '../file/time';
 import { readCall, readCalls } from './contract';
 import type { CallRow, CallView, CallsView, HeadSide } from './contract';
+
+const HTTP_OK = 200;
 import './proxy.css';
 
-const count = (value: number | undefined): string => value === undefined ? '' : value.toLocaleString('en-AU');
-const took = (ms: number | null): string => ms === null ? '' : ms < 1000 ? ms + ' ms' : (ms / 1000).toLocaleString('en-AU', { maximumFractionDigits: 1 }) + ' s';
+const count = (value: number | null): string => value === null ? '' : value.toLocaleString('en-AU');
+const took = (ms: number | null | undefined): string => ms === null || ms === undefined ? '' : ms < 1000 ? ms + ' ms' : (ms / 1000).toLocaleString('en-AU', { maximumFractionDigits: 1 }) + ' s';
 const unread = (refused: Refused, what: string) => <p className="why-not" role="alert">{what} could not be read. <small className="refusal-name" title={refused.refusal.reason}>{refused.refusal.refusal}</small></p>;
 
 /** The address of the proxy view with these chosen. */
@@ -43,13 +45,13 @@ function Calls({ agent, chosen }: { agent: string; chosen: string | null }) {
   if (first.status === 'refused') return unread(first.refused, 'Its calls');
   const pages = [first.data, ...earlier];
   const rows: CallRow[] = pages.flatMap((page) => page.calls);
-  const after = pages[pages.length - 1].after;
-  return <table className="usage-table proxy-calls"><thead><tr><th>Started</th><th>Model</th><th>Ended</th><th className="num">In</th><th className="num">Out</th><th className="num">From cache</th><th className="num">Took</th></tr></thead><tbody>
+  const after = pages[pages.length - 1].next;
+  return <table className="usage-table proxy-calls"><thead><tr><th>At</th><th>Model</th><th>Ended</th><th className="num">In</th><th className="num">Out</th><th className="num">From cache</th><th className="num">Took</th></tr></thead><tbody>
     {rows.map((row) => <tr key={row.call_id} data-call={row.call_id} aria-current={chosen === row.call_id ? 'true' : undefined}>
-      <td><a href={proxyHref({ agent, call: row.call_id })}>{clockOf(row.started_at)}</a></td>
+      <td><a href={proxyHref({ agent, call: row.call_id })}>{clockOf(new Date(row.at_ms).toISOString())}</a></td>
       <td>{row.model ?? <span className="dim">Not readable</span>}</td>
-      <td className={row.status === 'complete' ? 'sec' : 'why-not'} title={row.unrecorded_reason ?? undefined}>{row.status}{row.http_status !== null && row.http_status !== 200 ? ' (' + row.http_status + ')' : ''}</td>
-      <td className="num">{count(row.usage?.input)}</td><td className="num">{count(row.usage?.output)}</td><td className="num">{count(row.usage?.cache_read)}</td>
+      <td className={row.status === 'complete' ? 'sec' : 'why-not'}>{row.status ?? <span className="dim">Not said</span>}</td>
+      <td className="num">{count(row.input_tokens)}</td><td className="num">{count(row.output_tokens)}</td><td className="num">{count(row.cache_read_tokens)}</td>
       <td className="num">{took(row.duration_ms)}</td></tr>)}
     {rows.length ? null : <tr className="empty"><td className="dim" colSpan={7}>No call of this agent has been recorded.</td></tr>}
   </tbody>
@@ -62,7 +64,7 @@ function Calls({ agent, chosen }: { agent: string; chosen: string | null }) {
 const SHOWS = { request: 'Request', response: 'Response', headers: 'Headers' } as const;
 type Shows = keyof typeof SHOWS;
 
-function Side({ name, side }: { name: string; side: HeadSide | null }) {
+function Side({ name, side }: { name: string; side: HeadSide | undefined }) {
   if (!side) return <tr className="empty"><td className="dim" colSpan={2}>No {name} headers are on the record.</td></tr>;
   return <>{side.names.map((header, index) => <tr key={name + index} data-header={header}><td>{header}</td>
     <td className="sec">{side.values[header] ? side.values[header].join(', ') : <span className="dim">Value not kept</span>}</td></tr>)}</>;
@@ -83,9 +85,10 @@ function Call({ agent, call, shows }: { agent: string; call: string; shows: Show
   const load: Load<CallView> = useLoad(() => readCall(agent, call), 'proxy-call:' + agent + ':' + call);
   if (load.status === 'loading') return <p role="status">Reading the call…</p>;
   if (load.status === 'refused') return unread(load.refused, 'The call');
-  const { call: row, request, response, request_head, response_head, request_unreadable, response_unreadable } = load.data;
+  const { call: row, request, response, request_unreadable, response_unreadable } = load.data;
+  const http = row.head?.status;
   return <>
-    <p className="proxy-call-line">{row.model ?? 'Model not readable'} · {row.status}{row.http_status !== null ? ' · HTTP ' + row.http_status : ''}{row.duration_ms !== null ? ' · ' + took(row.duration_ms) : ''}{row.stream ? ' · streamed' : ''}
+    <p className="proxy-call-line" data-http={http !== undefined && http !== null && http !== HTTP_OK ? 'refused' : undefined}>{row.model ?? 'Model not readable'} · {row.status}{http !== undefined && http !== null ? ' · HTTP ' + http : ''}{row.duration_ms !== undefined ? ' · ' + took(row.duration_ms) : ''}{row.stream ? ' · streamed' : ''}
       {row.request_id ? <> · <small className="refusal-name">{row.request_id}</small></> : null}</p>
     {row.unrecorded_reason ? <p className="why-not" role="status">{row.unrecorded_reason}</p> : null}
     <div className="canvas-widget-variants proxy-shows" role="toolbar" aria-label="What of the call is shown">
@@ -94,8 +97,8 @@ function Call({ agent, call, shows }: { agent: string; call: string; shows: Show
     {shows === 'request' ? <Body value={request} why={request_unreadable} what="request" /> : null}
     {shows === 'response' ? <Body value={response} why={response_unreadable} what="response" /> : null}
     {shows === 'headers' ? <table className="usage-table proxy-headers"><tbody>
-      <tr><th colSpan={2}>Request</th></tr><Side name="request" side={request_head} />
-      <tr><th colSpan={2}>Response</th></tr><Side name="response" side={response_head} />
+      <tr><th colSpan={2}>Request</th></tr><Side name="request" side={row.head?.request} />
+      <tr><th colSpan={2}>Response</th></tr><Side name="response" side={row.head?.response} />
     </tbody></table> : null}
   </>;
 }
