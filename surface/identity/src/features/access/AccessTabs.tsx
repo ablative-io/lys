@@ -1,7 +1,7 @@
-/** Access is one page. Its views are tabs, each with its own address: the grants, the three questions, requests, reviews, resources, the graph and the model. */
+/** Access is one page. Its views are tabs, each with its own address: the grants, the three questions, requests, reviews, resources and the model. The graph has its own place on the rail. Tabs sit under the page's title. */
 export const ACCESS_TABS: [string, string, string][] = [
   ['grants', 'Grants', '#/access'], ['ask', 'Ask', '#/access/can'], ['requests', 'Requests', '#/requests'], ['reviews', 'Reviews', '#/reviews'],
-  ['resources', 'Resources', '#/resources'], ['graph', 'Graph', '#/graph'], ['model', 'Model', '#/model'],
+  ['resources', 'Resources', '#/resources'], ['model', 'Model', '#/model'],
 ];
 
 export function AccessTabs({ on }: { on: string }) {

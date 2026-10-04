@@ -9,7 +9,8 @@ import { tracking } from './contract';
 import type { BudgetsView, GoalsView, UsageView } from './contract';
 import './usage.css';
 
-export function AgentUsage({ agent }: { agent: string }) {
+/** `name` is the agent's name, said in place of its identifier wherever the service's words carry it. */
+export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState('');
   const path = encodeURIComponent(agent);
@@ -23,14 +24,14 @@ export function AgentUsage({ agent }: { agent: string }) {
     const tracked = tracking(usage);
     return <>
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
-      <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} />
+      <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
     </>;
   }} /></>;
 }
 
 /** A team's limits and goals: the same two tables as an agent's. A team's use is read with its limits. */
-export function TeamUsage({ team }: { team: string }) {
+export function TeamUsage({ team, name }: { team: string; name?: string }) {
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState('');
   const path = encodeURIComponent(team);
@@ -40,7 +41,7 @@ export function TeamUsage({ team }: { team: string }) {
   }), 'team-usage:' + team + ':' + revision);
   const changed = (words: string) => { setNotice(words); setRevision((value) => value + 1); };
   return <div className="usage">{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Team limits and goals" ok={({ budgets, goals }) => <>
-    <UsageBudgets budgets={budgets} receipts={[]} changed={changed} />
+    <UsageBudgets budgets={budgets} receipts={[]} changed={changed} name={name} />
     <UsageGoals agent={team} kind="team" goals={goals.goals} changed={changed} />
   </>} /></div>;
 }

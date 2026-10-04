@@ -30,6 +30,15 @@ function receipt(body: unknown) {
   return { ...RECEIPTS[4].receipt, identity: BEA, operation: body.operation, change_kind: 1 };
 }
 
+describe('Add a person', () => {
+  it('is one row: the name field and its button beside it', async () => {
+    const { entry } = await form({});
+    const row = entry.querySelector('.add-person-row');
+    expect(row?.querySelector('input[name="display_name"]')).not.toBeNull();
+    expect(row?.querySelector('button[type="submit"]')?.textContent).toBe('Add person');
+  });
+});
+
 describe('Add-person retry safety', () => {
   it('retains the exact registration across reload after an uncertain response', async () => {
     const first = await form({ 'POST /people': refused(503, 'StorageUncertain', 'The outcome is not known') });

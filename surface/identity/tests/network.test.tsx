@@ -8,7 +8,7 @@ import type { Machine, NameMachine } from '../src/features/network/contract';
 
 beforeEach(() => sessionStorage.clear());
 const machine: Machine = { id: 'op-' + 'a'.repeat(32), name: 'Workshop laptop', kind: 'laptop', runtime: null, slots: 0, may_run: [], may_reach: [], named_by: ADA, named_at: 1790000000, state: 'in_use', retired_at: null, last_report_at: null };
-const routes = { ...SERVICE, '/network': ok({ machines: [machine], reports_served: false }), ['/network/machines/' + machine.id + '/runner']: ok({ machine: machine.id, runner: null }) };
+const routes = { ...SERVICE, '/network': ok({ machines: [machine], reports_served: false }), ['/network/machines/' + machine.id + '/runner']: ok({ machine: machine.id, runner: null, answers: null }) };
 const button = (label: string) => [...document.querySelectorAll('button')].find((value) => value.textContent === label) ?? null;
 function input(name: string, value: string) {
   const element = $('[name="' + name + '"]');
@@ -34,7 +34,7 @@ function naming(runner: (id: string) => Route = (id) => ok({ machine: id, runner
   answers['POST /network/machines'] = (body) => {
     const draft = body as NameMachine;
     answers['POST /network/machines/' + draft.operation + '/runner'] = runner(draft.operation);
-    answers['/network/machines/' + draft.operation + '/runner'] = ok({ machine: draft.operation, runner: { kind: 'lys' } });
+    answers['/network/machines/' + draft.operation + '/runner'] = ok({ machine: draft.operation, runner: { kind: 'lys' }, answers: true });
     return ok(recorded(draft));
   };
   return answers;
@@ -48,6 +48,110 @@ describe('Network', () => {
     expect(row.textContent).toContain('Workshop laptop'); expect(row.textContent).toContain('Does not run agents'); expect(row.textContent).toContain('Lys does not start agents here.');
     expect($('section[aria-label="Workshop laptop"] h2')?.textContent).toBe('Workshop laptop');
     expect(button('Refresh network')).toBeNull();
+  });
+  it('is titled Network and counts one computer in the singular, once', async () => {
+    await mount('#/network', routes);
+    expect($('#screen .page.fill .head h1')?.textContent).toBe('Network');
+    expect($('#screen .page.fill .head .sub')).toBeNull();
+    expect($('.tools .count')?.textContent).toBe('1 computer');
+    expect($('#screen input[type="search"]')?.getAttribute('placeholder')).toBe('Search 1 computer');
+    expect($$('#screen tbody tr[data-href]')[0].textContent).not.toMatch(/\b1 (computers|agents)\b/);
+    expect($$('.stat .l').map((l) => l.textContent)).toEqual(['up now', 'not answering', 'agents running']);
+    expect(text()).not.toMatch(/\b1 computers\b/);
+  });
+  describe('says how each computer stands, by its runner\'s answer and never by a report\'s age', () => {
+    const lys = { kind: 'lys' };
+    const old = Math.floor(Date.now() / 1000) - 16 * 60;
+    const at = (given: Partial<Machine>, runner: object) => ({ ...routes, '/network': ok({ machines: [{ ...machine, runtime: 'lys-runner', ...given }], reports_served: true }),
+      ['/network/machines/' + machine.id + '/runner']: ok({ machine: machine.id, ...runner }) });
+    const shown = () => $$('#screen tbody tr[data-href]')[0]?.children[1]?.textContent;
+    it('is up when its runner answered, however long ago it last reported', async () => {
+      await mount('#/network', at({ last_report_at: old }, { runner: lys, answers: true }));
+      expect(shown()).toBe('Up');
+      expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '0', '0']);
+      expect(text()).not.toContain('Last heard');
+    });
+    it('is not answering when its runner did not answer, with when it was last heard and the service\'s reason beside it', async () => {
+      await mount('#/network', at({ last_report_at: old }, { runner: lys, answers: false, refusal: 'runner_unreachable', reason: '/run/lys/runner.sock: connection refused' }));
+      expect(shown()).toBe('Runner not answering, last heard 16 min ago');
+      expect($$('.stat .n').map((n) => n.textContent)).toEqual(['0', '1', '0']);
+      expect($('section[aria-label="Workshop laptop"]')?.textContent).toContain('Its runner did not answer: /run/lys/runner.sock: connection refused');
+    });
+    it('is not answering without inventing a last report when there is none', async () => {
+      await mount('#/network', at({ last_report_at: null }, { runner: lys, answers: false, refusal: 'runner_not_dialled_in', reason: 'no bridge of this machine is dialled in to this server' }));
+      expect(shown()).toBe('Runner not answering');
+    });
+    it('names a computer with no runner, and one that does not run agents, and one retired', async () => {
+      await mount('#/network', at({}, { runner: null, answers: null }));
+      expect(shown()).toBe('No runner connected');
+      unmountAll(); document.body.innerHTML = '';
+      await mount('#/network', at({ runtime: null }, { runner: null, answers: null }));
+      expect(shown()).toBe('Does not run agents');
+      unmountAll(); document.body.innerHTML = '';
+      await mount('#/network', at({ state: 'retired', retired_at: 1 }, { runner: lys, answers: true }));
+      await click(button('Show retired (1)'));
+      expect(shown()).toBe('Retired');
+    });
+    it('counts the agents running on it, in the singular for one', async () => {
+      const session = { session: 'op-' + 'e'.repeat(32), agent: SCRIBE, machine: machine.id, machine_name: 'Workshop laptop', runtime: 'sh', shown: 'running', last_reported: 'running', first_report_at: 1, last_report_at: 1, what: '', stopped: null, reported_by: 'runner' };
+      await mount('#/network', { ...at({}, { runner: lys, answers: true }), '/runtime/live': ok({ sessions: [session], unanswered: [] }) });
+      expect(shown()).toBe('Up, 1 agent running');
+    });
+    it('draws every computer at once, and a runner that never answers holds only its own row', async () => {
+      // The silent computer has an address of its own: a read still waiting is shared, and this one never ends.
+      const silent: Machine = { ...machine, id: 'op-' + 'c'.repeat(32), runtime: 'lys-runner' };
+      const other: Machine = { ...machine, id: 'op-' + 'b'.repeat(32), name: 'Ward desk', runtime: 'lys-runner' };
+      await mount('#/network', { ...routes, '/network': ok({ machines: [silent, other], reports_served: true }),
+        ['/network/machines/' + silent.id + '/runner']: (() => new Promise(() => undefined)) as unknown as Route,
+        ['/network/machines/' + other.id + '/runner']: ok({ machine: other.id, runner: lys, answers: true }) });
+      const rows = $$('#screen tbody tr[data-href]');
+      expect(rows.map((row) => row.children[0]?.textContent)).toEqual(['Workshop laptop', 'Ward desk']);
+      expect(rows.map((row) => row.children[1]?.textContent)).toEqual(['Asking its runner…', 'Up']);
+      expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '0', '0']);
+      expect($('section[aria-label="Workshop laptop"]')?.textContent).toContain('Asking its runner…');
+      expect($('section[aria-label="Workshop laptop"]')?.textContent).not.toContain('No runner is connected');
+    });
+        it('refuses an answer that does not say whether the runner answers', async () => {
+      await mount('#/network', at({}, { runner: lys }));
+      await settle();
+      expect(shown()).toBe('Lys could not ask its runner');
+      expect($('section[aria-label="Workshop laptop"]')?.textContent).toContain('did not say whether the computer');
+      expect($$('.stat .n').map((n) => n.textContent)).toEqual(['0', '0', '0']);
+    });
+  });
+
+  it('adds a computer in the list\'s own last row, under its columns, with no side form', async () => {
+    await mount('#/network', routes);
+    const row = $('#screen .listing table > tfoot:last-child > tr:last-child');
+    const heads = $$('#screen .listing thead th').map((th) => th.textContent);
+    expect(heads).toEqual(['Computer', 'Status', 'Running now', 'May start here']);
+    const cells = [...(row?.children ?? [])];
+    expect(cells).toHaveLength(4);
+    const form = cells[0].querySelector('form[aria-label="Add a computer"]');
+    expect(form?.querySelector('input[name="name"]')).not.toBeNull();
+    expect(cells[1].textContent).toBe('');
+    expect(cells[2].textContent).toBe('');
+    expect(cells[3].querySelector('button[type="submit"]')?.getAttribute('form')).toBe(form?.id);
+    expect($$('form[aria-label="Add a computer"]')).toHaveLength(1);
+    expect($('.recorded-form')).toBeNull();
+    await click(button('+ Add a computer'));
+    expect(document.activeElement).toBe(form?.querySelector('input[name="name"]'));
+  });
+  it('puts the keyboard in the add row when the address asks to add a computer', async () => {
+    await mount('#/network?add=computer', routes);
+    expect(document.activeElement?.getAttribute('name')).toBe('name');
+    expect(document.activeElement?.closest('tfoot')).not.toBeNull();
+  });
+  it('offers no add row to a person who may not add a computer', async () => {
+    await mount('#/network', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
+    expect($('form[aria-label="Add a computer"]')).toBeNull();
+    expect($('#screen .listing tfoot')).toBeNull();
+  });
+  it('says an empty network is empty once, in the list', async () => {
+    await mount('#/network', { ...routes, '/network': ok({ machines: [], reports_served: true }) });
+    expect(text().split('No computer yet.')).toHaveLength(2);
+    expect($('#screen tbody tr.empty td')?.textContent).toContain('No computer yet.');
+    expect(text()).not.toContain('Nothing here yet');
   });
   it('adds this computer with a name and no website permissions', async () => {
     const { posted } = await adding(naming());
@@ -83,6 +187,7 @@ describe('Network', () => {
   });
   it('asks before retiring and says running agents keep running', async () => {
     const { posted } = await mount('#/network', { ...routes, ['POST /network/machines/' + machine.id + '/retire']: ok({ ...machine, state: 'retired' }) });
+    expect(button('Retire this computer')?.closest('.section-h')).toBeNull();
     await click(button('Retire this computer')); expect(posted).toEqual([]);
     expect(text()).toContain('Agents already running on it keep running');
     await click(button('Confirm retirement'));
@@ -110,16 +215,18 @@ describe('Computers at the size of a business', () => {
   const now = Math.floor(Date.now() / 1000);
   const fleet: Machine[] = Array.from({ length: 60 }, (_, n) => ({ ...machine, id: 'op-' + String(n).padStart(32, 'a'), name: 'Builder ' + String(n).padStart(2, '0'), runtime: 'lys-runner', may_run: [{ id: n % 2 ? SCRIBE : REVIEWER, display_name: n % 2 ? 'Scribe' : 'Reviewer', state: 'active' }], last_report_at: n < 55 ? now : now - 86400 }));
   const big = { ...routes, '/teams': ok({ teams: [team(1, [SCRIBE]), team(2, [REVIEWER])] }), '/network': ok({ machines: fleet, reports_served: true }),
-    ...Object.fromEntries(fleet.map((each) => ['/network/machines/' + each.id + '/runner', ok({ machine: each.id, runner: { kind: 'dialled', key: 'a'.repeat(64) } })])) };
+    ...Object.fromEntries(fleet.map((each, n) => ['/network/machines/' + each.id + '/runner', ok({ machine: each.id, runner: { kind: 'dialled', key: 'a'.repeat(64) },
+      ...(n < 55 ? { answers: true } : { answers: false, refusal: 'runner_not_dialled_in', reason: 'no bridge of this machine is dialled in to this server' }) })])) };
   it('groups computers by the teams whose agents start there, and counts what is up', async () => {
     await mount('#/network', big);
     expect($$('#screen tr.group .group-name').map((name) => name.textContent)).toEqual(['Team 1', 'Team 2']);
-    expect($$('.stat .n').map((n) => n.textContent)).toEqual(['60', '55', '5', '0']);
+    expect($$('.stat .n').map((n) => n.textContent)).toEqual(['55', '5', '0']);
     expect($('.tools .count')?.textContent).toBe('60 computers in 2 groups');
+    expect(text().split('60 computers')).toHaveLength(2);
   });
-  it('shows only the computers not heard from, in one click', async () => {
+  it('shows only the computers whose runner is not answering, in one click', async () => {
     await mount('#/network', big);
-    await click(button('Not heard from'));
+    await click(button('Not answering'));
     expect($$('#screen tbody tr[data-href]').map((row) => row.querySelector('td')?.textContent)).toEqual(['Builder 55', 'Builder 57', 'Builder 59', 'Builder 56', 'Builder 58']);
   });
 });

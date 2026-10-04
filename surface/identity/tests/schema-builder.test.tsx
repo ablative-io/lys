@@ -173,7 +173,9 @@ describe('the Apps screen', () => {
     await render(<Apps />);
     expect(text()).toContain('https://app.example.test/signed-in');
     const channel = document.querySelector('table[aria-label="Relations of fixture_notes.channel"]');
-    expect([...channel?.querySelectorAll('thead th') ?? []].map((cell) => cell.textContent)).toEqual(['fixture_notes.channel', 'read', 'write']);
+    // The one permissions matrix: a column for each relation, a row for each action.
+    expect([...channel?.querySelectorAll('thead th') ?? []].map((cell) => cell.textContent)).toEqual(['fixture_notes.channel', 'poster']);
+    expect([...channel?.querySelectorAll('tbody th[scope="row"]') ?? []].map((cell) => cell.textContent)).toEqual(['read', 'write']);
     expect([...channel?.querySelectorAll('tbody td') ?? []].map((cell) => cell.getAttribute('aria-label'))).toEqual(['poster may read', 'poster may write']);
     expect(channel?.querySelector('tfoot')?.textContent).toBe('What is held on fixture_notes.workspace reaches it.');
     await click(button('Approve Notes fixture'));

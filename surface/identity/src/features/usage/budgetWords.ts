@@ -1,5 +1,5 @@
 /** A budget's limits as a person says them: "$500 a week", "50% of the weekly plan", "$212 of $500 this week". */
-import type { BudgetAct, Length, Limit, Measure, Used } from './contract';
+import type { Length, Limit, Measure, Used } from './contract';
 
 export const UNITS: Record<Measure, string> = { dollars: 'dollars', plan_percent: '% of my plan', tokens: 'tokens', running_ms: 'minutes running', context_percent: '% of its context' };
 
@@ -8,8 +8,6 @@ export const PERIOD_WORDS: Record<Length, string> = { five_hour: '5-hour window'
 const THIS: Record<Length, string> = { five_hour: 'this 5-hour window', day: 'today', week: 'this week', month: 'this month' };
 
 const ADJECTIVE: Record<Length, string> = { five_hour: '5-hour', day: 'daily', week: 'weekly', month: 'monthly' };
-
-const VERB: Record<BudgetAct, string> = { tell: 'Tells you', stop: 'Stops', compact: 'Compacts its session', notice: 'Types a notice into its session' };
 
 /** An amount as a person reads it: $500, 50%, 2,000,000 tokens, 90 minutes running. */
 export function amount(unit: Measure, value: number): string {
@@ -25,18 +23,6 @@ export function limitWords(limit: Pick<Limit, 'unit' | 'amount' | 'period'>): st
   if (limit.unit === 'context_percent' || limit.period === null) return amount(limit.unit, limit.amount) + ' of its context';
   if (limit.unit === 'plan_percent') return amount(limit.unit, limit.amount) + ' of the ' + ADJECTIVE[limit.period] + ' plan';
   return amount(limit.unit, limit.amount) + ' a ' + (limit.period === 'five_hour' ? '5-hour window' : limit.period);
-}
-
-/** The whole budget in sentences, one per act, each naming the limits that set it off. */
-export function summary(limits: Limit[], warnAt: number | null): string {
-  if (!limits.length) return 'No limit: this agent can spend without stopping.';
-  const acts = [...new Set(limits.map((limit) => limit.act))];
-  const sentences = acts.map((act) => {
-    const reached = limits.filter((limit) => limit.act === act);
-    return VERB[act] + ' at ' + reached.map(limitWords).join(' or ') + (reached.length > 1 ? ', whichever comes first' : '') + '.';
-  });
-  const warn = warnAt === null ? '' : ' Tells you first at ' + warnAt + '% of a limit.';
-  return sentences.join(' ') + warn;
 }
 
 /** What is used against a limit, beside it; null when nothing is reported for it. */

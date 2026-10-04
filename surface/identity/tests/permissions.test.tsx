@@ -63,8 +63,20 @@ describe('The ways it can work', () => {
   });
   it('carries a warning on the one with no checks', async () => {
     const { element } = await shown(claude, { default_mode: 'default' });
-    expect(radio(element, 'permission-mode', 'bypassPermissions')?.closest('label')?.querySelector('[aria-label="Warning"]')).not.toBeNull();
-    expect(radio(element, 'permission-mode', 'default')?.closest('label')?.querySelector('[aria-label="Warning"]')).toBeNull();
+    expect(radio(element, 'permission-mode', 'bypassPermissions')?.closest('tr')?.querySelector('[aria-label="Warning"]')).not.toBeNull();
+    expect(radio(element, 'permission-mode', 'default')?.closest('tr')?.querySelector('[aria-label="Warning"]')).toBeNull();
+  });
+  it('lays each way out in three fixed columns: the radio alone, the name with its own name whole beneath, and the meaning', async () => {
+    const { element } = await shown(claude, { default_mode: 'default' });
+    const row = radio(element, 'permission-mode', 'bypassPermissions')?.closest('tr');
+    const cells = [...row?.children ?? []];
+    expect(cells).toHaveLength(3);
+    expect(cells[0].className).toBe('mode-pick');
+    expect(cells[0].textContent).toBe('');
+    expect(cells[1].querySelector('.mode-id')?.textContent).toBe('bypassPermissions');
+    expect(cells[1].querySelector('label')?.htmlFor).toBe(radio(element, 'permission-mode', 'bypassPermissions')?.id);
+    expect(cells[2].className).toBe('mode-meaning');
+    expect(table(element, 'How it works')?.querySelectorAll('col')).toHaveLength(3);
   });
   it('shows a mode that is already chosen', async () => {
     const { element } = await shown(claude, { default_mode: 'plan' });
@@ -77,7 +89,7 @@ describe('The ways it can work', () => {
   });
   it('shows a mode nobody named by its own id', async () => {
     const { element } = await shown({ ...codex, modes: [mode('strange')] }, { default_mode: 'strange' });
-    expect(radio(element, 'permission-mode', 'strange')?.closest('label')?.textContent).toContain('strange');
+    expect(radio(element, 'permission-mode', 'strange')?.closest('tr')?.querySelector('.mode-name')?.textContent).toContain('strange');
   });
 });
 

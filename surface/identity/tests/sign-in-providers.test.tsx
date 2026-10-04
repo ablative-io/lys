@@ -50,8 +50,12 @@ describe('Sign-in providers', () => {
     await click(button('Set Google'));
     expect(posted).toEqual([{ path: '/sign-in-providers', body: { provider: 'google', client_id: '123.apps.googleusercontent.com', client_secret: 'GOCSPX-secret' } }]);
     expect(text()).toContain('Google is set');
-    expect($$('table.table tbody tr')).toHaveLength(1);
-    expect(text()).toContain('123.apps.googleusercontent.com');
+    // A provider's state and client id are said once, on its card, never again in a table.
+    const card = $('[role="radiogroup"] [data-provider="google"]');
+    expect(card?.textContent).toContain('Enabled');
+    expect(card?.textContent).toContain('123.apps.googleusercontent.com');
+    expect($$('table.table')).toHaveLength(0);
+    expect(text().split('123.apps.googleusercontent.com')).toHaveLength(2);
     expect(text()).not.toContain('GOCSPX-secret');
     const secret = $('form[aria-label="Set a sign-in provider"] input[type="password"]');
     expect(secret instanceof HTMLInputElement && secret.value).toBe('');

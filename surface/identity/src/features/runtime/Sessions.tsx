@@ -57,10 +57,9 @@ function Running({ sessions, unanswered, people, me, teams }: Awaited<ReturnType
   return <aside className="running-list" aria-label="Running now">
     {teams.refused ? <p className="why-not">Teams cannot be read, so sessions are listed without their team. {teams.refused}</p> : null}
     <Listing<RuntimeSession> groups={groups} columns={columns} id={(entry) => entry.session} href={at}
-      words={(entry) => name(entry) + ' ' + (entry.machine_name ?? entry.machine)} noun="running sessions"
+      words={(entry) => name(entry) + ' ' + (entry.machine_name ?? entry.machine)} noun="running sessions" empty="Nothing is running."
       holds={(items) => items.length.toLocaleString('en-AU') + ' running'}
       selected={sessions.find((entry) => entry.agent !== null && entry.agent === shown)?.session ?? null} select={() => undefined} open={(entry) => navigate(at(entry).slice(1))}
       tools={<WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />} />
-    {sessions.length ? null : <p className="dim">No running session was returned.</p>}
   </aside>;
 }

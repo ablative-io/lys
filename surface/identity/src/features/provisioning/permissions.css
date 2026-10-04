@@ -1,0 +1,10 @@
+/* The ways a program works: three fixed columns, the radio, the name with the program's own name beneath it, and what it means. */
+.permissions table.modes col.mode-pick { width: 40px; }
+.permissions table.modes col.mode-name { width: 13.5rem; }
+.permissions table.modes td { vertical-align: top; }
+.permissions table.modes td.mode-pick { text-align: center; padding-right: 0; }
+.permissions table.modes td.mode-pick input { margin: 2px 0 0; }
+.permissions table.modes td.mode-name { text-align: left; overflow-wrap: normal; }
+.permissions table.modes td.mode-name label { display: block; cursor: pointer; }
+/* The program's own name is shown whole: it never wraps and is never cut. */
+.permissions table.modes .mode-id { display: block; margin-top: 2px; font-size: 11px; white-space: nowrap; }

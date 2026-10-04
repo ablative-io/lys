@@ -1,0 +1,12 @@
+/* A section's heading with its one action beside it; the action keeps the ordinary button font. */
+.file-section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 8px; }
+.file-section-head h2 { margin: 0; }
+.file-section-head .section-h { margin: 0; }
+/* An agent's Access tab: what it can reach and the check form, side by side under the grant table. */
+.access-halves { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 8px; }
+.access-halves > div > .card:first-child, .access-halves > div > :first-child.card { margin-top: 0; }
+@media (max-width: 900px) { .access-halves { grid-template-columns: minmax(0, 1fr); } }
+.access-halves .section-h { margin-top: 0; }
+/* Credentials: certificates and handles are both cards with the same heading; each certificate is a part of its card. */
+.certificates .certificate { border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: 12px; }
+.certificates .certificate h3 .refusal-name { margin-left: 6px; font-weight: 400; }

@@ -39,10 +39,11 @@ export function grantOptions(choices: GrantChoices, boss: string, caller: string
   const relations = singleActionCarriers(model);
   const options = new Map<string, GrantOption>();
   for (const grant of choices.grants) {
-    if (grant.holder !== boss) continue;
+    // Access that no longer stands is not offered at all: there is nothing left in it to give.
+    if (grant.holder !== boss || !grant.standing.stands) continue;
     const pass = grant.pass_on;
     const app = grant.resource.kind.includes('.');
-    const reason = app ? appAgentRefusal : boss !== caller ? 'Only ' + name + ' can pass this on.' : !grant.standing.stands ? 'This access no longer stands.'
+    const reason = app ? appAgentRefusal : boss !== caller ? 'Only ' + name + ' can pass this on.'
       : pass.kind !== 'to' ? 'This access cannot be passed on.' : !pass.recipients.includes('agent') ? 'This access cannot be given to an agent.' : '';
     for (const action of grant.actions) {
       if (!app && excluded.has(action)) continue;

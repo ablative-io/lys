@@ -1,0 +1,11 @@
+/* The one permissions matrix (SchemaMatrix): the whole width, its head and its first column held in view while it scrolls inside its own box. */
+.schema-tables { display: grid; gap: 16px; margin: 6px 0 12px; }
+.schema-matrix { width: 100%; --matrix-bg: var(--surface-base); }
+.card .schema-matrix { --matrix-bg: var(--surface-card); }
+.schema-matrix th, .schema-matrix td { padding: 5px 10px; text-align: center; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+.schema-matrix thead th { position: sticky; top: 0; z-index: 2; background: var(--matrix-bg); }
+.schema-matrix th[scope=row] { position: sticky; left: 0; z-index: 1; background: var(--matrix-bg); text-align: left; font-weight: 400; color: var(--text-primary); white-space: normal; min-width: 240px; }
+.schema-matrix thead th:first-child { left: 0; z-index: 3; text-align: left; }
+.schema-matrix .alone { text-align: left; color: var(--text-secondary); }
+.schema-matrix td.alone { font: 11.5px "JetBrains Mono", ui-monospace, monospace; }
+.schema-matrix tfoot td { text-align: left; white-space: normal; }

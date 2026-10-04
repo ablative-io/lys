@@ -89,7 +89,7 @@ describe('Running sessions', () => {
   it('names an unavailable runtime', async () => {
     await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': refused(503, 'RuntimeUnavailable', 'No reports store') });
     expect(text()).toContain('RuntimeUnavailable');
-    expect(text()).not.toContain('No running session was returned');
+    expect(text()).not.toContain('Nothing is running.');
   });
 
   it('opens a session to its live output, read on from the cursor until it ends', async () => {

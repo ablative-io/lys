@@ -75,6 +75,7 @@ export function SignInProviders() {
     <Gate load={load} title="the sign-in settings" renderError={(error) => <ReadFailure error={error} subject="sign-in settings" administrator />} ok={(loaded) => {
       const data = confirmed ?? loaded;
       const held = (id: Provider) => data.providers.find((entry) => entry.provider === id);
+      const others = data.providers.filter((entry) => entry.provider === null || !data.offered.includes(entry.provider));
       return <>
         <div className="provider-picker" role="radiogroup" aria-label="Provider">
           {data.offered.map((offered) => {
@@ -85,17 +86,20 @@ export function SignInProviders() {
               <span className="provider-name">{GUIDES[offered].name}</span>
               <span className="provider-blurb">{GUIDES[offered].blurb}</span>
               <span className={'pill' + (set?.enabled ? ' ok' : '')}>{set ? (set.enabled ? 'Enabled' : 'Disabled') : 'Not set up'}</span>
+              {set ? <span className="provider-client"><span className="dim">Client id</span> <span className="mono">{set.client_id}</span></span> : null}
             </button>;
           })}
         </div>
-        {data.providers.length === 0 ? <p className="note">No sign-in provider is set yet. People sign in with their Lys email and password.</p> : <table className="table">
+        {/* A provider's state and client id are said once, on its card; only a provider this Lys no longer offers a card for is listed here. */}
+        {data.providers.length === 0 ? <p className="note">No sign-in provider is set yet. People sign in with their Lys email and password.</p> : null}
+        {others.length ? <table className="table" aria-label="Other sign-in providers">
           <thead><tr><th>Provider</th><th>State</th><th>Client id</th></tr></thead>
-          <tbody>{data.providers.map((entry) => <tr key={entry.id}>
+          <tbody>{others.map((entry) => <tr key={entry.id}>
             <td>{entry.name}</td>
             <td><span className={'pill' + (entry.enabled ? ' ok' : '')}>{entry.enabled ? 'Enabled' : 'Disabled'}</span></td>
             <td className="mono">{entry.client_id}</td>
           </tr>)}</tbody>
-        </table>}
+        </table> : null}
         <ol className="steps">
           <li><h3>Prepare {guide.name}</h3>
             <ul className="prepare">{guide.prepare.map((step) => <li key={step.text}>{step.text}{step.link ? <> <a className="btn" href={step.link.href} target="_blank" rel="noreferrer">{step.link.label} ↗</a></> : null}</li>)}</ul>

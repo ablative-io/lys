@@ -18,8 +18,9 @@
 .apps .app-refused { color: var(--danger); }
 .apps input, .apps textarea, .apps select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 10px; font: inherit; }
 .apps input:focus-visible, .apps textarea:focus-visible, .apps select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.schema-tables { display: grid; gap: 12px; margin: 6px 0 12px; }
-.schema-table { width: auto; }
-.schema-table th, .schema-table td { text-align: center; padding: 4px 10px; }
-.schema-table th:first-child { text-align: left; }
-.schema-table tfoot td { text-align: left; }
+/* The app is chosen from one compact row above; its card and matrix take the whole width under it. */
+.apps .app-picker { flex: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.apps .app-choice { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; min-height: 32px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-default); color: var(--text-secondary); font-size: 12.5px; }
+.apps .app-choice:hover { background: var(--surface-hover); color: var(--text-primary); }
+.apps .app-choice.on { border-color: var(--accent); color: var(--text-primary); background: var(--accent-glow); }
+.apps .app-pane { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }

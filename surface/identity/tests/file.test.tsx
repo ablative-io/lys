@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable, unmountAll } from './harness';
-import { ADA, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, COURIER, ME, RECEIPTS, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 
 /** What an agent's Overview reads for its run: its settings, the computers and the offered choices. */
 const RUN = {
@@ -14,10 +14,14 @@ describe("An agent's file", () => {
     const { requests } = await mount('#/file/' + SCRIBE);
     expect(requests).toContain('/directory/agents/' + SCRIBE);
     expect($('.file h1')?.textContent).toBe("Scribe");
-    expect($('.file')?.dataset.tab).toBe('agent file · A/00000000');
+    // One flat page: no folder tab, and no raw id printed under the name.
+    expect($('.file')?.dataset.tab).toBeUndefined();
+    expect($('.file')?.classList.contains('flat-file')).toBe(true);
+    expect($('.file .fileno')).toBeNull();
+    expect($('.file .head')?.textContent).not.toContain(SCRIBE);
     expect($('#state')?.textContent).toBe('Active');
     expect($('[aria-label="About this agent"] .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
-    expect($('.file .head')?.textContent).toContain('since 22 Sep');
+    expect($('.file .head')?.textContent).toContain('Added 22 Sep');
     expect($('.agent-details')).toBeNull();
     expect($('.file details')).toBeNull();
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Settings', 'Access1', 'Limits and goals', 'Sessions', 'Credentials', 'Record2']);
@@ -103,6 +107,37 @@ describe("An agent's file", () => {
     expect($$('.card a.mono').map((a) => a.getAttribute('href'))).toEqual(['/api/receipts/4', '/api/receipts/5']);
   });
 
+  it('says what each record line changed, from and to, read from the signed event, and names an earlier issuer’s sign-in', async () => {
+    // A canonical CBOR writer for the few shapes the directory's event body uses.
+    const head = (major: number, n: number): number[] => n < 24 ? [major << 5 | n] : n < 256 ? [major << 5 | 24, n] : n < 65536 ? [major << 5 | 25, n >> 8, n & 255] : [major << 5 | 26, n >>> 24, n >> 16 & 255, n >> 8 & 255, n & 255];
+    const uint = (n: number) => head(0, n);
+    const words = (value: string) => { const b = [...new TextEncoder().encode(value)]; return [...head(3, b.length), ...b]; };
+    const bytes = (b: number[]) => [...head(2, b.length), ...b];
+    const map = (entries: number[][]) => [...head(5, entries.length / 2), ...entries.flat()];
+    const body = (kind: number, change: number[]) => map([uint(1), uint(1), uint(2), bytes(new Array(16).fill(1)), uint(3), map([uint(1), words('old-issuer'), uint(2), words('ada'), uint(3), uint(1), uint(4), uint(1790000000)]),
+      uint(4), map([uint(1), uint(2), uint(2), bytes(new Array(16).fill(11))]), uint(5), uint(1790000000), uint(6), uint(kind), uint(7), change]);
+    const leaf = (payload: number[]) => [0xd2, ...head(4, 4), ...bytes([1]), ...map([]), ...bytes(payload), ...bytes([0, 0])];
+    const hex = (b: number[]) => b.map((n) => n.toString(16).padStart(2, '0')).join('');
+    const suspended = hex(leaf(body(5, map([uint(1), uint(2), uint(2), uint(2), uint(3), uint(3), uint(4), words('leaked its key')]))));
+    const renamed = hex(leaf(body(3, map([uint(1), map([uint(1), words('Quill')])]))));
+    const earlier = { ...RECEIPTS[5].receipt.actor, issuer: 'http://old-issuer.test' };
+    await mount(`#/file/${SCRIBE}/record`, { ...SERVICE,
+      [`/directory/agents/${SCRIBE}`]: ok({ ...SCRIBE_VIEW, provenance: { ...SCRIBE_VIEW.provenance, events: [4, 5, 6] } }),
+      '/receipts/5': ok({ ...RECEIPTS[5], message: suspended, receipt: { ...RECEIPTS[5].receipt, actor: earlier } }),
+      '/receipts/6': ok({ ...RECEIPTS[5], message: renamed, receipt: { ...RECEIPTS[5].receipt, change_kind: 3, log: { ...RECEIPTS[5].receipt.log, index: 6 } } }) });
+    const steps = $$('.timeline .tl');
+    expect(steps[1].textContent).toContain('Suspended: active → suspended');
+    expect(steps[1].textContent).toContain('leaked its key');
+    expect(steps[1].textContent).not.toContain('lifecycle moved');
+    // The subject is the signed-in person's only sign-in with it, under the issuer the install moved from.
+    expect(steps[1].textContent).toContain('by Ada (test person)');
+    expect(steps[2].textContent).toContain('Name changed to Quill');
+    // An unreadable leaf falls back to the change kind's words.
+    expect(steps[0].textContent).toContain('registered, under its person');
+    // The Evidence list keeps the entry link and no cut raw id.
+    expect(text()).not.toMatch(/op-[0-9a-f]{6,}…/);
+  });
+
   it('opens the lifecycle form in the head of the file itself, without leaving the page or changing identity state before submission', async () => {
     const { posted } = await mount('#/file/' + SCRIBE);
     await click($('.file .head [data-act="suspend"]'));
@@ -139,9 +174,39 @@ describe("An agent's file", () => {
 describe("A person's file", () => {
   it('lists the agents answering to them', async () => {
     await mount('#/file/' + ADA);
-    expect($('.file')?.dataset.tab).toBe('person file · P/00000000');
     const rows = $$('.card .row a').map((a) => a.textContent);
     expect(rows).toEqual(["Scribe", "Courier", "Archivist"]);
     expect(unreachable()).toEqual([]);
+  });
+  it('has the same flat head and tab names as an agent’s page, with no folder tab, raw id or the word person under the name', async () => {
+    await mount('#/file/' + ADA);
+    expect($('.file')?.dataset.tab).toBeUndefined();
+    expect($('.file')?.classList.contains('flat-file')).toBe(true);
+    expect($('.file .fileno')).toBeNull();
+    expect($('.file .head')?.textContent).not.toContain(ADA);
+    expect($('.file .head .sec')).toBeNull();
+    expect($$('.tabs a').map((a) => a.textContent?.replace(/\d+$/, ''))).toEqual(['Overview', 'Access', 'Limits and goals', 'Sessions', 'Credentials', 'Record']);
+  });
+  it('leaves retired agents out until Show retired is pressed', async () => {
+    await mount('#/file/' + BEA);
+    expect($$('.card .row a').map((a) => a.textContent)).toEqual(['Reviewer']);
+    const show = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Show retired (1)') ?? null;
+    expect(show).not.toBeNull();
+    await click(show);
+    expect($$('.card .row a').map((a) => a.textContent)).toEqual(['Reviewer', 'Lamplighter']);
+    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Hide retired') ?? null);
+    expect($$('.card .row a').map((a) => a.textContent)).toEqual(['Reviewer']);
+  });
+});
+
+describe('Naming the actor of a record line', () => {
+  it('names the signed-in person under an earlier issuer only when exactly one of their sign-ins has that subject', async () => {
+    const { signedInActor } = await import('../src/features/file/sections');
+    const me = { ...ME, sign_in_identities: [{ provider: 'http://new.test', subject: 'ada' }] };
+    expect(signedInActor({ issuer: 'http://old.test', subject: 'ada' }, me)).toBe(true);
+    expect(signedInActor({ issuer: 'http://old.test', subject: 'bea' }, me)).toBe(false);
+    const two = { ...me, sign_in_identities: [...me.sign_in_identities, { provider: 'http://other.test', subject: 'ada' }] };
+    expect(signedInActor({ issuer: 'http://old.test', subject: 'ada' }, two)).toBe(false);
+    expect(signedInActor({ issuer: 'http://other.test', subject: 'ada' }, two)).toBe(true);
   });
 });

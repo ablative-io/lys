@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Group } from './org';
 import { keyable } from './keyable';
+import { count, counted } from './count';
 
 export interface Column<T> { head: string; cell: (item: T) => ReactNode }
 
@@ -17,8 +18,10 @@ export interface ListingProps<T> {
   href: (item: T) => string;
   /** The words a search is matched against. */
   words: (item: T) => string;
-  /** What the rows are, plural: "people and agents", "computers". */
+  /** What the rows are, plural: "people and agents", "computers". One of them is said in the singular. */
   noun: string;
+  /** What the table body says when there is nothing to list, said once and only there. */
+  empty?: ReactNode;
   /** What a group holds, after its name: "12 people, 48 agents". */
   holds: (items: T[]) => string;
   /** Rows folded under a row, such as a person's agents. */
@@ -31,16 +34,16 @@ export interface ListingProps<T> {
   open?: (item: T) => void;
   /** Controls beside the search box. */
   tools?: ReactNode;
+  /** The table's own last rows, such as the row that adds one: rows in the table's columns, kept last and shown even when the list is empty. */
+  foot?: ReactNode;
   /** Reports the addresses shown, in order, for keyboard movement. */
   shown?: (ids: string[]) => void;
 }
 
 const PAGE = 25;
 
-const count = (n: number) => n.toLocaleString('en-AU');
-
 export function Listing<T>(props: ListingProps<T>) {
-  const { groups, columns, id, href, words, noun, holds, under, underNoun, underHead, selected, select, open, tools, shown } = props;
+  const { groups, columns, id, href, words, noun, empty, holds, under, underNoun, underHead, selected, select, open, tools, foot, shown } = props;
   const [query, setQuery] = useState('');
   const [folded, setFolded] = useState<Set<string>>(() => new Set());
   const [opened, setOpened] = useState<Set<string>>(() => new Set());
@@ -93,16 +96,18 @@ export function Listing<T>(props: ListingProps<T>) {
   useEffect(() => { shown?.(visible); }, [key]);
   return <div className="listing">
     <div className="tools">
-      <input className="search" type="search" aria-label={'Search ' + noun} placeholder={'Search ' + count(distinct.size) + ' ' + noun} value={query} onChange={(event) => setQuery(event.target.value)} />
+      <input className="search" type="search" aria-label={'Search ' + noun} placeholder={distinct.size ? 'Search ' + counted(distinct.size, noun) : 'Search ' + noun} value={query} onChange={(event) => setQuery(event.target.value)} />
       {tools}
-      <span className="note count">{needle ? count(found.size) + ' of ' + count(distinct.size) + ' match' : count(distinct.size) + ' ' + noun + (groups.length > 1 ? ' in ' + count(groups.length) + ' groups' : '')}</span>
+      {/* An empty list says so once, in the table body; the count says nothing then. */}
+      {distinct.size ? <span className="note count">{needle ? count(found.size) + ' of ' + count(distinct.size) + ' match' : counted(distinct.size, noun) + (groups.length > 1 ? ' in ' + counted(groups.length, 'groups') : '')}</span> : null}
     </div>
     <div className="pane">
       <table>
         <thead><tr>{columns.map((column, index) => [<th key={column.head}>{column.head}</th>, index === 0 && under ? <th key="under">{underHead ?? ''}</th> : null])}</tr></thead>
         {body}
+        {(needle ? matching.length : distinct.size) ? null : <tbody><tr className="empty"><td colSpan={width} className="dim">{needle ? 'Nothing matches “' + query.trim() + '”.' : empty ?? 'Nothing here yet.'}</td></tr></tbody>}
+        {foot ? <tfoot>{foot}</tfoot> : null}
       </table>
-      {matching.length ? null : <p className="dim">{needle ? 'Nothing matches “' + query.trim() + '”.' : 'Nothing here yet.'}</p>}
     </div>
   </div>;
 }

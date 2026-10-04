@@ -1,0 +1,43 @@
+/*
+ * A grant's columns fit what they hold (Tom, 4 Oct 2026): nothing breaks inside a word
+ * and the table never scrolls sideways. Grant and Relation are narrow and never wrap;
+ * the On reference and the path to a person take the room, wrapping only where a
+ * reference has its own breaks (after . : _ - /) or between names.
+ */
+/* Columns size to what they hold, not eleven equal shares. */
+.usage-table.grant-cols { table-layout: auto; width: 100%; }
+.grant-cols td { overflow-wrap: break-word; word-break: normal; hyphens: none; }
+.grant-cols .g-tight { white-space: nowrap; }
+.grant-cols .chain { gap: 4px; }
+.grant-cols .chain .pill { white-space: nowrap; margin: 1px 0; }
+.grant-cols .g-change { display: flex; flex-wrap: wrap; gap: 6px; }
+.grant-cols .g-change .btn { white-space: nowrap; }
+
+/* A chosen grant read as facts in the panel beside a list: one line each, nothing squeezed. */
+.grant-facts { grid-template-columns: max-content minmax(0, 1fr); }
+.grant-facts dd { overflow-wrap: break-word; }
+.grant-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+/* "Can [who] [do what] [on what]? [Check]": one sentence on one line, each field part of it. */
+.ask-line { flex-wrap: nowrap; }
+.ask-line select { min-width: 0; max-width: 30ch; }
+.ask-line .sec { white-space: nowrap; }
+
+/* The root grant form is one row you put things into, like a table's add row. */
+.act-panel.issue-root { border: 0; background: none; padding: 0; margin: 0 0 12px; }
+.issue-root .recorded-form fieldset {
+  display: grid; align-items: end; gap: 6px 10px;
+  grid-template-columns: minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(130px, 1.2fr) minmax(150px, 1.3fr) max-content minmax(190px, 1.3fr) max-content;
+}
+.issue-root .recorded-form fieldset > p { grid-column: 1 / -1; margin: 0 0 4px; }
+.issue-root .recorded-form .field { margin: 0; font-size: 12px; color: var(--text-secondary); }
+.issue-root .recorded-form .field .tick { display: flex; align-items: center; gap: 6px; min-height: 36px; white-space: nowrap; color: var(--text-primary); }
+.issue-root .recorded-form .expires { display: flex; align-items: center; gap: 8px; }
+.issue-root .recorded-form .expires input[type="datetime-local"] { flex: 1; min-width: 0; }
+.issue-root .recorded-form button[type="submit"] { margin-top: 0; }
+.grant-acts > :not(.btn) { flex-basis: 100%; }
+/* Each field of the question carries its visible name above it; the words of the sentence stay on the line. */
+.ask-line { align-items: flex-end; }
+.ask-field { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ask-field strong { line-height: 30px; }
+.ask-line > .sec, .ask-line > .btn { margin-bottom: 0; align-self: flex-end; line-height: 30px; }

@@ -1,8 +1,8 @@
 import { kindOf } from '../../generated';
 
-/** A file's sections; keys 1 to 7 reach them in this order. An agent has all seven; a person has no Settings. */
+/** A file's sections; keys 1 to 7 reach them in this order. An agent has all seven; a person has no Settings. The first is Overview on both. */
 export const TABS: [string, string][] = [
-  ['profile', 'Role'], ['provisioning', 'Settings'], ['access', 'Access'], ['budgets', 'Limits and goals'],
+  ['profile', 'Overview'], ['provisioning', 'Settings'], ['access', 'Access'], ['budgets', 'Limits and goals'],
   ['sessions', 'Sessions'], ['credentials', 'Credentials'], ['record', 'Record'],
 ];
 

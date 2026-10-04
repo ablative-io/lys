@@ -1,4 +1,4 @@
-import { actionWords, resourceFromText, resourceWords } from '../grants/action-words';
+import { actionWords, resourceFromText } from '../grants/action-words';
 import { readTogether } from '../../reads';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -7,15 +7,15 @@ import { AccessTabs } from './AccessTabs';
 import { Listing } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
 import type { Held, OrgTeam } from '../../shell/org';
-import { Picker } from '../../shell/Picker';
 import { useWhose, WhoseSelect } from '../../shell/Whose';
 import { DirectoryGate as Gate, problemWords } from '../people/Words';
 import { readTeams } from '../teams/Teams';
 import { reachMap } from '../grants/check';
-import { CheckBox, resourcesSeen } from '../grants/CheckBox';
-import { ActPanel, grantColumns } from '../grants/GrantTable';
+import { CheckBox, resourcesSeen, WhoChoice } from '../grants/CheckBox';
+import { ActForm, ActPanel, ChangeButtons, grantColumns } from '../grants/GrantTable';
+import type { Act } from '../grants/GrantTable';
 import { IssueRoot } from '../grants/IssueRoot';
-import { grantNo, nameOf, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
+import { grantNo, nameOf, readGrantWorld, resourceLabel, resourceName, voidOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import type { Grant } from '../../generated/grants';
 import { Pill } from '../people/Pill';
@@ -63,7 +63,7 @@ function Reach({ w, id }: { w: GrantWorld; id: string }) {
       return rows.length ? (
         <table><tbody>
           {rows.map(([res, acts]) => (
-            <tr key={res}><td>{resourceWords(resourceFromText(res))}</td><td>{actionWords(w.model, resourceFromText(res), acts)}</td></tr>
+            <tr key={res}><td>{resourceName(w, resourceFromText(res))}</td><td>{actionWords(w.model, resourceFromText(res), acts)}</td></tr>
           ))}
         </tbody></table>
       ) : <div className="dim">Nothing.</div>;
@@ -83,24 +83,23 @@ function WhoCan({ w, res }: { w: GrantWorld; res: string }) {
   );
 }
 
-function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: string; arg?: string }) {
+function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mode: string; arg?: string; reload: () => void }) {
   const navigate = useNavigate();
   const admin = w.people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<'all' | 'void'>('all');
+  const [acting, setActing] = useState<{ grant: Grant; act: Act; opener: HTMLElement } | null>(null);
   const issuing = mode === 'issue';
   const asking = mode !== '' && !issuing;
   const segs: [string, string][] = [['can', 'Can someone…'], ['reach', 'What can someone reach'], ['who', 'Who can reach something']];
   const seen = resourcesSeen(w);
   const resources = [...seen.keys()];
-  const labels = new Map([...seen].map(([k, v]) => [k, resourceLabel(v.resource)]));
-  const everyone = [...w.who].map(([id, x]) => ({ id, name: x.name, detail: x.kind === 'agent' && x.responsible ? 'agent of ' + nameOf(w, x.responsible) : undefined }));
+  const labels = new Map([...seen].map(([k, v]) => [k, resourceLabel(v.resource, w)]));
   let q = <CheckBox w={w} />;
   if (mode === 'reach') {
     const id = arg && w.who.has(arg) ? arg : w.me.person.id;
     q = <>
-      <div className="q"><span className="sec">What can <strong>{nameOf(w, id)}</strong> reach?</span></div>
-      <Picker key={id} name="reach" label="Ask about someone else" options={everyone} onChange={(ids) => { if (ids[0]) navigate('/access/reach/' + ids[0]); }} />
+      <div className="q ask-line"><span className="sec">What can</span><WhoChoice w={w} id="rWho" value={id} change={(who) => navigate('/access/reach/' + who)} /><span className="sec">reach?</span></div>
       <div className="card"><Reach w={w} id={id} /></div>
     </>;
   }
@@ -120,22 +119,25 @@ function Body({ w, teams, mode, arg }: { w: GrantWorld; teams: Teams; mode: stri
   const held = (g: Grant): Held => ({ id: g.holder, person: w.who.get(g.holder)?.responsible ?? null });
   const scoped = w.list.grants.filter((g) => inWhose(whose, teams.list, w.me.person.id, held(g))).filter((g) => show === 'all' || voidOf(w, g) !== null);
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => nameOf(w, id));
-  const columns = grantColumns(w);
+  const close = () => setActing(null);
+  const columns = [...grantColumns(w), { head: 'Change', cell: (g: Grant) => <ChangeButtons w={w} g={g} give open={(act, opener) => setActing({ grant: g, act, opener })} /> }];
+  const panel = issuing ? <ActPanel className="issue-root" label="Issue root grant" opener={null} close={() => navigate('/access')}><IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /></ActPanel>
+    : acting ? <ActPanel label={acting.act === 'revoke' ? 'Revoke' : 'Give'} opener={acting.opener} close={close}><ActForm w={w} g={acting.grant} act={acting.act} done={reload} close={close} /></ActPanel> : null;
   return <div className="page fill">
-    <AccessTabs on={asking ? 'ask' : 'grants'} />
     <div className="head">
       <div><h1>Access</h1><p className="sub">{asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}</p></div>
-      {asking ? null : <a className="btn primary" href={issuing ? '#/access' : '#/access/issue'}>{issuing ? 'Close the form' : 'Issue root grant'}</a>}
+      {asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : <a className="btn primary" href="#/access/issue">Issue root grant</a>}
     </div>
+    <AccessTabs on={asking ? 'ask' : 'grants'} />
     {asking ? <div className="pane">
       <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={mode === k ? 'on' : ''}>{l}</a>)}</div>
       <div className="check">{q}</div>
     </div> : <>
       {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
-      <div className="body one" style={issuing ? { gridTemplateRows: 'minmax(0, auto) minmax(0, 1fr)' } : undefined}>
-        {issuing ? <div className="pane"><ActPanel label="Issue root grant" opener={null} close={() => navigate('/access')}><IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /></ActPanel></div> : null}
+      <div className="body one grant-cols" style={panel ? { gridTemplateRows: 'minmax(0, auto) minmax(0, 1fr)' } : undefined}>
+        {panel ? <div className="pane">{panel}</div> : null}
         <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
-          words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceWords(g.resource)} noun="grants"
+          words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceName(w, g.resource)} noun="grants"
           holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' grant' : ' grants')}
           selected={null} select={() => undefined} open={(g) => navigate(`/file/${g.holder}/access`)}
           tools={<>
@@ -152,9 +154,10 @@ type Teams = { list: OrgTeam[]; refused: string };
 export function Access() {
   // No mode in the address is the Grants tab; a mode is one of the three questions on the Ask tab.
   const { mode = '', arg } = useParams();
+  const [revision, setRevision] = useState(0);
   const load = useLoad(() => readTogether({
     w: readGrantWorld(),
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
-  }), 'access');
-  return <Gate load={load} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} />} />;
+  }), 'access:' + revision);
+  return <Gate load={load} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} reload={() => setRevision((value) => value + 1)} />} />;
 }

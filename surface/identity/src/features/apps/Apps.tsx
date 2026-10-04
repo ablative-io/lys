@@ -9,9 +9,9 @@
  */
 import { ConfigTabs } from '../settings/ConfigTabs';
 import { useState } from 'react';
-import { Listing } from '../../shell/Listing';
-import type { Column } from '../../shell/Listing';
-import { Refused, operationId, useLoad } from '../../api';
+import { Refused, api, operationId, useLoad } from '../../api';
+import { SchemaMatrix } from './SchemaMatrix';
+import type { MatrixKind } from './SchemaMatrix';
 import { Gate } from '../signin/Gate';
 import { SchemaBuilder, send } from './SchemaBuilder';
 import type { SchemaJson } from './SchemaBuilder';
@@ -59,29 +59,20 @@ const who = (by: By) => (by.kind === 'operator' ? 'the install operator for ' + 
 const path = (id: string, rest: string) => '/apps/' + encodeURIComponent(id) + rest;
 const refusalWords = (error: unknown) => (error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error));
 
-type SchemaShape = { kinds?: Record<string, { actions?: string[]; relations?: Record<string, string[]>; parents?: string[] }>; relations?: Record<string, string[]> } | null;
+type SchemaShape = { kinds?: Record<string, MatrixKind>; relations?: Record<string, string[]> } | null;
 
-/** The schema of `app` as one table per kind: a row for each relation, a column for each action, a tick where the relation may do it. */
+/** The schema of `app` as the one permissions matrix. Lys's own actions read as the model's sentences. */
 export function SchemaTable({ app, schema, label }: { app: string; schema: unknown; label: string }) {
   const value = schema as SchemaShape;
-  const kinds: [string, { actions?: string[]; relations?: Record<string, string[]>; parents?: string[] }][] = app === LYS && value?.relations
-    ? [['Every kind of Lys’s own', { actions: [...new Set(Object.values(value.relations).flat())], relations: value.relations }]]
-    : Object.entries(value?.kinds ?? {});
-  return <div className="schema-tables" aria-label={label}>
-    {kinds.map(([kind, body]) => {
-      const actions = body.actions ?? [];
-      const relations = Object.entries(body.relations ?? {});
-      return <table className="schema-table" key={kind} aria-label={'Relations of ' + kind}>
-        <thead><tr><th>{kind}</th>{actions.map((action) => <th key={action}>{action}</th>)}</tr></thead>
-        <tbody>
-          {relations.map(([relation, may]) => <tr key={relation}><th scope="row">{relation}</th>{actions.map((action) => <td key={action} aria-label={relation + (may.includes(action) ? ' may ' : ' may not ') + action}>{may.includes(action) ? '✓' : ''}</td>)}</tr>)}
-          {relations.length ? null : <tr><td colSpan={actions.length + 1} className="dim">It has no relation of its own.</td></tr>}
-        </tbody>
-        {body.parents?.length ? <tfoot><tr><td colSpan={actions.length + 1} className="note">What is held on {body.parents.join(' or ')} reaches it.</td></tr></tfoot> : null}
-      </table>;
-    })}
-    {kinds.length ? null : <p className="dim">It declares no kind.</p>}
-  </div>;
+  if (app === LYS && value?.relations) return <LysSchema relations={value.relations} label={label} />;
+  return <SchemaMatrix kinds={Object.entries(value?.kinds ?? {})} label={label} />;
+}
+
+/** Lys's own schema: every relation on every kind of Lys's own, each action in the words the permission model gives it. */
+function LysSchema({ relations, label }: { relations: Record<string, string[]>; label: string }) {
+  const model = useLoad(api.model, 'permission-model');
+  const sentences = model.status === 'ok' ? model.data.action_sentences : {};
+  return <SchemaMatrix kinds={[['Every kind of Lys’s own', { relations }]]} label={label} sentence={(action) => sentences[action]} />;
 }
 
 export function Apps() {
@@ -97,32 +88,29 @@ export function Apps() {
   const [picked, setPicked] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   return <div className="page fill apps">
-    <ConfigTabs on="apps" />
-    <div className="head"><div><h1>Apps</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
+    <div className="head"><div><h1>Configuration</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
       <button type="button" className="btn primary" onClick={() => setRegistering(!registering)}>{registering ? 'Close the new app' : 'Register an app'}</button></div>
+    <ConfigTabs on="apps" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {
       const apps = answer.apps.map((app) => approved[app.id] ?? app);
       const open = apps.find((app) => app.id === picked) ?? apps.find((app) => app.state === 'pending') ?? apps[0] ?? null;
-      const group = [{ id: '', name: 'Apps', lead: null, depth: 0, items: apps, within: apps }];
-      const columns: Column<AppRecord>[] = [
-        { head: 'App', cell: (app) => app.name },
-        { head: 'State', cell: (app) => <span className={'app-state app-' + app.state}>{app.state === 'pending' ? 'waiting for approval' : app.state}</span> },
-        { head: 'Signs in to', cell: (app) => <span className="sec">{app.redirects.length} {app.redirects.length === 1 ? 'address' : 'addresses'}</span> },
-      ];
       const edited = apps.find((app) => app.id === editing);
-      if (registering) return <div className="body one"><div className="pane"><Register changed={changed} /></div></div>;
-      if (edited) return <div className="body one"><div className="pane"><section className="card" aria-label={'Permission template of ' + edited.id}>
+      if (registering) return <div className="pane"><Register changed={changed} /></div>;
+      if (edited) return <div className="pane"><section className="card" aria-label={'Permission template of ' + edited.id}>
         <div className="row"><h3>Permission template of {edited.name}</h3><button type="button" className="btn" onClick={() => setEditing(null)}>Close the template</button></div>
         <SchemaBuilder app={edited.id} version={edited.version} initial={edited.schema as SchemaJson} onSaved={(message) => { setEditing(null); changed(message); }} />
-      </section></div></div>;
-      return <div className="body work">
-        <Listing<AppRecord> groups={group} columns={columns} id={(app) => app.id} href={(app) => '#/apps?app=' + encodeURIComponent(app.id)} words={(app) => app.name + ' ' + app.id}
-          noun="apps" holds={(items) => items.length + ' apps'} selected={open?.id ?? null} select={() => undefined} open={(app) => setPicked(app.id)} />
-        <div className="detail">
-          {open ? <AppCard edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[open.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[open.id]:answer})); setIssued((held)=>{const next={...held};delete next[open.id];return next;}); }} issued={issued[open.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [open.id]: client }))} changed={changed} /> : <p>No app is registered.</p>}
+      </section></div>;
+      // The app is chosen above; its card and its matrix take the whole width below and scroll inside their own pane.
+      return <>
+        {apps.length ? <nav className="app-picker" aria-label="Apps">
+          {apps.map((app) => <button type="button" key={app.id} className={'app-choice' + (app.id === open?.id ? ' on' : '')} aria-pressed={app.id === open?.id} onClick={() => setPicked(app.id)}>
+{app.name}</button>)}
+        </nav> : null}
+        <div className="pane app-pane">
+          {open ? <AppCard edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[open.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[open.id]:answer})); setIssued((held)=>{const next={...held};delete next[open.id];return next;}); }} issued={issued[open.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [open.id]: client }))} changed={changed} /> : <p className="dim">No app is registered.</p>}
         </div>
-      </div>;
+      </>;
     }} />
   </div>;
 }
@@ -137,7 +125,7 @@ function AppCard({ app, issued, issue, changed, stored, saved, approved, edit }:
     setBusy(false);
   };
   return <article className="card app-card" aria-label={'App ' + app.id}>
-    <h3>{app.name} <span className="app-id mono">{app.id}</span> <span className={'app-state app-' + app.state}>{app.state}</span></h3>
+    <h3>{app.name} <span className={'app-state app-' + app.state}>{app.state}</span></h3>
     <p className="note">Registered by {who(app.registered_by)}{app.version ? ', schema version ' + app.version : ''}{app.client_id ? ', sign-in client ' + app.client_id : ''}{app.service_account ? ', acting as ' + app.service_account : ''}.</p>
     {app.redirects.length ? <div><b>Redirect addresses</b><ul className="app-list">{app.redirects.map((address) => <li className="mono" key={address}>{address}</li>)}</ul></div> : null}
     <div><b>{app.state === 'pending' ? 'The schema it asks for' : 'Its schema'}</b><SchemaTable app={app.id} schema={app.schema} label={'Schema of ' + app.id} /></div>

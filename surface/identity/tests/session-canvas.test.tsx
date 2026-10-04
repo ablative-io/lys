@@ -63,14 +63,27 @@ describe('Running: the list and the canvas', () => {
   it('does not use a failed live-session read as an empty graph', async () => {
     await mount('#/canvas', { ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'Reports could not be read') });
     expect(text()).toContain('RuntimeUnavailable');
-    expect(text()).not.toContain('No running sessions were returned');
+    expect(text()).not.toContain('Nothing is running.');
     expect($('.session-canvas')).toBeNull();
+  });
+
+  it('says an empty Running page is empty once, in the list\'s own body, under a title with no paragraph of instructions', async () => {
+    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [], unanswered: [] }) });
+    expect(text().split('Nothing is running.')).toHaveLength(2);
+    expect($('.running-list tbody tr.empty td')?.textContent).toBe('Nothing is running.');
+    expect(text()).not.toMatch(/No running sessions? (was|were) returned|Nothing here yet|0 running sessions/);
+    expect($('.session-canvas-page .head .sub')).toBeNull();
+    expect(text()).not.toContain('Drag a window');
   });
 
   it('does not label an unanswered runner as currently running', async () => {
     await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [running], unanswered: [{ session, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'Socket closed' }] }) });
     expect(text()).toContain('Runner did not answer; current state unknown');
     expect(text()).toContain('runner_unreachable: Socket closed');
+    const said = $$('[role="alert"]').map((alert) => alert.textContent ?? '').find((words) => words.includes('Socket closed')) ?? '';
+    expect(said).toContain('The runner on Test runner did not answer for Scribe.');
+    expect(text()).not.toContain(session);
+    expect(text()).not.toContain('machine-one');
   });
 
   it('keeps saying the runner did not answer in the window when its terminal is open', async () => {

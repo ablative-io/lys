@@ -1,8 +1,12 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
 /* No page scrolls as a whole (Tom, 4 Oct 2026). The screen never scrolls; every page fills the window, and only a component inside it (a table, a list, a form's pane, a terminal) scrolls on its own. */
 .screen { flex: 1; min-width: 0; overflow: hidden; overscroll-behavior: none; position: relative; }
-.page { height: 100%; box-sizing: border-box; padding: 26px 32px 18px; display: flex; flex-direction: column; overflow: hidden; }
+.page { height: 100%; box-sizing: border-box; padding: 10px 32px 18px; display: flex; flex-direction: column; overflow: hidden; }
 .page > .head, .page > .eyebrow, .page > h1, .page > .sub, .page > .tabs, .page > .stat-strip, .page > .tools, .page > a { flex: none; }
+/* One order for every page head (Tom, 4 Oct 2026): the title first, level with the rail's logo, and a page's tabs under it.
+   A page that writes its tabs before its head still shows them in this order. */
+.page:has(> .tabs) > .eyebrow, .page:has(> .tabs) > .head { order: -2; }
+.page > .tabs { order: -1; margin-top: 6px; }
 /* What a page holds below its head is its one scrolling component unless the page lays out its own. */
 .page:not(.fill) > form, .page:not(.fill) > .pane, .page:not(.fill) > .card, .page:not(.fill) > section, .page:not(.fill) > .directory-editor, .page:not(.fill) > [data-page-body] { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .eyebrow { font: 500 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); }
@@ -14,6 +18,8 @@ h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
 .seg { display: inline-flex; background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
 .seg button, .seg a { padding: 3px 10px; border-radius: var(--radius-sm); color: var(--text-muted); font-size: 12px; text-decoration: none; }
 .seg .on { background: var(--surface-hover); color: var(--text-primary); }
+/* One button font everywhere: a button never takes the mono face, capitals or spacing of the heading it sits in. */
+.btn { font-family: "DM Sans", system-ui, sans-serif; font-style: normal; letter-spacing: normal; text-transform: none; }
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-default); background: var(--surface-default); font-size: 12.5px; color: var(--text-primary); text-decoration: none; cursor: pointer; min-height: 32px; transition: background .12s ease, border-color .12s ease, transform .08s ease; }
 .btn:hover { background: var(--surface-hover); }
 .btn.primary { background: var(--accent); color: #17110b; border-color: transparent; font-weight: 600; }
@@ -115,3 +121,4 @@ tr.more td { border-bottom: 0; }
 .fill > .file { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .fill > .file > .pane { flex: 1; min-height: 0; }
 .fill > .pane { flex: 1; min-height: 0; }
+.listing tr.empty td { border-bottom: 0; padding: 14px 10px; }

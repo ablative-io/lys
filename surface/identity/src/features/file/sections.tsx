@@ -20,11 +20,12 @@ import { CheckBox } from '../grants/CheckBox';
 import { Delegate } from '../grants/Delegate';
 import { ActPanel, GrantTable } from '../grants/GrantTable';
 import { onText, passesToAgents } from '../grants/model';
-import { CHANGE_KINDS } from '../../generated';
+import { changeWords } from './receipt-words';
 import { Pill } from '../people/Pill';
 import { calledBy, firstName } from '../people/directory';
 import type { FileData } from './IdentityFile';
 import { clock } from './time';
+import './file.css';
 
 function Profile({ data }: { data: FileData }) {
   const { x, agent, agents } = data;
@@ -52,26 +53,31 @@ function Profile({ data }: { data: FileData }) {
             <dd><TeamsOf id={x.id} /></dd>
             <dt>State</dt>
             <dd>{x.state} <span className="note">· authority only; it does not say anything is running</span></dd>
-            {agent ? (
-              <>
-                <dt>Registered by</dt>
-                <dd><span className="mono dim">{agent.provenance.registered_by.subject}</span> <span className="note">at {agent.provenance.registered_by.provider}</span></dd>
-              </>
-            ) : null}
           </dl>
         </div>
-        {x.kind === 'person' ? (
-          <div className="card">
-            <h2>Agents answering to {firstName(x.display_name)}</h2>
-            {agents.length ? agents.map((a) => (
-              <div className="row" key={a.id}>
-                <a href={'#/file/' + a.id} style={{ textDecoration: 'none' }}>{a.display_name}</a>
-                <span><span className={'dot s-' + a.state} /><span className="dim">{a.state}</span></span>
-              </div>
-            )) : <div className="dim">None yet.</div>}
-          </div>
-        ) : null}
+        {x.kind === 'person' ? <AgentsOf name={x.display_name} agents={agents} /> : null}
       </div>
+    </div>
+  );
+}
+
+/** The agents answering to a person; retired ones are left out until asked for, with the same control the People list has. */
+function AgentsOf({ name, agents }: { name: string; agents: FileData['agents'] }) {
+  const [retired, setRetired] = useState(false);
+  const retiredCount = agents.filter((a) => a.state === 'retired').length;
+  const shown = retired ? agents : agents.filter((a) => a.state !== 'retired');
+  return (
+    <div className="card">
+      <div className="file-section-head">
+        <h2>Agents answering to {firstName(name)}</h2>
+        {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
+      </div>
+      {shown.length ? shown.map((a) => (
+        <div className="row" key={a.id}>
+          <a href={'#/file/' + a.id} style={{ textDecoration: 'none' }}>{a.display_name}</a>
+          <span><span className={'dot s-' + a.state} /><span className="dim">{a.state}</span></span>
+        </div>
+      )) : <div className="dim">{agents.length ? 'Every agent answering to ' + firstName(name) + ' is retired.' : 'None yet.'}</div>}
     </div>
   );
 }
@@ -92,40 +98,42 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
   return (
     <>
-      <div className="section-h" style={{ marginTop: 0 }}><span>Grants</span>
+      {/* The button sits beside the heading, not inside it, so it keeps every other button's font. */}
+      <div className="file-section-head"><span className="section-h">Grants</span>
         {x.kind === 'agent' && x.state !== 'retired' ? <button className="btn" data-act="grant" onClick={(event) => mineToGive && passable.length ? setGiving(event.currentTarget)
           : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)}>Give access</button> : null}
       </div>
       {giving && passable.length ? <ActPanel label="Give" opener={giving} close={() => setGiving(null)}><Delegate w={w} source={passable[0]} to={x.id} done={reload} close={() => setGiving(null)} /></ActPanel> : null}
       <GrantTable w={w} grants={held} done={reload} give={false} />
-    <div className="grid2">
-      <div>
-        {mineToGive && !passable.length ? (
-          <div style={{ marginTop: 12 }}>
-            <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record it once, for themselves.</p>
-            <button className="btn" data-act="agent-roots" onClick={() => {
-              request<unknown>('/grants/agent-roots', {}).then(reload, (problem: unknown) => shell.toast(problem instanceof Refused ? problem.refusal.reason : 'Lys could not record access you can give agents.'));
-            }}>Let me give agents access</button>
+      {mineToGive && !passable.length ? (
+        <div style={{ marginTop: 12 }}>
+          <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record it once, for themselves.</p>
+          <button className="btn" data-act="agent-roots" onClick={() => {
+            request<unknown>('/grants/agent-roots', {}).then(reload, (problem: unknown) => shell.toast(problem instanceof Refused ? problem.refusal.reason : 'Lys could not record access you can give agents.'));
+          }}>Let me give agents access</button>
+        </div>
+      ) : null}
+      {/* After the grant table, the two panels share the width as two halves. */}
+      <div className="access-halves">
+        <div>
+          <div className="section-h">
+            <span>What {name} can reach</span>
+            <a href={'#/access/reach/' + x.id} className="note" style={{ letterSpacing: 0, textTransform: 'none' }}>open in Access</a>
           </div>
-        ) : null}
-      </div>
-      <div>
-        <div className="section-h" style={{ marginTop: 0 }}>
-          <span>What {name} can reach</span>
-          <a href={'#/access/reach/' + x.id} className="note" style={{ letterSpacing: 0, textTransform: 'none' }}>open in Access</a>
+          <div className="card">
+            {reach.size ? (
+              <table><tbody>
+                {[...reach].map(([res, acts]) => (
+                  <tr key={res}><td>{res}</td><td><span className="svc built-in">built in</span></td><td className="mono">{acts.join(', ')}</td><td /></tr>
+                ))}
+              </tbody></table>
+            ) : <div className="dim">Nothing.</div>}
+          </div>
         </div>
-        <div className="card">
-          {reach.size ? (
-            <table><tbody>
-              {[...reach].map(([res, acts]) => (
-                <tr key={res}><td>{res}</td><td><span className="svc built-in">built in</span></td><td className="mono">{acts.join(', ')}</td><td /></tr>
-              ))}
-            </tbody></table>
-          ) : <div className="dim">Nothing.</div>}
+        <div>
+          <CheckBox w={w} who={x.id} />
         </div>
-        <CheckBox w={w} who={x.id} />
       </div>
-    </div>
     </>
   );
 }
@@ -143,11 +151,31 @@ function PersonRecord({ id }: { id: string }) {
   return <Gate load={load} title="Directory record" ok={(receipts) => <RecordView receipts={receipts} />} />;
 }
 
+/**
+ * Whether a record's actor is the signed-in person. The same issuer and subject is one of their sign-ins. A line
+ * written before the install moved to a new issuer names the earlier issuer (identity.json `issuer_moved_from`),
+ * which the front end is never told; so a subject matches when exactly one of the person's sign-in identities has
+ * that subject, whatever its issuer. Two sign-ins sharing the subject leave the line unnamed rather than guessed.
+ */
+export function signedInActor(actor: { issuer: string; subject: string }, me: MeView): boolean {
+  if (me.sign_in_identities.some((login) => login.provider === actor.issuer && login.subject === actor.subject)) return true;
+  return me.sign_in_identities.filter((login) => login.subject === actor.subject).length === 1;
+}
+
 /** Who a record line was signed for: an agent or the signed-in person by name; any other sign-in by the account name its provider gave, which is all the record holds. */
 function Actor({ actor, me }: { actor: ReceiptAnswer['receipt']['actor']; me: MeView | null }) {
   if (actor.agent) return <IdentityName id={actor.agent} />;
-  if (me?.sign_in_identities.some((login) => login.provider === actor.issuer && login.subject === actor.subject)) return <IdentityName id={me.person.id} />;
+  if (me && signedInActor(actor, me)) return <IdentityName id={me.person.id} />;
   return <>{actor.subject}</>;
+}
+
+/** What a record line changed: from and to when the signed event carries them, else the change's kind. */
+function Change({ answer }: { answer: ReceiptAnswer }) {
+  const said = changeWords(answer);
+  return <>
+    {said.words}{said.names.to ? <> <IdentityName id={said.names.to} />{said.names.from ? <span className="note"> (before: <IdentityName id={said.names.from} />)</span> : null}</> : null}
+    {said.reason ? <span className="note"> · “{said.reason}”</span> : null}
+  </>;
 }
 
 function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
@@ -164,7 +192,7 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
                 <div className={'tl' + (i === receipts.length - 1 ? ' now' : '')} key={r.receipt.log.index}>
                   <div className="when">{clock(r.receipt.actor.authenticated_at)}</div>
                   <div>
-                    {CHANGE_KINDS[r.receipt.change_kind] ?? 'change ' + r.receipt.change_kind}
+                    <Change answer={r} />
                     <span className="note"> · by <Actor actor={r.receipt.actor} me={me.status === 'ok' ? me.data : null} />{r.receipt.actor.authentication === 'operator' ? ', with the operator token' : ''}</span>
                   </div>
                 </div>
@@ -182,7 +210,6 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
           {receipts.map((r) => (
             <div className="row" style={{ padding: '5px 0' }} key={r.receipt.log.index}>
               <a href={'/api/receipts/' + r.receipt.log.index} className="mono">entry #{r.receipt.log.index}</a>
-              <span className="mono dim">{r.receipt.operation.slice(0, 11)}…</span>
             </div>
           ))}
           {receipts.length ? <div className="note" style={{ marginTop: 6 }}>Each entry is the signed receipt, the log checkpoint and its inclusion proof.</div> : null}
@@ -196,7 +223,7 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
   const person = data.x.kind === 'person';
   switch (tab) {
     case 'budgets':
-      return person ? <PersonalBudgets key={data.x.id} id={data.x.id} name={data.x.display_name} /> : <section className="usage"><AgentUsage key={data.x.id} agent={data.x.id} /></section>;
+      return person ? <PersonalBudgets key={data.x.id} id={data.x.id} name={data.x.display_name} /> : <section className="usage"><AgentUsage key={data.x.id} agent={data.x.id} name={data.x.display_name} /></section>;
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':

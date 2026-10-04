@@ -75,6 +75,31 @@ describe('Add-agent reporting and permissions', () => {
     await submit(form);
     expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + COURIER + '/transitions']);
   });
+  it('lays out what the agent is given as one table grouped by resource, with one head and an app’s reason said once on its group row', async () => {
+    const app = { ...source, id: 'grant-' + 'c'.repeat(32), resource: { kind: 'aion.workflow', id: 'default.card_build_v3_src_pr' }, relation: 'runner', actions: ['read', 'run'],
+      pass_on: { kind: 'to', actions: ['read', 'run'], recipients: ['agent'] } };
+    const { form } = await open({ '/grants': ok({ grants: [...GRANTS, app], revision: 7 }) });
+    const tables = form.querySelectorAll('table.agent-grants');
+    expect(tables).toHaveLength(1);
+    expect(form.querySelectorAll('table.agent-grants thead')).toHaveLength(1);
+    expect([...form.querySelectorAll('table.agent-grants thead th')].map((th) => th.textContent)).toEqual(['Give', 'What it may do']);
+    const groups = [...form.querySelectorAll<HTMLElement>('tr.agent-grants-resource')];
+    expect(groups.length).toBeGreaterThan(1);
+    const appRow = groups.find((row) => row.textContent?.includes('aion workflow'));
+    // The resource's whole name, never a shortened id.
+    expect(appRow?.textContent).toContain('an aion workflow, default.card_build_v3_src_pr');
+    expect(form.textContent).not.toContain('…');
+    // The reason is said once for the group, not on each of its two action rows.
+    expect(appRow?.textContent).toContain("Lys can't give an agent this app's actions until the app allows it.");
+    expect(form.textContent?.split("until the app allows it").length).toBe(2);
+  });
+  it('never offers access that no longer stands', async () => {
+    const gone = { ...source, id: 'grant-' + 'b'.repeat(32), resource: { kind: 'person', id: BEA }, standing: { ...source.standing, stands: false } };
+    const { form } = await open({ '/grants': ok({ grants: [...GRANTS, gone], revision: 7 }) });
+    expect([...form.querySelectorAll<HTMLInputElement>('input[name="action"]')].map((entry) => entry.value)).toEqual([editChoice, viewChoice, ledgerChoice]);
+    expect(form.textContent).not.toContain('no longer stands');
+    expect(form.querySelector('table.agent-grants')?.textContent).not.toContain('Bea (test person)');
+  });
   it('offers a live named default and only the chosen boss grants, with nothing checked', async () => {
     const { form, posted } = await open();
     expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);

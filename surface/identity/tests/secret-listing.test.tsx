@@ -14,7 +14,17 @@ describe('Secrets listing renderer', () => {
     expect(html).toContain('12');
     for (const sensitive of ['private-value', 'bearer-handle', 'private-digest', 'upstream-password']) expect(html).not.toContain(sensitive);
   });
-  it('names an empty discovery scope without claiming the whole store is empty', () => {
-    expect(renderToStaticMarkup(<MemoryRouter><SecretRows listing={{ secrets: [] }} /></MemoryRouter>)).toContain('No secrets were returned for this account.');
+  it('names an empty discovery scope without claiming the whole store is empty, once, in the table body', () => {
+    const html = renderToStaticMarkup(<MemoryRouter><SecretRows listing={{ secrets: [] }} /></MemoryRouter>);
+    expect(html).toMatch(/<tr class="empty"><td[^>]*>No secret is visible to this account\.<\/td><\/tr>/);
+    expect(html.split('No secret is visible to this account.')).toHaveLength(2);
+    expect(html).not.toMatch(/Nothing here yet|No secrets were returned|0 secrets/);
+  });
+
+  it('explains the list in one line above the table', () => {
+    const html = renderToStaticMarkup(<MemoryRouter><SecretRows listing={{ secrets: [] }} /></MemoryRouter>);
+    expect(html.match(/<p[ >]/g)).toHaveLength(1);
+    expect(html).toContain('never shown');
+    expect(html).not.toContain('Find the secrets');
   });
 });

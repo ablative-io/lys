@@ -1,4 +1,3 @@
-import { AccessTabs } from './AccessTabs';
 import { actionWords, resourceFromText, resourceWords } from '../grants/action-words';
 /** Every person, agent and resource, and the relations between them, laid out by a small force simulation. */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +10,7 @@ import type { GrantWorld } from '../grants/model';
 import { resourcesSeen } from '../grants/CheckBox';
 import { reachMap } from '../grants/check';
 import { installedOf } from './installed';
+import { counted } from '../../shell/count';
 import type { Installed } from './installed';
 import './graph.css';
 
@@ -128,6 +128,13 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const scale = () => { const box = svg.current?.getBoundingClientRect(); return box && box.width ? view.w / box.width : 1; };
+  // Marks and names keep their size on the screen whatever the zoom, so the first, fitted view is readable: they are drawn at the drawing's units per screen pixel.
+  const [, resized] = useState(0);
+  useEffect(() => { const again = () => resized((n) => n + 1); window.addEventListener('resize', again); again(); return () => window.removeEventListener('resize', again); }, []);
+  const size = scale();
+  const [hover, setHover] = useState<string | null>(null);
+  // Names are shown where they can be read: every name in a small drawing; otherwise the people and apps, the chosen one and its neighbours, and whatever the pointer is on.
+  const named = (node: Node) => nodes.length <= 30 || node.id === hover || (hot ? hot.has(node.id) : node.kind === 'person' || node.kind === 'app');
   const zoom = (factor: number, cx = view.x + view.w / 2, cy = view.y + view.h / 2) => setView((v) => {
     const w = Math.min(bounds.w * 3, Math.max(bounds.w / 8, v.w * factor)); const k = w / v.w;
     return { x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k, w, h: v.h * k };
@@ -181,9 +188,10 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
             const state = hot ? (hot.has(edge.a) && hot.has(edge.b) && (edge.a === focus || edge.b === focus) ? ' hot' : ' dimmed') : '';
             return <line key={index} className={'ge ' + edge.kind + state} x1={a.x} y1={a.y} x2={b.x} y2={b.y}><title>{edge.label}</title></line>;
           })}
-          {nodes.map((node) => <g key={node.id} className={'gn' + (hot && !hot.has(node.id) ? ' dimmed' : '')} transform={`translate(${node.x.toFixed(1)},${node.y.toFixed(1)})`}
-            tabIndex={0} role="link" aria-label={node.label} onClick={() => pick(node.id)} onKeyDown={(event) => { if (event.key === 'Enter') go(node.id); }}>
-            <Shape node={node} /><text x={13} y={4}>{node.label}</text>
+          {nodes.map((node) => <g key={node.id} className={'gn' + (hot && !hot.has(node.id) ? ' dimmed' : '') + (node.id === focus ? ' picked' : '')} transform={`translate(${node.x.toFixed(1)},${node.y.toFixed(1)})`}
+            tabIndex={0} role="link" aria-label={node.label} onClick={() => pick(node.id)} onKeyDown={(event) => { if (event.key === 'Enter') go(node.id); }}
+            onPointerEnter={() => setHover(node.id)} onPointerLeave={() => setHover((at) => (at === node.id ? null : at))} onFocus={() => setHover(node.id)} onBlur={() => setHover((at) => (at === node.id ? null : at))}>
+            <g transform={`scale(${size.toFixed(3)})`}><Shape node={node} />{named(node) ? <text x={13} y={4}>{node.label}</text> : null}</g>
           </g>)}
         </svg>
         <div className="legend">
@@ -192,7 +200,7 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
         </div>
       </div>
       <div className="node-card detail">
-        {!picked ? <><h2>Click anything</h2><p className="note">A person or agent lights up what it can reach. A resource lights up who can reach it. The same answers as the Access page, drawn.</p></>
+        {!picked ? <Summary world={world} nodes={nodes} />
           : picked.kind === 'resource' ? <><h2>{picked.label}</h2><p className="note">Highlighted: everyone who can reach it, per the permission service.</p>
             {reachedBy.map(([holder, actions]) => <div className="row" key={holder}><span>{nameOf(world, holder)}</span><span className="mono dim">{actionWords(world.model, resourceFromText(resourceOf(picked)), actions)}</span></div>)}
             {!reachedBy.length ? <p className="dim">Nobody.</p> : null}
@@ -206,13 +214,25 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
   </>;
 }
 
+/** What the drawing holds, counted, before anything is chosen. */
+function Summary({ world, nodes }: { world: GrantWorld; nodes: Node[] }) {
+  const who = [...world.who.values()];
+  const standing = world.list.grants.filter((grant) => grant.standing.stands).length;
+  const ended = world.list.grants.length - standing;
+  return <><h2>In this drawing</h2>
+    <div className="row"><span>People</span><span>{counted(who.filter((entry) => entry.kind === 'person').length, 'people')}</span></div>
+    <div className="row"><span>Agents</span><span>{counted(who.filter((entry) => entry.kind === 'agent').length, 'agents')}</span></div>
+    <div className="row"><span>Resources</span><span>{counted(nodes.filter((node) => node.kind === 'resource').length, 'resources')}</span></div>
+    <div className="row"><span>Grants</span><span>{counted(standing, 'standing', 'standing')}{ended ? ', ' + counted(ended, 'no longer standing', 'no longer standing') : ''}</span></div>
+    <p className="note">Choose anyone or anything to light what it reaches, or who reaches it.</p></>;
+}
+
 export function Graph() {
   const { id } = useParams();
   const load = useLoad(readGraph, 'identity-graph');
   return <div className="page fill">
-    <AccessTabs on="graph" />
     <div className="head"><div><h1>Graph</h1>
-      <p className="sub">Every person, agent and resource, and the relations between them. Answers are limited to the directory and resources you may see; these reads do not exercise a grant.</p></div></div>
+      <p className="sub">Every person, agent and resource you may see, and the grants between them. Reading it does not use a grant.</p></div></div>
     <Gate load={load} title="Graph" ok={({ world, installed }) => <>
       <Graphed world={world} installed={installed} focus={id} />
     </>} />

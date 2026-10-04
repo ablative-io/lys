@@ -1,7 +1,7 @@
 import type { Grant } from '../../generated/grants';
 import type { Answer } from './check';
 import { Chain } from './Chain';
-import { chainOf, needsText } from './model';
+import { chainOf, named, needsText } from './model';
 import type { GrantWorld } from './model';
 
 /** The answer as the mock-up's answerHtml draws it: the verdict, the path to a person or the named reason, and what it was judged under. */
@@ -16,13 +16,13 @@ export function AnswerView({ w, a, land }: { w: GrantWorld; a: Answer; land: boo
             <span className={'verdict-mark yes' + (land ? ' land' : '')}>Yes</span>
             <span className="why">{needsText(w, a.action, exercised?.relation ?? null)}.</span>
           </div>
-          <div style={{ marginTop: 8 }}>{chain.length ? <Chain w={w} chain={chain} /> : <span className="mono dim">{a.permit.path.join(' → ')}</span>}</div>
+          <div style={{ marginTop: 8 }}>{chain.length ? <Chain w={w} chain={chain} /> : <span className="dim">{a.permit.path.map((step) => named(w, step)).join(' → ')}</span>}</div>
         </>
       ) : (
         <div className="answer">
           <span className={'verdict-mark no' + (land ? ' land' : '')}>No</span>
           <span className="tag">{a.kind}</span>
-          <span className="why">{a.why}.</span>
+          <span className="why">{named(w, a.why)}.</span>
         </div>
       )}
       <div className="meta-line">

@@ -6,7 +6,6 @@ import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
 import { EmergencyStop, StopReceipt } from './EmergencyStop';
 import type { StopAnswer } from './EmergencyStop';
 import { DirectoryGate as Gate, ErrorWords, ACTION, STATUS } from '../people/Words';
-import { fileNo } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';
 import { TabBody } from './sections';
@@ -17,6 +16,7 @@ import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { AgentOverview } from './AgentOverview';
 import { AssignedRoles } from '../roles/AssignedRoles';
+import './agent-overview.css';
 
 /** Everything a file shows, all of it read from the service. */
 export interface FileData {
@@ -84,21 +84,13 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
       <div className="eyebrow">
         <a href="#/people">People and agents</a> / {x.display_name}
       </div>
-      <div className={'file' + (agent ? ' agent-page' : '')} data-tab={`${kind} file · ${fileNo(x.id)}`}>
+      {/* One flat look for a person and an agent: the name, no raw id under it, no folder tab. */}
+      <div className={'file flat-file' + (agent ? ' agent-page' : ' person-page')}>
         <div className="head">
           <div>
             <h1 style={{ fontSize: 24, marginTop: 0 }}>{x.display_name}</h1>
-            <div className="fileno">{x.id}</div>
-            {agent ? <p className="sec">{x.state === 'active' ? x.display_name + ' is added.' : x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}{since ? ' Registered since ' + day(since) + '.' : ''}</p> : <div className="sec">
-              {kind}
-              {person ? (
-                <>
-                  {' · answers to '}
-                  <Pill x={person} />
-                </>
-              ) : null}{' '}
-              {since ? <span className="dim">· since {day(since)}</span> : null}
-            </div>}
+            {agent ? <p className="sec">{x.state === 'active' ? '' : x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}{since ? (x.state === 'active' ? 'Added ' : ' Added ') + day(since) + '.' : ''}</p>
+              : person ? <p className="sec">Answers to <Pill x={person} /></p> : null}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button type="button" className="btn" data-act="rename" aria-pressed={changing === 'name'} onClick={() => setChanging(changing === 'name' ? null : 'name')}>Edit name</button>
@@ -128,7 +120,7 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
         <nav className="tabs" aria-label={agent ? 'Agent sections' : 'Sections'}>
           {tabsFor(x.id).map(([k, l]) => (
             <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''} aria-current={tab === k ? 'page' : undefined}>
-              {agent && k === 'profile' ? 'Overview' : l}
+              {l}
               {counts[k] !== undefined ? <span className="n">{counts[k]}</span> : null}
             </a>
           ))}
@@ -145,7 +137,9 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
 
 export function IdentityFile() {
   const { id = '', tab: asked = 'profile' } = useParams();
-  const tab = MERGED[asked] ?? asked;
+  // An address naming no section of this file opens its Overview, never a section of its own.
+  const merged = MERGED[asked] ?? asked;
+  const tab = tabsFor(id).some(([key]) => key === merged) ? merged : 'profile';
   const [version, setVersion] = useState(0);
   const [stop, setStop] = useState<StopAnswer | null>(null);
   const [notice, setNotice] = useState('');

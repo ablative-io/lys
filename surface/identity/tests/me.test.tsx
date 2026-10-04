@@ -84,8 +84,15 @@ describe('Personal scope', () => {
     const holds = [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`);
     expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger']);
     expect(holds).not.toContain('viewer of project:atlas');
-    const secrets = $$('.card').find((c) => c.querySelector('h2')?.textContent === 'Secrets available to you');
-    expect(secrets?.textContent).toContain('Secret values are never displayed here.');
+    // Secrets have their place on the rail; Account does not repeat it.
+    expect($$('.card').find((c) => c.querySelector('h2')?.textContent === 'Secrets available to you')).toBeUndefined();
+    expect(document.querySelector('.you-account a[href="#/secrets"]')).toBeNull();
+    // The grant table has the full width, in its own scrolling box, and the account's sections sit in one row under it.
+    expect(document.querySelector('.you-account.grid2')).toBeNull();
+    expect(document.querySelector('.you-holds-scroll table[aria-label="Grants"]')).not.toBeNull();
+    expect(document.querySelector('.you-account-row #signin-identities')).not.toBeNull();
+    // A person ends their other sign-ins here.
+    expect(document.querySelector('.you-account-row section[aria-label="Your signed-in sessions"]')).not.toBeNull();
   });
 });
 
@@ -114,10 +121,10 @@ describe('What you hold', () => {
   it('starts each row with what the grant lets the person do, from the actions it carries, then the relation, object and source', async () => {
     await mount('#/me?tab=account', withInstallGrants());
     expect(rows()).toEqual([
-      ['You can do everything here (project identity).', 'owner', 'project:identity', 'root'],
-      ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root'],
-      ["Edit this resource; View this resource (the directory's agents).", 'editor', 'directory:agents', 'root'],
-      ['You can take no action on project atlas.', 'auditor', 'project:atlas', 'root'],
+      ['Everything here', 'owner', 'project:identity', 'root'],
+      ['View this resource', 'viewer', 'project:ledger', 'root'],
+      ['Edit this resource; View this resource', 'editor', 'directory:agents', 'root'],
+      ['No action', 'auditor', 'project:atlas', 'root'],
     ]);
   });
 });

@@ -1,7 +1,8 @@
-.agent-page.file { background: none; border: 0; border-radius: 0; padding: 8px 0 0; margin-top: 0; }
-.agent-page.file::before { display: none; }
-.agent-page > .pane { padding: 0 4px 20px 0; }
-.agent-page .head { margin-bottom: 16px; align-items: center; }
+/* A person's page and an agent's page have one flat look: no card frame, no folder tab. */
+.flat-file.file { background: none; border: 0; border-radius: 0; padding: 8px 0 0; margin-top: 0; }
+.flat-file.file::before { display: none; }
+.flat-file > .pane { padding: 0 4px 20px 0; }
+.flat-file .head { margin-bottom: 16px; align-items: center; }
 .agent-facts { max-width: 760px; grid-template-columns: 105px minmax(0, 1fr); gap: 16px 24px; }
 .agent-facts dt { color: var(--text-secondary); }
 .agent-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }

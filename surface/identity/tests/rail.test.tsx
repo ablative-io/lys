@@ -73,7 +73,7 @@ describe('rail and dock side (conformance 9.1)', () => {
     expect(localStorage.getItem('iam.dock')).toBeNull();
     expect(dockRight()).toBe(false);
     await press('k', { metaKey: true }, document.body);
-    const act = $$('#palette .it[data-n]').filter((row) => row.firstElementChild?.textContent === 'Toggle dock side');
+    const act = $$('#palette .it[data-n]').filter((row) => row.firstElementChild?.textContent === 'Move Help to the other side');
     expect(act).toHaveLength(1);
     await click(act[0]);
     expect(dockRight()).toBe(true);

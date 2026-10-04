@@ -98,7 +98,7 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
         : <AgentTeams key={teamRevision} agent={agent.id} name={agent.display_name} teams={teams.data} person={me.data.person.id} login={me.data.signed_in} administrator={people.status === 'ok' && people.data.scope === 'directory'} changed={() => setTeamRevision((value) => value + 1)} />}</dd>
       {profile.status === 'ok' && profile.data?.harness && choices.status === 'ok' && people.status === 'ok'
         ? <><dt>Model and computer</dt><dd><ProfileFields brief key={profile.data.version} profile={profile.data} choices={choices.data} agent={agent.id} canChoose={people.data.scope === 'directory'} render={(fields, settings, refusal) => <>
-          {fields}<SaveSettings agent={agent.id} profile={profile.data} settings={settings} refusal={refusal} canSave={people.data.scope === 'directory'} people={people.data} machines={choices.data.machines} saved={reload} />
+          {fields}<SaveSettings agent={agent.id} profile={profile.data} settings={settings} refusal={refusal} canSave={people.data.scope === 'directory'} people={people.data} machines={choices.data.machines} saved={reload} brief />
         </>} /></dd></>
         : <>
       <dt>Computer</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : !computer ? 'Choose a computer when you start' : network.status !== 'ok' ? reading(network, 'computers') : machine ? <a href="#/network">{machine.name}</a> : <span className="why-not">The saved computer is no longer visible. Choose an available computer in Start.</span>}<p className="note">Saved choice for the next start.</p></dd>

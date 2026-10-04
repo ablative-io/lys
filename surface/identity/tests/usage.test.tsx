@@ -50,9 +50,14 @@ async function type(selector: string, value: string): Promise<void> {
   });
 }
 
+/** A form's submit button, inside it or in the table row whose controls belong to it. */
 async function submit(form: string): Promise<void> {
-  await click($('form[aria-label="' + form + '"] button[type="submit"]'));
+  const found = $('form[aria-label="' + form + '"]');
+  await click(found?.querySelector('button[type="submit"]') ?? $('button[type="submit"][form="' + found?.id + '"]'));
 }
+
+const addBudget = 'section[aria-label="Budgets"] table > tfoot > tr:last-child';
+const addGoal = 'section[aria-label="Goals"] table > tfoot > tr:last-child';
 
 async function reload(routes: Record<string, Route>): Promise<void> {
   unmountAll();
@@ -77,10 +82,42 @@ describe('Usage', () => {
     expect($('a[href="#/usage"]')).toBeNull();
   });
 
-  it('gives a goal a box several lines tall', async () => {
+  it('adds a limit in the budget table\'s own last row, each control under its own head', async () => {
+    await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens])) });
+    const heads = [...document.querySelectorAll('section[aria-label="Budgets"] thead th')].map((th) => th.textContent);
+    expect(heads).toEqual(['Spend at most', 'Used', 'When it\'s hit', 'Where it stands', 'Change']);
+    const cells = [...($(addBudget)?.children ?? [])];
+    expect(cells).toHaveLength(5);
+    expect(cells.every((cell) => cell.tagName === 'TD' && !cell.hasAttribute('colspan'))).toBe(true);
+    expect(cells[0].querySelector('input[name="limit"]')).not.toBeNull();
+    expect(cells[0].querySelector('select[aria-label="Unit"]')).not.toBeNull();
+    expect(cells[0].querySelector('select[aria-label="Period"]')).not.toBeNull();
+    expect(cells[1].textContent).toBe('');
+    expect(cells[1].children).toHaveLength(0);
+    expect(cells[2].querySelector('select[aria-label="When it\'s hit"]')).not.toBeNull();
+    expect(cells[3].textContent).toBe('');
+    expect(cells[3].children).toHaveLength(0);
+    expect(cells[4].querySelector('button[type="submit"]')?.textContent).toBe('Add this limit');
+    const form = $('form[aria-label="Set a budget"]');
+    expect([...($(addBudget)?.querySelectorAll('input, select, button') ?? [])].every((control) => control.getAttribute('form') === form?.id)).toBe(true);
+    expect(text()).not.toContain('New limit');
+  });
+
+  it('adds a goal in the goal table\'s own last row, in a box that grows with the words', async () => {
     await mount(file, keeping());
-    const what = $('form[aria-label="Set a goal"] textarea[name="words"]') as HTMLTextAreaElement | null;
-    expect(what?.rows).toBeGreaterThanOrEqual(4);
+    const heads = [...document.querySelectorAll('section[aria-label="Goals"] thead th')].map((th) => th.textContent);
+    expect(heads).toEqual(['Kind', 'What the agent is reminded of', 'Deadline', 'Where it stands', 'Change']);
+    const cells = [...($(addGoal)?.children ?? [])];
+    expect(cells).toHaveLength(5);
+    expect(cells[0].textContent).toBe('goal');
+    const what = cells[1].querySelector<HTMLTextAreaElement>('textarea[name="words"]');
+    expect(what?.rows).toBe(1);
+    expect(what?.classList.contains('usage-grow')).toBe(true);
+    expect(cells[2].querySelector('input[name="deadline"]')).not.toBeNull();
+    expect(cells[3].textContent).toBe('');
+    expect(cells[4].querySelector('button[type="submit"]')?.textContent).toBe('Set goal');
+    const form = $('form[aria-label="Set a goal"]');
+    expect([...($(addGoal)?.querySelectorAll('textarea, input, button') ?? [])].every((control) => control.getAttribute('form') === form?.id)).toBe(true);
   });
 
   it('shows a deadline-free goal without inventing a date', async () => {
@@ -94,7 +131,7 @@ describe('Usage', () => {
   it('changes a budget on the agent\'s own file and keeps it across a reload', async () => {
     const routes = keeping();
     const { requests } = await mount(file, routes);
-    await choose($('form[aria-label="Set a budget"] select'), 'tokens');
+    await choose($(addBudget + ' select[aria-label="Unit"]'), 'tokens');
     await type('input[name="limit"]', '5000');
     await submit('Set a budget');
     expect(requests).toContain('PUT ' + budgets);
@@ -103,7 +140,13 @@ describe('Usage', () => {
     expect(document.querySelector<HTMLInputElement>('section[aria-label="Budgets"] tbody input[name="amount-0"]')?.value).toBe('5000');
     expect($('section[aria-label="Budgets"] tbody tr')?.children[0]?.textContent).toBe('tokens a day');
     expect($('button[aria-label="Remove 5,000 tokens a day"]')).not.toBeNull();
-    expect($('.usage-summary')?.textContent).toBe('Tells you at 5,000 tokens a day.');
+    // The row carries what a summary sentence would repeat: the amount, its unit and period, and its act.
+    const act = document.querySelector<HTMLSelectElement>('section[aria-label="Budgets"] tbody select[name="act-0"]');
+    expect(act?.value).toBe('tell');
+    expect(act?.selectedOptions[0]?.textContent).toBe('Tell the responsible person');
+    expect($('.usage-summary')).toBeNull();
+    expect(text()).not.toContain('Tells you at');
+    expect($('section[aria-label="Budgets"] caption')).toBeNull();
     expect(text()).not.toMatch(/time zone|Measure|Counted each/);
   });
 
@@ -122,8 +165,8 @@ describe('Usage', () => {
   it('keeps a goal set with no deadline when the deadline box is left empty', async () => {
     const routes = keeping();
     await mount(file, routes);
-    expect($('form[aria-label="Set a goal"] select')).toBeNull();
-    expect(document.querySelector<HTMLInputElement>('form[aria-label="Set a goal"] input[name="deadline"]')?.value).toBe('');
+    expect($(addGoal + ' select')).toBeNull();
+    expect(document.querySelector<HTMLInputElement>(addGoal + ' input[name="deadline"]')?.value).toBe('');
     await type('textarea[name="words"]', 'Answer every question in plain words');
     await submit('Set a goal');
     await reload(routes);
@@ -140,6 +183,8 @@ describe('Usage', () => {
       sent = body as BudgetBody;
       return ok({ ...kept, ...sent, version: 8 });
     } });
+    expect($('section[aria-label="Budgets"] caption')?.textContent).toBe('Each limit acts on its own: whichever is reached first acts first.');
+    expect(text().split('whichever')).toHaveLength(2);
     await type('input[name="limit"]', '600');
     await submit('Set a budget');
     expect(sent).toEqual({ limits: [...limits, { unit: 'tokens', amount: 600, period: 'day', act: 'tell' }], warn_at: 80, version: 7 });
@@ -161,16 +206,32 @@ describe('Usage', () => {
 
   it('offers only the units Lys has a figure for, and says why the others are not offered', async () => {
     await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [], { unavailable: [{ unit: 'dollars', reason: 'no dollar spend is reported for this agent' }] })) });
-    expect(document.querySelector<HTMLOptionElement>('form[aria-label="Set a budget"] select[aria-label="Unit"] option[value="dollars"]')?.disabled).toBe(true);
-    expect(document.querySelector<HTMLOptionElement>('form[aria-label="Set a budget"] select[aria-label="Unit"] option[value="tokens"]')?.disabled).toBe(false);
-    expect(text()).toContain('dollars: no dollar spend is reported for this agent');
+    expect(document.querySelector<HTMLOptionElement>(addBudget + ' select[aria-label="Unit"] option[value="dollars"]')?.disabled).toBe(true);
+    expect(document.querySelector<HTMLOptionElement>(addBudget + ' select[aria-label="Unit"] option[value="tokens"]')?.disabled).toBe(false);
+    expect(text()).toContain('No dollar spend is reported for this agent.');
+  });
+
+  it('says why a unit has no figure once, in plain words, with no identifier', async () => {
+    await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [], { unavailable: [
+      { unit: 'dollars', reason: 'dollars have not been reported for agent ' + SCRIBE },
+      { unit: 'plan_percent', reason: 'plan window unreported for agent ' + SCRIBE + '; plan window unreported for agent ' + SCRIBE },
+    ] })) });
+    const said = [...document.querySelectorAll('section[aria-label="Budgets"] .usage-reason')].map((line) => line.textContent);
+    expect(said).toEqual(['No dollar spend has been reported for Scribe.', 'No plan window has been reported for Scribe.']);
+    const budget = $('section[aria-label="Budgets"]')?.textContent ?? '';
+    expect(budget).not.toContain(SCRIBE);
+    expect(budget).not.toMatch(/agent-[0-9a-f]/);
+    expect(budget).not.toContain('No limit');
+    expect(budget.split('No budget is set for this agent.')).toHaveLength(2);
   });
 
   it('names an unavailable figure without displaying it as a measured zero', async () => {
     await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens], {
       used: [{ unit: 'tokens', period: 'day', figure: null, since_ms: 0, unavailable: 'runner token report is missing' }],
     })) });
-    expect($('section[aria-label="Budgets"] tbody tr')?.children[3]?.textContent).toBe('Unavailable: runner token report is missing');
+    expect($('section[aria-label="Budgets"] tbody tr')?.children[1]?.textContent).toBe('Nothing reported yet');
+    expect($('section[aria-label="Budgets"] tbody tr')?.children[3]?.textContent).toBe('Runner token report is missing.');
+    expect($('section[aria-label="Budgets"] tbody tr')?.textContent).not.toMatch(/\b0 tokens/);
   });
 
   it('matches a receipt to its own limit and excludes warning receipts', async () => {

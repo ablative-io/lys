@@ -34,7 +34,6 @@ export function Secrets({ read }: { read: () => Promise<SecretListing> }) {
   const admin = people.status === 'ok' && people.data.view.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   return <>
-    <p className="sub">Find the secrets you are allowed to see. Their values stay in Lys secret storage.</p>
     {people.status === 'refused' ? <ReadFailure error={people.refused} subject="secret owners’ names" /> : null}
     <Gate load={load} title="your secrets" renderError={(error) => <ReadFailure error={error} subject="your secrets" administrator={admin} />} ok={(listing) => people.status === 'ok'
       ? <SecretRows listing={listing} people={people.data.view} teams={people.data.teams} me={people.data.me.person.id} whose={whose}
@@ -58,12 +57,12 @@ export function SecretRows({ listing, people, teams = [], me = '', whose = { kin
     { head: 'Change', cell: (entry) => <a className="btn" href={'#/secrets/entries?secret=' + encodeURIComponent(entry.name)}>Visibility and who may receive it</a> },
   ];
   return <>
-    <p className="note">Seeing a secret here does not give permission to use it or share that permission. Its value is never shown.</p>
-    {!listing.secrets.length ? <p className="note">No secrets were returned for this account.</p> : null}
+    {/* One line of explanation; an empty list says so once, in the table body. */}
+    <p className="sub">A secret's value is never shown, and seeing it here does not give permission to use it.</p>
     <SecretControls listing={listing} />
     <div className="body one">
     <Listing<Secret> groups={groups} columns={columns} id={(entry) => entry.name} href={(entry) => '#/secrets/entries?secret=' + encodeURIComponent(entry.name)}
-      words={(entry) => entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
+      words={(entry) => entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" empty="No secret is visible to this account." holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
       selected={null} select={() => undefined} tools={tools} />
     </div>
   </>;

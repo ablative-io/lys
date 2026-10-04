@@ -19,5 +19,6 @@ export const CONCEPTS: Concept[] = [
   {"id": "graph", "t": "Graph", "s": "The same answers as Access, drawn.", "sel": "#gsvg", "body": "Click a person or agent to light what it reaches; click a resource to light who reaches it."},
   {"id": "scope", "t": "Scope", "s": "Organisation, team, or yours alone.", "sel": "[data-scope]", "body": "A personal secret is yours. An agent uses it only through a virtual credential you issue, acting for you."},
   {"id": "tabs", "t": "Sections", "s": "Each section has its own address.", "sel": ".tabs", "body": "Keys 1 to 7 switch sections of a file. Every section can be linked to."},
+  {"id": "canvas", "t": "Running", "s": "Each running agent is a window you can move.", "sel": ".session-canvas-scroll", "body": "Drag a window by its bar, drag its corner to size it, drag the background or use the wheel to move the surface. With a bar focused, arrows move the window and Shift with arrows sizes its terminal; with the surface focused, arrows move the surface. Closing a terminal view leaves the process running."},
   {"id": "rail", "t": "The rail", "s": "Every screen, one key away.", "sel": "#rail", "body": "g then a letter goes to a screen. [ shows or hides labels. The rail and dock can sit on either side."},
 ];

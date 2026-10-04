@@ -54,6 +54,14 @@ async function submit(name = 'Ward computer', twice = false) {
   });
 }
 
+/** Whether the add row takes nothing: its name box and its button are both disabled, or neither is. */
+function locked(): boolean {
+  const name = $('form[aria-label="Add a computer"] [name="name"]');
+  const button = $('button[type="submit"][form="' + $('form[aria-label="Add a computer"]')?.id + '"]');
+  expect(name?.hasAttribute('disabled')).toBe(button?.hasAttribute('disabled'));
+  return Boolean(name?.hasAttribute('disabled'));
+}
+
 async function retry() {
   const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether it was added');
   if (!button) throw new Error('The retained addition has no retry action');
@@ -78,8 +86,17 @@ describe('Naming the computer Lys runs on', () => {
     expect([...form?.querySelectorAll('input') ?? []].map((input) => input.name)).toEqual(['name']);
     expect(form?.querySelector('[name="name"]')?.getAttribute('value')).not.toBeTruthy();
     expect(form?.querySelectorAll('textarea, select, input[type="checkbox"], input[type="search"]').length).toBe(0);
-    expect(form?.textContent).toContain('Type a name for this computer.');
+    expect(form?.textContent).not.toContain('Type a name for this computer.');
+    expect(form?.textContent).not.toContain('Give this computer a name');
     expect(form?.textContent).not.toContain('Another computer');
+    expect(posted).toEqual([]);
+  });
+
+  it('says a name is needed only after a submit without one, and sends nothing', async () => {
+    const { posted } = await open(service());
+    expect(document.body.textContent).not.toContain('Give this computer a name');
+    await submit('   ');
+    expect(document.body.textContent).toContain('Give this computer a name');
     expect(posted).toEqual([]);
   });
 
@@ -105,7 +122,7 @@ describe('Naming the computer Lys runs on', () => {
     const { posted } = await open(routes); await submit();
     expect(posted).toHaveLength(1);
     expect(sessionStorage.getItem(pendingKey)).toBeNull();
-    expect($('fieldset')?.hasAttribute('disabled')).toBe(false);
+    expect(locked()).toBe(false);
     expect(document.body.textContent).not.toContain('Ward computer was added.');
     plain(code);
     routes['POST /network/machines'] = nameMachine;
@@ -122,7 +139,7 @@ describe('Naming the computer Lys runs on', () => {
     const { posted } = await open(routes); await submit();
     expect(posted).toHaveLength(2);
     expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
-    expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(locked()).toBe(true);
     expect(document.body.textContent).not.toContain('Ward computer was added.');
     plain('NotAdmitted');
     const original = posted[1];
@@ -143,7 +160,7 @@ describe('Naming the computer Lys runs on', () => {
     await retry();
     expect(posted).toEqual([original, original]);
     expect(sessionStorage.getItem(pendingKey)).toBe(pending);
-    expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(locked()).toBe(true);
     expect(document.body.textContent).not.toContain('Ward computer was added.');
     plain('NotAdmitted');
   });
@@ -153,7 +170,7 @@ describe('Naming the computer Lys runs on', () => {
     const { posted } = await open(routes); await submit();
     expect(posted).toHaveLength(1);
     expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
-    expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(locked()).toBe(true);
     plain('Unanswered');
   });
 
@@ -193,7 +210,7 @@ describe('Naming the computer Lys runs on', () => {
     sessionStorage.setItem(pendingKey, '{');
     const { posted } = await open(service());
     expect(document.body.textContent).toContain('PendingMachineUnreadable');
-    expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(locked()).toBe(true);
     expect(posted).toEqual([]);
     plain('PendingMachineUnreadable');
   });

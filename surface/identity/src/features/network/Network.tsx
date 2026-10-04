@@ -1,10 +1,11 @@
-import { readBounded, readTogether } from '../../reads';
-/** The computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
-import { useState } from 'react';
+import { readTogether } from '../../reads';
+/** The Network: the computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { api, request, useLoad } from '../../api';
+import { Refused, api, request, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
 import { Listing } from '../../shell/Listing';
+import { counted } from '../../shell/count';
 import type { Column } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
 import type { Held, OrgTeam, Whose } from '../../shell/org';
@@ -13,23 +14,58 @@ import { problemWords } from '../people/Words';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { Gate } from '../signin/Gate';
 import { readTeams } from '../teams/Teams';
-import { AddMachine } from './AddMachine';
+import { AddComputerRow } from './AddMachine';
 import type { Machine, NetworkView } from './contract';
 import { MachineDetail, status } from './MachineDetail';
 import type { RunnerRecord } from './MachineDetail';
 
+/**
+ * What Lys knows of a computer's runner: still being asked; answered, with its record and whether the runner answered
+ * just now (null when it has none) and why not; or not read at all, with why in `reason`.
+ */
+export interface Asked { asked: 'asking' | 'answered' | 'unread'; runner: RunnerRecord | null; answers: boolean | null; refusal: string | null; reason: string | null }
+
 /** One computer with what Lys knows of it now. */
-export interface Computer { machine: Machine; runner: RunnerRecord | null; running: RuntimeSession[] | null; reports: boolean }
+export interface Computer extends Asked { machine: Machine; running: RuntimeSession[] | null }
+
+const ASKING: Asked = { asked: 'asking', runner: null, answers: null, refusal: null, reason: null };
+
+/** A machine's runner as the service answers it, asked just now. */
+type RunnerAnswer = { runner: RunnerRecord | null; answers: boolean | null; refusal?: string; reason?: string };
+
+function readRunner(answer: RunnerAnswer): Asked {
+  if (answer.answers !== true && answer.answers !== false && answer.answers !== null) throw new Error('The service did not say whether the computer\'s runner answers.');
+  return { asked: 'answered', runner: answer.runner, answers: answer.answers, refusal: answer.refusal ?? null, reason: answer.reason ?? null };
+}
+
+/**
+ * Each computer's runner, asked on its own: each answer fills its own row when it arrives, so a runner that never
+ * answers holds only its own row, and the page is drawn without waiting on any of them.
+ */
+function useRunners(machines: Machine[]): Map<string, Asked> {
+  const [known, setKnown] = useState(() => new Map<string, Asked>());
+  useEffect(() => {
+    let current = true;
+    setKnown(new Map());
+    for (const machine of machines) {
+      const kept = (asked: Asked) => { if (current) setKnown((all) => new Map(all).set(machine.id, asked)); };
+      request<RunnerAnswer>('/network/machines/' + encodeURIComponent(machine.id) + '/runner').then(readRunner).then(kept,
+        (problem: unknown) => kept({ ...ASKING, asked: 'unread', reason: problem instanceof Refused ? problem.refusal.refusal + ': ' + problem.refusal.reason : problem instanceof Error ? problem.message : String(problem) }));
+    }
+    return () => { current = false; };
+  }, [machines]);
+  return known;
+}
 
 type Show = 'all' | 'attention';
 
-async function readComputers(): Promise<Computer[]> {
+/** The computers and what runs on them; their runners are asked afterwards, each on its own. */
+async function readComputers(): Promise<{ machines: Machine[]; live: RuntimeSession[] | null }> {
   const { view, live } = await readTogether({
     view: request<NetworkView>('/network'),
     live: request<{ sessions: RuntimeSession[] }>('/runtime/live').then((answer) => answer.sessions, () => null),
   });
-  const runners = await readBounded(view.machines, (machine) => request<{ runner: RunnerRecord | null }>('/network/machines/' + encodeURIComponent(machine.id) + '/runner').then((answer) => answer.runner));
-  return view.machines.map((machine, index) => ({ machine, runner: runners[index], reports: view.reports_served, running: live?.filter((session) => session.machine === machine.id && session.shown !== 'stopped') ?? null }));
+  return { machines: view.machines, live };
 }
 
 /** A computer belongs where the agents that may start on it belong. */
@@ -49,21 +85,22 @@ export function Network() {
     teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })),
   }), 'network:' + revision);
   return <div className="page fill">
-    <Gate load={load} title="Computers" ok={(data) => <Computers {...data} teams={data.teams.teams} teamsRefused={data.teams.refused} notice={notice} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
+    <Gate load={load} title="Network" ok={(data) => <Computers {...data} teams={data.teams.teams} teamsRefused={data.teams.refused} notice={notice} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
   </div>;
 }
 
-function Computers({ computers, people, me, teams, teamsRefused, notice, refresh }: { computers: Computer[]; people: PeopleView; me: { person: { id: string } }; teams: OrgTeam[]; teamsRefused: string; notice: string; refresh: (message: string) => void }) {
+function Computers({ computers: read, people, me, teams, teamsRefused, notice, refresh }: { computers: Awaited<ReturnType<typeof readComputers>>; people: PeopleView; me: { person: { id: string } }; teams: OrgTeam[]; teamsRefused: string; notice: string; refresh: (message: string) => void }) {
   const admin = people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<Show>('all');
-  const [search, setSearch] = useSearchParams();
+  const known = useRunners(read.machines);
+  const computers: Computer[] = read.machines.map((machine) => ({ machine, ...(known.get(machine.id) ?? ASKING),
+    running: read.live?.filter((session) => session.machine === machine.id && session.shown !== 'stopped') ?? null }));
+  const [search] = useSearchParams();
   const adding = search.get('add') === 'computer';
-  const setAdding = (value: boolean) => {
-    const next = new URLSearchParams(search);
-    if (value) next.set('add', 'computer'); else next.delete('add');
-    setSearch(next, { replace: !value });
-  };
+  const name = useRef<HTMLInputElement>(null);
+  // Arriving to add a computer, as from an agent's page, puts the keyboard in the add row's name box.
+  useEffect(() => { if (adding) name.current?.focus(); }, [adding]);
   const [picked, setPicked] = useState<string | null>(null);
   const names = new Map(people.people.flatMap((person) => [[person.id, person.display_name] as const, ...person.agents.map((agent) => [agent.id, agent.display_name] as const)]));
   const attention = (computer: Computer) => status(computer).state === 'down';
@@ -78,36 +115,36 @@ function Computers({ computers, people, me, teams, teamsRefused, notice, refresh
   const columns: Column<Computer>[] = [
     { head: 'Computer', cell: (computer) => computer.machine.name },
     { head: 'Status', cell: (computer) => { const now = status(computer); return <><span className={'dot ' + (now.state === 'up' ? 's-active' : now.state === 'down' ? 's-suspended' : 's-retired')} />{now.words}</>; } },
-    { head: 'Running now', cell: (computer) => computer.running === null ? <span className="dim">cannot tell</span> : computer.running.length ? count(computer.running.length) + (computer.running.length === 1 ? ' agent' : ' agents') : <span className="dim">nothing</span> },
+    { head: 'Running now', cell: (computer) => computer.running === null ? <span className="dim">cannot tell</span> : computer.running.length ? counted(computer.running.length, 'agents') : <span className="dim">nothing</span> },
     { head: 'May start here', cell: (computer) => <span className="sec">{mayStart(computer.machine)}</span> },
   ];
-  const changed = (message: string) => { setAdding(false); refresh(message); };
+  const changed = (message: string) => { refresh(message); };
   return <>
     <div className="head">
-      <div><div className="eyebrow">Where agents run</div><h1>Computers</h1><p className="sub">Every computer Lys may start agents on, and what is running there now.</p></div>
-      {admin && !adding ? <button className="btn primary" onClick={() => setAdding(true)}>+ Add a computer</button> : null}
+      <div><div className="eyebrow">Where agents run</div><h1>Network</h1></div>
+      {admin ? <button className="btn primary" onClick={() => name.current?.focus()}>+ Add a computer</button> : null}
     </div>
+    {/* How many computers there are is the list's own count; the strip says only what the list does not. */}
     <div className="stat-strip">
-      <div className="stat"><div className="n">{count(computers.filter((computer) => computer.machine.state !== 'retired').length)}</div><div className="l">computers</div></div>
       <div className="stat"><div className="n">{count(up)}</div><div className="l">up now</div></div>
-      <div className="stat"><div className="n" style={computers.some(attention) ? { color: 'var(--warn)' } : undefined}>{count(computers.filter(attention).length)}</div><div className="l">not heard from</div></div>
-      <div className="stat"><div className="n">{count(running)}</div><div className="l">agents running</div></div>
+      <div className="stat"><div className="n" style={computers.some(attention) ? { color: 'var(--warn)' } : undefined}>{count(computers.filter(attention).length)}</div><div className="l">not answering</div></div>
+      <div className="stat"><div className="n">{count(running)}</div><div className="l">{running === 1 ? 'agent running' : 'agents running'}</div></div>
     </div>
     {notice ? <p role="status">{notice}</p> : null}
     {teamsRefused ? <p className="why-not">Teams cannot be read, so computers are listed without their team. {teamsRefused}</p> : null}
     <div className="body halves">
       <Listing<Computer> groups={groups} columns={columns} id={(computer) => computer.machine.id} href={(computer) => '#/network?computer=' + computer.machine.id}
-        words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers"
-        holds={(items) => count(items.length) + (items.length === 1 ? ' computer' : ' computers')}
-        selected={selected?.machine.id ?? null} select={(computer) => { setPicked(computer.machine.id); setAdding(false); }} open={(computer) => { setPicked(computer.machine.id); setAdding(false); }}
+        words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers" empty="No computer yet. Add the one Lys runs on to start agents here."
+        holds={(items) => counted(items.length, 'computers')}
+        selected={selected?.machine.id ?? null} select={(computer) => setPicked(computer.machine.id)} open={(computer) => setPicked(computer.machine.id)}
+        foot={admin ? <AddComputerRow person={me.person.id} changed={changed} name={name} /> : null}
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />
-          <div className="seg">{([['all', 'All'], ['attention', 'Not heard from']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
+          <div className="seg">{([['all', 'All'], ['attention', 'Not answering']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
           {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
         </>} />
       <div className="pane">
-        {adding && admin ? <AddMachine person={me.person.id} changed={changed} cancel={() => setAdding(false)} />
-          : selected ? <MachineDetail key={selected.machine.id} computer={selected} admin={admin} me={me.person.id} teams={teams} names={names} changed={changed} /> : <p className="dim">{computers.length ? 'Choose a computer.' : 'No computers yet. Add the one Lys runs on to start agents here.'}</p>}
+        {selected ? <MachineDetail key={selected.machine.id} computer={selected} admin={admin} me={me.person.id} teams={teams} names={names} changed={changed} /> : computers.length ? <p className="dim">Choose a computer.</p> : null}
       </div>
     </div>
   </>;

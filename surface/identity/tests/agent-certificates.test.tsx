@@ -14,6 +14,19 @@ describe('Agent certificates', () => {
     expect(JSON.parse(decodeURIComponent(href.slice(href.indexOf(',') + 1)))).toEqual({ agent: SCRIBE, claims_are_live: false, certificate });
     expect($('a[download="certificate.der"]')?.getAttribute('href')).toBe('data:application/pkix-cert;base64,AQID');
   });
+  it('titles a certificate by when and for whom, keeps the serial small, and says its claims as facts, never as raw JSON or raw ids', async () => {
+    const claims = { agent: SCRIBE, person: ADA, roles: [{ role: 'op-' + 'c'.repeat(32), version: 1 }], profile_version: 3, grants: [{}, {}], held_at: 1790000000 };
+    await mount('#/file/' + SCRIBE + '/credentials', { ...SERVICE, [path]: ok({ agent: SCRIBE, certificates: [{ ...certificate, serial: 'op-' + 'd'.repeat(32), claims }], claims_are_live: false }) });
+    const heading = [...document.querySelectorAll('.certificates h3')][0];
+    expect(heading?.textContent).toMatch(/^Issued .+ for Ada \(test person\)/);
+    expect(heading?.querySelector('.refusal-name')?.textContent).toBe('op-' + 'd'.repeat(32));
+    const facts = [...document.querySelectorAll('.certificates .certificate dl')][1]?.textContent ?? '';
+    expect(facts).toContain('Holds 2 grants'); expect(facts).toContain('Holds 1 role'); expect(facts).toContain('Version 3'); expect(facts).toContain('Held at');
+    expect(facts).not.toContain(SCRIBE); expect(facts).not.toContain(ADA); expect(facts).not.toContain('op-');
+    expect(document.querySelector('.certificates pre')).toBeNull();
+    // Both credential parts are cards with the same heading.
+    expect([...document.querySelectorAll('section.card > h2')].map((h) => h.textContent)).toEqual(expect.arrayContaining(['Credential handles', 'Capability certificates']));
+  });
   it('shows a logged withdrawal and its reason', async () => {
     await mount('#/file/' + SCRIBE + '/certificate', { ...SERVICE, [path]: ok({ agent: SCRIBE, claims_are_live: false, certificates: [{ ...certificate, withdrawn: { serial: 'serial-one', by: ADA, reason: 'Key replaced', withdrawn_at: 1790000001 } }] }) });
     expect(text()).toContain('Withdrawn at'); expect(text()).toContain('Key replaced'); expect(text()).not.toContain('No withdrawal recorded');

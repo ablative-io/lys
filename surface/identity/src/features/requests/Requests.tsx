@@ -65,6 +65,8 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
   const [picked, setPicked] = useState<string | null>(null);
   const agents = new Map(data.people.people.flatMap((each) => each.agents.map((agent) => [agent.id, each.id] as const)));
   const names = new Map(data.people.people.flatMap((each) => [[each.id, each.display_name] as const, ...each.agents.map((agent) => [agent.id, agent.display_name] as const)]));
+  /** What a request is on, by name where it is someone, never a raw id. */
+  const onWhat = (entry: AccessRequest): string => names.get(entry.resource.id) ?? entry.resource.id;
   const held = (entry: AccessRequest): Held => ({ id: entry.asked_by, person: agents.get(entry.asked_by) ?? null });
   const shown = entries
     .filter((entry) => show === 'mine' ? mayDecide(entry) : show === 'waiting' ? entry.state === 'waiting' : entry.state !== 'waiting')
@@ -75,21 +77,22 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
   const ask = asking || retained || entries.length === 0;
   const columns: Column<AccessRequest>[] = [
     { head: 'Who asked', cell: (entry) => entry.asked_by_name ?? 'Name unavailable' },
-    { head: 'For', cell: (entry) => <span className="sec">{entry.relation} on {entry.resource.id}</span> },
+    { head: 'For', cell: (entry) => <span className="sec">{entry.relation} on {onWhat(entry)}</span> },
     { head: 'Waiting', cell: (entry) => entry.state === 'waiting' ? waited(entry.asked_at) : <span className="dim">{entry.state}</span> },
     { head: 'Can decide', cell: (entry) => <span className="sec">{mayDecide(entry) ? 'you' : entry.approvers.map((each) => each.display_name).join(', ') || 'no one eligible'}</span> },
   ];
   const count = (items: AccessRequest[]) => { const waiting = items.filter((entry) => entry.state === 'waiting').length; return waiting ? waiting + ' waiting' : items.length + ' decided'; };
   return <>
-    <AccessTabs on="requests" />
     <div className="head">
-      <div><h1>Requests</h1><p className="sub">Ask for permission to use something, and decide what others have asked for, oldest first.</p></div>
+      <div><h1>Access</h1><p className="sub">Ask for permission to use something, and decide what others have asked for, oldest first.</p></div>
       {!ask ? <button className="btn primary" onClick={() => setAsking(true)}>+ Ask for access</button> : null}
     </div>
+    <AccessTabs on="requests" />
     {data.teams.refused ? <p className="why-not">Teams cannot be read, so requests are listed without their team. {data.teams.refused}</p> : null}
     <div className="body work">
       <Listing<AccessRequest> groups={groups} columns={columns} id={(entry) => entry.id} href={(entry) => '#/requests?request=' + entry.id}
-        words={(entry) => (entry.asked_by_name ?? '') + ' ' + entry.relation + ' ' + entry.resource.id + ' ' + entry.why} noun="requests" holds={count}
+        words={(entry) => (entry.asked_by_name ?? '') + ' ' + entry.relation + ' ' + onWhat(entry) + ' ' + entry.why} noun="requests" holds={count}
+        empty={show === 'mine' ? 'Nothing is waiting on you.' : show === 'waiting' ? 'Nothing is waiting.' : 'Nothing has been decided yet.'}
         selected={open?.id ?? null} select={() => undefined} open={(entry) => { setPicked(entry.id); setAsking(false); }}
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={data.teams.list} admin={admin} />
@@ -97,15 +100,15 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
         </>} />
       <div className="detail">
         {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm {...each} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }} />} />
-          : open ? <Detail model={choices.status === 'ok' ? choices.data.model : null} entry={open} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : <p className="dim">Nothing is waiting.</p>}
+          : open ? <Detail model={choices.status === 'ok' ? choices.data.model : null} entry={open} on={onWhat(open)} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : null}
       </div>
     </div>
   </>;
 }
 
-function Detail({ model, entry, person, mayDecide, changed }: { model: GrantModel | null; entry: AccessRequest; person: string; mayDecide: boolean; changed: (answer: AccessRequest) => void }) {
+function Detail({ model, entry, on, person, mayDecide, changed }: { model: GrantModel | null; entry: AccessRequest; on: string; person: string; mayDecide: boolean; changed: (answer: AccessRequest) => void }) {
   return <article className="card" aria-label="Request">
-    <h2>{entry.asked_by_name ?? 'Name unavailable'} · {entry.relation} on {entry.resource.id}</h2>
+    <h2>{entry.asked_by_name ?? 'Name unavailable'} · {entry.relation} on {on}</h2>
     <p><strong>{entry.state === 'waiting' ? 'Awaiting a decision' : entry.state === 'approved' ? 'Approved' : 'Declined'}</strong> · Asked {clock(entry.asked_at)}</p>
     <p>{entry.why}</p>
     <p className="note">Allows {model ? actionWords(model, entry.resource, entry.actions) : 'permission descriptions are unavailable'}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>

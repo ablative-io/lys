@@ -1,5 +1,6 @@
-import { ActionPicker, singleActionCarriers, withheldFromAgents } from '../grants/ActionPicker';
-import type { ActionGroup } from '../grants/ActionPicker';
+import { singleActionCarriers, withheldFromAgents } from '../grants/ActionPicker';
+import { AgentGrantPicker } from './AgentGrantPicker';
+import type { GrantGroup } from './AgentGrantPicker';
 import { useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -76,13 +77,13 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const options = useMemo(() => grantOptions(grants, person, me.person.id, chosen?.display_name ?? 'the holder'), [grants, person, me.person.id, chosen?.display_name]);
   const resourceLabels = useMemo(() => resourceNames(people, teams, runOptions.network), [people, teams, runOptions.network]);
   const actionGroups = useMemo(() => {
-    const groups = new Map<string, ActionGroup>();
+    const groups = new Map<string, GrantGroup>();
     for (const option of options) {
       const resource = option.grant.resource;
       const id = JSON.stringify(resource);
       const label = resourceWords(resource, resourceLabels);
       const group = groups.get(id) ?? { id, title: label.words, href: label.unnamed ? '#/resources' : undefined, choices: [] };
-      group.choices.push({ id: grantOptionKey(option), resource, relation: option.relation ?? '', actions: option.actions, reason: option.reason });
+      group.choices.push({ id: grantOptionKey(option), resource, actions: option.actions, reason: option.reason });
       groups.set(id, group);
     }
     return [...groups.values()];
@@ -149,9 +150,9 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       {!chosen ? <option value={person}>Reporting target unavailable</option> : null}
       {targets.map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + entry.state : !capability.answersTo && entry.id !== me.person.id ? ' · not served' : ''}</option>)}
     </select></label>
-    <fieldset style={{ border: 0, padding: 0, margin: '16px 0' }}><legend>What this agent is given access to in Lys</legend>
+    <fieldset className="agent-grants-scope"><legend>What this agent is given access to in Lys</legend>
       {chosen?.kind === 'agent' ? <p>This form cannot pass on {chosen.display_name}’s access. Add {name.trim() || 'this agent'} without extra access; <a href={'#/file/' + encodeURIComponent(chosen.id) + '/access'}>review {chosen.display_name}’s access</a>.</p> : <>
-        {grants.model && withheldFromAgents(grants.model) !== null ? <ActionPicker model={grants.model} groups={actionGroups} selected={selectedGrants} change={setSelectedGrants} disabled={locked} />
+        {grants.model && withheldFromAgents(grants.model) !== null ? <AgentGrantPicker model={grants.model} groups={actionGroups} selected={selectedGrants} change={setSelectedGrants} disabled={locked} />
           : !grants.problem ? <p>Lys cannot offer access for agents here yet, so this agent is added with none. You can give it access afterwards, on its own page.</p> : null}
         {unpickable ? <p>Some kinds of access cannot be given one at a time, so they are not offered here.</p> : null}
         {!options.length && !grants.problem ? <p>{chosen?.display_name ?? 'The one this agent answers to'} has no access in Lys to pass on.</p> : null}

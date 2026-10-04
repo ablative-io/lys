@@ -76,7 +76,9 @@ describe('An agent page explains the agent before its controls', () => {
     expect(requests).not.toContain('/receipts/4');
     expect($('.agent-details')).toBeNull();
     expect($('.file details')).toBeNull();
-    expect($('.file .head .fileno')?.textContent).toBe(SCRIBE);
+    // No raw id is printed under the name.
+    expect($('.file .head .fileno')).toBeNull();
+    expect($('.file .head')?.textContent).not.toContain(SCRIBE);
     expect(posted).toEqual([]);
   });
 
@@ -104,6 +106,21 @@ describe('An agent page explains the agent before its controls', () => {
     expect(posted).toHaveLength(2);
     expect($('button[aria-label="Remove from Care team"]')).toBeNull();
     expect(text()).not.toContain('team-one');
+  });
+
+  it('has one start control: the settings saver reads Save and is shown only once something is changed', async () => {
+    const { posted } = await open(notRunning);
+    const about = () => $('[aria-label="About this agent"]');
+    expect(about()?.querySelector('select[name="runs_on"]')).not.toBeNull();
+    expect(about()?.querySelector('form.save-settings button')).toBeNull();
+    expect(text()).not.toContain('Save and start');
+    expect($$('button').filter((entry) => entry.textContent === 'Start')).toHaveLength(1);
+    await choose(about()?.querySelector('select[name="runs_on"]') ?? null, '');
+    expect([...(about()?.querySelectorAll('form.save-settings button') ?? [])].map((entry) => entry.textContent)).toEqual(['Save']);
+    expect($$('button').filter((entry) => entry.textContent === 'Start')).toHaveLength(1);
+    await choose(about()?.querySelector('select[name="runs_on"]') ?? null, 'computer-one');
+    expect(about()?.querySelector('form.save-settings button')).toBeNull();
+    expect(posted).toEqual([]);
   });
 
   it('says a saved model no program lists is unlisted instead of showing a bare id as its name', async () => {
@@ -184,7 +201,8 @@ describe('An agent page explains the agent before its controls', () => {
 
   it('names the missing computer permission without presenting activation as readiness, with the fix in place', async () => {
     const { posted } = await open({ ...notRunning, '/network': ok({ machines: [{ id: 'computer-one', name: 'Ward computer', state: 'in_use', runtime: 'runner', may_run: [], may_run_roles: [] }], reports_served: true }) });
-    expect($('.file .head')?.textContent).toContain('Scribe is added.');
+    // The head says when the agent was added and its state; it claims nothing about readiness.
+    expect($('.file .head')?.textContent).not.toContain('is added');
     expect($('.file .head')?.textContent).not.toContain('finish setting it up');
     expect($('.file .head')?.textContent).not.toContain('Scribe is ready');
     expect(run()?.textContent).toContain('No computer is allowed to run Scribe.');
@@ -220,7 +238,7 @@ describe('An agent page explains the agent before its controls', () => {
 
   it('keeps the add-computer deep link administrator-only', async () => {
     const { posted } = await open({ '/network': ok({ machines: [], reports_served: true }), '/directory/people': refused(403, 'NotAdmitted', 'not administrator') }, '#/network?add=computer');
-    expect($('.page h1')?.textContent).toBe('Computers');
+    expect($('.page h1')?.textContent).toBe('Network');
     expect($('form[aria-label="Add a computer"]')).toBeNull();
     expect(posted).toEqual([]);
   });

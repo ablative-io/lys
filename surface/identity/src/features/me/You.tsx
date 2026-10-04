@@ -165,16 +165,23 @@ function Waiting({ waiting }: { waiting: ActiveData['waiting'] }) {
   </p>;
 }
 
+/**
+ * Your account: what you hold across the page's full width, its table scrolling inside its own box, and the
+ * account's own pieces as one row of sections under it. Secrets have their own place on the rail, so they are not
+ * repeated here; service accounts are linked from here because nothing else on the page reaches them.
+ */
 function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
   const { me, agents, w } = data;
   const mine = w.list.grants.filter((g) => g.holder === me.person.id && g.standing.stands);
   const same = (a: Login) => a.provider === me.signed_in.provider && a.subject === me.signed_in.subject;
-  return <div className="you-account grid2">
-    <div>
+  return <div className="you-account">
+    <section className="you-holds-pane" aria-label="What you hold">
       <div className="section-h" style={{ marginTop: 0 }}><span>What you hold</span></div>
-      <GrantTable w={w} grants={mine} done={reload} give={agents.length > 0} empty="Nothing yet." />
-    </div>
-    <div>
+      <div className="you-holds-scroll">
+        <GrantTable w={w} grants={mine} done={reload} give={agents.length > 0} empty="Nothing yet." />
+      </div>
+    </section>
+    <div className="you-account-row">
       <OwnAccount />
       <div className="card" id="signin-identities">
         <h2>Sign-in identities</h2>
@@ -182,10 +189,11 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
         {me.sign_in_identities.map((login) => (
           <SignInIdentity key={login.provider + ' ' + login.subject} login={login} current={same(login)} />
         ))}
-        <div className="note" style={{ marginTop: 6 }}>
-          These are the sign-in accounts linked to your identity.
-        </div>
       </div>
+      <section className="card" aria-label="Your signed-in sessions">
+        <h2>Your signed-in sessions</h2>
+        <SessionList person="" />
+      </section>
       <div className="card" id="service-accounts">
         <h2>Your service-account records</h2><a className="btn" href="#/people/view/accounts">Manage service accounts</a>
         <div className="note" style={{ margin: '2px 0 6px' }}>These records name accounts. Permission to use or lend their credentials is checked separately.</div>
@@ -199,11 +207,6 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
         ) : (
           <p className="note">No service-account records were returned for you.</p>
         )}
-      </div>
-      <div className="card">
-        <h2>Secrets available to you</h2>
-        <div className="note" style={{ marginTop: 6 }}>View the secrets you can access, their permissions and their activity. Secret values are never displayed here.</div>
-        <a className="btn" style={{ marginTop: 8 }} href="#/secrets">Open secrets</a>
       </div>
     </div>
   </div>;
@@ -252,13 +255,13 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
           <div className="eyebrow">Signed in as</div>
           <h1>{data.me.person.display_name}</h1>
         </div>
+        <Waiting waiting={data.waiting} />
       </div>
-      <Waiting waiting={data.waiting} />
       <div className="tabs">
         <a href="#/me" className={tab === 'agents' ? 'on' : undefined}>Agents</a>
         <a href="#/me?tab=account" className={tab === 'account' ? 'on' : undefined}>Account</a>
       </div>
-      {tab === 'account' ? <div className="pane"><Account data={data} reload={reload} /></div> : <Agents data={data} reload={reload} />}
+      {tab === 'account' ? <Account data={data} reload={reload} /> : <Agents data={data} reload={reload} />}
     </div>
   );
 }

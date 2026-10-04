@@ -28,3 +28,10 @@
 .usage-amount > * { flex: 1 1 0; min-width: 0; }
 .usage-table label.tick { margin: 0 0 6px; }
 .usage-add-row input[type=checkbox] { width: auto; }
+/* A table's own last row adding one: each control in its column's cell, belonging to a form kept beside the table. */
+.usage form.usage-add-form, form.usage-add-form { display: none; }
+.usage-table tr.usage-add-line td { border-bottom: 0; vertical-align: middle; }
+.usage-table tr.usage-add-line td > .btn { white-space: nowrap; }
+.usage-table textarea.usage-grow { field-sizing: content; min-height: 0; resize: none; font: inherit; }
+.usage-reason { margin: 0 0 4px; color: var(--text-secondary); }
+.usage-table caption.usage-caption { caption-side: top; text-align: left; padding: 0 0 6px; color: var(--text-secondary); }

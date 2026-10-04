@@ -204,6 +204,27 @@ struct Machine {
     notify: Arc<Notify>,
     delivered: HashMap<String, mpsc::Sender<Replied>>,
     nonces: HashSet<String>,
+    /// How many of the machine's bridges are dialled in now, each waiting
+    /// for its next request.
+    bridges: usize,
+}
+
+/// A bridge dialled in and waiting: counted while its ask is held, and no
+/// longer once it is answered or the bridge leaves.
+struct Bridged<'a> {
+    hub: &'a DialHub,
+    machine: &'a str,
+}
+
+impl Drop for Bridged<'_> {
+    fn drop(&mut self) {
+        let left = self.hub.with(self.machine, |held| {
+            held.bridges = held.bridges.saturating_sub(1);
+        });
+        if let Err(error) = left {
+            tracing::error!("runner bridge count unavailable: {error}");
+        }
+    }
 }
 
 /// Where requests for dialled runners wait for their machine's bridge.
@@ -281,8 +302,19 @@ impl DialHub {
         })
     }
 
+    /// Whether `machine`'s runner is dialled in now: a bridge of its waits
+    /// for its next request, or holds one it has not yet answered. A runner
+    /// that is not is never asked, since nothing would take the request.
+    pub fn bridged(&self, machine: &str) -> Result<bool, RunnerError> {
+        self.with(machine, |held| {
+            held.bridges > 0 || !held.delivered.is_empty()
+        })
+    }
+
     /// The next act for `machine` and its ticket, once there is one.
     pub async fn next(&self, machine: &str) -> Result<(String, Act), ServerError> {
+        self.with(machine, |held| held.bridges += 1)?;
+        let _waiting = Bridged { hub: self, machine };
         loop {
             let (taken, notify) = self.with(machine, |held| {
                 let taken = held.queue.pop_front().map(|pending| {

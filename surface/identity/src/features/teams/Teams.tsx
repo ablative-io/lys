@@ -48,12 +48,16 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
   const name = (id: string) => members.find((entry) => entry.id === id)?.display_name ?? 'someone outside your view';
   const manages = (each: Team) => each.owner === me.person.id || people.scope === 'directory';
   const needle = query.trim().toLowerCase();
-  const order = [...treeOrder(teams), ...teams.filter((team) => team.state === 'retired').map((team) => ({ team, depth: 0 }))];
+  // Retired teams are left out until asked for, with the same control the All view has.
+  const [retired, setRetired] = useState(false);
+  const retiredCount = teams.filter((each) => each.state === 'retired').length;
+  const order = [...treeOrder(teams), ...(retired ? teams.filter((each) => each.state === 'retired').map((each) => ({ team: each, depth: 0 })) : [])];
   const shown = order.filter(({ team }) => !needle || team.name.toLowerCase().includes(needle));
   const team = teams.find((each) => each.id === (picked ?? shown[0]?.team.id)) ?? null;
   return <>
     <div className="tools">
-      <input className="search" type="search" aria-label="Search teams" placeholder={'Search ' + teams.length.toLocaleString('en-AU') + ' teams'} value={query} onChange={(event) => setQuery(event.target.value)} />
+      <input className="search" type="search" aria-label="Search teams" placeholder={'Search ' + (teams.length - (retired ? 0 : retiredCount)).toLocaleString('en-AU') + (teams.length - (retired ? 0 : retiredCount) === 1 ? ' team' : ' teams')} value={query} onChange={(event) => setQuery(event.target.value)} />
+      {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
       <button className="btn primary" onClick={() => { setCreating(true); setNotice(''); }}>+ Create a team</button>
       {notice ? <span role="status" className="note">{notice}</span> : null}
     </div>
@@ -62,7 +66,8 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
         <table className="teams-table usage-table">
           <thead><tr><th>Team</th><th>Part of</th><th>Lead</th><th>Holds</th><th>Change</th></tr></thead>
           <tbody>{shown.map(({ team: each, depth }) => <TeamRow key={each.id + ':' + revision} team={each} depth={depth} teams={teams} current={each.id === team?.id && !creating} manages={manages(each)} person={me.person.id} login={me.signed_in}
-            name={name} holds={size(teams, each.id, people)} pick={() => { setPicked(each.id); setCreating(false); }} changed={changed} />)}</tbody>
+            name={name} holds={size(teams, each.id, people)} pick={() => { setPicked(each.id); setCreating(false); }} changed={changed} />)}
+            {teams.length && !shown.length ? <tr><td colSpan={5} className="dim">{needle ? 'No team matches that search.' : 'Every team is retired.'}</td></tr> : null}</tbody>
         </table>
         {teams.length ? null : <p className="dim">No teams yet. A team is how Lys groups people and their agents: create the first one.</p>}
       </div>
@@ -73,7 +78,7 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
             <p>Managed by <a href={'#/file/' + team.owner}>{name(team.owner)}</a>.</p>
           </section>
           <TeamMembers key={team.id + ':' + revision} team={team} person={me.person.id} login={me.signed_in} members={members} name={name} administrator={people.scope === 'directory'} manages={manages(team)} changed={changed} />
-          <TeamUsage team={team.id} />
+          <TeamUsage team={team.id} name={team.name} />
         </div> : null}
       </div>
     </div>

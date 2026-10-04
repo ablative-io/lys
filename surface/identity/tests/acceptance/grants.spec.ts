@@ -136,8 +136,8 @@ const ROWS: ConformanceRow[] = [
       const { requests } = await mount('#/me?tab=account');
       expect(requests).toContain('/grants');
       expect(holdRows()).toEqual([
-        ['You can do everything here (project identity).', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
-        ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root', 'no', ''],
+        ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+        ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
       ]);
     },
   },
@@ -154,7 +154,8 @@ const ROWS: ConformanceRow[] = [
       expect(requests).toContain('/directory/people');
       expect(requests).not.toContain('/people');
       expect(document.body.innerHTML).toContain(BEA_ROOT_G);
-      expect(text()).toContain('editor of project:ledger');
+      // The path to a person names the holders; the relation and resource it rests on are its title.
+      expect($('tr[data-grant] .chain')?.getAttribute('title')).toContain('editor of project:ledger');
     },
   },
   {
@@ -193,7 +194,8 @@ const ROWS: ConformanceRow[] = [
       await click($('[data-act="check"]'));
       expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
       expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
-      expect($('#answer .chain')?.textContent).toContain('Ada (test person) · owner of project:identity');
+      expect($('#answer .chain')?.textContent).toBe('Ada (test person)→Scribe');
+      expect($('#answer .chain')?.getAttribute('title')).toContain('Ada (test person) · owner of project:identity');
       expect($('#answer .meta-line')?.textContent).toContain('model v1');
       await choose($('#cPerm'), 'edit');
       await click($('[data-act="check"]'));
@@ -212,7 +214,8 @@ const ROWS: ConformanceRow[] = [
       expect(card[0].textContent).toContain('27 Sep 12:00 · tool');
       expect(card[0].textContent).toContain('27 Sep to 4 Oct');
       // Its source, as the chain from the person who issued it.
-      expect(card[0].querySelector('.chain')?.textContent).toBe('Ada (test person) · owner of project:identity→Scribe · viewer of project:identity');
+      expect(card[0].querySelector('.chain')?.textContent).toBe('Ada (test person)→Scribe');
+      expect(card[0].querySelector('.chain')?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
       expect(text()).not.toContain('never used');
       fresh();
       // A grant with no observed use reads "not seen", never "never used".

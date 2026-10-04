@@ -1,0 +1,16 @@
+/* Add an agent: one table of what the agent is given, grouped by resource. */
+.agent-grants { margin: 8px 0 0; }
+.agent-grants col.agent-grants-give { width: 56px; }
+.agent-grants td:first-child, .agent-grants th:first-child { text-align: center; }
+.agent-grants .agent-grants-resource th { text-align: left; font-weight: 500; color: var(--text-primary); white-space: normal; background: var(--surface-default); }
+.agent-grants .agent-grants-resource td { background: var(--surface-default); }
+.agent-grants .agent-grants-resource th a { color: inherit; }
+.agent-grants .agent-grants-resource td, .agent-grants .agent-grants-resource th { padding-top: 12px; }
+.agent-grants .hint { display: block; font-weight: 400; color: var(--text-muted); overflow-wrap: break-word; }
+.agent-grants th, .agent-grants td { overflow-wrap: break-word; }
+.agent-grants tbody tr:not(.agent-grants-resource) td:last-child { padding-left: 20px; }
+.agent-grants-scope { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+/* Add a person: one row, a name field the width of a name and its button beside it. */
+.add-person-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.add-person-row .field { margin: 0; width: 34ch; max-width: 100%; }
+.add-person-row .btn { flex: none; }

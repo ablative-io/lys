@@ -19,6 +19,16 @@ describe('Teams', () => {
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Reviewers'); input.dispatchEvent(new Event('input', { bubbles: true })); }); await settle();
     posted.length = 0; await click(button('Create team')); expect(posted).toEqual([{ path: '/teams', body: { operation: expect.stringMatching(/^op-/), name: 'Reviewers', description: '' } }]); expect(text()).toContain('Your team was recorded');
   });
+  it('hides retired teams until Show retired is pressed', async () => {
+    const old = { ...team, id: 'op-' + 'e'.repeat(32), name: 'Old crew', state: 'retired', retired_at: 1790000100 };
+    await open({ ...routes, '/teams': ok({ teams: [team, old] }) });
+    const names = () => [...document.querySelectorAll('.teams-table tbody tr[data-team] td:first-child')].map((cell) => cell.textContent);
+    expect(names()).toEqual(['Delivery']);
+    await click(button('Show retired (1)'));
+    expect(names()).toEqual(['Delivery', 'Old crew retired']);
+    await click(button('Hide retired'));
+    expect(names()).toEqual(['Delivery']);
+  });
   it('confirms membership changes and records only the selected person', async () => {
     const path = '/teams/' + team.id + '/members'; const { posted } = await open({ ...routes, ['POST ' + path]: (body) => receipt(body, 'added', ADA) });
     posted.length = 0; await choose($('select[name="member"]'), ADA); await click(button('Add member')); expect(posted).toEqual([]); await click(button('Confirm add member'));

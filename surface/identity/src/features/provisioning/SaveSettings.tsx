@@ -1,4 +1,4 @@
-/** The settings form's one button: it saves what the form shows as the next version of the agent's settings, and nothing else. Approving and starting belong to Start on the front page. The request is kept until its answer is confirmed, and the button is never greyed without its reason beside it. */
+/** The settings form's one button: it saves what the form shows as the next version of the agent's settings, and nothing else. Approving and starting belong to Start in the run panel. The request is kept until its answer is confirmed, and the button is never greyed without its reason beside it. On the Overview (`brief`) it reads Save and is shown only once something is changed, or a save is outstanding. */
 import { useRef, useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
 import { answeredNo, sendKept } from '../../kept';
@@ -12,11 +12,13 @@ import { changedFrom, profileRequest } from '../runtime/start-requests';
 import { Gate } from '../signin/Gate';
 import type { ProvisioningProfile } from './Provisioning';
 
-export function SaveSettings({ agent, profile, settings, refusal, canSave, people, machines, saved }: {
+export function SaveSettings({ agent, profile, settings, refusal, canSave, people, machines, saved, brief = false }: {
   agent: string; profile: ProvisioningProfile | null; settings: Record<string, unknown>; refusal: string; canSave: boolean;
   people: PeopleView; machines: Machine[];
-  /** When given, the button saves and then hands on to the start; with nothing changed it hands on at once. */
+  /** Called once a save is confirmed. */
   saved?: () => void;
+  /** The Overview's saver: it reads Save and is shown only when something was changed. */
+  brief?: boolean;
 }) {
   const load = useLoad(async () => {
     const [me, roles] = await Promise.all([api.me(), readRoles()]);
@@ -25,7 +27,7 @@ export function SaveSettings({ agent, profile, settings, refusal, canSave, peopl
   return <Gate load={load} title="Settings" ok={({ me, roles }) => {
     const name = entries(people).find((entry) => entry.id === agent)?.display_name ?? agent;
     return <>
-      <Save key={agent} agent={agent} name={name} person={me.person.id} profile={profile} settings={settings} refusal={refusal} canSave={canSave} then={saved} />
+      <Save key={agent} agent={agent} name={name} person={me.person.id} profile={profile} settings={settings} refusal={refusal} canSave={canSave} then={saved} brief={brief} />
       <Admission agent={agent} name={name} person={me.person.id} admin={people.scope === 'directory'} machines={machines} roles={roles.roles} />
     </>;
   }} />;
@@ -54,10 +56,11 @@ function keptSave(raw: string, path: string): KeptSave {
   return { path, body, version: body.from_version };
 }
 
-function Save({ agent, name, person, profile, settings, refusal, canSave, then }: {
-  agent: string; name: string; person: string; profile: ProvisioningProfile | null; settings: Record<string, unknown>; refusal: string; canSave: boolean; then?: () => void;
+function Save({ agent, name, person, profile, settings, refusal, canSave, then, brief }: {
+  agent: string; name: string; person: string; profile: ProvisioningProfile | null; settings: Record<string, unknown>; refusal: string; canSave: boolean; then?: () => void; brief: boolean;
 }) {
-  const label = then ? 'Save and start ' + name : 'Save these settings';
+  // Saving never starts the agent: Start in the run panel is the one start control.
+  const label = brief ? 'Save' : 'Save these settings';
   const path = '/agents/' + encodeURIComponent(agent) + '/provisioning';
   const key = 'lys.pending.settings-save.' + person + '.' + agent;
   // Start on the front page keeps its own unanswered request here; while one is kept, a new version would be saved under it.
@@ -75,7 +78,10 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then }
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
-  const changed = changedFrom(base, settings);
+  // The Overview shows only the model and the computer, so only a change to one of those is a change there.
+  const changed = brief && base?.harness
+    ? JSON.stringify(settings.model_access) !== JSON.stringify(base.model_access) || (settings.runs_on ?? '') !== (base.runs_on ?? '')
+    : changedFrom(base, settings);
   /** Why the button cannot be pressed, in the order a person would fix it; empty when it can. */
   const why = initial.error ? 'Lys kept an earlier save for ' + name + ' that it can no longer read.'
     : pending ? ''
@@ -83,12 +89,10 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then }
     : !canSave ? 'An administrator changes these settings.'
     : refusal ? refusal
     : base && !('session' in base) ? 'ProfileReadIncomplete: update Lys before changing these settings; the saved ones were not all returned.'
-    : !changed && !then ? 'Nothing has changed.'
+    : !changed ? 'Nothing has changed.'
     : '';
   const run = async () => {
     if (working.current || why) return;
-    // Nothing to save and no save outstanding: the settings stand as they are, so the start goes ahead.
-    if (then && !changed && !pending) { then(); return; }
     working.current = true; setBusy(true); setFailure(''); setSaved(false);
     const version = base?.version ?? 0;
     const current: KeptSave = pending ?? { path, body: { ...settings, operation: operationId(), from_version: version }, version };
@@ -98,20 +102,24 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then }
         // The computer is no part of a save; the request helper reads only the stage, the path, the body and the version.
         return profileRequest(agent, { stage: 'profile', path: current.path, body: current.body, version: current.version, machine: '' });
       }, true);
-      setPending(null); setBase(confirmed.profile);
-      if (then) then(); else setSaved(true);
+      setPending(null); setBase(confirmed.profile); setSaved(true);
+      if (then) then();
     } catch (error) {
       // The service answered no: nothing of this request is outstanding. Anything else may have been carried out, so the request stays kept.
       if (answeredNo(error)) setPending(null);
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
     } finally { working.current = false; setBusy(false); }
   };
+  // On the Overview nothing is offered until something is changed, a save is outstanding, or there is something to say.
+  if (brief && !changed && !pending && !failure && !saved && !initial.error) return null;
   return <form className="save-settings" onSubmit={(event) => { event.preventDefault(); void run(); }}>
     {pending ? <p role="status">The last save has no confirmed answer. Press {label} to send that same request again.</p> : null}
     {failure ? <><p role="alert" className="why-not">Lys could not confirm these settings were saved.</p><p><small className="refusal-name">{failure}</small></p></> : null}
     {saved && !failure ? <p role="status">Saved. {name} uses these settings the next time it starts. <a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
+    {brief && !changed && !pending ? null : <>
     <button type="submit" className="btn primary" disabled={busy || Boolean(why)}>{busy ? 'Saving…' : label}</button>
     {why ? <p className="why-not">{why}{starting && !pending && !initial.error ? <> <a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></> : null}</p> : null}
+    </>}
     {initial.error ? <p><small className="refusal-name">{initial.error}</small></p> : null}
   </form>;
 }

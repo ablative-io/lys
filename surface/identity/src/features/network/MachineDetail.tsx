@@ -5,22 +5,23 @@ import type { OrgTeam } from '../../shell/org';
 import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import { ago } from '../file/time';
+import { counted } from '../../shell/count';
 import type { Computer } from './Network';
 import type { Machine } from './contract';
 
 export type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
 
-/** Whether the computer is up, from what its runner last reported. */
-export function status({ machine, runner, reports, running }: Computer): { words: string; state: 'up' | 'down' | 'unknown' | 'off' } {
+/** Whether the computer is up, by its runner's own answer when Lys asked it just now; never guessed from a report's age. */
+export function status({ machine, asked, runner, answers, running }: Computer): { words: string; state: 'up' | 'down' | 'unknown' | 'off' } {
   if (machine.state === 'retired') return { words: 'Retired', state: 'off' };
   if (machine.runtime === null) return { words: 'Does not run agents', state: 'off' };
-  // An agent running on it now is the plainest sign it is up, whatever the last report's age.
-  if (running?.length) return { words: 'Up, ' + running.length + (running.length === 1 ? ' agent running' : ' agents running'), state: 'up' };
+  if (running?.length) return { words: 'Up, ' + counted(running.length, 'agents') + ' running', state: 'up' };
+  // Until its runner is asked, nothing is said of it: it counts neither as up nor as not answering.
+  if (asked === 'asking') return { words: 'Asking its runner…', state: 'unknown' };
+  if (asked === 'unread') return { words: 'Lys could not ask its runner', state: 'unknown' };
   if (!runner) return { words: 'No runner connected', state: 'down' };
-  if (!reports) return { words: 'Lys does not collect runner reports', state: 'unknown' };
-  if (machine.last_report_at === null) return { words: 'Never heard from', state: 'down' };
-  const fresh = Math.floor(Date.now() / 1000) - machine.last_report_at < 300;
-  return { words: (fresh ? 'Up, heard ' : 'Last heard ') + ago(machine.last_report_at), state: fresh ? 'up' : 'down' };
+  if (answers === true) return { words: 'Up', state: 'up' };
+  return { words: 'Runner not answering' + (machine.last_report_at === null ? '' : ', last heard ' + ago(machine.last_report_at)), state: 'down' };
 }
 
 /** How Lys reaches it. */
@@ -51,7 +52,9 @@ export function MachineDetail({ computer, admin, me, teams, names, changed }: { 
       {!machine.may_run.length && !(machine.may_run_roles ?? []).length ? <tr><td colSpan={2} className="dim">No agent may start here yet.</td></tr> : null}
     </tbody></table>}
     <div className="section-h">How Lys reaches it</div>
-    <p>{reached(machine, runner)}</p>
+    {computer.asked === 'answered' || machine.runtime === null ? <p>{reached(machine, runner)}</p> : computer.asked === 'asking' ? <p className="dim">Asking its runner…</p> : null}
+    {computer.answers === false && computer.reason ? <p className="why-not">Its runner did not answer: {computer.reason}</p> : null}
+    {computer.asked === 'unread' ? <p className="why-not">Lys could not ask its runner: {computer.reason}</p> : null}
     <p className="sec">Websites its agents' services may connect to: {machine.may_reach.join(', ') || 'none'}.</p>
     {admin && machine.state !== 'retired' ? <Retire machine={machine} changed={changed} /> : null}
   </section>;
@@ -92,6 +95,6 @@ function Retire({ machine, changed }: { machine: Machine; changed: (message: str
     } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
     finally { setBusy(false); }
   };
-  return <div className="section-h" style={{ display: 'block' }}>{confirm ? <><p>Retire {machine.name}? No agent can be started on it afterwards. Agents already running on it keep running.</p><button className="btn danger" disabled={busy} onClick={() => void retire()}>Confirm retirement</button>{' '}<button className="btn" disabled={busy} onClick={() => setConfirm(false)}>Cancel</button></>
+  return <div className="machine-retire" style={{ marginTop: 20 }}>{confirm ? <><p>Retire {machine.name}? No agent can be started on it afterwards. Agents already running on it keep running.</p><button className="btn danger" disabled={busy} onClick={() => void retire()}>Confirm retirement</button>{' '}<button className="btn" disabled={busy} onClick={() => setConfirm(false)}>Cancel</button></>
     : <button className="btn" onClick={() => setConfirm(true)}>Retire this computer</button>}{failure ? <p role="alert">{failure}</p> : null}</div>;
 }

@@ -115,7 +115,7 @@ describe('Usage port', () => {
     expect(changed).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('BudgetAnswerUnconfirmed');
     expect(element<HTMLButtonElement>(edit + ' button[type="submit"]').disabled).toBe(true);
-    expect(element<HTMLButtonElement>('form[aria-label="Set a budget"] button[type="submit"]').disabled).toBe(true);
+    expect(element<HTMLButtonElement>('tr[data-add="budget"] button[type="submit"]').disabled).toBe(true);
   });
 
   it('refuses an empty or negative edited amount before sending a request', async () => {
@@ -135,7 +135,7 @@ describe('Usage port', () => {
     const changed = vi.fn();
     serve({ ['PUT ' + path]: (body) => ok({ ...view, ...body as BudgetBody, version: 1 }) }, posted);
     await render(<UsageBudgets budgets={view} receipts={[]} changed={changed} />);
-    const form = 'form[aria-label="Set a budget"]';
+    const form = 'tr[data-add="budget"]';
     await choose(form + ' select', 'plan_percent');
     expect(Array.from(document.querySelectorAll<HTMLSelectElement>(form + ' select'))[1].value).toBe('five_hour');
     await input(form + ' input[name="limit"]', '101');
@@ -144,6 +144,26 @@ describe('Usage port', () => {
     await click(form + ' button[type="submit"]');
     expect(posted).toEqual([{ path: 'PUT ' + path, body: { limits: [{ unit: 'plan_percent', amount: 50, period: 'five_hour', act: 'tell' }], warn_at: null, version: 0 } }]);
     expect(changed).toHaveBeenCalledWith('Budget kept as version 1.');
+  });
+
+  it('names the holder in place of its identifier and says each reason once', async () => {
+    const view = budgetsView(holder, [], {
+      limits: [{ unit: 'dollars', amount: 5, period: 'day', act: 'tell' }],
+      used: [{ unit: 'dollars', period: 'day', figure: null, since_ms: 0, unavailable: 'dollars have not been reported for agent ' + SCRIBE }],
+      unavailable: [
+        { unit: 'dollars', reason: 'dollars have not been reported for agent ' + SCRIBE },
+        { unit: 'plan_percent', reason: 'plan window unreported for agent ' + SCRIBE + '; plan window unreported for agent ' + SCRIBE },
+      ],
+    });
+    serve({});
+    await render(<UsageBudgets budgets={view} receipts={[]} changed={vi.fn()} name="pancake" />);
+    const page = document.body.textContent ?? '';
+    expect(page).not.toContain(SCRIBE);
+    expect(element('tbody tr').children[3].textContent).toBe('No dollar spend has been reported for pancake.');
+    expect([...document.querySelectorAll('.usage-reason')].map((line) => line.textContent)).toEqual(['No plan window has been reported for pancake.']);
+    for (const sentence of ['No dollar spend has been reported for pancake.', 'No plan window has been reported for pancake.']) {
+      expect(page.split(sentence)).toHaveLength(2);
+    }
   });
 
   it('rewords one current-shape goal without rewriting its other fields or another goal', async () => {

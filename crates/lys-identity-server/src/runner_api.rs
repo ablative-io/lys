@@ -12,7 +12,13 @@
 //! - `POST /agents/{id}/wake` `{"message"}`
 //! - `GET /runtime/live`: the sessions still running, as their runners say,
 //!   and by name each session whose runner did not answer
-//! - `GET`, `POST /network/machines/{id}/runner`: a machine's runner
+//! - `GET /network/machines/{id}/runner`: a machine's runner record, and
+//!   whether its runner answers now: `answers` is `true` when it answered a
+//!   status request, `false` with the `refusal` and the `reason` when it did
+//!   not, and `null` when the machine names no runner. A dialled runner none
+//!   of whose bridges is dialled in is not asked: it answers `false`,
+//!   `runner_not_dialled_in`
+//! - `POST /network/machines/{id}/runner`: name a machine's runner
 //! - `POST /network/machines/{id}/folders`: the folders its runner names
 //!   (`machine_folders.rs`)
 //! - `GET /runner/protocol`: the runner protocol, published
@@ -508,6 +514,8 @@ async fn live(
     Ok(Json(answer))
 }
 
+/// A machine's runner record, and whether that runner answers a status
+/// request now, by its runner's word: never guessed from its last report.
 async fn runner(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -518,7 +526,33 @@ async fn runner(
         store.machine(&id).ok_or(ServerError::MachineUnknown)?;
         Ok(store.runner(&id).cloned())
     })?;
-    Ok(Json(json!({ "machine": id, "runner": runner })))
+    let Some(record) = runner.clone() else {
+        return Ok(Json(
+            json!({ "machine": id, "runner": runner, "answers": null }),
+        ));
+    };
+    let asked =
+        if matches!(record, RunnerRecord::Dialled { .. }) && !state.runners.hub().bridged(&id)? {
+            Err(ServerError::Runner {
+                refusal: "runner_not_dialled_in".to_owned(),
+                words: "this computer's runner is not connected to Lys right now".to_owned(),
+            })
+        } else {
+            crate::runner_client::ask(&state, &id, record, Act::Status { session: None })
+                .await
+                .map(drop)
+        };
+    Ok(Json(match asked {
+        Ok(()) => json!({ "machine": id, "runner": runner, "answers": true }),
+        Err(refused) => {
+            let reason = match &refused {
+                ServerError::Runner { words, .. } => words.clone(),
+                other => other.to_string(),
+            };
+            json!({ "machine": id, "runner": runner, "answers": false,
+                "refusal": refused.name(), "reason": reason })
+        }
+    }))
 }
 
 async fn name_runner(

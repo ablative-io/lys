@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, choose, click, mount, press, text, unmountAll, unreachable, settle } from './harness';
 import {
   ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE as BEA_BASE, DIRECTORY, GRANTS, LEDGER_G,
-  AGENT_MODEL as MODEL, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused,
+  AGENT_MODEL as MODEL, ME, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused,
 } from './fixtures';
 import type { DelegateBody, LastUse } from '../src/generated/grants';
 
@@ -20,8 +20,8 @@ describe('What you hold', () => {
     expect(requests).toContain('/grants');
     const rows = holdText();
     expect(rows).toEqual([
-      ['You can do everything here (project identity).', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
-      ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root', 'no', ''],
+      ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+      ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(unreachable()).toEqual([]);
   });
@@ -394,14 +394,16 @@ describe("What you can't give (conformance 2.4)", () => {
 describe('Can X do this? (conformance 8.1)', () => {
   it("answers yes with the path to a person on an agent's file", async () => {
     const { posted } = await mount(`#/file/${SCRIBE}/access`);
-    expect($$('tr[data-grant] .chain .pill').map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', "Scribe · viewer of project:identity"]);
+    expect($$('tr[data-grant] .chain .pill').map((p) => p.textContent)).toEqual(['Ada (test person)', 'Scribe']);
+    expect($('tr[data-grant] .chain')?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
     await choose($('#cPerm'), 'view');
     await press('c', {}, document.body);
     expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
     expect(posted.some((p) => p.path === '/grants/check')).toBe(false);
     expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
     expect($('#answer .why')?.textContent).toBe('view needs viewers or editors or owners.');
-    expect($('#answer .chain')?.textContent).toContain("Scribe · viewer of project:identity");
+    expect($('#answer .chain')?.textContent).toBe('Ada (test person)→Scribe');
+    expect($('#answer .chain')?.getAttribute('title')).toContain('Scribe · viewer of project:identity');
     expect($('#answer .meta-line')?.textContent).toContain('model v1');
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
   });
@@ -466,7 +468,8 @@ describe('Who can reach this? (conformance 8.2)', () => {
     location.hash = '#/access';
     await settle();
     const grants = $$('table tbody tr[data-href]').map((r) => [...r.querySelectorAll('.chain .pill')].map((pill) => pill.textContent));
-    expect(grants).toEqual([['Ada (test person) · owner of project:identity'], ['Ada (test person) · viewer of project:ledger'], ['Ada (test person) · owner of project:identity', 'Scribe · viewer of project:identity']]);
+    expect(grants).toEqual([['Ada (test person)'], ['Ada (test person)'], ['Ada (test person)', 'Scribe']]);
+    expect($$('table tbody tr[data-href] .chain').map((chain) => chain.getAttribute('title'))).toEqual(['Ada (test person) · owner of project:identity', 'Ada (test person) · viewer of project:ledger', 'Ada (test person) · owner of project:identity → Scribe · viewer of project:identity']);
     const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[8].textContent);
     expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool']);
     expect(unreachable()).toEqual([]);
@@ -481,7 +484,9 @@ describe('A grant card', () => {
     const refusedScribe = GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, standing: { stands: false as const, refusal: 'IdentityNotActive', grant: null, reason } } : g));
     await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: refusedScribe, revision: 7 }), '/directory/people': ok(suspend(DIRECTORY)), '/people': ok(suspend({ ...DIRECTORY, scope: 'personal', people: [DIRECTORY.people[0]] })) });
     const card = $$('tr[data-grant]').find((c) => c.querySelector('.verdict-mark.no'));
-    expect(card?.textContent).toContain(reason);
+    // The service's reason, with the raw identifier it names put as the name a person reads.
+    expect(card?.textContent).toContain("IdentityNotActive: Scribe is suspended, and only an active identity's grants are effective");
+    expect(card?.textContent).not.toContain(SCRIBE);
     expect(card?.textContent).not.toContain('what suspension refuses');
     expect(text()).not.toContain('Allows:');
     expect(card?.textContent).toContain('27 Sep 12:00 · tool');
@@ -494,7 +499,8 @@ describe('A grant card, its use and its window', () => {
     await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: unseen, revision: 7 }) });
     const card = $$('tr[data-grant]').find((c) => c.querySelector('.chain'));
     expect(card?.textContent).toContain('not seen');
-    expect([...(card?.querySelectorAll('.chain .pill') ?? [])].map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', 'Scribe · viewer of project:identity']);
+    expect([...(card?.querySelectorAll('.chain .pill') ?? [])].map((p) => p.textContent)).toEqual(['Ada (test person)', 'Scribe']);
+    expect(card?.querySelector('.chain')?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
     expect(card?.textContent).toContain('27 Sep to 4 Oct');
     expect(card?.textContent).not.toContain('never used');
   });
@@ -554,8 +560,8 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(meReads).toBeGreaterThan(0);
     expect($('h1')?.textContent).toBe('Ada (test person)');
     expect(holdText()).toEqual([
-      ['You can do everything here (project identity).', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
-      ['View this resource (project ledger).', 'viewer', 'project:ledger', 'root', 'no', ''],
+      ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+      ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(grantIdsOnScreen()).toEqual(['delegate:' + ROOT_G, 'revoke:' + ROOT_G, 'revoke:grant-00000000000000000000000000000020']);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
@@ -572,7 +578,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     // The second session read its own identity for itself; nothing was carried over.
     expect(bea.requests.filter((r) => r === '/me')).toHaveLength(meReads);
     expect($('h1')?.textContent).toBe('Bea (test person)');
-    expect(holdText()).toEqual([['Edit this resource; View this resource (project ledger).', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
+    expect(holdText()).toEqual([['Edit this resource; View this resource', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
     expect(grantIdsOnScreen()).toEqual(['delegate:' + BEA_ROOT_G, 'revoke:' + BEA_ROOT_G]);
     // Her agent, and what it holds under her root grant, not Ada's.
     location.hash = '#/me';
@@ -609,7 +615,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect($('h1')?.textContent).toBe('Bea (test person)');
     const cards = $$('tr[data-grant]').filter((c) => Boolean(c));
     expect(cards).toHaveLength(1);
-    expect(cards[0].textContent).toContain('editor of project:ledger');
+    expect(cards[0].querySelector('.chain')?.getAttribute('title')).toContain('editor of project:ledger');
     expect(cards[0].textContent).toContain('agent');
     expect(cards[0].textContent).toContain('27 Sep to 15 Nov');
     expect(cards[0].textContent).toContain('not seen');
@@ -730,5 +736,115 @@ describe('A grant whose uses were not all recorded (conformance 8.4)', () => {
     expect(card()[0].textContent).toContain('not seen');
     expect(text()).not.toContain('not recorded');
     expect(text()).not.toContain('never used');
+  });
+});
+
+/** A raw identity or grant id, which a person never reads as a label (Tom, 4 Oct 2026). */
+const RAW = /\b(?:person|agent|grant)-[0-9a-f]{8,}/;
+/** A grant held on a person: the resource is someone, so it is said by their name. */
+const ON_ADA_G = 'grant-' + '7'.repeat(32);
+const onAda = (routes = SERVICE) => ({ ...routes, '/grants': ok({ grants: [...GRANTS, { ...GRANTS[1], id: ON_ADA_G, resource: { kind: 'person', id: ADA } }], revision: 7 }) });
+
+describe('The grant table says each fact once, by name (walk of 4 Oct)', () => {
+  it('Allows carries the actions only; the resource is said in On', async () => {
+    await mount('#/me?tab=account');
+    for (const tr of holdRows()) {
+      expect(cell(tr, 'Allows')).not.toMatch(/identity|ledger/);
+      expect(cell(tr, 'On')).toMatch(/identity|ledger/);
+    }
+  });
+
+  it('the path to a person carries names only, the whole path kept in its title', async () => {
+    await mount(`#/file/${SCRIBE}/access`);
+    const chain = $('tr[data-grant] .chain');
+    expect([...(chain?.querySelectorAll('.pill') ?? [])].map((pill) => pill.textContent)).toEqual(['Ada (test person)', 'Scribe']);
+    expect(chain?.textContent).not.toMatch(/ of |:|owner|viewer/);
+    expect(chain?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
+  });
+
+  it('names a resource that is someone by their name, on the grants page and in every picker, never by a raw id', async () => {
+    await mount('#/access', onAda());
+    expect(text()).toContain('person Ada (test person)');
+    expect(text()).not.toMatch(RAW);
+    fresh();
+    await mount('#/access/can', onAda());
+    expect($$('#cRes option').map((o) => o.textContent)).toContain('Ada (test person) (person)');
+    for (const option of $$('#cRes option, #cWho option, #cPerm option')) expect(option.textContent).not.toMatch(RAW);
+    expect(text()).not.toMatch(RAW);
+    fresh();
+    await mount(`#/file/${SCRIBE}/access`, onAda());
+    expect($$('#cRes option').map((o) => o.textContent)).toContain('Ada (test person) (person)');
+    expect($$('.check .q .ask-field > .note').map((note) => note.textContent)).toEqual(['Who', 'Do what', 'On what']);
+    for (const option of $$('#cRes option, #cPerm option')) expect(option.textContent).not.toMatch(RAW);
+  });
+
+  it('the Access grants list has its Change column, and a press there opens the form on the page, not the holder', async () => {
+    await mount('#/access');
+    expect($$('thead th').map((th) => th.textContent).at(-1)).toBe('Change');
+    await click($(`[data-act="revoke"][data-g="${ROOT_G}"]`));
+    expect(location.hash).toBe('#/access');
+    expect($('.act-panel h2')?.textContent).toBe('Revoke owner of project:identity');
+    expect(unreachable()).toEqual([]);
+  });
+});
+
+describe('Ask is one sentence (walk of 4 Oct)', () => {
+  it('reads Can [who] [do what] [on what]? [Check], who first, with no separate box to ask about someone else', async () => {
+    const { posted } = await mount('#/access/can');
+    const line = $('.check .q');
+    const fields = [...(line?.querySelectorAll('select, button') ?? [])].map((el) => el.id || el.getAttribute('data-act'));
+    expect(fields).toEqual(['cWho', 'cPerm', 'cRes', 'check']);
+    expect(line?.textContent).toMatch(/^Can/);
+    expect($('input[aria-label="Ask about someone else"]')).toBeNull();
+    // Every field carries its visible name, the same on Access > Ask and on an agent's Access tab.
+    expect($$('.check .q .ask-field > .note').map((note) => note.textContent)).toEqual(['Who', 'Do what', 'On what']);
+    expect($$('.check .q select').every((select) => select.closest('label')?.querySelector('.note'))).toBe(true);
+    expect($$('#cWho option')[0].textContent).toBe('Ada (test person)');
+    expect($$('#cWho option').map((o) => o.textContent)).toContain('Scribe (agent of Ada (test person))');
+    await choose($('#cWho'), SCRIBE);
+    await choose($('#cPerm'), 'view');
+    await click($('[data-act="check"]'));
+    expect(posted.at(-1)?.path).toBe('/grants/who');
+    expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
+  });
+
+  it("asks what someone can reach in the same sentence, choosing who by name", async () => {
+    await mount('#/access/reach/' + SCRIBE);
+    expect($('.check .q')?.textContent).toMatch(/^What can.*reach\?$/);
+    expect(($('#rWho') as HTMLSelectElement | null)?.value).toBe(SCRIBE);
+    await choose($('#rWho'), ADA);
+    expect(location.hash).toBe('#/access/reach/' + ADA);
+  });
+});
+
+describe('Issue root grant is one row (walk of 4 Oct)', () => {
+  it('puts every field in one row of the one form, issues with Issue, and closes with a plain button', async () => {
+    await mount('#/access/issue');
+    const close = [...document.querySelectorAll('.head a')].find((a) => a.textContent === 'Close the form');
+    expect(close?.classList.contains('primary')).toBe(false);
+    const form = $('.act-panel.issue-root form[aria-label="Issue root grant"]');
+    expect(form?.querySelectorAll('.card, .act-panel')).toHaveLength(0);
+    const fields = [...(form?.querySelector('fieldset')?.children ?? [])].filter((el) => el.classList.contains('field')).map((el) => el.firstChild?.textContent);
+    expect(fields).toEqual(['Holder', 'Kind of thing', 'Which one', 'Relation', 'May pass on', 'Expires (your local time)']);
+    expect(form?.querySelector('button[type="submit"]')?.textContent).toBe('Issue');
+  });
+});
+
+describe('Reviews shows the chosen grant whole (walk of 4 Oct)', () => {
+  const view = { scope: 'personal', revision: 4, judged_at: 1790000000, decisions_recorded: true, unanswered: [],
+    due: [{ agent: { id: SCRIBE, display_name: 'Scribe', state: 'active' }, reviewer: ME.person, last_kept: null, grant: GRANTS[2] }] };
+
+  it('as facts beside the list, never the eleven-column table squeezed into the panel, with Keep access and Revoke', async () => {
+    await mount('#/reviews', { ...SERVICE, '/reviews': ok(view) });
+    const panel = $('section[aria-label="Grant to review"]');
+    expect(panel?.querySelector('table')).toBeNull();
+    expect($('table[aria-label="Grants"]')).toBeNull();
+    expect([...(panel?.querySelectorAll('dt') ?? [])].map((dt) => dt.textContent)).toEqual(['Holder', 'Allows', 'On', 'Relation', 'Path to a person', 'Window', 'Last used', 'Stands']);
+    expect([...(panel?.querySelectorAll('.chain .pill') ?? [])].map((pill) => pill.textContent)).toEqual(['Ada (test person)', 'Scribe']);
+    expect(panel?.textContent).toContain('27 Sep to 4 Oct');
+    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual(['Keep access', 'Revoke']);
+    await click($(`section[aria-label="Grant to review"] [data-act="revoke"][data-g="${SCRIBE_G}"]`));
+    expect($('.act-panel h2')?.textContent).toBe('Revoke viewer of project:identity');
+    expect(unreachable()).toEqual([]);
   });
 });

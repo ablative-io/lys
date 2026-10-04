@@ -51,7 +51,8 @@ export function serve(routes: Record<string, Route>, posted: { path: string; bod
       });
     }
     const route = routes[key];
-    const answer = typeof route === 'function' ? route(body) : route;
+    // A route may hand back a promise (cast to a Route) to answer later, or never, as a service that does not answer.
+    const answer = typeof route === 'function' ? await route(body) : route;
     if (!answer) return new Response('', { status: 404 });
     const text = typeof answer.body === 'string' ? answer.body : JSON.stringify(answer.body);
     return new Response(text, { status: answer.status, headers: { 'content-type': 'application/json' } });

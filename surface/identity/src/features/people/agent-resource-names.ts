@@ -16,8 +16,9 @@ export function resourceNames(people: PeopleView, teams: Team[], network: Networ
 }
 export function resourceWords(resource: ResourceRef, names: Map<string, string>): { words: string; unnamed: boolean } {
   const name = names.get(key(resource.kind, resource.id));
-  const kind = resource.kind.replaceAll('_', ' ');
+  // An app's kind is `app.kind`: said as two words, the app's name then the kind, `aion workflow`.
+  const kind = resource.kind.replaceAll('_', ' ').replaceAll('.', ' ');
   if (name) return { words: resource.kind === 'identity' ? name + '’s identity' : resource.kind === 'person' || resource.kind === 'agent' ? 'the ' + kind + ' ' + name : 'the ' + name + ' ' + (resource.kind === 'machine' ? 'computer' : kind), unnamed: false };
-  const short = resource.id.length > 12 ? resource.id.slice(0, 4) + '…' + resource.id.slice(-4) : resource.id;
-  return { words: (/^[aeiou]/i.test(kind) ? 'an ' : 'a ') + kind + ', ' + short, unnamed: true };
+  // With no name served, the resource's own name in its app is the whole id: a shortened id is not a name, so it is never cut.
+  return { words: (/^[aeiou]/i.test(kind) ? 'an ' : 'a ') + kind + ', ' + resource.id, unnamed: true };
 }

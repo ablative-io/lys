@@ -127,6 +127,22 @@ describe('Requests', () => {
     expect(text()).not.toContain('not built yet');
   });
 
+  it('says an empty list once, in the list, and leaves the panel beside it empty', async () => {
+    const asked: Ask = { operation: 'op-' + '7'.repeat(32), resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review' };
+    const decided = { ...kept(asked), state: 'approved', decision: { by: ADA, note: 'Needed', grant: null, decided_at: 1790000001 } };
+    await mount('#/requests', { ...routes, '/requests': ok({ requests: [decided] }) });
+    // Nothing is waiting, so the waiting list is empty: said once, in the list, never again beside it.
+    expect(text().split('Nothing is waiting.').length - 1).toBe(1);
+    expect(text()).not.toContain('Nothing here yet.');
+  });
+
+  it('names what a request is on by name when it is someone, never by a raw id', async () => {
+    const asked: Ask = { operation: 'op-' + '8'.repeat(32), resource: { kind: 'person', id: ADA }, relation: 'reader', ends_at: null, why: 'Review' };
+    await mount('#/requests', { ...routes, '/requests': ok({ requests: [kept(asked)] }) });
+    expect(text()).toContain('reader on ' + ME.person.display_name);
+    expect(text()).not.toContain(ADA);
+  });
+
   it('requires an explicit decision and uses only the source grants returned by the service', async () => {
     const asked: Ask = { operation: 'op-' + '2'.repeat(32), resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review the release' };
     const entry = { ...kept(asked), sources: ['grant-source'] };

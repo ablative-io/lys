@@ -64,10 +64,12 @@ describe('Revoke', () => {
     expect(card?.querySelector('[data-act="revoke"]')).toBeNull();
     location.hash = `#/file/${SCRIBE}/access`;
     await press('Escape', {}, document.body);
-    const derived = $$('tr[data-grant]').find((c) => c.textContent?.includes('viewer of project:identity'));
+    const derived = $(`tr[data-grant="${SCRIBE_G}"]`);
     expect(derived?.textContent).toContain('void');
     expect(derived?.textContent).toContain('which no longer stands');
-    expect(derived?.textContent).toContain(revokedReason(ROOT_G));
+    // The service's reason, its raw grant id put as the grant's short name.
+    expect(derived?.textContent).toContain(revokedReason(`G/${ROOT_G.slice(6, 14)}`));
+    expect(derived?.textContent).not.toContain(ROOT_G);
     location.hash = '#/me';
     await press('Escape', {}, document.body);
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
@@ -160,8 +162,12 @@ describe('What you hold after a revoke', () => {
 describe('Names as the mock-up writes them', () => {
   it("uses the first word of the name, exactly as x.name.split(' ')[0]", async () => {
     await mount(`#/file/${SCRIBE}/access`);
-    expect($('.check h2')?.textContent).toBe("Can Scribe do this?");
-    expect($('.section-h span')?.textContent).toBe('Grants');
-    expect($$('.section-h span').map((s) => s.textContent)).toContain("What Scribe can reach");
+    // The question is one sentence, Can [Scribe] [do what] [on what]?, its who the agent's first name.
+    expect($('.check .q')?.textContent).toMatch(/^Can/);
+    expect($('.check .q strong')?.textContent).toBe('Scribe');
+    // Each section's heading is its own words, whatever holds them beside it.
+    const heads = $$('.section-h').map((h) => h.querySelector('span')?.textContent ?? h.textContent);
+    expect(heads[0]).toBe('Grants');
+    expect(heads).toContain('What Scribe can reach');
   });
 });

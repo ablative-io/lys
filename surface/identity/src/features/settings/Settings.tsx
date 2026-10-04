@@ -22,18 +22,18 @@ export function Settings() {
   const { sec } = useParams();
   return (
     <div className="page fill">
-      <ConfigTabs on="settings" />
       <div className="head"><div><h1>Configuration</h1>
         <p className="sub">How this service runs. It stands on its own; nothing else needs to be installed for it to be useful.</p></div></div>
+      <ConfigTabs on="settings" />
       <div className="card pane" data-section={sec}>
         <h2>Layout</h2>
-              <Row t="Dock side" d="Which edge the rail and its drawer occupy. The screen takes the other.">
+              <Row t="Menu side" d="Which edge of the screen the menu and Help sit on.">
                 <div className="seg">
                   <button data-dock="left" className={shell.dockRight ? '' : 'on'} onClick={() => shell.setDockSide('left')}>Left</button>
                   <button data-dock="right" className={shell.dockRight ? 'on' : ''} onClick={() => shell.setDockSide('right')}>Right</button>
                 </div>
               </Row>
-              <Row t="Rail labels" d="Show the name beside every icon in the rail.">
+              <Row t="Menu labels" d="Show the name beside every icon in the menu.">
                 <div className="seg">
                   <button data-labels="icons" className={shell.labels ? '' : 'on'} onClick={() => shell.setLabels(false)}>Icons</button>
                   <button data-labels="labels" className={shell.labels ? 'on' : ''} onClick={() => shell.setLabels(true)}>Labels</button>

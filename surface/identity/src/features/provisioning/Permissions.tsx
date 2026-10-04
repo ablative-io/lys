@@ -27,6 +27,7 @@ import type { Forced, RuleList } from './permission-modes';
 import { RULE_KINDS, ruleFor, summary, wordsFor } from './permission-rules';
 import type { RuleKind } from './permission-rules';
 import type { Permissions as Value } from './Provisioning';
+import './permissions.css';
 
 type Computers = { id: string; name: string }[];
 
@@ -35,8 +36,11 @@ const KEPT = 'workspace-only';
 
 function Mode({ entry, chosen, pick }: { entry: Program['modes'][number]; chosen: boolean; pick: () => void }) {
   const known = MODES[entry.id];
+  const id = 'permission-mode-' + entry.id;
+  // Three fixed columns: the radio, the name with the program's own name for it beneath, whole, and what it means.
   return <tr className="mode-row">
-    <td><label className="tick"><input type="radio" name="permission-mode" value={entry.id} checked={chosen} onChange={pick} /><span><b>{known?.name ?? entry.id}</b>{known ? <small className="mode-id">{' ' + entry.id}</small> : null}{known?.warn ? <span className="mode-warn" role="img" aria-label="Warning"> ⚠</span> : null}</span></label></td>
+    <td className="mode-pick"><input type="radio" id={id} name="permission-mode" value={entry.id} checked={chosen} onChange={pick} /></td>
+    <td className="mode-name"><label htmlFor={id}><b>{known?.name ?? entry.id}</b>{known?.warn ? <span className="mode-warn" role="img" aria-label="Warning"> ⚠</span> : null}</label>{known ? <small className="mode-id">{entry.id}</small> : null}</td>
     <td className="mode-meaning">{entry.meaning}</td>
   </tr>;
 }
@@ -209,9 +213,9 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
     {kept ? null : <tfoot><tr><td colSpan={2}><FolderChooser computers={computers} preferred={computer} chosen="" choose={(folder) => add('additional_directories', folder)} label="Add an extra folder" confirm="Add" /></td></tr></tfoot>}
   </table>;
   return <div className="permissions wide" role="group" aria-label="What this agent may do">
-    {program ? <table className="usage-table" aria-label="How it works">
-      <colgroup><col style={{ width: '34%' }} /><col style={{ width: '66%' }} /></colgroup>
-      <thead><tr><th>How {programName} works</th><th>What that means</th></tr></thead>
+    {program ? <table className="usage-table modes" aria-label="How it works">
+      <colgroup><col className="mode-pick" /><col className="mode-name" /><col /></colgroup>
+      <thead><tr><th aria-label="Chosen" /><th>How {programName} works</th><th>What that means</th></tr></thead>
       <tbody>{ordered.map((entry) => <Mode key={entry.id} entry={entry} chosen={entry.id === mode} pick={() => change({ ...value, default_mode: entry.id })} />)}</tbody>
     </table> : null}
     {takesRules ? <>

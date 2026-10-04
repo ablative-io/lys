@@ -17,8 +17,11 @@ import { readTeams } from '../teams/Teams';
 import type { Grant } from '../../generated/grants';
 import { clock } from '../file/time';
 import { Gate } from '../signin/Gate';
-import { GrantTable } from '../grants/GrantTable';
-import { readGrantWorld } from '../grants/model';
+import { ActForm, ActPanel } from '../grants/GrantTable';
+import { Chain } from '../grants/Chain';
+import { chainOf, lastUsedText, mayText, nameOf, readGrantWorld, resourceName, resourceTitle, voidOf, windowText } from '../grants/model';
+import type { GrantWorld } from '../grants/model';
+import '../grants/grants.css';
 import { KeepGrant } from './KeepGrant';
 import type { Kept } from './KeepGrant';
 import { IdentityName, ReadFailure } from '../signin/words';
@@ -44,9 +47,9 @@ export function Reviews() {
   }), 'reviews:' + revision);
   const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
   return <div className="page fill">
-    <AccessTabs on="reviews" />
-    <div className="head"><div><h1>Reviews</h1>
+    <div className="head"><div><h1>Access</h1>
       <p className="sub">Check what each agent can do, and withdraw access it no longer needs.</p></div></div>
+    <AccessTabs on="reviews" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="agent access to review" renderError={(error) => <ReadFailure error={error} subject="agent access to review" />} ok={(data) => <Due {...data} confirmed={confirmed} kept={kept} revision={revision} reload={() => setRevision((value) => value + 1)} />} />
   </div>;
@@ -57,6 +60,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
   const admin = people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [picked, setPicked] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<HTMLElement | null>(null);
   const owners = new Map(people.people.flatMap((person) => person.agents.map((agent) => [agent.id, person.id] as const)));
   const names = new Map(people.people.flatMap((person) => [[person.id, person.display_name] as const, ...person.agents.map((agent) => [agent.id, agent.display_name] as const)]));
   const held = (due: Due): Held => ({ id: due.agent.id, person: owners.get(due.agent.id) ?? due.reviewer.id });
@@ -67,7 +71,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
   const last = (due: Due) => { const answer = confirmed[due.grant.id]; return answer ? { by: answer.kept_by, at: answer.at, note: answer.note } : due.last_kept ?? null; };
   const columns: Column<Due>[] = [
     { head: 'Agent', cell: (due) => due.agent.display_name },
-    { head: 'Access', cell: (due) => <span className="sec">{due.grant.relation} on {due.grant.resource.kind} {due.grant.resource.id}</span> },
+    { head: 'Access', cell: (due) => <span className="sec">{due.grant.relation} on {due.grant.resource.kind} {names.get(due.grant.resource.id) ?? due.grant.resource.id}</span> },
     { head: 'Responsible person', cell: (due) => <span className="sec">{due.reviewer.display_name}</span> },
     { head: 'Last kept', cell: (due) => { const at = last(due); return at ? <span className="sec">{clock(at.at)}</span> : <span className="dim">never</span>; } },
   ];
@@ -81,17 +85,41 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
       <Listing<Due> groups={groups} columns={columns} id={(due) => due.grant.id} href={(due) => '#/reviews?grant=' + due.grant.id}
         words={(due) => due.agent.display_name + ' ' + due.grant.resource.id + ' ' + due.reviewer.display_name} noun="grants to review"
         holds={(items) => items.length + (items.length === 1 ? ' grant' : ' grants')}
-        selected={open?.grant.id ?? null} select={() => undefined} open={(due) => setPicked(due.grant.id)}
+        selected={open?.grant.id ?? null} select={() => undefined} open={(due) => { setPicked(due.grant.id); setRevoking(null); }}
         tools={<WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />} />
       <div className="detail">{open ? <section className="card" aria-label="Grant to review">
-        <h2><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>{open.agent.display_name}</Link></h2>
-        {/* The grant is drawn as the one grant row when the grants this person may see hold it; the review names it either way. */}
-        {drawn && world.status === 'ok' ? <GrantTable w={world.data} grants={[drawn]} done={reload} give={false} /> : <p>{open.grant.relation} on {open.grant.resource.kind} {open.grant.resource.id}</p>}
-        <p className="note">{actionWords(model, open.grant.resource, open.grant.actions)}</p>
-        <p className="sec">Responsible: {open.reviewer.display_name}</p>
-        {last(open) ? <p>Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} /> on {clock(last(open)?.at ?? 0)}. {last(open)?.note}</p> : null}
-        {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p>This service does not record keep decisions.</p>}
+        {/* The chosen grant as facts, one line each, so it reads whole beside the list; the list row already says who is responsible and when it was last kept, so the panel says who kept it and why. */}
+        {drawn && world.status === 'ok' ? <GrantFacts w={world.data} g={drawn} agent={open.agent} />
+          : <dl className="facts grant-facts">
+            <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>{open.agent.display_name}</Link></dd>
+            <dt>Allows</dt><dd>{open.grant.actions.length ? actionWords(model, open.grant.resource, open.grant.actions) : 'No action'}</dd>
+            <dt>On</dt><dd>{open.grant.resource.kind} {names.get(open.grant.resource.id) ?? open.grant.resource.id}</dd>
+            <dt>Relation</dt><dd className="mono">{open.grant.relation}</dd>
+          </dl>}
+        {last(open) ? <p className="note">Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} />{last(open)?.note ? ': ' + last(open)?.note : '.'}</p> : null}
+        <div className="grant-acts">
+          {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p>This service does not record keep decisions.</p>}
+          {drawn && world.status === 'ok' && !drawn.revoked ? <button className="btn danger" type="button" data-act="revoke" data-g={drawn.id} onClick={(event) => setRevoking(event.currentTarget)}>Revoke</button> : null}
+        </div>
+        {revoking && drawn && world.status === 'ok' ? <ActPanel key={drawn.id} label="Revoke" opener={revoking} close={() => setRevoking(null)}>
+          <ActForm w={world.data} g={drawn} act="revoke" done={reload} close={() => setRevoking(null)} />
+        </ActPanel> : null}
       </section> : null}</div>
     </div> : <p className="note">No current agent grants need your review.</p>}
   </>;
+}
+
+/** One grant as facts: who holds it, what it allows, on what, the path to a person, its window, its last use and whether it stands. */
+function GrantFacts({ w, g, agent }: { w: GrantWorld; g: Grant; agent: AgentSummary }) {
+  const v = voidOf(w, g);
+  return <dl className="facts grant-facts">
+    <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(agent.id) + '/access'}>{nameOf(w, g.holder)}</Link></dd>
+    <dt>Allows</dt><dd>{mayText(w, g)}</dd>
+    <dt>On</dt><dd title={resourceTitle(w, g.resource)}>{resourceName(w, g.resource)}</dd>
+    <dt>Relation</dt><dd className="mono">{g.relation}</dd>
+    <dt>Path to a person</dt><dd><Chain w={w} chain={chainOf(w, g)} /></dd>
+    <dt>Window</dt><dd>{windowText(g)}</dd>
+    <dt>Last used</dt><dd className={g.last_use.seen ? undefined : 'dim'}>{lastUsedText(g)}</dd>
+    <dt>Stands</dt><dd>{v === null ? <><span className="dot s-active" />yes</> : <span className="danger">no: {v.why}</span>}</dd>
+  </dl>;
 }

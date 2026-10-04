@@ -8,7 +8,18 @@
 .you-panel { min-height: 0; display: flex; flex-direction: column; }
 .you-panel > .section-h { flex: none; margin: 0 0 8px; }
 .you-scroll { flex: 1; min-height: 0; overflow: auto; }
-.you-account { flex: 1; min-height: 0; overflow: auto; }
+/* Account: what you hold across the full width, scrolling in its own box; the account's sections as one row under it, scrolling in theirs. */
+.you-account { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.you-holds-pane { flex: 1 1 55%; min-height: 0; display: flex; flex-direction: column; }
+.you-holds-pane > .section-h { flex: none; }
+.you-holds-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.you-account-row { flex: 0 1 auto; max-height: 45%; min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(440px, 1.6fr) minmax(260px, 1fr); grid-template-rows: auto 1fr; gap: 16px; align-items: start; }
+/* The account's own form on the left, the signed-in sessions table in the wide middle, the two short records stacked on the right. */
+.you-account-row > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+.you-account-row > :nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+.you-account-row > :nth-child(2) { grid-column: 3; grid-row: 1; }
+.you-account-row > :nth-child(4) { grid-column: 3; grid-row: 2; }
+.you-account-row > .card { margin: 0; min-width: 0; }
 .you-tree { width: 100%; }
 .you-tree td { border-bottom: 0; padding: 0; }
 .you-tree tr[data-href] td { padding: 7px 10px; }

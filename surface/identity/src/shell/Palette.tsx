@@ -6,19 +6,29 @@ import { entries } from '../features/people/directory';
 import type { Entry } from '../features/people/directory';
 import { keyable } from './keyable';
 import { useShell } from './ShellContext';
+import { GO } from './keys';
 
 interface Item {
   g: string;
   t: string;
+  /** What is shown at the right: a key that does the same, or a short description; never an address. */
   d: string;
+  /** Where a Go to row leads, kept on the row for the keyboard and tests, never shown. */
+  to?: string;
   go: () => void;
 }
+
+/** The g key that reaches an address, as the key registry has it: "g p". */
+const keyFor = (hash: string): string => {
+  const letter = Object.entries(GO).find(([, path]) => '#' + path === hash)?.[0];
+  return letter ? 'g ' + letter : '';
+};
 
 export const PAGES: [string, string][] = [
   ['You', '#/me'], ['People and agents', '#/people'], ['Running', '#/canvas'], ['Roles', '#/roles'],
   ['Access: grants', '#/access'], ['Access: ask', '#/access/can'], ['Access: requests', '#/requests'], ['Access: reviews', '#/reviews'],
-  ['Access: resources', '#/resources'], ['Access: graph', '#/graph'], ['Access: model', '#/model'],
-  ['Secrets', '#/secrets'], ['Configuration: services and sign-in providers', '#/connections'], ['Configuration: apps', '#/apps'], ['Computers', '#/network'], ['Configuration', '#/settings'],
+  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Graph', '#/graph'],
+  ['Secrets', '#/secrets'], ['Network', '#/network'], ['Configuration', '#/settings'], ['Configuration: services and sign-in providers', '#/connections'], ['Configuration: apps', '#/apps'],
 ];
 
 export function Palette() {
@@ -51,9 +61,9 @@ export function Palette() {
     ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
     ...ids.map((x) => ({ g: 'Ask', t: `What can ${x.display_name} reach?`, d: '', go: () => go('#/access/reach/' + x.id) })),
     { g: 'Acts', t: 'Add an agent', d: '', go: () => go('#/agents/new') },
-    { g: 'Acts', t: 'Toggle dock side', d: '\\', go: shell.toggleDockSide },
-    { g: 'Acts', t: 'Toggle rail labels', d: '[', go: shell.toggleLabels },
-    ...PAGES.map(([t, h]) => ({ g: 'Go to', t, d: h, go: () => go(h) })),
+    { g: 'Acts', t: 'Move Help to the other side', d: '\\', go: shell.toggleDockSide },
+    { g: 'Acts', t: 'Show or hide menu labels', d: '[', go: shell.toggleLabels },
+    ...PAGES.map(([t, h]) => ({ g: 'Go to', t, d: keyFor(h), to: h, go: () => go(h) })),
   ];
   const q = query.toLowerCase();
   const items = source.filter((i) => (i.t + ' ' + i.d + ' ' + i.g).toLowerCase().includes(q));
@@ -92,7 +102,7 @@ export function Palette() {
       rows.push(<div className="grp" key={'g' + n}>{group}</div>);
     }
     rows.push(
-      <div className={'it' + (n === at ? ' sel' : '')} data-n={n} key={n} onClick={() => choose(item)} {...(open ? keyable(() => choose(item)) : {})}>
+      <div className={'it' + (n === at ? ' sel' : '')} data-n={n} data-to={item.to} key={n} onClick={() => choose(item)} {...(open ? keyable(() => choose(item)) : {})}>
         <span>{item.t}</span>
         <span className="dim mono">{item.d}</span>
       </div>,

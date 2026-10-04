@@ -18,10 +18,10 @@ const labels = { configured: 'Configured', local: 'Local to Lys', unconfigured: 
 export function Connections() {
   const load = useLoad(readConnections, 'connections');
   return <div className="page fill">
-    <ConfigTabs on="connections" />
-    <div className="head"><div><h1>Services and sign-in providers</h1>
-      <p className="sub">The services this Lys installation is configured to use.</p></div>
+    <div className="head"><div><h1>Configuration</h1>
+      <p className="sub">The services this Lys installation is configured to use, and the accounts people sign in with.</p></div>
     </div>
+    <ConfigTabs on="connections" />
     <Gate load={load} title="Connections" ok={(data) => <div className="pane stack">
       <p className="note">Configured means a service is selected in this installation. It does not confirm that service is reachable now.</p>
       {data.connections.length === 0 ? <p>The service returned no configured integrations.</p> : <div className="card-grid">{data.connections.map((connection) => <section className="card" key={connection.id}>

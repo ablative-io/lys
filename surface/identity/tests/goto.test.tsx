@@ -2,24 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press } from './harness';
 
 // Every screen is one palette entry and one g letter away. The letters and where each goes are written out here
-// rather than read from the shell's own tables. Access is one rail item whose views are its tabs, and Running is the canvas.
+// rather than read from the shell's own tables. Access is one rail item whose views are its tabs, the graph has its own rail
+// item beside it, the computers are the Network, and Running is the canvas.
 
 const LETTERS: Record<string, [string, string]> = {
   p: ['#/people', 'people'], o: ['#/roles', 'roles'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/requests', 'access'], w: ['#/reviews', 'access'],
   v: ['#/secrets', 'secrets'], n: ['#/connections', 'settings'], m: ['#/model', 'access'], s: ['#/settings', 'settings'],
-  h: ['#/graph', 'access'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], l: ['#/canvas', 'canvas'],
+  h: ['#/graph', 'graph'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], l: ['#/canvas', 'canvas'],
 };
-const RAIL_ITEMS = ['me', 'people', 'canvas', 'roles', 'access', 'secrets', 'network', 'settings'];
+const RAIL_ITEMS = ['me', 'people', 'canvas', 'roles', 'access', 'graph', 'secrets', 'network', 'settings'];
 
 const current = () => $('#rail a.on')?.dataset.nav;
 
-/** The open palette's Go to rows, in order, each with its destination hash. */
+/** The open palette's Go to rows, in order, each with its destination hash (kept on the row, never shown). */
 function goToRows(): { row: HTMLElement; hash: string }[] {
   const rows: { row: HTMLElement; hash: string }[] = [];
   let group = '';
   for (const el of $$('#palList > *')) {
     if (el.classList.contains('grp')) group = el.textContent ?? '';
-    else if (group === 'Go to' && el.matches('.it[data-n]')) rows.push({ row: el, hash: el.lastElementChild?.textContent ?? '' });
+    else if (group === 'Go to' && el.matches('.it[data-n]')) rows.push({ row: el, hash: el.dataset.to ?? '' });
   }
   return rows;
 }

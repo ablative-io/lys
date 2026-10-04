@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { API, api, useLoad } from '../../api';
+import { API, api } from '../../api';
 import type { Load, Refused } from '../../api';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
@@ -11,23 +11,12 @@ export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   );
 }
 
-/** What a caller with no session is shown: sign-in through the service's configured issuer, with how access is managed and the running build in view. The service keeps the session. */
+/** What a caller with no session is shown: the title and one button that signs in through the service's configured issuer. The service keeps the session; the running build is under Configuration. */
 export function SignIn() {
-  const authority = useLoad(api.authority, 'sign-in-authority');
   return (
     <div className="page">
-      <div className="eyebrow">Identity</div>
       <h1>Sign in</h1>
-      <p className="sub">Use your account to open the directory and manage your access.</p>
-      <a className="btn primary" href={API + '/login'}>
-        Sign in
-      </a>
-      <section className="card" style={{ marginTop: 18, maxWidth: 640 }} aria-label="How access is managed">
-        <p>People sign in. Agents are registered by a person responsible for them.</p>
-        {authority.status === 'loading' ? <p>Reading access details…</p>
-          : authority.status === 'ok' ? <><p>{authority.data.authority}</p><p className="dim">Build <code>{authority.data.build}</code></p></>
-          : <p role="status">Access details are unavailable: {authority.refused.refusal.refusal} — {authority.refused.refusal.reason}</p>}
-      </section>
+      <div><a className="btn primary" href={API + '/login'}>Sign in</a></div>
     </div>
   );
 }

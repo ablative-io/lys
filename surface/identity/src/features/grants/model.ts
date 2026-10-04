@@ -50,37 +50,56 @@ export const sourceText = (g: Grant): string => (g.resource.kind === 'directory'
 /** What follows the actions given on a grant's resource: `on the agents directory` for a directory collection, the reference otherwise. */
 export const givenOnText = (g: Grant): string => (g.resource.kind === 'directory' ? 'on ' + resourceWords(g.resource) : onText(g));
 
+/** A kind as a person says it: `service account`, never `service_account`. */
+const kindWords = (kind: string): string => kind.replace(/_/g, ' ');
+
+/** Whether `id` is an identity or a grant's raw identifier, which a person never reads as a label. */
+const rawId = /\b(?:person|agent|service|grant)-[0-9a-f]{8,}\b/g;
+
 /**
- * A resource named in a sentence: a directory collection as the directory's,
- * an identity the caller may see by its name, anything else as its kind and id.
+ * A resource as a person reads it: a directory collection in plain words, an
+ * identity by its name (never its raw id), anything else as its kind and id.
  */
-export const objectText = (w: GrantWorld, r: ResourceRef): string => {
-  if (r.kind === 'directory') return `the directory's ${r.id}`;
+export const resourceName = (w: GrantWorld, r: ResourceRef): string => {
+  if (r.kind === 'directory') return resourceWords(r);
   const who = w.who.get(r.id);
-  return `${r.kind} ${who ? who.name : r.id}`;
+  if (who) return `${kindWords(r.kind)} ${who.name}`;
+  return `${kindWords(r.kind)} ${named(w, r.id)}`;
 };
 
 /**
- * What `g` lets its holder do, from the actions the grant itself carries, which
- * are the actions the service checks when it is exercised: the widest-held
- * action first, as the model carries them (view before edit before grant).
+ * A sentence from the service with every raw identifier in it put as a person
+ * reads it: an identity by its name, a grant by its short name.
  */
-export function mayText(w: GrantWorld, g: Grant): string {
-  // "You" is said only of the signed-in person's own grant; anyone else's is said of them.
-  const you = g.holder === w.me.person.id;
-  if (!g.actions.length) return `${you ? 'You can' : 'Can'} take no action on ${objectText(w, g.resource)}.`;
-  const listed = actionWords(w.model, g.resource, g.actions);
-  return `${listed === 'everything here' ? (you ? 'You can do everything here' : 'Can do everything here') : listed} (${objectText(w, g.resource)}).`;
+export function named(w: GrantWorld, text: string): string {
+  return text.replace(rawId, (id) => (id.toLowerCase().startsWith('grant-') ? grantNo(id) : nameOf(w, id)));
 }
 
 /**
- * A resource as the mock-up's pickers name it: a project or organisation by its id,
- * a directory collection in plain words (`the agents directory`), anything else as `name (type)`.
+ * What `g` lets its holder do: the actions the grant itself carries, which are
+ * the actions the service checks when it is exercised, widest first as the model
+ * carries them. Only the actions: the resource is the grant's On, and is said there.
  */
-export const resourceLabel = (r: ResourceRef): string => {
+export function mayText(w: GrantWorld, g: Grant): string {
+  if (!g.actions.length) return 'No action';
+  const listed = actionWords(w.model, g.resource, g.actions);
+  return listed === 'everything here' ? 'Everything here' : listed;
+}
+
+/**
+ * A resource as the pickers name it: a project or organisation by its id,
+ * a directory collection in plain words (`the agents directory`), an identity by
+ * its name, anything else as `name (type)`. Never a raw identity id.
+ */
+export const resourceLabel = (r: ResourceRef, w?: GrantWorld): string => {
   if (r.kind === 'project' || r.kind === 'organisation') return resourceText(r);
-  return r.kind === 'directory' ? resourceWords(r) : `${r.id} (${r.kind})`;
+  if (r.kind === 'directory') return resourceWords(r);
+  const who = w?.who.get(r.id);
+  return `${who ? who.name : w ? named(w, r.id) : r.id} (${kindWords(r.kind)})`;
 };
+
+/** A resource's full reference for a cell's title: its kind and its name where it is an identity. */
+export const resourceTitle = (w: GrantWorld, r: ResourceRef): string => (w.who.has(r.id) || r.id.match(rawId) ? resourceName(w, r) : resourceText(r));
 
 /** The chain from the root grant down to `g`. */
 export function chainOf(w: GrantWorld, g: Grant): Grant[] {
@@ -104,7 +123,7 @@ export interface Void {
 }
 
 /**
- * Why `g` does not stand, in the service's words, or null when the service
+ * Why `g` does not stand, in the service's words with names for its raw ids, or null when the service
  * answers that it stands. Nothing here walks a chain, reads a clock or decides
  * standing from a holder's state: the service's standing is the only answer.
  */
@@ -112,7 +131,7 @@ export function voidOf(w: GrantWorld, g: Grant): Void | null {
   const s = g.standing;
   if (s.stands) return null;
   const upstream = s.grant !== null && s.grant !== g.id;
-  const why = upstream ? `it derives from ${grantNo(s.grant ?? '')}, which no longer stands (${s.reason})` : s.reason;
+  const why = upstream ? `it derives from ${grantNo(s.grant ?? '')}, which no longer stands (${named(w, s.reason)})` : named(w, s.reason);
   return { why, open: s.refusal === 'IdentityNotActive' && w.who.get(g.holder)?.state === 'suspended' };
 }
 
