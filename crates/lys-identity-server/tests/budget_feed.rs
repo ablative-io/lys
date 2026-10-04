@@ -232,6 +232,34 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
             email: "operator@example.test".to_owned(),
         })
         .await?;
+    // With no limit set, the agent's usage still answers what it used and
+    // its account's windows; nothing is held against a limit.
+    let (status, usage) = service
+        .get(&format!("/agents/{agent}/usage"), Some(&cookie))
+        .await?;
+    assert_eq!(status, 200, "{usage}");
+    assert_eq!(usage["used"], json!([]));
+    assert_eq!(
+        usage["figures"]
+            .as_array()
+            .ok_or("no figures")?
+            .iter()
+            .map(|row| json!([row["unit"], row["period"], row["figure"]]))
+            .collect::<Vec<_>>(),
+        vec![
+            json!(["context_percent", null, 35]),
+            json!(["tokens", "day", 100]),
+            json!(["tokens", "week", 100]),
+            json!(["dollars", "day", 500]),
+            json!(["dollars", "week", 500]),
+            json!(["running_ms", "day", 150]),
+        ]
+    );
+    let accounts = usage["accounts"].as_array().ok_or("no accounts")?;
+    assert_eq!(accounts.len(), 1, "{usage}");
+    assert_eq!(accounts[0]["account"], "shared-account");
+    assert_eq!(accounts[0]["windows"][0]["duration_minutes"], 10_080);
+    assert_eq!(accounts[0]["windows"][0]["used_percent"], 49);
     let path = format!("/budgets/agent/{agent}");
     let limits = json!([
         {"unit": "tokens", "amount": 200, "period": "day", "act": "tell"},
