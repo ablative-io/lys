@@ -80,6 +80,8 @@ describe('Team boxes, worked out', () => {
     expect(made.marks.groups.map((group) => group.label)).toEqual(['Zinc', 'Idle']);
     expect(within(made.marks.groups[0], made.marks.groups[1])).toBe(true);
     expect(teamBoxed({ nodes, edges: [], teams }, boxes, NONE)).toBeNull();
+    // A retired team's membership is drawn as a line that does not stand; it gets no box.
+    expect(teamBoxed({ nodes, edges: [{ ...member('zinc', 'dee'), stands: false }], teams }, boxes, NONE)).toBeNull();
     // Teams that name each other as parent are neither inside the other: the one with an agent running is drawn alone, and the press still ends.
     const round = { a: { name: 'A', parent: 'b' }, b: { name: 'B', parent: 'a' } };
     expect(teamBoxed({ nodes, edges: [member('a', 'ada')], teams: round }, boxes, NONE)!.marks.groups.map((group) => group.label)).toEqual(['A']);

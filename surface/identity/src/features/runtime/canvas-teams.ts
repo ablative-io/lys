@@ -1,5 +1,6 @@
 /**
- * A box round each team, drawn for the person in one press. Every team with an agent running gets a box named for it,
+ * A box round each team, drawn for the person in one press. Every team with an agent running gets a box named for it (a
+ * retired team's membership is a record, not a team, and gets none),
  * holding the team's own card and its agents' windows; a team's own teams are boxes inside its box, so the hierarchy is
  * seen. A team with nothing running is drawn only when one of its own teams is. Teams that name each other as parent are neither inside the other. An agent in several teams stands in one
  * box: the team furthest down the hierarchy, and of two as far down the one first by name. The boxes are ordinary
@@ -34,7 +35,7 @@ export function teamBoxed(graph: Pick<SessionGraph, 'nodes' | 'edges' | 'teams'>
   // Each window's one team.
   const members = new Map<string, string[]>();
   const teamsOf = new Map<string, string[]>();
-  for (const edge of graph.edges) if (edge.kind === 'membership' && edge.to in boxes) teamsOf.set(edge.to, [...teamsOf.get(edge.to) ?? [], edge.from.slice('team:'.length)]);
+  for (const edge of graph.edges) if (edge.kind === 'membership' && edge.stands && edge.to in boxes) teamsOf.set(edge.to, [...teamsOf.get(edge.to) ?? [], edge.from.slice('team:'.length)]);
   for (const [window, teams] of teamsOf) {
     const team = [...teams].sort((left, right) => line(right).length - line(left).length || name(left).localeCompare(name(right)) || left.localeCompare(right))[0];
     members.set(team, [...members.get(team) ?? [], window]);
