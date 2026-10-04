@@ -49,6 +49,9 @@ pub struct Group {
     pub id: String,
     /// Its label, in the person's words.
     pub label: String,
+    /// The colour the person gave it, by the palette's name; absent for Lys's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colour: Option<String>,
     /// Its left edge.
     pub x: f64,
     /// Its top edge.
@@ -68,6 +71,9 @@ pub struct Note {
     pub id: String,
     /// What the person wrote.
     pub text: String,
+    /// The colour the person gave it, by the palette's name; absent for Lys's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colour: Option<String>,
     /// Its left edge.
     pub x: f64,
     /// Its top edge.
@@ -75,6 +81,61 @@ pub struct Note {
     /// Its width.
     pub w: f64,
     /// Its height.
+    pub h: f64,
+}
+
+/// The view a widget is in beyond its pill.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+#[schema(as = CanvasWidgetView)]
+pub enum WidgetView {
+    /// Opened out to everything it holds.
+    Detail,
+    /// Its settings.
+    Settings,
+}
+
+/// How a widget draws a figure that is a level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+#[schema(as = CanvasWidgetLook)]
+pub enum WidgetLook {
+    /// With a bar.
+    Bar,
+    /// As a dial.
+    Dial,
+}
+
+/// A widget a person put on the canvas: one kind of what Lys holds about
+/// agents. The lines drawn to it say which agents it counts; the page
+/// knows the kinds, and one it does not know is kept as it was sent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = CanvasWidget)]
+pub struct Widget {
+    /// The name the page gave it.
+    pub id: String,
+    /// Its kind, by the page's name for it.
+    pub kind: String,
+    /// The one figure it shows, when the person chose one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shows: Option<String>,
+    /// The view it is in; absent while it is a pill.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view: Option<WidgetView>,
+    /// How a level is drawn; absent for its number alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub look: Option<WidgetLook>,
+    /// The colour the person gave it, by the palette's name; absent for Lys's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colour: Option<String>,
+    /// Its left edge.
+    pub x: f64,
+    /// Its top edge.
+    pub y: f64,
+    /// Its width when it is opened out.
+    pub w: f64,
+    /// Its height when it is opened out.
     pub h: f64,
 }
 
@@ -132,6 +193,9 @@ pub struct Arrangement {
     /// The lines.
     #[serde(default)]
     pub links: Vec<Link>,
+    /// The widgets.
+    #[serde(default)]
+    pub widgets: Vec<Widget>,
 }
 
 /// A layout saved by name.

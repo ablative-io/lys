@@ -40,11 +40,16 @@ fn arrangement(x: f64) -> Value {
     json!({
         "boxes": {"agent:one": {"x": x, "y": 40.0, "w": 760.0, "h": 480.0}},
         "open": ["agent:one"],
-        "groups": [{"id": "group:a", "label": "Iridium", "x": 0.0, "y": 0.0, "w": 900.0, "h": 600.0}],
+        "groups": [{"id": "group:a", "label": "Iridium", "colour": "teal", "x": 0.0, "y": 0.0, "w": 900.0, "h": 600.0}],
         "notes": [{"id": "note:a", "text": "Ask about the build", "x": 20.0, "y": 540.0, "w": 260.0, "h": 180.0}],
         "links": [
             {"id": "link:a", "from": "agent:one", "to": "note:a"},
             {"id": "link:b", "from": "note:a", "to": "group:a", "from_side": "top", "to_side": "left"},
+            {"id": "link:c", "from": "agent:one", "to": "widget:a", "from_side": "right", "to_side": "left"},
+        ],
+        "widgets": [
+            {"id": "widget:a", "kind": "usage", "shows": "window/300", "view": "settings", "look": "dial", "colour": "blue", "x": 820.0, "y": 40.0, "w": 340.0, "h": 250.0},
+            {"id": "widget:b", "kind": "goals", "x": 820.0, "y": 90.0, "w": 340.0, "h": 190.0},
         ],
     })
 }
@@ -242,10 +247,20 @@ async fn what_cannot_be_kept_is_refused_by_name_and_changes_nothing() -> Result 
     worded["boxes"]["agent:one"]["x"] = json!("left");
     let mut sideways = arrangement(1.0);
     sideways["links"][1]["from_side"] = json!("up");
+    // A widget in a view, or drawn a way, that there is not; and one with no kind.
+    let mut viewed = arrangement(1.0);
+    viewed["widgets"][0]["view"] = json!("inside out");
+    let mut drawn = arrangement(1.0);
+    drawn["widgets"][0]["look"] = json!("pie");
+    let mut kindless = arrangement(1.0);
+    kindless["widgets"][1] = json!({"id": "widget:b", "x": 1.0, "y": 1.0, "w": 1.0, "h": 1.0});
     for body in [
         json!({"arrangement": unknown}),
         json!({"arrangement": worded}),
         json!({"arrangement": sideways}),
+        json!({"arrangement": viewed}),
+        json!({"arrangement": drawn}),
+        json!({"arrangement": kindless}),
         json!({}),
     ] {
         refused(

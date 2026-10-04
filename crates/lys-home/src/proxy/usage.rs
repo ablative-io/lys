@@ -54,7 +54,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Number;
 
 use super::journal::OpenCall;
-use crate::record::call::captured::{Head, Tokens};
+use crate::record::call::captured::Head;
+/// The token figures a line carries, named here for a reader of the file.
+pub use crate::record::call::captured::Tokens;
 use crate::record::call::{Api, CallStatus};
 
 /// One finished call, as its run's usage file holds it.
