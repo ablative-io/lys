@@ -194,7 +194,7 @@ pub struct Usage {
     pub context_percent: Option<u64>,
     /// The model call this use counts, when the proxy saw it pass.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub call: Option<CallSeen>,
+    pub call: Option<Box<CallSeen>>,
     /// The budgets this use crossed, kept with it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub crossed: Vec<Crossing>,

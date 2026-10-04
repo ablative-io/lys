@@ -190,6 +190,9 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::NoPerson
         | ServerError::SetupRequired
         | ServerError::AgentNotVisible
+        | ServerError::CallUnknown
+        | ServerError::CallKeptElsewhere { .. }
+        | ServerError::CallRecordsUnavailable { .. }
         | ServerError::GrantNotVisible
         | ServerError::Withheld { .. }
         | ServerError::SessionUnknown

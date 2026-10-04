@@ -32,6 +32,13 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - A Chat Completions stream reports no usage to the proxy's reader.
 - The proxy's admission write is on the call's path; its cost (`admission_ns`) is on every record and has
   not been read against Tom's "no latency".
+- Dollars and running time. Tom, 4 October 20:20: "The cost in US dollars is definitely there... I'm pretty
+  sure it's available through the status line alone." It is: Claude Code's status line reports the cost in US
+  dollars and the running time, and Lys has the adapter that reads it. A run counted through the proxy starts
+  with that adapter off (the start gives the runner one way of tracking, not both). Next round: both together,
+  the proxy for calls and the status line for dollars and time. Codex's own figure is still to be found.
+- Claude Code mods: what more a run can be made to report (Tom, same turn: "have a little bit more look at
+  mods, Claude code mods, to see if we could get more information out of them").
 - Any local program can send a run key, or none.
 - Model accounts end to end: who draws from which account, registered by a person.
 

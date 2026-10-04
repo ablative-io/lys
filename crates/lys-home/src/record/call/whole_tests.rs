@@ -89,8 +89,8 @@ fn a_stream_is_its_events_in_order_each_data_as_json_when_it_is_json()
     assert_eq!(whole.response.unreadable, None);
     // A stream that stops inside an event shows what came before and says so.
     let cut = &STREAM[..STREAM.len() - 6];
-    let kept = kept(Some(cut), None, true)?;
-    let whole = call_whole(&kept.home, "s", &kept.entry)?;
+    let short = self::kept(Some(cut), None, true)?;
+    let whole = call_whole(&short.home, "s", &short.entry)?;
     assert_eq!(
         whole.response.json,
         Some(json!([{ "event": "message_start", "data": { "type": "message_start" } }]))

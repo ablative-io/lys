@@ -6,7 +6,7 @@ fn call(agent: &str, id: &str, at_ms: i64) -> Usage {
         event: format!("native:machine:{id}"),
         agent: agent.to_owned(),
         at_ms,
-        call: Some(CallSeen {
+        call: Some(Box::new(CallSeen {
             id: id.to_owned(),
             model: None,
             input_tokens: None,
@@ -15,7 +15,7 @@ fn call(agent: &str, id: &str, at_ms: i64) -> Usage {
             cache_read_tokens: None,
             run: "0123456789abcdef0123456789abcdef".to_owned(),
             record: None,
-        }),
+        })),
         ..Usage::default()
     }
 }

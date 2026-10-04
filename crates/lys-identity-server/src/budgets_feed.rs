@@ -191,36 +191,35 @@ pub fn convert(
         Some(context) => context_percent(record, context, windows, &mut unavailable)?,
         None => None,
     };
-    let usage =
-        Usage {
-            event: format!("native:{machine}:{}", record.id),
-            agent: agent.to_owned(),
-            at_ms,
-            tokens,
-            running_ms,
-            dollars_micros: record.figures.dollars_micros,
-            account: record.account.clone(),
-            plan_windows: snapshot.then(|| record.figures.plan_windows.clone()),
-            reported_running_ms,
-            native_snapshot: snapshot,
-            unavailable,
-            session: Some(record.session.clone()),
-            context_percent,
-            // A spend record the proxy's usage file gave names its run: it counts one call.
-            call: record.run.as_ref().filter(|_| !snapshot).map(|run| {
-                crate::budgets_state::CallSeen {
-                    id: record.id.clone(),
-                    model: record.model.clone(),
-                    input_tokens: record.figures.input_tokens,
-                    output_tokens: record.figures.output_tokens,
-                    cache_creation_tokens: record.figures.cache_creation_tokens,
-                    cache_read_tokens: record.figures.cache_read_tokens,
-                    run: run.clone(),
-                    record: record.record.clone(),
-                }
-            }),
-            ..Usage::default()
-        };
+    let usage = Usage {
+        event: format!("native:{machine}:{}", record.id),
+        agent: agent.to_owned(),
+        at_ms,
+        tokens,
+        running_ms,
+        dollars_micros: record.figures.dollars_micros,
+        account: record.account.clone(),
+        plan_windows: snapshot.then(|| record.figures.plan_windows.clone()),
+        reported_running_ms,
+        native_snapshot: snapshot,
+        unavailable,
+        session: Some(record.session.clone()),
+        context_percent,
+        // A spend record the proxy's usage file gave names its run: it counts one call.
+        call: record.run.as_ref().filter(|_| !snapshot).map(|run| {
+            Box::new(crate::budgets_state::CallSeen {
+                id: record.id.clone(),
+                model: record.model.clone(),
+                input_tokens: record.figures.input_tokens,
+                output_tokens: record.figures.output_tokens,
+                cache_creation_tokens: record.figures.cache_creation_tokens,
+                cache_read_tokens: record.figures.cache_read_tokens,
+                run: run.clone(),
+                record: record.record.clone(),
+            })
+        }),
+        ..Usage::default()
+    };
     crate::budgets_enforce::checked(&usage)?;
     Ok(usage)
 }

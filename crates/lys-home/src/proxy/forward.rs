@@ -328,8 +328,8 @@ pub struct ProxyConfig {
     pub anthropic: Base,
     /// The base an `/openai` path is forwarded to.
     pub openai: Base,
-    /// The base an `/openai` call is forwarded to when it carries a ChatGPT
-    /// account: a Codex signed in with ChatGPT is answered there, not by the
+    /// The base an `/openai` call is forwarded to when it carries a `ChatGPT`
+    /// account: a Codex signed in with `ChatGPT` is answered there, not by the
     /// API.
     pub chatgpt: Base,
 }
@@ -499,7 +499,7 @@ impl Proxy {
     }
 }
 
-/// The header a Codex signed in with ChatGPT sends its account's id in.
+/// The header a Codex signed in with `ChatGPT` sends its account's id in.
 const CHATGPT_ACCOUNT: &str = "chatgpt-account-id";
 /// The header Codex names its session in.
 const CODEX_SESSION: &str = "session-id";

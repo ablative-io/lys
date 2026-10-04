@@ -19,8 +19,8 @@ async fn path_echo() -> Res<SocketAddr> {
     Ok(addr)
 }
 
-/// A request as Codex sends one: its session in a header, and its ChatGPT
-/// account's id when it is signed in with ChatGPT.
+/// A request as Codex sends one: its session in a header, and its `ChatGPT`
+/// account's id when it is signed in with `ChatGPT`.
 fn codex(method: &str, path: &str, chatgpt: bool) -> Res<Request<Full<Bytes>>> {
     let mut request = Request::builder()
         .method(method)
@@ -38,8 +38,8 @@ fn codex(method: &str, path: &str, chatgpt: bool) -> Res<Request<Full<Bytes>>> {
     Ok(request.body(Full::new(body))?)
 }
 
-async fn asked(harness: &Harness, request: Request<Full<Bytes>>) -> Res<Value> {
-    let (response, _connection) = send(harness.addr, request).await?;
+async fn asked(proxy: SocketAddr, request: Request<Full<Bytes>>) -> Res<Value> {
+    let (response, _connection) = send(proxy, request).await?;
     Ok(serde_json::from_slice(
         &response.into_body().collect().await?.to_bytes(),
     )?)
@@ -51,21 +51,21 @@ async fn a_codex_signed_in_with_chatgpt_is_answered_by_chatgpts_backend_and_link
     let harness = Harness::start(path_echo().await?).await?;
     let path = format!("/{RUN}/openai/v1/responses");
     // With an API key the call goes to the API as it came, without its key.
-    let api = asked(&harness, codex("POST", &path, false)?).await?;
+    let api = asked(harness.addr, codex("POST", &path, false)?).await?;
     assert_eq!(api["path"], "/v1/responses");
     let report = harness.report()?;
     assert_eq!(report.session, "codex-session-1");
     assert!(report.linked);
     // Signed in with ChatGPT, it goes to ChatGPT's backend, whose paths carry no /v1.
-    let chatgpt = asked(&harness, codex("POST", &path, true)?).await?;
+    let chatgpt = asked(harness.addr, codex("POST", &path, true)?).await?;
     assert_eq!(chatgpt["path"], "/chatgpt-backend/responses");
     let report = harness.report()?;
     assert_eq!(report.session, "codex-session-1");
     // What is not a model call follows the same route and is not recorded.
     let models = format!("/{RUN}/openai/v1/models?client_version=1");
-    let listed = asked(&harness, codex("GET", &models, true)?).await?;
+    let listed = asked(harness.addr, codex("GET", &models, true)?).await?;
     assert_eq!(listed["path"], "/chatgpt-backend/models?client_version=1");
-    let listed = asked(&harness, codex("GET", &models, false)?).await?;
+    let listed = asked(harness.addr, codex("GET", &models, false)?).await?;
     assert_eq!(listed["path"], "/v1/models?client_version=1");
     let calls = harness.calls("codex-session-1")?;
     assert_eq!(calls.len(), 2);
