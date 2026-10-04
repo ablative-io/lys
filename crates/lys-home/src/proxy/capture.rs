@@ -156,9 +156,14 @@ impl Call {
         if let Some(link) = link.filter(Link::is_linked) {
             let mut open = self.open.clone();
             open.session = link.to_record();
-            if let Err(error) = self.journal.write(&open) {
-                eprintln!("lys-proxy: {error}");
-                self.with(|s| s.journal_failed = true);
+            // This runs as the request's last bytes pass: the record is
+            // put in place, and its sync is made beside the call.
+            match self.journal.put(&open) {
+                Ok(()) => self.journal.settle_beside(&open.call_id),
+                Err(error) => {
+                    eprintln!("lys-proxy: {error}");
+                    self.with(|s| s.journal_failed = true);
+                }
             }
         }
     }

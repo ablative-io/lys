@@ -52,6 +52,21 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - Any local program can send a run key, or none.
 - Model accounts end to end: who draws from which account, registered by a person.
 
+## Found on the walk of 1215fd1e, 4 October 2026, and written for the next install
+
+- The service followed a runner's feed, and held its grant channel, only from its own start. An upgrade
+  starts the service before the runner, so after every upgrade no use reached the service until it was
+  started again. Written: each link is begun again when that runner next answers a request
+  (`runner_links.rs`); a link that ended on a refusal stays ended, and every end is said.
+- The proxy held each call for two disk syncs, about 12 ms each: at admission, and when the request named
+  its session. Written: the call waits only for the record to be put in place; the syncs are made beside it.
+- A short line's own handle lay over the first add button beside a window, so pressing "add usage" a
+  second time took the first widget's line away. Written: the window in front stands over the handles.
+- Not yet shown on an installed build: a call with tokens and a context percent (pancake's account was
+  refused by its provider, HTTP 429, when walked), and a Codex agent.
+- Six machine records on Tom's Mac name the one runner socket; five follows end, as designed, on a use
+  that names a session of another machine. Clutter from earlier joins, to be cleared with Tom.
+
 ## The runner
 
 - A runner restarted while it drains a run's usage.

@@ -98,9 +98,22 @@ impl Journal {
 
     /// Write (or rewrite) a call's record durably.
     pub fn write(&self, call: &OpenCall) -> Result<(), ProxyError> {
-        use std::io::Write;
         #[cfg(test)]
         let started = std::time::Instant::now();
+        let result = self.put(call).and_then(|()| self.settle(&call.call_id));
+        #[cfg(test)]
+        super::timing::add(&super::timing::JOURNAL_WRITE, started);
+        result
+    }
+
+    /// Put a call's record in place whole, without waiting for the disk.
+    ///
+    /// This is all a call waits for on the forwarding path. From here the
+    /// record is there for the proxy's next start, so a call in flight when
+    /// the proxy ends is still found and recorded lost. It holds through a
+    /// loss of power once [`Journal::settle`] has returned for it.
+    pub fn put(&self, call: &OpenCall) -> Result<(), ProxyError> {
+        use std::io::Write;
         let bytes = serde_json::to_vec(call).map_err(|source| ProxyError::JournalEncode {
             call_id: call.call_id.clone(),
             source,
@@ -113,13 +126,42 @@ impl Journal {
         };
         let mut file = std::fs::File::create(&tmp).map_err(unwritable)?;
         file.write_all(&bytes).map_err(unwritable)?;
-        file.sync_all().map_err(unwritable)?;
         drop(file);
-        std::fs::rename(&tmp, &path).map_err(unwritable)?;
-        let result = sync_dir(&self.dir).map_err(unwritable);
-        #[cfg(test)]
-        super::timing::add(&super::timing::JOURNAL_WRITE, started);
-        result
+        std::fs::rename(&tmp, &path).map_err(unwritable)
+    }
+
+    /// Make a put record hold through a loss of power: its file synced,
+    /// then the journal's directory. A record retired meanwhile has nothing
+    /// left to settle.
+    pub fn settle(&self, call_id: &str) -> Result<(), ProxyError> {
+        let path = self.path_of(call_id);
+        let unwritable = |source| ProxyError::JournalUnwritable {
+            path: path.clone(),
+            source,
+        };
+        match std::fs::File::open(&path) {
+            Ok(file) => file.sync_all().map_err(unwritable)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(unwritable(error)),
+        }
+        sync_dir(&self.dir).map_err(unwritable)
+    }
+
+    /// Settle a put record beside the call that put it, so the call does
+    /// not wait for the disk: on one of the runtime's blocking threads when
+    /// this is called inside a runtime, and here otherwise. A settle that
+    /// fails is said; the call's own record is written durably at its end.
+    pub fn settle_beside(&self, call_id: &str) {
+        let (journal, call_id) = (self.clone(), call_id.to_owned());
+        let settle = move || {
+            if let Err(error) = journal.settle(&call_id) {
+                eprintln!("lys-proxy: {error}");
+            }
+        };
+        match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => drop(runtime.spawn_blocking(settle)),
+            Err(_) => settle(),
+        }
     }
 
     /// Remove a call's record once its outcome is recorded.

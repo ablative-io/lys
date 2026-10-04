@@ -6,7 +6,9 @@
 //! page are kept with the cursor after them before the next page is asked.
 //! Nothing here waits on a clock. A follow ends on the runner's refusal or
 //! on its connection failing, and that end is said, so a source that is not
-//! followed shows as uncovered on the agent page.
+//! followed shows as uncovered on the agent page. A follow that ended
+//! because its runner was not there is begun again when that runner next
+//! answers a request ([`crate::runner_links`]).
 
 use std::sync::Arc;
 
@@ -17,6 +19,7 @@ use crate::error::ServerError;
 use crate::network_api::with_network;
 use crate::routes::AppState;
 use crate::runner_client::RunnerRecord;
+use crate::runner_links::{AGAIN, Link, lost};
 
 /// Follow every named runner's feed, each on a task of its own.
 pub fn follow_at_start(state: &Arc<AppState>) {
@@ -44,14 +47,29 @@ pub fn follow_at_start(state: &Arc<AppState>) {
         }
     };
     for (machine, runner) in runners {
-        let state = Arc::clone(state);
-        tokio::spawn(async move {
-            let ended = follow(&state, &machine, runner).await;
-            (state.say)(&format!(
-                "refusals: the feed of machine {machine}'s runner is no longer followed: {ended}"
-            ));
-        });
+        ensure(state, &machine, runner);
     }
+}
+
+/// Follow `machine`'s runner's feed on a task of its own, unless it is
+/// followed already or its follow ended on a refusal.
+pub fn ensure(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
+    if state.budgets.is_none()
+        || state.network.is_none()
+        || !state.runners.links().begin(Link::Feed, machine)
+    {
+        return;
+    }
+    let (state, machine) = (Arc::clone(state), machine.to_owned());
+    tokio::spawn(async move {
+        let ended = follow(&state, &machine, runner).await;
+        let again = matches!(&ended, ServerError::Runner { refusal, .. } if lost(refusal));
+        state.runners.links().ended(Link::Feed, &machine, again);
+        (state.say)(&format!(
+            "refusals: the feed of machine {machine}'s runner is no longer followed: {ended}{}",
+            if again { AGAIN } else { "" }
+        ));
+    });
 }
 
 async fn follow(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) -> ServerError {

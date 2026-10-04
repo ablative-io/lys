@@ -201,6 +201,7 @@ pub mod runner_api;
 mod runner_bytes_api;
 pub mod runner_client;
 mod runner_dial;
+pub mod runner_links;
 pub mod runner_operate;
 pub mod runner_sessions;
 mod runner_start_pass;

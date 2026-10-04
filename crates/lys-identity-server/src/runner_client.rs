@@ -371,6 +371,7 @@ pub struct Runners {
     key: Arc<Ed25519Identity>,
     own: Option<PathBuf>,
     hub: Arc<DialHub>,
+    links: crate::runner_links::Links,
 }
 
 impl Runners {
@@ -381,7 +382,13 @@ impl Runners {
             key,
             own,
             hub: Arc::new(DialHub::default()),
+            links: crate::runner_links::Links::default(),
         }
+    }
+
+    /// Which standing links to runners are held ([`crate::runner_links`]).
+    pub fn links(&self) -> &crate::runner_links::Links {
+        &self.links
     }
 
     /// The public half of the key every request to a runner is signed with:
@@ -495,17 +502,25 @@ pub async fn ask(
 ) -> Result<Answer, ServerError> {
     let leave = Arc::new(Leave::default());
     let guard = LeaveOnDrop(Arc::clone(&leave));
-    let (shared, machine) = (Arc::clone(state), machine.to_owned());
-    let asked =
-        tokio::task::spawn_blocking(move || shared.runners.ask(&machine, &record, &act, &leave))
-            .await
-            .map_err(|failed| ServerError::Runner {
-                refusal: "runner_unreachable".to_owned(),
-                words: format!("the request to the runner ended abnormally: {failed}"),
-            })?;
+    let (shared, asked_machine, asked_record) =
+        (Arc::clone(state), machine.to_owned(), record.clone());
+    let asked = tokio::task::spawn_blocking(move || {
+        shared
+            .runners
+            .ask(&asked_machine, &asked_record, &act, &leave)
+    })
+    .await
+    .map_err(|failed| ServerError::Runner {
+        refusal: "runner_unreachable".to_owned(),
+        words: format!("the request to the runner ended abnormally: {failed}"),
+    })?;
     guard.0.done()?;
     drop(guard);
-    Ok(asked?)
+    let answer = asked?;
+    // The runner answered, so it is there: a standing link that lost it is
+    // begun again now.
+    crate::runner_links::ensure(state, machine, &record);
+    Ok(answer)
 }
 
 #[cfg(test)]

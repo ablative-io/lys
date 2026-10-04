@@ -41,7 +41,7 @@ pub enum Placement {
 /// Measurements of admission and the asynchronous capture worker.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaptureTiming {
-    /// Journal append and sync hold; absent if admission was interrupted before its measurement persisted.
+    /// How long the call was held while its journal record was put in place; absent if admission was interrupted before its measurement persisted. The sync that makes the record hold through a loss of power is made beside the call and is not in this.
     pub admission_ns: Option<u64>,
     /// Body durability measurement, with interrupted measurement distinguished explicitly.
     pub durable: DurableTime,

@@ -21,6 +21,8 @@ use crate::error::ServerError;
 use crate::grants::with_grants;
 use crate::network_api::with_network;
 use crate::routes::AppState;
+use crate::runner_client::RunnerRecord;
+use crate::runner_links::{AGAIN, Link, lost};
 use crate::session::now;
 
 /// Hold a grant channel to every runner reached by socket, each on a
@@ -48,27 +50,40 @@ pub fn hold_at_start(state: &Arc<AppState>) {
         }
     };
     for (machine, runner) in runners {
-        let state = Arc::clone(state);
-        tokio::task::spawn_blocking(move || {
-            let ended = match state.runners.grant_channel(&runner) {
-                Ok(mut channel) => loop {
-                    match channel.question() {
-                        Ok(Some(question)) => {
-                            if let Err(error) = channel.answer(&judged(&state, &question)) {
-                                break error.to_string();
-                            }
-                        }
-                        Ok(None) => break "the runner closed it".to_owned(),
-                        Err(error) => break error.to_string(),
-                    }
-                },
-                Err(error) => error.to_string(),
-            };
-            (state.say)(&format!(
-                "grants: the grant channel to machine {machine}'s runner is not held: {ended}"
-            ));
-        });
+        ensure(state, &machine, runner);
     }
+}
+
+/// Hold `machine`'s runner's grant channel on a thread of its own, unless
+/// it is held already or its holding ended on a refusal. A channel its
+/// runner closed, or whose runner was not there, is held again when that
+/// runner next answers a request ([`crate::runner_links`]).
+pub fn ensure(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
+    if state.network.is_none() || !state.runners.links().begin(Link::Grants, machine) {
+        return;
+    }
+    let (state, machine) = (Arc::clone(state), machine.to_owned());
+    tokio::task::spawn_blocking(move || {
+        let (ended, again) = match state.runners.grant_channel(&runner) {
+            Ok(mut channel) => loop {
+                match channel.question() {
+                    Ok(Some(question)) => {
+                        if let Err(error) = channel.answer(&judged(&state, &question)) {
+                            break (error.to_string(), lost(&error.name()));
+                        }
+                    }
+                    Ok(None) => break ("the runner closed it".to_owned(), true),
+                    Err(error) => break (error.to_string(), lost(&error.name())),
+                }
+            },
+            Err(error) => (error.to_string(), lost(&error.name())),
+        };
+        state.runners.links().ended(Link::Grants, &machine, again);
+        (state.say)(&format!(
+            "grants: the grant channel to machine {machine}'s runner is not held: {ended}{}",
+            if again { AGAIN } else { "" }
+        ));
+    });
 }
 
 /// The answer to `question` from the grants as they stand now.

@@ -332,6 +332,24 @@ describe('Typing to several agents at once', () => {
   });
 });
 
+describe('The window in front', () => {
+  it('stands over a line\'s own handle, so the add button under a short line is the one pressed', async () => {
+    start();
+    await mount('#/canvas', routes);
+    const window = $('.session-canvas-node.sessions') as HTMLElement;
+    expect(window.style.zIndex).toBe('2');
+    await pointer($('.session-canvas-node.sessions h3'), 'pointerdown', 300, 240);
+    await click($('[data-add-widget="usage"]'));
+    // The line to the new widget is 48 long and its handle sits at its middle, where the column of add buttons is; the handle's layer is 4.
+    expect($('.canvas-link-remove')).not.toBeNull();
+    expect(Number(window.style.zIndex)).toBeGreaterThan(4);
+    // Pressed again, the button adds a second widget and the first keeps its line.
+    await click($('[data-add-widget="usage"]'));
+    expect($$('[data-widget]')).toHaveLength(2);
+    expect($$('.canvas-link-remove')).toHaveLength(2);
+  });
+});
+
 describe('Looking closer', () => {
   it('brings the view in to a window when its bar is double-pressed, and goes back to the view before when it is double-pressed again', async () => {
     start();

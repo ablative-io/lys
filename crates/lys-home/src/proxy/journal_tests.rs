@@ -34,6 +34,38 @@ fn open_call(call_id: &str, session: Option<&str>) -> OpenCall {
     }
 }
 
+/// What a call waits for on the forwarding path is the record put in place,
+/// not the disk: the record is there for the next start at once, settling
+/// it afterwards changes nothing a reader sees, and a record retired before
+/// its settle has nothing left to settle.
+#[test]
+fn a_record_put_without_waiting_for_the_disk_is_there_at_once_and_settles_beside_the_call() -> Res {
+    let dir = tempfile::tempdir()?;
+    let journal = Journal::open(dir.path().join("journal"))?;
+    let mut call = open_call("c1", Some(KEY));
+    call.run = Some("run-a".to_owned());
+    journal.put(&call)?;
+    assert!(Journal::holds_run(journal.dir(), "run-a")?);
+    journal.settle("c1")?;
+    // Outside a runtime the settle is made here; inside one, on a thread beside the call.
+    journal.settle_beside("c1");
+    assert!(Journal::holds_run(journal.dir(), "run-a")?);
+    journal.retire("c1")?;
+    journal.settle("c1")?;
+    journal.settle_beside("c1");
+    assert!(!Journal::holds_run(journal.dir(), "run-a")?);
+    let left: Vec<_> = std::fs::read_dir(journal.dir())?
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name())
+        .filter(|name| name.to_string_lossy().contains("c1"))
+        .collect();
+    assert!(
+        left.is_empty(),
+        "nothing of the call is left behind: {left:?}"
+    );
+    Ok(())
+}
+
 #[test]
 fn a_run_is_held_while_a_call_of_it_is_open_and_no_longer_once_it_is_retired() -> Res {
     let dir = tempfile::tempdir()?;

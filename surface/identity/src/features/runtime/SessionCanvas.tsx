@@ -431,7 +431,8 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
         const kind = node.column === 'sessions' ? 'Agent' : node.column === 'teams' ? 'Team or sender' : 'Resource or recipient';
         const unanswered = !!node.session && graph.unanswered.some((entry) => entry.session === node.session?.session);
         return <article className={'session-canvas-node ' + node.column + (shown ? ' open' : '') + (unanswered ? ' unanswered' : '') + (menu === node.id ? ' menu-open' : '') + (together.includes(node.id) ? ' together' : '')} key={node.id} data-node={node.id} aria-label={kind + ': ' + node.title}
-          style={{ left: box.x, top: box.y, width: box.w, height: box.h, zIndex: front === node.id ? 3 : node.session ? 2 : 1 }}
+          // The window in front stands over everything drawn on the surface, a line's own handle included: its add buttons sit where a short line's handle does, and a press there is for the button.
+          style={{ left: box.x, top: box.y, width: box.w, height: box.h, zIndex: front === node.id ? 5 : node.session ? 2 : 1 }}
           onPointerDownCapture={(event) => {
             if (pick) pick(node.id)(event);
             // With a widget in hand, a press on an agent's window places it beside the window, with a line from the window feeding it.

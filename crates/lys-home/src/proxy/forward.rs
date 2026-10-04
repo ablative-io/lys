@@ -470,15 +470,18 @@ impl Proxy {
             admission_ns: None,
             completed: None,
         };
-        // Admission gate: the request waits for the journal file and directory sync.
+        // Admission gate: the request waits only for its journal record to
+        // be put in place. The sync that makes the record hold through a
+        // loss of power is made beside the call, never in its way.
         let admission = std::time::Instant::now();
-        if let Err(error) = self.journal.write(&open) {
+        if let Err(error) = self.journal.put(&open) {
             return refusal(
                 StatusCode::SERVICE_UNAVAILABLE,
                 &format!("lys-proxy refused the call: {error}"),
             );
         }
         open.admission_ns = Some(u64::try_from(admission.elapsed().as_nanos()).unwrap_or(u64::MAX));
+        self.journal.settle_beside(&open.call_id);
         let call = Call::admit(open, &self.capture, self.journal.clone(), self.sink.clone());
         call.asked(request.headers());
         let request = request.map(|body| Tee::new(body, call.request_side()).boxed_unsync());

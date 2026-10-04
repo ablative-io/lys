@@ -80,6 +80,13 @@ of it.
 - A call in flight when the proxy restarts is recorded `lost` on the next start; a call whose
   response was durable is never recorded lost. These states are the record's, not a reason
   to drop anything.
+- A call waits at admission only for its journal record to be put in place, and again only for
+  that when its request has named its session. The syncs that make the record hold through a
+  loss of power are made beside the call, never in its way. So a call in flight when the proxy
+  ends is found at its next start and recorded `lost`; a call admitted in the last moments
+  before the computer itself lost power may leave no record. (Until 4 October 2026 both syncs
+  were on the call's path: one call read on the installed build was held 12.7 ms at admission,
+  against Tom's "no latency".)
 
 ## Later functions, all built on the same pass
 
