@@ -177,7 +177,6 @@ impl ServerError {
             | Self::LaunchRecordMissing
             | Self::ProfileVersionUnknown { .. }
             | Self::RuntimeSessionUnknown
-            | Self::CallUnknown
             | Self::RoleUnknown
             | Self::RoleVersionUnknown
             | Self::HolderUnknown
@@ -208,7 +207,6 @@ impl ServerError {
             | Self::McpHandleUnsupported { .. }
             | Self::RuntimeSessionStarted { .. }
             | Self::RuntimeSessionStopped { .. }
-            | Self::CallKeptElsewhere { .. }
             | Self::RuntimeReportReused { .. }
             | Self::ServiceAccountReused { .. }
             | Self::ServiceAccountRetired { .. }
@@ -251,7 +249,6 @@ impl ServerError {
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }
             | Self::RuntimeUnavailable { .. }
-            | Self::CallRecordsUnavailable { .. }
             | Self::ServiceAccountsUnavailable { .. }
             | Self::StopsUnavailable { .. }
             | Self::PolicyUnavailable { .. }
@@ -267,6 +264,7 @@ impl ServerError {
             Self::Goal(error) => error.status(),
             Self::Team(error) => error.status(),
             Self::Budget(error) => error.status(),
+            Self::Call(error) => error.status(),
             Self::Holding(error) => error.status(),
             Self::Machine(error) => error.status(),
             Self::Cord(error) => error.status(),

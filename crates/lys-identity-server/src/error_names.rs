@@ -20,6 +20,7 @@ fn server(error: &ServerError) -> &str {
     match error {
         ServerError::Team(error) => team(error),
         ServerError::Budget(error) => budget(error),
+        ServerError::Call(error) => error.name(),
         ServerError::Holding(error) => error.name(),
         ServerError::Machine(error) => error.name(),
         ServerError::Cord(error) => error.name(),
@@ -108,9 +109,6 @@ fn server(error: &ServerError) -> &str {
         ServerError::McpHandleUnsupported { .. } => "McpHandleUnsupported",
         ServerError::RuntimeUnavailable { .. } => "RuntimeUnavailable",
         ServerError::RuntimeSessionUnknown => "RuntimeSessionUnknown",
-        ServerError::CallUnknown => "CallUnknown",
-        ServerError::CallKeptElsewhere { .. } => "CallKeptElsewhere",
-        ServerError::CallRecordsUnavailable { .. } => "CallRecordsUnavailable",
         ServerError::RuntimeSessionStarted { .. } => "RuntimeSessionStarted",
         ServerError::RuntimeSessionStopped { .. } => "RuntimeSessionStopped",
         ServerError::RuntimeReportReused { .. } => "RuntimeReportReused",

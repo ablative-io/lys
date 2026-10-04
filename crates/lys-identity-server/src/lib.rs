@@ -81,6 +81,7 @@ mod drafts_api_tests;
 pub mod drafts_list;
 pub mod error;
 pub mod error_budget;
+pub mod error_call;
 pub mod error_canvas;
 pub mod error_cord;
 pub mod error_holding;

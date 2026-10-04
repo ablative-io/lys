@@ -23,9 +23,9 @@ use crate::record::entries::{CUSTOM_CALL, EntryBody};
 
 pub(crate) mod captured;
 mod coding;
-pub mod whole;
 mod parts;
 mod reported;
+pub mod whole;
 
 use parts::{complete_response_parts, read_json, request_parts_of};
 pub use parts::{request_model, request_parts, request_parts_file, response_parts};

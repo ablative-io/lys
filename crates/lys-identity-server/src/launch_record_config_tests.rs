@@ -1,7 +1,7 @@
 #![cfg(test)]
-use crate::harness_description;
 use super::build;
 use crate::agent_pass_store::Passes;
+use crate::harness_description;
 use crate::launch_template::{Start, from_template, render};
 use crate::provisioning_store::{ProvisioningStore, Version};
 use lys_core::Ed25519Identity;

@@ -29,6 +29,7 @@ use serde_json::Value;
 use crate::budgets_api::with_budgets;
 use crate::budgets_state::Usage;
 use crate::error::ServerError;
+use crate::error_call::CallError;
 use crate::routes::AppState;
 use crate::runner_sessions::operator;
 
@@ -182,9 +183,10 @@ fn machine(usage: &Usage, call: &str) -> String {
 }
 
 fn unavailable(reason: impl Into<String>) -> ServerError {
-    ServerError::CallRecordsUnavailable {
+    CallError::RecordsUnavailable {
         reason: reason.into(),
     }
+    .into()
 }
 
 /// Read the call from the proxy's home under `proxy`; a session that home
@@ -195,7 +197,7 @@ fn read(proxy: &std::path::Path, at: &RecordAt, machine: String) -> Result<CallW
         .session_path(&at.session)
         .map_err(|error| unavailable(error.to_string()))?;
     if !file.is_file() {
-        return Err(ServerError::CallKeptElsewhere { machine });
+        return Err(CallError::KeptElsewhere { machine }.into());
     }
     call_whole(&home, &at.session, &at.entry).map_err(|error| unavailable(error.to_string()))
 }
@@ -212,7 +214,7 @@ async fn whole(
             .index
             .call(&agent, &call)
             .and_then(|position| held.uses.get(position))
-            .ok_or(ServerError::CallUnknown)?;
+            .ok_or(CallError::Unknown)?;
         let at = usage.call.as_ref().and_then(|seen| seen.record.clone());
         Ok((at, machine(usage, &call)))
     })?;
