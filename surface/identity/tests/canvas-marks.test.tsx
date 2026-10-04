@@ -78,8 +78,8 @@ describe('The canvas is the person\'s own', () => {
     expect($('.canvas-note')).toBeNull();
     await pointer($('.session-canvas-scroll'), 'pointerdown', 424, 324);
     await pointer($('.session-canvas-scroll'), 'pointerup', 424, 324);
-    // The note is where the press landed (the view starts at 24, 24), and the tool is let go.
-    expect([($('.canvas-note') as HTMLElement).style.left, ($('.canvas-note') as HTMLElement).style.top]).toEqual(['400px', '300px']);
+    // The note is where the press landed (the view starts at 24, 64, beneath the swap), and the tool is let go.
+    expect([($('.canvas-note') as HTMLElement).style.left, ($('.canvas-note') as HTMLElement).style.top]).toEqual(['400px', '260px']);
     expect($('[data-act="draw-note"]')?.getAttribute('aria-pressed')).toBe('false');
     await write($('.canvas-note textarea'), 'Ask Scribe about the build');
     await leave($('.canvas-note textarea'));

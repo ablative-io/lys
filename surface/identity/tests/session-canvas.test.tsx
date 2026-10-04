@@ -205,8 +205,9 @@ describe('Running: the list and the canvas', () => {
     await pointer(surface, 'pointerdown', 5, 5);
     await pointer(surface, 'pointermove', 105, 55);
     await pointer(surface, 'pointerup', 105, 55);
-    expect(before).toBe('translate(24px, 24px)');
-    expect(space.style.transform).toBe('translate(124px, 74px)');
+    // A canvas nobody has moved opens beneath the swap at the top of the page.
+    expect(before).toBe('translate(24px, 64px)');
+    expect(space.style.transform).toBe('translate(124px, 114px)');
     expect([parseFloat(one.style.left), parseFloat(one.style.top)]).toEqual([left + 40, top + 20]);
   });
 

@@ -15,14 +15,21 @@ export function zoomed(view: View, k: number, cx: number, cy: number): View {
   const from = zoomOf(view), to = Math.min(ZOOM[1], Math.max(ZOOM[0], k));
   return { x: cx - (cx - view.x) * to / from, y: cy - (cy - view.y) * to / from, k: to };
 }
-export const HOME: View = { x: 24, y: 24 };
 /**
- * The view that holds one part of the surface whole, in the middle of a page `width` by `height`, with `clear` left
- * around it; zoomed in no further than `nearest`.
+ * The top of the page is the Operations swap's, which stands over the canvas there. A person may move anything under it;
+ * a view the canvas chooses itself, home or a framing, keeps what it shows beneath it, so nothing it has just put there
+ * lies under the swap.
+ */
+export const SWAP = 56;
+export const HOME: View = { x: 24, y: SWAP + 8 };
+/**
+ * The view that holds one part of the surface whole, in the middle of what a page `width` by `height` has beneath the
+ * swap, with `clear` left around it; zoomed in no further than `nearest`.
  */
 export function framed(part: { x: number; y: number; w: number; h: number }, width: number, height: number, nearest = ZOOM[1], clear = 64): View {
-  const k = Math.min(nearest, Math.max(ZOOM[0], Math.min(width / (part.w + clear), height / (part.h + clear))));
-  return { x: width / 2 - (part.x + part.w / 2) * k, y: height / 2 - (part.y + part.h / 2) * k, k };
+  const beneath = height - SWAP;
+  const k = Math.min(nearest, Math.max(ZOOM[0], Math.min(width / (part.w + clear), beneath / (part.h + clear))));
+  return { x: width / 2 - (part.x + part.w / 2) * k, y: SWAP + beneath / 2 - (part.y + part.h / 2) * k, k };
 }
 /** The part of the surface that holds every one of `things`; none when there are no things. */
 export function around(things: { x: number; y: number; w: number; h: number }[]): { x: number; y: number; w: number; h: number } | undefined {

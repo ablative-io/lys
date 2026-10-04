@@ -257,10 +257,12 @@ export function WidgetCard({ widget, held, board, morph, chosen, pick, move, lin
   const medium = widget.faces ?? kind?.faces ?? [];
   // Chosen figures stay in the order the kind offers them, whichever was pressed first.
   const faced = (key: string) => Object.keys(choices ?? {}).filter((each) => each === key ? !medium.includes(key) : medium.includes(each));
-  return <article className={'canvas-widget' + (widget.view ? ' wide' : '') + (morph ? ' morph' : '') + (pick ? ' picking' : '')} data-widget={widget.id} data-kind={widget.kind} data-view={widget.view ?? 'pill'}
+  return <article className={'canvas-widget' + (widget.view ? ' wide' : '') + (morph ? ' morph' : '') + (pick ? ' picking' : '') + (chosen ? ' chosen' : '')} data-widget={widget.id} data-kind={widget.kind} data-view={widget.view ?? 'pill'}
     ref={card} aria-label={label + (whose ? ' of ' + whose : '')} style={{ left: now.x, top: now.y, width: now.w, height: widget.view ? undefined : now.h, ...tint(widget.colour) }} onPointerDownCapture={pick}
+    // The whole card moves it, its rows as much as its bar. Locked, it is not moved, and a drag begun on it is the canvas's as it was.
+    onPointerDown={widget.locked ? undefined : move}
     onContextMenu={(event) => { event.preventDefault(); if (!widget.locked) set({ view: 'settings' }); }}>
-    <header className="canvas-widget-bar" onPointerDown={widget.locked ? undefined : move}>
+    <header className="canvas-widget-bar">
       <KindSymbol kind={widget.kind} /><h3>{whose || label}</h3>{part?.percent !== undefined && widget.look === 'dial' ? <Dial percent={part.percent} /> : null}<b className="canvas-widget-figure">{figure}</b>
       <button type="button" className="canvas-widget-turn" data-act="widget-view" aria-label={next + ': ' + label + (whose ? ' of ' + whose : '')} title={next} disabled={widget.locked} onClick={() => set({ view: turned })}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d={widget.view === 'settings' ? 'M7 14l5-5 5 5' : 'M7 10l5 5 5-5'} /></svg></button>

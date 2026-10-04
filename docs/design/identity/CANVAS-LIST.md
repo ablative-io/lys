@@ -12,14 +12,15 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - The HUD on an agent's window: compact, set a goal, add a task.
 - Layouts kept as project configuration, so a project opens on its own canvas.
 - Free terminals on a computer, only on the computers a person has that permission for.
-- The Canvas and Proxy swap at the top of Operations lies over a window that stands at the top of the canvas,
-  and takes the press meant for "Open terminal" and for the first add button. Tidy stands the first window
-  exactly there. Seen on the walk of a4f6eff3; first in the next piece.
-- In a tidied column the widgets stand 10 apart, and a chosen widget's remove control stands above its top
-  edge, under the widget above it: it cannot be pressed until the widget is dragged clear. Seen on the walk
-  of a4f6eff3.
-- A drag begun on the rows of a widget that is opened out selects their words and moves the canvas; the
-  widget stays where it is. A widget shown small moves when dragged. Seen on the walk of a4f6eff3.
+- The Canvas and Proxy swap at the top of Operations lay over a window that stood at the top of the canvas,
+  and took the press meant for "Open terminal" and for the first add button; Tidy and home stood the first
+  window exactly there. Written 5 October: the top 56 of the page is the swap's, and a view the canvas chooses
+  itself (home, Tidy, a double press) keeps what it shows beneath it; a person may still move anything under
+  it by hand. Walked on the developer server; leaves this list when installed and walked there.
+- In a tidied column a chosen widget's remove control lay under the widget above it. Written 5 October: the
+  widget chosen, or under the pointer, stands in front of its neighbours. Walked on the developer server.
+- A drag begun on the rows of an opened widget moved the canvas, not the widget. Written 5 October: the whole
+  card moves it; locked, it stays and the drag is the canvas's as before. Walked on the developer server.
 - The terminal's background colour.
 - Pinch to zoom by touch.
 - What the canvas shows when nothing is running.

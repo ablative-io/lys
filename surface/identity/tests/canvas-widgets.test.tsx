@@ -7,6 +7,7 @@ import type { Route } from './fixtures';
 import { mockTerminal } from './terminal-double';
 import { accountsOf, combined, scopeOf, summed } from '../src/features/runtime/canvas-widgets';
 import { stood } from '../src/features/runtime/canvas-marks';
+import { HOME, SWAP, framed } from '../src/features/runtime/canvas-view';
 import type { DashboardAgent } from '../src/features/dashboard/contract';
 import { windowWords } from '../src/features/runtime/CanvasWidgets';
 import { clockMs } from '../src/features/file/time';
@@ -361,18 +362,18 @@ describe('Looking closer', () => {
     const before = drawing.style.transform;
     const twice = () => act(async () => { $('.session-canvas-node.sessions .session-canvas-bar')?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
     await twice();
-    // The window is 440 wide: with its margin it fills the 1,008 of the view at twice its size, in the middle.
-    expect(drawing.style.transform).toBe('translate(-336px, -34px) scale(2)');
+    // The window is 440 wide: with its margin it fills the 1,008 of the view at twice its size, in the middle of what the page has beneath the swap (56 of its 800).
+    expect(drawing.style.transform).toBe('translate(-336px, -6px) scale(2)');
     await twice();
     expect(drawing.style.transform).toBe(before);
     // Once the person has moved the view, the double press looks closer again: the view before is only gone back to from where the double press left it.
     await twice();
     await act(async () => { surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
-    expect(drawing.style.transform).toBe('translate(-400px, -34px) scale(2)');
+    expect(drawing.style.transform).toBe('translate(-400px, -6px) scale(2)');
     await twice();
-    expect(drawing.style.transform).toBe('translate(-336px, -34px) scale(2)');
+    expect(drawing.style.transform).toBe('translate(-336px, -6px) scale(2)');
     await twice();
-    expect(drawing.style.transform).toBe('translate(-400px, -34px) scale(2)');
+    expect(drawing.style.transform).toBe('translate(-400px, -6px) scale(2)');
   });
 
   it('brings a whole box into view when its bar is double-pressed, and everything on the canvas when the canvas itself is', async () => {
@@ -386,7 +387,7 @@ describe('Looking closer', () => {
     const twice = (on: Element | null) => act(async () => { on?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
     // The box is 440 wide: it fills the view at twice its size, its middle in the middle. Double-pressed again, the view is as it was.
     await twice($('.canvas-group-bar'));
-    expect(drawing.style.transform).toBe('translate(-336px, -100px) scale(2)');
+    expect(drawing.style.transform).toBe('translate(-336px, -72px) scale(2)');
     await twice($('.canvas-group-bar'));
     expect(drawing.style.transform).toBe(before);
     // A double press in the label is for its words, not for the view.
@@ -395,9 +396,58 @@ describe('Looking closer', () => {
     // The canvas itself: everything on it in the middle of the view; and back. With the resource's card, which stands from 1,100 to 1,320 across at the top, everything is 1,120 by 300 from (200, 0): it and its margin fit the 1,008 of the view at 1,008 / 1,184.
     await twice(surface);
     const k = 1008 / 1184;
-    expect(drawing.style.transform).toBe(`translate(${504 - 760 * k}px, ${400 - 150 * k}px) scale(${k})`);
+    expect(drawing.style.transform).toBe(`translate(${504 - 760 * k}px, ${428 - 150 * k}px) scale(${k})`);
     await twice(surface);
     expect(drawing.style.transform).toBe(before);
+  });
+});
+
+describe('A view the canvas chooses', () => {
+  it('keeps what it shows beneath the swap at the top of the page: home, a small part in the middle, a tall part zoomed out to fit', () => {
+    expect(HOME).toEqual({ x: 24, y: SWAP + 8 });
+    // A small part stands in the middle of what the page has beneath the swap: 844 of its 900.
+    expect(framed({ x: 100, y: 100, w: 200, h: 100 }, 1600, 900, 1)).toEqual({ x: 600, y: SWAP + 422 - 150, k: 1 });
+    // A part taller than the page is zoomed out until it and its margin fit beneath the swap, so its top is under the swap's foot.
+    const tall = framed({ x: 0, y: 0, w: 400, h: 2000 }, 1600, 900, 1, 128);
+    expect(tall.k).toBe(844 / 2128);
+    expect(tall.y).toBeCloseTo(SWAP + 64 * (844 / 2128), 9);
+  });
+});
+
+describe('A widget under the hand', () => {
+  const opened = { id: 'widget:w', kind: 'usage', x: 700, y: 300, w: 340, h: 250, view: 'detail' };
+  const small = { id: 'widget:s', kind: 'usage', x: 700, y: 600, w: 248, h: 34 };
+
+  it('is moved by its rows as by its bar when it is opened out, and the canvas stays where it is', async () => {
+    start({ widgets: [opened] });
+    await mount('#/canvas', routes);
+    const [surface, drawing, widget] = [$('.session-canvas-scroll'), $('.session-canvas') as HTMLElement, $('[data-widget="widget:w"]') as HTMLElement];
+    const before = drawing.style.transform;
+    expect([widget.style.left, widget.style.top]).toEqual(['700px', '300px']);
+    await pointer($('[data-widget="widget:w"] .canvas-widget-body'), 'pointerdown', 800, 420);
+    await pointer(surface, 'pointermove', 860, 450);
+    await pointer(surface, 'pointerup', 860, 450);
+    expect([widget.style.left, widget.style.top]).toEqual(['760px', '330px']);
+    expect(drawing.style.transform).toBe(before);
+    // Locked, it stays, and the drag is the canvas's as it was before.
+    await click($('[data-widget="widget:w"] [data-act="widget-lock"]'));
+    await pointer($('[data-widget="widget:w"] .canvas-widget-body'), 'pointerdown', 800, 420);
+    await pointer(surface, 'pointermove', 830, 440);
+    await pointer(surface, 'pointerup', 830, 440);
+    expect([widget.style.left, widget.style.top]).toEqual(['760px', '330px']);
+    expect(drawing.style.transform).not.toBe(before);
+  });
+
+  it('is marked as the one chosen when it is pressed, which stands it and its remove control in front of its neighbours', async () => {
+    start({ widgets: [opened, small] });
+    await mount('#/canvas', routes);
+    const [surface, above, below] = [$('.session-canvas-scroll'), $('[data-widget="widget:w"]') as HTMLElement, $('[data-widget="widget:s"]') as HTMLElement];
+    expect([above.classList.contains('chosen'), below.classList.contains('chosen')]).toEqual([false, false]);
+    await pointer($('[data-widget="widget:s"] .canvas-widget-bar'), 'pointerdown', 760, 617);
+    await pointer(surface, 'pointerup', 760, 617);
+    expect([above.classList.contains('chosen'), below.classList.contains('chosen')]).toEqual([false, true]);
+    expect($('[data-widget="widget:s"] [data-act="remove-widget"]')).not.toBeNull();
+    expect($('[data-widget="widget:w"] [data-act="remove-widget"]')).toBeNull();
   });
 });
 

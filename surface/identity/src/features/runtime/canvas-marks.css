@@ -79,6 +79,8 @@
 /* A widget is a pill: its symbol, whose it is, its one figure. Pressed, it opens out, the way an island does, and its list scrolls inside it. */
 .canvas-widget { position: absolute; box-sizing: border-box; z-index: 2; display: flex; flex-direction: column; border: 1px solid var(--border-default); border-radius: 17px; background: #0b0b0e; color: var(--text-primary); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); overflow: visible; }
 .canvas-widget.wide { border-radius: 20px; z-index: 3; }
+/* The widget chosen, or under the pointer, stands in front of its neighbours: its remove control and its lock stand outside its own edge, where the next widget in a column would lie over them. */
+.canvas-widget.chosen, .canvas-widget:hover { z-index: 5; }
 .canvas-widget.morph { transition: width .34s cubic-bezier(.3, 1.35, .45, 1), border-radius .34s ease; }
 .canvas-widget.morph > .canvas-widget-body { animation: canvas-widget-in .3s ease; }
 @keyframes canvas-widget-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
@@ -96,7 +98,7 @@
 .canvas-widget-variants { flex: none; display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px; }
 .canvas-widget-variants button { padding: 2px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--surface-hover); color: var(--text-secondary); font: inherit; font-size: 11.5px; cursor: pointer; }
 .canvas-widget-variants button[aria-pressed="true"] { background: var(--text-primary); color: #0b0b0e; }
-.canvas-widget-body { flex: none; padding: 0 14px 12px; font-size: 13px; }
+.canvas-widget-body { flex: none; padding: 0 14px 12px; font-size: 13px; user-select: none; }
 .canvas-widget-body .dash-table { width: 100%; }
 .canvas-widget-body .dash-table td { padding: 5px 8px 5px 0; }
 .canvas-widget-open { flex: none; padding: 0 14px 10px; font-size: 11.5px; color: var(--text-secondary); }
