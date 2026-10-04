@@ -255,6 +255,16 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
     setView((now) => zoomed(now, factor === null ? 1 : zoomOf(now) * factor, cx, cy));
   };
   const [menu, setMenu] = useState<string | null>(null);
+  // Double-pressing a window's bar brings the view in until that window fills it; double-pressing it again goes back to the view before.
+  const back = useRef<{ id: string; view: View } | null>(null);
+  const zoomTo = (id: string) => {
+    const [element, box] = [surface.current, at(id)];
+    if (!element || !box) return;
+    if (back.current?.id === id) { const was = back.current.view; back.current = null; setView(was); return; }
+    const k = Math.min(ZOOM[1], Math.max(ZOOM[0], Math.min(element.clientWidth / (box.w + 64), element.clientHeight / (box.h + 64))));
+    back.current = { id, view };
+    setView({ x: element.clientWidth / 2 - (box.x + box.w / 2) * k, y: element.clientHeight / 2 - (box.y + box.h / 2) * k, k });
+  };
 
   const begin = (start: (from: [number, number]) => Drag) => (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || (event.target instanceof Element && event.target.closest('button, a, input, select, textarea, .terminal'))) return;
@@ -474,7 +484,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
             else setFront(node.id);
           }}>
           <header className="session-canvas-bar" tabIndex={0} aria-label={'Move ' + node.title + ' with the arrow keys' + (node.session ? '; with Shift, size its terminal' : '')} onKeyDown={nudge(node.id)}
-            onPointerDown={moving(node.id)}>
+            onPointerDown={moving(node.id)} onDoubleClick={(event) => { if (!(event.target instanceof Element && event.target.closest('button, a'))) zoomTo(node.id); }}>
             <span className="session-canvas-kind">{kind}</span><h3>{node.title}</h3><span className="note">{node.detail}</span>
             {node.session ? <span className="note" title={state ?? undefined}>{state}</span> : null}
             {/* One slim bar: a closed window opens from it; an open one keeps its controls in a small menu over the window. */}

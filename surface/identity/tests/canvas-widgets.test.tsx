@@ -209,6 +209,24 @@ describe('Widgets on the canvas', () => {
   });
 });
 
+describe('Looking closer', () => {
+  it('brings the view in to a window when its bar is double-pressed, and goes back to the view before when it is double-pressed again', async () => {
+    start();
+    await mount('#/canvas', routes);
+    const surface = $('.session-canvas-scroll') as HTMLElement;
+    Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1008 });
+    Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 800 });
+    const drawing = $('.session-canvas') as HTMLElement;
+    const before = drawing.style.transform;
+    const twice = () => act(async () => { $('.session-canvas-node.sessions .session-canvas-bar')?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+    await twice();
+    // The window is 440 wide: with its margin it fills the 1,008 of the view at twice its size, in the middle.
+    expect(drawing.style.transform).toBe('translate(-336px, -34px) scale(2)');
+    await twice();
+    expect(drawing.style.transform).toBe(before);
+  });
+});
+
 describe('What a widget counts', () => {
   const row = (id: string, name: string, more: Record<string, unknown> = {}) => ({ agent: { id, display_name: name, state: 'active' }, teams: [], sessions: [], usage: usage(id, []), budget: {}, goals: { goals: [] }, ...more }) as unknown as DashboardAgent;
   const rows = [row(SCRIBE, 'Scribe'), row(COURIER, 'Courier'), row('agent-x', 'Xavier')];
