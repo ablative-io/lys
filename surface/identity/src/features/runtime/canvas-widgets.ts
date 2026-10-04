@@ -25,7 +25,7 @@ export interface Kind {
 /** Every kind of widget, in the order the bar offers them. */
 export const KINDS: Record<string, Kind> = {
   usage: { label: 'Usage', size: [340, 250], symbol: 'M4 17a8 8 0 1 1 16 0M12 17l4.5-6',
-    choices: { 'context_percent/': 'Context', 'tokens/day': 'Tokens today', 'tokens/week': 'Tokens this week', 'dollars/day': 'Dollars today', 'dollars/week': 'Dollars this week', 'running_ms/day': 'Running today', 'window/300': '5-hour window', 'window/10080': '7-day window' },
+    choices: { 'context_percent/': 'Context', 'tokens/day': 'Tokens today', 'tokens/week': 'Tokens this week', 'dollars/day': 'Dollars today', 'dollars/week': 'Dollars this week', 'running_ms/day': 'Running today', 'running_ms/week': 'Running this week', 'window/300': '5-hour window', 'window/10080': '7-day window' },
     faces: ['context_percent/', 'tokens/day', 'window/300'] },
   budget: { label: 'Budget', size: [340, 170], symbol: 'M12 3v18M16.5 7.5C15.8 6.2 14.2 5.5 12 5.5c-2.6 0-4.5 1.2-4.5 3.2S9.300 11.5 12 12s4.500 1.300 4.500 3.300-1.900 3.200-4.500 3.200c-2.200 0-3.800-.700-4.500-2' },
   goals: { label: 'Goals', size: [340, 190], symbol: 'M6 21V4M6 4.500h11l-2.500 4 2.500 4H6' },

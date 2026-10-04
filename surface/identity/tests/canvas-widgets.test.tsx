@@ -157,7 +157,7 @@ describe('Widgets on the canvas', () => {
     expect($$('[data-widget] tr[data-account]').map((row) => row.querySelector('td')?.textContent)).toEqual(['org-main, 5-hour', 'org-main, 7-day']);
     await turn();
     expect(card.dataset.view).toBe('settings');
-    expect($$('[data-variant]').map((each) => each.textContent)).toEqual(['First reported', 'Context', 'Tokens today', 'Tokens this week', 'Dollars today', 'Dollars this week', 'Running today', '5-hour window', '7-day window']);
+    expect($$('[data-variant]').map((each) => each.textContent)).toEqual(['First reported', 'Context', 'Tokens today', 'Tokens this week', 'Dollars today', 'Dollars this week', 'Running today', 'Running this week', '5-hour window', '7-day window']);
     await click($('[data-variant="window/10080"]'));
     expect([figure(), kept().widgets[0].shows]).toEqual(['61% of 7-day', 'window/10080']);
     // A level is drawn as its number, with a bar, or as a dial, on the pill and opened out.

@@ -253,6 +253,7 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
             json!(["dollars", "day", 500]),
             json!(["dollars", "week", 500]),
             json!(["running_ms", "day", 150]),
+            json!(["running_ms", "week", 150]),
         ]
     );
     let accounts = usage["accounts"].as_array().ok_or("no accounts")?;

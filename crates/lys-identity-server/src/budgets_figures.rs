@@ -29,13 +29,14 @@ pub struct AccountWindows {
 }
 
 /// The figures every agent is shown, in the order shown.
-const SHOWN: [(Measure, Option<Length>); 6] = [
+const SHOWN: [(Measure, Option<Length>); 7] = [
     (Measure::ContextPercent, None),
     (Measure::Tokens, Some(Length::Day)),
     (Measure::Tokens, Some(Length::Week)),
     (Measure::Dollars, Some(Length::Day)),
     (Measure::Dollars, Some(Length::Week)),
     (Measure::RunningMs, Some(Length::Day)),
+    (Measure::RunningMs, Some(Length::Week)),
 ];
 
 /// `agent`'s figures and its accounts' windows.
