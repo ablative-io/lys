@@ -1,7 +1,7 @@
 //! Prepared call references survive a crash before the session append.
 
 use super::parts::{complete_response_parts, read_json, request_model, request_parts_of};
-use super::{CallMeta, CallRecord, CallStatus, IngestReport, OutcomeMeta, already, find_call};
+use super::{Api, CallMeta, CallRecord, CallStatus, IngestReport, OutcomeMeta, already, find_call};
 use crate::error::HomeError;
 use crate::record::{
     Session,
@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::path::Path;
 
 #[cfg(test)]
@@ -235,18 +236,103 @@ pub(crate) struct Captured<'a> {
     pub seen: &'a Seen,
 }
 
+/// A content coding a stored response is decoded from: the three the
+/// proxy's stream reader decodes (`proxy::decode`).
+#[derive(Clone, Copy)]
+enum Coding {
+    Gzip,
+    Deflate,
+    Brotli,
+}
+
+impl Coding {
+    /// The one coding the response's head names, when it is one of the
+    /// three. More than one coding, or any other, is none: none of those
+    /// bytes are guessed at.
+    fn of(head: &Head) -> Option<Self> {
+        let [one] = head.response.values.get("content-encoding")?.as_slice() else {
+            return None;
+        };
+        let one = one.trim();
+        [
+            ("gzip", Self::Gzip),
+            ("deflate", Self::Deflate),
+            ("br", Self::Brotli),
+        ]
+        .into_iter()
+        .find_map(|(name, coding)| one.eq_ignore_ascii_case(name).then_some(coding))
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Gzip => "gzip",
+            Self::Deflate => "deflate",
+            Self::Brotli => "br",
+        }
+    }
+
+    /// The whole of `stored`, decoded. The stored bytes stay as they came.
+    fn decode(self, stored: &[u8]) -> std::io::Result<Vec<u8>> {
+        // The decoder's working buffer, not a bound on what it decodes.
+        const BUFFER: usize = 8192;
+        let mut bytes = Vec::new();
+        match self {
+            Self::Gzip => flate2::read::MultiGzDecoder::new(stored).read_to_end(&mut bytes)?,
+            Self::Deflate => flate2::read::ZlibDecoder::new(stored).read_to_end(&mut bytes)?,
+            Self::Brotli => {
+                brotli_decompressor::Decompressor::new(stored, BUFFER).read_to_end(&mut bytes)?
+            }
+        };
+        Ok(bytes)
+    }
+}
+
+const NOT_JSON: &str = "the response is not JSON";
+
+/// The response stored at `path` as JSON, decoded first when its head names
+/// one coding that is decoded. Bytes that do not decode leave why in
+/// `undecoded` and are no complete response.
+fn read_response(
+    path: &Path,
+    seen: &Seen,
+    api: Api,
+    undecoded: &mut Option<String>,
+) -> Result<Value, HomeError> {
+    let Some(coding) = Coding::of(&seen.head) else {
+        return read_json(path, NOT_JSON);
+    };
+    let stored = std::fs::read(path).map_err(|e| HomeError::io("reading a body file", path, e))?;
+    let bytes = coding.decode(&stored).map_err(|error| {
+        *undecoded = Some(format!(
+            "the response's content-encoding is {}, and its stored bytes do not decode as that: {error}",
+            coding.name()
+        ));
+        HomeError::BodyShape {
+            api: api.as_str(),
+            reason: "the response's bytes do not decode as the coding it names",
+        }
+    })?;
+    serde_json::from_slice(&bytes).map_err(|source| HomeError::Json {
+        context: NOT_JSON,
+        source,
+    })
+}
+
 /// Why a call that ended whole could not be read into parts. Only the
 /// response is parsed here as JSON, so a JSON failure is the response's: the
-/// reason then says what the response's own head named as its encoding, the
-/// one thing that says why stored bytes that reached the client whole do not
-/// parse. Nothing is guessed from the bytes.
+/// reason then says what the response's own head named as its encoding and
+/// whether that was decoded, the one thing that says why stored bytes that
+/// reached the client whole do not parse. Nothing is guessed from the bytes.
 fn unread(error: &HomeError, head: &Head) -> String {
     match (error, head.response.values.get("content-encoding")) {
-        (HomeError::Json { .. }, Some(codings)) => format!(
-            "{error}; the response's content-encoding is {}, and a response that is not an \
-             event stream is read as stored, not decoded",
-            codings.join(", ")
-        ),
+        (HomeError::Json { .. }, Some(codings)) => match Coding::of(head) {
+            Some(coding) => format!("{error}, after its {} coding was decoded", coding.name()),
+            None => format!(
+                "{error}; the response's content-encoding is {}, which is not decoded: \
+                 one coding of gzip, deflate or br is",
+                codings.join(", ")
+            ),
+        },
         (HomeError::Json { .. }, None) if head.status.is_some() => {
             format!("{error}; the response names no content-encoding")
         }
@@ -274,6 +360,7 @@ impl PreparedCall {
         };
         let mut status = meta.status;
         let mut reason = input.seen.unrecorded.clone();
+        let mut undecoded = None;
         let response = if status == CallStatus::Complete {
             let result = match (&model, input.response) {
                 (Some(model), Some(path)) if request_whole => {
@@ -289,7 +376,7 @@ impl PreparedCall {
                     match input.response_parts {
                         Some(parts) => Ok(Cow::Borrowed(parts)),
                         None => complete_response_parts(&complete, None, || {
-                            read_json(path, "the response is not JSON")
+                            read_response(path, input.seen, meta.api, &mut undecoded)
                         })
                         .map(Cow::Owned),
                     }
@@ -303,7 +390,11 @@ impl PreparedCall {
                 Ok(parts) => parts,
                 Err(error @ (HomeError::BodyShape { .. } | HomeError::Json { .. })) => {
                     status = CallStatus::Unrecorded;
-                    reason = Some(unread(&error, &input.seen.head));
+                    reason = Some(
+                        undecoded
+                            .take()
+                            .unwrap_or_else(|| unread(&error, &input.seen.head)),
+                    );
                     Cow::Owned(Vec::new())
                 }
                 Err(error) => return Err(error),

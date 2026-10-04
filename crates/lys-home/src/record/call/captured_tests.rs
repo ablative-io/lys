@@ -122,18 +122,31 @@ fn answered(coding: Option<&str>) -> Seen {
 #[test]
 fn an_unrecorded_call_names_its_reason_and_the_encoding_the_response_named()
 -> Result<(), Box<dyn std::error::Error>> {
-    // The read of 3 October: a whole response that is not JSON as stored.
+    // A coding that is not decoded: the stored bytes are read as they are,
+    // and the reason says which coding the response named.
     let encoded = prepared(
         REQUEST,
         &[0x83, 0x38, 0, 0],
         CallStatus::Complete,
-        &answered(Some("br")),
+        &answered(Some("zstd")),
     )?;
     assert_eq!(encoded.status, CallStatus::Unrecorded);
     let reason = encoded.unrecorded_reason.ok_or("no reason")?;
     assert!(reason.starts_with("the response is not JSON: "), "{reason}");
     assert!(
-        reason.contains("the response's content-encoding is br"),
+        reason.contains("the response's content-encoding is zstd, which is not decoded"),
+        "{reason}"
+    );
+    // Two codings are not guessed at either.
+    let twice = prepared(
+        REQUEST,
+        &encoded_as("gzip", RESPONSE)?,
+        CallStatus::Complete,
+        &answered(Some("gzip, br")),
+    )?;
+    let reason = twice.unrecorded_reason.ok_or("no reason")?;
+    assert!(
+        reason.contains("gzip, br, which is not decoded"),
         "{reason}"
     );
 
@@ -155,6 +168,93 @@ fn an_unrecorded_call_names_its_reason_and_the_encoding_the_response_named()
     let reason = garbled.unrecorded_reason.ok_or("no reason")?;
     assert!(reason.contains("needs both bodies and a model"), "{reason}");
     assert!(!reason.contains("content-encoding"), "{reason}");
+    Ok(())
+}
+
+/// `body` under the content coding `coding`.
+fn encoded_as(coding: &str, body: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    use flate2::Compression;
+    use std::io::Write;
+    match coding {
+        "gzip" => {
+            let mut encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::fast());
+            encoder.write_all(body)?;
+            Ok(encoder.finish()?)
+        }
+        "deflate" => {
+            let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), Compression::fast());
+            encoder.write_all(body)?;
+            Ok(encoder.finish()?)
+        }
+        "br" => {
+            let mut encoder = brotli::CompressorWriter::new(Vec::new(), 4096, 5, 22);
+            encoder.write_all(body)?;
+            Ok(encoder.into_inner())
+        }
+        _ => Err("fixture coding is not one of the three".into()),
+    }
+}
+
+#[test]
+fn a_response_that_is_not_an_event_stream_is_decoded_from_the_coding_it_names()
+-> Result<(), Box<dyn std::error::Error>> {
+    const REFUSED: &[u8] =
+        br#"{"type":"error","error":{"type":"rate_limit_error","message":"slow down"}}"#;
+    for coding in ["gzip", "deflate", "br", "BR", " gzip "] {
+        let named = coding.trim().to_ascii_lowercase();
+        // A whole response reads as it would have read unencoded.
+        let whole = prepared(
+            REQUEST,
+            &encoded_as(&named, RESPONSE)?,
+            CallStatus::Complete,
+            &answered(Some(coding)),
+        )?;
+        assert_eq!(whole.status, CallStatus::Complete, "{coding}");
+        assert_eq!(whole.unrecorded_reason, None, "{coding}");
+        assert_eq!(whole.response.len(), 1, "{coding}");
+        // A provider's refusal is read as what it is: an error body, not
+        // bytes that are not JSON.
+        let refused = prepared(
+            REQUEST,
+            &encoded_as(&named, REFUSED)?,
+            CallStatus::Complete,
+            &answered(Some(coding)),
+        )?;
+        assert_eq!(refused.status, CallStatus::Unrecorded, "{coding}");
+        let reason = refused.unrecorded_reason.ok_or("no reason")?;
+        assert!(
+            reason.ends_with("an error body is not a complete response"),
+            "{reason}"
+        );
+        // Bytes that are not the coding the response named: said, with the
+        // coding, and never read as something else.
+        let wrong = prepared(
+            REQUEST,
+            RESPONSE,
+            CallStatus::Complete,
+            &answered(Some(coding)),
+        )?;
+        assert_eq!(wrong.status, CallStatus::Unrecorded, "{coding}");
+        let reason = wrong.unrecorded_reason.ok_or("no reason")?;
+        assert!(
+            reason.starts_with(&format!(
+                "the response's content-encoding is {named}, and its stored bytes do not decode as that: "
+            )),
+            "{reason}"
+        );
+        // Decoded bytes that are not JSON say the coding was decoded.
+        let text = prepared(
+            REQUEST,
+            &encoded_as(&named, b"not JSON")?,
+            CallStatus::Complete,
+            &answered(Some(coding)),
+        )?;
+        let reason = text.unrecorded_reason.ok_or("no reason")?;
+        assert!(
+            reason.ends_with(&format!(", after its {named} coding was decoded")),
+            "{reason}"
+        );
+    }
     Ok(())
 }
 
