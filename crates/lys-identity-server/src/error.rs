@@ -243,6 +243,9 @@ pub enum ServerError {
     /// A refusal of the master off switch, or of a start it holds back.
     #[error(transparent)]
     Cord(#[from] crate::error_cord::CordError),
+    /// A refusal of a person's canvas.
+    #[error(transparent)]
+    Canvas(#[from] crate::error_canvas::CanvasError),
     /// The signed-in sessions could not be kept or read back.
     #[error("SessionsUnavailable: {reason}")]
     SessionsUnavailable {
@@ -723,19 +726,5 @@ pub enum ServerError {
         refusal: String,
         /// Why, in words.
         words: String,
-    },
-    /// A dial request was not signed by the machine's key, or names a
-    /// machine with no dialled runner.
-    #[error("runner_dial_refused: {reason}")]
-    DialRefused {
-        /// Why.
-        reason: String,
-    },
-    /// A dial was signed under an epoch not this server's: it was made
-    /// before the server last started, or captured and sent again after.
-    #[error("runner_dial_stale: {reason}")]
-    DialStale {
-        /// Why.
-        reason: String,
     },
 }

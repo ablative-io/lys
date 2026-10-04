@@ -305,6 +305,10 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/secrets/add" "Add a secret with its value" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "SecretExists", "SecretRetired", "OperationReused", "RouteInvalid", "ValueEmpty"]] scope("secret", "secret.add", []);
     POST "/secrets/replace" "Change a secret's value" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "LendingNotPermitted", "ValueEmpty"]] scope("secret", "secret.replace", []);
     POST "/secrets/retire" "Retire a secret" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "LendingNotPermitted"]] scope("secret", "secret.retire", []);
+    GET "/canvas" "The caller's canvas: their arrangement and saved layouts" S [SIGNED, &["NoPerson", "CanvasUnavailable"]];
+    PUT "/canvas" "Keep the caller's arrangement" S [SIGNED_BODY, &["NoPerson", "CanvasUnavailable"]];
+    POST "/canvas/layouts" "Save an arrangement as a layout of the caller's, by name" S [SIGNED_BODY, &["NoPerson", "CanvasRefused", "CanvasUnavailable"]];
+    POST "/canvas/layouts/remove" "Remove a layout of the caller's, by name" S [SIGNED_BODY, &["NoPerson", "CanvasRefused", "CanvasUnavailable"]];
     GET "/sessions" "The caller's sessions" S [SIGNED, &["NoPerson"]];
     POST "/sessions/{id}/end" "End one's own session" S [SIGNED, &["SessionUnknown"], &["NoPerson"]];
     GET "/directory/people/{id}/sessions" "A person's sessions" S [ADMIN, &["IdentityUnknown"]] scope("person", "read", ["id"]);

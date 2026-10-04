@@ -137,6 +137,10 @@ fn changes_state(method: &Method, path: &str) -> bool {
     {
         return false;
     }
+    // A person's canvas is their own picture: keeping it changes nothing anyone else reads.
+    if path == "/canvas" || path.starts_with("/canvas/") {
+        return false;
+    }
     !matches!(
         path,
         "/grants/check/batch" | "/secrets/recipients" | "/secrets/scope"

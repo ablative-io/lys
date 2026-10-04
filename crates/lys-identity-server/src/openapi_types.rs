@@ -102,6 +102,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     ));
     entries.extend(crate::drafts_api::types(api));
     entries.extend(crate::cord_api::types(api));
+    entries.extend(crate::canvas_api::types(api));
     entries.extend(crate::dashboard_api::types(api));
     entries.push(restart_types(api));
     entries.extend(grants_and_reviews(api));

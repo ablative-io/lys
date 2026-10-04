@@ -113,6 +113,9 @@ pub struct AppState {
     /// The master off switch, kept beside the directory log: always open,
     /// since every start asks it.
     pub cord: Mutex<crate::cord_store::CordStore>,
+    /// Each person's canvas, one file for each beside the directory log,
+    /// read when asked and made at the person's first change.
+    pub canvas: crate::canvas_store::CanvasStore,
     /// The goals and their reminders, when the configuration names their directory.
     pub goals: Option<crate::goals_store::Goals>,
     /// The apps, kept beside the grant log: always open, holding at least

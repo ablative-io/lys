@@ -221,6 +221,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::MachineUnknown
         | ServerError::Machine(..)
         | ServerError::Cord(..)
+        | ServerError::Canvas(..)
         | ServerError::SessionsUnavailable { .. }
         | ServerError::MemoryUnavailable { .. }
         | ServerError::ProvisioningUnavailable { .. }
@@ -289,9 +290,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::NotPermitted { .. }
         | ServerError::NoLiveSession { .. }
         | ServerError::RunnerAbsent { .. }
-        | ServerError::Runner { .. }
-        | ServerError::DialRefused { .. }
-        | ServerError::DialStale { .. } => "server_error",
+        | ServerError::Runner { .. } => "server_error",
     };
     let body = json!({
         "error": code,

@@ -12,6 +12,7 @@ use lys_identity_server::{
     budgets_store::BudgetStore,
     certificates_store::CertificateStore,
     configuration_store::ConfigurationStore,
+    cord_store::CordStore,
     goals_store::GoalStore,
     mcp_requests_store::McpRequestStore,
     requests_store::RequestStore,
@@ -33,6 +34,7 @@ pub(crate) fn paths(config: &Config) -> Vec<(&'static str, PathBuf)> {
             config.log_dir.with_file_name("organisation"),
         ),
         ("runner-acts", config.log_dir.with_file_name("runner-acts")),
+        ("cord", config.log_dir.with_file_name("cord")),
         (
             "launch-records",
             config.log_dir.with_file_name("launch-records"),
@@ -81,6 +83,9 @@ pub(crate) fn build(name: &str, path: &Path, config: &Config) -> Result<(), Box<
         }
         "runner-acts" => {
             snapshot_result(ActStore::open(path, key)?.snapshot_failure())?;
+        }
+        "cord" => {
+            snapshot_result(CordStore::open(path, key)?.snapshot_failure())?;
         }
         "launch-records" => {
             snapshot_result(

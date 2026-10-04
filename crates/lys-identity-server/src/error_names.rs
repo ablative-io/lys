@@ -23,6 +23,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::Holding(error) => error.name(),
         ServerError::Machine(error) => error.name(),
         ServerError::Cord(error) => error.name(),
+        ServerError::Canvas(error) => error.name(),
         ServerError::HarnessCatalogueUnreadable { .. } => "harness_catalogue_unreadable",
         ServerError::Identity(error) => identity(error),
         ServerError::Grant(error) => grant(error),
@@ -140,8 +141,6 @@ fn server(error: &ServerError) -> &str {
         ServerError::NotPermitted { .. } => "not_permitted",
         ServerError::NoLiveSession { .. } => "no_live_session",
         ServerError::RunnerAbsent { .. } => "runner_absent",
-        ServerError::DialRefused { .. } => "runner_dial_refused",
-        ServerError::DialStale { .. } => "runner_dial_stale",
     }
 }
 

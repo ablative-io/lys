@@ -55,9 +55,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 fn refused(reason: impl Into<String>) -> ServerError {
-    ServerError::DialRefused {
-        reason: reason.into(),
-    }
+    crate::error_machine::MachineError::dial_refused(reason)
 }
 
 fn header<'a>(headers: &'a HeaderMap, name: &str) -> Result<&'a str, ServerError> {
@@ -84,9 +82,10 @@ fn admitted(
         .ok_or_else(|| refused(format!("machine `{machine}`'s key does not read")))?;
     let epoch = header(headers, EPOCH_HEADER)?;
     if epoch != state.runners.hub().epoch() {
-        return Err(ServerError::DialStale {
+        return Err(crate::error_machine::MachineError::DialStale {
             reason: format!("the dial names epoch `{epoch}`, which is not this server's"),
-        });
+        }
+        .into());
     }
     let nonce = header(headers, NONCE_HEADER)?;
     if nonce.len() != 32 || unhex(nonce).is_none() {

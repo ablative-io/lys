@@ -2,7 +2,9 @@
 //! machine named in other words, another team assignment, another allowance,
 //! another connection code. And the connection code's own refusals: no code
 //! while this Lys cannot be reached from another computer, and a code that
-//! does not connect, which never says why.
+//! does not connect, which never says why. And a machine's runner dialling
+//! in: a dial its key did not sign, and one signed under another start of
+//! this server.
 
 use axum::http::StatusCode;
 
@@ -53,9 +55,31 @@ pub enum MachineError {
         "RunnerJoinRefused: this connection code does not connect this computer; ask the administrator for a new code"
     )]
     JoinRefused,
+    /// A dial request was not signed by the machine's key, or names a
+    /// machine with no dialled runner.
+    #[error("runner_dial_refused: {reason}")]
+    DialRefused {
+        /// Why.
+        reason: String,
+    },
+    /// A dial was signed under an epoch not this server's: it was made
+    /// before the server last started, or captured and sent again after.
+    #[error("runner_dial_stale: {reason}")]
+    DialStale {
+        /// Why.
+        reason: String,
+    },
 }
 
 impl MachineError {
+    /// A dial refused for `reason`.
+    pub(crate) fn dial_refused(reason: impl Into<String>) -> crate::error::ServerError {
+        Self::DialRefused {
+            reason: reason.into(),
+        }
+        .into()
+    }
+
     pub(crate) const fn name(&self) -> &'static str {
         match self {
             Self::Reused { .. } => "MachineReused",
@@ -64,6 +88,8 @@ impl MachineError {
             Self::JoinOperationReused { .. } => "RunnerJoinOperationReused",
             Self::JoinUnreachable { .. } => "RunnerJoinUnreachable",
             Self::JoinRefused => "RunnerJoinRefused",
+            Self::DialRefused { .. } => "runner_dial_refused",
+            Self::DialStale { .. } => "runner_dial_stale",
         }
     }
 
@@ -73,8 +99,10 @@ impl MachineError {
             | Self::TeamReused { .. }
             | Self::AgentsReused { .. }
             | Self::JoinOperationReused { .. }
-            | Self::JoinUnreachable { .. } => StatusCode::CONFLICT,
+            | Self::JoinUnreachable { .. }
+            | Self::DialStale { .. } => StatusCode::CONFLICT,
             Self::JoinRefused => StatusCode::FORBIDDEN,
+            Self::DialRefused { .. } => StatusCode::UNAUTHORIZED,
         }
     }
 }

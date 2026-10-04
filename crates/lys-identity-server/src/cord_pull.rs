@@ -257,6 +257,70 @@ pub(crate) async fn end_late_start(
     record_stopped(state, &pull, &ended)
 }
 
+/// Settle a session kept as starting whose start was refused because
+/// everything is stopped. Its computer is asked under the pull in force: a
+/// session the runner ended is recorded as that pull's; one the runner
+/// still runs stays open; one the runner does not hold never ran, and is
+/// kept as stopped in the runner's own words. A session not kept open is
+/// left as it is and no runner is asked.
+pub(crate) async fn settle_refused_start(
+    state: &Arc<AppState>,
+    machine: &str,
+    session: &str,
+    agent: &str,
+) -> Result<(), ServerError> {
+    if state.runtime.is_none() {
+        return Ok(());
+    }
+    let open = with_runtime(state, |store| {
+        Ok(store
+            .session(session)
+            .is_some_and(|tracked| !tracked.stopped()))
+    })?;
+    let Some(pull) = with_cord(state, CordStore::standing)? else {
+        return Ok(());
+    };
+    if !open {
+        return Ok(());
+    }
+    let (stopped, running) = ask_runner(state, machine, &pull)
+        .await
+        .map_err(|(refusal, words)| ServerError::Runner { refusal, words })?;
+    let held = stopped.iter().chain(&running).any(|each| each == session);
+    let ended: Vec<(String, String)> = stopped
+        .into_iter()
+        .map(|each| (machine.to_owned(), each))
+        .collect();
+    record_stopped(state, &pull, &ended)?;
+    if held {
+        return Ok(());
+    }
+    with_runtime(state, |store| {
+        if store
+            .session(session)
+            .is_none_or(crate::runtime_state::Tracked::stopped)
+        {
+            return Ok(());
+        }
+        store
+            .report(Report {
+                operation: part(&pull.operation, "never-started", session),
+                session: session.to_owned(),
+                agent: Some(agent.to_owned()),
+                machine: machine.to_owned(),
+                state: Reported::Stopped,
+                what: format!("everything stopped by {}: {}", pull.by, pull.reason),
+                confirmation: format!(
+                    "the runner of machine {machine}, asked when everything was stopped, held no such session"
+                ),
+                reported_by: format!("the runner of machine {machine}"),
+                at: now(),
+                launch: None,
+            })
+            .map(drop)
+    })
+}
+
 /// Record every session a runner ended by this pull as stopped, in one
 /// durable write, then close each run's pass and context as a confirmed end
 /// closes them. A session its runner names that Lys does not hold open on

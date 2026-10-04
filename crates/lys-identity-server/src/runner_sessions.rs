@@ -308,8 +308,12 @@ pub async fn run_on_runner(
     (agent, machine, caller): (&str, &str, &str),
     launch: Launch,
 ) -> Result<Value, ServerError> {
-    // Every start a runner is asked for comes here: none while everything is stopped.
-    crate::cord_api::refuse_start(state)?;
+    // Every start a runner is asked for comes here: none while everything is
+    // stopped. A start already kept as starting is settled, not left open.
+    if let Err(stopped) = crate::cord_api::refuse_start(state) {
+        crate::cord_pull::settle_refused_start(state, machine, &launch.session, agent).await?;
+        return Err(stopped);
+    }
     let runner = machine_runner(state, machine)?.ok_or(ServerError::MachineWithoutRunner)?;
     let driven = Driven {
         session: launch.session.clone(),

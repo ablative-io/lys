@@ -503,6 +503,18 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         ),
         (ServerError::Cord(CordError::NotPulled), "cord_not_pulled"),
         (
+            ServerError::Canvas(crate::error_canvas::CanvasError::Unavailable {
+                reason: detail.to_owned(),
+            }),
+            "CanvasUnavailable",
+        ),
+        (
+            ServerError::Canvas(crate::error_canvas::CanvasError::Refused {
+                words: detail.to_owned(),
+            }),
+            "CanvasRefused",
+        ),
+        (
             ServerError::Cord(CordError::Unavailable {
                 reason: detail.to_owned(),
             }),
@@ -594,15 +606,15 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "runner:name",
         ),
         (
-            ServerError::DialRefused {
+            ServerError::Machine(crate::error_machine::MachineError::DialRefused {
                 reason: detail.to_owned(),
-            },
+            }),
             "runner_dial_refused",
         ),
         (
-            ServerError::DialStale {
+            ServerError::Machine(crate::error_machine::MachineError::DialStale {
                 reason: detail.to_owned(),
-            },
+            }),
             "runner_dial_stale",
         ),
     ]

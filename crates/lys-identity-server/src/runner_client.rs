@@ -333,8 +333,10 @@ impl DialHub {
     /// Hand `reply` to the caller waiting on `ticket`.
     pub fn reply(&self, machine: &str, ticket: &str, reply: Replied) -> Result<(), ServerError> {
         let waiting = self.with(machine, |held| held.delivered.remove(ticket))?;
-        let waiting = waiting.ok_or_else(|| ServerError::DialRefused {
-            reason: format!("no request of machine `{machine}` waits on ticket `{ticket}`"),
+        let waiting = waiting.ok_or_else(|| {
+            crate::error_machine::MachineError::dial_refused(format!(
+                "no request of machine `{machine}` waits on ticket `{ticket}`"
+            ))
         })?;
         if waiting.send(reply).is_err() {
             return Err(ServerError::Runner {

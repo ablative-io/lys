@@ -153,7 +153,6 @@ impl ServerError {
             | Self::SignInRefused
             | Self::SetupCodeRefused
             | Self::ClientUnknown
-            | Self::DialRefused { .. }
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled | Self::RegistrationThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::BodyTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
@@ -217,7 +216,6 @@ impl ServerError {
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }
             | Self::RunnerAbsent { .. }
-            | Self::DialStale { .. }
             | Self::SetupClosed
             | Self::ReviewReused { .. }
             | Self::BootstrapInterrupted { .. } => StatusCode::CONFLICT,
@@ -269,6 +267,7 @@ impl ServerError {
             Self::Holding(error) => error.status(),
             Self::Machine(error) => error.status(),
             Self::Cord(error) => error.status(),
+            Self::Canvas(error) => error.status(),
         }
     }
 }

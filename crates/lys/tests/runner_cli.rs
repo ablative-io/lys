@@ -169,7 +169,22 @@ fn a_runner_asked_to_stop_ends_every_session_and_the_next_reports_each_exit() ->
             .ended
             .clone()
             .ok_or("a session reads running")?;
-        assert_eq!(ended.how, EndedHow::Exited, "its exit was seen: {id}");
+        // The runner ended it for its own stop, and says so: who, and why. Its exit was still seen, never invented.
+        assert_eq!(ended.how, EndedHow::Stopped, "its stop is said: {id}");
+        let stopped = ended.stopped.as_ref().ok_or("a stop names no one")?;
+        assert_eq!(stopped.by, "the runner", "{id}");
+        assert_eq!(
+            stopped.reason, "the runner was asked to stop by SIGTERM",
+            "{id}"
+        );
+        assert!(
+            stopped.at <= ended.at,
+            "it was stopped before it ended: {id}"
+        );
+        assert!(
+            ended.status.is_some() || ended.signal.is_some(),
+            "its exit was seen: {id}"
+        );
         exited += 1;
     }
     assert_eq!(exited, 2);
