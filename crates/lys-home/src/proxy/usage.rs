@@ -44,8 +44,8 @@
 //! - A line that is not a whole JSON object is what a dying proxy left of a
 //!   write it did not finish. A reader skips it; the call's whole line
 //!   follows on a line of its own.
-//! - The file is not synced when a line is written. A machine that loses
-//!   power can lose the last lines though the calls' records are kept.
+//! - The file and its directory are synced after each line, before the
+//!   journal lets the call go: a line is not lost to a power loss.
 
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -153,7 +153,11 @@ pub(super) fn append(dir: &Path, call: &OpenCall) -> std::io::Result<()> {
     }
     text.push_str(&serde_json::to_string(&line).map_err(std::io::Error::other)?);
     text.push('\n');
-    file.write_all(text.as_bytes())
+    file.write_all(text.as_bytes())?;
+    // The line is durable before the journal lets the call go: a budget
+    // must not read low after a power loss.
+    file.sync_all()?;
+    std::fs::File::open(dir)?.sync_all()
 }
 
 /// Whether the file ends part way through a line.
