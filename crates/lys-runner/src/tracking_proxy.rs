@@ -217,7 +217,13 @@ impl ProxyReading<'_> {
                     observed,
                     Measure::Spend,
                     (figures, unavailable),
-                    (line.model.clone(), account.clone(), line.session.clone()),
+                    (
+                        line.model.clone(),
+                        account.clone(),
+                        line.record.clone().zip(line.entry.clone()).map(
+                            |(session, entry)| crate::tracking::RecordAt { session, entry },
+                        ),
+                    ),
                 ));
             }
             None => bodies.push(coverage(
@@ -270,7 +276,11 @@ impl ProxyReading<'_> {
         observed: Option<u64>,
         measure: Measure,
         (figures, mut unavailable): (Figures, Vec<Unavailable>),
-        (model, account, record): (Option<String>, Option<String>, Option<String>),
+        (model, account, record): (
+            Option<String>,
+            Option<String>,
+            Option<crate::tracking::RecordAt>,
+        ),
     ) -> Body {
         let observed_at = observed.unwrap_or_else(|| {
             unavailable.push(Unavailable {

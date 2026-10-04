@@ -1,5 +1,6 @@
 //! Prepared call references survive a crash before the session append.
 
+use super::coding::Coding;
 use super::parts::{complete_response_parts, read_json, request_model, request_parts_of};
 use super::{Api, CallMeta, CallRecord, CallStatus, IngestReport, OutcomeMeta, already, find_call};
 use crate::error::HomeError;
@@ -12,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::io::Read;
 use std::path::Path;
 
 #[cfg(test)]
@@ -234,57 +234,6 @@ pub(crate) struct Captured<'a> {
     pub raw_response: Option<String>,
     pub timing: CaptureTiming,
     pub seen: &'a Seen,
-}
-
-/// A content coding a stored response is decoded from: the three the
-/// proxy's stream reader decodes (`proxy::decode`).
-#[derive(Clone, Copy)]
-enum Coding {
-    Gzip,
-    Deflate,
-    Brotli,
-}
-
-impl Coding {
-    /// The one coding the response's head names, when it is one of the
-    /// three. More than one coding, or any other, is none: none of those
-    /// bytes are guessed at.
-    fn of(head: &Head) -> Option<Self> {
-        let [one] = head.response.values.get("content-encoding")?.as_slice() else {
-            return None;
-        };
-        let one = one.trim();
-        [
-            ("gzip", Self::Gzip),
-            ("deflate", Self::Deflate),
-            ("br", Self::Brotli),
-        ]
-        .into_iter()
-        .find_map(|(name, coding)| one.eq_ignore_ascii_case(name).then_some(coding))
-    }
-
-    fn name(self) -> &'static str {
-        match self {
-            Self::Gzip => "gzip",
-            Self::Deflate => "deflate",
-            Self::Brotli => "br",
-        }
-    }
-
-    /// The whole of `stored`, decoded. The stored bytes stay as they came.
-    fn decode(self, stored: &[u8]) -> std::io::Result<Vec<u8>> {
-        // The decoder's working buffer, not a bound on what it decodes.
-        const BUFFER: usize = 8192;
-        let mut bytes = Vec::new();
-        match self {
-            Self::Gzip => flate2::read::MultiGzDecoder::new(stored).read_to_end(&mut bytes)?,
-            Self::Deflate => flate2::read::ZlibDecoder::new(stored).read_to_end(&mut bytes)?,
-            Self::Brotli => {
-                brotli_decompressor::Decompressor::new(stored, BUFFER).read_to_end(&mut bytes)?
-            }
-        };
-        Ok(bytes)
-    }
 }
 
 const NOT_JSON: &str = "the response is not JSON";

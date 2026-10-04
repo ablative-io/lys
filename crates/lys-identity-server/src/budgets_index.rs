@@ -24,6 +24,10 @@ struct Agent {
     totals: crate::budgets_totals::Totals,
     /// Each account's reports of its windows, whichever session made them.
     accounts: BTreeMap<String, Timeline>,
+    /// The uses that each count one model call, in the order made.
+    calls: Timeline,
+    /// Each call's use, by the call's id.
+    call_ids: BTreeMap<String, usize>,
 }
 
 /// Rebuilt from retained records on open; never part of signed state.
@@ -79,6 +83,32 @@ impl Index {
                 })
                 .collect()
         })
+    }
+
+    /// The positions of up to `count` of `agent`'s calls made before
+    /// `before`, newest first, and whether older ones remain: a walk of that
+    /// many index rows, never of the uses.
+    pub(crate) fn calls(
+        &self,
+        agent: &str,
+        before: Option<(i64, usize)>,
+        count: usize,
+    ) -> (Vec<usize>, bool) {
+        let Some(agent) = self.agents.get(agent) else {
+            return (Vec::new(), false);
+        };
+        let mut older = agent
+            .calls
+            .range(..before.unwrap_or((i64::MAX, usize::MAX)))
+            .rev()
+            .map(|(_, position)| *position);
+        let page = older.by_ref().take(count).collect();
+        (page, older.next().is_some())
+    }
+
+    /// The position of the use that counts `agent`'s call `id`.
+    pub(crate) fn call(&self, agent: &str, id: &str) -> Option<usize> {
+        self.agents.get(agent)?.call_ids.get(id).copied()
     }
 
     pub(crate) fn has_usage(&self, agent: &str) -> bool {
@@ -190,6 +220,10 @@ impl Agent {
                 usage,
                 position,
             );
+        }
+        if let Some(call) = &usage.call {
+            insert(&mut self.calls, usage, position);
+            self.call_ids.insert(call.id.clone(), position);
         }
         self.totals.record(usage, position)?;
         insert(&mut self.periods, usage, position);

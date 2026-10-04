@@ -89,6 +89,14 @@ pub struct UsageLine {
     pub ended_at: Option<String>,
     /// How the call ended.
     pub status: CallStatus,
+    /// The home session the call is recorded under: the linked session's
+    /// own id, or the day's unlinked one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record: Option<String>,
+    /// The id of the entry in that session that holds the call, so a reader
+    /// seeks to it and never walks the file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry: Option<String>,
 }
 
 /// One account window a response's headers reported.
@@ -139,16 +147,26 @@ impl UsageLine {
             started_at: record.started_at.clone(),
             ended_at: ended_at(&record.started_at, record.duration_ms),
             status: record.status,
+            record: None,
+            entry: None,
         })
     }
 }
 
-/// Append the call's line to its run's file under `dir`; a call with no run
-/// key or no prepared record writes nothing.
-pub(super) fn append(dir: &Path, call: &OpenCall) -> std::io::Result<()> {
-    let Some(line) = UsageLine::of(call) else {
+/// Append the call's line to its run's file under `dir`, naming the home
+/// session and entry it was recorded as; a call with no run key or no
+/// prepared record writes nothing.
+pub(super) fn append(
+    dir: &Path,
+    call: &OpenCall,
+    record: &str,
+    entry: &str,
+) -> std::io::Result<()> {
+    let Some(mut line) = UsageLine::of(call) else {
         return Ok(());
     };
+    line.record = Some(record.to_owned());
+    line.entry = Some(entry.to_owned());
     std::fs::create_dir_all(dir)?;
     let mut file = std::fs::OpenOptions::new()
         .read(true)

@@ -225,9 +225,9 @@ pub struct CallSeen {
     pub cache_read_tokens: Option<u64>,
     /// The run key the call carried.
     pub run: String,
-    /// The proxy's record file that holds the call whole, when it named one.
+    /// Where the proxy keeps the call whole, when its usage line said.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub record: Option<String>,
+    pub record: Option<lys_runner::tracking::RecordAt>,
 }
 
 /// One leaf of the budgets' log.

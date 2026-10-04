@@ -438,23 +438,24 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
         super::timing::add(&super::timing::INGEST, started);
         super::timing::mark(&super::timing::DURABLE);
     }
-    match ingested {
+    let entry = match ingested {
         Ok((status, ingested)) => {
             report.time_to_record_ns = job
                 .last_arrival
                 .map(|at| u64::try_from(at.elapsed().as_nanos()).unwrap_or(u64::MAX));
             report.status = status;
-            report.entry_id = Some(ingested.entry_id);
+            report.entry_id = Some(ingested.entry_id.clone());
             report.already_recorded = ingested.already_recorded;
+            ingested.entry_id
         }
         Err(error) => {
             report.held = Some(error.to_string());
             return report;
         }
-    }
+    };
     // The record is durable and the journal still holds the call: a death
     // before this line is written is a line written by the next start.
-    if let Err(error) = super::usage::append(&journal.usage_dir(), &job.call) {
+    if let Err(error) = super::usage::append(&journal.usage_dir(), &job.call, &session_id, &entry) {
         report.held = Some(format!(
             "the call's usage line could not be written: {error}"
         ));

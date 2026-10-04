@@ -22,6 +22,8 @@ use crate::record::blocks::{BlockStore, Hash, Put};
 use crate::record::entries::{CUSTOM_CALL, EntryBody};
 
 pub(crate) mod captured;
+mod coding;
+pub mod whole;
 mod parts;
 mod reported;
 

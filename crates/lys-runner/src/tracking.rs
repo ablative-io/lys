@@ -224,10 +224,20 @@ pub struct UsageRecord {
     /// whole on the machine it was made on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run: Option<String>,
-    /// The name of the proxy's record file that holds the call whole (the
-    /// harness's own session id), when the call named one.
+    /// Where the proxy keeps the call whole, when its usage line said.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub record: Option<String>,
+    pub record: Option<RecordAt>,
+}
+
+/// Where a proxy keeps one call whole: the session of its home and the
+/// entry in it, so a reader seeks to the call and never walks the file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecordAt {
+    /// The home session the call is recorded under.
+    pub session: String,
+    /// The entry in that session that holds the call.
+    pub entry: String,
 }
 
 /// The rotation evidence a record is attributed by.
