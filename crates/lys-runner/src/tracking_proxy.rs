@@ -66,7 +66,7 @@ impl ProxyTracking {
         if !is_run_key(&self.run) {
             return Err(RunnerError::refused(
                 "run_key_invalid",
-                "a run key is one or more letters, digits, '-' or '_'",
+                "a run key is 32 lowercase hexadecimal digits, as a launch mints it",
             ));
         }
         Ok(())

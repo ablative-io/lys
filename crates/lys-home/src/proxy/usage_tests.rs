@@ -9,6 +9,9 @@ use crate::record::Home;
 
 type Res = Result<(), Box<dyn std::error::Error>>;
 
+/// A run key of the shape a launch mints.
+const RUN: &str = "0123456789abcdef0123456789abcdef";
+
 fn open_call(call_id: &str, run: Option<&str>) -> OpenCall {
     OpenCall {
         call_id: call_id.to_owned(),
@@ -30,10 +33,10 @@ fn a_restart_writes_the_line_of_a_call_it_recovers_after_closing_a_torn_line() -
     let capture = dir.path().join("capture");
     std::fs::create_dir_all(&capture)?;
     std::fs::create_dir_all(journal.usage_dir())?;
-    let file = journal.usage_dir().join("r-1.jsonl");
+    let file = journal.usage_dir().join(format!("{RUN}.jsonl"));
     // What a proxy that died part way through a line left behind.
     std::fs::write(&file, b"{\"call_id\":\"torn")?;
-    journal.write(&open_call("c1", Some("r-1")))?;
+    journal.write(&open_call("c1", Some(RUN)))?;
     journal.write(&open_call("c2", None))?;
     assert_eq!(recover(&home, &journal, &capture)?.len(), 2);
 
@@ -43,7 +46,7 @@ fn a_restart_writes_the_line_of_a_call_it_recovers_after_closing_a_torn_line() -
     assert_eq!(lines[0], "{\"call_id\":\"torn");
     let line: UsageLine = serde_json::from_str(lines[1])?;
     assert_eq!(line.call_id, "c1");
-    assert_eq!(line.run, "r-1");
+    assert_eq!(line.run, RUN);
     assert_eq!(line.session.as_deref(), Some(KEY));
     assert_eq!(line.status, CallStatus::Lost);
     assert_eq!(line.usage, None);
@@ -97,8 +100,9 @@ fn a_call_ends_its_length_after_it_started_and_a_run_key_is_plain() {
         "{ended:?}"
     );
     assert_eq!(ended_at("2026-09-28T10:00:00.000Z", None), None);
-    assert!(is_run_key("r-1_A"));
+    assert!(is_run_key(RUN));
     assert!(!is_run_key(""));
     assert!(!is_run_key("../r"));
     assert!(!is_run_key("r.jsonl"));
+    assert!(!is_run_key("r-1_A"));
 }

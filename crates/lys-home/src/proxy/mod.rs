@@ -33,6 +33,8 @@ pub mod link;
 #[cfg(test)]
 mod link_tests;
 mod persist;
+#[cfg(test)]
+mod run_key_tests;
 mod spool;
 pub mod stream;
 pub mod stream_chat;

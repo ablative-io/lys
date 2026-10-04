@@ -226,7 +226,7 @@ fn native_template(
                     return Err(refused(
                         fields,
                         "run",
-                        "a run key is one or more letters, digits, '-' or '_'",
+                        "a run key is 32 lowercase hexadecimal digits, as a launch mints it",
                     ));
                 }
                 let address = keyed(proxy, run).ok_or_else(|| {

@@ -10,6 +10,8 @@ use serde_json::{Value, json};
 type TestResult = Result<(), Box<dyn Error>>;
 
 const PROXY: &str = "http://127.0.0.1:18484/anthropic";
+/// A run key of the shape a launch mints.
+const RUN: &str = "0123456789abcdef0123456789abcdef";
 
 fn fields(model_proxy: Option<&str>) -> Result<LaunchFields, Box<dyn Error>> {
     let catalogue: Value = serde_json::from_str(include_str!(
@@ -66,29 +68,31 @@ fn the_proxy_is_the_run_s_base_url_and_absent_without_one() -> TestResult {
 #[test]
 fn a_run_key_goes_first_on_the_proxy_s_path_and_in_the_run_s_environment() -> TestResult {
     let mut keyed = fields(Some(PROXY))?;
-    keyed.run = Some("run-fixture".to_owned());
+    keyed.run = Some(RUN.to_owned());
     let keyed_env = env(&render(&keyed, &[], &permissions(), &[])?.text)?;
     assert_eq!(
         keyed_env[PROXY_VARIABLE],
-        "http://127.0.0.1:18484/run-fixture/anthropic"
+        format!("http://127.0.0.1:18484/{RUN}/anthropic")
     );
-    assert_eq!(keyed_env[RUN_VARIABLE], "run-fixture");
+    assert_eq!(keyed_env[RUN_VARIABLE], RUN);
     // A key says nothing without a proxy to put it on.
     let mut alone = fields(None)?;
-    alone.run = Some("run-fixture".to_owned());
+    alone.run = Some(RUN.to_owned());
     let alone_env = env(&render(&alone, &[], &permissions(), &[])?.text)?;
     assert!(alone_env.get(RUN_VARIABLE).is_none());
     assert!(alone_env.get(PROXY_VARIABLE).is_none());
     // A key that is not one, or an address a key cannot follow, is refused
     // by name: the run is never given the proxy unkeyed in its place.
-    let mut slashed = fields(Some(PROXY))?;
-    slashed.run = Some("run/fixture".to_owned());
-    let Err(refusal) = render(&slashed, &[], &permissions(), &[]) else {
-        return Err("a run key with a slash was rendered".into());
-    };
-    assert!(refusal.to_string().contains("run"), "{refusal}");
+    for not_a_key in ["run/fixture", "run-fixture", &RUN[1..]] {
+        let mut wrong = fields(Some(PROXY))?;
+        wrong.run = Some(not_a_key.to_owned());
+        let Err(refusal) = render(&wrong, &[], &permissions(), &[]) else {
+            return Err(format!("{not_a_key} was rendered as a run key").into());
+        };
+        assert!(refusal.to_string().contains("run"), "{refusal}");
+    }
     let mut hostless = fields(Some("anthropic"))?;
-    hostless.run = Some("run-fixture".to_owned());
+    hostless.run = Some(RUN.to_owned());
     let Err(refusal) = render(&hostless, &[], &permissions(), &[]) else {
         return Err("an address with no host was keyed".into());
     };

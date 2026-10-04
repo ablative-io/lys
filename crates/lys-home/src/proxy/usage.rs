@@ -102,14 +102,21 @@ pub struct Window {
     pub resets_at_ms: u64,
 }
 
-/// Whether a path part can be a run key: one or more ASCII letters, digits,
-/// `-` or `_`. A key names its run's usage file, so nothing else is one.
+/// The digits of a run key: two for each of the sixteen random bytes a
+/// launch mints one from (`record::fresh_id`).
+const RUN_KEY_DIGITS: usize = 32;
+
+/// Whether a path part is a run key: exactly what a Lys launch mints for a
+/// run, 32 lowercase hexadecimal digits. Nothing else is one: not another
+/// length, not another letter, not an upper-case digit. A key names its
+/// run's usage file and says whose a call is, so nothing is taken for one
+/// that a launch could not have minted.
 #[must_use]
 pub fn is_run_key(part: &str) -> bool {
-    !part.is_empty()
+    part.len() == RUN_KEY_DIGITS
         && part
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 impl UsageLine {

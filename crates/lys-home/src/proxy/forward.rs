@@ -423,8 +423,10 @@ impl Proxy {
         let Some((provider, base, rest)) = self.route(unkeyed) else {
             return refusal(
                 StatusCode::NOT_FOUND,
-                "lys-proxy: no provider for this path; a path begins /anthropic or /openai, \
-                 after its run key when it carries one",
+                "lys-proxy refused the call: its path names no provider. A path begins \
+                 /anthropic or /openai, after its run key when it carries one, and a run key \
+                 is the 32 lowercase hexadecimal digits a Lys launch gave the run; any other \
+                 first part is not a key",
             );
         };
         let Some(api) = api_of(request.method(), &rest) else {
@@ -474,18 +476,16 @@ impl Proxy {
     }
 }
 
-/// The providers a path names, each as the path part that names it.
-const PROVIDERS: [&str; 2] = ["anthropic", "openai"];
-
 /// The run key a path opens with, and the path without it.
 ///
 /// A Lys launch gives a run its base address with one part put first, the
 /// run's key: `/<key>/anthropic/v1/messages`. The key is taken off here and
-/// never forwarded. A key is one or more ASCII letters, digits, `-` or `_`,
-/// and is never a provider's name: a path whose first part is a provider
-/// carries no key and is routed as it came. Any other plain first part is
-/// read as a key, so a path that names no provider after it is answered as
-/// naming none.
+/// never forwarded. A key is exactly what a launch mints, 32 lowercase
+/// hexadecimal digits ([`super::usage::is_run_key`]), so it is never a
+/// provider's name: a path whose first part is a provider carries no key and
+/// is routed as it came. Any other first part is not a key and is left on
+/// the path, which then names no provider and is refused before anything is
+/// journalled or forwarded.
 #[must_use]
 pub fn run_key(path_and_query: &str) -> (Option<&str>, &str) {
     let Some(after) = path_and_query.strip_prefix('/') else {
@@ -495,7 +495,7 @@ pub fn run_key(path_and_query: &str) -> (Option<&str>, &str) {
         return (None, path_and_query);
     };
     let (first, rest) = after.split_at(end);
-    if !super::usage::is_run_key(first) || PROVIDERS.contains(&first) {
+    if !super::usage::is_run_key(first) {
         return (None, path_and_query);
     }
     (Some(first), rest)
