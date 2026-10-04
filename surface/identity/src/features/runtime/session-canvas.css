@@ -75,3 +75,15 @@
 .session-canvas-node:fullscreen .terminal { flex: 1; min-height: 0; }
 .canvas-connections, .canvas-about { max-height: 120px; overflow: auto; overscroll-behavior: contain; }
 .canvas-connections h4 { margin: 0 0 4px; }
+
+/* The Running page is the canvas, edge to edge: no title line, no strip, no frame. Who is running sits over its top left as names to go to; what a runner did not answer, and the fold of connections in words, sit under them; the zoom and the way back sit over its top right. */
+.page.session-canvas-page { position: relative; padding: 0; }
+.session-canvas-page > .head { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); }
+.session-canvas-page > .head:has(button) { position: absolute; top: 10px; right: 12px; z-index: 8; width: auto; height: auto; overflow: visible; clip-path: none; }
+.session-canvas-page > .head:has(button) h1 { display: none; }
+.session-canvas-page .canvas-side { position: relative; }
+.session-canvas-page .running-list { position: absolute; top: 10px; left: 12px; z-index: 5; max-width: calc(100% - 360px); }
+.session-canvas-page .session-canvas-strip { position: absolute; top: 44px; left: 12px; z-index: 5; margin: 0; max-width: min(640px, 60%); flex-direction: column; align-items: flex-start; }
+.session-canvas-page .canvas-side > .session-canvas-scroll { margin-top: 0; border: 0; border-radius: 0; }
+.canvas-fold > summary { cursor: pointer; font-size: 12px; color: var(--text-muted); }
+.canvas-fold-body { margin-top: 6px; padding: 10px 12px; max-height: 50vh; overflow: auto; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }

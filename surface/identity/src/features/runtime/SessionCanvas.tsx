@@ -311,9 +311,12 @@ function Whole({ graph, messages }: { graph: SessionGraph; messages: Load<Messag
     <div className="session-canvas-strip">
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}
-      {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
-      {read ? <section className="canvas-about" aria-label="Message connections"><MessageConnections value={read} change={setLater} /></section> : null}
-      <Connections graph={whole} />
+      {/* The connections in words are one small fold over the canvas: there for a reader who wants them, never a line across the page. */}
+      <details className="canvas-fold"><summary>Connections ({whole.edges.length})</summary><div className="canvas-fold-body">
+        {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
+        {read ? <section className="canvas-about" aria-label="Message connections"><MessageConnections value={read} change={setLater} /></section> : null}
+        <Connections graph={whole} />
+      </div></details>
     </div>
     <Canvas graph={whole} />
   </>;
