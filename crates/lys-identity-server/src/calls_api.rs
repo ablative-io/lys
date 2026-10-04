@@ -65,6 +65,11 @@ pub struct CallRow {
     pub cache_read_tokens: Option<u64>,
     /// The account the call drew on.
     pub account: Option<String>,
+    /// How the call ended, in the record's own word: `complete`,
+    /// `cancelled`, `partial`, `unrecorded` or `lost`.
+    pub status: Option<String>,
+    /// How long the call took, in milliseconds.
+    pub duration_ms: Option<u64>,
 }
 
 /// One page of an agent's calls, newest first.
@@ -136,6 +141,8 @@ fn row(usage: &Usage) -> Option<CallRow> {
         cache_creation_tokens: call.cache_creation_tokens,
         cache_read_tokens: call.cache_read_tokens,
         account: usage.account.clone(),
+        status: call.record.as_ref().map(|kept| kept.status.clone()),
+        duration_ms: call.record.as_ref().and_then(|kept| kept.duration_ms),
     })
 }
 

@@ -17,8 +17,10 @@
 //! - A call that reported token figures is one spend record whose id is the
 //!   call's id, so a line the proxy wrote twice is the same record twice.
 //! - A call that reported none is a `usage_unreported` coverage entry, and a
-//!   call lost in flight is a `call_lost` one: neither is counted as nothing
-//!   spent.
+//!   call lost in flight is a `call_lost` one, each beside a spend record of
+//!   the call's id that carries no figure: every call that passed is on the
+//!   record with how it ended, and neither is counted as nothing spent.
+//! - Every spend record names where the proxy keeps the call whole.
 //! - The account windows the response's headers reported are one snapshot
 //!   record, id `<call id>:plan`, kept only when the windows or the account
 //!   differ from the last kept, as a Codex rollout's are.
@@ -100,7 +102,7 @@ fn instant(text: &str) -> Option<u64> {
 /// The spend figures of one call's reported tokens. The context in use is
 /// the call's whole input: fresh input, cache reads and cache writes.
 fn spend(api: Api, usage: &Tokens) -> (Figures, Vec<Unavailable>) {
-    let (input, context) = match api {
+    let (input, context, written) = match api {
         // Anthropic's input excludes what the cache held.
         Api::Messages => (
             usage.input,
@@ -109,19 +111,23 @@ fn spend(api: Api, usage: &Tokens) -> (Figures, Vec<Unavailable>) {
                     .checked_add(usage.cache_read.unwrap_or(0))?
                     .checked_add(usage.cache_creation.unwrap_or(0))
             }),
+            usage.cache_creation,
         ),
-        // OpenAI's input counts the cached tokens among it.
+        // OpenAI's input counts the cached tokens among it, and its usage has
+        // no figure for tokens written to the cache: none are written at a
+        // price of their own, so a call that reported its input wrote nought.
         Api::ChatCompletions | Api::Responses => (
             usage
                 .input
                 .map(|input| input.saturating_sub(usage.cache_read.unwrap_or(0))),
             usage.input,
+            usage.input.map(|_| usage.cache_creation.unwrap_or(0)),
         ),
     };
     let figures = Figures {
         input_tokens: input,
         output_tokens: usage.output,
-        cache_creation_tokens: usage.cache_creation,
+        cache_creation_tokens: written,
         cache_read_tokens: usage.cache_read,
         context_tokens: context,
         ..Figures::default()
@@ -182,16 +188,6 @@ impl ProxyReading<'_> {
                 ),
             )];
         }
-        if line.status == CallStatus::Lost {
-            return vec![coverage(
-                "call_lost",
-                source,
-                format!(
-                    "call {} was lost in flight: the proxy died before its response ended, and what it spent is not known",
-                    line.call_id
-                ),
-            )];
-        }
         let observed = line
             .ended_at
             .as_deref()
@@ -201,39 +197,73 @@ impl ProxyReading<'_> {
             .account
             .clone()
             .or_else(|| self.tracking.account.clone());
+        // Where the call is kept whole and how it ended: what a list of the
+        // session's calls shows, whether or not the call reported a figure.
+        let kept = line
+            .record
+            .clone()
+            .zip(line.entry.clone())
+            .map(|(session, entry)| crate::tracking::RecordAt {
+                session,
+                entry,
+                status: serde_json::to_value(line.status)
+                    .ok()
+                    .and_then(|word| word.as_str().map(str::to_owned))
+                    .unwrap_or_default(),
+                duration_ms: observed
+                    .zip(instant(&line.started_at))
+                    .and_then(|(ended, started)| ended.checked_sub(started)),
+            });
         let mut bodies = Vec::new();
-        match line.usage.as_ref() {
-            Some(usage) => {
-                let (mut figures, mut unavailable) = spend(line.api, usage);
-                if self.tracking.context_window == 0 && figures.context_tokens.take().is_some() {
-                    unavailable.push(Unavailable {
-                        figure: "context_tokens".to_owned(),
-                        reason: "the_profile_declares_no_context_window".to_owned(),
-                    });
-                }
-                bodies.push(self.record(
-                    source,
-                    (line.call_id.clone(), offset),
-                    observed,
-                    Measure::Spend,
-                    (figures, unavailable),
-                    (
-                        line.model.clone(),
-                        account.clone(),
-                        line.record.clone().zip(line.entry.clone()).map(
-                            |(session, entry)| crate::tracking::RecordAt { session, entry },
-                        ),
-                    ),
-                ));
-            }
-            None => bodies.push(coverage(
+        // A call whose spend is not known is still one record, with no
+        // figure, beside the coverage entry that says why: every call that
+        // passed is on the record, and none is counted as nothing spent.
+        let unknown = if line.status == CallStatus::Lost {
+            Some((
+                "call_lost",
+                format!(
+                    "call {} was lost in flight: the proxy died before its response ended, and what it spent is not known",
+                    line.call_id
+                ),
+            ))
+        } else if line.usage.is_none() {
+            Some((
                 "usage_unreported",
-                source,
                 format!(
                     "call {} ended {:?} and its response reported no token figures: what it spent is not known",
                     line.call_id, line.status
                 ),
-            )),
+            ))
+        } else {
+            None
+        };
+        let (figures, mut unavailable) = match (&unknown, line.usage.as_ref()) {
+            (None, Some(usage)) => spend(line.api, usage),
+            // No figure, each named as unreported.
+            _ => spend(line.api, &Tokens::default()),
+        };
+        let mut figures = figures;
+        if self.tracking.context_window == 0 && figures.context_tokens.take().is_some() {
+            unavailable.push(Unavailable {
+                figure: "context_tokens".to_owned(),
+                reason: "the_profile_declares_no_context_window".to_owned(),
+            });
+        }
+        let lost = line.status == CallStatus::Lost;
+        if let Some((state, words)) = unknown {
+            bodies.push(coverage(state, source, words));
+        }
+        bodies.push(self.record(
+            source,
+            (line.call_id.clone(), offset),
+            observed,
+            Measure::Spend,
+            (figures, unavailable),
+            (line.model.clone(), account.clone(), kept),
+        ));
+        if lost {
+            // A lost call's head never arrived: it reports no windows.
+            return bodies;
         }
         let mut unavailable = Vec::new();
         let mut plan_windows: Vec<PlanWindow> = line
@@ -313,3 +343,7 @@ impl ProxyReading<'_> {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "tracking_proxy_tests.rs"]
+mod tests;

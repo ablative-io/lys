@@ -139,11 +139,15 @@ fn page(session: &str, agent: &str, at: u64, kept: &str) -> TestResult<FeedPage>
                     RecordAt {
                         session: "kept".to_owned(),
                         entry: kept.to_owned(),
+                        status: "complete".to_owned(),
+                        duration_ms: Some(1200),
                     }
                 } else {
                     RecordAt {
                         session: "made-elsewhere".to_owned(),
                         entry: "entry".to_owned(),
+                        status: "partial".to_owned(),
+                        duration_ms: None,
                     }
                 });
             }
@@ -329,12 +333,28 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
                 row["call_id"],
                 row["model"],
                 row["input_tokens"],
-                row["account"]
+                row["account"],
+                row["status"],
+                row["duration_ms"]
             ]))
             .collect::<Vec<_>>(),
         vec![
-            json!(["1-Spend", "model-one", 70, "shared-account"]),
-            json!(["0-Spend", "model-one", 30, "shared-account"]),
+            json!([
+                "1-Spend",
+                "model-one",
+                70,
+                "shared-account",
+                "complete",
+                1200
+            ]),
+            json!([
+                "0-Spend",
+                "model-one",
+                30,
+                "shared-account",
+                "partial",
+                null
+            ]),
         ]
     );
     assert_eq!(calls["next"], json!(null));

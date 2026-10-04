@@ -238,6 +238,11 @@ pub struct RecordAt {
     pub session: String,
     /// The entry in that session that holds the call.
     pub entry: String,
+    /// How the call ended, in the record's own word.
+    pub status: String,
+    /// How long the call took, when its line said when it ended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
 }
 
 /// The rotation evidence a record is attributed by.
