@@ -60,6 +60,11 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
   (`runner_links.rs`); a link that ended on a refusal stays ended, and every end is said.
 - The proxy held each call for two disk syncs, about 12 ms each: at admission, and when the request named
   its session. Written: the call waits only for the record to be put in place; the syncs are made beside it.
+- Found by the full test run on that fix: a service stopped while its runner was still there waited for
+  ever, because the grant channel it held was read on a thread nothing could end. The installed service
+  ends with its process, so only a service stopped inside a running program met it. Written: the channel
+  is closed when the service that holds it stops (`grants_refusals.rs`), the way a request to a runner is
+  closed when its caller leaves.
 - A short line's own handle lay over the first add button beside a window, so pressing "add usage" a
   second time took the first widget's line away. Written: the window in front stands over the handles.
 - Not yet shown on an installed build: a call with tokens and a context percent (pancake's account was

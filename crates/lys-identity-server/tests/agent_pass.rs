@@ -108,7 +108,10 @@ type Capture = (
 );
 
 /// A fake runner that accepts `starts` signed starts, answering each Started
-/// and handing back each session and run entry.
+/// and handing back each session and run entry. The service holds a grant
+/// channel to a runner that answers, and follows its feed: this one holds
+/// each channel it is asked for until it is done, and refuses its feed by
+/// name. Neither is a start.
 fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error>> {
     let socket = table.dir.path().join("capture-certificates.sock");
     let listener = UnixListener::bind(&socket)?;
@@ -116,16 +119,33 @@ fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error
     let (send, receive) = std::sync::mpsc::channel();
     let answering = std::thread::spawn(move || {
         let result = (|| -> TestResult {
-            for _ in 0..starts {
+            let (mut started, mut channels) = (0, Vec::new());
+            while started < starts {
                 let (stream, _) = listener.accept()?;
                 let greeting = Greeting::fresh(&"b".repeat(32));
                 let mut writer = &stream;
                 writeln!(writer, "{}", greeting.line())?;
                 let mut line = zeroize::Zeroizing::new(String::new());
                 BufReader::new(&stream).read_line(&mut line)?;
-                let Act::AsCaller { done, .. } = verify_request(&line, &key, &greeting)? else {
-                    return Err("start was not done for its caller".into());
+                let done = match verify_request(&line, &key, &greeting)? {
+                    Act::AsCaller { done, .. } => done,
+                    Act::GrantChannel => {
+                        writeln!(writer, "{}", reply_line(Answer::GrantChannel))?;
+                        channels.push(stream);
+                        continue;
+                    }
+                    Act::Feed { .. } => {
+                        let refused = Answer::Refused {
+                            refusal: "feed_not_kept".to_owned(),
+                            words: "this stand-in keeps no feed".to_owned(),
+                            oldest: None,
+                        };
+                        writeln!(writer, "{}", reply_line(refused))?;
+                        continue;
+                    }
+                    other => return Err(format!("the stand-in was asked {other:?}").into()),
                 };
+                started += 1;
                 let Act::Start {
                     launch,
                     lys_mcp: Some(entry),

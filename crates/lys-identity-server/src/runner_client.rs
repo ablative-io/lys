@@ -154,6 +154,11 @@ impl Leave {
         Ok(())
     }
 
+    /// Whether the caller has left.
+    pub fn left(&self) -> bool {
+        self.left.load(Ordering::SeqCst)
+    }
+
     /// The request was answered: nothing is left to close.
     pub fn done(&self) -> Result<(), RunnerError> {
         drop(
@@ -448,12 +453,14 @@ impl Runners {
         read_reply(&reply)
     }
 
-    /// Hold a grant channel to `record`'s runner. A runner that dials in
-    /// holds no connection the server can keep, and is refused by name:
-    /// its grantable rules are then denied `grant_state_unavailable`.
+    /// Hold a grant channel to `record`'s runner, closed when its holder
+    /// leaves. A runner that dials in holds no connection the server can
+    /// keep, and is refused by name: its grantable rules are then denied
+    /// `grant_state_unavailable`.
     pub fn grant_channel(
         &self,
         record: &RunnerRecord,
+        leave: &Leave,
     ) -> Result<lys_runner::GrantChannel, RunnerError> {
         let socket = match record {
             RunnerRecord::Lys => self.own.clone().ok_or_else(|| RunnerError::Unreachable {
@@ -468,7 +475,10 @@ impl Runners {
                 ));
             }
         };
-        lys_runner::connect(&socket)?.grant_channel(&self.key)
+        let connection = lys_runner::connect(&socket)?;
+        let closer = connection.closer()?;
+        leave.hold(Box::new(move || closer.close()))?;
+        connection.grant_channel(&self.key)
     }
 
     /// Ask `act` of the runner on `socket`, signed over the greeting of the

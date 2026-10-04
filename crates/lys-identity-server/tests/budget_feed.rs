@@ -656,3 +656,129 @@ async fn a_runner_that_comes_up_after_the_service_is_followed_from_the_first_req
     );
     Ok(())
 }
+
+/// A runner that stays: it answers folders, refuses its feed by name, and
+/// holds each grant channel it is asked for, saying when one is held and
+/// when the service's end of it closes.
+async fn serve_holding(
+    listener: UnixListener,
+    key: [u8; 32],
+    held: tokio::sync::mpsc::UnboundedSender<()>,
+    gone: tokio::sync::mpsc::UnboundedSender<()>,
+) -> Result<(), String> {
+    loop {
+        let (socket, _) = listener.accept().await.map_err(|error| error.to_string())?;
+        let (read, mut write) = socket.into_split();
+        let greeting = Greeting::fresh("0123456789abcdef0123456789abcdef");
+        write
+            .write_all(format!("{}\n", greeting.line()).as_bytes())
+            .await
+            .map_err(|error| error.to_string())?;
+        let mut lines = BufReader::new(read).lines();
+        let line = lines
+            .next_line()
+            .await
+            .map_err(|error| error.to_string())?
+            .ok_or("missing request")?;
+        let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
+        let channel = matches!(act, Act::GrantChannel);
+        let answer = match act {
+            Act::Folders { .. } => Answer::Folders {
+                under: "/".to_owned(),
+                folders: Vec::new(),
+            },
+            Act::GrantChannel => Answer::GrantChannel,
+            Act::Feed { .. } => Answer::Refused {
+                refusal: "feed_not_kept".to_owned(),
+                words: "this stand-in keeps no feed".to_owned(),
+                oldest: None,
+            },
+            other => {
+                return Err(format!(
+                    "unexpected request of the staying runner: {other:?}"
+                ));
+            }
+        };
+        let reply = Reply {
+            version: lys_runner::protocol::PROTOCOL_VERSION,
+            answer,
+        };
+        let line = serde_json::to_string(&reply).map_err(|error| error.to_string())?;
+        write
+            .write_all(format!("{line}\n").as_bytes())
+            .await
+            .map_err(|error| error.to_string())?;
+        if channel {
+            held.send(()).map_err(|error| error.to_string())?;
+            let gone = gone.clone();
+            // The runner asks nothing here: the next thing it reads on the channel is its end.
+            tokio::spawn(async move {
+                let ended = lines.next_line().await;
+                drop(write);
+                if matches!(ended, Ok(Some(_))) {
+                    return Err("the service wrote on a channel it was asked nothing on".to_owned());
+                }
+                gone.send(()).map_err(|error| error.to_string())
+            });
+        }
+    }
+}
+
+/// A service that stops closes the grant channel it holds. Its runner is
+/// still there and would hold the channel for ever, so a stop that waited
+/// for the runner to close it would never end.
+#[tokio::test]
+async fn a_service_that_stops_closes_the_grant_channel_it_holds_to_a_runner_still_there()
+-> TestResult {
+    let (mut service, named) = Service::start_saying(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.proxy_dir = Some(config.log_dir.with_file_name("proxy")),
+        None,
+        named,
+    )
+    .await?;
+    let cookie = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "operator@example.test".to_owned(),
+        })
+        .await?;
+    let listener = UnixListener::bind(&named.socket)?;
+    let (held, mut holds) = tokio::sync::mpsc::unbounded_channel();
+    let (gone, mut closes) = tokio::sync::mpsc::unbounded_channel();
+    let mut runner = FeedRunner(Some(tokio::spawn(serve_holding(
+        listener, named.key, held, gone,
+    ))));
+    // The runner answers a request, so the service holds its grant channel.
+    let (status, folders) = send(
+        &service,
+        reqwest::Method::POST,
+        &format!("/network/machines/{}/folders", named.machine),
+        Auth::Cookie(&cookie),
+        Some(&json!({})),
+    )
+    .await?;
+    assert_eq!(status, 200, "{folders}");
+    tokio::select! {
+        result = runner.finish() => { result?; return Err("the staying runner ended before its channel was held".into()); }
+        asked = holds.recv() => { asked.ok_or("the staying runner left")?; }
+    }
+    assert!(
+        closes.try_recv().is_err(),
+        "the channel is held while the service is up"
+    );
+    // The stop ends, and the runner sees the channel close; the service that starts holds one again.
+    service.restart().await?;
+    tokio::select! {
+        result = runner.finish() => { result?; return Err("the staying runner ended before its channel closed".into()); }
+        ended = closes.recv() => { ended.ok_or("the staying runner left")?; }
+    }
+    tokio::select! {
+        result = runner.finish() => { result?; return Err("the staying runner ended before its channel was held again".into()); }
+        asked = holds.recv() => { asked.ok_or("the staying runner left")?; }
+    }
+    Ok(())
+}
