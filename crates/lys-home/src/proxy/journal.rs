@@ -49,6 +49,11 @@ pub struct OpenCall {
     pub started_at: String,
     /// The session it is linked to, once its key was read.
     pub session: Option<String>,
+    /// The run key the call's path opened with: the first path part a Lys
+    /// launch puts on the base address it gives a run, taken off before the
+    /// call is forwarded. None for a call whose path carried no key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
     /// Admission hold, absent only until the measured gate has returned.
     pub admission_ns: Option<u64>,
     /// Prepared references, absent while capture has not completed.

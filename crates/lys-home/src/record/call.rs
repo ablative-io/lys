@@ -92,6 +92,12 @@ pub struct CallRecord {
     /// and for a response that was not an event stream.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<captured::Tokens>,
+    /// The run key the call's path opened with: what a Lys launch put first
+    /// on the base address it gave the run, so the call names the run that
+    /// made it. Absent for a call that carried none, and for a call the
+    /// proxy did not see pass.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
     /// The provider's id for the request, from the response's `request-id`
     /// header (`x-request-id` where that is the provider's): the harness's
     /// `requestId` for the same call. Absent when the response named none.
@@ -229,6 +235,7 @@ pub fn ingest_call(
         model: Some(meta.model.clone()),
         message_id: None,
         usage: None,
+        run: None,
         request_id: None,
         head: None,
         unrecorded_reason: None,
@@ -281,6 +288,7 @@ pub fn ingest_call_files(
         model: Some(meta.model.clone()),
         message_id: None,
         usage: None,
+        run: None,
         request_id: None,
         head: None,
         unrecorded_reason: None,
@@ -350,6 +358,7 @@ pub fn ingest_outcome(
         model,
         message_id: None,
         usage: None,
+        run: None,
         request_id: None,
         head: None,
         unrecorded_reason: None,

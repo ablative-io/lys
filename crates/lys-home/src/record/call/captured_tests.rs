@@ -36,6 +36,7 @@ fn prepared_stream_parts_survive_without_a_second_body_parse()
             seen: &Seen {
                 message_id: Some("msg_1".to_owned()),
                 tokens: None,
+                run: None,
                 head: Head::default(),
                 unrecorded: None,
             },

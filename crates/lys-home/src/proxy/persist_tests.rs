@@ -75,6 +75,7 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
             api: Api::Messages,
             started_at: "2000-01-01T00:00:00Z".into(),
             session: None,
+            run: None,
             admission_ns: Some(81),
             completed: Some(completed),
         },

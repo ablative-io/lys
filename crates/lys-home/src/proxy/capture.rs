@@ -257,6 +257,7 @@ impl Call {
                 seen: Seen {
                     message_id,
                     tokens,
+                    run: self.open.run.clone(),
                     head: std::mem::take(&mut s.seen.head),
                     unrecorded,
                 },
@@ -445,6 +446,7 @@ mod poison_tests {
             api: Api::Messages,
             started_at: "2000-01-01T00:00:00Z".to_owned(),
             session: None,
+            run: None,
             admission_ns: None,
             completed: None,
         };

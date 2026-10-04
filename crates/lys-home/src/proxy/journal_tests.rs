@@ -28,6 +28,7 @@ fn open_call(call_id: &str, session: Option<&str>) -> OpenCall {
         api: Api::Messages,
         started_at: "2026-09-28T10:00:00.000Z".to_owned(),
         session: session.map(str::to_owned),
+        run: None,
         admission_ns: None,
         completed: None,
     }

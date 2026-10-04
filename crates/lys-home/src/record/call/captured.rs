@@ -98,6 +98,8 @@ pub struct Seen {
     /// The token figures the response's event stream reported, read as it
     /// passed; absent when the stream reported none.
     pub tokens: Option<Tokens>,
+    /// The run key the call's path opened with, when it carried one.
+    pub run: Option<String>,
     /// The status and the kept headers.
     pub head: Head,
     /// Why the proxy marked the call unrecorded, when it did.
@@ -317,6 +319,7 @@ impl PreparedCall {
                 model,
                 message_id: input.seen.message_id.clone(),
                 usage: input.seen.tokens.clone(),
+                run: input.seen.run.clone(),
                 request_id: input.seen.head.request_id(),
                 head: (input.seen.head != Head::default()).then(|| input.seen.head.clone()),
                 unrecorded_reason: reason.filter(|_| status == CallStatus::Unrecorded),
