@@ -11,7 +11,8 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
   5 October: one press on the tools bar (shown when a team has an agent running) draws a box named for each
   such team round its card and its agents' windows, a team's own teams inside it, and tidies; "Put it back"
   undoes it; the boxes are ordinary boxes after. An agent in several teams stands in the one furthest down.
-  Leaves this list when installed and walked.
+  Installed in 0feba1e8 and walked there on 5 October with two teams made for it (Ablative, and Lys under
+  it); it leaves the list.
 - Widgets for everything Lys holds about an agent that has none yet: tasks, git branch, commits, worktrees,
   pull requests, reviews, jobs and tickets.
 - The HUD on an agent's window: compact, set a goal, add a task.
@@ -21,7 +22,7 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
   and took the press meant for "Open terminal" and for the first add button; Tidy and home stood the first
   window exactly there. Written 5 October: the top 56 of the page is the swap's, and a view the canvas chooses
   itself (home, Tidy, a double press) keeps what it shows beneath it; a person may still move anything under
-  it by hand. Walked on the developer server; leaves this list when installed and walked there.
+  it by hand. Installed in 0feba1e8 and walked there; it leaves the list.
 - In a tidied column a chosen widget's remove control lay under the widget above it. Written 5 October: the
   widget chosen, or under the pointer, stands in front of its neighbours. Walked on the developer server.
 - A drag begun on the rows of an opened widget moved the canvas, not the widget. Written 5 October: the whole
@@ -31,7 +32,15 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - What the canvas shows when nothing is running.
 - The Agents table and the widgets say some of the same things; one of them goes.
 - The You and Dashboard pages.
-- "Claude mods": later.
+- "Claude mods": later, and to be talked through with Tom first. Tom, 5 October, about 08:40: "definitely
+  think we should talk about Claude mods because there is a way to get Fable usage through that... a mod
+  that worked exactly the same way that our hooks had, where it just sort of sent off all of the
+  information... look at the slash usage command... the endpoint that that's getting to... we might actually
+  be able to pretty fundamentally rewrite some of the aspects of Claude Code... wondering if we couldn't even
+  potentially create like a unified harness inside Claude Code and get Claude Code running the codex models
+  as well... dial down on one particular harness... that allows any given model." Said back by Waffles as
+  ideas, unmeasured: the account's windows already reach the canvas through the proxy; Codex models inside
+  Claude Code could be the proxy translating the calls. `docs/design/home/MODS.md` is the page to read first.
 
 ## Usage and the proxy
 
@@ -45,7 +54,8 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - A call the provider refused (Claude Code's start-up probe is refused with HTTP 429 at a limit) carried no
   figures, and one call of unknown spend made the day's and the week's tokens "Not reported", and would
   refuse a start under a token cap. Written 5 October: the usage line carries the provider's HTTP status,
-  and a call refused at its head is a spend of nought. Uses kept before that install stay as they were
+  and a call refused at its head is a spend of nought (installed in 25fe25d2 and walked: the probe of
+  08:56 is kept with nought of each). Uses kept before that install stay as they were
   kept: an agent with an earlier refused probe shows its tokens from the next day and the next week.
 - Shown on the install of 0feba1e8, 5 October: two calls with tokens on the Proxy screen and the account's
   two windows on the usage widget. A context percent still needs a window declared for the model.
