@@ -241,7 +241,11 @@ impl Call {
             };
             let unrecorded = (status == CallStatus::Unrecorded).then(|| why.to_owned());
             let mut call = self.open.clone();
-            call.session = s.scanner.link().to_record();
+            // The body's own link when it names one; else the one the
+            // request's head gave at admission.
+            if let Some(session) = s.scanner.link().to_record() {
+                call.session = Some(session);
+            }
             Some(Job {
                 call,
                 status,

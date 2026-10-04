@@ -76,6 +76,23 @@ pub fn keyed(proxy: &str, run: &str) -> Option<String> {
     Some(format!("{scheme}://{authority}/{run}{path}"))
 }
 
+/// The address a Codex run is given for the proxy: the proxy's own host,
+/// the run's key first on the path when the run has one, then `/openai/v1`,
+/// whatever path the configured address names for Anthropic. None when
+/// `proxy` is not an address with a scheme and a host.
+#[must_use]
+pub fn openai_base(proxy: &str, run: Option<&str>) -> Option<String> {
+    let (scheme, rest) = proxy.split_once("://")?;
+    let authority = rest.split('/').next().filter(|host| !host.is_empty())?;
+    if scheme.is_empty() {
+        return None;
+    }
+    Some(run.map_or_else(
+        || format!("{scheme}://{authority}/openai/v1"),
+        |run| format!("{scheme}://{authority}/{run}/openai/v1"),
+    ))
+}
+
 enum Contract {
     Native,
     Codex,

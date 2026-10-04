@@ -106,6 +106,27 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
             format!("mcp_servers.{name}={}", native_value(value)?),
         ]);
     }
+    if let Some(proxy) = &template.fields.model_proxy {
+        // Codex is pointed at Lys's proxy as a provider of its own, signed
+        // in as the machine's Codex is, over plain HTTP event streams: the
+        // proxy reads a call as it passes, and a WebSocket it cannot read.
+        // (Measured on codex-cli 0.159.2, 4 Oct 2026: OPENAI_BASE_URL in the
+        // environment is ignored; the built-in provider opens a WebSocket.)
+        let base = crate::harness::rendering::openai_base(proxy, template.fields.run.as_deref())
+            .ok_or_else(|| {
+                "model_proxy: the model proxy's address has no host a Codex run can be given"
+                    .to_owned()
+            })?;
+        arguments.extend([
+            "-c".to_owned(),
+            format!(
+                "model_providers.lys={{name=\"OpenAI through Lys\",base_url={},wire_api=\"responses\",requires_openai_auth=true,supports_websockets=false}}",
+                native_value(&json!(base))?
+            ),
+            "-c".to_owned(),
+            "model_provider=\"lys\"".to_owned(),
+        ]);
+    }
     if let Some(sandbox) = template.permissions.default_mode {
         if sandbox == "workspace-write" {
             // Command-line settings keep project configuration from widening the boundary.

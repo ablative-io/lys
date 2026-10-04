@@ -43,5 +43,10 @@ pub enum ProxyCommand {
         /// Where an `/openai` path is forwarded.
         #[arg(long, default_value = "https://api.openai.com")]
         openai: String,
+
+        /// Where an `/openai` call is forwarded when it carries a ChatGPT
+        /// account, as a Codex signed in with ChatGPT sends.
+        #[arg(long, default_value = "https://chatgpt.com/backend-api/codex")]
+        chatgpt: String,
     },
 }

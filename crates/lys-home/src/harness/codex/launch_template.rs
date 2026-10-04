@@ -184,6 +184,21 @@ pub(crate) fn render(
             fields.identity.version.to_string(),
         ),
     ]);
+    if let (Some(_), Some(run)) = (&fields.model_proxy, &fields.run) {
+        // The run's key, from which the start tells the runner to count
+        // the run's calls as the proxy sees them pass.
+        if !crate::proxy::usage::is_run_key(run) {
+            return Err(refused(
+                fields,
+                "run",
+                "a run key is 32 lowercase hexadecimal digits, as a launch mints it",
+            ));
+        }
+        environment.insert(
+            crate::harness::rendering::RUN_VARIABLE.to_owned(),
+            run.clone(),
+        );
+    }
     for held in secrets {
         if held.handle.is_empty()
             || environment

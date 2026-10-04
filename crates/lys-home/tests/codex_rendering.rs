@@ -446,3 +446,77 @@ fn codex_refuses_wake_channels_and_colliding_command_variables() -> TestResult {
     assert_eq!(error.member, "mcp_servers");
     Ok(())
 }
+
+#[test]
+fn codex_is_given_the_model_proxy_as_a_provider_over_http_streams_with_its_run_key() -> TestResult {
+    const RUN: &str = "0123456789abcdef0123456789abcdef";
+    let launch_of = |fields: &LaunchFields| -> Result<_, Box<dyn Error>> {
+        let rendered = render(fields, &[], &permissions("workspace-write"), &[])?;
+        Ok(rendering_launch::render(
+            "codex/template-v1",
+            &fields.harness.program,
+            &rendered.text,
+            InstructionsMode::Keep,
+        )?)
+    };
+    // With no model proxy the machine's Codex talks to its provider as it is set up to.
+    let plain = launch_of(&fields()?)?;
+    assert!(
+        !plain
+            .arguments
+            .iter()
+            .any(|arg| arg.starts_with("model_provider"))
+    );
+    assert!(!plain.environment.contains_key("LYS_RUN"));
+    // With one, Codex is given the proxy's own host with the run's key first on the path,
+    // whatever path the configured address names for Anthropic, and the run's key in its environment.
+    let mut proxied = fields()?;
+    proxied.model_proxy = Some("http://127.0.0.1:18484/anthropic".to_owned());
+    proxied.run = Some(RUN.to_owned());
+    let launch = launch_of(&proxied)?;
+    let provider = format!(
+        "model_providers.lys={{name=\"OpenAI through Lys\",base_url=\"http://127.0.0.1:18484/{RUN}/openai/v1\",wire_api=\"responses\",requires_openai_auth=true,supports_websockets=false}}"
+    );
+    for setting in [provider.as_str(), "model_provider=\"lys\""] {
+        assert!(
+            launch
+                .arguments
+                .windows(2)
+                .any(|args| args == ["-c", setting]),
+            "{setting}: {:?}",
+            launch.arguments
+        );
+    }
+    assert_eq!(
+        launch.environment.get("LYS_RUN").map(String::as_str),
+        Some(RUN)
+    );
+    // A proxy with no run key is still used, uncounted by a key.
+    proxied.run = None;
+    let unkeyed = launch_of(&proxied)?;
+    assert!(
+        unkeyed
+            .arguments
+            .iter()
+            .any(|arg| { arg.contains("base_url=\"http://127.0.0.1:18484/openai/v1\"") })
+    );
+    assert!(!unkeyed.environment.contains_key("LYS_RUN"));
+    // A run key that is not one is refused by member.
+    proxied.run = Some("not-a-key".to_owned());
+    let refusal = render(&proxied, &[], &permissions("workspace-write"), &[])
+        .err()
+        .ok_or("a bad run key rendered")?;
+    assert!(refusal.to_string().contains("run"), "{refusal}");
+    // An address with no host is refused when the launch is built.
+    proxied.run = None;
+    proxied.model_proxy = Some("nowhere".to_owned());
+    let rendered = render(&proxied, &[], &permissions("workspace-write"), &[])?;
+    let refused = rendering_launch::render(
+        "codex/template-v1",
+        &proxied.harness.program,
+        &rendered.text,
+        InstructionsMode::Keep,
+    );
+    assert!(refused.is_err());
+    Ok(())
+}

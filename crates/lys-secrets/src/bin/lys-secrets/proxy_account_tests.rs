@@ -83,6 +83,7 @@ async fn a_call_on_a_model_account_goes_through_the_proxy_and_the_broker_with_th
         home: dir.path().join("proxy-home"),
         state: dir.path().join("proxy-state"),
         anthropic: nowhere.clone(),
+        chatgpt: nowhere.clone(),
         openai: nowhere,
         broker: Some(Broker {
             base: Base::parse(&broker_base)?,
@@ -104,7 +105,10 @@ async fn a_call_on_a_model_account_goes_through_the_proxy_and_the_broker_with_th
     let status = answer.status();
     let text = answer.text().await?;
     assert_eq!(status, reqwest::StatusCode::OK, "{text}");
-    assert!(!text.contains(TOKEN), "the run's answer carried the token: {text}");
+    assert!(
+        !text.contains(TOKEN),
+        "the run's answer carried the token: {text}"
+    );
     assert_eq!(
         seen.lock().expect("test state lock poisoned").last(),
         Some(&format!("Bearer {TOKEN}")),
@@ -113,8 +117,8 @@ async fn a_call_on_a_model_account_goes_through_the_proxy_and_the_broker_with_th
     // The proxy records the call off the forwarding path; its report says
     // the record is written.
     let reports = started.reports;
-    let recorded = tokio::task::spawn_blocking(move || reports.recv().map(|_report| reports))
-        .await??;
+    let recorded =
+        tokio::task::spawn_blocking(move || reports.recv().map(|_report| reports)).await??;
     never_written(dir.path(), TOKEN)?;
     drop(recorded);
 

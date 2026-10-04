@@ -77,6 +77,7 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
         anthropic,
         upstream,
         openai,
+        chatgpt,
     } = command;
     // Every prompt and reply of every run passes into the proxy's home and
     // state: what it writes is its owner's alone.
@@ -101,6 +102,7 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
         state,
         anthropic: anthropic_base,
         openai: parsed(&openai)?,
+        chatgpt: parsed(&chatgpt)?,
     };
     let start = json!({
         "proxy": "listening",
@@ -108,6 +110,7 @@ pub fn run(command: ProxyCommand) -> CliResult<()> {
         "anthropic": shown(&anthropic),
         "anthropic_from": source,
         "openai": shown(&openai),
+        "chatgpt": shown(&chatgpt),
     });
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)

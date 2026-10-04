@@ -328,6 +328,10 @@ pub struct ProxyConfig {
     pub anthropic: Base,
     /// The base an `/openai` path is forwarded to.
     pub openai: Base,
+    /// The base an `/openai` call is forwarded to when it carries a ChatGPT
+    /// account: a Codex signed in with ChatGPT is answered there, not by the
+    /// API.
+    pub chatgpt: Base,
 }
 
 /// The little proxy: forwards by path prefix and records each model call
@@ -337,6 +341,7 @@ pub struct Proxy {
     upstream: Upstream,
     anthropic: Base,
     openai: Base,
+    chatgpt: Base,
     capture: PathBuf,
     journal: Journal,
     sink: Sink,
@@ -372,6 +377,7 @@ impl Proxy {
             upstream,
             anthropic: config.anthropic,
             openai: config.openai,
+            chatgpt: config.chatgpt,
             capture,
             journal,
             sink,
@@ -429,7 +435,18 @@ impl Proxy {
                  first part is not a key",
             );
         };
-        let Some(api) = api_of(request.method(), &rest) else {
+        let api = api_of(request.method(), &rest);
+        // A Codex signed in with ChatGPT sends its account's id, and is
+        // answered by ChatGPT's Codex backend, whose paths carry no `/v1`.
+        // One header lookup; the machine's own Codex sign-in decides.
+        let chatgpt = provider == "openai" && request.headers().contains_key(CHATGPT_ACCOUNT);
+        let (base, rest) = if chatgpt {
+            let rest = rest.strip_prefix("/v1").map_or(rest.as_str(), |rest| rest);
+            (&self.chatgpt, rest.to_owned())
+        } else {
+            (base, rest)
+        };
+        let Some(api) = api else {
             // Not a model call: forwarded as it came, and not recorded.
             let request = request.map(BodyExt::boxed_unsync);
             return match self.upstream.send(base, &rest, request).await {
@@ -442,7 +459,13 @@ impl Proxy {
             provider: provider.to_owned(),
             api,
             started_at: now(),
-            session: None,
+            // Codex names its session in a header; a Messages call names
+            // its own in the body, read as the request passes.
+            session: request
+                .headers()
+                .get(CODEX_SESSION)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|id| super::link::Link::from_record(Some(id)).to_record()),
             run: run.map(str::to_owned),
             admission_ns: None,
             completed: None,
@@ -475,6 +498,11 @@ impl Proxy {
         }
     }
 }
+
+/// The header a Codex signed in with ChatGPT sends its account's id in.
+const CHATGPT_ACCOUNT: &str = "chatgpt-account-id";
+/// The header Codex names its session in.
+const CODEX_SESSION: &str = "session-id";
 
 /// The run key a path opens with, and the path without it.
 ///

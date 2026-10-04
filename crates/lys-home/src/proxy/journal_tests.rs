@@ -149,6 +149,7 @@ async fn a_call_open_when_the_proxy_stops_is_recorded_lost_by_the_next_start() -
         home: harness.dir.path().join("home"),
         state: harness.dir.path().join("state"),
         anthropic: base.clone(),
+        chatgpt: base.clone(),
         openai: base,
     })?;
     assert_eq!(restarted.lost.len(), 1);

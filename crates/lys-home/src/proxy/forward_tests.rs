@@ -129,6 +129,9 @@ impl Harness {
             home: dir.path().join("home"),
             state: dir.path().join("state"),
             anthropic: base.clone(),
+            // The same upstream under a path of its own, so a test can tell
+            // which base a call was sent to.
+            chatgpt: Base::parse(&format!("http://{upstream}/chatgpt-backend"))?,
             openai: base,
         })?;
         assert!(started.lost.is_empty());
@@ -526,3 +529,6 @@ async fn a_response_larger_than_the_old_bound_is_forwarded_and_recorded_whole() 
     assert_eq!(bytes, sent);
     Ok(())
 }
+
+#[path = "forward_codex_tests.rs"]
+mod codex;

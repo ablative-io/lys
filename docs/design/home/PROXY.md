@@ -115,6 +115,35 @@ login already carries its own `ANTHROPIC_BASE_URL` (a gateway) is not silently o
 the proxy forwards to that upstream, and the record names it. On upgrade the proxy restarts
 after the services, the way the runner does.
 
+## Codex through the proxy (measured 4 October 2026, codex-cli 0.159.2)
+
+What Codex does was measured against a local listener that recorded only header names and the
+shape of the body, never a credential or any content:
+
+- `OPENAI_BASE_URL` in the environment is ignored. The call went straight to the provider.
+- With `openai_base_url` set, Codex opens a WebSocket (`GET <base>/responses`, `Upgrade: websocket`,
+  `OpenAI-Beta: responses_websockets=2026-02-06`). The proxy reads HTTP calls as they pass and
+  cannot read a WebSocket, so this setting is not used.
+- With a provider of its own named on the command line
+  (`-c model_providers.lys={name=..., base_url=..., wire_api="responses", requires_openai_auth=true,
+  supports_websockets=false}` and `-c model_provider="lys"`), Codex sends `POST <base>/responses`
+  with `accept: text/event-stream`, a JSON body with `stream: true`, and it also asks
+  `GET <base>/models?client_version=...`. Signed in with ChatGPT it sends `authorization` and
+  `chatgpt-account-id`; it names its session in `session-id` and its thread in `thread-id`.
+
+So a Lys launch gives Codex those two settings, with the base `http://<proxy>/<run key>/openai/v1`,
+and the run key in `LYS_RUN`. Nothing in the machine's own Codex configuration is written. The proxy
+forwards an `/openai` call that carries `chatgpt-account-id` to ChatGPT's Codex backend
+(`https://chatgpt.com/backend-api/codex`, whose paths carry no `/v1`) and any other to the API: the
+machine's own Codex sign-in decides, by one header lookup. A Codex call is linked to its harness
+session by the `session-id` header, as a Messages call is by `metadata.user_id`.
+
+Not yet measured, and named as gaps until a Codex agent has been started through an installed Lys:
+the response stream as ChatGPT's backend sends it, and the names of the headers that carry the
+account's windows (the `x-codex-` family is kept with its values, so the first real call shows them).
+Codex also marks a sub-agent's calls (`x-openai-subagent`, `x-codex-parent-thread-id` appear in the
+binary): that is the way to tell a main thread's context from a side call's, and is not yet used.
+
 ## Slices, each landed and read back before the next
 
 Tom, 11:11: keep it smaller today, one slice at a time, nobody waiting on anyone.
