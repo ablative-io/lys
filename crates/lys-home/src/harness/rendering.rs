@@ -55,6 +55,26 @@ pub(super) fn refused(
 /// The variable a run's model calls are sent to Lys's proxy through.
 pub const PROXY_VARIABLE: &str = "ANTHROPIC_BASE_URL";
 
+/// The variable a launch says a run's key in: the key it put first on the
+/// path of the proxy's address it gave the run.
+pub const RUN_VARIABLE: &str = "LYS_RUN";
+
+/// The proxy's address with `run` put first on its path:
+/// `http://host:port/anthropic` becomes `http://host:port/<run>/anthropic`.
+/// None when `proxy` is not an address with a scheme and a host.
+#[must_use]
+pub fn keyed(proxy: &str, run: &str) -> Option<String> {
+    let (scheme, rest) = proxy.split_once("://")?;
+    let (authority, path) = match rest.find('/') {
+        Some(at) => rest.split_at(at),
+        None => (rest, ""),
+    };
+    if scheme.is_empty() || authority.is_empty() {
+        return None;
+    }
+    Some(format!("{scheme}://{authority}/{run}{path}"))
+}
+
 enum Contract {
     Native,
     Codex,

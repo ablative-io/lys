@@ -45,7 +45,8 @@ pub const PROXY_ADAPTER: &str = "lys-proxy-usage/1";
 pub struct ProxyTracking {
     /// The run key the launch put first on the base address it gave the run.
     pub run: String,
-    /// The context window the profile declares, in tokens.
+    /// The context window the profile declares, in tokens; zero when it
+    /// declares none.
     pub context_window: u64,
     /// The profile version the window was declared in.
     pub profile_version: u32,
@@ -55,19 +56,17 @@ pub struct ProxyTracking {
 }
 
 impl ProxyTracking {
-    /// The tracking, refused by name: a run key that is not one, or a
-    /// window of no tokens.
+    /// The tracking, refused by name: a run key that is not one.
+    ///
+    /// A context window of no tokens is not refused: it says the profile
+    /// declares none. Such a run's spend is counted and its context in use
+    /// is not, because a context is only ever said against a declared
+    /// window.
     pub fn checked(&self) -> Result<(), RunnerError> {
         if !is_run_key(&self.run) {
             return Err(RunnerError::refused(
                 "run_key_invalid",
                 "a run key is one or more letters, digits, '-' or '_'",
-            ));
-        }
-        if self.context_window == 0 {
-            return Err(RunnerError::refused(
-                "window_invalid",
-                "a declared context window holds at least one token",
             ));
         }
         Ok(())
@@ -204,14 +203,23 @@ impl ProxyReading<'_> {
             .or_else(|| self.tracking.account.clone());
         let mut bodies = Vec::new();
         match line.usage.as_ref() {
-            Some(usage) => bodies.push(self.record(
-                source,
-                (line.call_id.clone(), offset),
-                observed,
-                Measure::Spend,
-                spend(line.api, usage),
-                (line.model.clone(), account.clone()),
-            )),
+            Some(usage) => {
+                let (mut figures, mut unavailable) = spend(line.api, usage);
+                if self.tracking.context_window == 0 && figures.context_tokens.take().is_some() {
+                    unavailable.push(Unavailable {
+                        figure: "context_tokens".to_owned(),
+                        reason: "the_profile_declares_no_context_window".to_owned(),
+                    });
+                }
+                bodies.push(self.record(
+                    source,
+                    (line.call_id.clone(), offset),
+                    observed,
+                    Measure::Spend,
+                    (figures, unavailable),
+                    (line.model.clone(), account.clone()),
+                ));
+            }
             None => bodies.push(coverage(
                 "usage_unreported",
                 source,

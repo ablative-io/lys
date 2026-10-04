@@ -125,21 +125,43 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
         None,
         Some(proxy),
     )?;
+    // The run is given the proxy under a key minted for this launch alone.
+    let run = proxied
+        .environment
+        .get("LYS_RUN")
+        .ok_or("a start through the model proxy was given no run key")?;
+    if run.is_empty() || !run.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+        return Err("the run key is not plain letters and digits".into());
+    }
     if proxied
         .environment
         .get("ANTHROPIC_BASE_URL")
         .map(String::as_str)
-        != Some(proxy)
+        != Some(format!("http://127.0.0.1:18484/{run}/anthropic").as_str())
     {
-        return Err("the model proxy is not the run's base URL".into());
+        return Err("the run's base URL is not the model proxy under its run key".into());
     }
-    let added: Vec<&String> = proxied
+    let allowed = ["ANTHROPIC_BASE_URL", "LYS_RUN", "LYS_PROVISIONING_VERSION"];
+    let only_these = proxied
         .environment
         .keys()
         .filter(|name| !launch.environment.contains_key(*name))
-        .collect();
-    if added.len() != 1 || proxied.arguments != launch.arguments {
-        return Err("the model proxy forced more on the run than its base URL".into());
+        .all(|name| allowed.contains(&name.as_str()));
+    if !only_these || proxied.arguments != launch.arguments {
+        return Err(
+            "the model proxy forced more on the run than its base URL and its run key".into(),
+        );
+    }
+    let again = build(
+        &store,
+        &record,
+        "session-fixture".to_owned(),
+        "sh",
+        None,
+        Some(proxy),
+    )?;
+    if again.environment.get("LYS_RUN") == Some(run) {
+        return Err("two launches were given the same run key".into());
     }
     let mut passes = Passes::open(dir.path().join("passes.json"))?;
     let act =

@@ -22,9 +22,9 @@ pub(crate) fn act(
     }
     if launch.config.is_none() {
         return Ok(Act::Start {
+            proxy: proxied(&launch),
             launch: Box::new(launch),
             lys_mcp: None,
-            proxy: None,
         });
     }
     let record = launch
@@ -39,13 +39,34 @@ pub(crate) fn act(
         });
     };
     Ok(Act::Start {
+        proxy: proxied(&launch),
         launch: Box::new(launch),
         lys_mcp: Some(lys_runner::protocol::LysMcp {
             url: format!("{origin}/api/mcp"),
             pass: pass.to_string(),
             seat,
         }),
-        proxy: None,
+    })
+}
+
+/// How the run is tracked through the proxy, when its launch minted it a run
+/// key: the key and the profile version, as the launch wrote them in its
+/// environment. No profile declares a context window yet, so none is said,
+/// and the account is the one each call's own headers name.
+fn proxied(launch: &Launch) -> Option<lys_runner::tracking_proxy::ProxyTracking> {
+    let run = launch
+        .environment
+        .get(lys_home::harness::rendering::RUN_VARIABLE)?;
+    let profile_version = launch
+        .environment
+        .get("LYS_PROVISIONING_VERSION")?
+        .parse()
+        .ok()?;
+    Some(lys_runner::tracking_proxy::ProxyTracking {
+        run: run.clone(),
+        context_window: 0,
+        profile_version,
+        account: None,
     })
 }
 

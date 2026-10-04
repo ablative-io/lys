@@ -35,6 +35,28 @@ pub(crate) fn build(
         return Err(ServerError::MachineWithoutRuntime);
     }
     let skills = crate::launch_harness::skill_files(store, version)?;
+    // A Claude Code run is given the proxy under a key minted for this launch
+    // alone, so the proxy says which run made each call. Only that template
+    // gives a run the proxy's address; another harness's run is given no key.
+    let harness = version
+        .settings
+        .harness
+        .as_ref()
+        .and_then(crate::launch_template::runner_harness);
+    let run = model_proxy
+        .filter(|_| harness == Some(lys_runner::tracking::Harness::ClaudeCode))
+        .map(|proxy| {
+            let run = lys_home::record::fresh_id();
+            lys_home::harness::rendering::keyed(proxy, &run)
+                .map(|address| (run, address))
+                .ok_or_else(|| ServerError::LaunchUnrenderable {
+                    reason: "the model proxy's address has no host a run key can follow".to_owned(),
+                })
+        })
+        .transpose()?;
+    let model_proxy = run
+        .as_ref()
+        .map_or(model_proxy, |(_, address)| Some(address.as_str()));
     let rendered = crate::launch_template::render(
         &crate::launch_template::Start {
             agent: &record.agent,
@@ -66,6 +88,17 @@ pub(crate) fn build(
         ("LYS_HANDLES".to_owned(), record.credential_ids.join(",")),
         ("LYS_LAUNCH_TEMPLATE".to_owned(), rendered.template_sha256),
     ]));
+    if let Some((run, _)) = run {
+        // The start act reads these two back to tell the runner the run's
+        // key and the profile version it is tracked under.
+        native.environment.extend(BTreeMap::from([
+            (lys_home::harness::rendering::RUN_VARIABLE.to_owned(), run),
+            (
+                "LYS_PROVISIONING_VERSION".to_owned(),
+                version.number.to_string(),
+            ),
+        ]));
+    }
     Ok(Launch {
         session,
         program: native.program,
