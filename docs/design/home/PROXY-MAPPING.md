@@ -53,8 +53,10 @@ one JSON object per line, never rewritten by Lys. Record kinds seen in this run'
    names its reason (`unrecorded_reason`), and for a response that is not JSON as stored the reason
    says what the response's own `content-encoding` named, with the request's `accept-encoding`
    beside it in `head`. The encoding of that first call is therefore read off the next run's
-   record, not guessed from four bytes. What is still not done: a response that is not an event
-   stream is read as stored and never decoded, so an encoded one stays unrecorded, with its reason.
+   record, not guessed from four bytes. Since 4 October a response that is not an event stream is
+   decoded before it is read when its head names one coding of gzip, deflate or br (`prepare()` in
+   `record/call/captured.rs`, commit 6b504c60, unbuilt at the time of writing); any other coding, or
+   more than one, is still read as stored and stays unrecorded, with its reason.
 5. **Model and time agree but are not the link.** `data.model` on the call equals
    `assistant.message.model` and `attachment.identity.modelId`. Timestamps align to the second (call
    3's record time is the assistant record's timestamp; calls 2 and 3 `started_at` are the user
