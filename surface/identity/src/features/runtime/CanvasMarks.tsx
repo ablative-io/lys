@@ -1,8 +1,8 @@
 /** A person's own marks as they are drawn on the surface: boxes with a label, notes, and the lines between things. */
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
-import { linkEnds } from './canvas-marks';
-import type { Box, Group, Link, Note } from './canvas-marks';
+import { SIDES, linkRoute } from './canvas-marks';
+import type { Box, Group, Link, Note, Side } from './canvas-marks';
 
 type Press = (event: PointerEvent<HTMLElement>) => void;
 interface Held {
@@ -12,12 +12,14 @@ interface Held {
   pick: Press | undefined;
   move: Press;
   size: Press;
+  /** Starts a line from one edge of this thing, dragged to another thing. */
+  link: (side: Side) => Press;
   change: (words: string) => void;
   remove: () => void;
 }
 
 /** A box around windows, with its label on its top edge. Its inside is the surface: only its bar and its corner are held. */
-export function GroupBox({ group, fresh, pick, move, size, change, remove }: { group: Group } & Held) {
+export function GroupBox({ group, fresh, pick, move, size, link, change, remove }: { group: Group } & Held) {
   const [label, setLabel] = useState(group.label);
   useEffect(() => setLabel(group.label), [group.label]);
   // A box is on the surface while it is still being drawn out; its label takes the keyboard when the drawing ends.
@@ -32,11 +34,12 @@ export function GroupBox({ group, fresh, pick, move, size, change, remove }: { g
       <button type="button" className="canvas-mark-remove" aria-label={'Remove the box ' + (group.label || 'with no label')} onClick={remove}>×</button>
     </header>
     <span className="session-canvas-grip" aria-hidden="true" onPointerDown={size} />
+    <Anchors from={link} />
   </section>;
 }
 
 /** A note written on the surface. What is typed is kept when the person leaves the note. */
-export function NoteCard({ note, fresh, pick, move, size, change, remove }: { note: Note } & Held) {
+export function NoteCard({ note, fresh, pick, move, size, link, change, remove }: { note: Note } & Held) {
   const [text, setText] = useState(note.text);
   useEffect(() => setText(note.text), [note.text]);
   return <article className={'canvas-note' + (pick ? ' picking' : '')} data-note={note.id} aria-label="Note"
@@ -48,25 +51,32 @@ export function NoteCard({ note, fresh, pick, move, size, change, remove }: { no
     <textarea aria-label="Note" placeholder="Write a note" value={text} autoFocus={fresh}
       onChange={(event) => setText(event.target.value)} onBlur={() => { if (text !== note.text) change(text); }} />
     <span className="session-canvas-grip" aria-hidden="true" onPointerDown={size} />
+    <Anchors from={link} />
   </article>;
 }
 
+/** The four dots on a thing's edges that a line is dragged from. */
+const DOT: Record<Side, [string, string]> = { top: ['50%', '0'], right: ['100%', '50%'], bottom: ['50%', '100%'], left: ['0', '50%'] };
+export function Anchors({ from }: { from: (side: Side) => Press }) {
+  return <>{SIDES.map((side) => <span key={side} className="canvas-anchor" data-anchor={side} aria-hidden="true" style={{ left: DOT[side][0], top: DOT[side][1] }} onPointerDown={from(side)} />)}</>;
+}
+
 type At = (id: string) => Box | undefined;
-const ends = (link: Link, at: At) => { const [from, to] = [at(link.from), at(link.to)]; return from && to ? linkEnds(from, to) : null; };
+const route = (link: Link, at: At) => { const [from, to] = [at(link.from), at(link.to)]; return from && to ? linkRoute(from, to, link) : null; };
 
 /** The lines a person drew, inside the surface's drawing. A line with an end that is not on the surface now is not drawn, and is kept. */
 export function LinkLines({ links, at }: { links: Link[]; at: At }) {
   return <>{links.flatMap((link) => {
-    const line = ends(link, at);
-    return line ? [<path key={link.id} className="person-line" data-link={link.id} d={`M ${line[0]} ${line[1]} L ${line[2]} ${line[3]}`} />] : [];
+    const line = route(link, at);
+    return line ? [<path key={link.id} className="person-line" data-link={link.id} d={line.d} />] : [];
   })}</>;
 }
 
 /** Each drawn line's own small control at its middle, to take the line away. */
 export function LinkHandles({ links, at, remove }: { links: Link[]; at: At; remove: (id: string) => void }) {
   return <>{links.flatMap((link) => {
-    const line = ends(link, at);
+    const line = route(link, at);
     return line ? [<button key={link.id} type="button" className="canvas-mark-remove canvas-link-remove" aria-label="Remove this line"
-      style={{ left: (line[0] + line[2]) / 2, top: (line[1] + line[3]) / 2 }} onClick={() => remove(link.id)}>×</button>] : [];
+      style={{ left: line.middle[0], top: line.middle[1] }} onClick={() => remove(link.id)}>×</button>] : [];
   })}</>;
 }

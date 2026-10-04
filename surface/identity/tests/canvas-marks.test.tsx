@@ -1,11 +1,11 @@
 /** The canvas is the person's own: they draw boxes with labels, notes and lines on it, find an agent from it, and save every layout by name, kept for them on the service. */
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { $, $$, click, mount, press, settle, text, type } from './harness';
+import { $, $$, click, mount, press, settle, text, type, unmountAll } from './harness';
 import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { mockTerminal } from './terminal-double';
-import { linkEnds, readArrangement, within } from '../src/features/runtime/canvas-marks';
+import { linkEnds, linkRoute, nearestSide, readArrangement, within } from '../src/features/runtime/canvas-marks';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
 const session = 'op-' + '7'.repeat(32);
@@ -24,6 +24,14 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   localStorage.clear();
 });
+
+/** Holds the note tool and presses the surface at (x, y): the note goes there. */
+async function placeNote(x = 400, y = 300) {
+  const surface = $('.session-canvas-scroll');
+  await click($('[data-act="draw-note"]'));
+  await pointer(surface, 'pointerdown', x, y);
+  await pointer(surface, 'pointerup', x, y);
+}
 
 /** Draws a box from (100, 100) to (700, 500) on the surface, whose view starts at (24, 24), and labels it. */
 async function drawBox(label: string) {
@@ -63,7 +71,16 @@ describe('The canvas is the person\'s own', () => {
 
   it('puts a note on the canvas, keeps what is written in it, and draws a line from a window to it that goes when the note does', async () => {
     await mount('#/canvas', routes);
-    await click($('[data-act="add-note"]'));
+    expect($('[data-act="draw-note"]')?.getAttribute('aria-pressed')).toBe('false');
+    await click($('[data-act="draw-note"]'));
+    expect($('[data-act="draw-note"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(text()).toContain('Press on the canvas where the note goes.');
+    expect($('.canvas-note')).toBeNull();
+    await pointer($('.session-canvas-scroll'), 'pointerdown', 424, 324);
+    await pointer($('.session-canvas-scroll'), 'pointerup', 424, 324);
+    // The note is where the press landed (the view starts at 24, 24), and the tool is let go.
+    expect([($('.canvas-note') as HTMLElement).style.left, ($('.canvas-note') as HTMLElement).style.top]).toEqual(['400px', '300px']);
+    expect($('[data-act="draw-note"]')?.getAttribute('aria-pressed')).toBe('false');
     await write($('.canvas-note textarea'), 'Ask Scribe about the build');
     await leave($('.canvas-note textarea'));
     expect(keptHere().notes).toEqual([expect.objectContaining({ text: 'Ask Scribe about the build' })]);
@@ -75,12 +92,58 @@ describe('The canvas is the person\'s own', () => {
     expect($$('path.person-line')).toHaveLength(1);
     expect($('[data-act="draw-line"]')?.getAttribute('aria-pressed')).toBe('false');
     const note = $('.canvas-note')?.getAttribute('data-note');
-    expect(keptHere().links).toEqual([expect.objectContaining({ from: node, to: note })]);
+    // What is kept names the window by its agent, so the line holds when the agent has been started again.
+    expect(keptHere().links).toEqual([expect.objectContaining({ from: 'agent:' + SCRIBE, to: note })]);
     // Picking a thing for a line opened no terminal and sent nothing.
     expect($('.terminal')).toBeNull();
     await click($('.canvas-note .canvas-mark-remove'));
     expect($$('path.person-line')).toHaveLength(0);
     expect(keptHere().links).toEqual([]);
+  });
+
+  it('draws a line by dragging from a dot on a thing\'s edge to another thing, and draws none when it is let go over nothing', async () => {
+    await mount('#/canvas', routes);
+    await placeNote();
+    const [one, note, surface] = [$('.session-canvas-node.sessions'), $('.canvas-note'), $('.session-canvas-scroll')];
+    expect(one?.querySelectorAll('.canvas-anchor')).toHaveLength(4);
+    expect(note?.querySelectorAll('.canvas-anchor')).toHaveLength(4);
+    const over = vi.fn<(x: number, y: number) => Element | null>(() => null);
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: over });
+    await pointer(one?.querySelector('.canvas-anchor') ?? null, 'pointerdown', 300, 200);
+    await pointer(surface, 'pointermove', 500, 400);
+    expect($$('path.drawing-line')).toHaveLength(1);
+    await pointer(surface, 'pointerup', 500, 400);
+    expect($$('path.drawing-line')).toHaveLength(0);
+    expect($$('path.person-line')).toHaveLength(0);
+    over.mockReturnValue(note?.querySelector('textarea') ?? null);
+    await pointer(one?.querySelector('.canvas-anchor') ?? null, 'pointerdown', 300, 200);
+    await pointer(surface, 'pointermove', 420, 320);
+    await pointer(surface, 'pointerup', 420, 320);
+    expect($$('path.person-line')).toHaveLength(1);
+    // It leaves the edge whose dot it was dragged from (the first dot is the top one) and meets the edge it was let go nearest; its way turns square corners.
+    expect(keptHere().links).toEqual([expect.objectContaining({ from: 'agent:' + SCRIBE, to: note?.getAttribute('data-note'), from_side: 'top', to_side: 'left' })]);
+    expect($('path.person-line')?.getAttribute('d')).toMatch(/^M [-\d.]+ [-\d.]+ V [-\d.]+ H [-\d.]+$/);
+    // The window was not moved and no terminal was opened by the drag.
+    expect($('.terminal')).toBeNull();
+    Reflect.deleteProperty(document, 'elementFromPoint');
+  });
+
+  it('stays where it is when the page is read again and when the agent has been started again', async () => {
+    await mount('#/canvas', routes);
+    await drawBox('Iridium');
+    const one = $('.session-canvas-node.sessions') as HTMLElement;
+    await act(async () => { one.querySelector('.session-canvas-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
+    const [left, top] = [one.style.left, one.style.top];
+    expect(Object.keys(keptHere().boxes)).toContain('agent:' + SCRIBE);
+    expect(Object.keys(keptHere().boxes).some((id) => id.startsWith('session:'))).toBe(false);
+    unmountAll();
+    // The agent was stopped and started: its session has another name. Its window is where the agent's was, and the box is still there.
+    const again = 'op-' + '9'.repeat(32);
+    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [{ ...running, session: again }], unanswered: [] }) });
+    const now = $('.session-canvas-node.sessions') as HTMLElement;
+    expect(now.getAttribute('data-node')).toBe('session:' + again);
+    expect([now.style.left, now.style.top]).toEqual([left, top]);
+    expect($('.canvas-group')?.getAttribute('aria-label')).toBe('Box: Iridium');
   });
 
   it('leaves a tool with Escape and draws nothing', async () => {
@@ -89,7 +152,7 @@ describe('The canvas is the person\'s own', () => {
     await pointer($('.session-canvas-node.sessions'), 'pointerdown', 0, 0);
     await press('Escape', {}, window as unknown as Element);
     expect($('[data-act="draw-line"]')?.getAttribute('aria-pressed')).toBe('false');
-    await click($('[data-act="add-note"]'));
+    await placeNote();
     await pointer($('.canvas-note'), 'pointerdown', 0, 0);
     expect($$('path.person-line')).toHaveLength(0);
   });
@@ -152,7 +215,7 @@ describe('The canvas is the person\'s own', () => {
 
   it('says that a change was not kept when the service that keeps the canvas refuses it, with the refusal by name', async () => {
     await mount('#/canvas', { ...routes, '/canvas': ok({ arrangement: null, layouts: [] }), 'PUT /canvas': refused(503, 'CanvasUnavailable', 'the canvas store is not open') });
-    await click($('[data-act="add-note"]'));
+    await placeNote();
     expect($('.canvas-dock [role="alert"]')?.textContent).toContain('The arrangement was not kept on the service.');
     expect($('.canvas-dock [role="alert"]')?.textContent).toContain('CanvasUnavailable: the canvas store is not open');
   });
@@ -242,5 +305,17 @@ describe('What a person drew, as it is kept', () => {
     expect(linkEnds(box, { x: -300, y: 20, w: 100, h: 100 })).toEqual([0, 50, -200, 70]);
     expect(linkEnds(box, { x: 20, y: 300, w: 100, h: 100 })).toEqual([50, 100, 70, 300]);
     expect(linkEnds(box, { x: 20, y: -300, w: 100, h: 100 })).toEqual([50, 0, 70, -200]);
+  });
+
+  it('routes a line from the edge it was drawn from with square corners, never as the crow flies', () => {
+    const [from, to] = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 300, y: 200, w: 100, h: 100 }];
+    // With no edge named the facing edges are taken: out to the right, in from the left, turning half way.
+    expect(linkRoute(from, to, {})).toEqual({ d: 'M 100 50 H 200 V 250 H 300', middle: [200, 150] });
+    expect(linkRoute(from, to, { from_side: 'bottom', to_side: 'top' })).toEqual({ d: 'M 50 100 V 150 H 350 V 200', middle: [200, 150] });
+    expect(linkRoute(from, to, { from_side: 'right', to_side: 'top' })).toEqual({ d: 'M 100 50 H 350 V 200', middle: [350, 50] });
+    expect(linkRoute(from, to, { from_side: 'bottom', to_side: 'left' })).toEqual({ d: 'M 50 100 V 250 H 300', middle: [50, 250] });
+    expect(nearestSide(to, [310, 250])).toBe('left');
+    expect(nearestSide(to, [350, 290])).toBe('bottom');
+    expect(readArrangement({ boxes: {}, open: [], links: [{ id: 'link:a', from: 'a', to: 'b', from_side: 'up' }] })).toBeNull();
   });
 });

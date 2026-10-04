@@ -167,7 +167,8 @@ describe('Running: the list and the canvas', () => {
     await act(async () => { one.querySelector('.session-canvas-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
     expect(parseFloat(one.style.left)).toBe(before + 16);
     const kept = JSON.parse(localStorage.getItem('lys.canvas') ?? 'null') as { boxes: Record<string, { x: number }> };
-    expect(kept.boxes['session:' + session].x).toBe(before + 16);
+    // Kept under the agent's name, so the place holds when the agent has been started again.
+    expect(kept.boxes['agent:' + SCRIBE].x).toBe(before + 16);
   });
 
   it('opens the agent the route names even when its window was kept closed, at the open size', async () => {

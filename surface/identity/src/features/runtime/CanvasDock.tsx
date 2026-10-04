@@ -1,9 +1,8 @@
 /**
  * What hovers over the canvas and never takes it over: one small bar of symbols at its bottom right, and one small panel
- * that opens from the bar. The bar holds the tools (a box, a note, a line), the zoom, and three buttons that open the
- * panel: the agents, to find one and go to it; the saved layouts; the connections in words. Nothing is laid over the
- * surface until it is asked for, so the bar is the same size with three agents or three hundred. The zoom is its own
- * small bar at the bottom left.
+ * that opens from the bar. The bar holds three buttons that open the panel: the agents, to find one and go to it; the saved layouts; the connections in words. Nothing is laid over the
+ * surface until it is asked for, so the bar is the same size with three agents or three hundred. The drawing tools (a box, a
+ * line, a note) are their own bar to its left, apart, and the zoom is its own small bar at the bottom left.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -17,16 +16,16 @@ import type { SessionGraph } from './session-graph';
 import { said } from './canvas-kept';
 import type { Keeping, SavedLayout } from './canvas-kept';
 
-export type Tool = 'box' | 'line' | null;
+export type Tool = 'box' | 'line' | 'note' | null;
 export type Panel = 'agents' | 'layouts' | 'connections' | null;
 export const PANELS: Record<Exclude<Panel, null>, string> = { agents: 'Agents', layouts: 'Layouts', connections: 'Connections' };
 
 /** The bar's symbols, drawn in the rail's own line style. */
 const SYMBOLS = {
   agents: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5" /><circle cx="17" cy="9" r="2.4" /><path d="M15.5 14.2c2.3.2 4 1.8 4.6 4.8" /></>,
-  box: <rect x="4" y="5" width="16" height="14" rx="2" strokeDasharray="3 2.5" />,
-  note: <><path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5M8 9h8M8 12.5h5" /></>,
-  line: <><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M7.5 16.5l9-9" /></>,
+  box: <><rect x="3.5" y="7" width="17" height="13" rx="2" strokeDasharray="3 2.5" /><path d="M6 4h6" /></>,
+  line: <><rect x="3" y="4" width="7" height="6" rx="1.2" /><rect x="14" y="14" width="7" height="6" rx="1.2" /><path d="M10 9l4 6" /></>,
+  note: <path d="M5 4h14v10l-6 6H5zM13 20v-6h6" />,
   layouts: <><rect x="3.5" y="4" width="7.5" height="7" rx="1.2" /><rect x="13" y="4" width="7.5" height="7" rx="1.2" /><rect x="3.5" y="13" width="7.5" height="7" rx="1.2" /><rect x="13" y="13" width="7.5" height="7" rx="1.2" /></>,
   connections: <><circle cx="6" cy="7" r="2.2" /><circle cx="18" cy="6" r="2.2" /><circle cx="12" cy="17" r="2.2" /><path d="M8.1 7.6 15.8 6.4M7.1 9 10.9 15M16.9 8 13.1 15" /></>,
   out: <path d="M6 12h12" />,
@@ -110,8 +109,8 @@ function Layouts({ keeping, layouts, save, remove }: {
   </>;
 }
 
-export function CanvasDock({ graph, show, tool, setTool, picking, addNote, panel, setPanel, zoom, zoomBy, home, says, connections, ...layouts }: {
-  graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean; addNote: () => void;
+export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, says, connections, ...layouts }: {
+  graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean;
   panel: Panel; setPanel: (panel: Panel) => void;
   /** How far the surface is zoomed, in percent; `zoomBy` steps it, or with null puts it back to actual size; `home` brings the windows back into view. */
   zoom: number; zoomBy: (factor: number | null) => void; home: () => void;
@@ -134,7 +133,7 @@ export function CanvasDock({ graph, show, tool, setTool, picking, addNote, panel
   <div className="canvas-dock">
     <div className="canvas-dock-says">
       {says}
-      {tool ? <span role="status">{tool === 'box' ? 'Drag on the canvas to draw the box.' : picking ? 'Now press the thing the line goes to.' : 'Press the thing the line starts from.'} Escape leaves it.</span> : null}
+      {tool ? <span role="status">{tool === 'box' ? 'Drag on the canvas to draw the box.' : tool === 'note' ? 'Press on the canvas where the note goes.' : picking ? 'Now press the thing the line goes to.' : 'Press the thing the line starts from.'} Escape leaves it.</span> : null}
     </div>
     {/* Each part stays on the page while the panel is away, so nothing in it is read again when it opens. */}
     <section className={'canvas-pop' + (panel ? ' open' : '')} aria-label={panel ? PANELS[panel] : 'Canvas panel'} aria-hidden={!panel}>
@@ -142,14 +141,18 @@ export function CanvasDock({ graph, show, tool, setTool, picking, addNote, panel
       <div className="canvas-pop-body" hidden={panel !== 'layouts'}><Layouts {...layouts} /></div>
       <div className="canvas-pop-body" hidden={panel !== 'connections'}>{connections}</div>
     </section>
-    <div className="canvas-bar" role="toolbar" aria-label="Canvas tools">
-      <Symbol act="agents" says={'Agents: ' + running + ' running. Find one and go to it'} on={slide('agents')} expanded={panel === 'agents'} count={running} />
-      <Symbol act="layouts" says="Layouts: save this one, or open a saved one" on={slide('layouts')} expanded={panel === 'layouts'} />
-      <Symbol act="connections" says="Connections, in words" on={slide('connections')} expanded={panel === 'connections'} />
-      <span className="canvas-bar-rule" aria-hidden="true" />
-      <Symbol act="draw-box" says="Box: drag on the canvas to draw a box around windows, then label it" on={hold('box')} pressed={tool === 'box'} />
-      <Symbol act="add-note" says="Note: put a note on the canvas" on={addNote} />
-      <Symbol act="draw-line" says="Line: press one thing, then another, to draw a line between them" on={hold('line')} pressed={tool === 'line'} />
+    {/* Drawing is one bar and finding is another, apart, the drawing to the left: each drawing tool is held, then used on the canvas, and shows that it is held. */}
+    <div className="canvas-bars">
+      <div className="canvas-bar canvas-draw" role="toolbar" aria-label="Draw on the canvas">
+        <Symbol act="draw-box" says="Box: drag on the canvas to draw a box around windows, then label it" on={hold('box')} pressed={tool === 'box'} />
+        <Symbol act="draw-line" says="Line: press one thing, then another, to draw a line between them; or drag from a dot on a thing's edge to another thing" on={hold('line')} pressed={tool === 'line'} />
+        <Symbol act="draw-note" says="Note: press on the canvas where the note goes" on={hold('note')} pressed={tool === 'note'} />
+      </div>
+      <div className="canvas-bar" role="toolbar" aria-label="Canvas tools">
+        <Symbol act="agents" says={'Agents: ' + running + ' running. Find one and go to it'} on={slide('agents')} expanded={panel === 'agents'} count={running} />
+        <Symbol act="layouts" says="Layouts: save this one, or open a saved one" on={slide('layouts')} expanded={panel === 'layouts'} />
+        <Symbol act="connections" says="Connections, in words" on={slide('connections')} expanded={panel === 'connections'} />
+      </div>
     </div>
   </div>
   </>;

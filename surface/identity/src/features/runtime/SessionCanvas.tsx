@@ -13,13 +13,13 @@ import type { SessionGraph } from './session-graph';
 import { firstMessagePage } from './message-connections';
 import type { MessageRead } from './message-connections';
 import { MessageConnections } from './MessageConnections';
-import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, readArrangement, within } from './canvas-marks';
-import type { Arrangement, Box, Marks } from './canvas-marks';
+import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, nearestSide, readArrangement, sidePoint, within } from './canvas-marks';
+import type { Arrangement, Box, Marks, Side } from './canvas-marks';
 import { keepArrangement, readKeeping, removeLayout, said, saveLayout } from './canvas-kept';
 import type { Keeping, SavedLayout } from './canvas-kept';
 import { CanvasDock, PANELS } from './CanvasDock';
 import type { Panel, Tool } from './CanvasDock';
-import { GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
+import { Anchors, GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
 import './session-canvas.css';
 import './canvas-marks.css';
 
@@ -38,7 +38,8 @@ function zoomed(view: View, k: number, cx: number, cy: number): View {
   const from = zoomOf(view), to = Math.min(ZOOM[1], Math.max(ZOOM[0], k));
   return { x: cx - (cx - view.x) * to / from, y: cy - (cy - view.y) * to / from, k: to };
 }
-interface Kept extends Arrangement { view: View }
+/** What this browser keeps: the arrangement, where the surface is looked at from, and the arrival last answered (an agent at a place in this tab's history). */
+interface Kept extends Arrangement { view: View; shown?: string }
 
 const KEPT = 'lys.canvas';
 const HOME: View = { x: 24, y: 24 };
@@ -77,7 +78,8 @@ function kept(): Kept | null {
     const view = (value as { view?: Record<string, unknown> } | null)?.view;
     if (!arrangement || !view || typeof view !== 'object' || !['x', 'y'].every((key) => Number.isFinite(view[key]))) return null;
     if (view.k !== undefined && !(typeof view.k === 'number' && view.k >= ZOOM[0] && view.k <= ZOOM[1])) return null;
-    return { ...arrangement, view: view as unknown as View };
+    const shown = (value as { shown?: unknown }).shown;
+    return { ...arrangement, view: view as unknown as View, ...(typeof shown === 'string' ? { shown } : {}) };
   } catch { return null; }
 }
 
@@ -112,6 +114,9 @@ export function lineBetween(from: Box, to: Box): string {
 }
 
 /** The address of a session's terminal alone, filling its own browser window. */
+/** A line being dragged, from the dot it started on to the pointer. */
+const lineTo = (from: [number, number], to: [number, number]): string => `M ${from[0]} ${from[1]} L ${to[0]} ${to[1]}`;
+
 const windowOf = (session: { session: string; agent: string | null }): string =>
   '#/window/' + encodeURIComponent(session.session) + (session.agent ? '?agent=' + encodeURIComponent(session.agent) : '');
 
@@ -122,15 +127,21 @@ type Drag = { kind: 'pan'; from: [number, number]; view: View }
   /** A thing moved or sized: `least` is the smallest it sizes to, `along` what sits in a moved box and goes with it. */
   | { kind: 'move' | 'size'; id: string; from: [number, number]; box: Box; least: [number, number]; along: [string, Box][] }
   /** A box being drawn out from where the press began on the surface. */
-  | { kind: 'draw'; id: string; from: [number, number]; at: [number, number] };
+  | { kind: 'draw'; id: string; from: [number, number]; at: [number, number] }
+  /** A line being dragged from a dot on one thing's edge to whatever it is let go over. */
+  | { kind: 'link'; id: string; side: Side; from: [number, number] };
 
 function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping: Keeping; connections: ReactNode }) {
   const { agent } = useParams();
   // What the service keeps for this person comes first; without it, what this browser kept. Where the surface is looked at from is always this browser's own.
   const [before] = useState<Kept | null>(() => {
     const here = kept();
-    return keeping.arrangement ? { ...renamed(keeping.arrangement, hereName(graph)), view: here?.view ?? HOME } : here;
+    const theirs = keeping.arrangement ?? here;
+    return theirs ? { ...renamed(theirs, hereName(graph)), view: here?.view ?? HOME, shown: here?.shown } : null;
   });
+  // Arriving for an agent is one place in this tab's history. Reading the page again, or coming back to it, is the same place: the canvas then stays where it was.
+  const arrival = agent ? agent + '@' + String((window.history.state as { key?: unknown } | null)?.key ?? '') : undefined;
+  const answered = useRef(before?.shown);
   // The agent the person came for, when the route names one: its terminal is open and in view whatever was kept.
   const asked = graph.nodes.find((node) => agent && node.session?.agent === agent)?.id ?? null;
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set([...(before?.open ?? []), ...(asked ? [asked] : [])]));
@@ -148,6 +159,8 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
   const [tool, setTool] = useState<Tool>(null);
   const [lineFrom, setLineFrom] = useState<string | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
+  // The line being dragged from a thing's dot: where it started and where the pointer is, on the surface.
+  const [dragged, setDragged] = useState<{ from: string; side: Side; to: [number, number] } | null>(null);
   const [layouts, setLayouts] = useState<SavedLayout[]>(keeping.layouts);
   // The panel that is out, and a saved layout to open, are in the address: a link goes to the canvas with that panel out or that layout open.
   const [search, setSearch] = useSearchParams();
@@ -174,7 +187,8 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
   };
   /** Everything arranged, as it is kept: every window's place, with the places kept for agents that are not running now. */
   const arrangement = (): Arrangement => {
-    const away = Object.fromEntries(Object.entries(moved).filter(([id]) => id.startsWith(AGENT) && hereName(graph)(id) === id));
+    // A card that is not here may only be missing because its read was refused this visit, and an agent that is not running keeps its place for when it is. A session with no agent that has ended keeps none.
+    const away = Object.fromEntries(Object.entries(moved).filter(([id]) => !(id in boxes) && !id.startsWith('session:') && hereName(graph)(id) === id));
     return renamed({ boxes: { ...away, ...boxes }, open: [...open], ...marks }, keptName(graph));
   };
   useEffect(() => {
@@ -207,19 +221,26 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
 
   // On arriving, and again when the route names another agent: that agent's terminal is open, at the open size, in the middle of the view.
   useLayoutEffect(() => {
-    if (asked) show(asked, false);
+    if (asked && answered.current !== arrival) show(asked, false);
+    if (asked) answered.current = arrival;
     // Only when the agent asked for changes: after that the view and the windows are the person's.
   }, [asked]);
 
-  // The arrangement is this browser's own: it is kept as it changes and is there on the next visit.
+  // A window is its agent's: when the agent's session ends and another begins, the new one takes the window's place and its open terminal.
+  const agents = useRef(new Map<string, string>());
   useEffect(() => {
+    for (const node of graph.nodes) if (node.session?.agent) agents.current.set(node.id, AGENT + node.session.agent);
     const here = new Set(graph.nodes.map((node) => node.id));
-    // A session that is no longer here has ended and keeps no place. A team, resource or message card that is not here may
-    // only be missing because its read was refused this visit, so its place is kept.
-    const boxes = Object.fromEntries(Object.entries(moved).filter(([id]) => !id.startsWith('session:') || here.has(id)));
+    const now = (id: string) => hereName(graph)(here.has(id) ? id : agents.current.get(id) ?? id);
+    setOpen((held) => [...held].some((id) => now(id) !== id) ? new Set([...held].map(now)) : held);
+    setMoved((held) => Object.keys(held).some((id) => now(id) !== id) ? Object.fromEntries(Object.entries(held).map(([id, box]) => [now(id), box])) : held);
+  }, [graph]);
+
+  // The canvas stays where it is: this browser keeps it as it changes, under each agent's name, so it is there when the page is read again and when the agents have been started again.
+  useEffect(() => {
     // A browser may refuse to keep anything. The surface still works for this visit, and says that it will not be remembered.
     try {
-      localStorage.setItem(KEPT, JSON.stringify({ boxes, open: [...open].filter((id) => here.has(id)), view, ...marks } satisfies Kept));
+      localStorage.setItem(KEPT, JSON.stringify({ ...arrangement(), view, ...(answered.current ? { shown: answered.current } : {}) } satisfies Kept));
       setUnkept(null);
     } catch (error) { setUnkept(error instanceof Error ? error.message : String(error)); }
   }, [graph, moved, open, view, marks]);
@@ -278,15 +299,31 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
     if (now.kind === 'pan') { setView((held) => ({ ...held, x: now.view.x + sx, y: now.view.y + sy })); return; }
     // A window moves and sizes by what the pointer travelled on the surface, which is the screen's distance over the zoom.
     const [dx, dy] = [sx / zoomOf(view), sy / zoomOf(view)];
+    if (now.kind === 'link') {
+      const rect = surface.current?.getBoundingClientRect();
+      if (rect) setDragged({ from: now.id, side: now.side, to: [(event.clientX - rect.left - view.x) / zoomOf(view), (event.clientY - rect.top - view.y) / zoomOf(view)] });
+      return;
+    }
     if (now.kind === 'draw') { put(now.id, { x: now.at[0] + Math.min(0, dx), y: now.at[1] + Math.min(0, dy), w: Math.abs(dx), h: Math.abs(dy) }); return; }
     if (now.kind === 'size') { put(now.id, { ...now.box, w: Math.max(now.least[0], now.box.w + dx), h: Math.max(now.least[1], now.box.h + dy) }); return; }
     put(now.id, { ...now.box, x: now.box.x + dx, y: now.box.y + dy });
     for (const [id, box] of now.along) put(id, { ...box, x: box.x + dx, y: box.y + dy });
   };
-  const finish = () => {
+  const finish = (event: PointerEvent) => {
     const now = drag.current;
     drag.current = null;
     if (!now || now.kind === 'pan') return;
+    if (now.kind === 'link') {
+      // The line ends on the thing it is let go over: a window, a note or a box's bar. Let go over nothing, it is not drawn.
+      const over = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-node], [data-note], [data-group]');
+      const to = over?.getAttribute('data-node') ?? over?.getAttribute('data-note') ?? over?.getAttribute('data-group');
+      const [rect, onto] = [surface.current?.getBoundingClientRect(), to ? at(to) : undefined];
+      setDragged(null);
+      if (!to || to === now.id || !rect || !onto) return;
+      // It leaves the edge it was dragged from and meets the edge it was let go nearest.
+      const to_side = nearestSide(onto, [(event.clientX - rect.left - view.x) / zoomOf(view), (event.clientY - rect.top - view.y) / zoomOf(view)]);
+      setMarks((all) => ({ ...all, links: [...all.links, { id: markId('link'), from: now.id, to, from_side: now.side, to_side }] }));
+    }
     if (now.kind === 'draw') {
       // A press that was not dragged still makes a box, at the size a box is made at. Its label then takes the keyboard.
       setMarks((all) => ({ ...all, groups: all.groups.map((each) => each.id === now.id && (each.w < SMALLEST_MARK[0] || each.h < SMALLEST_MARK[1]) ? { ...each, w: GROUP[0], h: GROUP[1] } : each) }));
@@ -298,9 +335,18 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
   /** A press on the surface itself: with the box tool it starts a box where it lands; otherwise it takes hold of the surface. */
   const pressed = (from: [number, number]): Drag => {
     const element = surface.current;
-    if (tool !== 'box' || !element) return { kind: 'pan', from, view };
-    const [rect, k, id] = [element.getBoundingClientRect(), zoomOf(view), markId('group')];
+    if (!element || (tool !== 'box' && tool !== 'note')) return { kind: 'pan', from, view };
+    const [rect, k] = [element.getBoundingClientRect(), zoomOf(view)];
     const here: [number, number] = [(from[0] - rect.left - view.x) / k, (from[1] - rect.top - view.y) / k];
+    if (tool === 'note') {
+      // A note goes where the press lands, and can be dragged into place before the press is let go.
+      const note = { id: markId('note'), text: '', x: here[0], y: here[1], w: NOTE[0], h: NOTE[1] };
+      setMarks((all) => ({ ...all, notes: [...all.notes, note] }));
+      setTool(null);
+      setFresh(note.id);
+      return { kind: 'move', id: note.id, from, box: note, least: SMALLEST_MARK, along: [] };
+    }
+    const id = markId('group');
     setMarks((all) => ({ ...all, groups: [...all.groups, { id, label: '', x: here[0], y: here[1], w: 0, h: 0 }] }));
     return { kind: 'draw', id, from, at: here };
   };
@@ -312,6 +358,7 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
       : [];
     return { kind: 'move', id, from, box, least: SMALLEST, along: inside };
   });
+  const linking = (id: string) => (side: Side) => begin((from) => ({ kind: 'link', id, side, from }));
   const sizing = (id: string, least: [number, number]) => begin((from) => ({ kind: 'size', id, from, box: at(id) ?? { x: 0, y: 0, w: 0, h: 0 }, least, along: [] }));
   /** With the line tool, a press on a thing picks it: the first is where the line starts, the second where it ends. */
   const pick = tool !== 'line' ? null : (id: string) => (event: PointerEvent<HTMLElement>) => {
@@ -320,13 +367,6 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
     if (lineFrom === null) { setLineFrom(id); return; }
     if (lineFrom !== id) { setMarks((all) => ({ ...all, links: [...all.links, { id: markId('link'), from: lineFrom, to: id }] })); changed(); }
     setTool(null);
-  };
-  const addNote = () => {
-    const element = surface.current, k = zoomOf(view), id = markId('note');
-    const [x, y] = element ? [(element.clientWidth / 2 - view.x) / k, (element.clientHeight / 2 - view.y) / k] : [0, 0];
-    setMarks((all) => ({ ...all, notes: [...all.notes, { id, text: '', x: x - NOTE[0] / 2, y: y - NOTE[1] / 2, w: NOTE[0], h: NOTE[1] }] }));
-    setFresh(id);
-    changed();
   };
   /** Takes a box, a note or a line away; a line that ended on what was taken away goes with it. */
   const removeMark = (id: string) => {
@@ -391,12 +431,12 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
   return <><div className={'session-canvas-scroll' + (tool ? ' tool-' + tool : '')} role="region" aria-label="Agent connection canvas" tabIndex={0} ref={surface} onKeyDown={travel}
     onPointerDown={begin(pressed)} onPointerMove={during} onPointerUp={finish} onPointerCancel={finish}>
     <div className="session-canvas" style={{ transform: `translate(${view.x}px, ${view.y}px)` + (zoomOf(view) === 1 ? '' : ` scale(${zoomOf(view)})`), transformOrigin: '0 0' }}>
-      {marks.groups.map((group) => <GroupBox key={group.id} group={group} fresh={fresh === group.id} pick={pick?.(group.id)} move={moving(group.id)} size={sizing(group.id, SMALLEST_MARK)}
+      {marks.groups.map((group) => <GroupBox key={group.id} group={group} fresh={fresh === group.id} pick={pick?.(group.id)} move={moving(group.id)} size={sizing(group.id, SMALLEST_MARK)} link={linking(group.id)}
         change={(label) => reworded(group.id, label)} remove={() => removeMark(group.id)} />)}
       <svg className="session-canvas-lines" aria-hidden="true">{graph.edges.flatMap((edge) => {
         const [from, to] = [boxes[edge.from], boxes[edge.to]];
         return from && to ? [<path key={edge.id} d={lineBetween(from, to)} data-kind={edge.kind} data-standing={edge.stands} />] : [];
-      })}<LinkLines links={marks.links} at={at} /></svg>
+      })}<LinkLines links={marks.links} at={at} />{dragged && at(dragged.from) ? <path className="drawing-line" d={lineTo(sidePoint(at(dragged.from) as Box, dragged.side), dragged.to)} /> : null}</svg>
       {graph.nodes.map((node) => {
         const box = boxes[node.id], shown = open.has(node.id);
         const state = !node.session ? null : graph.unanswered.some((entry) => entry.session === node.session?.session) ? 'Runner did not answer; current state unknown' : node.session.shown === 'running' ? 'Running' : 'Starting, not yet confirmed';
@@ -427,14 +467,15 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
             <Terminal key={node.session.session} session={node.session.session} agent={node.session.agent} machine={node.session.machine_name ?? node.session.machine} />
             <span className="session-canvas-grip" aria-hidden="true" onPointerDown={sizing(node.id, SMALLEST)} />
           </> : null}
+          <Anchors from={linking(node.id)} />
         </article>;
       })}
-      {marks.notes.map((note) => <NoteCard key={note.id} note={note} fresh={fresh === note.id} pick={pick?.(note.id)} move={moving(note.id)} size={sizing(note.id, SMALLEST_MARK)}
+      {marks.notes.map((note) => <NoteCard key={note.id} note={note} fresh={fresh === note.id} pick={pick?.(note.id)} move={moving(note.id)} size={sizing(note.id, SMALLEST_MARK)} link={linking(note.id)}
         change={(text) => reworded(note.id, text)} remove={() => removeMark(note.id)} />)}
       <LinkHandles links={marks.links} at={at} remove={removeMark} />
     </div>
   </div>
-  <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} addNote={addNote} panel={panel} setPanel={setPanel}
+  <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} panel={panel} setPanel={setPanel}
     zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} connections={connections} keeping={keeping} layouts={layouts} save={save} remove={remove}
     says={<>
       {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}
