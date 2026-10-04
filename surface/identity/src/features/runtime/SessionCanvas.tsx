@@ -13,7 +13,7 @@ import type { SessionGraph } from './session-graph';
 import { firstMessagePage } from './message-connections';
 import type { MessageRead } from './message-connections';
 import { MessageConnections } from './MessageConnections';
-import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, nearestSide, nextColour, sidePoint, standing, stood, within } from './canvas-marks';
+import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, covering, markId, nearestSide, nextColour, sidePoint, standing, stood, within } from './canvas-marks';
 import type { Arrangement, Box, Marks, Side } from './canvas-marks';
 import { KEPT, hereName, keepArrangement, kept, keptName, readKeeping, removeLayout, renamed, said, saveLayout } from './canvas-kept';
 import type { Keeping, Kept, SavedLayout } from './canvas-kept';
@@ -50,7 +50,7 @@ const STEPS: Record<string, [number, number] | undefined> = { ArrowLeft: [-16, 0
 
 type Drag = { kind: 'pan'; from: [number, number]; view: View }
   /** A thing moved or sized: `least` is the smallest it sizes to, `along` what sits in a moved box and goes with it. */
-  | { kind: 'move' | 'size'; id: string; from: [number, number]; box: Box; least: [number, number]; along: [string, Box][] }
+  | { kind: 'move' | 'size'; id: string; from: [number, number]; box: Box; least: [number, number]; along: [string, Box][]; axis?: 'w' | 'h' }
   /** A box being drawn out from where the press began on the surface. */
   | { kind: 'draw'; id: string; from: [number, number]; at: [number, number] }
   /** A line being dragged from a dot on one thing's edge to whatever it is let go over. */
@@ -240,7 +240,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
       return;
     }
     if (now.kind === 'draw') { put(now.id, { x: now.at[0] + Math.min(0, dx), y: now.at[1] + Math.min(0, dy), w: Math.abs(dx), h: Math.abs(dy) }); return; }
-    if (now.kind === 'size') { put(now.id, { ...now.box, w: Math.max(now.least[0], now.box.w + dx), h: Math.max(now.least[1], now.box.h + dy) }); return; }
+    if (now.kind === 'size') { put(now.id, { ...now.box, w: now.axis === 'h' ? now.box.w : Math.max(now.least[0], now.box.w + dx), h: now.axis === 'w' ? now.box.h : Math.max(now.least[1], now.box.h + dy) }); return; }
     put(now.id, { ...now.box, x: now.box.x + dx, y: now.box.y + dy });
     for (const [id, box] of now.along) put(id, { ...box, x: box.x + dx, y: box.y + dy });
   };
@@ -265,6 +265,8 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
       setTool(null);
       setFresh(now.id);
     }
+    // A thing let go in a box is covered by it: the box is drawn out round whatever now sits in it.
+    else if (now.kind !== 'link') setMarks((all) => ({ ...all, groups: covering(all.groups, [...Object.values(boxes), ...all.notes, ...all.widgets.map(standing)]) }));
     changed();
   };
   /** Puts a widget on the surface: the kind in hand, or the kind named. `fed` is the window it was placed on, which a line then feeds it from. */
@@ -328,7 +330,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
     return { kind: 'move', id, from, box, least: SMALLEST, along: inside };
   });
   const linking = (id: string) => (side: Side) => begin((from) => ({ kind: 'link', id, side, from }));
-  const sizing = (id: string, least: [number, number]) => begin((from) => ({ kind: 'size', id, from, box: at(id) ?? { x: 0, y: 0, w: 0, h: 0 }, least, along: [] }));
+  const sizing = (id: string, least: [number, number], axis?: 'w' | 'h') => begin((from) => ({ kind: 'size', id, from, box: at(id) ?? { x: 0, y: 0, w: 0, h: 0 }, least, along: [], axis }));
   /** With the line tool, a press on a thing picks it: the first is where the line starts, the second where it ends. */
   const pick = tool !== 'line' ? null : (id: string) => (event: PointerEvent<HTMLElement>) => {
     event.stopPropagation();
@@ -420,7 +422,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
     onPointerDown={begin(pressed)} onPointerMove={during} onPointerUp={finish} onPointerCancel={finish}
     onDoubleClick={(event) => { if (!tool && (event.target === event.currentTarget || event.target === event.currentTarget.firstElementChild)) zoomTo('', around([...Object.values(boxes), ...marks.groups, ...marks.notes, ...widgets]), 1); }}>
     <div className="session-canvas" style={{ transform: `translate(${view.x}px, ${view.y}px)` + (zoomOf(view) === 1 ? '' : ` scale(${zoomOf(view)})`), transformOrigin: '0 0' }}>
-      {marks.groups.map((group) => <GroupBox key={group.id} group={group} fresh={fresh === group.id} pick={pick?.(group.id)} move={moving(group.id)} size={sizing(group.id, SMALLEST_MARK)} link={linking(group.id)} look={() => zoomTo(group.id)}
+      {marks.groups.map((group) => <GroupBox key={group.id} group={group} fresh={fresh === group.id} pick={pick?.(group.id)} move={moving(group.id)} size={sizing(group.id, SMALLEST_MARK)} edge={(axis) => sizing(group.id, SMALLEST_MARK, axis)} link={linking(group.id)} look={() => zoomTo(group.id)}
         change={(label) => reworded(group.id, label)} colour={() => recoloured(group.id)} remove={() => removeMark(group.id)} />)}
       <svg className="session-canvas-lines" aria-hidden="true">{graph.edges.flatMap((edge) => {
         const [from, to] = [boxes[edge.from], boxes[edge.to]];

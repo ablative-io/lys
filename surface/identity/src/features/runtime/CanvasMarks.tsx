@@ -24,7 +24,8 @@ interface Held {
 const Swatch = ({ on, of }: { on: () => void; of: string }) => <button type="button" className="canvas-swatch" data-act="colour" aria-label={'Change the colour of ' + of} title="Colour" onClick={on} />;
 
 /** A box around windows, with its label on its top edge. Its inside is the surface: only its bar and its corner are held. */
-export function GroupBox({ group, fresh, pick, move, size, link, change, colour, remove, look }: { group: Group; /** Brings the view in to this box, or back out again. */ look: () => void } & Held) {
+/** A box is held by its whole outline: its bar and its left edge move it, its right edge and its foot size it one way, its corner both. */
+export function GroupBox({ group, fresh, pick, move, size, edge, link, change, colour, remove, look }: { group: Group; /** Brings the view in to this box, or back out again. */ look: () => void; /** Sizes it along one side only: its width or its height. */ edge: (axis: 'w' | 'h') => Press } & Held) {
   const [label, setLabel] = useState(group.label);
   useEffect(() => setLabel(group.label), [group.label]);
   // A box is on the surface while it is still being drawn out; its label takes the keyboard when the drawing ends.
@@ -39,6 +40,9 @@ export function GroupBox({ group, fresh, pick, move, size, link, change, colour,
       <Swatch on={colour} of={'the box ' + (group.label || 'with no label')} />
       <button type="button" className="canvas-mark-remove" aria-label={'Remove the box ' + (group.label || 'with no label')} onClick={remove}>×</button>
     </header>
+    <span className="canvas-group-edge left" aria-hidden="true" onPointerDownCapture={pick} onPointerDown={move} />
+    <span className="canvas-group-edge right" aria-hidden="true" onPointerDown={edge('w')} />
+    <span className="canvas-group-edge foot" aria-hidden="true" onPointerDown={edge('h')} />
     <span className="session-canvas-grip" aria-hidden="true" onPointerDown={size} />
     <Anchors from={link} />
   </section>;

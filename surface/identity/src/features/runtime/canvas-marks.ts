@@ -128,6 +128,25 @@ export const within = (group: Box, box: Box): boolean => {
   return x >= group.x && x <= group.x + group.w && y >= group.y && y <= group.y + group.h;
 };
 
+/** How far a box stands clear of what it covers: under its label's bar at the top, and by its edge on every other side. */
+const [COVER_BAR, COVER_EDGE] = [40, 20];
+/**
+ * The boxes grown to cover what sits in them. A thing sits in a box when its middle is inside; a box that does not
+ * reach round the whole of such a thing is drawn out until it does, clear of it by its edge and under its bar. A box
+ * only grows here, and the smallest are grown first, so a box round another is grown round what that one became.
+ */
+export function covering(groups: Group[], things: Box[]): Group[] {
+  const grown = new Map<string, Group>();
+  for (const group of [...groups].sort((left, right) => left.w * left.h - right.w * right.h)) {
+    const smaller = groups.filter((each) => each.id !== group.id && each.w * each.h < group.w * group.h).map((each) => grown.get(each.id) ?? each);
+    const held = [...things, ...smaller].filter((each) => within(group, each));
+    const [x, y] = [Math.min(group.x, ...held.map((each) => each.x - COVER_EDGE)), Math.min(group.y, ...held.map((each) => each.y - COVER_BAR))];
+    const [right, foot] = [Math.max(group.x + group.w, ...held.map((each) => each.x + each.w + COVER_EDGE)), Math.max(group.y + group.h, ...held.map((each) => each.y + each.h + COVER_EDGE))];
+    grown.set(group.id, x === group.x && y === group.y && right === group.x + group.w && foot === group.y + group.h ? group : { ...group, x, y, w: right - x, h: foot - y });
+  }
+  return groups.map((group) => grown.get(group.id) ?? group);
+}
+
 /** Where a drawn line leaves one thing and meets the other: the facing edges, at their middles. */
 export function linkEnds(from: Box, to: Box): [number, number, number, number] {
   const [fx, fy, tx, ty] = [from.x + from.w / 2, from.y + from.h / 2, to.x + to.w / 2, to.y + to.h / 2];

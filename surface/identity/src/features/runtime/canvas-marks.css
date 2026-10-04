@@ -4,7 +4,13 @@
 .canvas-group-bar:active { cursor: grabbing; }
 .session-canvas .canvas-group .canvas-group-bar input { flex: 0 1 auto; width: auto; min-width: 0; max-width: calc(100% - 34px); padding: 2px 6px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 600; }
 .session-canvas .canvas-group .canvas-group-bar input:hover, .session-canvas .canvas-group .canvas-group-bar input:focus { border-color: var(--border-default); background: var(--surface-card); }
-.canvas-group > .session-canvas-grip { pointer-events: auto; }
+.canvas-group > .session-canvas-grip { pointer-events: auto; width: 26px; height: 26px; border-bottom-right-radius: var(--radius-lg); }
+/* A box's outline is held all the way round, 12 wide over its dashed line: the left edge moves it, the right edge and the foot size it. */
+.canvas-group-edge { position: absolute; pointer-events: auto; }
+.canvas-group-edge.left { left: -6px; top: 30px; bottom: 0; width: 12px; cursor: grab; }
+.canvas-group-edge.right { right: -6px; top: 30px; bottom: 26px; width: 12px; cursor: ew-resize; }
+.canvas-group-edge.foot { left: 6px; right: 26px; bottom: -6px; height: 12px; cursor: ns-resize; }
+.canvas-group-edge:hover { background: color-mix(in srgb, var(--tint, var(--accent)) 30%, transparent); border-radius: 6px; }
 .canvas-note { position: absolute; box-sizing: border-box; z-index: 2; display: flex; flex-direction: column; border: 1px solid var(--border-default); border-left: 3px solid var(--warn, var(--accent)); border-radius: var(--radius-md); background: var(--surface-card); overflow: hidden; }
 .canvas-note-bar { flex: none; display: flex; align-items: center; justify-content: space-between; height: 24px; padding: 0 4px 0 10px; cursor: grab; user-select: none; }
 .canvas-note-bar:active { cursor: grabbing; }

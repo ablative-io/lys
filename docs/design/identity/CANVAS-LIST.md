@@ -13,6 +13,13 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
   undoes it; the boxes are ordinary boxes after. An agent in several teams stands in the one furthest down.
   Installed in 0feba1e8 and walked there on 5 October with two teams made for it (Ablative, and Lys under
   it); it leaves the list.
+- A box covers what is dropped in it, and is easier to hold. Tom, 5 October, 09:23: "the grouping boxes should
+  probably dynamically resize when you drop things inside them, so they cover them... It's difficult to resize
+  and move." Written 5 October: when anything is let go, each box grows (it never shrinks) to hold whatever has
+  its middle in it, 20 clear at the sides and foot and 40 under its label, smaller boxes first so a box inside
+  another carries the outer one with it. A box's whole outline is held: the left edge moves it, the right edge
+  sizes its width, the foot its height, and the corner grip is larger. Walked on the developer server with a
+  box and a note of my own. An edge that lies under a window cannot be pressed there; the window is in front.
 - Widgets for everything Lys holds about an agent that has none yet: tasks, git branch, commits, worktrees,
   pull requests, reviews, jobs and tickets.
 - The HUD on an agent's window: compact, set a goal, add a task.
