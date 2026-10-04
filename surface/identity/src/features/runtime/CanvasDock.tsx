@@ -2,7 +2,8 @@
  * What hovers over the canvas and never takes it over: one small bar of symbols at its bottom right, and one small panel
  * that opens from the bar. The bar holds three buttons that open the panel: the agents, to find one and go to it; the saved layouts; the connections in words. Nothing is laid over the
  * surface until it is asked for, so the bar is the same size with three agents or three hundred. The drawing tools (a box, a
- * line, a note) are their own bar to its left, apart, and the zoom is its own small bar at the bottom left.
+ * line, a note) are their own bar to its left, apart, and the zoom is its own small bar at the bottom left. Each bar is the
+ * person's to move: dragged by its grip to another corner of the canvas, it stays there in this browser.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -136,6 +137,43 @@ function Widgets({ held, place, drop }: { held: string | null; place: (kind: str
       onClick={() => { if (dragged.current) dragged.current = false; else place(kind); }}><KindSymbol kind={kind} />{each.label}</button>)}</div>;
 }
 
+/** A corner of the canvas a bar is kept in. */
+export type Corner = 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left';
+/** The corners in the order a bar's grip goes round them when it is pressed without dragging. */
+const CORNERS: Corner[] = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+type Bar = 'look' | 'draw' | 'find';
+const BARS: Record<Bar, string> = { look: 'view', draw: 'drawing', find: 'tools' };
+const BAR_HOMES: Record<Bar, Corner> = { look: 'bottom-left', draw: 'bottom-right', find: 'bottom-right' };
+const KEPT_BARS = 'lys.canvas.bars';
+/** Where this browser kept each bar; a bar it kept no corner for is in its own. */
+function keptBars(): Record<Bar, Corner> {
+  try {
+    const kept = JSON.parse(localStorage.getItem(KEPT_BARS) ?? '{}') as Record<string, unknown>;
+    const at = (bar: Bar): Corner => CORNERS.includes(kept[bar] as Corner) ? kept[bar] as Corner : BAR_HOMES[bar];
+    return { look: at('look'), draw: at('draw'), find: at('find') };
+  } catch { return BAR_HOMES; }
+}
+
+/**
+ * A bar's grip. Dragged, the bar goes to the corner of the canvas nearest where it is let go; pressed without dragging,
+ * to the next corner round.
+ */
+function Grip({ bar, at, move, drag }: { bar: Bar; at: Corner; move: (to: Corner) => void; drag: (on: boolean) => void }) {
+  const from = useRef<[number, number] | null>(null);
+  return <button type="button" className="canvas-bar-grip" data-move={bar} aria-label={'Move the ' + BARS[bar] + ' bar: it is at the ' + at.replace('-', ' ') + '. Drag it to a corner, or press for the next corner'} title="Drag to a corner"
+    onPointerDown={(event) => { from.current = [event.clientX, event.clientY]; event.currentTarget.setPointerCapture?.(event.pointerId); drag(true); }}
+    onPointerUp={(event) => {
+      const start = from.current;
+      from.current = null;
+      drag(false);
+      if (!start) return;
+      const canvas = event.currentTarget.closest('.canvas-corner')?.parentElement?.getBoundingClientRect();
+      if (!canvas || Math.hypot(event.clientX - start[0], event.clientY - start[1]) <= 6) { move(CORNERS[(CORNERS.indexOf(at) + 1) % CORNERS.length]); return; }
+      move(((event.clientY < canvas.top + canvas.height / 2 ? 'top' : 'bottom') + '-' + (event.clientX < canvas.left + canvas.width / 2 ? 'left' : 'right')) as Corner);
+    }}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v.01M15 6v.01M9 12v.01M15 12v.01M9 18v.01M15 18v.01" /></svg></button>;
+}
+
 export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, says, connections, kind, place, drop, ...layouts }: {
   graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean;
   panel: Panel; setPanel: (panel: Panel) => void;
@@ -153,15 +191,44 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
   const hold = (name: Exclude<Tool, null>) => () => setTool(tool === name ? null : name);
   const slide = (name: Exclude<Panel, null>) => () => setPanel(panel === name ? null : name);
   const running = graph.nodes.filter((node) => node.session).length;
+  const [corners, setCorners] = useState(keptBars);
+  const [dragging, setDragging] = useState(false);
+  const grip = (bar: Bar) => <Grip bar={bar} at={corners[bar]} drag={setDragging} move={(to) => setCorners((now) => {
+    const next = { ...now, [bar]: to };
+    try { localStorage.setItem(KEPT_BARS, JSON.stringify(next)); } catch { /* A browser that keeps nothing still moves the bar for now. */ }
+    return next;
+  })} />;
+  const bars: Record<Bar, ReactNode> = {
+    look: <div key="look" className="canvas-bar canvas-look" role="toolbar" aria-label="Canvas view">
+      {grip('look')}
+      <Symbol act="zoom-out" says="Zoom out" on={() => zoomBy(1 / 1.25)} />
+      <button type="button" className="canvas-symbol canvas-zoom" data-act="zoom-reset" aria-label="Zoom to actual size" title="Zoom to actual size" onClick={() => zoomBy(null)}>{zoom}%</button>
+      <Symbol act="zoom-in" says="Zoom in" on={() => zoomBy(1.25)} />
+      <Symbol act="home" says="Back to the windows" on={home} />
+    </div>,
+    // Drawing is one bar and finding is another, apart: each drawing tool is held, then used on the canvas, and shows that it is held.
+    draw: <div key="draw" className="canvas-bar canvas-draw" role="toolbar" aria-label="Draw on the canvas">
+      {grip('draw')}
+      <Symbol act="draw-box" says="Box: drag on the canvas to draw a box around windows, then label it" on={hold('box')} pressed={tool === 'box'} />
+      <Symbol act="draw-line" says="Line: press one thing, then another, to draw a line between them; or drag from a dot on a thing's edge to another thing" on={hold('line')} pressed={tool === 'line'} />
+      <Symbol act="draw-note" says="Note: press on the canvas where the note goes" on={hold('note')} pressed={tool === 'note'} />
+      <Symbol act="draw-widget" says="Widget: choose what to show about your agents, then press where it goes" on={slide('widgets')} pressed={tool === 'widget'} expanded={panel === 'widgets'} />
+    </div>,
+    find: <div key="find" className="canvas-bar canvas-find-bar" role="toolbar" aria-label="Canvas tools">
+      {grip('find')}
+      <Symbol act="agents" says={'Agents: ' + running + ' running. Find one and go to it'} on={slide('agents')} expanded={panel === 'agents'} count={running} />
+      <Symbol act="layouts" says="Layouts: save this one, or open a saved one" on={slide('layouts')} expanded={panel === 'layouts'} />
+      <Symbol act="connections" says="Connections, in words" on={slide('connections')} expanded={panel === 'connections'} />
+    </div>,
+  };
+  // The panel, and what has to be said, stand by the bar they belong to: the widgets and a held tool by the drawing bar, the rest by the tools.
+  const owner: Bar = panel === 'widgets' || (tool && !panel) ? 'draw' : 'find';
   return <>
-  {/* Looking is at the bottom left; doing is at the bottom right. */}
-  <div className="canvas-bar canvas-look" role="toolbar" aria-label="Canvas view">
-    <Symbol act="zoom-out" says="Zoom out" on={() => zoomBy(1 / 1.25)} />
-    <button type="button" className="canvas-symbol canvas-zoom" data-act="zoom-reset" aria-label="Zoom to actual size" title="Zoom to actual size" onClick={() => zoomBy(null)}>{zoom}%</button>
-    <Symbol act="zoom-in" says="Zoom in" on={() => zoomBy(1.25)} />
-    <Symbol act="home" says="Back to the windows" on={home} />
-  </div>
-  <div className="canvas-dock">
+  {CORNERS.filter((corner) => Object.values(corners).includes(corner)).map((corner) => <div key={corner} className="canvas-corner" data-corner={corner}>
+    {(Object.keys(bars) as Bar[]).filter((bar) => corners[bar] === corner).map((bar) => bars[bar])}
+  </div>)}
+  {dragging ? CORNERS.map((corner) => <span key={corner} className="canvas-corner-offer" data-corner={corner} aria-hidden="true" />) : null}
+  <div className="canvas-dock" data-corner={corners[owner]}>
     <div className="canvas-dock-says">
       {says}
       {tool ? <span role="status">{tool === 'box' ? 'Drag on the canvas to draw the box.' : tool === 'note' ? 'Press on the canvas where the note goes.'
@@ -174,20 +241,6 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
       <div className="canvas-pop-body" hidden={panel !== 'connections'}>{connections}</div>
       <div className="canvas-pop-body" hidden={panel !== 'widgets'}><Widgets held={tool === 'widget' ? kind : null} place={place} drop={drop} /></div>
     </section>
-    {/* Drawing is one bar and finding is another, apart, the drawing to the left: each drawing tool is held, then used on the canvas, and shows that it is held. */}
-    <div className="canvas-bars">
-      <div className="canvas-bar canvas-draw" role="toolbar" aria-label="Draw on the canvas">
-        <Symbol act="draw-box" says="Box: drag on the canvas to draw a box around windows, then label it" on={hold('box')} pressed={tool === 'box'} />
-        <Symbol act="draw-line" says="Line: press one thing, then another, to draw a line between them; or drag from a dot on a thing's edge to another thing" on={hold('line')} pressed={tool === 'line'} />
-        <Symbol act="draw-note" says="Note: press on the canvas where the note goes" on={hold('note')} pressed={tool === 'note'} />
-        <Symbol act="draw-widget" says="Widget: choose what to show about your agents, then press where it goes" on={slide('widgets')} pressed={tool === 'widget'} expanded={panel === 'widgets'} />
-      </div>
-      <div className="canvas-bar" role="toolbar" aria-label="Canvas tools">
-        <Symbol act="agents" says={'Agents: ' + running + ' running. Find one and go to it'} on={slide('agents')} expanded={panel === 'agents'} count={running} />
-        <Symbol act="layouts" says="Layouts: save this one, or open a saved one" on={slide('layouts')} expanded={panel === 'layouts'} />
-        <Symbol act="connections" says="Connections, in words" on={slide('connections')} expanded={panel === 'connections'} />
-      </div>
-    </div>
   </div>
   </>;
 }

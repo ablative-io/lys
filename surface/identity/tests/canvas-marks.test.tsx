@@ -146,6 +146,37 @@ describe('The canvas is the person\'s own', () => {
     expect($('.canvas-group')?.getAttribute('aria-label')).toBe('Box: Iridium');
   });
 
+  it('keeps each bar in the corner the person moved it to: dragged by its grip, or pressed for the next corner round', async () => {
+    await mount('#/canvas', routes);
+    const corner = (bar: string) => $('[data-move="' + bar + '"]')?.closest('.canvas-corner')?.getAttribute('data-corner');
+    const corners = () => ['look', 'draw', 'find'].map(corner);
+    expect(corners()).toEqual(['bottom-left', 'bottom-right', 'bottom-right']);
+    // Pressed without dragging, a bar goes to the next corner round.
+    await pointer($('[data-move="look"]'), 'pointerdown', 20, 780);
+    await pointer($('[data-move="look"]'), 'pointerup', 20, 780);
+    expect(corners()).toEqual(['top-left', 'bottom-right', 'bottom-right']);
+    // Dragged, it goes to the corner nearest where it is let go; while it is dragged each corner shows it can go there.
+    const canvas = $('.canvas-corner')?.parentElement as HTMLElement;
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800, x: 0, y: 0, toJSON: () => ({}) });
+    const grip = $('[data-move="find"]');
+    await pointer(grip, 'pointerdown', 900, 780);
+    expect($$('.canvas-corner-offer').map((each) => each.getAttribute('data-corner'))).toEqual(['top-left', 'top-right', 'bottom-right', 'bottom-left']);
+    await pointer(grip, 'pointerup', 880, 60);
+    expect([corners(), $$('.canvas-corner-offer').length]).toEqual([['top-left', 'bottom-right', 'top-right'], 0]);
+    // The panel opens beside the bar it belongs to: the layouts by the tools, the widgets by the drawing bar.
+    await click($('[data-act="layouts"]'));
+    expect([$('.canvas-pop')?.getAttribute('aria-label'), $('.canvas-dock')?.getAttribute('data-corner')]).toEqual(['Layouts', 'top-right']);
+    await click($('[data-act="draw-widget"]'));
+    expect([$('.canvas-pop')?.getAttribute('aria-label'), $('.canvas-dock')?.getAttribute('data-corner')]).toEqual(['Widgets', 'bottom-right']);
+    // Kept in this browser: read again, each bar is where it was put; a corner it does not know is the bar's own.
+    expect(JSON.parse(localStorage.getItem('lys.canvas.bars') ?? '{}')).toEqual({ look: 'top-left', draw: 'bottom-right', find: 'top-right' });
+    localStorage.setItem('lys.canvas.bars', JSON.stringify({ look: 'top-left', draw: 'middle', find: 'top-right' }));
+    unmountAll();
+    document.body.innerHTML = '';
+    await mount('#/canvas', routes);
+    expect(corners()).toEqual(['top-left', 'bottom-right', 'top-right']);
+  });
+
   it('leaves a tool with Escape and draws nothing', async () => {
     await mount('#/canvas', routes);
     await click($('[data-act="draw-line"]'));
