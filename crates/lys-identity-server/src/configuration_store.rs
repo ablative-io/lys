@@ -22,6 +22,12 @@ pub struct Zone {
     pub by: String,
     /// When it was recorded, in seconds since the Unix epoch.
     pub at: u64,
+    /// The context window a person declared for each model, in tokens; none
+    /// for a model declared as side work, whose calls never set an agent's
+    /// context.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[schema(value_type = Object)]
+    pub model_windows: crate::budgets_feed::Windows,
 }
 
 /// A signed snapshot accompanies every setting change.
@@ -56,6 +62,29 @@ pub fn checked(zone: &str) -> Result<(), ServerError> {
             refusal: "ConfigurationZoneRefused",
             words: format!("{zone} has no named IANA zone"),
         }));
+    }
+    Ok(())
+}
+
+/// Refuse a model with no name or a window of no tokens.
+pub fn checked_windows(windows: &crate::budgets_feed::Windows) -> Result<(), ServerError> {
+    let refuse = |words: String| {
+        Err(ServerError::Budget(BudgetError::BudgetRefused {
+            refusal: "ConfigurationMalformed",
+            words,
+        }))
+    };
+    for (model, window) in windows {
+        if model.trim().is_empty() || model.trim() != model {
+            return refuse(format!(
+                "`{model}` is not a model's name: it is empty or has space around it"
+            ));
+        }
+        if *window == Some(0) {
+            return refuse(format!(
+                "the context window of {model} is no tokens; give its window, or declare it side work"
+            ));
+        }
     }
     Ok(())
 }
@@ -107,6 +136,7 @@ impl ConfigurationStore {
                 version: 1,
                 by: "host_setup".to_owned(),
                 at: crate::session::now(),
+                model_windows: crate::budgets_feed::Windows::new(),
             };
             let bytes = serde_json::to_vec(&zone).map_err(unavailable)?;
             log.append(&bytes).map_err(unavailable)?;
@@ -144,9 +174,24 @@ impl ConfigurationStore {
     }
 
     /// Store one zone after validating its name and the version read.
-    pub fn set(&mut self, zone: String, expected: u64, by: String) -> Result<Zone, ServerError> {
+    /// Set the zone, and the model windows when they are given; windows not
+    /// given stay as held.
+    pub fn set(
+        &mut self,
+        zone: String,
+        model_windows: Option<crate::budgets_feed::Windows>,
+        expected: u64,
+        by: String,
+    ) -> Result<Zone, ServerError> {
         self.settle()?;
         checked(&zone)?;
+        let model_windows = match model_windows {
+            Some(windows) => {
+                checked_windows(&windows)?;
+                windows
+            }
+            None => self.zone.model_windows.clone(),
+        };
         if self.zone.version != expected {
             return Err(ServerError::Budget(
                 BudgetError::ConfigurationVersionConflict {
@@ -162,6 +207,7 @@ impl ConfigurationStore {
                 .ok_or_else(|| unavailable("organisation version exhausted"))?,
             by,
             at: crate::session::now(),
+            model_windows,
         };
         let bytes = serde_json::to_vec(&next).map_err(unavailable)?;
         let index = self.log.len();
@@ -185,6 +231,7 @@ impl ConfigurationStore {
 
 fn stored(zone: &Zone) -> Result<(), ServerError> {
     checked(&zone.zone).map_err(unavailable)?;
+    checked_windows(&zone.model_windows).map_err(unavailable)?;
     if zone.version == 0 || zone.by.is_empty() {
         return Err(unavailable(
             "stored organisation setting has no version or source",

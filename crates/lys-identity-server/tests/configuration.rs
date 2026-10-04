@@ -63,3 +63,61 @@ async fn configuration_refuses_anonymous_and_other_people() -> TestResult {
     assert!(body.get("sign_in").is_none());
     Ok(())
 }
+
+#[tokio::test]
+async fn model_windows_are_declared_kept_and_refused_by_name() -> TestResult {
+    use identity_contract::apps::{Auth, send};
+    use serde_json::json;
+    let mut service = Service::start().await?;
+    let cookie = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "administrator@example.test".to_owned(),
+        })
+        .await?;
+    let (status, body) = service.get("/configuration", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{body}");
+    // Nothing is declared at first, and no kept call has named a model.
+    assert_eq!(body["organisation"].get("model_windows"), None);
+    assert_eq!(body["models_undeclared"], json!([]));
+    let zone = body["organisation"]["zone"].clone();
+    let version = body["organisation"]["version"]
+        .as_u64()
+        .ok_or("no version")?;
+    let windows = json!({"model-one": 200_000, "small-model": null});
+    let put = |body: serde_json::Value| {
+        let (service, cookie) = (&service, &cookie);
+        async move {
+            send(
+                service,
+                reqwest::Method::PUT,
+                "/configuration",
+                Auth::Cookie(cookie),
+                Some(&body),
+            )
+            .await
+        }
+    };
+    let (status, answer) =
+        put(json!({"zone": zone, "version": version, "model_windows": windows})).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer["model_windows"], windows);
+    assert_eq!(answer["version"], version + 1);
+    // The zone set without the table leaves the table as held.
+    let (status, answer) = put(json!({"zone": zone, "version": version + 1})).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer["model_windows"], windows);
+    // A window of no tokens and a model with no name are refused by name.
+    for refused in [json!({"model-one": 0}), json!({" ": 5}), json!({"": null})] {
+        let (status, answer) =
+            put(json!({"zone": zone, "version": version + 2, "model_windows": refused})).await?;
+        assert_eq!(status, 400, "{answer}");
+        assert_eq!(answer["refusal"], "ConfigurationMalformed");
+    }
+    service.restart().await?;
+    let (status, body) = service.get("/configuration", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["organisation"]["model_windows"], windows);
+    assert_eq!(body["organisation"]["version"], version + 2);
+    Ok(())
+}

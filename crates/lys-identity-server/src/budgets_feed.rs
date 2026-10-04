@@ -27,6 +27,8 @@ pub async fn keep_page(
         return Err(refused("runner feed format or cursor is invalid"));
     }
     let mut refusals = Vec::new();
+    // Read once for the page, before any use is kept.
+    let windows = crate::configuration_api::organisation(state)?.model_windows;
     for entry in page.entries {
         match entry.body {
             Body::Usage(record) => {
@@ -50,7 +52,7 @@ pub async fn keep_page(
                         .ok_or_else(|| refused("runner feed usage has no tracked agent"))
                 })?;
                 let usage = with_budgets(state, |store| {
-                    convert(machine, &agent, &record, store.held())
+                    convert(machine, &agent, &record, store.held(), &windows)
                 })?;
                 crate::budgets_enforce::keep(state, usage).await?;
             }
@@ -66,12 +68,69 @@ pub async fn keep_page(
     })
 }
 
+/// The context windows a person declared, by model: a window in tokens, or
+/// none for a model declared as side work, whose calls never set an agent's
+/// context.
+pub type Windows = std::collections::BTreeMap<String, Option<u64>>;
+
+/// The share of its window a call's context fills. The window a person
+/// declared for the call's model decides; a model declared as side work
+/// sets no context; a model with no row falls to the window the run's
+/// profile declared. A context with no window to hold it against, or larger
+/// than the window a person declared, is unavailable by name: never a guess,
+/// and never a use lost with it.
+fn context_percent(
+    record: &UsageRecord,
+    context: u64,
+    windows: &Windows,
+    unavailable: &mut Vec<Unavailable>,
+) -> Result<Option<u64>, ServerError> {
+    let mut gap = |reason: String| {
+        unavailable.push(Unavailable {
+            figure: "context_percent".to_owned(),
+            reason,
+        });
+        Ok(None)
+    };
+    let model = record.model.as_deref();
+    let window = match model.and_then(|model| windows.get(model)) {
+        Some(Some(tokens)) if context <= *tokens => *tokens,
+        Some(Some(tokens)) => {
+            return gap(format!(
+                "the call's context of {context} tokens is larger than the window of {tokens} declared for its model"
+            ));
+        }
+        Some(None) => {
+            return gap(
+                "the call's model is declared as side work, which never sets an agent's context"
+                    .to_owned(),
+            );
+        }
+        None if record.context_window == 0 => {
+            return gap(format!(
+                "no context window is declared for model {}",
+                model.unwrap_or("(not named)")
+            ));
+        }
+        None if context > record.context_window => {
+            return Err(refused(
+                "native context must fit a positive declared window",
+            ));
+        }
+        None => record.context_window,
+    };
+    u64::try_from(u128::from(context) * 100 / u128::from(window))
+        .map(Some)
+        .map_err(|error| refused(format!("native context percentage: {error}")))
+}
+
 /// Convert cumulative time only once; native snapshots never charge their token totals.
 pub fn convert(
     machine: &str,
     agent: &str,
     record: &UsageRecord,
     prior: &crate::budgets_state::Held,
+    windows: &Windows,
 ) -> Result<Usage, ServerError> {
     if record.version != RECORD_VERSION || record.id.is_empty() || record.session.is_empty() {
         return Err(refused(
@@ -120,19 +179,10 @@ pub fn convert(
     } else {
         0
     };
-    let context_percent = record
-        .figures
-        .context_tokens
-        .map(|context| {
-            if record.context_window == 0 || context > record.context_window {
-                return Err(refused(
-                    "native context must fit a positive declared window",
-                ));
-            }
-            u64::try_from(u128::from(context) * 100 / u128::from(record.context_window))
-                .map_err(|error| refused(format!("native context percentage: {error}")))
-        })
-        .transpose()?;
+    let context_percent = match record.figures.context_tokens {
+        Some(context) => context_percent(record, context, windows, &mut unavailable)?,
+        None => None,
+    };
     let usage =
         Usage {
             event: format!("native:{machine}:{}", record.id),
@@ -195,3 +245,7 @@ fn tokens(record: &UsageRecord, unavailable: &mut Vec<Unavailable>) -> Result<u6
     }
     Ok(total)
 }
+
+#[cfg(test)]
+#[path = "budgets_feed_tests.rs"]
+mod tests;

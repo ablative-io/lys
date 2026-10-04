@@ -38,10 +38,28 @@ async fn configuration(
     let actor = signed_in(&state, &headers)?;
     crate::routes::administrator(&state, &actor)?;
     let issuer = crate::connections_api::origin(state.oidc.issuer(), "sign-in provider")?;
+    let organisation = organisation(&state)?;
+    // Each model a kept call named that the table has no row for; with no
+    // budgets store there are no kept calls to name one.
+    let undeclared: Vec<String> = if state.budgets.is_some() {
+        crate::budgets_api::with_budgets(&state, |store| {
+            Ok(store
+                .held()
+                .index
+                .models()
+                .iter()
+                .filter(|model| !organisation.model_windows.contains_key(*model))
+                .cloned()
+                .collect())
+        })?
+    } else {
+        Vec::new()
+    };
     Ok(Json(json!({
         "source": "startup_configuration",
         "mutable_in_browser": false,
-        "organisation": organisation(&state)?,
+        "organisation": organisation,
+        "models_undeclared": undeclared,
         "sign_in": {
             "provider_origin": issuer,
             "session_seconds": startup.session_seconds,
@@ -84,6 +102,12 @@ pub(crate) fn organisation(
 pub(crate) struct ZoneBody {
     zone: String,
     version: u64,
+    /// The whole table of declared context windows, by model: a window in
+    /// tokens, or null for a model declared as side work. Absent leaves the
+    /// table as held.
+    #[serde(default)]
+    #[schema(value_type = Object)]
+    model_windows: Option<crate::budgets_feed::Windows>,
 }
 
 async fn set_zone(
@@ -112,5 +136,7 @@ async fn set_zone(
             reason: format!("organisation setting lock poisoned: {error}"),
         })
     })?;
-    store.set(body.zone, body.version, by).map(Json)
+    store
+        .set(body.zone, body.model_windows, body.version, by)
+        .map(Json)
 }

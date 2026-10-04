@@ -38,6 +38,8 @@ mod tests;
 #[derive(Debug, Default)]
 pub struct Index {
     agents: BTreeMap<String, Agent>,
+    /// Every model a kept call named.
+    models: BTreeSet<String>,
 }
 
 fn insert(timeline: &mut Timeline, usage: &Usage, position: usize) {
@@ -60,6 +62,7 @@ impl Clone for Index {
         crate::budgets_work::visit(crate::budgets_work::Work::IndexCopy);
         Self {
             agents: self.agents.clone(),
+            models: self.models.clone(),
         }
     }
 }
@@ -129,7 +132,17 @@ impl Index {
         Ok(index)
     }
 
+    /// Every model a kept call named, in name order.
+    pub(crate) const fn models(&self) -> &BTreeSet<String> {
+        &self.models
+    }
+
     pub(crate) fn insert(&mut self, usage: &Usage, position: usize) -> Result<(), String> {
+        if let Some(model) = usage.call.as_ref().and_then(|call| call.model.as_ref())
+            && !self.models.contains(model)
+        {
+            self.models.insert(model.clone());
+        }
         if let Some(agent) = self.agents.get_mut(&usage.agent) {
             agent.insert(usage, position)?;
         } else {

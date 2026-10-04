@@ -41,5 +41,14 @@ fn an_agents_calls_page_newest_first_and_are_found_by_id() -> Result<(), String>
     assert_eq!(index.call("a", "c3"), Some(3));
     assert_eq!(index.call("a", "other"), None);
     assert_eq!(index.call("b", "other"), Some(6));
+    assert!(index.models().is_empty());
+    let mut named = call("a", "named", 10);
+    if let Some(seen) = named.call.as_mut() {
+        seen.model = Some("model-one".to_owned());
+    }
+    let mut index = index;
+    index.insert(&named, 7)?;
+    index.insert(&named, 8)?;
+    assert_eq!(index.models().iter().collect::<Vec<_>>(), vec!["model-one"]);
     Ok(())
 }

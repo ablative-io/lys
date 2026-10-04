@@ -61,9 +61,10 @@ impl ProxyTracking {
     /// The tracking, refused by name: a run key that is not one.
     ///
     /// A context window of no tokens is not refused: it says the profile
-    /// declares none. Such a run's spend is counted and its context in use
-    /// is not, because a context is only ever said against a declared
-    /// window.
+    /// declares none. Such a run's context in use is still reported with
+    /// each call's model, and the service holds it against the window a
+    /// person declared for that model; with none declared there either, the
+    /// service says so by name.
     pub fn checked(&self) -> Result<(), RunnerError> {
         if !is_run_key(&self.run) {
             return Err(RunnerError::refused(
@@ -237,18 +238,11 @@ impl ProxyReading<'_> {
         } else {
             None
         };
-        let (figures, mut unavailable) = match (&unknown, line.usage.as_ref()) {
+        let (figures, unavailable) = match (&unknown, line.usage.as_ref()) {
             (None, Some(usage)) => spend(line.api, usage),
             // No figure, each named as unreported.
             _ => spend(line.api, &Tokens::default()),
         };
-        let mut figures = figures;
-        if self.tracking.context_window == 0 && figures.context_tokens.take().is_some() {
-            unavailable.push(Unavailable {
-                figure: "context_tokens".to_owned(),
-                reason: "the_profile_declares_no_context_window".to_owned(),
-            });
-        }
         let lost = line.status == CallStatus::Lost;
         if let Some((state, words)) = unknown {
             bodies.push(coverage(state, source, words));
