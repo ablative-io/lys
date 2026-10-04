@@ -127,15 +127,31 @@ export function facing(from: Box, to: Box): [Side, Side] {
 
 const across = (side: Side): boolean => side === 'left' || side === 'right';
 
+/** The most a line's turn is rounded by; a short leg is rounded by half its length. */
+const TURN = 14;
+
+/** The path through `points`, each turn rounded over. */
+function rounded(points: [number, number][]): string {
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let index = 1; index < points.length; index += 1) {
+    const [[px, py], [x, y], next] = [points[index - 1], points[index], points[index + 1]];
+    const [before, after] = [Math.hypot(x - px, y - py), next ? Math.hypot(next[0] - x, next[1] - y) : 0];
+    const r = Math.min(TURN, before / 2, after / 2);
+    if (!next || r === 0) { d += ` L ${x} ${y}`; continue; }
+    d += ` L ${x - (x - px) / before * r} ${y - (y - py) / before * r} Q ${x} ${y} ${x + (next[0] - x) / after * r} ${y + (next[1] - y) / after * r}`;
+  }
+  return d;
+}
+
 /**
- * A line's way from one thing to another: it leaves the edge it was drawn from, runs straight, and turns square corners
- * to meet the other's edge; never a diagonal. `middle` is a point on it, where its own small control sits.
+ * A line's way from one thing to another: it leaves the edge it was drawn from, runs straight, and turns to meet the
+ * other's edge, each turn rounded over; never a diagonal. `middle` is a point on it, where its own small control sits.
  */
 export function linkRoute(from: Box, to: Box, link: Pick<Link, 'from_side' | 'to_side'>): { d: string; middle: [number, number] } {
   const [facingFrom, facingTo] = facing(from, to);
   const [out, into] = [link.from_side ?? facingFrom, link.to_side ?? facingTo];
   const [[x, y], [ex, ey]] = [sidePoint(from, out), sidePoint(to, into)];
-  if (across(out) && across(into)) { const turn = (x + ex) / 2; return { d: `M ${x} ${y} H ${turn} V ${ey} H ${ex}`, middle: [turn, (y + ey) / 2] }; }
-  if (!across(out) && !across(into)) { const turn = (y + ey) / 2; return { d: `M ${x} ${y} V ${turn} H ${ex} V ${ey}`, middle: [(x + ex) / 2, turn] }; }
-  return across(out) ? { d: `M ${x} ${y} H ${ex} V ${ey}`, middle: [ex, y] } : { d: `M ${x} ${y} V ${ey} H ${ex}`, middle: [x, ey] };
+  if (across(out) && across(into)) { const turn = (x + ex) / 2; return { d: rounded([[x, y], [turn, y], [turn, ey], [ex, ey]]), middle: [turn, (y + ey) / 2] }; }
+  if (!across(out) && !across(into)) { const turn = (y + ey) / 2; return { d: rounded([[x, y], [x, turn], [ex, turn], [ex, ey]]), middle: [(x + ex) / 2, turn] }; }
+  return across(out) ? { d: rounded([[x, y], [ex, y], [ex, ey]]), middle: [ex, y] } : { d: rounded([[x, y], [x, ey], [ex, ey]]), middle: [x, ey] };
 }

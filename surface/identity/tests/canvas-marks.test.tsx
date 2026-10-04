@@ -122,7 +122,7 @@ describe('The canvas is the person\'s own', () => {
     expect($$('path.person-line')).toHaveLength(1);
     // It leaves the edge whose dot it was dragged from (the first dot is the top one) and meets the edge it was let go nearest; its way turns square corners.
     expect(keptHere().links).toEqual([expect.objectContaining({ from: 'agent:' + SCRIBE, to: note?.getAttribute('data-note'), from_side: 'top', to_side: 'left' })]);
-    expect($('path.person-line')?.getAttribute('d')).toMatch(/^M [-\d.]+ [-\d.]+ V [-\d.]+ H [-\d.]+$/);
+    expect($('path.person-line')?.getAttribute('d')).toMatch(/^M ([-\d.]+) [-\d.]+ L \1 [-\d.]+ Q \1 ([-\d.]+) [-\d.]+ \2 L [-\d.]+ \2$/);
     // The window was not moved and no terminal was opened by the drag.
     expect($('.terminal')).toBeNull();
     Reflect.deleteProperty(document, 'elementFromPoint');
@@ -312,10 +312,10 @@ describe('What a person drew, as it is kept', () => {
   it('routes a line from the edge it was drawn from with square corners, never as the crow flies', () => {
     const [from, to] = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 300, y: 200, w: 100, h: 100 }];
     // With no edge named the facing edges are taken: out to the right, in from the left, turning half way.
-    expect(linkRoute(from, to, {})).toEqual({ d: 'M 100 50 H 200 V 250 H 300', middle: [200, 150] });
-    expect(linkRoute(from, to, { from_side: 'bottom', to_side: 'top' })).toEqual({ d: 'M 50 100 V 150 H 350 V 200', middle: [200, 150] });
-    expect(linkRoute(from, to, { from_side: 'right', to_side: 'top' })).toEqual({ d: 'M 100 50 H 350 V 200', middle: [350, 50] });
-    expect(linkRoute(from, to, { from_side: 'bottom', to_side: 'left' })).toEqual({ d: 'M 50 100 V 250 H 300', middle: [50, 250] });
+    expect(linkRoute(from, to, {})).toEqual({ d: 'M 100 50 L 186 50 Q 200 50 200 64 L 200 236 Q 200 250 214 250 L 300 250', middle: [200, 150] });
+    expect(linkRoute(from, to, { from_side: 'bottom', to_side: 'top' })).toEqual({ d: 'M 50 100 L 50 136 Q 50 150 64 150 L 336 150 Q 350 150 350 164 L 350 200', middle: [200, 150] });
+    expect(linkRoute(from, to, { from_side: 'right', to_side: 'top' })).toEqual({ d: 'M 100 50 L 336 50 Q 350 50 350 64 L 350 200', middle: [350, 50] });
+    expect(linkRoute(from, to, { from_side: 'bottom', to_side: 'left' })).toEqual({ d: 'M 50 100 L 50 236 Q 50 250 64 250 L 300 250', middle: [50, 250] });
     expect(nearestSide(to, [310, 250])).toBe('left');
     expect(nearestSide(to, [350, 290])).toBe('bottom');
     expect(readArrangement({ boxes: {}, open: [], links: [{ id: 'link:a', from: 'a', to: 'b', from_side: 'up' }] })).toBeNull();
