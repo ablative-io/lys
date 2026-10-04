@@ -111,7 +111,29 @@ describe('Network', () => {
       expect($('section[aria-label="Workshop laptop"]')?.textContent).toContain('Asking its runner…');
       expect($('section[aria-label="Workshop laptop"]')?.textContent).not.toContain('No runner is connected');
     });
-        it('refuses an answer that does not say whether the runner answers', async () => {
+    it('ends an ask still waiting on its runner when the person leaves the page', async () => {
+      const silent: Machine = { ...machine, id: 'op-' + 'd'.repeat(32), runtime: 'lys-runner' };
+      await mount('#/me', { ...routes, '/network': ok({ machines: [silent], reports_served: true }),
+        ['/network/machines/' + silent.id + '/runner']: (() => new Promise(() => undefined)) as unknown as Route });
+      // The service's stand-in is watched for the signal each runner ask carries.
+      const served = globalThis.fetch;
+      const asks: AbortSignal[] = [];
+      globalThis.fetch = ((input: string, init?: RequestInit) => {
+        if (String(input).endsWith('/runner') && init?.signal) asks.push(init.signal);
+        return served(input, init);
+      }) as typeof fetch;
+      try {
+        await act(async () => { location.hash = '#/network'; });
+        await settle();
+        expect($$('#screen tbody tr[data-href]').map((row) => row.children[1]?.textContent)).toEqual(['Asking its runner…']);
+        expect(asks).toHaveLength(1);
+        expect(asks[0].aborted).toBe(false);
+        await act(async () => { location.hash = '#/me'; });
+        await settle();
+        expect(asks[0].aborted).toBe(true);
+      } finally { globalThis.fetch = served; }
+    });
+    it('refuses an answer that does not say whether the runner answers', async () => {
       await mount('#/network', at({}, { runner: lys }));
       await settle();
       expect(shown()).toBe('Lys could not ask its runner');

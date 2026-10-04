@@ -395,7 +395,7 @@ describe('Can X do this? (conformance 8.1)', () => {
   it("answers yes with the path to a person on an agent's file", async () => {
     const { posted } = await mount(`#/file/${SCRIBE}/access`);
     expect($$('tr[data-grant] .chain .pill').map((p) => p.textContent)).toEqual(['Ada (test person)', 'Scribe']);
-    expect($('tr[data-grant] .chain')?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
+    expect($('tr[data-grant] .chain')?.getAttribute('title')).toBe('Ada (test person), P/00000000 · owner of project:identity → Scribe, agent of Ada (test person), A/00000000 · viewer of project:identity');
     await choose($('#cPerm'), 'view');
     await press('c', {}, document.body);
     expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
@@ -403,7 +403,7 @@ describe('Can X do this? (conformance 8.1)', () => {
     expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
     expect($('#answer .why')?.textContent).toBe('view needs viewers or editors or owners.');
     expect($('#answer .chain')?.textContent).toBe('Ada (test person)→Scribe');
-    expect($('#answer .chain')?.getAttribute('title')).toContain('Scribe · viewer of project:identity');
+    expect($('#answer .chain')?.getAttribute('title')).toContain('Scribe, agent of Ada (test person), A/00000000 · viewer of project:identity');
     expect($('#answer .meta-line')?.textContent).toContain('model v1');
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
   });
@@ -469,7 +469,7 @@ describe('Who can reach this? (conformance 8.2)', () => {
     await settle();
     const grants = $$('table tbody tr[data-href]').map((r) => [...r.querySelectorAll('.chain .pill')].map((pill) => pill.textContent));
     expect(grants).toEqual([['Ada (test person)'], ['Ada (test person)'], ['Ada (test person)', 'Scribe']]);
-    expect($$('table tbody tr[data-href] .chain').map((chain) => chain.getAttribute('title'))).toEqual(['Ada (test person) · owner of project:identity', 'Ada (test person) · viewer of project:ledger', 'Ada (test person) · owner of project:identity → Scribe · viewer of project:identity']);
+    expect($$('table tbody tr[data-href] .chain').map((chain) => chain.getAttribute('title'))).toEqual(['Ada (test person), P/00000000 · owner of project:identity', 'Ada (test person), P/00000000 · viewer of project:ledger', 'Ada (test person), P/00000000 · owner of project:identity → Scribe, agent of Ada (test person), A/00000000 · viewer of project:identity']);
     const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[8].textContent);
     expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool']);
     expect(unreachable()).toEqual([]);
@@ -500,7 +500,7 @@ describe('A grant card, its use and its window', () => {
     const card = $$('tr[data-grant]').find((c) => c.querySelector('.chain'));
     expect(card?.textContent).toContain('not seen');
     expect([...(card?.querySelectorAll('.chain .pill') ?? [])].map((p) => p.textContent)).toEqual(['Ada (test person)', 'Scribe']);
-    expect(card?.querySelector('.chain')?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
+    expect(card?.querySelector('.chain')?.getAttribute('title')).toBe('Ada (test person), P/00000000 · owner of project:identity → Scribe, agent of Ada (test person), A/00000000 · viewer of project:identity');
     expect(card?.textContent).toContain('27 Sep to 4 Oct');
     expect(card?.textContent).not.toContain('never used');
   });
@@ -759,7 +759,7 @@ describe('The grant table says each fact once, by name (walk of 4 Oct)', () => {
     const chain = $('tr[data-grant] .chain');
     expect([...(chain?.querySelectorAll('.pill') ?? [])].map((pill) => pill.textContent)).toEqual(['Ada (test person)', 'Scribe']);
     expect(chain?.textContent).not.toMatch(/ of |:|owner|viewer/);
-    expect(chain?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
+    expect(chain?.getAttribute('title')).toBe('Ada (test person), P/00000000 · owner of project:identity → Scribe, agent of Ada (test person), A/00000000 · viewer of project:identity');
   });
 
   it('names a resource that is someone by their name, on the grants page and in every picker, never by a raw id', async () => {

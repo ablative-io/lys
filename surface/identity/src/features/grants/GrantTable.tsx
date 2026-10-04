@@ -6,7 +6,7 @@ import type { Column } from '../../shell/Listing';
 import { clock } from '../file/time';
 import { Delegate } from './Delegate';
 import { Chain } from './Chain';
-import { chainOf, grantNo, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, windowText } from './model';
+import { chainOf, grantNo, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
 import './grants.css';
@@ -24,7 +24,7 @@ export function breakable(text: string): ReactNode {
 export function grantColumns(w: GrantWorld): Column<Grant>[] {
   return [
     { head: 'Grant', cell: (g) => <span className="mono g-tight">{grantNo(g.id)}</span> },
-    { head: 'Holder', cell: (g) => nameOf(w, g.holder) },
+    { head: 'Holder', cell: (g) => <span title={whoTitle(w, g.holder)}>{nameOf(w, g.holder)}</span> },
     { head: 'Allows', cell: (g) => breakable(mayText(w, g)) },
     { head: 'Relation', cell: (g) => <span className="mono g-tight">{g.relation}</span> },
     { head: 'On', cell: (g) => <span className="g-room" title={resourceTitle(w, g.resource)}>{breakable(resourceName(w, g.resource))}</span> },

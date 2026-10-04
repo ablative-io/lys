@@ -23,7 +23,9 @@ export function SchemaMatrix({ kinds, label, sentence }: { kinds: [string, Matri
   return <div className="schema-tables" aria-label={label}>
     {kinds.map(([kind, body]) => {
       const relations = Object.entries(body.relations ?? {});
-      const actions = body.actions ?? [...new Set(relations.flatMap(([, may]) => may))];
+      // Every action any relation carries has a row: the kind's declared actions first, then any a relation carries that the kind did not list, so nothing a relation gives is left off the screen.
+      const carried = [...new Set(relations.flatMap(([, may]) => may))];
+      const actions = [...(body.actions ?? []), ...carried.filter((action) => !(body.actions ?? []).includes(action))];
       const fold = relations.length > COLUMNS;
       const alone = fold ? relations.filter(([, may]) => may.length === 1) : [];
       const columns = fold ? relations.filter(([, may]) => may.length !== 1) : relations;

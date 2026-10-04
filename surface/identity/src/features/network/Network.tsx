@@ -46,13 +46,15 @@ function useRunners(machines: Machine[]): Map<string, Asked> {
   const [known, setKnown] = useState(() => new Map<string, Asked>());
   useEffect(() => {
     let current = true;
+    // Leaving the page, or a new list of computers, ends every ask still waiting, so a runner that never answers holds no connection after it.
+    const leave = new AbortController();
     setKnown(new Map());
     for (const machine of machines) {
       const kept = (asked: Asked) => { if (current) setKnown((all) => new Map(all).set(machine.id, asked)); };
-      request<RunnerAnswer>('/network/machines/' + encodeURIComponent(machine.id) + '/runner').then(readRunner).then(kept,
+      request<RunnerAnswer>('/network/machines/' + encodeURIComponent(machine.id) + '/runner', undefined, 'POST', leave.signal).then(readRunner).then(kept,
         (problem: unknown) => kept({ ...ASKING, asked: 'unread', reason: problem instanceof Refused ? problem.refusal.refusal + ': ' + problem.refusal.reason : problem instanceof Error ? problem.message : String(problem) }));
     }
-    return () => { current = false; };
+    return () => { current = false; leave.abort(); };
   }, [machines]);
   return known;
 }

@@ -19,7 +19,7 @@ import { clock } from '../file/time';
 import { Gate } from '../signin/Gate';
 import { ActForm, ActPanel } from '../grants/GrantTable';
 import { Chain } from '../grants/Chain';
-import { chainOf, lastUsedText, mayText, nameOf, readGrantWorld, resourceName, resourceTitle, voidOf, windowText } from '../grants/model';
+import { chainOf, lastUsedText, mayText, nameOf, readGrantWorld, resourceName, resourceTitle, voidOf, whoTitle, windowText } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import '../grants/grants.css';
 import { KeepGrant } from './KeepGrant';
@@ -113,7 +113,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
 function GrantFacts({ w, g, agent }: { w: GrantWorld; g: Grant; agent: AgentSummary }) {
   const v = voidOf(w, g);
   return <dl className="facts grant-facts">
-    <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(agent.id) + '/access'}>{nameOf(w, g.holder)}</Link></dd>
+    <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(agent.id) + '/access'} title={whoTitle(w, g.holder)}>{nameOf(w, g.holder)}</Link></dd>
     <dt>Allows</dt><dd>{mayText(w, g)}</dd>
     <dt>On</dt><dd title={resourceTitle(w, g.resource)}>{resourceName(w, g.resource)}</dd>
     <dt>Relation</dt><dd className="mono">{g.relation}</dd>

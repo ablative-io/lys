@@ -195,7 +195,7 @@ const ROWS: ConformanceRow[] = [
       expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
       expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
       expect($('#answer .chain')?.textContent).toBe('Ada (test person)→Scribe');
-      expect($('#answer .chain')?.getAttribute('title')).toContain('Ada (test person) · owner of project:identity');
+      expect($('#answer .chain')?.getAttribute('title')).toContain('Ada (test person), P/00000000 · owner of project:identity');
       expect($('#answer .meta-line')?.textContent).toContain('model v1');
       await choose($('#cPerm'), 'edit');
       await click($('[data-act="check"]'));
@@ -215,7 +215,7 @@ const ROWS: ConformanceRow[] = [
       expect(card[0].textContent).toContain('27 Sep to 4 Oct');
       // Its source, as the chain from the person who issued it.
       expect(card[0].querySelector('.chain')?.textContent).toBe('Ada (test person)→Scribe');
-      expect(card[0].querySelector('.chain')?.getAttribute('title')).toBe('Ada (test person) · owner of project:identity → Scribe · viewer of project:identity');
+      expect(card[0].querySelector('.chain')?.getAttribute('title')).toBe('Ada (test person), P/00000000 · owner of project:identity → Scribe, agent of Ada (test person), A/00000000 · viewer of project:identity');
       expect(text()).not.toContain('never used');
       fresh();
       // A grant with no observed use reads "not seen", never "never used".

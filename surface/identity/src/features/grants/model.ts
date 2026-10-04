@@ -39,6 +39,18 @@ export async function readGrantWorld(knownMe?: MeView): Promise<GrantWorld> {
 
 export const nameOf = (w: GrantWorld, id: string): string => w.who.get(id)?.name ?? fileNo(id);
 
+/**
+ * Who `id` is, said so that two of the same name can be told apart: the name, whose agent or account it is, and the
+ * file number. Names are not unique, so every place that shows a bare name carries this as its title.
+ */
+export const whoTitle = (w: GrantWorld, id: string): string => {
+  const who = w.who.get(id);
+  if (!who) return fileNo(id);
+  const of = who.responsible ? w.who.get(who.responsible)?.name : undefined;
+  const whose = of ? (who.kind === 'agent' ? ', agent of ' : ', account of ') + of : '';
+  return who.name + whose + ', ' + fileNo(id);
+};
+
 /** A grant's short name, as the mock-up writes `G-5`. */
 export const grantNo = (id: string): string => 'G/' + id.slice(id.indexOf('-') + 1, id.indexOf('-') + 9);
 
@@ -99,7 +111,7 @@ export const resourceLabel = (r: ResourceRef, w?: GrantWorld): string => {
 };
 
 /** A resource's full reference for a cell's title: its kind and its name where it is an identity. */
-export const resourceTitle = (w: GrantWorld, r: ResourceRef): string => (w.who.has(r.id) || r.id.match(rawId) ? resourceName(w, r) : resourceText(r));
+export const resourceTitle = (w: GrantWorld, r: ResourceRef): string => (w.who.has(r.id) ? `${kindWords(r.kind)} ${whoTitle(w, r.id)}` : r.id.match(rawId) ? resourceName(w, r) : resourceText(r));
 
 /** The chain from the root grant down to `g`. */
 export function chainOf(w: GrantWorld, g: Grant): Grant[] {

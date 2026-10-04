@@ -1,10 +1,10 @@
 import type { Grant } from '../../generated/grants';
-import { nameOf, resourceTitle } from './model';
+import { nameOf, resourceTitle, whoTitle } from './model';
 import type { GrantWorld } from './model';
 
 /** The whole path as a sentence, for the cell's title: who holds what, step by step. */
 export const chainSentence = (w: GrantWorld, chain: Grant[]): string =>
-  chain.map((c) => `${nameOf(w, c.holder)} · ${c.relation} of ${resourceTitle(w, c.resource)}`).join(' → ');
+  chain.map((c) => `${whoTitle(w, c.holder)} · ${c.relation} of ${resourceTitle(w, c.resource)}`).join(' → ');
 
 /**
  * The path from a person down to a grant: the holders' names only, joined by
