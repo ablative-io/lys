@@ -74,9 +74,8 @@ impl Sessions {
             );
             return false;
         };
-        let watched =
-            notify::Watcher::watch(watcher, &journal, notify::RecursiveMode::NonRecursive);
-        if let Err(error) = watched {
+        let began = notify::Watcher::watch(watcher, &journal, notify::RecursiveMode::NonRecursive);
+        if let Err(error) = began {
             self.undrained(
                 id,
                 &format!(
