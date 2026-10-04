@@ -119,7 +119,8 @@ describe('The canvas is the person\'s own', () => {
     expect(kept?.groups).toHaveLength(1);
     // Saved by name, listed, opened again after the window was moved away, and removed.
     await click($('[data-act="layouts"]'));
-    expect($('.canvas-panel')?.className).toContain('open');
+    expect($('.canvas-pop')?.className).toContain('open');
+    expect($('.canvas-pop')?.getAttribute('aria-label')).toBe('Layouts');
     expect(text()).toContain('kept on the service');
     await type($('.canvas-layouts input[name="name"]'), 'Morning');
     await click($('.canvas-layouts tfoot button'));
@@ -127,8 +128,12 @@ describe('The canvas is the person\'s own', () => {
     expect((posted.find((entry) => entry.path === '/canvas/layouts')?.body as { name: string }).name).toBe('Morning');
     for (let step = 0; step < 3; step += 1) await act(async () => { one.querySelector('.session-canvas-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); });
     expect(one.style.top).toBe('308px');
+    // A layout's name is its link: it opens the layout, the panel stays out, and the layout's name does not stay in the address.
+    expect($('[data-act="open-layout"]')?.getAttribute('href')).toBe('#/canvas?panel=layouts&layout=Morning');
     await click($('[data-act="open-layout"]'));
     expect([one.style.left, one.style.top]).toEqual(['316px', '260px']);
+    expect(location.hash).toBe('#/canvas?panel=layouts');
+    expect($('.canvas-pop')?.className).toContain('open');
     await click($('[data-act="remove-layout"]'));
     expect($$('.canvas-layouts tbody tr[data-layout]')).toHaveLength(0);
     expect(text()).toContain('No layout is saved yet.');
@@ -152,28 +157,54 @@ describe('The canvas is the person\'s own', () => {
     expect($('.canvas-dock [role="alert"]')?.textContent).toContain('CanvasUnavailable: the canvas store is not open');
   });
 
-  it('finds an agent from the dock: one that is running goes to its window, one that is not goes to its own page', async () => {
+  it('keeps the agents behind one button: the running ones go to their windows, the others to their own pages, and a name typed finds one', async () => {
     await mount('#/canvas', routes);
-    const find = $('.canvas-find input');
-    await act(async () => { find?.focus(); });
-    await settle();
+    // The bar is symbols only, each named for a reader; nothing is laid over the canvas until it is asked for.
+    expect($$('.canvas-bar button').every((each) => !!each.getAttribute('aria-label'))).toBe(true);
+    expect($('[data-act="agents"]')?.textContent).toBe('1');
+    expect($('.canvas-pop')?.className).not.toContain('open');
+    await click($('[data-act="agents"]'));
+    expect(location.hash).toBe('#/canvas?panel=agents');
+    expect($('.canvas-pop')?.getAttribute('aria-label')).toBe('Agents');
+    expect(document.activeElement).toBe($('.canvas-find input'));
     const all = $$('.canvas-find-list a');
-    expect(all[0].getAttribute('data-find')).toBe('running');
     expect(all[0].getAttribute('href')).toBe('#/canvas/' + SCRIBE);
-    expect(all[0].textContent).toContain('Running on Test runner');
+    expect(all[0].closest('.running-chip')?.textContent).toContain('Test runner');
     expect(all.some((each) => each.getAttribute('data-find') === 'idle' && each.getAttribute('href')?.startsWith('#/file/agent-'))).toBe(true);
     expect(all.filter((each) => each.getAttribute('href') === '#/file/' + SCRIBE)).toHaveLength(0);
-    await type(find, 'scri');
-    expect($$('.canvas-find-list a').map((each) => each.getAttribute('data-find'))).toEqual(['running']);
-    await type(find, 'no such agent');
-    expect($('.canvas-find-list')?.textContent).toBe('No agent by that name.');
-    // The connections in words are in the panel, on the page whether it is open or away.
-    expect($('.canvas-panel')?.className).not.toContain('open');
+    await type($('.canvas-find input'), 'scri');
+    expect($$('.canvas-find-list a').map((each) => each.getAttribute('href'))).toEqual(['#/canvas/' + SCRIBE]);
+    await type($('.canvas-find input'), 'no such agent');
+    expect($$('.canvas-find-list a')).toHaveLength(0);
+    expect($('.canvas-find-list p')?.textContent).toBe('No agent by that name.');
+    // The connections in words are in the same panel, on the page whether it is open or away; Escape puts it away.
     await click($('[data-act="connections"]'));
-    expect($('.canvas-panel')?.getAttribute('aria-label')).toBe('Connections');
-    expect($('.canvas-panel .canvas-connections')).not.toBeNull();
-    await click($('[data-act="close-panel"]'));
-    expect($('.canvas-panel')?.className).not.toContain('open');
+    expect($('.canvas-pop')?.getAttribute('aria-label')).toBe('Connections');
+    expect($('.canvas-pop .canvas-connections')).not.toBeNull();
+    await press('Escape', {}, window as unknown as Element);
+    expect($('.canvas-pop')?.className).not.toContain('open');
+    expect($('.canvas-pop .canvas-connections')).not.toBeNull();
+    expect(location.hash).toBe('#/canvas');
+  });
+});
+
+describe('Addresses on the canvas', () => {
+  it('goes straight to a saved layout or to a panel by its address, and says when the layout named is not saved', async () => {
+    const layout = { name: 'Morning', saved_at: 1790000500, arrangement: { boxes: { ['agent:' + SCRIBE]: { x: 640, y: 480, w: 440, h: 34 } }, open: [], groups: [{ id: 'group:a', label: 'Iridium', x: 600, y: 400, w: 600, h: 300 }], notes: [], links: [] } };
+    const kept = { ...routes, '/canvas': ok({ arrangement: null, layouts: [layout] }), 'PUT /canvas': ok({}) };
+    await mount('#/canvas?layout=Morning', kept);
+    const one = $('.session-canvas-node.sessions') as HTMLElement;
+    expect([one.style.left, one.style.top]).toEqual(['640px', '480px']);
+    expect($('.canvas-group')?.getAttribute('aria-label')).toBe('Box: Iridium');
+    expect(location.hash).toBe('#/canvas');
+  });
+
+  it('opens the panel the address names, and names a layout that is not saved', async () => {
+    await mount('#/canvas?panel=connections&layout=Nowhere', routes);
+    expect($('.canvas-pop')?.className).toContain('open');
+    expect($('.canvas-pop')?.getAttribute('aria-label')).toBe('Connections');
+    expect($('.canvas-dock [role="alert"]')?.textContent).toBe('No layout is saved as Nowhere.');
+    expect(location.hash).toBe('#/canvas?panel=connections');
   });
 });
 

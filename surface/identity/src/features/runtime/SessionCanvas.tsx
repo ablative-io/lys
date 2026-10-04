@@ -2,7 +2,7 @@ import { refreshLive } from '../../live';
 /** A surface of windows: each permitted session and each thing it is connected to is a window a person drags, sizes and arranges, with as many live terminals open as they choose. */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { useLive, useLoad } from '../../api';
 import { RunningList } from './Sessions';
 import type { Load } from '../../api';
@@ -17,7 +17,7 @@ import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, readArrangement, within }
 import type { Arrangement, Box, Marks } from './canvas-marks';
 import { keepArrangement, readKeeping, removeLayout, said, saveLayout } from './canvas-kept';
 import type { Keeping, SavedLayout } from './canvas-kept';
-import { CanvasDock, CanvasPanel } from './CanvasDock';
+import { CanvasDock, PANELS } from './CanvasDock';
 import type { Panel, Tool } from './CanvasDock';
 import { GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
 import './session-canvas.css';
@@ -148,8 +148,15 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
   const [tool, setTool] = useState<Tool>(null);
   const [lineFrom, setLineFrom] = useState<string | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
-  const [panel, setPanel] = useState<Panel>(null);
   const [layouts, setLayouts] = useState<SavedLayout[]>(keeping.layouts);
+  // The panel that is out, and a saved layout to open, are in the address: a link goes to the canvas with that panel out or that layout open.
+  const [search, setSearch] = useSearchParams();
+  const asked_panel = search.get('panel');
+  const panel: Panel = asked_panel !== null && asked_panel in PANELS ? asked_panel as Panel : null;
+  const addressed = (change: (next: URLSearchParams) => void) => setSearch((now) => { const next = new URLSearchParams(now); change(next); return next; }, { replace: true });
+  const setPanel = (next: Panel) => addressed((query) => { if (next) query.set('panel', next); else query.delete('panel'); });
+  const wanted = search.get('layout');
+  const [missing, setMissing] = useState<string | null>(null);
   // Counts what the person changed. Each change is kept for them on the service once it is whole: a drag when it ends, words when they are left.
   const [changes, setChanges] = useState(0);
   const changed = () => setChanges((now) => now + 1);
@@ -177,11 +184,13 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
   }, [changes]);
   // A tool is left with Escape, and a line half drawn is dropped with it.
   useEffect(() => {
-    if (!tool) { setLineFrom(null); return; }
-    const leave = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') setTool(null); };
+    if (!tool) setLineFrom(null);
+    if (!tool && !panel) return;
+    // Escape leaves the tool in hand; with none in hand it puts the panel away.
+    const leave = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') { if (tool) setTool(null); else setPanel(null); } };
     window.addEventListener('keydown', leave);
     return () => window.removeEventListener('keydown', leave);
-  }, [tool]);
+  }, [tool, panel]);
   /** Opens a window's terminal if it is closed and brings it to the middle of the view, in front. */
   const show = (id: string, theirs = true) => {
     const element = surface.current, was = boxes[id];
@@ -328,6 +337,14 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
     setMarks((all) => ({ ...all, groups: all.groups.map((each) => each.id === id ? { ...each, label: words } : each), notes: all.notes.map((each) => each.id === id ? { ...each, text: words } : each) }));
     changed();
   };
+  // A layout named in the address is opened once, on arriving, and its name then leaves the address, so reading the page again keeps what the person has since arranged.
+  useEffect(() => {
+    if (wanted === null) return;
+    const layout = layouts.find((each) => each.name === wanted);
+    if (layout) openLayout(layout.arrangement);
+    setMissing(layout ? null : wanted);
+    addressed((query) => query.delete('layout'));
+  }, [wanted]);
   const save = async (name: string) => setLayouts(await saveLayout(keeping.where, name, arrangement()));
   const remove = async (name: string) => setLayouts(await removeLayout(keeping.where, name));
   /** A saved layout becomes the arrangement: its windows go where it has them, and its boxes, notes and lines replace the ones here. */
@@ -373,13 +390,6 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
 
   return <><div className={'session-canvas-scroll' + (tool ? ' tool-' + tool : '')} role="region" aria-label="Agent connection canvas" tabIndex={0} ref={surface} onKeyDown={travel}
     onPointerDown={begin(pressed)} onPointerMove={during} onPointerUp={finish} onPointerCancel={finish}>
-    <div className="session-canvas-tools">
-      {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}
-      <button type="button" className="btn" data-act="zoom-out" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>−</button>
-      <button type="button" className="btn" data-act="zoom-reset" aria-label="Zoom to actual size" onClick={() => zoomBy(null)}>{Math.round(zoomOf(view) * 100)}%</button>
-      <button type="button" className="btn" data-act="zoom-in" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</button>
-      <button type="button" className="btn" data-act="home" onClick={home}>Back to the windows</button>
-    </div>
     <div className="session-canvas" style={{ transform: `translate(${view.x}px, ${view.y}px)` + (zoomOf(view) === 1 ? '' : ` scale(${zoomOf(view)})`), transformOrigin: '0 0' }}>
       {marks.groups.map((group) => <GroupBox key={group.id} group={group} fresh={fresh === group.id} pick={pick?.(group.id)} move={moving(group.id)} size={sizing(group.id, SMALLEST_MARK)}
         change={(label) => reworded(group.id, label)} remove={() => removeMark(group.id)} />)}
@@ -424,8 +434,13 @@ function Canvas({ graph, keeping, connections }: { graph: SessionGraph; keeping:
       <LinkHandles links={marks.links} at={at} remove={removeMark} />
     </div>
   </div>
-  <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} addNote={addNote} panel={panel} setPanel={setPanel} edges={graph.edges.length} unsent={unsent} />
-  <CanvasPanel panel={panel} close={() => setPanel(null)} connections={connections} keeping={keeping} layouts={layouts} save={save} open={openLayout} remove={remove} />
+  <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} addNote={addNote} panel={panel} setPanel={setPanel}
+    zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} connections={connections} keeping={keeping} layouts={layouts} save={save} remove={remove}
+    says={<>
+      {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}
+      {missing !== null ? <span className="why-not" role="alert">No layout is saved as {missing}.</span> : null}
+      {unsent ? <span className="why-not" role="alert">The arrangement was not kept on the service. <small className="refusal-name">{unsent}</small></span> : null}
+    </>} />
   </>;
 }
 
@@ -475,7 +490,8 @@ export function SessionCanvas() {
   return <div className="page fill session-canvas-page">
     <div className="head"><div><h1>Running</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}</div></div>
     <div className="canvas-side">
-      <RunningList />
+        {/* With agents running, who is running is behind the bar's Agents button. With none, or while the canvas cannot be read, it is said here. */}
+        {load.status === 'ok' && load.data.nodes.some((node) => node.session) ? null : <RunningList />}
         <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? (keeping.status === 'ok' ? <Whole graph={graph} messages={messages} keeping={keeping.data} /> : <p role="status">Reading your canvas…</p>) : <>
           {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
           {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}

@@ -1,73 +1,83 @@
 /**
- * What hovers over the canvas and never takes it over: a small dock at its bottom left to find an agent and to draw a
- * box, a note or a line, and one panel that slides out from the right edge for the saved layouts and for the
- * connections in words. Neither blocks the surface; the canvas stays live under both.
+ * What hovers over the canvas and never takes it over: one small bar of symbols at its bottom right, and one small panel
+ * that opens from the bar. The bar holds the tools (a box, a note, a line), the zoom, and three buttons that open the
+ * panel: the agents, to find one and go to it; the saved layouts; the connections in words. Nothing is laid over the
+ * surface until it is asked for, so the bar is the same size with three agents or three hundred. The zoom is its own
+ * small bar at the bottom left.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useLocation } from 'react-router';
 import { api } from '../../api';
 import { entries } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { clock } from '../file/time';
+import { RunningList } from './Sessions';
 import type { SessionGraph } from './session-graph';
 import { said } from './canvas-kept';
 import type { Keeping, SavedLayout } from './canvas-kept';
-import type { Arrangement } from './canvas-marks';
 
 export type Tool = 'box' | 'line' | null;
-export type Panel = 'layouts' | 'connections' | null;
+export type Panel = 'agents' | 'layouts' | 'connections' | null;
+export const PANELS: Record<Exclude<Panel, null>, string> = { agents: 'Agents', layouts: 'Layouts', connections: 'Connections' };
 
-/** Find an agent by name: one that is running goes to its window here, one that is not goes to its own page. */
-function Find({ graph, show }: { graph: SessionGraph; show: (node: string) => void }) {
+/** The bar's symbols, drawn in the rail's own line style. */
+const SYMBOLS = {
+  agents: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5" /><circle cx="17" cy="9" r="2.4" /><path d="M15.5 14.2c2.3.2 4 1.8 4.6 4.8" /></>,
+  box: <rect x="4" y="5" width="16" height="14" rx="2" strokeDasharray="3 2.5" />,
+  note: <><path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5M8 9h8M8 12.5h5" /></>,
+  line: <><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M7.5 16.5l9-9" /></>,
+  layouts: <><rect x="3.5" y="4" width="7.5" height="7" rx="1.2" /><rect x="13" y="4" width="7.5" height="7" rx="1.2" /><rect x="3.5" y="13" width="7.5" height="7" rx="1.2" /><rect x="13" y="13" width="7.5" height="7" rx="1.2" /></>,
+  connections: <><circle cx="6" cy="7" r="2.2" /><circle cx="18" cy="6" r="2.2" /><circle cx="12" cy="17" r="2.2" /><path d="M8.1 7.6 15.8 6.4M7.1 9 10.9 15M16.9 8 13.1 15" /></>,
+  out: <path d="M6 12h12" />,
+  in: <path d="M6 12h12M12 6v12" />,
+  home: <><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" /><rect x="9" y="9" width="6" height="6" rx="1" /></>,
+};
+
+/** One symbol on the bar. What it does is its name for a reader and its tip for a pointer. */
+function Symbol({ act, says, on, pressed, expanded, count }: { act: string; says: string; on: () => void; pressed?: boolean; expanded?: boolean; count?: number }) {
+  return <button type="button" className="canvas-symbol" data-act={act} aria-label={says} title={says} aria-pressed={pressed} aria-expanded={expanded} onClick={on}>
+    <svg viewBox="0 0 24 24" aria-hidden="true">{SYMBOLS[act.replace(/^(draw|add|zoom)-/, '') as keyof typeof SYMBOLS]}</svg>
+    {count === undefined ? null : <span className="canvas-symbol-count">{count}</span>}
+  </button>;
+}
+
+/** Find an agent by name: the running ones first, each going to its window here; then the ones that are not running, each going to its own page. */
+function Agents({ graph, show, open }: { graph: SessionGraph; show: (node: string) => void; open: boolean }) {
   const [query, setQuery] = useState('');
   const [agents, setAgents] = useState<Entry[] | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
-  const read = () => {
+  const field = useRef<HTMLInputElement>(null);
+  // The agents that are not running are read when the panel first opens, and the search takes the keyboard each time it does.
+  useEffect(() => {
+    if (!open) return;
+    field.current?.focus();
     if (agents) return;
-    api.people().then((answer) => { setAgents(entries(answer).filter((each) => each.kind === 'agent')); setRefused(null); },
-      (error: unknown) => setRefused(said(error)));
-  };
-  const running = graph.nodes.flatMap((node) => node.session ? [{ node: node.id, agent: node.session.agent, name: node.title, where: node.session.machine_name ?? node.session.machine }] : []);
-  const idle = (agents ?? []).filter((each) => each.state !== 'retired' && !running.some((live) => live.agent === each.id));
-  const wanted = (name: string) => name.toLowerCase().includes(query.trim().toLowerCase());
-  const [live, rest] = [running.filter((each) => wanted(each.name)), idle.filter((each) => wanted(each.display_name))];
-  const first = live[0] ? '#/canvas' + (live[0].agent ? '/' + encodeURIComponent(live[0].agent) : '') : rest[0] ? '#/file/' + rest[0].id : null;
+    api.people().then((answer) => { setAgents(entries(answer).filter((each) => each.kind === 'agent')); setRefused(null); }, (error: unknown) => setRefused(said(error)));
+  }, [open]);
+  const running = new Set(graph.nodes.flatMap((node) => node.session?.agent ? [node.session.agent] : []));
+  const wanted = query.trim().toLowerCase();
+  const idle = (agents ?? []).filter((each) => each.state !== 'retired' && !running.has(each.id) && each.display_name.toLowerCase().includes(wanted));
   return <div className="canvas-find">
-    <input type="search" aria-label="Find an agent" placeholder="Find an agent" value={query} onFocus={read} onChange={(event) => setQuery(event.target.value)}
-      onKeyDown={(event) => { if (event.key === 'Enter' && first) { if (live[0]) show(live[0].node); location.hash = first; event.currentTarget.blur(); } }} />
-    <div className="canvas-find-list" role="listbox" aria-label="Agents">
-      {live.map((each) => <a key={each.node} role="option" aria-selected={false} href={'#/canvas' + (each.agent ? '/' + encodeURIComponent(each.agent) : '')} data-find="running" onClick={() => show(each.node)}>
-        <span><span className="dot s-active" />{each.name}</span><span className="sec">Running on {each.where}</span></a>)}
-      {rest.map((each) => <a key={each.id} role="option" aria-selected={false} href={'#/file/' + each.id} data-find="idle">
-        <span>{each.display_name}</span><span className="sec">Not running</span></a>)}
+    <input ref={field} type="search" aria-label="Find an agent" placeholder="Find an agent" value={query} tabIndex={open ? 0 : -1} onChange={(event) => setQuery(event.target.value)}
+      onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.closest('.canvas-find')?.querySelector<HTMLAnchorElement>('.canvas-find-list a')?.click(); }} />
+    <div className="canvas-find-list">
+      <RunningList named={query} go={(session) => show('session:' + session)} />
+      {idle.map((each) => <a key={each.id} href={'#/file/' + each.id} data-find="idle"><span>{each.display_name}</span><span className="sec">Not running</span></a>)}
       {refused ? <p className="why-not" role="alert">The agents that are not running could not be read. <small className="refusal-name">{refused}</small></p> : null}
-      {!live.length && !rest.length && !refused ? <p className="dim">{agents ? 'No agent by that name.' : 'Reading the agents…'}</p> : null}
+      {agents && !idle.length && wanted && ![...graph.nodes].some((node) => node.session && node.title.toLowerCase().includes(wanted)) ? <p className="dim">No agent by that name.</p> : null}
     </div>
   </div>;
 }
 
-export function CanvasDock({ graph, show, tool, setTool, picking, addNote, panel, setPanel, edges, unsent }: {
-  graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean;
-  addNote: () => void; panel: Panel; setPanel: (panel: Panel) => void; edges: number; unsent: string | null;
+/**
+ * The saved layouts as one table: each is saved over or removed where it stands, and the last row saves the canvas as it
+ * is under a new name. A layout's name is its link: it opens the layout, and it is an address that can be kept or sent.
+ */
+function Layouts({ keeping, layouts, save, remove }: {
+  keeping: Keeping; layouts: SavedLayout[]; save: (name: string) => Promise<void>; remove: (name: string) => Promise<void>;
 }) {
-  const press = (name: Exclude<Tool, null>) => () => setTool(tool === name ? null : name);
-  const slide = (name: Exclude<Panel, null>) => () => setPanel(panel === name ? null : name);
-  return <div className="canvas-dock" role="toolbar" aria-label="Canvas tools">
-    <Find graph={graph} show={show} />
-    <button type="button" className="btn" data-act="draw-box" aria-pressed={tool === 'box'} title="Drag on the canvas to draw a box around windows, then label it" onClick={press('box')}>Box</button>
-    <button type="button" className="btn" data-act="add-note" title="Put a note on the canvas" onClick={addNote}>Note</button>
-    <button type="button" className="btn" data-act="draw-line" aria-pressed={tool === 'line'} title="Press one thing, then another, to draw a line between them" onClick={press('line')}>Line</button>
-    <button type="button" className="btn" data-act="layouts" aria-expanded={panel === 'layouts'} onClick={slide('layouts')}>Layouts</button>
-    <button type="button" className="btn" data-act="connections" aria-expanded={panel === 'connections'} onClick={slide('connections')}>Connections ({edges})</button>
-    {tool ? <span className="canvas-dock-say" role="status">{tool === 'box' ? 'Drag on the canvas to draw the box.' : picking ? 'Now press the thing the line goes to.' : 'Press the thing the line starts from.'} Escape leaves it.</span> : null}
-    {unsent ? <span className="why-not" role="alert">The arrangement was not kept on the service. <small className="refusal-name">{unsent}</small></span> : null}
-  </div>;
-}
-
-/** The saved layouts as one table: each is opened, saved over or removed where it stands, and the last row saves the canvas as it is under a new name. */
-function Layouts({ keeping, layouts, save, open, remove }: {
-  keeping: Keeping; layouts: SavedLayout[]; save: (name: string) => Promise<void>; open: (layout: Arrangement) => void; remove: (name: string) => Promise<void>;
-}) {
+  const { pathname } = useLocation();
   const [name, setName] = useState('');
   const [refused, setRefused] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,16 +87,12 @@ function Layouts({ keeping, layouts, save, open, remove }: {
   };
   const wanted = name.trim();
   return <>
-    <p className="note">{keeping.where === 'service'
-      ? 'Your layouts are yours: kept on the service, the same on any computer you sign in at.'
-      : <>Kept in this browser only: the service is not keeping your canvas. <small className="refusal-name">{keeping.why}</small></>}</p>
     <form id="canvas-save-layout" aria-label="Save this layout" onSubmit={(event) => { event.preventDefault(); if (wanted && !busy) doing(save(wanted), () => setName('')); }} />
     <table className="canvas-layouts"><thead><tr><th>Layout</th><th>Saved</th><th>Change</th></tr></thead>
       <tbody>
         {layouts.map((layout) => <tr key={layout.name} data-layout={layout.name}>
-          <td>{layout.name}</td><td className="sec">{clock(layout.saved_at)}</td>
+          <td><a data-act="open-layout" href={'#' + pathname + '?panel=layouts&layout=' + encodeURIComponent(layout.name)} title="Open this layout">{layout.name}</a></td><td className="sec">{clock(layout.saved_at)}</td>
           <td className="canvas-layout-acts">
-            <button type="button" className="btn" data-act="open-layout" onClick={() => open(layout.arrangement)}>Open</button>
             <button type="button" className="btn" data-act="save-over" disabled={busy} onClick={() => doing(save(layout.name))}>Save over</button>
             <button type="button" className="btn" data-act="remove-layout" disabled={busy} onClick={() => doing(remove(layout.name))}>Remove</button>
           </td></tr>)}
@@ -97,18 +103,54 @@ function Layouts({ keeping, layouts, save, open, remove }: {
         <td><button form="canvas-save-layout" type="submit" className="btn primary" disabled={!wanted || busy}>{layouts.some((each) => each.name === wanted) ? 'Save over' : 'Save'}</button></td>
       </tr></tfoot>
     </table>
+    <p className="note">{keeping.where === 'service'
+      ? 'Your layouts are yours: kept on the service, the same on any computer you sign in at.'
+      : <>Kept in this browser only: the service is not keeping your canvas. <small className="refusal-name">{keeping.why}</small></>}</p>
     {refused ? <p className="why-not" role="alert">That was not done. <small className="refusal-name">{refused}</small></p> : null}
   </>;
 }
 
-/** The panel that slides out over the right edge. Both of its parts stay on the page while it is away, so nothing in them is read again when it opens. */
-export function CanvasPanel({ panel, close, connections, ...layouts }: {
-  panel: Panel; close: () => void; connections: ReactNode;
-  keeping: Keeping; layouts: SavedLayout[]; save: (name: string) => Promise<void>; open: (layout: Arrangement) => void; remove: (name: string) => Promise<void>;
+export function CanvasDock({ graph, show, tool, setTool, picking, addNote, panel, setPanel, zoom, zoomBy, home, says, connections, ...layouts }: {
+  graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean; addNote: () => void;
+  panel: Panel; setPanel: (panel: Panel) => void;
+  /** How far the surface is zoomed, in percent; `zoomBy` steps it, or with null puts it back to actual size; `home` brings the windows back into view. */
+  zoom: number; zoomBy: (factor: number | null) => void; home: () => void;
+  /** What went wrong that the person has to know, each said once over the bar. */
+  says: ReactNode;
+  connections: ReactNode;
+  keeping: Keeping; layouts: SavedLayout[]; save: (name: string) => Promise<void>; remove: (name: string) => Promise<void>;
 }) {
-  return <aside className={'canvas-panel' + (panel ? ' open' : '')} aria-label={panel === 'connections' ? 'Connections' : 'Layouts'} aria-hidden={!panel}>
-    <header><h2>{panel === 'connections' ? 'Connections' : 'Layouts'}</h2><button type="button" className="btn" data-act="close-panel" tabIndex={panel ? 0 : -1} onClick={close}>Close</button></header>
-    <div className="canvas-panel-body" hidden={panel !== 'layouts'}><Layouts {...layouts} /></div>
-    <div className="canvas-panel-body" hidden={panel !== 'connections'}>{connections}</div>
-  </aside>;
+  const hold = (name: Exclude<Tool, null>) => () => setTool(tool === name ? null : name);
+  const slide = (name: Exclude<Panel, null>) => () => setPanel(panel === name ? null : name);
+  const running = graph.nodes.filter((node) => node.session).length;
+  return <>
+  {/* Looking is at the bottom left; doing is at the bottom right. */}
+  <div className="canvas-bar canvas-look" role="toolbar" aria-label="Canvas view">
+    <Symbol act="zoom-out" says="Zoom out" on={() => zoomBy(1 / 1.25)} />
+    <button type="button" className="canvas-symbol canvas-zoom" data-act="zoom-reset" aria-label="Zoom to actual size" title="Zoom to actual size" onClick={() => zoomBy(null)}>{zoom}%</button>
+    <Symbol act="zoom-in" says="Zoom in" on={() => zoomBy(1.25)} />
+    <Symbol act="home" says="Back to the windows" on={home} />
+  </div>
+  <div className="canvas-dock">
+    <div className="canvas-dock-says">
+      {says}
+      {tool ? <span role="status">{tool === 'box' ? 'Drag on the canvas to draw the box.' : picking ? 'Now press the thing the line goes to.' : 'Press the thing the line starts from.'} Escape leaves it.</span> : null}
+    </div>
+    {/* Each part stays on the page while the panel is away, so nothing in it is read again when it opens. */}
+    <section className={'canvas-pop' + (panel ? ' open' : '')} aria-label={panel ? PANELS[panel] : 'Canvas panel'} aria-hidden={!panel}>
+      <div className="canvas-pop-body" hidden={panel !== 'agents'}><Agents graph={graph} show={show} open={panel === 'agents'} /></div>
+      <div className="canvas-pop-body" hidden={panel !== 'layouts'}><Layouts {...layouts} /></div>
+      <div className="canvas-pop-body" hidden={panel !== 'connections'}>{connections}</div>
+    </section>
+    <div className="canvas-bar" role="toolbar" aria-label="Canvas tools">
+      <Symbol act="agents" says={'Agents: ' + running + ' running. Find one and go to it'} on={slide('agents')} expanded={panel === 'agents'} count={running} />
+      <Symbol act="layouts" says="Layouts: save this one, or open a saved one" on={slide('layouts')} expanded={panel === 'layouts'} />
+      <Symbol act="connections" says="Connections, in words" on={slide('connections')} expanded={panel === 'connections'} />
+      <span className="canvas-bar-rule" aria-hidden="true" />
+      <Symbol act="draw-box" says="Box: drag on the canvas to draw a box around windows, then label it" on={hold('box')} pressed={tool === 'box'} />
+      <Symbol act="add-note" says="Note: put a note on the canvas" on={addNote} />
+      <Symbol act="draw-line" says="Line: press one thing, then another, to draw a line between them" on={hold('line')} pressed={tool === 'line'} />
+    </div>
+  </div>
+  </>;
 }

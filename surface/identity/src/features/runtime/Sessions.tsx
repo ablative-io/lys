@@ -22,23 +22,24 @@ async function readRunning() {
 }
 
 /**
- * What is running, as one line across the top of the canvas: each agent with its computer and state. A name goes to
- * that agent's terminal on the canvas, which is the one place a terminal is shown. The canvas has no list beside it.
+ * What is running: each agent with its computer and state. A name goes to that agent's terminal on the canvas, which is
+ * the one place a terminal is shown. On the canvas this is behind the Agents button, never laid over the surface; `named`
+ * keeps only the agents whose name holds those letters, and `go` is told the session a pressed name belongs to.
  */
-export function RunningList() {
+export function RunningList({ named = '', go }: { named?: string; go?: (session: string) => void }) {
   const load = useLive(readRunning, 'runtime-live');
-  return <Gate load={load} title="Running sessions" ok={(data) => <Running {...data} />} />;
+  return <Gate load={load} title="Running sessions" ok={(data) => <Running {...data} named={named} go={go} />} />;
 }
 
-function Running({ sessions, unanswered, people }: Awaited<ReturnType<typeof readRunning>>) {
+function Running({ sessions, unanswered, people, named, go }: Awaited<ReturnType<typeof readRunning>> & { named: string; go?: (session: string) => void }) {
   const { agent: shown } = useParams();
   const names = new Map(people.people.flatMap((person) => person.agents.map((agent) => [agent.id, agent.display_name] as const)));
   const silent = (entry: RuntimeSession) => unanswered.some((each) => each.session === entry.session);
   const name = (entry: RuntimeSession) => entry.agent ? names.get(entry.agent) ?? 'An agent outside your view' : 'Unattached session';
   const at = (entry: RuntimeSession) => '#/canvas' + (entry.agent ? '/' + encodeURIComponent(entry.agent) : '');
   return <nav className="running-list" aria-label="Running now">
-    {sessions.map((entry) => <span className="running-chip" key={entry.session} data-session={entry.session} title={'Since ' + clock(entry.first_report_at)}>
-      <a href={at(entry)} aria-current={entry.agent !== null && entry.agent === shown ? 'page' : undefined}>{name(entry)}</a>
+    {sessions.filter((entry) => name(entry).toLowerCase().includes(named.trim().toLowerCase())).map((entry) => <span className="running-chip" key={entry.session} data-session={entry.session} title={'Since ' + clock(entry.first_report_at)}>
+      <a href={at(entry)} aria-current={entry.agent !== null && entry.agent === shown ? 'page' : undefined} onClick={() => go?.(entry.session)}>{name(entry)}</a>
       <span className="sec">{entry.machine_name ?? entry.machine}</span>
       <span className="running-state">{silent(entry) ? <span className="why-not">Its runner did not answer; last reported {entry.last_reported}</span> : entry.shown === 'running' ? <><span className="dot s-active" />Running</> : 'Starting, not yet confirmed'}</span>
     </span>)}
