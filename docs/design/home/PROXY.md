@@ -55,8 +55,25 @@ of it.
   the harness would not have, Lys does not either.
 - Storing is a milliseconds operation to haematite, off the forwarding path. Nothing hangs or
   holds up the call to be recorded.
-- The call's record is linked to its run by the session id the harness puts in the request
-  body (`metadata.user_id` for Claude Code), never by guessing from timing.
+- A call names the Lys run that made it by the run key: thirty-two random hexadecimal digits
+  the launch mints for each start and puts first on the path of the proxy address it gives the
+  run (`http://…/<key>/anthropic`). The proxy takes the key off before it forwards, writes it on
+  the call's record, and counts the call's usage against that run; a first path part that is
+  not a key is refused by name. Nothing is guessed from timing, and nothing depends on one
+  harness's request shape, so a Codex run is counted the same way as a Claude Code run.
+- The record also keeps the session id the harness puts in the request body
+  (`metadata.user_id` for Claude Code), which links the call to the harness's own session
+  file. The two links do different work: the key says whose run, the session id says which
+  of the harness's files.
+- Amended 4 October 2026 by Waffles. The page first said the session id alone linked a call
+  to its run. The runner never learns a harness's session id without reading its session
+  files, which this page forbids, so usage could not be counted per run that way. Put to Tom
+  as the page against the code, he answered: "these sound like really technical questions,
+  which I would defer to you to make like the most robust, most future-proof, best possible
+  decision possible", and "I really don't want you waiting on me." The run key is that
+  decision. Known and not closed: any program on the machine can send a key of the right
+  shape, or none, so a call can be counted against another run or against no run; closing it
+  means the proxy takes only keys the service has told it are live.
 - The session files the harness writes stay where they are and are not rewritten. A
   document says how the API records map onto the session files, so a reader can move from
   either to the other.
@@ -89,7 +106,11 @@ The proxy is `lys proxy serve`, a subcommand of the `lys` program, the way the r
 own Unit with a pid file, an exit lock and a log, placed, kept and put back with `lys`; no
 new program in the install's set. The install writes the proxy's address into the identity
 server's configuration; the launch puts `ANTHROPIC_BASE_URL` (and the OpenAI equivalent for
-Codex, when that slice comes) into the run's environment, and nothing else. A machine whose
+Codex, when that slice comes), carrying the run key first on its path, into the run's
+environment. Beside it goes `LYS_RUN`, the same key by name, with the launch's other `LYS_`
+variables (`LYS_MACHINE`, `LYS_PROVISIONING_VERSION`), so the service reads the key from a
+named variable and never by taking an address apart. Nothing else is set, and nothing that
+changes how the harness behaves. A machine whose
 login already carries its own `ANTHROPIC_BASE_URL` (a gateway) is not silently overridden:
 the proxy forwards to that upstream, and the record names it. On upgrade the proxy restarts
 after the services, the way the runner does.
