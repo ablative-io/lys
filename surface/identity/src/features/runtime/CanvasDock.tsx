@@ -1,6 +1,6 @@
 /**
  * What hovers over the canvas and never takes it over: one small bar of symbols at its bottom right, and one small panel
- * that opens from the bar. The bar holds three buttons that open the panel: the agents, to find one and go to it; the saved layouts; the connections in words. Nothing is laid over the
+ * that opens from the bar. The bar holds three buttons that open the panel: the agents, to find one and go to it; the saved layouts; the connections in words; and Tidy, which puts everything on the canvas into rows. Nothing is laid over the
  * surface until it is asked for, so the bar is the same size with three agents or three hundred. The drawing tools (a box, a
  * line, a note) are their own bar to its left, apart, and the zoom is its own small bar at the bottom left. Each bar is the
  * person's to move: dragged by its grip to another corner of the canvas, it stays there in this browser.
@@ -33,6 +33,7 @@ const SYMBOLS = {
   connections: <><circle cx="6" cy="7" r="2.2" /><circle cx="18" cy="6" r="2.2" /><circle cx="12" cy="17" r="2.2" /><path d="M8.1 7.6 15.8 6.4M7.1 9 10.9 15M16.9 8 13.1 15" /></>,
   out: <path d="M6 12h12" />,
   in: <path d="M6 12h12M12 6v12" />,
+  tidy: <><rect x="3" y="4" width="10.5" height="7" rx="1.2" /><path d="M16.5 5.5h4.5M16.5 9.5h4.5" /><rect x="3" y="13" width="10.5" height="7" rx="1.2" /><path d="M16.5 14.5h4.5M16.5 18.5h4.5" /></>,
   home: <><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" /><rect x="9" y="9" width="6" height="6" rx="1" /></>,
 };
 
@@ -174,11 +175,13 @@ function Grip({ bar, at, move, drag }: { bar: Bar; at: Corner; move: (to: Corner
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v.01M15 6v.01M9 12v.01M15 12v.01M9 18v.01M15 18v.01" /></svg></button>;
 }
 
-export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, says, connections, kind, place, drop, ...layouts }: {
+export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, tidy, says, connections, kind, place, drop, ...layouts }: {
   graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean;
   panel: Panel; setPanel: (panel: Panel) => void;
   /** How far the surface is zoomed, in percent; `zoomBy` steps it, or with null puts it back to actual size; `home` brings the windows back into view. */
   zoom: number; zoomBy: (factor: number | null) => void; home: () => void;
+  /** Puts everything on the canvas into rows. */
+  tidy: () => void;
   /** What went wrong that the person has to know, each said once over the bar. */
   says: ReactNode;
   connections: ReactNode;
@@ -219,6 +222,7 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
       <Symbol act="agents" says={'Agents: ' + running + ' running. Find one and go to it'} on={slide('agents')} expanded={panel === 'agents'} count={running} />
       <Symbol act="layouts" says="Layouts: save this one, or open a saved one" on={slide('layouts')} expanded={panel === 'layouts'} />
       <Symbol act="connections" says="Connections, in words" on={slide('connections')} expanded={panel === 'connections'} />
+      <Symbol act="tidy" says="Tidy: put every window, widget, note and box into rows" on={tidy} />
     </div>,
   };
   // The panel, and what has to be said, stand by the bar they belong to: the widgets and a held tool by the drawing bar, the rest by the tools.

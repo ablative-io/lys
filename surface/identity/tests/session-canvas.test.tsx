@@ -67,6 +67,12 @@ describe('Running: the list and the canvas', () => {
     expect($('.session-canvas')).toBeNull();
   });
 
+  it('asks a person who is not signed in to sign in once, not once for the canvas and again for the list', async () => {
+    await mount('#/canvas', { ...routes, '/runtime/live': refused(401, 'NotSignedIn', 'Sign in first') });
+    expect($$('h1').filter((heading) => heading.textContent === 'Sign in')).toHaveLength(1);
+    expect($('.session-canvas')).toBeNull();
+  });
+
   it('says an empty Running page is empty once, in the list\'s own body, under a title with no paragraph of instructions', async () => {
     await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [], unanswered: [] }) });
     expect(text().split('Nothing is running.')).toHaveLength(2);

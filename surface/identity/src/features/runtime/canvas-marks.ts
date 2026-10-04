@@ -33,7 +33,7 @@ export interface Widget extends Box {
   /** How a figure that is a percent is drawn: as its number alone when absent, with a bar, or as a dial. */
   look?: 'bar' | 'dial';
   colour?: string;
-  /** Locked, it is not moved, changed or taken away until it is unlocked. */
+  /** Locked, it is not moved, changed or taken away by a hand until it is unlocked. A box moved still takes it along, and Tidy still arranges it. */
   locked?: boolean;
 }
 /**

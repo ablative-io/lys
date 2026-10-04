@@ -347,6 +347,39 @@ describe('Looking closer', () => {
     expect(drawing.style.transform).toBe('translate(-336px, -34px) scale(2)');
     await twice();
     expect(drawing.style.transform).toBe(before);
+    // Once the person has moved the view, the double press looks closer again: the view before is only gone back to from where the double press left it.
+    await twice();
+    await act(async () => { surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
+    expect(drawing.style.transform).toBe('translate(-400px, -34px) scale(2)');
+    await twice();
+    expect(drawing.style.transform).toBe('translate(-336px, -34px) scale(2)');
+    await twice();
+    expect(drawing.style.transform).toBe('translate(-400px, -34px) scale(2)');
+  });
+
+  it('brings a whole box into view when its bar is double-pressed, and everything on the canvas when the canvas itself is', async () => {
+    start({ groups: [{ id: 'group:a', label: 'Iridium', x: 200, y: 200, w: 440, h: 100 }] });
+    await mount('#/canvas', routes);
+    const surface = $('.session-canvas-scroll') as HTMLElement;
+    Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1008 });
+    Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 800 });
+    const drawing = $('.session-canvas') as HTMLElement;
+    const before = drawing.style.transform;
+    const twice = (on: Element | null) => act(async () => { on?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+    // The box is 440 wide: it fills the view at twice its size, its middle in the middle. Double-pressed again, the view is as it was.
+    await twice($('.canvas-group-bar'));
+    expect(drawing.style.transform).toBe('translate(-336px, -100px) scale(2)');
+    await twice($('.canvas-group-bar'));
+    expect(drawing.style.transform).toBe(before);
+    // A double press in the label is for its words, not for the view.
+    await twice($('.canvas-group-bar input'));
+    expect(drawing.style.transform).toBe(before);
+    // The canvas itself: everything on it in the middle of the view; and back. With the resource's card, which stands from 1,100 to 1,320 across at the top, everything is 1,120 by 300 from (200, 0): it and its margin fit the 1,008 of the view at 1,008 / 1,184.
+    await twice(surface);
+    const k = 1008 / 1184;
+    expect(drawing.style.transform).toBe(`translate(${504 - 760 * k}px, ${400 - 150 * k}px) scale(${k})`);
+    await twice(surface);
+    expect(drawing.style.transform).toBe(before);
   });
 });
 

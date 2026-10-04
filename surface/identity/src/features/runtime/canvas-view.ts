@@ -16,6 +16,20 @@ export function zoomed(view: View, k: number, cx: number, cy: number): View {
   return { x: cx - (cx - view.x) * to / from, y: cy - (cy - view.y) * to / from, k: to };
 }
 export const HOME: View = { x: 24, y: 24 };
+/**
+ * The view that holds one part of the surface whole, in the middle of a page `width` by `height`, with `clear` left
+ * around it; zoomed in no further than `nearest`.
+ */
+export function framed(part: { x: number; y: number; w: number; h: number }, width: number, height: number, nearest = ZOOM[1], clear = 64): View {
+  const k = Math.min(nearest, Math.max(ZOOM[0], Math.min(width / (part.w + clear), height / (part.h + clear))));
+  return { x: width / 2 - (part.x + part.w / 2) * k, y: height / 2 - (part.y + part.h / 2) * k, k };
+}
+/** The part of the surface that holds every one of `things`; none when there are no things. */
+export function around(things: { x: number; y: number; w: number; h: number }[]): { x: number; y: number; w: number; h: number } | undefined {
+  if (!things.length) return undefined;
+  const [x, y] = [Math.min(...things.map((each) => each.x)), Math.min(...things.map((each) => each.y))];
+  return { x, y, w: Math.max(...things.map((each) => each.x + each.w)) - x, h: Math.max(...things.map((each) => each.y + each.h)) - y };
+}
 
 /**
  * The wheel moves the surface, and a pinch zooms it about the pointer: a trackpad's pinch arrives as a wheel with

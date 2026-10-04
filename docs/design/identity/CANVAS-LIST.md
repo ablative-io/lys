@@ -6,14 +6,22 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 
 ## The canvas
 
-- Tidy: lay the windows and widgets out automatically.
+- Tidy: lay the windows and widgets out automatically. Written 4 October, 21:11, and walked on the developer
+  server (one press from the tools bar; "Put it back" beside it until the next change); leaves this list when
+  it is installed and walked there.
 - A box around each team, drawn for the person.
 - Widgets for everything Lys holds about an agent that has none yet: tasks, git branch, commits, worktrees,
   pull requests, reviews, jobs and tickets.
 - The HUD on an agent's window: compact, set a goal, add a task.
 - Layouts kept as project configuration, so a project opens on its own canvas.
 - Free terminals on a computer, only on the computers a person has that permission for.
-- Double-click out to group.
+- Double-click out to group. Tom, 4 October 17:01: "double clicking should return you back... to your previous
+  view... until you move again... Maybe double clicking should just sort of take you back out to... view the
+  whole thing or view the whole group that you're on." Written 21:18 as: a double press on a window's bar or a
+  box's bar brings the view in to it and the same double press goes back, until the view is moved; a double
+  press on the canvas itself brings everything into view. Walked on the developer server; leaves this list when
+  installed and walked there.
+- The Canvas and Proxy swap at the top of Operations lies over a window that stands at the top of the canvas.
 - The terminal's background colour.
 - Pinch to zoom by touch.
 - What the canvas shows when nothing is running.

@@ -8,6 +8,8 @@ const CARD: [number, number] = [220, 64];
 /** A terminal window's size closed, when it is only its bar, and when it is first opened. */
 export const CLOSED: [number, number] = [440, BAR];
 export const OPENED: [number, number] = [760, 480];
+/** The smallest a terminal window is dragged to: its bar still shows the agent's name beside state, Stop and close, and a prompt can still be read. */
+export const SMALLEST: [number, number] = [560, 180];
 
 /** A first place for every node that has none: teams down the left, agents in the middle two across, resources on the right. */
 export function placed(graph: SessionGraph, have: Record<string, Box>, open: ReadonlySet<string>): Record<string, Box> {

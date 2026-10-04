@@ -6,6 +6,10 @@
 import { Refused, request } from '../../api';
 import { readArrangement } from './canvas-marks';
 import type { Arrangement } from './canvas-marks';
+import { ZOOM } from './canvas-view';
+import type { View } from './canvas-view';
+import { AGENT } from './canvas-widgets';
+import type { SessionGraph } from './session-graph';
 
 /** A layout saved by name. */
 export interface SavedLayout { name: string; saved_at: number; arrangement: Arrangement }
@@ -78,4 +82,41 @@ export async function removeLayout(where: Keeping['where'], name: string): Promi
   const layouts = inBrowser().filter((each) => each.name !== name);
   localStorage.setItem(LAYOUTS, JSON.stringify(layouts));
   return layouts;
+}
+
+/** What this browser keeps: the arrangement, where the surface is looked at from, and the arrival last answered (an agent at a place in this tab's history). */
+export interface Kept extends Arrangement { view: View; shown?: string }
+
+export const KEPT = 'lys.canvas';
+
+/**
+ * A window is kept under its agent's name, not its session's: a session's name is new every time the agent starts, and
+ * a layout saved today has to find the same agents tomorrow.
+ */
+export const keptName = (graph: SessionGraph) => (id: string): string => {
+  const agent = graph.nodes.find((node) => node.id === id)?.session?.agent;
+  return agent ? AGENT + agent : id;
+};
+export const hereName = (graph: SessionGraph) => (id: string): string =>
+  id.startsWith(AGENT) ? graph.nodes.find((node) => node.session?.agent === id.slice(AGENT.length))?.id ?? id : id;
+export function renamed(arrangement: Arrangement, name: (id: string) => string): Arrangement {
+  return {
+    ...arrangement,
+    boxes: Object.fromEntries(Object.entries(arrangement.boxes).map(([id, box]) => [name(id), box])),
+    open: arrangement.open.map(name),
+    links: arrangement.links.map((link) => ({ ...link, from: name(link.from), to: name(link.to) })),
+  };
+}
+
+/** The arrangement this browser kept. One that cannot be read is no arrangement: the surface then lays itself out afresh. */
+export function kept(): Kept | null {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(KEPT) ?? 'null');
+    const arrangement = readArrangement(value);
+    const view = (value as { view?: Record<string, unknown> } | null)?.view;
+    if (!arrangement || !view || typeof view !== 'object' || !['x', 'y'].every((key) => Number.isFinite(view[key]))) return null;
+    if (view.k !== undefined && !(typeof view.k === 'number' && view.k >= ZOOM[0] && view.k <= ZOOM[1])) return null;
+    const shown = (value as { shown?: unknown }).shown;
+    return { ...arrangement, view: view as unknown as View, ...(typeof shown === 'string' ? { shown } : {}) };
+  } catch { return null; }
 }

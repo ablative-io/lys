@@ -13,15 +13,16 @@ import type { SessionGraph } from './session-graph';
 import { firstMessagePage } from './message-connections';
 import type { MessageRead } from './message-connections';
 import { MessageConnections } from './MessageConnections';
-import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, nearestSide, nextColour, readArrangement, sidePoint, standing, stood, within } from './canvas-marks';
+import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, nearestSide, nextColour, sidePoint, standing, stood, within } from './canvas-marks';
 import type { Arrangement, Box, Marks, Side } from './canvas-marks';
-import { keepArrangement, readKeeping, removeLayout, said, saveLayout } from './canvas-kept';
-import type { Keeping, SavedLayout } from './canvas-kept';
+import { KEPT, hereName, keepArrangement, kept, keptName, readKeeping, removeLayout, renamed, said, saveLayout } from './canvas-kept';
+import type { Keeping, Kept, SavedLayout } from './canvas-kept';
 import { ProxyView, proxyHref } from '../proxy/ProxyView';
 import { CanvasDock, KindSymbol, PANELS } from './CanvasDock';
 import type { Panel, Tool } from './CanvasDock';
 import { Anchors, GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
-import { HOME, ZOOM, useWheel, zoomOf, zoomed } from './canvas-view';
+import { HOME, around, framed, useWheel, zoomOf, zoomed } from './canvas-view';
+import { tidied } from './canvas-tidy';
 import type { View } from './canvas-view';
 import { TypeTogether } from './CanvasTogether';
 import { WidgetCard, heldOf } from './CanvasWidgets';
@@ -31,54 +32,15 @@ import type { Board } from '../dashboard/board';
 import './session-canvas.css';
 import './canvas-marks.css';
 
-import { CLOSED, OPENED, lineBetween, placed } from './canvas-place';
+import { CLOSED, OPENED, SMALLEST, lineBetween, placed } from './canvas-place';
 export type { Box } from './canvas-marks';
 export { lineBetween, placed } from './canvas-place';
 export type { View } from './canvas-view';
 
-/** What this browser keeps: the arrangement, where the surface is looked at from, and the arrival last answered (an agent at a place in this tab's history). */
-interface Kept extends Arrangement { view: View; shown?: string }
-
-const KEPT = 'lys.canvas';
-/** The smallest a terminal window is dragged to: its bar still shows the agent's name beside state, Stop and close, and a prompt can still be read. */
-const SMALLEST: [number, number] = [560, 180];
-
-/**
- * A window is kept under its agent's name, not its session's: a session's name is new every time the agent starts, and
- * a layout saved today has to find the same agents tomorrow.
- */
-const keptName = (graph: SessionGraph) => (id: string): string => {
-  const agent = graph.nodes.find((node) => node.id === id)?.session?.agent;
-  return agent ? AGENT + agent : id;
-};
-const hereName = (graph: SessionGraph) => (id: string): string =>
-  id.startsWith(AGENT) ? graph.nodes.find((node) => node.session?.agent === id.slice(AGENT.length))?.id ?? id : id;
-function renamed(arrangement: Arrangement, name: (id: string) => string): Arrangement {
-  return {
-    ...arrangement,
-    boxes: Object.fromEntries(Object.entries(arrangement.boxes).map(([id, box]) => [name(id), box])),
-    open: arrangement.open.map(name),
-    links: arrangement.links.map((link) => ({ ...link, from: name(link.from), to: name(link.to) })),
-  };
-}
-
-/** The arrangement this browser kept. One that cannot be read is no arrangement: the surface then lays itself out afresh. */
-function kept(): Kept | null {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(KEPT) ?? 'null');
-    const arrangement = readArrangement(value);
-    const view = (value as { view?: Record<string, unknown> } | null)?.view;
-    if (!arrangement || !view || typeof view !== 'object' || !['x', 'y'].every((key) => Number.isFinite(view[key]))) return null;
-    if (view.k !== undefined && !(typeof view.k === 'number' && view.k >= ZOOM[0] && view.k <= ZOOM[1])) return null;
-    const shown = (value as { shown?: unknown }).shown;
-    return { ...arrangement, view: view as unknown as View, ...(typeof shown === 'string' ? { shown } : {}) };
-  } catch { return null; }
-}
-
-/** The address of a session's terminal alone, filling its own browser window. */
 /** A line being dragged, from the dot it started on to the pointer. */
 const lineTo = (from: [number, number], to: [number, number]): string => `M ${from[0]} ${from[1]} L ${to[0]} ${to[1]}`;
 
+/** The address of a session's terminal alone, filling its own browser window. */
 const windowOf = (session: { session: string; agent: string | null }): string =>
   '#/window/' + encodeURIComponent(session.session) + (session.agent ? '?agent=' + encodeURIComponent(session.agent) : '');
 
@@ -229,15 +191,33 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
     setView((now) => zoomed(now, factor === null ? 1 : zoomOf(now) * factor, cx, cy));
   };
   const [menu, setMenu] = useState<string | null>(null);
-  // Double-pressing a window's bar brings the view in until that window fills it; double-pressing it again goes back to the view before.
-  const back = useRef<{ id: string; view: View } | null>(null);
-  const zoomTo = (id: string) => {
-    const [element, box] = [surface.current, at(id)];
+  // Double-pressing a window's bar, or a box's, brings the view in until that thing fills it; double-pressing the canvas itself brings everything on it into view, no nearer than actual size. The same double press again goes back to the view before, until the person moves the view: after that it looks closer again.
+  const back = useRef<{ id: string; view: View; to: View } | null>(null);
+  const zoomTo = (id: string, box = at(id), nearest?: number) => {
+    const [element, was] = [surface.current, back.current];
     if (!element || !box) return;
-    if (back.current?.id === id) { const was = back.current.view; back.current = null; setView(was); return; }
-    const k = Math.min(ZOOM[1], Math.max(ZOOM[0], Math.min(element.clientWidth / (box.w + 64), element.clientHeight / (box.h + 64))));
-    back.current = { id, view };
-    setView({ x: element.clientWidth / 2 - (box.x + box.w / 2) * k, y: element.clientHeight / 2 - (box.y + box.h / 2) * k, k });
+    back.current = null;
+    if (was?.id === id && was.to === view) { setView(was.view); return; }
+    const to = framed(box, element.clientWidth, element.clientHeight, nearest);
+    back.current = { id, view, to };
+    setView(to);
+  };
+  // Tidy puts everything into rows and brings the whole into view, no nearer than actual size. Until the person changes something else, it can be put back as it was.
+  const [untidy, setUntidy] = useState<{ moved: Record<string, Box>; marks: Marks; view: View; at: number } | null>(null);
+  const tidy = () => {
+    const element = surface.current;
+    if (!element?.clientWidth || !element.clientHeight) return;
+    const next = tidied(boxes, marks, Object.fromEntries(graph.nodes.map((node) => [node.id, node.column])), hereName(graph), element.clientWidth / element.clientHeight);
+    setUntidy({ moved, marks, view, at: changes + 1 });
+    setMoved((all) => ({ ...all, ...next.boxes }));
+    setMarks((all) => ({ ...all, groups: next.groups, notes: next.notes, widgets: next.widgets }));
+    setView(framed(next.extent, element.clientWidth, element.clientHeight, 1, 128));
+    changed();
+  };
+  const putBack = () => {
+    if (!untidy) return;
+    setMoved(untidy.moved); setMarks(untidy.marks); setView(untidy.view); setUntidy(null);
+    changed();
   };
 
   const begin = (start: (from: [number, number]) => Drag) => (event: PointerEvent<HTMLElement>) => {
@@ -436,9 +416,10 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
   };
 
   return <><div className={'session-canvas-scroll' + (tool ? ' tool-' + tool : '')} role="region" aria-label="Agent connection canvas" tabIndex={0} ref={surface} onKeyDown={travel}
-    onPointerDown={begin(pressed)} onPointerMove={during} onPointerUp={finish} onPointerCancel={finish}>
+    onPointerDown={begin(pressed)} onPointerMove={during} onPointerUp={finish} onPointerCancel={finish}
+    onDoubleClick={(event) => { if (!tool && (event.target === event.currentTarget || event.target === event.currentTarget.firstElementChild)) zoomTo('', around([...Object.values(boxes), ...marks.groups, ...marks.notes, ...widgets]), 1); }}>
     <div className="session-canvas" style={{ transform: `translate(${view.x}px, ${view.y}px)` + (zoomOf(view) === 1 ? '' : ` scale(${zoomOf(view)})`), transformOrigin: '0 0' }}>
-      {marks.groups.map((group) => <GroupBox key={group.id} group={group} fresh={fresh === group.id} pick={pick?.(group.id)} move={moving(group.id)} size={sizing(group.id, SMALLEST_MARK)} link={linking(group.id)}
+      {marks.groups.map((group) => <GroupBox key={group.id} group={group} fresh={fresh === group.id} pick={pick?.(group.id)} move={moving(group.id)} size={sizing(group.id, SMALLEST_MARK)} link={linking(group.id)} look={() => zoomTo(group.id)}
         change={(label) => reworded(group.id, label)} colour={() => recoloured(group.id)} remove={() => removeMark(group.id)} />)}
       <svg className="session-canvas-lines" aria-hidden="true">{graph.edges.flatMap((edge) => {
         const [from, to] = [boxes[edge.from], boxes[edge.to]];
@@ -501,8 +482,9 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
   {together.length ? <TypeTogether chosen={running.filter((each) => together.includes(each.node))} drop={(node) => setTogether((now) => now.filter((id) => id !== node))} clear={() => setTogether([])}
     all={running.every((each) => together.includes(each.node)) ? null : () => setTogether(running.map((each) => each.node))} /> : null}
   <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} panel={panel} setPanel={setPanel}
-    zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} connections={connections} kind={kind} place={(next) => { setKind(next); setTool('widget'); setPanel(null); }} drop={drop} keeping={keeping} layouts={layouts} save={save} remove={remove}
+    zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} tidy={tidy} connections={connections} kind={kind} place={(next) => { setKind(next); setTool('widget'); setPanel(null); }} drop={drop} keeping={keeping} layouts={layouts} save={save} remove={remove}
     says={<>
+      {untidy?.at === changes ? <span role="status">Tidied. <button type="button" className="btn" data-act="untidy" onClick={putBack}>Put it back</button></span> : null}
       {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}
       {missing !== null ? <span className="why-not" role="alert">No layout is saved as {missing}.</span> : null}
       {unsent ? <span className="why-not" role="alert">The arrangement was not kept on the service. <small className="refusal-name">{unsent}</small></span> : null}
@@ -561,8 +543,8 @@ export function SessionCanvas() {
     {/* Operations is two views of the same agents: the canvas they are arranged on, and the model calls they made. */}
     <nav className="operations-swap" aria-label="Operations views"><a href="#/canvas" aria-current={proxy ? undefined : 'page'}>Canvas</a><a href={proxyHref({})} aria-current={proxy ? 'page' : undefined}>Proxy</a></nav>
     {proxy ? <ProxyView board={board} /> : <div className="canvas-side">
-        {/* With agents running, who is running is behind the bar's Agents button. With none, or while the canvas cannot be read, it is said here. */}
-        {load.status === 'ok' && load.data.nodes.some((node) => node.session) ? null : <RunningList />}
+        {/* With agents running, who is running is behind the bar's Agents button. With none, or while the canvas cannot be read, it is said here; a person who is not signed in is asked to sign in once, by the canvas. */}
+        {(load.status === 'ok' && load.data.nodes.some((node) => node.session)) || (load.status === 'refused' && load.refused.status === 401) ? null : <RunningList />}
         <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? (keeping.status === 'ok' ? <Whole graph={graph} messages={messages} keeping={keeping.data} board={board} /> : <p role="status">Reading your canvas…</p>) : <>
           {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
           {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}

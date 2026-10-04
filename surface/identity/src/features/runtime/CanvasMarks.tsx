@@ -24,7 +24,7 @@ interface Held {
 const Swatch = ({ on, of }: { on: () => void; of: string }) => <button type="button" className="canvas-swatch" data-act="colour" aria-label={'Change the colour of ' + of} title="Colour" onClick={on} />;
 
 /** A box around windows, with its label on its top edge. Its inside is the surface: only its bar and its corner are held. */
-export function GroupBox({ group, fresh, pick, move, size, link, change, colour, remove }: { group: Group } & Held) {
+export function GroupBox({ group, fresh, pick, move, size, link, change, colour, remove, look }: { group: Group; /** Brings the view in to this box, or back out again. */ look: () => void } & Held) {
   const [label, setLabel] = useState(group.label);
   useEffect(() => setLabel(group.label), [group.label]);
   // A box is on the surface while it is still being drawn out; its label takes the keyboard when the drawing ends.
@@ -32,7 +32,7 @@ export function GroupBox({ group, fresh, pick, move, size, link, change, colour,
   useEffect(() => { if (fresh) words.current?.focus(); }, [fresh]);
   return <section className={'canvas-group' + (pick ? ' picking' : '')} data-group={group.id} aria-label={'Box: ' + (group.label || 'no label yet')}
     style={{ left: group.x, top: group.y, width: group.w, height: group.h, ...tint(group.colour) }}>
-    <header className="canvas-group-bar" onPointerDownCapture={pick} onPointerDown={move}>
+    <header className="canvas-group-bar" onPointerDownCapture={pick} onPointerDown={move} onDoubleClick={(event) => { if (!(event.target instanceof Element && event.target.closest('input, button'))) look(); }}>
       <input ref={words} aria-label="Label of this box" placeholder="Label this box" value={label} size={Math.max(14, label.length + 2)}
         onChange={(event) => setLabel(event.target.value)} onBlur={() => { if (label !== group.label) change(label); }}
         onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
