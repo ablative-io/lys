@@ -41,11 +41,13 @@ const rowOf = (name: string) => $$('tr[data-href]').find((tr) => tr.querySelecto
 const cells = (name: string) => [...(rowOf(name)?.querySelectorAll('td') ?? [])].map((td) => td.textContent);
 
 describe('The Dashboard is the front page', () => {
-  it('is the rail\'s first entry, and #/ lands on it', async () => {
+  it('is the rail\'s second entry, after Operations, and #/ lands on it', async () => {
     await mount('#/', routes);
     expect($('.page h1')?.textContent).toBe('Dashboard');
     expect($('#rail a.on')?.dataset.nav).toBe('dashboard');
-    const first = $$('#rail a[data-nav]')[0];
+    // Operations, the canvas of running agents, is the first thing in the rail (Tom, 4 October 2026).
+    const [operations, first] = $$('#rail a[data-nav]');
+    expect([operations.title, operations.getAttribute('href')]).toEqual(['Operations (g c)', '#/canvas']);
     expect(first.dataset.nav).toBe('dashboard');
     expect(first.getAttribute('href')).toBe('#/dashboard');
     expect(first.title).toBe('Dashboard (g d)');

@@ -568,7 +568,7 @@ export function SessionCanvas() {
   const keeping = useLoad(readKeeping, 'canvas-kept');
   const board = useLive(readBoard, 'canvas-board');
   return <div className="page fill session-canvas-page">
-    <div className="head"><div><h1>Running</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}</div></div>
+    <div className="head"><div><h1>Operations</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}</div></div>
     <div className="canvas-side">
         {/* With agents running, who is running is behind the bar's Agents button. With none, or while the canvas cannot be read, it is said here. */}
         {load.status === 'ok' && load.data.nodes.some((node) => node.session) ? null : <RunningList />}
