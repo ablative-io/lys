@@ -483,6 +483,7 @@ impl Service {
             setup: None,
             password_policy: None,
             model_proxy: None,
+            proxy_dir: None,
             surface_dir: None,
             runner_socket: None,
         };

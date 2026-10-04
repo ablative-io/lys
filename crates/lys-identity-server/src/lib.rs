@@ -56,6 +56,7 @@ pub mod budgets_usage;
 #[cfg(test)]
 mod budgets_work;
 pub mod caller_admission;
+pub mod calls_api;
 pub mod canvas_api;
 pub mod canvas_store;
 mod certificate_keys;

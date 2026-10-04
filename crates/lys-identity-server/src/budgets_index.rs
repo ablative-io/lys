@@ -30,6 +30,10 @@ struct Agent {
     call_ids: BTreeMap<String, usize>,
 }
 
+#[cfg(test)]
+#[path = "budgets_index_tests.rs"]
+mod tests;
+
 /// Rebuilt from retained records on open; never part of signed state.
 #[derive(Debug, Default)]
 pub struct Index {

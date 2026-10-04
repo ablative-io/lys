@@ -177,6 +177,7 @@ impl ServerError {
             | Self::LaunchRecordMissing
             | Self::ProfileVersionUnknown { .. }
             | Self::RuntimeSessionUnknown
+            | Self::CallUnknown
             | Self::RoleUnknown
             | Self::RoleVersionUnknown
             | Self::HolderUnknown
@@ -207,6 +208,7 @@ impl ServerError {
             | Self::McpHandleUnsupported { .. }
             | Self::RuntimeSessionStarted { .. }
             | Self::RuntimeSessionStopped { .. }
+            | Self::CallKeptElsewhere { .. }
             | Self::RuntimeReportReused { .. }
             | Self::ServiceAccountReused { .. }
             | Self::ServiceAccountRetired { .. }
@@ -249,6 +251,7 @@ impl ServerError {
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }
             | Self::RuntimeUnavailable { .. }
+            | Self::CallRecordsUnavailable { .. }
             | Self::ServiceAccountsUnavailable { .. }
             | Self::StopsUnavailable { .. }
             | Self::PolicyUnavailable { .. }

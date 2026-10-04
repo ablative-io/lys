@@ -73,6 +73,18 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
         ),
         (GET, "/agents/{id}/usage", None, Some(usage.clone())),
         (
+            GET,
+            "/agents/{id}/calls",
+            None,
+            Some(api.schema::<crate::calls_api::CallsView>()),
+        ),
+        (
+            GET,
+            "/agents/{id}/calls/{call}",
+            None,
+            Some(api.schema::<crate::calls_api::CallView>()),
+        ),
+        (
             POST,
             "/agents/{id}/usage",
             Some(api.schema::<UsageBody>()),

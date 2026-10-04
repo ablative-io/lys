@@ -244,6 +244,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/runner/join" "Join another computer's runner with its connection code" P [&["RequestMalformed", "RunnerJoinRefused", "MachineRetired", "NetworkUnavailable"]];
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
     GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown"]] scope("agent", "read", ["id"]);
+    GET "/agents/{id}/calls" "An agent's model calls, newest first" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RequestMalformed"]] scope("agent", "read", ["id"]);
+    GET "/agents/{id}/calls/{call}" "One model call whole: its record and both bodies" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "not_permitted", "CallUnknown", "CallKeptElsewhere", "CallRecordsUnavailable"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown", "RuntimeUnavailable", "ProvisioningUnavailable"]] scope("agent", "agent.usage.report", ["id"]);
     GET "/agents/{id}/policy" "An agent's tool-boundary policy" S [SIGNED, &["not_permitted"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]] scope("agent", "agent.policy.set", ["id"]);

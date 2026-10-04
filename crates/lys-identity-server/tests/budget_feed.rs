@@ -17,7 +17,9 @@ use lys_identity_server::runtime_store::RuntimeStore;
 use lys_log_store::{FileLeafStore, FrontierLog};
 use lys_runner::protocol::{Greeting, Reply, verify_request};
 use lys_runner::refusals::RefusalRecord;
-use lys_runner::tracking::{CLAUDE_ADAPTER, Figures, Measure, RECORD_VERSION, UsageRecord};
+use lys_runner::tracking::{
+    CLAUDE_ADAPTER, Figures, Measure, RECORD_VERSION, RecordAt, UsageRecord,
+};
 use lys_runner::tracking_budget::PlanWindow;
 use lys_runner::tracking_store::{Body, FEED_FORMAT, FeedEntry, FeedPage};
 use lys_runner::{Act, Answer};
@@ -77,7 +79,29 @@ fn record(session: &str, id: &str, measure: Measure, at: u64, figures: Figures) 
     }
 }
 
-fn page(session: &str, agent: &str, at: u64) -> TestResult<FeedPage> {
+/// A proxy home under `proxy` holding the call `1-Spend` whole; its entry.
+fn kept_call(proxy: &std::path::Path) -> TestResult<String> {
+    use lys_home::record::blocks::Hash;
+    use lys_home::record::entries::{CUSTOM_CALL, EntryBody};
+    let home = lys_home::record::Home::open(proxy.join("home"))?;
+    let blocks = home.blocks()?;
+    let (request, response) = (br#"{"model":"model-one"}"#, br#"{"type":"message"}"#);
+    blocks.put(request)?;
+    blocks.put(response)?;
+    let mut session = home.create_session("kept", "", None)?;
+    Ok(session.append(EntryBody::Custom {
+        custom_type: CUSTOM_CALL.to_owned(),
+        data: Some(json!({
+            "call_id": "1-Spend", "provider": "p", "api": "anthropic-messages",
+            "request": [], "response": [], "status": "complete",
+            "started_at": "2000-01-01T00:00:00Z", "stream": false,
+            "raw_request": Hash::of(request).as_str(),
+            "raw_response": Hash::of(response).as_str(),
+        })),
+    })?)
+}
+
+fn page(session: &str, agent: &str, at: u64, kept: &str) -> TestResult<FeedPage> {
     let mut entries = Vec::new();
     for (index, (tokens, cost, time)) in [(30, 400_000_000, 100), (70, 100_000_000, 150)]
         .into_iter()
@@ -103,11 +127,31 @@ fn page(session: &str, agent: &str, at: u64) -> TestResult<FeedPage> {
         };
         for (measure, figures) in [(Measure::Spend, spend), (Measure::Snapshot, snapshot)] {
             let id = format!("{index}-{measure:?}");
+            let counted = matches!(measure, Measure::Spend);
+            let mut usage = record(session, &id, measure, at, figures);
+            if counted {
+                // A spend the proxy's usage file gave names its run and where
+                // the call is kept: the second in this computer's proxy home,
+                // the first in a session that home does not hold.
+                usage.model = Some("model-one".to_owned());
+                usage.run = Some("0123456789abcdef0123456789abcdef".to_owned());
+                usage.record = Some(if index == 1 {
+                    RecordAt {
+                        session: "kept".to_owned(),
+                        entry: kept.to_owned(),
+                    }
+                } else {
+                    RecordAt {
+                        session: "made-elsewhere".to_owned(),
+                        entry: "entry".to_owned(),
+                    }
+                });
+            }
             entries.push(FeedEntry {
                 seq: u64::try_from(entries.len())?,
                 at,
                 session: session.to_owned(),
-                body: Body::Usage(record(session, &id, measure, at, figures)),
+                body: Body::Usage(usage),
             });
         }
     }
@@ -210,8 +254,16 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
             drop(said.send_replace(Some(line.to_owned())));
         }
     });
-    let (mut service, (agent, machine, dir, mut runner)) =
-        Service::start_saying(GRANT_MODEL, None, None, None, |_| {}, Some(say), prepare).await?;
+    let (mut service, (agent, machine, dir, mut runner)) = Service::start_saying(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.proxy_dir = Some(config.log_dir.with_file_name("proxy")),
+        Some(say),
+        prepare,
+    )
+    .await?;
     tokio::select! {
         result = runner.finish() => { result?; ended.changed().await?; }
         changed = ended.changed() => {
@@ -263,6 +315,64 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
     assert_eq!(accounts[0]["account"], "shared-account");
     assert_eq!(accounts[0]["windows"][0]["duration_minutes"], 10_080);
     assert_eq!(accounts[0]["windows"][0]["used_percent"], 49);
+    // Each call the proxy reported is listed newest first from the kept uses.
+    let (status, calls) = service
+        .get(&format!("/agents/{agent}/calls"), Some(&cookie))
+        .await?;
+    assert_eq!(status, 200, "{calls}");
+    assert_eq!(
+        calls["calls"]
+            .as_array()
+            .ok_or("no calls")?
+            .iter()
+            .map(|row| json!([
+                row["call_id"],
+                row["model"],
+                row["input_tokens"],
+                row["account"]
+            ]))
+            .collect::<Vec<_>>(),
+        vec![
+            json!(["1-Spend", "model-one", 70, "shared-account"]),
+            json!(["0-Spend", "model-one", 30, "shared-account"]),
+        ]
+    );
+    assert_eq!(calls["next"], json!(null));
+    let (status, refused) = service
+        .get(
+            &format!("/agents/{agent}/calls?after=nonsense"),
+            Some(&cookie),
+        )
+        .await?;
+    assert_eq!(status, 400, "{refused}");
+    // A call kept on this computer is read whole: its record and both bodies.
+    let (status, whole) = service
+        .get(&format!("/agents/{agent}/calls/1-Spend"), Some(&cookie))
+        .await?;
+    assert_eq!(status, 200, "{whole}");
+    assert_eq!(whole["call"]["call_id"], "1-Spend");
+    assert_eq!(whole["request"], json!({"model": "model-one"}));
+    assert_eq!(whole["response"], json!({"type": "message"}));
+    assert_eq!(whole["request_unreadable"], json!(null));
+    assert_eq!(whole["response_unreadable"], json!(null));
+    // One this computer's proxy does not hold names the computer that made it.
+    let (status, elsewhere) = service
+        .get(&format!("/agents/{agent}/calls/0-Spend"), Some(&cookie))
+        .await?;
+    assert_eq!(status, 409, "{elsewhere}");
+    let words = elsewhere.to_string();
+    assert!(
+        words.contains("CallKeptElsewhere") && words.contains(&machine),
+        "{words}"
+    );
+    let (status, unknown) = service
+        .get(
+            &format!("/agents/{agent}/calls/no-such-call"),
+            Some(&cookie),
+        )
+        .await?;
+    assert_eq!(status, 404, "{unknown}");
+    assert!(unknown.to_string().contains("CallUnknown"), "{unknown}");
     let path = format!("/budgets/agent/{agent}");
     let limits = json!([
         {"unit": "tokens", "amount": 200, "period": "day", "act": "tell"},
@@ -358,7 +468,8 @@ fn prepare(
         launch: None,
     })?;
     let at = u64::try_from(jiff::Timestamp::now().as_millisecond())?;
-    let page = page(&session, &agent, at)?;
+    let kept = kept_call(config.proxy_dir.as_deref().ok_or("no proxy directory")?)?;
+    let page = page(&session, &agent, at, &kept)?;
     let public_key = key.public_key_bytes();
     let runner = FeedRunner(Some(tokio::spawn(serve(listener, public_key, page))));
     Ok((agent, machine, dir, runner))

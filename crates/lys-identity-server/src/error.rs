@@ -514,6 +514,23 @@ pub enum ServerError {
         "RuntimeSessionUnknown: no session by that id is visible to the caller; an agent's session begins with a starting report and a found session with a running report"
     )]
     RuntimeSessionUnknown,
+    /// No model call by that id is kept for the agent.
+    #[error("CallUnknown: no model call by that id is kept for the agent")]
+    CallUnknown,
+    /// The call is kept whole on another computer.
+    #[error(
+        "CallKeptElsewhere: the call is kept whole on computer `{machine}`, where it was made; this service reads the calls kept on its own computer"
+    )]
+    CallKeptElsewhere {
+        /// The computer whose runner reported the call.
+        machine: String,
+    },
+    /// The proxy's call records are not configured or could not be read.
+    #[error("CallRecordsUnavailable: {reason}")]
+    CallRecordsUnavailable {
+        /// What failed.
+        reason: String,
+    },
     /// The session was already started.
     #[error("RuntimeSessionStarted: session `{session}` was already started")]
     RuntimeSessionStarted {

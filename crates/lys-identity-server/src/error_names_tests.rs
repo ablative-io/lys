@@ -408,6 +408,19 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "RuntimeUnavailable",
         ),
         (ServerError::RuntimeSessionUnknown, "RuntimeSessionUnknown"),
+        (ServerError::CallUnknown, "CallUnknown"),
+        (
+            ServerError::CallKeptElsewhere {
+                machine: detail.to_owned(),
+            },
+            "CallKeptElsewhere",
+        ),
+        (
+            ServerError::CallRecordsUnavailable {
+                reason: detail.to_owned(),
+            },
+            "CallRecordsUnavailable",
+        ),
         (
             ServerError::RuntimeSessionStarted {
                 session: detail.to_owned(),
