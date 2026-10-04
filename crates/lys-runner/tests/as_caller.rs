@@ -68,6 +68,7 @@ fn a_session_started_for_a_person_takes_input_only_for_a_verified_caller() -> Te
         Act::Start {
             launch: Box::new(launch()),
             lys_mcp: None,
+            proxy: None,
         },
     ))?;
     assert!(matches!(started, Answer::Started { .. }), "{started:?}");

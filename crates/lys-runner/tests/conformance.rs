@@ -110,6 +110,7 @@ fn shell(id: &str) -> Launch {
 fn start(client: &Client, id: &str) -> TestResult {
     match client.ask(&Act::Start {
         lys_mcp: None,
+        proxy: None,
         launch: Box::new(shell(id)),
     })? {
         Answer::Started { session, pid, .. } if session == id && pid > 0 => Ok(()),
@@ -380,6 +381,7 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         },
         Act::Start {
             lys_mcp: None,
+            proxy: None,
             launch: Box::new(shell(&id)),
         },
         Act::Input {

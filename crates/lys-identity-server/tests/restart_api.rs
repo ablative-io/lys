@@ -254,6 +254,7 @@ async fn no_reviewed_profile_refuses_before_ending_the_running_session() -> Test
     .await?;
     held.client().ask(&Act::Start {
         lys_mcp: None,
+        proxy: None,
         launch: Box::new(Launch {
             session: session.clone(),
             program: "/bin/cat".to_owned(),
@@ -481,6 +482,7 @@ async fn a_kept_start_naming_no_directory_restarts_into_the_profiles_folder() ->
     .await?;
     held.client().ask(&Act::Start {
         lys_mcp: None,
+        proxy: None,
         launch: Box::new(Launch {
             session: session.clone(),
             program: "/bin/cat".to_owned(),

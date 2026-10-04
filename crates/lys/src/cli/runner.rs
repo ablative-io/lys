@@ -37,6 +37,14 @@ pub enum RunnerCommand {
         /// Each session's scrollback, in bytes.
         #[arg(long, default_value_t = SCROLLBACK)]
         scrollback: usize,
+
+        /// The Lys proxy's state directory on this machine: the one given
+        /// to `lys proxy serve --state`. A run that goes through the proxy
+        /// has its model calls counted from the usage file the proxy keeps
+        /// there. Without it such a run is started and is not counted, and
+        /// its coverage says so.
+        #[arg(long)]
+        proxy_state: Option<PathBuf>,
     },
 
     /// Relay the server's requests to this machine's runner, dialling the

@@ -24,6 +24,7 @@ pub(crate) fn act(
         return Ok(Act::Start {
             launch: Box::new(launch),
             lys_mcp: None,
+            proxy: None,
         });
     }
     let record = launch
@@ -44,6 +45,7 @@ pub(crate) fn act(
             pass: pass.to_string(),
             seat,
         }),
+        proxy: None,
     })
 }
 

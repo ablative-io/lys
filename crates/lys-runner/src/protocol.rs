@@ -112,6 +112,11 @@ pub enum Act {
         /// Run-only MCP credentials, omitted by older servers.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         lys_mcp: Option<LysMcp>,
+        /// The run key and how the session is tracked through the proxy,
+        /// for a run whose launch gave it the proxy's base address under
+        /// that key. Absent for a run that does not go through the proxy.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proxy: Option<crate::tracking_proxy::ProxyTracking>,
     },
     /// Type text, then Enter when asked.
     Input {

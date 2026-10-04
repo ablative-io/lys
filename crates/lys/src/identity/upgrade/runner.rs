@@ -137,6 +137,14 @@ impl Restart {
             layout.data_dir().join("runner").display().to_string(),
             "--server-key".into(),
             public.display().to_string(),
+            // Where the install's proxy keeps its state (`proxy::unit`).
+            "--proxy-state".into(),
+            layout
+                .data_dir()
+                .join("proxy")
+                .join("state")
+                .display()
+                .to_string(),
         ];
         let ports = Ports::load(layout)?;
         Ok(Self {

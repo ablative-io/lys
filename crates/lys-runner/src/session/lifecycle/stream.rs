@@ -13,9 +13,71 @@ use super::super::{Session, Sessions, Table, now_ms};
 use super::{Wake, transcript_parent, window_limit};
 use crate::error::RunnerError;
 use crate::tracking::{Accounts, Harness, Reading, Tracking};
+use crate::tracking_proxy::{PROXY_ADAPTER, ProxyReading};
 use crate::tracking_store::{Body, Commit, Coverage, SourceState};
 
 impl Sessions {
+    /// Bind session `id` to its run's usage file under the proxy's state and
+    /// follow it. Nothing here refuses the run: a proxy state this runner
+    /// was not told of, or a usage directory that cannot be made or watched,
+    /// is said in the session's coverage.
+    pub(crate) fn follow_proxy(self: &Arc<Self>, table: &mut Table, id: &str) {
+        let Some(proxy) = table
+            .sessions
+            .get(id)
+            .and_then(|session| session.guard.proxy.clone())
+        else {
+            return;
+        };
+        let held = table.feed.source(id).cloned();
+        let unfollowed = |table: &mut Table, words: String| {
+            crate::error::said(&format!("session {id}: coverage_incomplete: {words}"));
+            let source = held.clone().unwrap_or_default();
+            let coverage = Coverage {
+                adapter: Some(PROXY_ADAPTER.to_owned()),
+                ..Coverage::of("coverage_incomplete", &source, None, words)
+            };
+            if let Err(error) = append(table, id, vec![Body::Coverage(coverage)], None) {
+                crate::error::said(&format!("session {id}: coverage_record_failed: {error}"));
+            }
+        };
+        let Some(dir) = self.proxy_usage.get() else {
+            unfollowed(
+                table,
+                "this runner was not told where the proxy keeps its state, so the run's model calls are not counted"
+                    .to_owned(),
+            );
+            return;
+        };
+        if let Err(error) = std::fs::create_dir_all(dir) {
+            unfollowed(table, format!("{} cannot be made: {error}", dir.display()));
+            return;
+        }
+        let source = SourceState {
+            path: proxy.file(dir).display().to_string(),
+            generation: held.as_ref().map_or(0, |held| held.generation + 1),
+            bound: proxy.run.clone(),
+            ..SourceState::default()
+        };
+        let words = format!(
+            "following {} from its start: the proxy writes one line there for each finished call of run {}",
+            source.path, proxy.run
+        );
+        let bound = Coverage {
+            adapter: Some(PROXY_ADAPTER.to_owned()),
+            ..Coverage::of("source_bound", &source, Some(0), words)
+        };
+        if append(table, id, vec![Body::Coverage(bound)], Some(source)).is_err() {
+            // `append` has said why and counted the gap.
+            return;
+        }
+        if let Err(error) = self.follow(table, id) {
+            crate::error::said(&format!(
+                "session {id}: its usage file is not followed: {error}"
+            ));
+        }
+    }
+
     /// Follow session `id`'s bound stream on a thread of its own, stopping
     /// any follower it had.
     pub(crate) fn follow(self: &Arc<Self>, table: &mut Table, id: &str) -> Result<(), RunnerError> {
@@ -111,26 +173,40 @@ impl Sessions {
             let Some(session) = table.sessions.get(id) else {
                 return;
             };
-            let Some(tracking) = session.guard.tracking.clone() else {
-                return;
-            };
+            let tracking = session.guard.tracking.clone();
+            let proxy = session.guard.proxy.clone();
             let Some(mut source) = table.feed.source(id).cloned() else {
                 return;
             };
-            let evidence = accounts(session, &tracking);
-            let current = evidence.current.map(str::to_owned);
-            let moves = evidence.moves.to_vec();
+            let (current, moves) = tracking.as_ref().map_or((None, Vec::new()), |tracking| {
+                let evidence = accounts(session, tracking);
+                (evidence.current.map(str::to_owned), evidence.moves.to_vec())
+            });
             drop(table);
-            let reading = Reading {
+            let now = now_ms();
+            let harness = tracking.as_ref().map(|tracking| Reading {
                 runner: self.state.runner(),
                 session: id,
-                tracking: &tracking,
+                tracking,
                 accounts: Accounts {
                     current: current.as_deref(),
                     moves: &moves,
                     declared: tracking.account.as_deref(),
                 },
-                now: now_ms(),
+                now,
+            });
+            let proxied = proxy.as_ref().map(|tracking| ProxyReading {
+                runner: self.state.runner(),
+                session: id,
+                tracking,
+                now,
+            });
+            // A session has one stream: its harness's when its harness is
+            // tracked, else its run's usage file under the proxy's state.
+            let lines = match (&harness, &proxied) {
+                (Some(reading), _) => Lines::Harness(reading),
+                (None, Some(reading)) => Lines::Proxy(reading),
+                (None, None) => return,
             };
             let mut bodies = Vec::new();
             if let Some(reason) = &lost {
@@ -142,7 +218,7 @@ impl Sessions {
             )));
             }
             let before = source.clone();
-            let more = read_lines(&reading, &mut source, &mut bodies);
+            let more = read_lines(lines, &mut source, &mut bodies);
             if bodies.is_empty() && source == before {
                 return;
             }
@@ -241,8 +317,16 @@ pub(crate) fn accounts<'a>(session: &'a Session, tracking: &'a Tracking) -> Acco
     }
 }
 
+/// What a stream's lines are read with: a harness's adapter, or the proxy's
+/// usage file reader.
+#[derive(Clone, Copy)]
+enum Lines<'a> {
+    Harness(&'a Reading<'a>),
+    Proxy(&'a ProxyReading<'a>),
+}
+
 /// Read `source` from its offset to its last whole line into `bodies`.
-fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<Body>) -> bool {
+fn read_lines(lines: Lines<'_>, source: &mut SourceState, bodies: &mut Vec<Body>) -> bool {
     let opened = std::fs::File::open(&source.path).and_then(|file| {
         let metadata = file.metadata()?;
         Ok((file, metadata))
@@ -318,9 +402,12 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
             return false;
         }
         match serde_json::from_slice::<Value>(&line) {
-            Ok(record) => bodies.extend(match reading.tracking.harness {
-                Harness::ClaudeCode => reading.claude(source, at, &record),
-                Harness::Codex => reading.codex(source, at, &record),
+            Ok(record) => bodies.extend(match lines {
+                Lines::Harness(reading) => match reading.tracking.harness {
+                    Harness::ClaudeCode => reading.claude(source, at, &record),
+                    Harness::Codex => reading.codex(source, at, &record),
+                },
+                Lines::Proxy(reading) => reading.line(source, at, &record),
             }),
             Err(error) => bodies.push(Body::Coverage(Coverage::of(
                 "record_unreadable",

@@ -79,6 +79,7 @@ pub mod terminal_bytes;
 pub mod tracking;
 pub mod tracking_budget;
 mod tracking_fields;
+pub mod tracking_proxy;
 pub mod tracking_store;
 pub mod trust;
 #[cfg(test)]

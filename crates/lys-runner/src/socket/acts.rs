@@ -56,6 +56,7 @@ pub(super) fn perform(
         Act::Start {
             mut launch,
             lys_mcp,
+            proxy,
         } => {
             if let Some(entry) = lys_mcp {
                 crate::launch_config::add_lys_mcp(&mut launch, &entry)?;
@@ -66,7 +67,10 @@ pub(super) fn perform(
                 .clone()
                 .map(|admitted| Admitted::verified(*admitted))
                 .transpose()?;
-            let (pid, started_at) = sessions.begin(*launch, policy, None)?;
+            let (pid, started_at) = match proxy {
+                Some(proxy) => sessions.begin_proxied(*launch, policy, proxy)?,
+                None => sessions.begin(*launch, policy, None)?,
+            };
             Ok(Answer::Started {
                 session,
                 pid,
@@ -180,6 +184,7 @@ fn as_caller(
         Act::Start {
             mut launch,
             lys_mcp,
+            proxy,
         } => {
             if let Some(entry) = lys_mcp {
                 crate::launch_config::add_lys_mcp(&mut launch, &entry)?;
@@ -190,7 +195,10 @@ fn as_caller(
                 .clone()
                 .map(|admitted| Admitted::verified(*admitted))
                 .transpose()?;
-            let (pid, started_at) = sessions.begin_for(*launch, policy, None, caller)?;
+            let (pid, started_at) = match proxy {
+                Some(proxy) => sessions.begin_proxied_for(*launch, policy, proxy, caller)?,
+                None => sessions.begin_for(*launch, policy, None, caller)?,
+            };
             Ok(Answer::Started {
                 session,
                 pid,

@@ -111,6 +111,9 @@ pub struct Handed {
     pub policy: Option<Policy>,
     /// How its harness is tracked.
     pub tracking: Option<Tracking>,
+    /// How it is tracked through the proxy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<crate::tracking_proxy::ProxyTracking>,
     /// Its bound working directory.
     pub cwd: String,
     /// Whether it is between turns.

@@ -36,6 +36,7 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
                 let Act::Start {
                     launch,
                     lys_mcp: Some(entry),
+                    ..
                 } = *done
                 else {
                     return Err("start carried no run pass".into());
@@ -128,6 +129,7 @@ fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error
                 let Act::Start {
                     launch,
                     lys_mcp: Some(entry),
+                    ..
                 } = *done
                 else {
                     return Err("start carried no run pass".into());

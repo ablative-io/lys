@@ -122,21 +122,8 @@ impl Live {
     }
 }
 
-/// What a session was started with beside its launch, and where its turns
-/// stand.
-#[derive(Debug, Clone, Default)]
-pub struct Guard {
-    /// The tool-boundary policy installed for the launch.
-    pub policy: Option<Policy>,
-    /// How its harness is tracked.
-    pub tracking: Option<Tracking>,
-    /// Its leader, as spawned.
-    pub leader: Option<Leader>,
-    /// Its bound working directory.
-    pub cwd: String,
-    /// Whether it is between turns, as its harness last said.
-    pub idle: bool,
-}
+mod guard;
+pub use guard::Guard;
 
 /// One session.
 pub(crate) struct Session {
@@ -222,6 +209,8 @@ pub struct Sessions {
     changed: Condvar,
     state: StateFile,
     state_dir: PathBuf,
+    /// The proxy's `usage` directory on this machine, once said.
+    proxy_usage: std::sync::OnceLock<PathBuf>,
     scrollback: usize,
     pub(crate) writer: crate::durable::Writer,
     #[cfg(test)]
@@ -362,6 +351,7 @@ impl Sessions {
                 changed: Condvar::new(),
                 state,
                 state_dir,
+                proxy_usage: std::sync::OnceLock::new(),
                 scrollback,
                 writer,
                 #[cfg(test)]
@@ -465,7 +455,7 @@ impl Sessions {
         policy: Option<Policy>,
         tracking: Option<Tracking>,
     ) -> Result<(u32, u64), RunnerError> {
-        self.begin_owned(launch, policy, tracking, None)
+        self.begin_owned(launch, policy, tracking, None, None)
     }
 
     fn begin_owned(
@@ -473,6 +463,7 @@ impl Sessions {
         mut launch: Launch,
         policy: Option<Policy>,
         tracking: Option<Tracking>,
+        proxy: Option<crate::tracking_proxy::ProxyTracking>,
         responsible: Option<String>,
     ) -> Result<(u32, u64), RunnerError> {
         if let Some(tracking) = &tracking {
@@ -545,6 +536,7 @@ impl Sessions {
             guard: Guard {
                 policy,
                 tracking,
+                proxy,
                 leader: None,
                 cwd,
                 idle: true,
@@ -591,6 +583,10 @@ impl Sessions {
         if let Some(trust) = &trusted {
             recorded = recorded.and_then(|()| lifecycle::trust_recorded(&mut table, &id, trust));
         }
+        // A session tracked through the proxy is bound to its usage file. A
+        // run is not refused for a file that cannot be followed: what stands
+        // in the way is said in its coverage.
+        self.follow_proxy(&mut table, &id);
         drop(table);
         self.activate(&id, pending)?;
         drop(reservation);

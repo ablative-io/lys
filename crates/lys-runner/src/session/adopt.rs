@@ -103,6 +103,7 @@ impl Sessions {
             guard: Guard {
                 policy: handed.policy.clone(),
                 tracking: handed.tracking.clone(),
+                proxy: handed.proxy.clone(),
                 leader: Some(handed.leader.clone()),
                 cwd: handed.cwd.clone(),
                 idle: handed.idle,

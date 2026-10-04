@@ -215,6 +215,14 @@ pub(super) fn start_runner(
         &layout.data_dir().join("runner").display().to_string(),
         "--server-key",
         &public.display().to_string(),
+        // Where the install's proxy keeps its state (`proxy::unit`).
+        "--proxy-state",
+        &layout
+            .data_dir()
+            .join("proxy")
+            .join("state")
+            .display()
+            .to_string(),
     ]
     .map(str::to_string);
     let started = services::start_detached(program, &args, &log, &pid, false)?;

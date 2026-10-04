@@ -144,7 +144,7 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
     let mut passes = Passes::open(dir.path().join("passes.json"))?;
     let act =
         crate::runner_start_pass::act(&mut passes, agent, "http://fixture.test", launch, None)?;
-    if !matches!(&act, Act::Start { launch, lys_mcp:Some(_) } if launch.config.is_some()) {
+    if !matches!(&act, Act::Start { launch, lys_mcp:Some(_), .. } if launch.config.is_some()) {
         return Err("the record start carries no native config or run pass".into());
     }
     let key = Arc::new(Ed25519Identity::load_or_generate(

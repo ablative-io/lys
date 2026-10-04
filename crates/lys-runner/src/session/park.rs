@@ -255,6 +255,7 @@ impl Sessions {
                 rotation: session.rotation.clone(),
                 policy: session.guard.policy.clone(),
                 tracking: session.guard.tracking.clone(),
+                proxy: session.guard.proxy.clone(),
                 cwd: session.guard.cwd.clone(),
                 idle: session.guard.idle,
                 ending: session.ending,

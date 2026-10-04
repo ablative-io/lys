@@ -22,6 +22,7 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
             state,
             server_key,
             scrollback,
+            proxy_state,
         } => {
             let runner = Runner::open(&Options {
                 server_key: public_key(&server_key)?,
@@ -29,6 +30,9 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
                 state,
                 scrollback,
             })?;
+            if let Some(proxy_state) = &proxy_state {
+                runner.sessions().proxy_state(proxy_state);
+            }
             serve(runner, &socket)
         }
 
