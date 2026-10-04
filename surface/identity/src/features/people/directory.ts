@@ -28,10 +28,10 @@ export function entries(view: PeopleView): Entry[] {
   return [...people, ...agents];
 }
 
-/** The file number: the kind's letter (A an agent, S a service account, P a person) and the head of the enduring id. */
+/** The file number of an identity: the kind's letter (A an agent, S a service account, whose id begins `op-`, P a person) and the head of the enduring id. */
 export const fileNo = (id: string): string => {
   const hex = id.slice(id.indexOf('-') + 1);
-  return (kindOf(id) === 'agent' ? 'A/' : id.startsWith('service-') ? 'S/' : 'P/') + hex.slice(0, 8);
+  return (kindOf(id) === 'agent' ? 'A/' : id.startsWith('op-') ? 'S/' : 'P/') + hex.slice(0, 8);
 };
 
 /** The first word of a name, exactly as the mock-up writes `x.name.split(' ')[0]`. */

@@ -2,7 +2,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SchemaMatrix } from '../src/features/apps/SchemaMatrix';
-import { nameOf, whoTitle } from '../src/features/grants/model';
+import { named, nameOf, whoTitle } from '../src/features/grants/model';
 import type { GrantWorld } from '../src/features/grants/model';
 
 const table = (html: string): Document => new DOMParser().parseFromString(html, 'text/html');
@@ -30,7 +30,7 @@ describe('The permissions matrix', () => {
 describe('A name that two hold', () => {
   it('is told apart in its title by whose agent it is and its file number', () => {
     const ada = 'person-' + 'a'.repeat(32), bea = 'person-' + 'b'.repeat(32);
-    const one = 'agent-' + '1'.repeat(32), two = 'agent-' + '2'.repeat(32), account = 'service-' + '3'.repeat(32);
+    const one = 'agent-' + '1'.repeat(32), two = 'agent-' + '2'.repeat(32), account = 'op-' + '3'.repeat(32);
     const w = { who: new Map([
       [ada, { name: 'Ada', state: 'active', kind: 'person', responsible: null }],
       [bea, { name: 'Bea', state: 'active', kind: 'person', responsible: null }],
@@ -43,7 +43,12 @@ describe('A name that two hold', () => {
     expect(whoTitle(w, two)).toBe('Scout, agent of Bea, A/22222222');
     expect(whoTitle(w, ada)).toBe('Ada, P/aaaaaaaa');
     expect(whoTitle(w, account)).toBe('Loader, account of Ada, S/33333333');
+    // A service account's id begins op-, as an operation's does: in a sentence it is named only when the directory answered an account under it.
+    expect(named(w, 'held by ' + account + ' under ' + 'op-' + '4'.repeat(32))).toBe('held by Loader under op-' + '4'.repeat(32));
+    expect(named(w, 'held by ' + one)).toBe('held by Scout');
     // Someone outside the caller's view has no name to show; the file number alone stands for them.
     expect(whoTitle(w, 'agent-' + '9'.repeat(32))).toBe('A/99999999');
+    expect(whoTitle(w, 'op-' + '9'.repeat(32))).toBe('S/99999999');
+    expect(nameOf(w, 'person-' + '9'.repeat(32))).toBe('P/99999999');
   });
 });

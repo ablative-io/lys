@@ -48,7 +48,9 @@ export const whoTitle = (w: GrantWorld, id: string): string => {
   if (!who) return fileNo(id);
   const of = who.responsible ? w.who.get(who.responsible)?.name : undefined;
   const whose = of ? (who.kind === 'agent' ? ', agent of ' : ', account of ') + of : '';
-  return who.name + whose + ', ' + fileNo(id);
+  // The letter is the record's own kind, not a guess from the id's shape.
+  const letter = who.kind === 'agent' ? 'A/' : who.kind === 'person' ? 'P/' : 'S/';
+  return who.name + whose + ', ' + letter + id.slice(id.indexOf('-') + 1, id.indexOf('-') + 9);
 };
 
 /** A grant's short name, as the mock-up writes `G-5`. */
@@ -65,8 +67,12 @@ export const givenOnText = (g: Grant): string => (g.resource.kind === 'directory
 /** A kind as a person says it: `service account`, never `service_account`. */
 const kindWords = (kind: string): string => kind.replace(/_/g, ' ');
 
-/** Whether `id` is an identity or a grant's raw identifier, which a person never reads as a label. */
-const rawId = /\b(?:person|agent|service|grant)-[0-9a-f]{8,}\b/g;
+/**
+ * An identity's or a grant's raw identifier, which a person never reads as a label. A service account's id begins
+ * `op-` (crates/lys-identity/src/id.rs), as an operation's, a team's and a computer's do, so an `op-` id is read as
+ * a name only when the directory answered a service account under it.
+ */
+const rawId = /\b(?:person|agent|grant|op)-[0-9a-f]{8,}\b/g;
 
 /**
  * A resource as a person reads it: a directory collection in plain words, an
@@ -84,7 +90,7 @@ export const resourceName = (w: GrantWorld, r: ResourceRef): string => {
  * reads it: an identity by its name, a grant by its short name.
  */
 export function named(w: GrantWorld, text: string): string {
-  return text.replace(rawId, (id) => (id.toLowerCase().startsWith('grant-') ? grantNo(id) : nameOf(w, id)));
+  return text.replace(rawId, (id) => (id.toLowerCase().startsWith('grant-') ? grantNo(id) : id.startsWith('op-') && !w.who.has(id) ? id : nameOf(w, id)));
 }
 
 /**
