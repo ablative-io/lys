@@ -141,6 +141,8 @@ impl Sessions {
         let follower = std::thread::Builder::new()
             .name("runner-transcript".to_owned())
             .spawn(move || {
+                let mut watcher = watcher;
+                let mut draining = false;
                 sessions.read_source(&owned, None);
                 if sessions.table.is_poisoned() {
                     return;
@@ -149,9 +151,21 @@ impl Sessions {
                     match next {
                         Wake::Changed => sessions.read_source(&owned, None),
                         Wake::Lost(reason) => sessions.read_source(&owned, Some(&reason)),
+                        Wake::Drain => {
+                            if !sessions.drain_watched(&owned, &mut watcher) {
+                                break;
+                            }
+                            draining = true;
+                            sessions.read_source(&owned, None);
+                        }
                         Wake::Stop => break,
                     }
                     if sessions.table.is_poisoned() {
+                        break;
+                    }
+                    // The journal is asked after each reading, and only a
+                    // change under it or under the usage file wakes the next.
+                    if draining && sessions.drained(&owned) {
                         break;
                     }
                 }

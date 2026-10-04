@@ -7,7 +7,7 @@ use std::sync::Arc;
 use portable_pty::Child;
 
 use super::super::{Sessions, now_ms};
-use super::{plan, stop_follower};
+use super::plan;
 use crate::protocol::{Ended, EndedHow};
 
 impl Sessions {
@@ -244,9 +244,7 @@ impl Sessions {
             return;
         };
         session.ended = Some(ended.clone());
-        if let Some(follower) = session.follower.take() {
-            stop_follower(id, &follower);
-        }
+        super::drain::end_follower(id, session);
         if table
             .sessions
             .get(id)

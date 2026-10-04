@@ -159,6 +159,37 @@ impl Journal {
         }
         Ok(calls)
     }
+
+    /// Whether the journal in `dir` holds an open call that carries the run
+    /// key `run`. This is how another process than the proxy asks whether a
+    /// run still has a call whose usage line is yet to be written: the line
+    /// is appended before the call's record is retired, so a run with no
+    /// record here has every finished call's line in its usage file. A record
+    /// retired between the listing and its read is no longer open.
+    pub fn holds_run(dir: &Path, run: &str) -> Result<bool, ProxyError> {
+        let listing = std::fs::read_dir(dir)
+            .map_err(|e| ProxyError::io("listing the open-call journal", dir, e))?;
+        for item in listing {
+            let item = item.map_err(|e| ProxyError::io("listing the open-call journal", dir, e))?;
+            let name = item.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with('.') || !name.ends_with(".json") {
+                continue;
+            }
+            let path = item.path();
+            let bytes = match std::fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(ProxyError::io("reading a journal record", &path, e)),
+            };
+            let call: OpenCall = serde_json::from_slice(&bytes)
+                .map_err(|source| ProxyError::JournalRecord { path, source })?;
+            if call.run.as_deref() == Some(run) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }
 
 fn sync_dir(dir: &Path) -> std::io::Result<()> {

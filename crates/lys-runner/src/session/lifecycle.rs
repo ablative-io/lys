@@ -27,6 +27,7 @@ use crate::tracking::Harness;
 
 pub use crate::peer::Collected;
 
+mod drain;
 mod launch;
 mod stream;
 mod terminal;
@@ -64,7 +65,13 @@ pub(crate) enum Wake {
     Changed,
     /// Change notices were lost; the stream is read from its cursor again.
     Lost(String),
-    /// The session ended, or its stream was bound to another file.
+    /// The session's process ended and its stream is its run's usage file
+    /// under the proxy's state: a call it made may end after it did, so the
+    /// file is read on until the proxy's journal holds no open call of the
+    /// run.
+    Drain,
+    /// The session's harness stream ended with it, or its stream was bound
+    /// to another file.
     Stop,
 }
 

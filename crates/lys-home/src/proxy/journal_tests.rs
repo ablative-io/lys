@@ -35,6 +35,32 @@ fn open_call(call_id: &str, session: Option<&str>) -> OpenCall {
 }
 
 #[test]
+fn a_run_is_held_while_a_call_of_it_is_open_and_no_longer_once_it_is_retired() -> Res {
+    let dir = tempfile::tempdir()?;
+    let journal = Journal::open(dir.path().join("journal"))?;
+    let mut mine = open_call("c1", Some(KEY));
+    mine.run = Some("run-a".to_owned());
+    let mut other = open_call("c2", None);
+    other.run = Some("run-b".to_owned());
+    journal.write(&mine)?;
+    journal.write(&other)?;
+    journal.write(&open_call("c3", None))?;
+    assert!(Journal::holds_run(journal.dir(), "run-a")?);
+    assert!(Journal::holds_run(journal.dir(), "run-b")?);
+    assert!(!Journal::holds_run(journal.dir(), "run-c")?);
+    journal.retire("c1")?;
+    assert!(!Journal::holds_run(journal.dir(), "run-a")?);
+    assert!(Journal::holds_run(journal.dir(), "run-b")?);
+    // A journal that is not there cannot be read, which is an error by name
+    // and never "no open call".
+    assert!(Journal::holds_run(&dir.path().join("absent"), "run-a").is_err());
+    // A record that does not read is an error too, for the same reason.
+    std::fs::write(journal.dir().join("c4.json"), b"{")?;
+    assert!(Journal::holds_run(journal.dir(), "run-a").is_err());
+    Ok(())
+}
+
+#[test]
 fn a_restart_records_each_open_call_lost_once_with_what_was_spooled() -> Res {
     let dir = tempfile::tempdir()?;
     let home = Home::open(dir.path().join("home"))?;

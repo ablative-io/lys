@@ -149,7 +149,9 @@ pub(crate) fn trust_dialog(
 
 pub(crate) fn window_limit(table: &mut Table, id: &str, bodies: &[Body]) -> Option<Leader> {
     let session = table.sessions.get_mut(id)?;
-    if session.ending {
+    // A run's usage file is read on after its process ended; a figure read
+    // then signals no process.
+    if session.ending || session.ended.is_some() {
         return None;
     }
     let rotation = session.rotation.as_mut()?;
