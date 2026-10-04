@@ -68,11 +68,18 @@ async fn configuration_refuses_anonymous_and_other_people() -> TestResult {
 async fn model_windows_are_declared_kept_and_refused_by_name() -> TestResult {
     use identity_contract::apps::{Auth, send};
     use serde_json::json;
-    let mut service = Service::start().await?;
+    // The setting is changed by a person: the administrator is one in the directory.
+    let (mut service, _seeded) = Service::start_with(|config| {
+        Ok(lys_identity_server::dev_seed::seed_configured(
+            config,
+            [ADMINISTRATOR, "other-subject"],
+        )?)
+    })
+    .await?;
     let cookie = service
         .sign_in(Login {
             subject: ADMINISTRATOR.to_owned(),
-            email: "administrator@example.test".to_owned(),
+            email: "operator@example.test".to_owned(),
         })
         .await?;
     let (status, body) = service.get("/configuration", Some(&cookie)).await?;

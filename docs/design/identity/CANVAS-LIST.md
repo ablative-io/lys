@@ -37,8 +37,10 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
   dollars and the running time, and Lys has the adapter that reads it. A run counted through the proxy starts
   with that adapter off (the start gives the runner one way of tracking, not both). Next round: both together,
   the proxy for calls and the status line for dollars and time. Codex's own figure is still to be found.
-- Claude Code mods: what more a run can be made to report (Tom, same turn: "have a little bit more look at
-  mods, Claude code mods, to see if we could get more information out of them").
+- Claude Code mods are not needed for this. Tom, 4 October 20:25: "if it's just those things, they're also
+  available in the status line... we don't need to dive into mods unless there's anything extra available."
+  What a mod would add beyond the status line is turn boundaries and sub-agent spawns as events; neither is
+  asked for.
 - Any local program can send a run key, or none.
 - Model accounts end to end: who draws from which account, registered by a person.
 
@@ -50,3 +52,17 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - The console stop route, and the broker's console actor.
 - Session handover.
 - The audit, intent first.
+
+## Other products through Lys
+
+Tom, 4 October 20:26: "what else winds up needing to go through Lys... Apollo will probably need some help
+getting haematite's permissions and sign in. We also need to look at Cambium's permissions and sign in."
+
+- Haematite. Talked through with Apollo in the Lys room the same evening; his design page comes before any
+  code. Lys's two pieces: a claim naming the responsible person on an agent's token, and a read that gives
+  everything one subject holds on one app, with the grant log's position as its revision, so the service
+  evaluates rows itself and asks again when `/changes` answers. Rule both sides hold: Lys opens its own
+  store through the library in its own process, never through `haem serve`.
+- The embedding and query workers are children of the haematite service and hold no credential of their
+  own (Apollo, 20:34); nothing of theirs goes through Lys.
+- Cambium's sign-in and permissions: not yet looked at.
