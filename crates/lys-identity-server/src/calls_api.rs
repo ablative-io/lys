@@ -13,7 +13,6 @@
 //! whole is everything the agent sent and was sent, so it is held to whoever
 //! may read the agent's terminal.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::rejection::QueryRejection;
@@ -190,7 +189,7 @@ fn unavailable(reason: impl Into<String>) -> ServerError {
 
 /// Read the call from the proxy's home under `proxy`; a session that home
 /// does not hold was recorded on the computer that reported it.
-fn read(proxy: PathBuf, at: &RecordAt, machine: String) -> Result<CallWhole, ServerError> {
+fn read(proxy: &std::path::Path, at: &RecordAt, machine: String) -> Result<CallWhole, ServerError> {
     let home = Home::read(proxy.join("home")).map_err(|error| unavailable(error.to_string()))?;
     let file = home
         .session_path(&at.session)
@@ -223,7 +222,7 @@ async fn whole(
     let proxy = state.proxy_dir.clone().ok_or_else(|| {
         unavailable("the configuration names no proxy_dir, so this service reads no call records")
     })?;
-    let read = tokio::task::spawn_blocking(move || read(proxy, &at, machine))
+    let read = tokio::task::spawn_blocking(move || read(&proxy, &at, machine))
         .await
         .map_err(|error| unavailable(format!("reading the call did not finish: {error}")))??;
     if read.call.call_id != call {

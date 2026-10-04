@@ -441,8 +441,8 @@ impl Proxy {
         // One header lookup; the machine's own Codex sign-in decides.
         let chatgpt = provider == "openai" && request.headers().contains_key(CHATGPT_ACCOUNT);
         let (base, rest) = if chatgpt {
-            let rest = rest.strip_prefix("/v1").map_or(rest.as_str(), |rest| rest);
-            (&self.chatgpt, rest.to_owned())
+            let rest = rest.strip_prefix("/v1").unwrap_or(&rest).to_owned();
+            (&self.chatgpt, rest)
         } else {
             (base, rest)
         };
