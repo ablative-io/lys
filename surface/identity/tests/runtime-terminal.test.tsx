@@ -1,12 +1,13 @@
 /** DIRECTORY-050 R7: the Running page lists every running session beside the canvas, opens one to its live terminal there, types a line, sends keys, asks before Stop by naming the agent, and names every refusal. */
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { $, $$, click, mount, text } from './harness';
+import { $, $$, click, mount, text, settle } from './harness';
 import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { RuntimeSession } from '../src/features/runtime/RuntimeSessions';
 import { byteOutput } from '../src/features/runtime/terminal-transport';
-import { browser, listeners, mockTerminal, written } from './terminal-double';
+import { browser, listeners, mockTerminal, sent, written } from './terminal-double';
+import { MAC_KEYS } from '../src/features/runtime/GpuTerminal';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
 const ID = 'op-' + '5'.repeat(32);
@@ -50,6 +51,34 @@ describe('Running sessions', () => {
     });
     expect($$('.running-list .running-chip a[href="#/canvas/' + SCRIBE + '"]')).toHaveLength(2);
     expect(posted.some((entry) => entry.path.endsWith('/end'))).toBe(false);
+  });
+
+  it('sends a Mac\'s Command and Option editing keys as the bytes a line editor acts on, and leaves every other key to the terminal', async () => {
+    // The session's first output is answered and the next read waits, as a live read does while nothing is printed.
+    let asked = 0;
+    const live = (() => { asked += 1; return asked === 1 ? output(0, '$ ') : new Promise(() => {}); }) as unknown as Route;
+    await mount('#/canvas/' + SCRIBE, { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), ['POST ' + base + '/read-bytes']: live });
+    const screen = $('.terminal-screen');
+    expect(screen).not.toBeNull();
+    // The terminal takes keys once it has opened.
+    for (let turn = 0; turn < 20 && screen?.getAttribute('data-renderer') === 'starting'; turn++) await settle();
+    expect(screen?.getAttribute('data-renderer')).toBe('webgpu');
+    const press = (key: string, more: KeyboardEventInit) => { const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...more }); screen?.dispatchEvent(event); return event.defaultPrevented; };
+    expect(press('Backspace', { metaKey: true })).toBe(true);
+    expect(press('Delete', { metaKey: true })).toBe(true);
+    expect(press('ArrowLeft', { metaKey: true })).toBe(true);
+    expect(press('ArrowRight', { metaKey: true })).toBe(true);
+    expect(press('Backspace', { altKey: true })).toBe(true);
+    expect(press('Delete', { altKey: true })).toBe(true);
+    expect(press('ArrowLeft', { altKey: true })).toBe(true);
+    expect(press('ArrowRight', { altKey: true })).toBe(true);
+    expect(sent).toEqual(['\x15', '\x0b', '\x01', '\x05', '\x1b\x7f', '\x1bd', '\x1bb', '\x1bf']);
+    expect(Object.keys(MAC_KEYS)).toHaveLength(8);
+    // A plain key, a Control key and a Command letter are the terminal's own: nothing is sent from here and nothing is held back.
+    expect(press('Backspace', {})).toBe(false);
+    expect(press('ArrowLeft', { ctrlKey: true, altKey: true })).toBe(false);
+    expect(press('c', { metaKey: true })).toBe(false);
+    expect(sent).toHaveLength(8);
   });
 
   it('never opens a terminal that was not returned in the permitted session list', async () => {

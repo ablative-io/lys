@@ -12,7 +12,7 @@
 .session-canvas-scroll { position: relative; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); cursor: grab; touch-action: none; }
 .session-canvas-scroll:active { cursor: grabbing; }
 .session-canvas-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.session-canvas-tools { position: absolute; z-index: 10; top: 8px; right: 8px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.session-canvas-tools { position: absolute; z-index: 7; bottom: 12px; right: 12px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .session-canvas { position: absolute; left: 0; top: 0; width: 0; height: 0; }
 .session-canvas-lines { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; overflow: visible; }
 .session-canvas-lines path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
@@ -76,14 +76,12 @@
 .canvas-connections, .canvas-about { max-height: 120px; overflow: auto; overscroll-behavior: contain; }
 .canvas-connections h4 { margin: 0 0 4px; }
 
-/* The Running page is the canvas, edge to edge: no title line, no strip, no frame. Who is running sits over its top left as names to go to; what a runner did not answer, and the fold of connections in words, sit under them; the zoom and the way back sit over its top right. */
+/* The Running page is the canvas, edge to edge: no title line, no strip, no frame. Everything else hovers over its bottom edge: who is running, as names to go to, and the dock under them at the left; the zoom and the way back at the right. Only what a runner did not answer is said at the top. */
 .page.session-canvas-page { position: relative; padding: 0; }
 .session-canvas-page > .head { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); }
 .session-canvas-page > .head:has(button) { position: absolute; top: 10px; right: 12px; z-index: 8; width: auto; height: auto; overflow: visible; clip-path: none; }
 .session-canvas-page > .head:has(button) h1 { display: none; }
 .session-canvas-page .canvas-side { position: relative; }
-.session-canvas-page .running-list { position: absolute; top: 10px; left: 12px; z-index: 5; max-width: calc(100% - 360px); }
-.session-canvas-page .session-canvas-strip { position: absolute; top: 44px; left: 12px; z-index: 5; margin: 0; max-width: min(640px, 60%); flex-direction: column; align-items: flex-start; }
+.session-canvas-page .running-list { position: absolute; bottom: 72px; left: 12px; z-index: 6; max-width: calc(100% - 320px); }
+.session-canvas-page .session-canvas-strip { position: absolute; top: 10px; left: 12px; z-index: 5; margin: 0; max-width: min(640px, 60%); flex-direction: column; align-items: flex-start; }
 .session-canvas-page .canvas-side > .session-canvas-scroll { margin-top: 0; border: 0; border-radius: 0; }
-.canvas-fold > summary { cursor: pointer; font-size: 12px; color: var(--text-muted); }
-.canvas-fold-body { margin-top: 6px; padding: 10px 12px; max-height: 50vh; overflow: auto; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }

@@ -8,6 +8,22 @@ import type { SessionEnd } from './Terminal';
 type Backend = BrowserTerminal['renderer']['backend'];
 const RENDERERS: Record<Backend, string> = { webgpu: 'WebGPU', webgl2: 'WebGL2', canvas2d: 'Canvas 2D' };
 
+/**
+ * The editing keys a Mac's own terminals give: Command and Option with Delete and the arrows. The library encodes a
+ * key as the terminal protocol says; these are sent as the control bytes a line editor acts on, as Terminal and
+ * Ghostty send them.
+ */
+export const MAC_KEYS: Record<string, string> = {
+  'meta+Backspace': '\x15', // delete to the start of the line
+  'meta+Delete': '\x0b', // delete to the end of the line
+  'meta+ArrowLeft': '\x01', // go to the start of the line
+  'meta+ArrowRight': '\x05', // go to the end of the line
+  'alt+Backspace': '\x1b\x7f', // delete the word before
+  'alt+Delete': '\x1bd', // delete the word after
+  'alt+ArrowLeft': '\x1bb', // go back a word
+  'alt+ArrowRight': '\x1bf', // go forward a word
+};
+
 export function GpuTerminal({ session, onEnd, onFailure }: {
   session: string; onEnd: (end: SessionEnd) => void; onFailure: (error: unknown) => void;
 }) {
@@ -56,6 +72,20 @@ export function GpuTerminal({ session, onEnd, onFailure }: {
       };
       opened.on('resize', resize);
       resize(opened.geometry);
+      // One session has one size, and another window showing it may have set its own. The window a person is using
+      // says its size again when they click or type into it, so what they look at always fills what they see.
+      const claim = () => resize(opened.geometry);
+      container.addEventListener('pointerdown', claim, { signal: controller.signal });
+      container.addEventListener('focusin', claim, { signal: controller.signal });
+      const macKey = (event: KeyboardEvent) => {
+        if (event.ctrlKey || event.shiftKey || event.metaKey === event.altKey) return;
+        const bytes = MAC_KEYS[(event.metaKey ? 'meta+' : 'alt+') + event.key];
+        if (bytes === undefined) return;
+        event.preventDefault();
+        event.stopPropagation();
+        opened.sendText(bytes);
+      };
+      container.addEventListener('keydown', macKey, { capture: true, signal: controller.signal });
       await resizeWork;
       if (controller.signal.aborted) return;
       const connection = opened.connect(terminalStreams(session, controller, (end) => callbacks.current.onEnd(end)), { signal: controller.signal });

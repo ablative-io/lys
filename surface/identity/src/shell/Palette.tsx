@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../api';
+import { api, request } from '../api';
 import { entries } from '../features/people/directory';
 import type { Entry } from '../features/people/directory';
 import { keyable } from './keyable';
@@ -37,6 +37,8 @@ export function Palette() {
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
   const [ids, setIds] = useState<Entry[]>([]);
+  // The agents running now, so a name typed here goes straight to that agent's terminal on the canvas.
+  const [running, setRunning] = useState<{ agent: string | null; machine: string; machine_name?: string | null }[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const open = shell.paletteOpen;
@@ -51,6 +53,10 @@ export function Palette() {
       (answer) => live && setIds(entries(answer)),
       () => live && setIds([]),
     );
+    request<{ sessions: typeof running }>('/runtime/live').then(
+      (answer) => live && setRunning(Array.isArray(answer.sessions) ? answer.sessions : []),
+      () => live && setRunning([]),
+    );
     return () => {
       live = false;
     };
@@ -58,6 +64,11 @@ export function Palette() {
 
   const go = (hash: string) => navigate(hash.slice(1));
   const source: Item[] = [
+    ...running.flatMap((session) => {
+      const agent = ids.find((x) => x.id === session.agent);
+      const to = '#/canvas/' + encodeURIComponent(session.agent ?? '');
+      return agent ? [{ g: 'Running now', t: agent.display_name + ': terminal', d: 'on ' + (session.machine_name ?? session.machine), to, go: () => go(to) }] : [];
+    }),
     ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
     ...ids.map((x) => ({ g: 'Ask', t: `What can ${x.display_name} reach?`, d: '', go: () => go('#/access/reach/' + x.id) })),
     { g: 'Acts', t: 'Add an agent', d: '', go: () => go('#/agents/new') },
