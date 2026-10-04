@@ -6,22 +6,20 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 
 ## The canvas
 
-- Tidy: lay the windows and widgets out automatically. Written 4 October, 21:11, and walked on the developer
-  server (one press from the tools bar; "Put it back" beside it until the next change); leaves this list when
-  it is installed and walked there.
 - A box around each team, drawn for the person.
 - Widgets for everything Lys holds about an agent that has none yet: tasks, git branch, commits, worktrees,
   pull requests, reviews, jobs and tickets.
 - The HUD on an agent's window: compact, set a goal, add a task.
 - Layouts kept as project configuration, so a project opens on its own canvas.
 - Free terminals on a computer, only on the computers a person has that permission for.
-- Double-click out to group. Tom, 4 October 17:01: "double clicking should return you back... to your previous
-  view... until you move again... Maybe double clicking should just sort of take you back out to... view the
-  whole thing or view the whole group that you're on." Written 21:18 as: a double press on a window's bar or a
-  box's bar brings the view in to it and the same double press goes back, until the view is moved; a double
-  press on the canvas itself brings everything into view. Walked on the developer server; leaves this list when
-  installed and walked there.
-- The Canvas and Proxy swap at the top of Operations lies over a window that stands at the top of the canvas.
+- The Canvas and Proxy swap at the top of Operations lies over a window that stands at the top of the canvas,
+  and takes the press meant for "Open terminal" and for the first add button. Tidy stands the first window
+  exactly there. Seen on the walk of a4f6eff3; first in the next piece.
+- In a tidied column the widgets stand 10 apart, and a chosen widget's remove control stands above its top
+  edge, under the widget above it: it cannot be pressed until the widget is dragged clear. Seen on the walk
+  of a4f6eff3.
+- A drag begun on the rows of a widget that is opened out selects their words and moves the canvas; the
+  widget stays where it is. A widget shown small moves when dragged. Seen on the walk of a4f6eff3.
 - The terminal's background colour.
 - Pinch to zoom by touch.
 - What the canvas shows when nothing is running.
@@ -38,8 +36,8 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - A call made on a joined computer is listed, and its body answers `CallKeptElsewhere`: the service reads
   only the proxy home on its own computer.
 - A Chat Completions stream reports no usage to the proxy's reader.
-- The proxy's admission write is on the call's path; its cost (`admission_ns`) is on every record and has
-  not been read against Tom's "no latency".
+- The proxy's admission write is on the call's path without a disk sync since a4f6eff3: 0.57 ms on the one
+  call read. Whether that is "no latency" is Tom's to say; the figure is on every record (`admission_ns`).
 - Dollars and running time. Tom, 4 October 20:20: "The cost in US dollars is definitely there... I'm pretty
   sure it's available through the status line alone." It is: Claude Code's status line reports the cost in US
   dollars and the running time, and Lys has the adapter that reads it. A run counted through the proxy starts
@@ -52,23 +50,29 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - Any local program can send a run key, or none.
 - Model accounts end to end: who draws from which account, registered by a person.
 
-## Found on the walk of 1215fd1e, 4 October 2026, and written for the next install
+## Installed and walked: a4f6eff3, 5 October 2026, 00:06
 
-- The service followed a runner's feed, and held its grant channel, only from its own start. An upgrade
-  starts the service before the runner, so after every upgrade no use reached the service until it was
-  started again. Written: each link is begun again when that runner next answers a request
-  (`runner_links.rs`); a link that ended on a refusal stays ended, and every end is said.
-- The proxy held each call for two disk syncs, about 12 ms each: at admission, and when the request named
-  its session. Written: the call waits only for the record to be put in place; the syncs are made beside it.
-- Found by the full test run on that fix: a service stopped while its runner was still there waited for
-  ever, because the grant channel it held was read on a thread nothing could end. The installed service
-  ends with its process, so only a service stopped inside a running program met it. Written: the channel
-  is closed when the service that holds it stops (`grants_refusals.rs`), the way a request to a runner is
-  closed when its caller leaves.
-- A short line's own handle lay over the first add button beside a window, so pressing "add usage" a
-  second time took the first widget's line away. Written: the window in front stands over the handles.
-- Not yet shown on an installed build: a call with tokens and a context percent (pancake's account was
-  refused by its provider, HTTP 429, when walked), and a Codex agent.
+Left the list on this walk: Tidy and "Put it back" (a window moved by hand, tidied, put back, tidied again);
+the double press on a window's bar in and out, and on the canvas to the whole; and the four defects below,
+written after the walk of 1215fd1e. Tom's words of 4 October 17:01 on the double press, kept: "double
+clicking should return you back... to your previous view... until you move again... Maybe double clicking
+should just sort of take you back out to... view the whole thing or view the whole group that you're on."
+
+- The service follows a runner's feed and holds its grant channel again when that runner next answers a
+  request (`runner_links.rs`). Walked: after the upgrade, with no restart of the service, the first call of
+  an agent started from the You page was listed on the Proxy screen.
+- The proxy no longer holds a call for a disk sync. Walked: `admission_ns` 574,667 (0.57 ms) on the new
+  call; 12,702,417 (12.7 ms) on the call of 4 October.
+- The window in front stands over a line's handle. Walked: "add usage" pressed twice beside a window that
+  already had one usage widget made three widgets and three lines.
+- A service that stops closes the grant channels it holds (`grants_refusals.rs`). Not walked: the installed
+  service ends with its process; `budget_feed.rs` holds the test.
+
+Still not shown on an installed build:
+
+- A call with tokens and a context percent. The agent walked with was refused by its provider both times
+  (an error body, kept as `unrecorded`), so no call carries use yet, and no window is declared for its model.
+- A Codex agent.
 - Six machine records on Tom's Mac name the one runner socket; five follows end, as designed, on a use
   that names a session of another machine. Clutter from earlier joins, to be cleared with Tom.
 
