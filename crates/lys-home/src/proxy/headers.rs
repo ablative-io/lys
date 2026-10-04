@@ -56,7 +56,9 @@ const ANSWERED: [&str; 5] = [
 
 /// Response headers whose values are kept by the start of their name: what
 /// the provider says about the call, and the rate limit report of each.
-const ANSWERED_FAMILIES: [&str; 2] = ["anthropic-", "x-ratelimit-"];
+/// `x-codex-` is the family the Codex upstream reports an account's primary
+/// and secondary windows in.
+const ANSWERED_FAMILIES: [&str; 3] = ["anthropic-", "x-ratelimit-", "x-codex-"];
 
 /// What the record keeps of the request's headers.
 pub(super) fn asked(headers: &HeaderMap) -> Side {
