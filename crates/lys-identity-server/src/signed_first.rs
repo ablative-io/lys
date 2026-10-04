@@ -15,8 +15,9 @@
 //! in full before its body, by a session, the operator's token or a run
 //! pass, has its body read whole, however long. Any other caller, one whose
 //! credential or signature the route judges over the body or one on a
-//! public route, has no more than [`UNVERIFIED_BODY_LIMIT`] bytes read, and
-//! a longer body is refused `BodyTooLarge` before any route reads it.
+//! public route, has no more than [`UNVERIFIED_BODY_LIMIT`] bytes kept, and
+//! a longer body is refused `BodyTooLarge` before any route reads it; its
+//! rest is read and dropped so the caller receives the refusal.
 
 use std::collections::HashMap;
 use std::future::poll_fn;
@@ -184,21 +185,42 @@ async fn unverified(request: Request, next: Next) -> Response {
     }
 }
 
-/// The bytes of `body`, refused `BodyTooLarge` at the first frame that
-/// would take them past [`UNVERIFIED_BODY_LIMIT`]. A frame that is not
-/// data, a trailer, is not kept: no route reads one.
+/// The bytes of `body`, refused `BodyTooLarge` when a frame would take them
+/// past [`UNVERIFIED_BODY_LIMIT`]. From that frame on nothing is kept: what
+/// was read is dropped, and the rest of the body is read and dropped too, so
+/// the caller finishes sending and receives the refusal. Answering while the
+/// caller still sends closes the connection under it, and the caller sees a
+/// reset in place of the refusal. A frame that is not data, a trailer, is
+/// not kept: no route reads one.
 async fn bounded(mut body: Body) -> Result<Bytes, ServerError> {
     let mut read = Vec::new();
+    let mut over = false;
     while let Some(frame) = poll_fn(|context| Pin::new(&mut body).poll_frame(context)).await {
-        let frame = frame.map_err(|error| ServerError::RequestMalformed {
-            reason: format!("the request body could not be read: {error}"),
-        })?;
+        let frame = match frame {
+            Ok(frame) => frame,
+            // The body is already refused for its length; how its rest ends
+            // changes nothing.
+            Err(_) if over => break,
+            Err(error) => {
+                return Err(ServerError::RequestMalformed {
+                    reason: format!("the request body could not be read: {error}"),
+                });
+            }
+        };
+        if over {
+            continue;
+        }
         if let Ok(data) = frame.into_data() {
             if data.len() > UNVERIFIED_BODY_LIMIT - read.len() {
-                return Err(ServerError::BodyTooLarge);
+                over = true;
+                read = Vec::new();
+                continue;
             }
             read.extend_from_slice(&data);
         }
+    }
+    if over {
+        return Err(ServerError::BodyTooLarge);
     }
     Ok(Bytes::from(read))
 }
