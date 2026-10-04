@@ -23,6 +23,7 @@ use crate::record::entries::{CUSTOM_CALL, EntryBody};
 
 pub(crate) mod captured;
 mod parts;
+mod reported;
 
 use parts::{complete_response_parts, read_json, request_parts_of};
 pub use parts::{request_model, request_parts, request_parts_file, response_parts};
@@ -87,9 +88,10 @@ pub struct CallRecord {
     /// for the same call. Absent when no `message_start` was read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
-    /// The token figures the response reported, read from its event stream
-    /// in the one pass as it went by. Absent when the stream reported none,
-    /// and for a response that was not an event stream.
+    /// The token figures the response reported: read from its event stream
+    /// in the one pass as it went by, or, for a response that was not an
+    /// event stream, from the `usage` object at the top of its JSON. Absent
+    /// when the response reported none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<captured::Tokens>,
     /// The run key the call's path opened with: what a Lys launch put first

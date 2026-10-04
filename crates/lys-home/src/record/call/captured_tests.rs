@@ -259,6 +259,79 @@ fn a_response_that_is_not_an_event_stream_is_decoded_from_the_coding_it_names()
 }
 
 #[test]
+fn a_whole_body_response_gives_the_token_figures_its_usage_names()
+-> Result<(), Box<dyn std::error::Error>> {
+    const COUNTED: &[u8] = br#"{"type":"message","role":"assistant","content":[{"type":"text","text":"phi"}],"usage":{"input_tokens":7,"output_tokens":3,"cache_creation_input_tokens":11,"cache_read_input_tokens":13}}"#;
+    let counted = Tokens {
+        input: Some(7),
+        output: Some(3),
+        cache_creation: Some(11),
+        cache_read: Some(13),
+        reasoning: None,
+    };
+    let plain = prepared(REQUEST, COUNTED, CallStatus::Complete, &answered(None))?;
+    assert_eq!(plain.status, CallStatus::Complete);
+    assert_eq!(plain.usage, Some(counted.clone()));
+    // The same figures from a body that came encoded.
+    let encoded = prepared(
+        REQUEST,
+        &encoded_as("br", COUNTED)?,
+        CallStatus::Complete,
+        &answered(Some("br")),
+    )?;
+    assert_eq!(encoded.usage, Some(counted));
+    // A response that names no usage gives none, never zeros.
+    let silent = prepared(REQUEST, RESPONSE, CallStatus::Complete, &answered(None))?;
+    assert_eq!(silent.usage, None);
+    // Figures read as a stream passed stand.
+    let mut seen = answered(None);
+    seen.tokens = Some(Tokens {
+        input: Some(1),
+        ..Tokens::default()
+    });
+    let passed = prepared(REQUEST, COUNTED, CallStatus::Complete, &seen)?;
+    assert_eq!(passed.usage, seen.tokens);
+    // Each api's own member names fill the same figures.
+    let responses = Tokens::of_whole_body(
+        Api::Responses,
+        &serde_json::json!({"usage": {"input_tokens": 20, "output_tokens": 5,
+            "input_tokens_details": {"cached_tokens": 8},
+            "output_tokens_details": {"reasoning_tokens": 2}}}),
+    );
+    assert_eq!(
+        responses,
+        Some(Tokens {
+            input: Some(20),
+            output: Some(5),
+            cache_creation: None,
+            cache_read: Some(8),
+            reasoning: Some(2),
+        })
+    );
+    let chat = Tokens::of_whole_body(
+        Api::ChatCompletions,
+        &serde_json::json!({"usage": {"prompt_tokens": 9, "completion_tokens": 4,
+            "prompt_tokens_details": {"cached_tokens": 6},
+            "completion_tokens_details": {"reasoning_tokens": 1}}}),
+    );
+    assert_eq!(
+        chat,
+        Some(Tokens {
+            input: Some(9),
+            output: Some(4),
+            cache_creation: None,
+            cache_read: Some(6),
+            reasoning: Some(1),
+        })
+    );
+    assert_eq!(
+        Tokens::of_whole_body(Api::Messages, &serde_json::json!({})),
+        None
+    );
+    Ok(())
+}
+
+#[test]
 fn the_reason_is_the_capture_steps_when_it_marked_the_call_and_absent_otherwise()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut seen = answered(None);

@@ -289,33 +289,49 @@ impl Coding {
 
 const NOT_JSON: &str = "the response is not JSON";
 
+/// What reading a whole-body response leaves beside its JSON.
+#[derive(Default)]
+struct WholeBody {
+    /// Why its stored bytes did not decode as the coding it named.
+    undecoded: Option<String>,
+    /// The token figures the `usage` object at its top names: what an event
+    /// stream's reader reads as the stream passes.
+    tokens: Option<Tokens>,
+}
+
 /// The response stored at `path` as JSON, decoded first when its head names
-/// one coding that is decoded. Bytes that do not decode leave why in
-/// `undecoded` and are no complete response.
+/// one coding that is decoded. Bytes that do not decode leave why in `whole`
+/// and are no complete response; a response that reads leaves the token
+/// figures it reported there, whatever its shape goes on to be.
 fn read_response(
     path: &Path,
     seen: &Seen,
     api: Api,
-    undecoded: &mut Option<String>,
+    whole: &mut WholeBody,
 ) -> Result<Value, HomeError> {
-    let Some(coding) = Coding::of(&seen.head) else {
-        return read_json(path, NOT_JSON);
-    };
-    let stored = std::fs::read(path).map_err(|e| HomeError::io("reading a body file", path, e))?;
-    let bytes = coding.decode(&stored).map_err(|error| {
-        *undecoded = Some(format!(
-            "the response's content-encoding is {}, and its stored bytes do not decode as that: {error}",
-            coding.name()
-        ));
-        HomeError::BodyShape {
-            api: api.as_str(),
-            reason: "the response's bytes do not decode as the coding it names",
+    let json: Value = match Coding::of(&seen.head) {
+        None => read_json(path, NOT_JSON)?,
+        Some(coding) => {
+            let stored =
+                std::fs::read(path).map_err(|e| HomeError::io("reading a body file", path, e))?;
+            let bytes = coding.decode(&stored).map_err(|error| {
+                whole.undecoded = Some(format!(
+                    "the response's content-encoding is {}, and its stored bytes do not decode as that: {error}",
+                    coding.name()
+                ));
+                HomeError::BodyShape {
+                    api: api.as_str(),
+                    reason: "the response's bytes do not decode as the coding it names",
+                }
+            })?;
+            serde_json::from_slice(&bytes).map_err(|source| HomeError::Json {
+                context: NOT_JSON,
+                source,
+            })?
         }
-    })?;
-    serde_json::from_slice(&bytes).map_err(|source| HomeError::Json {
-        context: NOT_JSON,
-        source,
-    })
+    };
+    whole.tokens = Tokens::of_whole_body(api, &json);
+    Ok(json)
 }
 
 /// Why a call that ended whole could not be read into parts. Only the
@@ -360,7 +376,7 @@ impl PreparedCall {
         };
         let mut status = meta.status;
         let mut reason = input.seen.unrecorded.clone();
-        let mut undecoded = None;
+        let mut whole = WholeBody::default();
         let response = if status == CallStatus::Complete {
             let result = match (&model, input.response) {
                 (Some(model), Some(path)) if request_whole => {
@@ -376,7 +392,7 @@ impl PreparedCall {
                     match input.response_parts {
                         Some(parts) => Ok(Cow::Borrowed(parts)),
                         None => complete_response_parts(&complete, None, || {
-                            read_response(path, input.seen, meta.api, &mut undecoded)
+                            read_response(path, input.seen, meta.api, &mut whole)
                         })
                         .map(Cow::Owned),
                     }
@@ -391,7 +407,8 @@ impl PreparedCall {
                 Err(error @ (HomeError::BodyShape { .. } | HomeError::Json { .. })) => {
                     status = CallStatus::Unrecorded;
                     reason = Some(
-                        undecoded
+                        whole
+                            .undecoded
                             .take()
                             .unwrap_or_else(|| unread(&error, &input.seen.head)),
                     );
@@ -409,7 +426,9 @@ impl PreparedCall {
                 api: meta.api,
                 model,
                 message_id: input.seen.message_id.clone(),
-                usage: input.seen.tokens.clone(),
+                // An event stream's figures were read as it passed; a
+                // whole-body response's are the ones its own JSON named.
+                usage: input.seen.tokens.clone().or(whole.tokens),
                 run: input.seen.run.clone(),
                 request_id: input.seen.head.request_id(),
                 head: (input.seen.head != Head::default()).then(|| input.seen.head.clone()),

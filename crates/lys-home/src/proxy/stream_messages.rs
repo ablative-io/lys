@@ -22,18 +22,8 @@
 use serde_json::{Map, Value};
 
 use crate::proxy::stream_sse::SseEvent;
-use crate::record::call::captured::{TokenFigure, Tokens};
-
-/// The members of a Messages `usage` object and the figure each names.
-/// `message_start` carries them under `message.usage`; `message_delta`
-/// carries the same members again as the response ends, and what it names
-/// replaces what `message_start` gave.
-const USAGE: [(&str, TokenFigure); 4] = [
-    ("input_tokens", TokenFigure::Input),
-    ("output_tokens", TokenFigure::Output),
-    ("cache_creation_input_tokens", TokenFigure::CacheCreation),
-    ("cache_read_input_tokens", TokenFigure::CacheRead),
-];
+use crate::record::call::Api;
+use crate::record::call::captured::Tokens;
 
 /// A Messages stream being assembled.
 #[derive(Debug, Default)]
@@ -68,8 +58,10 @@ impl MessagesAssembler {
         match data.get("type").and_then(Value::as_str) {
             Some("message_start") => self.started(&data),
             Some("message_delta") => {
+                // The same members `message_start` gave, again as the
+                // response ends: what this names replaces what that gave.
                 if let Some(usage) = data.get("usage") {
-                    self.tokens.read(usage, &USAGE);
+                    self.tokens.read_usage(Api::Messages, usage);
                 }
             }
             Some("ping") => {}
@@ -90,7 +82,7 @@ impl MessagesAssembler {
             .and_then(Value::as_str)
             .map(str::to_owned);
         if let Some(usage) = data.get("message").and_then(|message| message.get("usage")) {
-            self.tokens.read(usage, &USAGE);
+            self.tokens.read_usage(Api::Messages, usage);
         }
     }
 

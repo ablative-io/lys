@@ -17,7 +17,8 @@
 use serde_json::Value;
 
 use crate::proxy::stream_sse::SseEvent;
-use crate::record::call::captured::{TokenFigure, Tokens};
+use crate::record::call::Api;
+use crate::record::call::captured::Tokens;
 
 /// A Responses stream being assembled.
 #[derive(Debug, Default)]
@@ -85,21 +86,7 @@ impl ResponsesAssembler {
     pub fn tokens(&self) -> Option<Tokens> {
         let usage = self.completed.as_ref()?.get("usage")?;
         let mut tokens = Tokens::default();
-        tokens.read(
-            usage,
-            &[
-                ("input_tokens", TokenFigure::Input),
-                ("output_tokens", TokenFigure::Output),
-                ("cached_input_tokens", TokenFigure::CacheRead),
-                ("reasoning_output_tokens", TokenFigure::Reasoning),
-            ],
-        );
-        if let Some(details) = usage.get("input_tokens_details") {
-            tokens.read(details, &[("cached_tokens", TokenFigure::CacheRead)]);
-        }
-        if let Some(details) = usage.get("output_tokens_details") {
-            tokens.read(details, &[("reasoning_tokens", TokenFigure::Reasoning)]);
-        }
+        tokens.read_usage(Api::Responses, usage);
         tokens.reported()
     }
 
