@@ -77,7 +77,9 @@ impl ResponsesAssembler {
     /// The token figures of the completed response's `usage`: `input_tokens`
     /// and `output_tokens`, the cached part of the input under
     /// `input_tokens_details.cached_tokens` and the reasoning part of the
-    /// output under `output_tokens_details.reasoning_tokens`. None until
+    /// output under `output_tokens_details.reasoning_tokens`; each of the
+    /// two is also read where a usage names it beside the others, as
+    /// `cached_input_tokens` and `reasoning_output_tokens`. None until
     /// `response.completed` was read, and when it carried no figure.
     #[must_use]
     pub fn tokens(&self) -> Option<Tokens> {
@@ -88,6 +90,8 @@ impl ResponsesAssembler {
             &[
                 ("input_tokens", TokenFigure::Input),
                 ("output_tokens", TokenFigure::Output),
+                ("cached_input_tokens", TokenFigure::CacheRead),
+                ("reasoning_output_tokens", TokenFigure::Reasoning),
             ],
         );
         if let Some(details) = usage.get("input_tokens_details") {
