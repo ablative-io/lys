@@ -30,6 +30,9 @@ export const readCord = (): Promise<CordView | Refused> => request<CordView>(PUL
   (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: 'CordUnreadable', reason: String(problem) }),
 );
 
+/** What the Dashboard's own read lists: sessions still running, and agents whose sessions could not be read. */
+export interface Listed { running: number; unread: number }
+
 const who = (pull: CordPull): string => pull.by_name ?? 'an administrator';
 
 /**
@@ -38,15 +41,18 @@ const who = (pull: CordPull): string => pull.by_name ?? 'an administrator';
  * says what has not stopped, since a page that read
  * "everything is stopped" over a running agent would be believed.
  */
-export function stoppedLine(pull: CordPull, last: CordResult | null): string {
+export function stoppedLine(pull: CordPull, last: CordResult | null, listed: Listed = { running: 0, unread: 0 }): string {
   const told = pull.reason + ', by ' + who(pull) + ', ' + clock(pull.at) + '. No agent can be started.';
   if (!last || last.operation !== pull.operation) return 'Stop everything was pulled; what it stopped is not yet known. ' + told;
-  const still = last.still_running.length;
+  // What the page itself lists as running, or could not read, counts against the pull's own result: a session started
+  // as the cord was pulled, or one a runner never named, is in the list and not in the result.
+  const still = Math.max(last.still_running.length, listed.running);
   const unreached = last.unreached.length;
-  if (!still && !unreached) return 'Everything is stopped: ' + told;
+  if (!still && !unreached && !listed.unread) return 'Everything is stopped: ' + told;
   const left = [
     still ? still + (still === 1 ? ' agent is still running' : ' agents are still running') : '',
     unreached ? unreached + (unreached === 1 ? ' computer could not be reached' : ' computers could not be reached') : '',
+    listed.unread ? 'whether ' + listed.unread + (listed.unread === 1 ? ' agent is' : ' agents are') + ' running could not be read' : '',
   ].filter(Boolean).join(' and ');
   return 'Stop everything was pulled, and not everything has stopped: ' + left + '. ' + told;
 }
@@ -75,7 +81,7 @@ export function pullSentences(result: CordResult): string[] {
   for (const computer of unreached) said.push(where(computer.machine_name) + ' could not be reached: ' + computer.reason + '.');
   const agents = new Map([...stopped, ...still].flatMap((session): [string, string | null][] => session.agent ? [[session.agent, session.agent_name]] : []));
   for (const refused of result.handles_refused) {
-    said.push('The credential service did not confirm that the credentials of ' + (agents.get(refused.agent) ?? 'an agent with no name') + ' ended.');
+    said.push('The credential service did not confirm that the credentials of ' + (agents.get(refused.agent) ?? 'an agent with no name') + ' ended: ' + refused.refusal + '.');
   }
   return said.filter(Boolean);
 }

@@ -234,6 +234,11 @@ describe('What the Dashboard reads, as the service answers it', () => {
     expect(cells('Scribe')[2]).toBe('No limit');
     const courier = [...($(`tr[data-href="#/file/${COURIER}"]`)?.querySelectorAll('td') ?? [])].map((td) => td.textContent);
     expect(courier.slice(0, 2)).toEqual(['Courier teams: TeamsUnavailable', 'registered']);
+    // An agent whose sessions could not be read is not counted as stopped: Running now names it and never says nothing runs.
+    const panel = $('section[aria-label="Running now"]');
+    expect(panel?.textContent).not.toContain('Nothing is running.');
+    expect(panel?.querySelector('tr[data-unread="' + SCRIBE + '"]')?.textContent).toBe('ScribeWhether it is running could not be read. RuntimeUnavailable');
+    expect(rowOf('Scribe')?.querySelector('.dot')?.getAttribute('aria-label')).toBe('not known');
   });
 
   it('says a waiting count that could not be read by its refusal name, its link still there, never zero', async () => {

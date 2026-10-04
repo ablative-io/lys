@@ -120,7 +120,7 @@ function AgentRow({ entry, level, place, open, context }: { entry: Entry; level:
   const teamsRefused = row && refusedPart(row.teams) ? row.teams.refusal : null;
   return <>
     <tr data-href={'#/file/' + entry.id} {...keyable(() => open(entry.id))}>
-      <td style={depth(level)} className="you-agent"><span className={'dot ' + (live.length ? 's-active' : 's-retired')} aria-label={live.length ? 'running' : 'not running'} />{entry.display_name}
+      <td style={depth(level)} className="you-agent"><span className={'dot ' + (live.length ? 's-active' : 's-retired')} aria-label={sessionsRefused ? 'not known' : live.length ? 'running' : 'not running'} />{entry.display_name}
         {teamsRefused ? <> <span className="sec">teams:</span> <Refusal name={teamsRefused} /></> : null}</td>
       <td className="sec you-where">{sessionsRefused ? <Refusal name={sessionsRefused} />
         : live.length ? live.map((session) => <span className="dash-line" key={session.session}>{whereOf(session)}</span>)
@@ -181,6 +181,8 @@ export function AgentTree({ branches, context }: { branches: Branch[]; context: 
 /** Running now: one row for each live session, with its own Watch and Stop. */
 export function RunningNow({ rows, context, first = null }: { rows: DashboardAgent[]; context: RowContext; first?: ReactNode }) {
   const running = rows.flatMap((row) => liveOf(row).map((session) => ({ entry: entryOf(row), session })));
+  // An agent whose sessions could not be read is not counted as stopped: the panel names it and says why.
+  const unread = rows.flatMap((row) => refusedPart(row.sessions) ? [{ entry: entryOf(row), refusal: row.sessions }] : []);
   return <table className="dash-table" aria-label="Running now">
     <tbody>{first}{running.length ? running.map(({ entry, session }) => {
       const place = 'running/' + session.session;
@@ -191,6 +193,9 @@ export function RunningNow({ rows, context, first = null }: { rows: DashboardAge
         </tr>
         <AskedRow entry={entry} place={place} context={context} columns={3} />
       </Fragment>;
-    }) : <tr className="empty"><td className="dim">Nothing is running.</td></tr>}</tbody>
+    }) : unread.length ? null : <tr className="empty"><td className="dim">Nothing is running.</td></tr>}
+    {unread.map(({ entry, refusal }) => <tr key={entry.id} data-unread={entry.id}>
+      <td>{entry.display_name}</td><td className="why-not" colSpan={2} title={refusal.reason}>Whether it is running could not be read. <Refusal name={refusal.refusal} /></td>
+    </tr>)}</tbody>
   </table>;
 }

@@ -127,3 +127,5 @@ tr.more td { border-bottom: 0; }
 .page.signed-out > .card { flex: none; overflow: visible; width: 280px; display: grid; justify-items: center; gap: 12px; padding: 28px 24px; }
 .page.signed-out .mark { margin: 0; }
 .page.signed-out h1 { margin: 0; }
+/* The add row of the secrets table: where a secret is used is three labelled inputs side by side. */
+.secret-where label { display: inline-flex; flex-direction: column; gap: 4px; margin: 0 10px 0 0; vertical-align: top; font-size: 12px; }

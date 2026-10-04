@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { clock } from '../src/features/file/time';
 import { $, $$, click, mount, settle, text, type, unmountAll, unreachable } from './harness';
-import { ADA, ARCHIVIST, COURIER, CORD, SCRIBE, SERVICE, ok } from './fixtures';
+import { ADA, ARCHIVIST, COURIER, CORD, SCRIBE, SERVICE, dashboard, ok } from './fixtures';
 import type { Answer, Route } from './fixtures';
 
 afterEach(() => sessionStorage.clear());
@@ -46,13 +46,15 @@ describe('Stop everything', () => {
     };
     const { posted } = await mount('#/', { ...SERVICE, 'POST /runtime/stop-everything': answered as Route });
     await click($('[data-act="stop-everything"]'));
-    expect(row()?.textContent).toContain('This stops every running agent on every computer. Nothing Lys started is left running.');
+    expect(row()?.textContent).toContain('This tells every running agent on every computer to stop, and no agent can be started until you let them start again.');
+    expect(row()?.textContent).not.toContain('Nothing Lys started is left running');
     expect(pulls(posted)).toEqual([]);
     const now = $$('section[aria-label="Running now"] tr.dash-cord button').find((button) => button.textContent === 'Stop everything now');
     expect(now?.hasAttribute('disabled')).toBe(true);
     await type(row()?.querySelector('input:not([type="checkbox"])') ?? null, 'a runaway loop');
-    await click(row()?.querySelector('input[type="checkbox"]') ?? null);
-    expect(row()?.textContent).toContain('Kill anything that does not stop');
+    // Killing what ignores the stop is on unless the person takes it off: stop everything means everything.
+    expect((row()?.querySelector('input[type="checkbox"]') as HTMLInputElement | null)?.checked).toBe(true);
+    expect(row()?.textContent).toContain('Kill anything that does not stop. Without this, an agent that ignores the stop keeps running.');
     await click(now ?? null);
 
     expect(pulls(posted)).toHaveLength(1);
@@ -99,6 +101,22 @@ describe('Stop everything', () => {
     expect($('.dash-cord-line p')?.textContent).toBe(unknown);
     await mount('#/', { ...SERVICE, '/runtime/stop-everything': stopping(PULLED, true, { ...CLEAN, operation: 'op-' + '8'.repeat(32) }) });
     expect($('.dash-cord-line p')?.textContent).toBe(unknown);
+  });
+
+  it('does not say everything is stopped over a session the page itself lists as running, or over sessions it could not read', async () => {
+    const told = 'the building is on fire, by Ada (test person), ' + clock(AT) + '. No agent can be started.';
+    const live = { session: 'op-' + 'd'.repeat(32), agent: SCRIBE, machine: LAB, machine_name: 'Lab', shown: 'running', last_reported: 'running' };
+    await mount('#/', { ...SERVICE, '/runtime/stop-everything': stopping(PULLED, true), '/dashboard': ok(dashboard({ [SCRIBE]: { sessions: [live] } })) });
+    expect($('.dash-cord-line p')?.textContent).toBe('Stop everything was pulled, and not everything has stopped: 1 agent is still running. ' + told);
+    unmountAll();
+    await mount('#/', { ...SERVICE, '/runtime/stop-everything': stopping(PULLED, true), '/dashboard': ok(dashboard({ [SCRIBE]: { sessions: { refusal: 'RuntimeUnavailable', reason: 'no reports store' } } })) });
+    expect($('.dash-cord-line p')?.textContent).toBe('Stop everything was pulled, and not everything has stopped: whether 1 agent is running could not be read. ' + told);
+  });
+
+  it('keeps the button when how the cord stands could not be read, and says the read was refused', async () => {
+    await mount('#/', { ...SERVICE, '/runtime/stop-everything': { status: 503, body: { refusal: 'cord_unavailable', reason: 'the cord store is closed' } } as Route });
+    expect($('.dash-cord-line')?.textContent).toContain('Lys could not say whether everything is stopped.');
+    expect($('[data-act="stop-everything"]')?.textContent).toBe('Stop everything');
   });
 
   it('shows a person who is not the administrator the line and no button', async () => {

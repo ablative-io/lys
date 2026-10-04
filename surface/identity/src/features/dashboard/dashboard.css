@@ -8,11 +8,13 @@
 .you-tree thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-default); padding: 6px 10px; text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .dash-table { width: 100%; }
 .dash-table td { padding: 7px 10px; }
-.dash-table .dash-num { width: 3ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.dash-table .dash-num { width: 1%; min-width: 3ch; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .dash-table a { color: var(--text-primary); }
 .dash-table .you-act { text-align: right; white-space: nowrap; }
 .dash-table .you-asked td { padding: 4px 12px 14px; }
 .dash-picture { position: absolute; right: 20px; bottom: 20px; z-index: 30; width: min(560px, 46vw); height: min(360px, 48vh); display: flex; flex-direction: column; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgb(0 0 0 / 0.28); overflow: hidden; }
+/* While the picture is shown the right-hand panels end above it, so it never covers a row or its controls. */
+.dash-watching .dash-side { padding-bottom: min(360px, 48vh); }
 .dash-picture-bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border-subtle); }
 .dash-picture-bar h2 { margin: 0; font-size: 13px; }
 .dash-picture-bar .sec { flex: 1; font-size: 12px; }

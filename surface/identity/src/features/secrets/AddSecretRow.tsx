@@ -137,17 +137,18 @@ export function AddSecretRow({ person, changed }: { person: string; changed: (me
     <td><select form={id} name="class" aria-label="Kind of secret" value={asked.class} disabled={blocked} onChange={(event) => set({ class: event.target.value === 'key' ? 'key' : 'credential' as AddedClass })}>
       <option value="credential">A credential</option><option value="key">A key</option>
     </select></td>
-    <td>
-      <input form={id} name="upstream" aria-label="Where it is used" placeholder="https://…" value={asked.upstream} disabled={blocked} onChange={(event) => set({ upstream: event.target.value })} />
-      <input form={id} name="header" aria-label="Header it travels in" value={asked.header} disabled={blocked} onChange={(event) => set({ header: event.target.value })} />
-      <input form={id} name="prefix" aria-label="Text before it in that header" value={asked.prefix} disabled={blocked} onChange={(event) => set({ prefix: event.target.value })} />
+    {/* Where a secret is used is entered here and never listed: the cell spans the two columns a secret not yet added has nothing for, and each input says what it is. */}
+    <td colSpan={2} className="secret-where">
+      <label className="sec">Sent to <input form={id} name="upstream" aria-label="Where it is used" placeholder="https://…" value={asked.upstream} disabled={blocked} onChange={(event) => set({ upstream: event.target.value })} /></label>
+      <label className="sec">In the header <input form={id} name="header" aria-label="Header it travels in" value={asked.header} disabled={blocked} onChange={(event) => set({ header: event.target.value })} /></label>
+      <label className="sec">After the text <input form={id} name="prefix" aria-label="Text before it in that header" value={asked.prefix} disabled={blocked} onChange={(event) => set({ prefix: event.target.value })} /></label>
     </td>
     <td>
       <input form={id} name="value" type="password" autoComplete="new-password" aria-label="Value" placeholder="Value, shown never again" value={value} disabled={blocked} onChange={(event) => setValue(event.target.value)} />
       {pending ? <div role="status"><p>Adding {pending.asked.name} is not confirmed. What you entered is kept, except the value, which is never kept.</p>
         <button className="btn" type="button" disabled={busy} onClick={() => { void check(); }}>Check whether it was added</button></div> : null}
       {failure ? <p className="why-not" role="alert">{failure}</p> : null}
+      <button form={id} className="btn primary" type="submit" disabled={blocked}>Add this secret</button>
     </td>
-    <td><button form={id} className="btn primary" type="submit" disabled={blocked}>Add this secret</button></td>
   </tr>;
 }

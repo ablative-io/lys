@@ -7,7 +7,8 @@
 .canvas-connections li { margin: 8px 0; overflow-wrap: anywhere; }
 .session-canvas-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 6px; font-size: 12.5px; }
 .session-canvas-strip > p { margin: 0; }
-.fill > .session-canvas-scroll { flex: 1; min-height: 0; margin-top: 8px; }
+/* The surface takes all the height its column has left, whether it sits straight in the page or beside the list. */
+.fill > .session-canvas-scroll, .canvas-side > .session-canvas-scroll { flex: 1; min-height: 0; margin-top: 8px; }
 .session-canvas-scroll { position: relative; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); cursor: grab; touch-action: none; }
 .session-canvas-scroll:active { cursor: grabbing; }
 .session-canvas-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }

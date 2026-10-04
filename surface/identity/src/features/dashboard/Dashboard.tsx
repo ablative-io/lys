@@ -86,14 +86,17 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
   const [pulling, setPulling] = useState(pullPending);
   // A started row waits only for the next read of the page. When that read arrives the row says what is so: Watch and Stop if it runs, Start again if it does not.
   useEffect(() => { setAsked((held) => held?.what === 'started' ? null : held); }, [data]);
-  const rows = data.answer.agents.filter((row) => row.agent.state !== 'retired');
-  const byId = new Map(rows.map((row) => [row.agent.id, row]));
+  // A retired agent leaves the agents list, but a session of its that has not stopped still stands in Running now.
+  const every = data.answer.agents;
+  const rows = every.filter((row) => row.agent.state !== 'retired');
+  const byId = new Map(every.map((row) => [row.agent.id, row]));
   const teams = data.teams instanceof Refused ? [] : data.teams;
   const context: RowContext = {
     rows: byId, me: data.me.person.id, asked, ask: setAsked, changed: reload, watching, stopped: stoppedWhy(data.cord),
     watch: (agent, id) => { const row = byId.get(agent); const session = liveOf(row).find((each) => each.session === id); if (row && session) watch(row, session); },
   };
-  return <><CordLine cord={data.cord} changed={reload} /><div className="dash-body">
+  const listed = { running: every.flatMap(liveOf).length, unread: every.filter((row) => refusedPart(row.sessions)).length };
+  return <><CordLine cord={data.cord} changed={reload} listed={listed} /><div className="dash-body">
     <section className="you-panel dash-agents" aria-label="Agents">
       <div className="section-h"><span>Agents</span></div>
       {data.teams instanceof Refused ? <p className="why-not">Teams cannot be read, so your agents are listed without their teams. <small className="refusal-name">{data.teams.refusal.refusal}</small></p> : null}
@@ -106,7 +109,7 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
       </section>
       <section className="you-panel" aria-label="Running now">
         <div className="section-h"><span>Running now</span><StopEverythingButton cord={data.cord} open={() => setPulling(true)} /></div>
-        <div className="you-scroll"><RunningNow rows={rows} context={context}
+        <div className="you-scroll"><RunningNow rows={every} context={context}
           first={pulling ? <StopEverythingRow columns={3} close={() => setPulling(false)} changed={reload} /> : null} /></div>
       </section>
     </div>
@@ -137,14 +140,17 @@ export function Dashboard() {
   const load = read.status === 'loading' && last.current ? last.current : read;
   const [watched, setWatched] = useState<Watched | null>(null);
   // The picture keeps the session it shows. When a later read no longer lists that session and its agent has exactly one
-  // other live session, the agent was restarted, and the picture moves to the new one; otherwise the terminal says how it ended.
+  // live session that was not there while the watched one ran, the agent was restarted, and the picture moves to the new
+  // one; a session that was already running beside it is another piece of work, and the terminal says how the watched one ended.
+  const beside = useRef<Set<string>>(new Set());
   const live = load.status === 'ok' && load.data.kind === 'active' && watched ? liveOf(load.data.answer.agents.find((row) => row.agent.id === watched.agent)) : [];
-  const shown = watched && live.length === 1 && !live.some((each) => each.session === watched.session.session) ? { ...watched, session: live[0] } : watched;
-  return <div className="page fill dash-page">
+  if (watched && live.some((each) => each.session === watched.session.session)) for (const each of live) beside.current.add(each.session);
+  const shown = watched && live.length === 1 && !beside.current.has(live[0].session) ? { ...watched, session: live[0] } : watched;
+  return <div className={'page fill dash-page' + (shown ? ' dash-watching' : '')}>
     <div className="head"><div><h1>Dashboard</h1></div>{read.status === 'refused' ? <button type="button" className="btn" onClick={refreshLive}>Reconnect</button> : null}</div>
     <Gate load={load} title="your dashboard" ok={(data) => data.kind === 'registered' ? <Navigate replace to="/me" />
       : <Page data={data} reload={() => setVersion((v) => v + 1)} watching={shown?.session.session ?? null}
-        watch={(row, session) => setWatched({ agent: row.agent.id, name: row.agent.display_name, session })} />} />
+        watch={(row, session) => { beside.current = new Set(liveOf(row).map((each) => each.session)); setWatched({ agent: row.agent.id, name: row.agent.display_name, session }); }} />} />
     {shown ? <Picture watched={shown} close={() => setWatched(null)} /> : null}
   </div>;
 }
