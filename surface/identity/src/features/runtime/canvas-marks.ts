@@ -24,10 +24,12 @@ export interface Link { id: string; from: string; to: string; from_side?: Side; 
  */
 export interface Widget extends Box {
   id: string; kind: string;
-  /** Which one of the kind's figures it shows, when the person chose one; everything the kind holds otherwise. */
+  /** Which one of the kind's figures its small face shows, when the person chose one; the first that was reported otherwise. */
   shows?: string;
-  /** The view it is in beyond the pill: everything it holds, or its settings. `w` and `h` are its size in either. */
-  view?: 'detail' | 'settings';
+  /** The figures its medium face holds side by side, when the person chose them; the kind's own few otherwise. */
+  faces?: string[];
+  /** The face it shows beyond the small one, the pill: medium (a few figures), large (everything it holds), or its settings. `w` and `h` are its size in any of them. */
+  view?: 'faces' | 'detail' | 'settings';
   /** How a figure that is a percent is drawn: as its number alone when absent, with a bar, or as a dial. */
   look?: 'bar' | 'dial';
   colour?: string;
@@ -46,12 +48,37 @@ export function nextColour(colour: string | undefined): string | undefined {
   const names = Object.keys(COLOURS);
   return names[colour === undefined ? 0 : names.indexOf(colour) + 1 || names.length];
 }
-/** A widget's views in the order its own button goes through them: the pill, everything it holds, its settings. */
-export const nextView = (view: Widget['view']): Widget['view'] => view === undefined ? 'detail' : view === 'detail' ? 'settings' : undefined;
+/**
+ * A widget's views in the order its own button goes through them: small (the pill), medium (a few figures side by side),
+ * large (everything it holds), its settings. A kind with no figures to choose among has no medium face.
+ */
+export function nextView(view: Widget['view'], faced: boolean): Widget['view'] {
+  if (view === undefined) return faced ? 'faces' : 'detail';
+  return view === 'faces' ? 'detail' : view === 'detail' ? 'settings' : undefined;
+}
 /** The size of a widget that is not opened out: a pill holding its symbol, whose it is, and its one figure. */
 export const PILL: [number, number] = [248, 34];
 /** A widget as it stands on the surface now: a pill, or its own size when it is opened out. */
 export const standing = (widget: Widget): Widget => widget.view ? widget : { ...widget, w: PILL[0], h: PILL[1] };
+/** The gap kept between a widget opened out and one it moved down. */
+const CLEAR = 10;
+/**
+ * Every widget as it stands now. One opened out is as large as what it holds, so it moves the widgets it would cover
+ * down, clear of it, and they move what they would cover in turn. Where the person put each one is kept: it stands
+ * there again when the one above it is a pill.
+ */
+export function stood(widgets: Widget[]): Widget[] {
+  const placed: { now: Widget; pushes: boolean }[] = [];
+  for (const widget of [...widgets].sort((left, right) => left.y - right.y)) {
+    let now = standing(widget);
+    for (const above of [...placed].sort((left, right) => left.now.y - right.now.y)) {
+      const beside = now.x < above.now.x + above.now.w && above.now.x < now.x + now.w;
+      if (above.pushes && beside && now.y >= above.now.y && now.y < above.now.y + above.now.h + CLEAR) now = { ...now, y: above.now.y + above.now.h + CLEAR };
+    }
+    placed.push({ now, pushes: !!widget.view || now.y !== widget.y });
+  }
+  return widgets.map((widget) => placed.find((each) => each.now.id === widget.id)?.now ?? widget);
+}
 export interface Marks { groups: Group[]; notes: Note[]; links: Link[]; widgets: Widget[] }
 /** Everything a person arranged: where each window sits, which terminals are open, and what they drew. */
 export interface Arrangement extends Marks { boxes: Record<string, Box>; open: string[] }
@@ -67,7 +94,8 @@ export const isBox = (value: unknown): value is Box => record(value) && ['x', 'y
 const worded = (value: unknown, word: string): boolean => record(value) && typeof value.id === 'string' && typeof value[word] === 'string' && (value.colour === undefined || typeof value.colour === 'string');
 const isGroup = (value: unknown): value is Group => isBox(value) && worded(value, 'label');
 const isNote = (value: unknown): value is Note => isBox(value) && worded(value, 'text');
-const isWidget = (value: unknown): value is Widget => isBox(value) && worded(value, 'kind') && ((value as Widget).shows === undefined || typeof (value as Widget).shows === 'string') && [undefined, 'detail', 'settings'].includes((value as Widget).view) && [undefined, 'bar', 'dial'].includes((value as Widget).look) && [undefined, true, false].includes((value as Widget).locked);
+const named = (value: unknown): boolean => value === undefined || (Array.isArray(value) && value.every((each) => typeof each === 'string'));
+const isWidget = (value: unknown): value is Widget => isBox(value) && worded(value, 'kind') && ((value as Widget).shows === undefined || typeof (value as Widget).shows === 'string') && named((value as Widget).faces) && [undefined, 'faces', 'detail', 'settings'].includes((value as Widget).view) && [undefined, 'bar', 'dial'].includes((value as Widget).look) && [undefined, true, false].includes((value as Widget).locked);
 const sided = (value: unknown): boolean => value === undefined || SIDES.includes(value as Side);
 const isLink = (value: unknown): value is Link => worded(value, 'from') && worded(value, 'to') && sided((value as Link).from_side) && sided((value as Link).to_side);
 /** A list that was not kept at all is an empty one; a list holding anything else cannot be read. */

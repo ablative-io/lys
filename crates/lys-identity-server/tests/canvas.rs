@@ -50,6 +50,8 @@ fn arrangement(x: f64) -> Value {
         "widgets": [
             {"id": "widget:a", "kind": "usage", "shows": "window/300", "view": "settings", "look": "dial", "locked": true, "colour": "blue", "x": 820.0, "y": 40.0, "w": 340.0, "h": 250.0},
             {"id": "widget:b", "kind": "goals", "x": 820.0, "y": 90.0, "w": 340.0, "h": 190.0},
+            {"id": "widget:c", "kind": "usage", "faces": ["dollars/day", "window/10080"], "view": "faces", "x": 820.0, "y": 140.0, "w": 340.0, "h": 120.0},
+            {"id": "widget:d", "kind": "usage", "faces": [], "x": 820.0, "y": 190.0, "w": 340.0, "h": 120.0},
         ],
     })
 }

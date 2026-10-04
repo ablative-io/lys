@@ -85,6 +85,11 @@
 .canvas-widget-body .dash-table td { padding: 5px 8px 5px 0; }
 .canvas-widget-open { flex: none; padding: 0 14px 10px; font-size: 11.5px; color: var(--text-secondary); }
 .canvas-widget:hover > .canvas-anchor { opacity: 1; }
+/* A widget is small, so the dots a line is dragged from stand just outside its border, not on it. */
+.canvas-widget > .canvas-anchor[data-anchor="top"] { margin-top: -14px; }
+.canvas-widget > .canvas-anchor[data-anchor="bottom"] { margin-top: 4px; }
+.canvas-widget > .canvas-anchor[data-anchor="left"] { margin-left: -14px; }
+.canvas-widget > .canvas-anchor[data-anchor="right"] { margin-left: 4px; }
 .session-canvas-scroll.tool-line .canvas-widget { cursor: crosshair; outline: 1px dashed var(--accent); outline-offset: 2px; }
 .session-canvas-scroll.tool-widget, .session-canvas-scroll.tool-widget .session-canvas-node { cursor: copy; }
 
@@ -99,6 +104,13 @@
 .canvas-stat { display: flex; flex-direction: column; gap: 2px; padding: 8px 2px; }
 .canvas-stat b { font-size: 30px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .canvas-stat-none { padding: 8px 2px; margin: 0; }
+/* The medium face: the chosen figures side by side, each its number over what it is. */
+.canvas-faces { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.canvas-faces .canvas-stat { flex: 1 1 0; min-width: max-content; }
+.canvas-stat.mid b { font-size: 21px; }
+.canvas-stat.mid .sec { font-size: 11.5px; }
+.canvas-stat.none b { font-size: 13px; font-weight: 500; line-height: 1.75; color: var(--text-secondary); }
+.canvas-dial.mid > b { position: absolute; font-size: 16px; }
 /* What was last pressed is chosen: it shows it, and the Delete key takes it away. */
 .canvas-chosen { position: absolute; box-sizing: border-box; z-index: 5; pointer-events: none; border-radius: 20px; outline: 1.5px solid var(--accent); outline-offset: 3px; }
 .session-canvas-lines .person-line { pointer-events: stroke; cursor: pointer; }
@@ -132,7 +144,7 @@
 .canvas-widget-remove { position: absolute; left: calc(100% + 4px); top: -24px; z-index: 6; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 1.5px solid var(--danger); border-radius: 50%; background: transparent; color: var(--danger); font-size: 13px; line-height: 1; cursor: pointer; }
 .canvas-widget-remove:hover { background: var(--danger); color: #1a0d0d; }
 /* The lock at a widget's bottom right: its shackle swings open and shut. It shows on a widget under the pointer, and always while it is locked. */
-.canvas-widget-lock { position: absolute; right: -9px; bottom: -9px; z-index: 6; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 1px solid var(--border-default); border-radius: 50%; background: var(--surface-card); color: var(--text-secondary); cursor: pointer; opacity: 0; transition: opacity .15s ease; }
+.canvas-widget-lock { position: absolute; left: calc(100% + 4px); top: calc(100% + 4px); z-index: 6; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 1px solid var(--border-default); border-radius: 50%; background: var(--surface-card); color: var(--text-secondary); cursor: pointer; opacity: 0; transition: opacity .15s ease; }
 .canvas-widget:hover > .canvas-widget-lock, .canvas-widget-lock[aria-pressed="true"], .canvas-widget-lock:focus-visible { opacity: 1; }
 .canvas-widget-lock[aria-pressed="true"] { color: var(--tint, var(--accent)); border-color: var(--tint, var(--accent)); }
 .canvas-widget-lock svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }

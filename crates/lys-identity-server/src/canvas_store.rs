@@ -89,6 +89,8 @@ pub struct Note {
 #[serde(rename_all = "lowercase")]
 #[schema(as = CanvasWidgetView)]
 pub enum WidgetView {
+    /// Its medium face: a few figures side by side.
+    Faces,
     /// Opened out to everything it holds.
     Detail,
     /// Its settings.
@@ -117,9 +119,13 @@ pub struct Widget {
     pub id: String,
     /// Its kind, by the page's name for it.
     pub kind: String,
-    /// The one figure it shows, when the person chose one.
+    /// The one figure it shows as a pill, when the person chose one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shows: Option<String>,
+    /// The figures its medium face holds, when the person chose them;
+    /// an empty list is a face the person emptied, and is kept as one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faces: Option<Vec<String>>,
     /// The view it is in; absent while it is a pill.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view: Option<WidgetView>,

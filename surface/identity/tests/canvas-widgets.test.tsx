@@ -6,8 +6,10 @@ import { COURIER, SCRIBE, SERVICE, dashboard, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { mockTerminal } from './terminal-double';
 import { accountsOf, scopeOf, summed } from '../src/features/runtime/canvas-widgets';
+import { stood } from '../src/features/runtime/canvas-marks';
 import type { DashboardAgent } from '../src/features/dashboard/contract';
 import { windowWords } from '../src/features/runtime/CanvasWidgets';
+import { clockMs } from '../src/features/file/time';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
 const session = 'op-' + '7'.repeat(32);
@@ -142,13 +144,20 @@ describe('Widgets on the canvas', () => {
     const figure = () => card.querySelector('.canvas-widget-figure')?.textContent;
     expect([card.getAttribute('aria-label'), card.dataset.view, figure()]).toEqual(['Usage of Scribe', 'pill', '43% context']);
     expect(card.querySelector('.canvas-widget-body')).toBeNull();
+    // Its medium face: a few figures side by side, each its number over what it is, until the person chooses their own.
+    await turn();
+    expect([card.dataset.view, card.style.width, card.style.height]).toEqual(['faces', '340px', '']);
+    expect($$('[data-widget] [data-stat]').map((each) => [each.dataset.stat, each.querySelector('b')?.textContent, each.querySelector('.sec')?.textContent])).toEqual([
+      ['context_percent/', '43%', 'Context now'], ['tokens/day', '120,000 tokens', 'Tokens today'], ['window/300/org-main', '28%', '5-hour window of org-main, resets ' + clockMs(1790003600000)]]);
+    expect(card.querySelector('.session-canvas-grip')).toBeNull();
+    // Its large face: everything it holds.
     await turn();
     expect([card.dataset.view, card.style.width, card.style.height]).toEqual(['detail', '340px', '']);
     expect($$('[data-widget] tr[data-figure]').map((row) => row.textContent)).toEqual(['Context now43%', 'Tokens today120,000 tokens', 'Dollars todayNot reported']);
     expect($$('[data-widget] tr[data-account]').map((row) => row.querySelector('td')?.textContent)).toEqual(['org-main, 5-hour', 'org-main, 7-day']);
     await turn();
     expect(card.dataset.view).toBe('settings');
-    expect($$('[data-variant]').map((each) => each.textContent)).toEqual(['Everything', 'Context', 'Tokens today', 'Tokens this week', 'Dollars today', 'Dollars this week', 'Running today', '5-hour window', '7-day window']);
+    expect($$('[data-variant]').map((each) => each.textContent)).toEqual(['First reported', 'Context', 'Tokens today', 'Tokens this week', 'Dollars today', 'Dollars this week', 'Running today', '5-hour window', '7-day window']);
     await click($('[data-variant="window/10080"]'));
     expect([figure(), kept().widgets[0].shows]).toEqual(['61% of 7-day', 'window/10080']);
     // A level is drawn as its number, with a bar, or as a dial, on the pill and opened out.
@@ -161,11 +170,34 @@ describe('Widgets on the canvas', () => {
     expect([(kept().widgets[0] as { colour?: string }).colour, card.style.getPropertyValue('--tint')]).toEqual(['blue', '#7aa7d9']);
     await turn();
     await turn();
-    expect([card.dataset.view, $('[data-widget] .canvas-stat.dial b')?.textContent]).toEqual(['detail', '61%']);
-    // A figure nobody reported is said so, never shown as zero, and has no level to draw.
+    expect([card.dataset.view, $$('[data-widget] .canvas-stat.dial b').map((each) => each.textContent)]).toEqual(['faces', ['43%', '28%']]);
+    // The figures of the medium face are chosen in its settings, each on or off, and stay in the order they are offered.
+    await turn();
+    await turn();
+    expect($$('[data-face][aria-pressed="true"]').map((each) => each.dataset.face)).toEqual(['context_percent/', 'tokens/day', 'window/300']);
+    await click($('[data-face="window/10080"]'));
+    await click($('[data-face="tokens/day"]'));
+    await click($('[data-face="dollars/day"]'));
+    expect((kept().widgets[0] as { faces?: string[] }).faces).toEqual(['context_percent/', 'dollars/day', 'window/300', 'window/10080']);
+    await turn();
+    await turn();
+    // A figure nobody reported is said so on the face, never shown as zero.
+    expect($$('[data-widget] [data-stat]').map((each) => [each.dataset.stat, each.querySelector('b')?.textContent])).toEqual([
+      ['context_percent/', '43%'], ['dollars/day', 'Not reported'], ['window/300/org-main', '28%'], ['window/10080/org-main', '61%']]);
+    expect($('[data-stat="dollars/day"]')?.getAttribute('title')).toBe('Scribe: dollars have not been reported');
+    // With nothing but an unreported figure shown there is no level to draw; with no figure chosen the face says so.
+    await turn();
     await turn();
     await click($('[data-variant="dollars/day"]'));
+    for (const key of ['context_percent/', 'window/300', 'window/10080']) await click($('[data-face="' + key + '"]'));
     expect([figure(), $('[data-look]')]).toEqual(['Not reported', null]);
+    await click($('[data-face="dollars/day"]'));
+    expect((kept().widgets[0] as { faces?: string[] }).faces).toEqual([]);
+    await turn();
+    await turn();
+    expect([card.dataset.view, card.querySelector('.canvas-widget-body')?.textContent]).toEqual(['faces', 'No figure is chosen for this face.']);
+    await turn();
+    await turn();
     await click($('[data-variant=""]'));
     expect(kept().widgets[0].shows).toBeUndefined();
     // Locked, it is not opened, moved or taken away; unlocked, it is again.
@@ -243,6 +275,17 @@ describe('What a widget counts', () => {
     expect(scopeOf(there, [{ id: 'l', from: 'group:a', to: 'widget:w' }], [box], windows, rows)).toMatchObject({ rows: [rows[0]], whose: 'Iridium: 1 agent' });
     // A line to a note, or to a window that is gone, feeds nothing: the widget falls back to where it sits.
     expect(scopeOf(there, [{ id: 'l', from: 'note:n', to: 'widget:w' }], [box], windows, rows).everyone).toBe(true);
+  });
+
+  it('moves the widgets an opened one would cover down, clear of it, and leaves the rest where they were put', () => {
+    const pill = (id: string, x: number, y: number) => ({ id, kind: 'goals', x, y, w: 340, h: 190 });
+    const open = { id: 'open', kind: 'usage', x: 100, y: 100, w: 340, h: 200, view: 'detail' as const };
+    const places = (widgets: Parameters<typeof stood>[0]) => stood(widgets).map((each) => [each.id, each.y, each.h]);
+    // Two pills stacked under an opened widget go below it, the second below the first; one beside it stays.
+    expect(places([open, pill('a', 100, 144), pill('b', 100, 188), pill('beside', 500, 144), pill('above', 100, 40)])).toEqual([
+      ['open', 100, 200], ['a', 310, 34], ['b', 354, 34], ['beside', 144, 34], ['above', 40, 34]]);
+    // As pills, each stands where the person put it, even one laid over another.
+    expect(places([{ ...open, view: undefined }, pill('a', 100, 110)])).toEqual([['open', 100, 34], ['a', 110, 34]]);
   });
 
   it('adds amounts over the agents, shows levels at their highest, and counts who did not report with the reason', () => {

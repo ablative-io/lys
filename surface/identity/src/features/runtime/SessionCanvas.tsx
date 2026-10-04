@@ -1,6 +1,6 @@
 import { refreshLive } from '../../live';
 /** A surface of windows: each permitted session and each thing it is connected to is a window a person drags, sizes and arranges, with as many live terminals open as they choose. */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { useLive, useLoad } from '../../api';
@@ -13,7 +13,7 @@ import type { SessionGraph } from './session-graph';
 import { firstMessagePage } from './message-connections';
 import type { MessageRead } from './message-connections';
 import { MessageConnections } from './MessageConnections';
-import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, nearestSide, nextColour, readArrangement, sidePoint, standing, within } from './canvas-marks';
+import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, nearestSide, nextColour, readArrangement, sidePoint, standing, stood, within } from './canvas-marks';
 import type { Arrangement, Box, Marks, Side } from './canvas-marks';
 import { keepArrangement, readKeeping, removeLayout, said, saveLayout } from './canvas-kept';
 import type { Keeping, SavedLayout } from './canvas-kept';
@@ -23,23 +23,21 @@ import { Anchors, GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMar
 import { HOME, ZOOM, useWheel, zoomOf, zoomed } from './canvas-view';
 import type { View } from './canvas-view';
 import { WidgetCard } from './CanvasWidgets';
-import { KINDS, scopeOf } from './canvas-widgets';
+import { AGENT, KINDS, scopeOf } from './canvas-widgets';
 import { readBoard } from '../dashboard/board';
 import type { Board } from '../dashboard/board';
 import './session-canvas.css';
 import './canvas-marks.css';
 
+import { CLOSED, OPENED, lineBetween, placed } from './canvas-place';
 export type { Box } from './canvas-marks';
+export { lineBetween, placed } from './canvas-place';
 export type { View } from './canvas-view';
 
 /** What this browser keeps: the arrangement, where the surface is looked at from, and the arrival last answered (an agent at a place in this tab's history). */
 interface Kept extends Arrangement { view: View; shown?: string }
 
 const KEPT = 'lys.canvas';
-const BAR = 34;
-const CARD: [number, number] = [220, 64];
-const CLOSED: [number, number] = [440, BAR];
-const OPENED: [number, number] = [760, 480];
 /** The smallest a terminal window is dragged to: its bar still shows the agent's name beside state, Stop and close, and a prompt can still be read. */
 const SMALLEST: [number, number] = [560, 180];
 
@@ -47,7 +45,6 @@ const SMALLEST: [number, number] = [560, 180];
  * A window is kept under its agent's name, not its session's: a session's name is new every time the agent starts, and
  * a layout saved today has to find the same agents tomorrow.
  */
-const AGENT = 'agent:';
 const keptName = (graph: SessionGraph) => (id: string): string => {
   const agent = graph.nodes.find((node) => node.id === id)?.session?.agent;
   return agent ? AGENT + agent : id;
@@ -74,36 +71,6 @@ function kept(): Kept | null {
     const shown = (value as { shown?: unknown }).shown;
     return { ...arrangement, view: view as unknown as View, ...(typeof shown === 'string' ? { shown } : {}) };
   } catch { return null; }
-}
-
-/** A first place for every node that has none: teams down the left, agents in the middle two across, resources on the right. */
-export function placed(graph: SessionGraph, have: Record<string, Box>, open: ReadonlySet<string>): Record<string, Box> {
-  const boxes: Record<string, Box> = {};
-  const sessions = graph.nodes.filter((node) => node.column === 'sessions');
-  const across = Math.min(2, Math.max(1, sessions.length));
-  const middle = CARD[0] + 60;
-  const right = middle + across * (OPENED[0] + 40) + 20;
-  const count = { teams: 0, sessions: 0, resources: 0 };
-  for (const node of graph.nodes) {
-    const index = count[node.column]++;
-    // A place kept under the agent's name is the place of whichever session that agent has now; such a window stands closed until it is opened.
-    const agent = node.session?.agent;
-    const named = agent ? have[AGENT + agent] : undefined;
-    const was = have[node.id] ?? (named && !open.has(node.id) ? { ...named, w: CLOSED[0], h: CLOSED[1] } : named);
-    if (was) { boxes[node.id] = was; continue; }
-    if (node.column === 'sessions') {
-      const [w, h] = open.has(node.id) ? OPENED : CLOSED;
-      boxes[node.id] = { x: middle + (index % across) * (OPENED[0] + 40), y: Math.floor(index / across) * (OPENED[1] + 40), w, h };
-    } else boxes[node.id] = { x: node.column === 'teams' ? 0 : right, y: index * (CARD[1] + 20), w: CARD[0], h: CARD[1] };
-  }
-  return boxes;
-}
-
-/** A connection, drawn from the middle of one window's right edge to the middle of the other's left edge. */
-export function lineBetween(from: Box, to: Box): string {
-  const [x, y, endX, endY] = [from.x + from.w, from.y + from.h / 2, to.x, to.y + to.h / 2];
-  const middle = (x + endX) / 2;
-  return `M ${x} ${y} C ${middle} ${y}, ${middle} ${endY}, ${endX} ${endY}`;
 }
 
 /** The address of a session's terminal alone, filling its own browser window. */
@@ -178,7 +145,9 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
   const drag = useRef<Drag | null>(null);
   const surface = useRef<HTMLDivElement>(null);
   /** Where a thing on the surface is: a window, a box or a note; a line's end kept under an agent's name is that agent's window. */
-  const at = (id: string): Box | undefined => boxes[id] ?? boxes[hereName(graph)(id)] ?? [...marks.groups, ...marks.notes, ...marks.widgets.map(standing)].find((each) => each.id === id);
+  // Widgets where they stand now: one opened out moves those under it down for as long as it is open.
+  const widgets = useMemo(() => stood(marks.widgets), [marks.widgets]);
+  const at = (id: string): Box | undefined => boxes[id] ?? boxes[hereName(graph)(id)] ?? [...marks.groups, ...marks.notes, ...widgets].find((each) => each.id === id);
   const put = (id: string, box: Box) => {
     const onto = <T extends Box & { id: string }>(all: T[]): T[] => all.map((each) => each.id === id ? { ...each, x: box.x, y: box.y, w: box.w, h: box.h } : each);
     if (id.startsWith('group:')) setMarks((all) => ({ ...all, groups: onto(all.groups) }));
@@ -368,7 +337,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
     const box = at(id) ?? { x: 0, y: 0, w: 0, h: 0 };
     // A box takes along what sits in it: windows, notes and smaller boxes.
     const inside: [string, Box][] = id.startsWith('group:')
-      ? [...Object.entries(boxes), ...[...marks.notes, ...marks.groups, ...marks.widgets.map(standing)].filter((each) => each.id !== id).map((each): [string, Box] => [each.id, each])].filter(([, each]) => within(box, each))
+      ? [...Object.entries(boxes), ...[...marks.notes, ...marks.groups, ...widgets].filter((each) => each.id !== id).map((each): [string, Box] => [each.id, each])].filter(([, each]) => within(box, each))
       : [];
     return { kind: 'move', id, from, box, least: SMALLEST, along: inside };
   });
@@ -515,8 +484,8 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
       })}
       {marks.notes.map((note) => <NoteCard key={note.id} note={note} fresh={fresh === note.id} pick={pick?.(note.id)} move={moving(note.id)} size={sizing(note.id, SMALLEST_MARK)} link={linking(note.id)}
         change={(text) => reworded(note.id, text)} colour={() => recoloured(note.id)} remove={() => removeMark(note.id)} />)}
-      {marks.widgets.map((widget) => <WidgetCard key={widget.id} widget={widget} board={board} morph={morph === widget.id} chosen={chosen === widget.id} scope={board.status === 'ok' ? scopeOf(standing(widget), marks.links, marks.groups, windows, board.data.rows) : null}
-        pick={pick?.(widget.id)} move={moving(widget.id)} size={sizing(widget.id, SMALLEST_MARK)} link={linking(widget.id)} remove={() => removeMark(widget.id)}
+      {widgets.map((widget) => <WidgetCard key={widget.id} widget={widget} board={board} morph={morph === widget.id} chosen={chosen === widget.id} scope={board.status === 'ok' ? scopeOf(widget, marks.links, marks.groups, windows, board.data.rows) : null}
+        pick={pick?.(widget.id)} move={moving(widget.id)} link={linking(widget.id)} remove={() => removeMark(widget.id)}
         fit={(h) => setMarks((all) => ({ ...all, widgets: all.widgets.map((each) => each.id === widget.id ? { ...each, h } : each) }))}
         set={(change) => { setMarks((all) => ({ ...all, widgets: all.widgets.map((each) => each.id === widget.id ? { ...each, ...change } : each) })); if ('view' in change) setMorph(widget.id); changed(); }} />)}
       <LinkHandles links={marks.links} at={at} remove={removeMark} />

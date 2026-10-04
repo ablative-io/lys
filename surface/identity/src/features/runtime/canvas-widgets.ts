@@ -15,11 +15,18 @@ import type { Box, Group, Link, Widget } from './canvas-marks';
 export const AGENT = 'agent:';
 
 /** A kind of widget: its name, the size it opens out to, and its symbol as the path of a 24 by 24 line drawing. */
-export interface Kind { label: string; size: [number, number]; symbol: string; /** The single figures a widget of this kind can be set to show, each by its name. */ choices?: Record<string, string> }
+export interface Kind {
+  label: string; size: [number, number]; symbol: string;
+  /** The single figures a widget of this kind can be set to show, each by its name. */
+  choices?: Record<string, string>;
+  /** The figures its medium face holds until the person chooses their own. */
+  faces?: string[];
+}
 /** Every kind of widget, in the order the bar offers them. */
 export const KINDS: Record<string, Kind> = {
   usage: { label: 'Usage', size: [340, 250], symbol: 'M4 17a8 8 0 1 1 16 0M12 17l4.5-6',
-    choices: { 'context_percent/': 'Context', 'tokens/day': 'Tokens today', 'tokens/week': 'Tokens this week', 'dollars/day': 'Dollars today', 'dollars/week': 'Dollars this week', 'running_ms/day': 'Running today', 'window/300': '5-hour window', 'window/10080': '7-day window' } },
+    choices: { 'context_percent/': 'Context', 'tokens/day': 'Tokens today', 'tokens/week': 'Tokens this week', 'dollars/day': 'Dollars today', 'dollars/week': 'Dollars this week', 'running_ms/day': 'Running today', 'window/300': '5-hour window', 'window/10080': '7-day window' },
+    faces: ['context_percent/', 'tokens/day', 'window/300'] },
   budget: { label: 'Budget', size: [340, 170], symbol: 'M12 3v18M16.5 7.5C15.8 6.2 14.2 5.5 12 5.5c-2.6 0-4.5 1.2-4.5 3.2S9.300 11.5 12 12s4.500 1.300 4.500 3.300-1.900 3.200-4.500 3.200c-2.200 0-3.800-.700-4.500-2' },
   goals: { label: 'Goals', size: [340, 190], symbol: 'M6 21V4M6 4.500h11l-2.500 4 2.500 4H6' },
   requests: { label: 'Requests', size: [360, 190], symbol: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.600 9.500a2.500 2.500 0 1 1 3.900 2c-.900.600-1.500 1.200-1.500 2.300M12 17.200v.100' },
