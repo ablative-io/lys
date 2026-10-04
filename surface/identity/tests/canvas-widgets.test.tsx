@@ -157,6 +157,8 @@ describe('Widgets on the canvas', () => {
     expect($$('[data-widget] tr[data-account]').map((row) => row.querySelector('td')?.textContent)).toEqual(['org-main, 5-hour', 'org-main, 7-day']);
     await turn();
     expect(card.dataset.view).toBe('settings');
+    // The usage of one agent opens on that agent's model calls, where each can be read whole.
+    expect([card.querySelector('[data-act="whole-page"]')?.textContent, card.querySelector('[data-act="whole-page"]')?.getAttribute('href')]).toEqual(['Open its model calls', '#/canvas?view=proxy&agent=' + SCRIBE]);
     expect($$('[data-variant]').map((each) => each.textContent)).toEqual(['First reported', 'Context', 'Tokens today', 'Tokens this week', 'Dollars today', 'Dollars this week', 'Running today', 'Running this week', '5-hour window', '7-day window']);
     await click($('[data-variant="window/10080"]'));
     expect([figure(), kept().widgets[0].shows]).toEqual(['61% of 7-day', 'window/10080']);

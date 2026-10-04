@@ -109,7 +109,8 @@ function usagePart(scope: Scope, { shows, faces, look }: Chosen): Held {
   const medium = (faces ?? KINDS.usage.faces ?? []).map((key) => ({ key, held: read(key) }));
   const face = medium.reduce((sum, each) => sum + Math.max(1, each.held.length), 0) === 1 ? 'large' : 'mid';
   const why = (key: string) => lines.find((each) => each.unit + '/' + (each.period ?? '') === key)?.missing.join('\n');
-  return { label: 'Usage', href: '#/people', count, ...(small ? { figure: small.length ? small.map((each) => each.figure).join(', ') + small[0].tail : 'Not reported' } : {}),
+  // The usage of one agent opens on its model calls, each of which can be read whole; of several, on the list to choose from.
+  return { label: 'Usage', href: '#/canvas?view=proxy' + (several ? '' : '&agent=' + encodeURIComponent(scope.rows[0].agent.id)), count, ...(small ? { figure: small.length ? small.map((each) => each.figure).join(', ') + small[0].tail : 'Not reported' } : {}),
     percent: small ? (levels.length ? Math.max(...levels) : undefined) : context?.figure ?? undefined,
     value: small ? (small.length ? { amount: Math.max(...small.map((each) => each.value.amount)), unit: small[0].value.unit } : undefined)
       : context?.figure != null ? { amount: context.figure, unit: 'context_percent' } : tokens?.figure != null ? { amount: tokens.figure, unit: 'tokens' } : undefined,
@@ -280,7 +281,7 @@ export function WidgetCard({ widget, held, board, morph, chosen, pick, move, lin
         {part?.percent !== undefined || part?.levelled ? <tr><td>Drawn as</td><td><div className="canvas-widget-variants" role="toolbar" aria-label="How its level is drawn">
           {([[undefined, 'Number'], ['bar', 'Bar'], ['dial', 'Dial']] as const).map(([key, name]) => <button key={name} type="button" data-look={key ?? 'number'} aria-pressed={widget.look === key} onClick={() => set({ look: key })}>{name}</button>)}
         </div></td></tr> : null}
-        {part?.href ? <tr><td>Whole page</td><td><a href={part.href}>Open {label.toLowerCase()}</a></td></tr> : null}
+        {part?.href ? <tr><td>Whole page</td><td><a href={part.href} data-act="whole-page">{widget.kind === 'usage' ? 'Open its model calls' : 'Open ' + label.toLowerCase()}</a></td></tr> : null}
         <tr><td>Colour</td><td><div className="canvas-swatches" role="toolbar" aria-label="Its colour">
           {[undefined, ...Object.keys(COLOURS)].map((key) => <button key={key ?? 'own'} type="button" className="canvas-swatch" data-colour={key ?? 'own'} aria-label={key ?? 'Lys’s own'} title={key ?? 'Lys’s own'} aria-pressed={widget.colour === key} style={tint(key)} onClick={() => set({ colour: key })} />)}
         </div></td></tr>
