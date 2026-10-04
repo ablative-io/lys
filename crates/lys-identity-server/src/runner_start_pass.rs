@@ -20,9 +20,11 @@ pub(crate) fn act(
             session: Some(launch.session),
         });
     }
+    // Read before any pass is issued: a start refused here holds none.
+    let proxy = proxied(&launch)?;
     if launch.config.is_none() {
         return Ok(Act::Start {
-            proxy: proxied(&launch),
+            proxy,
             launch: Box::new(launch),
             lys_mcp: None,
         });
@@ -39,7 +41,7 @@ pub(crate) fn act(
         });
     };
     Ok(Act::Start {
-        proxy: proxied(&launch),
+        proxy,
         launch: Box::new(launch),
         lys_mcp: Some(lys_runner::protocol::LysMcp {
             url: format!("{origin}/api/mcp"),
@@ -53,22 +55,50 @@ pub(crate) fn act(
 /// key: the key and the profile version, as the launch wrote them in its
 /// environment. No profile declares a context window yet, so none is said,
 /// and the account is the one each call's own headers name.
-fn proxied(launch: &Launch) -> Option<lys_runner::tracking_proxy::ProxyTracking> {
-    let run = launch
+///
+/// A launch that names no run key does not go through the proxy and is
+/// tracked through none. One that names a key and no profile version that
+/// reads is refused by name: its calls would be forwarded and paid for with
+/// the runner never told to count them, so it is never started untracked
+/// in silence.
+fn proxied(
+    launch: &Launch,
+) -> Result<Option<lys_runner::tracking_proxy::ProxyTracking>, ServerError> {
+    let Some(run) = launch
         .environment
-        .get(lys_home::harness::rendering::RUN_VARIABLE)?;
+        .get(lys_home::harness::rendering::RUN_VARIABLE)
+    else {
+        return Ok(None);
+    };
+    let refused = |what: &str| ServerError::LaunchUnrenderable {
+        reason: format!(
+            "the launch of session {} names a run key ({}) and {what}, so its model calls \
+             could not be counted; the start is refused",
+            launch.session,
+            lys_home::harness::rendering::RUN_VARIABLE
+        ),
+    };
     let profile_version = launch
         .environment
-        .get("LYS_PROVISIONING_VERSION")?
-        .parse()
-        .ok()?;
-    Some(lys_runner::tracking_proxy::ProxyTracking {
+        .get(PROFILE_VERSION_VARIABLE)
+        .ok_or_else(|| refused("no profile version (LYS_PROVISIONING_VERSION is absent)"))?
+        .parse::<u32>()
+        .map_err(|error| {
+            refused(&format!(
+                "a profile version that does not read as a number \
+                 (LYS_PROVISIONING_VERSION: {error})"
+            ))
+        })?;
+    Ok(Some(lys_runner::tracking_proxy::ProxyTracking {
         run: run.clone(),
         context_window: 0,
         profile_version,
         account: None,
-    })
+    }))
 }
+
+/// The variable a launch names its profile version in.
+const PROFILE_VERSION_VARIABLE: &str = "LYS_PROVISIONING_VERSION";
 
 pub(crate) fn record_after_end<T>(
     ending: Result<(), ServerError>,

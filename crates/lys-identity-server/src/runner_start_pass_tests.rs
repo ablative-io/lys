@@ -46,6 +46,70 @@ fn a_launch_without_native_config_issues_no_agent_pass() -> TestResult {
     assert!(!file.exists());
     Ok(())
 }
+/// A launch that names a run key goes through the proxy. Without a profile
+/// version that reads, the runner could not be told to count it, so the
+/// start is refused by name and no pass is issued for it.
+#[test]
+fn a_run_key_without_a_profile_version_that_reads_refuses_the_start_by_name() -> TestResult {
+    use lys_home::harness::rendering::RUN_VARIABLE;
+    let dir = tempfile::tempdir()?;
+    let file = dir.path().join("passes.json");
+    let mut passes = Passes::open(file.clone())?;
+    let run = "0123456789abcdef0123456789abcdef";
+    for (version, named) in [(None, "is absent"), (Some("one"), "does not read")] {
+        for configured in [false, true] {
+            let mut keyed = launch(configured);
+            keyed
+                .environment
+                .insert(RUN_VARIABLE.to_owned(), run.to_owned());
+            if let Some(version) = version {
+                keyed
+                    .environment
+                    .insert("LYS_PROVISIONING_VERSION".to_owned(), version.to_owned());
+            }
+            let answered = act(
+                &mut passes,
+                AgentId::from_bytes([1; 16]),
+                "http://fixture.test",
+                keyed,
+                None,
+            );
+            let reason = match answered {
+                Err(ServerError::LaunchUnrenderable { reason }) => reason,
+                other => return Err(format!("{version:?} was answered {other:?}").into()),
+            };
+            assert!(reason.contains(named), "{reason}");
+            assert!(reason.contains("LYS_PROVISIONING_VERSION"), "{reason}");
+            assert!(reason.contains("session-fixture"), "{reason}");
+            assert!(!passes.has_session("session-fixture")?);
+        }
+    }
+    assert!(!file.exists());
+    // The same launch with a version that reads is started under its key.
+    let mut keyed = launch(true);
+    keyed
+        .environment
+        .insert(RUN_VARIABLE.to_owned(), run.to_owned());
+    keyed
+        .environment
+        .insert("LYS_PROVISIONING_VERSION".to_owned(), "7".to_owned());
+    let selected = act(
+        &mut passes,
+        AgentId::from_bytes([1; 16]),
+        "http://fixture.test",
+        keyed,
+        None,
+    )?;
+    let Act::Start {
+        proxy: Some(tracking),
+        ..
+    } = selected
+    else {
+        return Err("a keyed launch with its version was not started under its key".into());
+    };
+    assert_eq!((tracking.run.as_str(), tracking.profile_version), (run, 7));
+    Ok(())
+}
 #[test]
 fn concurrent_start_selection_issues_one_pass() -> TestResult {
     let dir = tempfile::tempdir()?;
