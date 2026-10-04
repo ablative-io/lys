@@ -118,8 +118,7 @@ fn failed_pass_end_and_receipt_both_name_their_failure() {
     assert!(error.contains("durable ending failed"));
     assert!(error.contains("receipt append failed"));
 }
-#[path = "../tests/support/harness_description.rs"]
-mod harness_description;
+use crate::harness_description;
 /// The start-command path: the start is rendered, kept as a view, and the
 /// launch the runner is sent is built from that kept view alone.
 #[test]

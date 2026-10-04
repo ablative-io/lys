@@ -1,6 +1,5 @@
 #![cfg(test)]
-#[path = "../tests/support/harness_description.rs"]
-mod harness_description;
+use crate::harness_description;
 use super::build;
 use crate::agent_pass_store::Passes;
 use crate::launch_template::{Start, from_template, render};
