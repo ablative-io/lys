@@ -215,6 +215,14 @@ pub struct Config {
     /// own setup says.
     #[serde(default)]
     pub model_proxy: Option<String>,
+    /// Where Lys's model proxy on this machine keeps what it recorded: its
+    /// `home` (every call whole) and its `state` (each run's usage file).
+    /// The service only reads there, to show a person an agent's calls; it
+    /// never writes, and nothing a call waits on reads it. Without it the
+    /// calls of this machine's runs cannot be shown, and that is said by
+    /// name.
+    #[serde(default)]
+    pub proxy_dir: Option<PathBuf>,
     /// The compiled screens the service serves at `/`, its own routes then
     /// answering under `/api`. Without it the routes answer at the root and
     /// no screen is served.

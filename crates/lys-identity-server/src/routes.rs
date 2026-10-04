@@ -68,6 +68,9 @@ pub struct AppState {
     /// Lys's model proxy for Anthropic calls, given to each Claude Code run
     /// Lys starts as its base URL; absent, runs reach their provider directly.
     pub model_proxy: Option<String>,
+    /// Where the model proxy on this machine keeps its records, read to
+    /// show an agent's calls; absent, they cannot be shown.
+    pub proxy_dir: Option<PathBuf>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.

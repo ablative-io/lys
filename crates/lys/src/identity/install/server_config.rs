@@ -175,6 +175,8 @@ pub fn render(
         "runner_socket": layout.runner_socket().display().to_string(),
     });
     rendered["model_proxy"] = Value::String(carried.ports.proxy_url());
+    // Where that proxy keeps its records, so the service can show a person an agent's calls.
+    rendered["proxy_dir"] = Value::String(layout.data_dir().join("proxy").display().to_string());
     // When the issuer an earlier configuration named is not this one, the
     // sign-in service moved: the service is handed the earlier issuer and
     // records the move in the directory once, and the administrator's login
