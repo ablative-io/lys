@@ -47,6 +47,10 @@ impl Reader {
                     input: Pending::default(),
                     ended: false,
                 })))
+            } else if encoding.eq_ignore_ascii_case(b"br") {
+                Some(Codec::Brotli(Box::new(Brotli(
+                    brotli_decompressor::Decompressor::new(Pending::default(), CHUNK),
+                ))))
             } else {
                 None
             };
@@ -157,6 +161,18 @@ impl Read for Pending {
 enum Codec {
     Gzip(Box<MultiGzDecoder<Pending>>),
     Deflate(Box<Inflater>),
+    Brotli(Box<Brotli>),
+}
+
+/// The br decoder over what has arrived. It reads its input through
+/// [`Pending`], so a read with no input yet is `WouldBlock` and loses
+/// nothing: the decoder keeps its state and goes on at the next read.
+struct Brotli(brotli_decompressor::Decompressor<Pending>);
+
+impl std::fmt::Debug for Brotli {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Brotli")
+    }
 }
 
 impl Codec {
@@ -164,6 +180,7 @@ impl Codec {
         match self {
             Self::Gzip(codec) => codec.get_mut(),
             Self::Deflate(codec) => &mut codec.input,
+            Self::Brotli(codec) => codec.0.get_mut(),
         }
     }
 
@@ -171,6 +188,7 @@ impl Codec {
         match self {
             Self::Gzip(codec) => codec.read(output),
             Self::Deflate(codec) => codec.read(output),
+            Self::Brotli(codec) => codec.0.read(output),
         }
     }
 }

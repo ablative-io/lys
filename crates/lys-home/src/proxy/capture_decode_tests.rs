@@ -169,13 +169,28 @@ async fn a_deflate_stream_is_complete_with_parts_and_unchanged_client_bytes() ->
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_br_stream_is_complete_and_wrong_or_cut_br_bytes_never_complete_a_call() -> Res {
+    // The gzip fixture's own stream, encoded br.
+    let mut plain = Vec::new();
+    std::io::Read::read_to_end(&mut flate2::read::GzDecoder::new(GZIP), &mut plain)?;
+    let mut encoder = brotli::CompressorWriter::new(Vec::new(), 4096, 5, 22);
+    encoder.write_all(&plain)?;
+    let sent = encoder.into_inner();
+    round_trip(Some("br"), &sent, CallStatus::Complete).await?;
+    round_trip(Some("BR"), &sent, CallStatus::Complete).await?;
+    round_trip(Some("br"), &sent[..sent.len() - 2], CallStatus::Partial).await?;
+    // Bytes that are not br are not guessed at.
+    round_trip(Some("br"), GZIP, CallStatus::Partial).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concatenated_gzip_members_are_one_complete_stream() -> Res {
     round_trip(Some("GZip"), MEMBERS, CallStatus::Complete).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn unsupported_encodings_are_not_guessed_from_gzip_bytes() -> Res {
-    for encoding in ["br", "zstd", "unknown", "gzip, br"] {
+    for encoding in ["zstd", "unknown", "gzip, br"] {
         round_trip(Some(encoding), GZIP, CallStatus::Partial).await?;
     }
     Ok(())
