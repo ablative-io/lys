@@ -211,14 +211,14 @@ async fn a_secret_is_added_replaced_and_retired_and_its_value_goes_only_upstream
     assert_eq!(again["repeated"], true);
     // The same operation with another route is refused by name.
     let other = add(VALUE, "https://elsewhere.example")?;
-    let reused = crate::values::add(
+    let again = crate::values::add(
         State(Arc::clone(&shared)),
         vouched(&key, ("POST", "/_lys/add"), PERSON, &other)?,
     )
     .await
     .err()
     .ok_or("a reused operation id was applied")?;
-    assert!(reused.1.starts_with("OperationReused"), "{}", reused.1);
+    assert!(again.1.starts_with("OperationReused"), "{}", again.1);
     // A body that does not read is refused in fixed words, never quoting it.
     let mut quoted = serde_json::Map::new();
     quoted.insert(VALUE.to_owned(), Value::from(VALUE));

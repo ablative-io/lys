@@ -55,11 +55,13 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
         .unwrap_or_default()
         .to_owned();
     let path = parts.uri.path().to_owned();
-    log.lock().expect("fixture lock poisoned").push(Received {
-        path: path.clone(),
-        on_behalf_of: on_behalf_of.clone(),
-        body: body.to_vec(),
-    });
+    log.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(Received {
+            path: path.clone(),
+            on_behalf_of: on_behalf_of.clone(),
+            body: body.to_vec(),
+        });
     let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
     let named = |member: &str| asked[member].as_str().unwrap_or_default().to_owned();
     match path.as_str() {
@@ -135,7 +137,7 @@ async fn setup(subject: &str) -> Result<Setup, Box<dyn Error>> {
     let say: lys_identity_server::Say = Arc::new(move |line| {
         saying
             .lock()
-            .expect("fixture lock poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(line.to_owned());
     });
     let (service, seeded) = Box::pin(Service::start_saying(
@@ -172,7 +174,9 @@ fn login(subject: &str) -> Login {
 }
 
 fn received(log: &Log) -> Vec<Received> {
-    log.lock().expect("fixture lock poisoned").clone()
+    log.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
 }
 
 /// Neither the answers, nor any line the service said, nor any file under
@@ -182,7 +186,7 @@ fn never_kept(setup: &Setup, text: &str) -> TestResult {
         !setup
             .said
             .lock()
-            .expect("fixture lock poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .iter()
             .any(|line| line.contains(text)),
         "a line the service said carries the value"

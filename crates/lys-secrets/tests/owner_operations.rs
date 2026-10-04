@@ -227,6 +227,40 @@ fn the_settings_answer_the_last_operation_applied() -> TestResult {
     Ok(())
 }
 
+/// A replace or a retire sent again answers only the one it belongs to:
+/// anyone else who learned its operation id is refused as the owner check
+/// refuses, and reads neither the sequence nor when the name was retired.
+#[test]
+fn a_repeated_replace_or_retire_answers_only_its_owner() -> TestResult {
+    const REPLACE: &str = "replace-value-00003";
+    const RETIRE: &str = "retire-secret-00004";
+    const STRANGER: &str = "person:eve";
+    let world = world()?;
+    let mut broker = sealed(&world)?;
+    let next = Secret::from_slice(b"value-three");
+
+    let (first, sequence) = broker.replace_secret(OWNER, (SECRET, &next), (None, Some(REPLACE)))?;
+    assert!(matches!(first, OwnerChanged::Applied));
+    let (again, repeated) = broker.replace_secret(OWNER, (SECRET, &next), (None, Some(REPLACE)))?;
+    assert!(matches!(again, OwnerChanged::Repeated { .. }));
+    assert_eq!(repeated, sequence, "its owner reads where it stands");
+    assert_eq!(
+        refusal(broker.replace_secret(STRANGER, (SECRET, &next), (None, Some(REPLACE)))),
+        "LendingNotPermitted"
+    );
+
+    let (first, at) = broker.retire_secret(OWNER, SECRET, (None, Some(RETIRE)))?;
+    assert!(matches!(first, OwnerChanged::Applied));
+    let (again, repeated) = broker.retire_secret(OWNER, SECRET, (None, Some(RETIRE)))?;
+    assert!(matches!(again, OwnerChanged::Repeated { .. }));
+    assert_eq!(repeated, at, "the one who retired it reads when");
+    assert_eq!(
+        refusal(broker.retire_secret(STRANGER, SECRET, (None, Some(RETIRE)))),
+        "LendingNotPermitted"
+    );
+    Ok(())
+}
+
 /// What a start must answer of the changes made under `FIRST` and `SECOND`.
 fn holds_both(broker: &mut Broker<LocalGrants>) -> TestResult {
     assert_eq!(last(broker)?.as_deref(), Some(SECOND));

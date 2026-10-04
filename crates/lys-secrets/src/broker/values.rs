@@ -80,6 +80,9 @@ impl<P: PermissionCheck> Broker<P> {
         let change = format!("{REPLACED}value");
         let call = match self.owner_admission(name, operation, &change)? {
             Admission::Repeated(outcome) => {
+                // Only its owner reads where the secret stands, also when the
+                // operation is one already answered.
+                self.owns(owner, name)?;
                 let sequence = self.store.entry(name).map_or(0, |entry| entry.sequence);
                 return Ok((OwnerChanged::Repeated { outcome }, sequence));
             }
@@ -119,7 +122,15 @@ impl<P: PermissionCheck> Broker<P> {
         let change = format!("{RETIRED}{name}");
         let call = match self.owner_admission(name, operation, &change)? {
             Admission::Repeated(outcome) => {
-                let at = self.store.retired(name).map_or(0, |retired| retired.at_ms);
+                // Only the one who retired it reads when; anyone else is
+                // answered as the owner check answers.
+                let at = match self.store.retired(name) {
+                    Some(retired) if retired.by == owner => retired.at_ms,
+                    _ => {
+                        self.owns(owner, name)?;
+                        0
+                    }
+                };
                 return Ok((OwnerChanged::Repeated { outcome }, at));
             }
             Admission::Fresh(call) => call,

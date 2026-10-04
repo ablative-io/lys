@@ -270,8 +270,11 @@ async fn a_lys_served_only_on_its_own_computer_gives_no_code() -> TestResult {
     Ok(())
 }
 
+/// A file's path and everything in it.
+type Read = (std::path::PathBuf, Vec<u8>);
+
 /// Every regular file under `dir`, read whole.
-fn files(dir: &Path) -> Result<Vec<(std::path::PathBuf, Vec<u8>)>, Box<dyn Error>> {
+fn files(dir: &Path) -> Result<Vec<Read>, Box<dyn Error>> {
     let mut found = Vec::new();
     let mut dirs = vec![dir.to_owned()];
     while let Some(dir) = dirs.pop() {

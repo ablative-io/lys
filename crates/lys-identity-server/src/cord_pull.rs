@@ -24,7 +24,7 @@ use lys_runner::{Act, Answer};
 use sha2::{Digest, Sha256};
 
 use crate::cord_api::with_cord;
-use crate::cord_store::{HandlesRefused, Named, Pull, PullResult, Pulling, Unreached};
+use crate::cord_store::{CordStore, HandlesRefused, Named, Pull, PullResult, Pulling, Unreached};
 use crate::error::ServerError;
 use crate::network_api::with_network;
 use crate::routes::{AppState, hex, with_directory};
@@ -62,7 +62,11 @@ pub(crate) async fn pull(
         Pulling::Go(pull) => pull,
     };
     let open = ask_sessions(state, &pull)?;
-    let machines: BTreeSet<String> = open.iter().map(|open| open.machine.clone()).collect();
+    // Every computer that names a runner is asked, whether or not Lys holds a
+    // session open on it: a session Lys does not track, or one started as the
+    // cord was pulled, is stopped with the rest.
+    let mut machines: BTreeSet<String> = open.iter().map(|open| open.machine.clone()).collect();
+    machines.extend(runner_machines(state)?);
     let mut asking = tokio::task::JoinSet::new();
     for machine in machines {
         let (state, pull) = (Arc::clone(state), pull.clone());
@@ -71,6 +75,10 @@ pub(crate) async fn pull(
             (machine, answer)
         });
     }
+    // The runners are already being asked; each agent's credentials end now,
+    // not after the slowest runner has answered.
+    let agents: BTreeSet<String> = open.iter().filter_map(|open| open.agent.clone()).collect();
+    let (handles_ended, handles_refused) = end_handles(state, headers, &pull, &agents).await;
     let mut ended: Vec<(String, String)> = Vec::new();
     let mut running: Vec<(String, String)> = Vec::new();
     let mut unreached: Vec<(String, String, String)> = Vec::new();
@@ -92,20 +100,15 @@ pub(crate) async fn pull(
         }
     }
     record_stopped(state, &pull, &ended)?;
-    let agents: BTreeSet<String> = open.iter().filter_map(|open| open.agent.clone()).collect();
-    let (handles_ended, handles_refused) = end_handles(state, headers, &pull, &agents).await;
-    let confirmed: BTreeSet<&str> = ended.iter().map(|(_, session)| session.as_str()).collect();
+    // A session is confirmed stopped only by the runner of the computer it
+    // is tracked on: another computer's runner naming it confirms nothing.
+    let ended: BTreeSet<(String, String)> = ended.into_iter().collect();
     let mut still: BTreeSet<(String, String)> = open
         .iter()
-        .filter(|open| !confirmed.contains(open.session.as_str()))
         .map(|open| (open.machine.clone(), open.session.clone()))
+        .filter(|held| !ended.contains(held))
         .collect();
-    still.extend(
-        running
-            .into_iter()
-            .filter(|(_, session)| !confirmed.contains(session.as_str())),
-    );
-    let ended: BTreeSet<(String, String)> = ended.into_iter().collect();
+    still.extend(running.into_iter().filter(|held| !ended.contains(held)));
     let names = Names::read(state, &open, ended.iter().chain(&still), &unreached)?;
     let result = PullResult {
         operation: pull.operation.clone(),
@@ -215,6 +218,43 @@ async fn ask_runner(state: &Arc<AppState>, machine: &str, pull: &Pull) -> Asked 
         )),
         Err(error) => Err(named(&error)),
     }
+}
+
+/// Every computer in use that names a runner. A retired computer is asked
+/// only when Lys still holds a session open on it.
+fn runner_machines(state: &AppState) -> Result<BTreeSet<String>, ServerError> {
+    if state.network.is_none() {
+        return Ok(BTreeSet::new());
+    }
+    with_network(state, |store| {
+        Ok(store
+            .machines()
+            .iter()
+            .filter(|machine| machine.retired.is_none() && store.runner(&machine.id).is_some())
+            .map(|machine| machine.id.clone())
+            .collect())
+    })
+}
+
+/// A start that crossed a pull: its session was tracked after the pull had
+/// asked its computer, so nothing ended it. That computer is asked again
+/// under the pull in force, and what it ends is recorded as that pull's
+/// own. Nothing is asked when no pull is in force.
+pub(crate) async fn end_late_start(
+    state: &Arc<AppState>,
+    machine: &str,
+) -> Result<(), ServerError> {
+    let Some(pull) = with_cord(state, CordStore::standing)? else {
+        return Ok(());
+    };
+    let (stopped, _) = ask_runner(state, machine, &pull)
+        .await
+        .map_err(|(refusal, words)| ServerError::Runner { refusal, words })?;
+    let ended: Vec<(String, String)> = stopped
+        .into_iter()
+        .map(|session| (machine.to_owned(), session))
+        .collect();
+    record_stopped(state, &pull, &ended)
 }
 
 /// Record every session a runner ended by this pull as stopped, in one

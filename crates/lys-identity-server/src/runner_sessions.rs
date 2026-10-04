@@ -410,6 +410,15 @@ pub async fn run_on_runner(
     if let Some(ended) = &ended {
         record_end(state, &driven, ended)?;
     }
+    // A pull recorded while the runner was starting this session never asked
+    // for it. The cord is read again now the session is tracked: under a
+    // pull its computer is asked again, and the start is refused.
+    if ended.is_none()
+        && let Err(stopped) = crate::cord_api::refuse_start(state)
+    {
+        crate::cord_pull::end_late_start(state, machine).await?;
+        return Err(stopped);
+    }
     Ok(json!({
         "session": driven.session,
         "state": if ended.is_some() { "ended" } else { "running" },

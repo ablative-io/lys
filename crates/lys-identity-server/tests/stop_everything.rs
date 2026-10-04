@@ -394,6 +394,50 @@ async fn a_start_while_everything_is_stopped_is_refused_and_goes_through_after_r
     table.close()
 }
 
+/// A start and a pull sent together: whichever the service takes first, once
+/// both have answered no session of the agent is left running under the
+/// pulled cord, and a start that was answered as started was stopped by it.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_start_sent_as_the_cord_is_pulled_is_never_left_running() -> TestResult {
+    let table = Table::set().await?;
+    let adas = table.agent(0);
+    table.profile(&adas).await?;
+    for round in 0..6 {
+        let body = json!({ "operation": operation()?, "reason": "a runaway loop", "kill": true });
+        let (start, pull) = tokio::join!(table.start(&adas), table.pull(&table.ada, &body));
+        let (start, (status, pulled)) = (start?, pull?);
+        assert_eq!(status, 200, "round {round}: {pulled}");
+        if start.0 != 200 {
+            refused(&start, 409, "everything_stopped");
+        }
+        let (status, sessions) = table
+            .service
+            .get(
+                &format!("/agents/{adas}/runtime/sessions"),
+                Some(&table.ada),
+            )
+            .await?;
+        assert_eq!(status, 200, "{sessions}");
+        let live: Vec<&Value> = sessions["sessions"]
+            .as_array()
+            .map(|all| {
+                all.iter()
+                    .filter(|each| each["shown"] != "stopped")
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(
+            live.is_empty(),
+            "round {round}: a session runs under a pulled cord; the start answered {}: {sessions}",
+            start.0
+        );
+        let release = json!({ "operation": operation()? });
+        let (status, released) = table.release(&table.ada, &release).await?;
+        assert_eq!(status, 200, "{released}");
+    }
+    table.close()
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn only_the_administrator_pulls_or_releases_and_anyone_signed_in_reads_how_it_stands()
 -> TestResult {
