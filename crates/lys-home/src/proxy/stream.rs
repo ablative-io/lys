@@ -18,6 +18,7 @@ use crate::proxy::stream_messages::MessagesAssembler;
 use crate::proxy::stream_responses::ResponsesAssembler;
 use crate::proxy::stream_sse::{SseEvent, SseFramer};
 use crate::record::call::Api;
+use crate::record::call::captured::Tokens;
 
 /// One api's grammar.
 #[derive(Debug)]
@@ -79,6 +80,18 @@ impl StreamReader {
         match &self.grammar {
             Grammar::Messages(g) => g.message_id(),
             Grammar::Chat(_) | Grammar::Responses(_) => None,
+        }
+    }
+
+    /// The token figures the stream has reported so far: a Messages stream's
+    /// `message_start` and `message_delta`, a Responses stream's
+    /// `response.completed`. A Chat Completions stream's are not read here.
+    #[must_use]
+    pub fn tokens(&self) -> Option<Tokens> {
+        match &self.grammar {
+            Grammar::Messages(g) => g.tokens(),
+            Grammar::Responses(g) => g.tokens(),
+            Grammar::Chat(_) => None,
         }
     }
 

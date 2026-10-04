@@ -203,12 +203,20 @@ impl Call {
                 .as_ref()
                 .and_then(Reader::message_id)
                 .map(str::to_owned);
+            // What a stream that stopped short had reported by then; a
+            // stream read to its end gives its whole figures below.
+            let mut tokens = s.reader.as_ref().and_then(Reader::tokens);
             let parts = s.reader.take().and_then(|reader| {
                 if end != End::Complete {
                     return None;
                 }
-                match reader.finish() {
-                    Ok(parts) => parts,
+                match reader.finish_counted() {
+                    Ok((parts, counted)) => {
+                        if counted.is_some() {
+                            tokens = counted;
+                        }
+                        parts
+                    }
                     Err(error) => {
                         eprintln!(
                             "lys-proxy: response_decode_failed: call {}: {error}",
@@ -248,6 +256,7 @@ impl Call {
                 timing,
                 seen: Seen {
                     message_id,
+                    tokens,
                     head: std::mem::take(&mut s.seen.head),
                     unrecorded,
                 },

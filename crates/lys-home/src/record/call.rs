@@ -87,6 +87,11 @@ pub struct CallRecord {
     /// for the same call. Absent when no `message_start` was read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
+    /// The token figures the response reported, read from its event stream
+    /// in the one pass as it went by. Absent when the stream reported none,
+    /// and for a response that was not an event stream.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<captured::Tokens>,
     /// The provider's id for the request, from the response's `request-id`
     /// header (`x-request-id` where that is the provider's): the harness's
     /// `requestId` for the same call. Absent when the response named none.
@@ -223,6 +228,7 @@ pub fn ingest_call(
         api: meta.api,
         model: Some(meta.model.clone()),
         message_id: None,
+        usage: None,
         request_id: None,
         head: None,
         unrecorded_reason: None,
@@ -274,6 +280,7 @@ pub fn ingest_call_files(
         api: meta.api,
         model: Some(meta.model.clone()),
         message_id: None,
+        usage: None,
         request_id: None,
         head: None,
         unrecorded_reason: None,
@@ -342,6 +349,7 @@ pub fn ingest_outcome(
         api: meta.api,
         model,
         message_id: None,
+        usage: None,
         request_id: None,
         head: None,
         unrecorded_reason: None,

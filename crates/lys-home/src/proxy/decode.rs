@@ -10,6 +10,7 @@ use serde_json::Value;
 
 use super::stream::StreamReader;
 use crate::record::call::Api;
+use crate::record::call::captured::Tokens;
 
 const CHUNK: usize = 8192;
 
@@ -83,16 +84,38 @@ impl Reader {
         }
     }
 
+    /// The token figures the stream reader has read so far. A compressed
+    /// stream's last events may still be undecoded: [`Reader::finish_counted`]
+    /// gives the figures of the whole stream.
+    pub(super) fn tokens(&self) -> Option<Tokens> {
+        match &self.coding {
+            Coding::Plain(reader) => reader.tokens(),
+            Coding::Compressed(decoder) => decoder.reader.tokens(),
+        }
+    }
+
+    /// The response's parts, as [`Reader::finish_counted`] gives them.
+    #[cfg(test)]
     pub(super) fn finish(self) -> io::Result<Option<Vec<Value>>> {
+        self.finish_counted().map(|(parts, _)| parts)
+    }
+
+    /// The response's parts when the stream ended whole, and the token
+    /// figures it reported, read after the last of it was decoded.
+    pub(super) fn finish_counted(self) -> io::Result<(Option<Vec<Value>>, Option<Tokens>)> {
         match self.coding {
-            Coding::Plain(reader) => Ok((*reader).finish()),
+            Coding::Plain(reader) => {
+                let tokens = reader.tokens();
+                Ok(((*reader).finish(), tokens))
+            }
             Coding::Compressed(mut decoder) => {
                 decoder.codec.input().finished = true;
                 decoder.drain()?;
                 if !decoder.ended {
                     return Err(invalid("compressed response ended before its trailer"));
                 }
-                Ok(decoder.reader.finish())
+                let tokens = decoder.reader.tokens();
+                Ok((decoder.reader.finish(), tokens))
             }
         }
     }

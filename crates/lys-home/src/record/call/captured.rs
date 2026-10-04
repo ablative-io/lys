@@ -95,10 +95,83 @@ pub struct Seen {
     /// The provider's id for the response message, from a Messages stream's
     /// `message_start`.
     pub message_id: Option<String>,
+    /// The token figures the response's event stream reported, read as it
+    /// passed; absent when the stream reported none.
+    pub tokens: Option<Tokens>,
     /// The status and the kept headers.
     pub head: Head,
     /// Why the proxy marked the call unrecorded, when it did.
     pub unrecorded: Option<String>,
+}
+
+/// The token figures a provider reported for one call, each as the response
+/// named it and none computed here. A figure the response did not carry is
+/// absent, never zero.
+///
+/// The two providers count input differently and the figures are kept as
+/// reported: a Messages response's `input_tokens` leaves out what was read
+/// from or written to the cache, and a Responses response's `input_tokens`
+/// includes its cached tokens.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Tokens {
+    /// Input tokens, as the provider counts them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<u64>,
+    /// Output tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<u64>,
+    /// Tokens written to the cache (Messages: `cache_creation_input_tokens`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_creation: Option<u64>,
+    /// Tokens read from the cache (Messages: `cache_read_input_tokens`;
+    /// Responses: `input_tokens_details.cached_tokens`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read: Option<u64>,
+    /// Output tokens spent reasoning (Responses:
+    /// `output_tokens_details.reasoning_tokens`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<u64>,
+}
+
+impl Tokens {
+    /// Take each figure `usage` names under `names`, leaving a figure it
+    /// does not name as it was: a later report of the same call replaces
+    /// only what it carries.
+    pub fn read(&mut self, usage: &Value, names: &[(&str, TokenFigure)]) {
+        for (name, figure) in names {
+            let Some(count) = usage.get(*name).and_then(Value::as_u64) else {
+                continue;
+            };
+            match figure {
+                TokenFigure::Input => self.input = Some(count),
+                TokenFigure::Output => self.output = Some(count),
+                TokenFigure::CacheCreation => self.cache_creation = Some(count),
+                TokenFigure::CacheRead => self.cache_read = Some(count),
+                TokenFigure::Reasoning => self.reasoning = Some(count),
+            }
+        }
+    }
+
+    /// These figures, or none when the response carried no figure at all.
+    #[must_use]
+    pub fn reported(&self) -> Option<Self> {
+        (*self != Self::default()).then(|| self.clone())
+    }
+}
+
+/// Which figure of [`Tokens`] a provider's member names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TokenFigure {
+    /// [`Tokens::input`].
+    Input,
+    /// [`Tokens::output`].
+    Output,
+    /// [`Tokens::cache_creation`].
+    CacheCreation,
+    /// [`Tokens::cache_read`].
+    CacheRead,
+    /// [`Tokens::reasoning`].
+    Reasoning,
 }
 
 /// The response headers that carry the provider's id for the request, in the
@@ -243,6 +316,7 @@ impl PreparedCall {
                 api: meta.api,
                 model,
                 message_id: input.seen.message_id.clone(),
+                usage: input.seen.tokens.clone(),
                 request_id: input.seen.head.request_id(),
                 head: (input.seen.head != Head::default()).then(|| input.seen.head.clone()),
                 unrecorded_reason: reason.filter(|_| status == CallStatus::Unrecorded),

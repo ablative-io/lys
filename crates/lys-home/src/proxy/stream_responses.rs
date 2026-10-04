@@ -17,6 +17,7 @@
 use serde_json::Value;
 
 use crate::proxy::stream_sse::SseEvent;
+use crate::record::call::captured::{TokenFigure, Tokens};
 
 /// A Responses stream being assembled.
 #[derive(Debug, Default)]
@@ -71,6 +72,31 @@ impl ResponsesAssembler {
             self.items.resize_with(index + 1, || None);
         }
         self.items[index] = Some(item.clone());
+    }
+
+    /// The token figures of the completed response's `usage`: `input_tokens`
+    /// and `output_tokens`, the cached part of the input under
+    /// `input_tokens_details.cached_tokens` and the reasoning part of the
+    /// output under `output_tokens_details.reasoning_tokens`. None until
+    /// `response.completed` was read, and when it carried no figure.
+    #[must_use]
+    pub fn tokens(&self) -> Option<Tokens> {
+        let usage = self.completed.as_ref()?.get("usage")?;
+        let mut tokens = Tokens::default();
+        tokens.read(
+            usage,
+            &[
+                ("input_tokens", TokenFigure::Input),
+                ("output_tokens", TokenFigure::Output),
+            ],
+        );
+        if let Some(details) = usage.get("input_tokens_details") {
+            tokens.read(details, &[("cached_tokens", TokenFigure::CacheRead)]);
+        }
+        if let Some(details) = usage.get("output_tokens_details") {
+            tokens.read(details, &[("reasoning_tokens", TokenFigure::Reasoning)]);
+        }
+        tokens.reported()
     }
 
     /// The response's output items, only when the stream ended whole.
