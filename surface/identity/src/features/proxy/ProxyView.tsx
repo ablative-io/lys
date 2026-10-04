@@ -1,6 +1,6 @@
 /**
- * The proxy, read: every agent, the model calls its runs made, and one call whole, its request and its response as the
- * provider's own JSON, set out to be read. Three columns, each scrolling in itself; the address holds what is chosen,
+ * The proxy, read: every agent, the model calls its runs made, and one call whole: first read as what went in and what
+ * came out, then its request and its response as the provider's own JSON, in colour. Three columns, each scrolling in itself; the address holds what is chosen,
  * so a call can be linked to.
  */
 import { useEffect, useState } from 'react';
@@ -11,9 +11,16 @@ import type { Board } from '../dashboard/board';
 import { refusedPart } from '../dashboard/contract';
 import { clockOf } from '../file/time';
 import { readCall, readCalls } from './contract';
+import { Coloured } from './json-colour';
+import { ProxyRead } from './ProxyRead';
 import type { CallRow, CallView, CallsView, HeadSide } from './contract';
 
 const HTTP_OK = 200;
+/** How a call ended, in words for the list, and what the word means. The record's own word is on the call when it is opened. */
+const ENDED: Partial<Record<string, [string, string]>> = {
+  unrecorded: ['No complete response', 'What the provider answered was not a complete response, so no usage was reported. Open the call to see what it answered.'],
+  lost: ['Lost in flight', 'The proxy stopped before the response ended. What the call spent is not known.'],
+};
 import './proxy.css';
 
 const count = (value: number | null): string => value === null ? '' : value.toLocaleString('en-AU');
@@ -50,7 +57,7 @@ function Calls({ agent, chosen }: { agent: string; chosen: string | null }) {
     {rows.map((row) => <tr key={row.call_id} data-call={row.call_id} aria-current={chosen === row.call_id ? 'true' : undefined}>
       <td><a href={proxyHref({ agent, call: row.call_id })}>{clockOf(new Date(row.at_ms).toISOString())}</a></td>
       <td>{row.model ?? <span className="dim">Not readable</span>}</td>
-      <td className={row.status === 'complete' ? 'sec' : 'why-not'}>{row.status ?? <span className="dim">Not said</span>}</td>
+      <td className={row.status === 'complete' ? 'sec' : 'why-not'} title={row.status ? ENDED[row.status]?.[1] : undefined}>{row.status ? ENDED[row.status]?.[0] ?? row.status : <span className="dim">Not said</span>}</td>
       <td className="num">{count(row.input_tokens)}</td><td className="num">{count(row.output_tokens)}</td><td className="num">{count(row.cache_read_tokens)}</td>
       <td className="num">{took(row.duration_ms)}</td></tr>)}
     {rows.length ? null : <tr className="empty"><td className="dim" colSpan={7}>No call of this agent has been recorded.</td></tr>}
@@ -61,7 +68,7 @@ function Calls({ agent, chosen }: { agent: string; chosen: string | null }) {
   </td></tr></tfoot> : null}</table>;
 }
 
-const SHOWS = { request: 'Request', response: 'Response', headers: 'Headers' } as const;
+const SHOWS = { read: 'Read', request: 'Request', response: 'Response', headers: 'Headers' } as const;
 type Shows = keyof typeof SHOWS;
 
 function Side({ name, side }: { name: string; side: HeadSide | undefined }) {
@@ -77,7 +84,7 @@ function Body({ value, why, what }: { value: unknown; why: string | null; what: 
   const text = JSON.stringify(value, null, 2);
   return <>
     <button type="button" className="btn proxy-copy" data-act="copy-json" onClick={() => { void navigator.clipboard?.writeText(text).then(() => setCopied(true)); }}>{copied ? 'Copied' : 'Copy'}</button>
-    <pre className="proxy-json" data-json={what} tabIndex={0}>{text}</pre>
+    <pre className="proxy-json" data-json={what} tabIndex={0}><Coloured text={text} /></pre>
   </>;
 }
 
@@ -92,8 +99,9 @@ function Call({ agent, call, shows }: { agent: string; call: string; shows: Show
       {row.request_id ? <> · <small className="refusal-name">{row.request_id}</small></> : null}</p>
     {row.unrecorded_reason ? <p className="why-not" role="status">{row.unrecorded_reason}</p> : null}
     <div className="canvas-widget-variants proxy-shows" role="toolbar" aria-label="What of the call is shown">
-      {(Object.keys(SHOWS) as Shows[]).map((key) => <a key={key} href={proxyHref({ agent, call, shows: key === 'request' ? undefined : key })} data-shows={key} aria-current={shows === key ? 'true' : undefined}>{SHOWS[key]}</a>)}
+      {(Object.keys(SHOWS) as Shows[]).map((key) => <a key={key} href={proxyHref({ agent, call, shows: key === 'read' ? undefined : key })} data-shows={key} aria-current={shows === key ? 'true' : undefined}>{SHOWS[key]}</a>)}
     </div>
+    {shows === 'read' ? <ProxyRead request={request} response={response} unreadable={{ request: request_unreadable, response: response_unreadable }} /> : null}
     {shows === 'request' ? <Body value={request} why={request_unreadable} what="request" /> : null}
     {shows === 'response' ? <Body value={response} why={response_unreadable} what="response" /> : null}
     {shows === 'headers' ? <table className="usage-table proxy-headers"><tbody>
@@ -107,7 +115,8 @@ function Call({ agent, call, shows }: { agent: string; call: string; shows: Show
 export function ProxyView({ board }: { board: Load<Board> }) {
   const [search] = useSearchParams();
   const [agent, call] = [search.get('agent'), search.get('call')];
-  const shows: Shows = search.get('shows') === 'response' ? 'response' : search.get('shows') === 'headers' ? 'headers' : 'request';
+  const asked = search.get('shows');
+  const shows: Shows = asked !== null && asked in SHOWS ? asked as Shows : 'read';
   return <div className="proxy-view">
     <section aria-label="Agents"><Agents board={board} chosen={agent} /></section>
     <section aria-label="Calls">{agent ? <Calls agent={agent} chosen={call} /> : <p className="dim">Choose an agent to see the model calls its runs made.</p>}</section>

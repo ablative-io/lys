@@ -1,8 +1,12 @@
 /* The proxy view: three columns filling the page, each scrolling in itself; the page never scrolls. */
-.proxy-view { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(170px, 230px) minmax(420px, 1fr) minmax(420px, 1.3fr); gap: 12px; }
+.proxy-view { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(170px, 200px) minmax(560px, 1fr) minmax(420px, 1.2fr); gap: 12px; }
 .proxy-view > section { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-card); padding: 8px 10px; }
 .proxy-view table { width: 100%; }
 .proxy-view th.num, .proxy-view td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* A call's row stays on one line; only how it ended may wrap. */
+.proxy-calls th, .proxy-calls td { white-space: nowrap; padding-left: 6px; padding-right: 6px; font-size: 12.5px; }
+.proxy-calls td:nth-child(3) { white-space: normal; }
+.proxy-view table.proxy-calls { table-layout: auto; }
 .proxy-view tr[aria-current="true"] > td { background: var(--accent-glow, var(--surface-default)); }
 .proxy-call-line { margin: 2px 0 8px; font-size: 12.5px; color: var(--text-secondary); }
 .proxy-shows { padding: 0 0 8px; }
@@ -11,6 +15,21 @@
 .proxy-copy { float: right; margin: 0 0 6px 8px; font-size: 11.5px; padding: 2px 9px; }
 .proxy-json { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: #0b0b0e; color: var(--text-primary); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; clear: both; }
 .proxy-headers td:first-child { white-space: nowrap; }
+/* JSON in colour: names, quoted words, numbers, and true, false and null. */
+.proxy-json .json-name { color: #8ab4f8; }
+.proxy-json .json-word { color: #9ece9a; }
+.proxy-json .json-number { color: #e0af68; }
+.proxy-json .json-plain { color: #c79bf2; }
+/* A call read: what went in and what came out, each turn folded under its own line. */
+.proxy-read { clear: both; display: flex; flex-direction: column; gap: 14px; }
+.proxy-read h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-secondary); }
+.proxy-read details { margin: 0 0 6px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--surface-default); }
+.proxy-read summary { padding: 5px 10px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+.proxy-read summary .dim { font-weight: 400; margin-left: 6px; }
+.proxy-read details > .proxy-words, .proxy-read details > .proxy-piece { margin: 0; padding: 6px 10px 8px; border-top: 1px solid var(--border-subtle); }
+.proxy-words { margin: 0 0 8px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.proxy-piece > b { display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary); }
+.proxy-piece .proxy-json, .proxy-read .proxy-json { clear: none; }
 /* Operations swaps between the canvas and the proxy by one small bar at the top of the page, over either view. */
 .operations-swap { position: absolute; z-index: 9; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; padding: 3px; border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-card); box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
 .operations-swap a { padding: 4px 14px; border-radius: 999px; color: var(--text-secondary); font-size: 12.5px; text-decoration: none; }

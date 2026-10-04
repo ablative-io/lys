@@ -81,8 +81,15 @@ fn budget_put_and_get_describe_one_versioned_collection_and_the_used_invariant()
     let keys = used["properties"]
         .as_object()
         .ok_or("no used row properties")?;
-    assert_eq!(keys.len(), 5, "{used}");
-    for field in ["unit", "period", "figure", "since_ms", "unavailable"] {
+    assert_eq!(keys.len(), 6, "{used}");
+    for field in [
+        "unit",
+        "period",
+        "figure",
+        "since_ms",
+        "unavailable",
+        "reported",
+    ] {
         assert!(keys.contains_key(field), "{used}");
     }
     Ok(())

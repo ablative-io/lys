@@ -200,10 +200,7 @@ impl Index {
         since: Option<i64>,
         at_ms: i64,
     ) -> Result<crate::budgets_totals::Spend, String> {
-        let mut spend = crate::budgets_totals::Spend {
-            total: Some(0),
-            gap: None,
-        };
+        let mut spend = crate::budgets_totals::Spend::empty();
         for agent in agents.iter().filter_map(|agent| self.agents.get(agent)) {
             let added = agent
                 .totals
@@ -217,6 +214,7 @@ impl Index {
             {
                 spend.gap = Some(gap);
             }
+            spend.gaps += added.gaps;
         }
         Ok(spend)
     }

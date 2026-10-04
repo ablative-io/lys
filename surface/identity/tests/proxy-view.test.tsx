@@ -58,8 +58,9 @@ describe('The proxy view in Operations', () => {
     const cells = (id: string) => [...($('[data-call="' + id + '"]')?.querySelectorAll('td') ?? [])].map((each) => each.textContent);
     expect(cells('c1')).toEqual([clockOf('2026-10-04T06:00:00.000Z'), 'claude-fable-5-1', 'complete', '1,200', '340', '88,000', '2.4 s']);
     // A call that was not recorded is listed all the same and says how it ended; its figures are empty, not zero.
-    expect(cells('c2')).toEqual([clockOf('2026-10-04T06:00:00.000Z'), 'Not readable', 'unrecorded', '', '', '', '310 ms']);
-    expect($('[data-call="c2"] td.why-not')?.textContent).toBe('unrecorded');
+    expect(cells('c2')).toEqual([clockOf('2026-10-04T06:00:00.000Z'), 'Not readable', 'No complete response', '', '', '', '310 ms']);
+    expect($('[data-call="c2"] td.why-not')?.textContent).toBe('No complete response');
+    expect($('[data-call="c2"] td.why-not')?.getAttribute('title')).toContain('no usage was reported');
     expect($('[data-call="c1"] a')?.getAttribute('href')).toBe('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c1');
     await click($('[data-act="earlier-calls"]'));
     await settle();
@@ -69,11 +70,13 @@ describe('The proxy view in Operations', () => {
   });
 
   it('shows a call whole: its request and its response as the provider\'s JSON set out to be read, and its headers with no credential\'s value', async () => {
-    await mount('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c1', routes);
+    await mount('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c1&shows=request', routes);
     expect($('[data-call="c1"]')?.getAttribute('aria-current')).toBe('true');
     expect($('.proxy-call-line')?.textContent).toBe('claude-fable-5-1 · complete · HTTP 200 · 2.4 s · streamed · req_c1');
     expect($('[data-json="request"]')?.textContent).toBe(JSON.stringify(request, null, 2));
-    expect($$('[data-shows]').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['Request', 'true'], ['Response', null], ['Headers', null]]);
+    expect($$('[data-shows]').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['Read', null], ['Request', 'true'], ['Response', null], ['Headers', null]]);
+    // The JSON is in colour and is still the same text: a name, a quoted word and a number each in their own.
+    expect([$('[data-json="request"] .json-name')?.textContent, $('[data-json="request"] .json-word')?.textContent, $('[data-json="request"] .json-number')?.textContent]).toEqual(['"model"', '"claude-fable-5-1"', '32000']);
     await click($('[data-shows="response"]'));
     await settle();
     expect(location.hash).toBe('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c1&shows=response');
@@ -83,6 +86,12 @@ describe('The proxy view in Operations', () => {
     expect($$('[data-header]').map((each) => each.textContent)).toEqual(['authorizationValue not kept', 'anthropic-version2023-06-01', 'request-idreq_c1']);
     // A body that could not be read as JSON says so with why, and headers that are not on the record are said to be absent.
     await click($('[data-call="c2"] a'));
+    await settle();
+    // A call opens read; with no body to read it says so for each side, with why.
+    expect($('[data-shows="read"]')?.getAttribute('aria-current')).toBe('true');
+    expect($('[data-read="in"]')?.textContent).toContain('This call has no request that can be read as JSON. the body is not JSON: expected value at line 1 column 1');
+    expect($('[data-read="out"]')?.textContent).toContain('This call has no response that can be read as JSON. no body was recorded');
+    await click($('[data-shows="request"]'));
     await settle();
     expect(text()).toContain('This call has no request that can be read as JSON. the body is not JSON: expected value at line 1 column 1');
     expect($('.proxy-call-line')?.textContent).toBe('Model not readable · unrecorded · 310 ms');

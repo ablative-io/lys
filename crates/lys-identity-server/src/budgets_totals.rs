@@ -13,6 +13,8 @@ type Timeline = BTreeMap<(i64, usize), usize>;
 pub(crate) struct Spend {
     pub(crate) total: Option<u128>,
     pub(crate) gap: Option<usize>,
+    /// How many records in the period carry no figure for the unit.
+    pub(crate) gaps: usize,
 }
 
 impl Spend {
@@ -20,6 +22,7 @@ impl Spend {
         Self {
             total: Some(0),
             gap: None,
+            gaps: 0,
         }
     }
 
@@ -39,8 +42,11 @@ impl Spend {
             }
             Measure::PlanPercent | Measure::ContextPercent => false,
         });
-        if gap && self.gap.is_none_or(|earlier| position < earlier) {
-            self.gap = Some(position);
+        if gap {
+            self.gaps += 1;
+            if self.gap.is_none_or(|earlier| position < earlier) {
+                self.gap = Some(position);
+            }
         }
         let amount = match unit {
             Measure::Tokens => usage.tokens,
@@ -205,5 +211,40 @@ impl Totals {
             state,
         });
         Ok(state.spend[unit])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_period_sums_what_was_reported_and_counts_what_was_not() -> Result<(), String> {
+        let reported = |tokens| Usage {
+            tokens,
+            ..Usage::default()
+        };
+        let unreported = Usage {
+            unavailable: vec![lys_runner::tracking::Unavailable {
+                figure: "tokens".to_owned(),
+                reason: "the response reported no token figures".to_owned(),
+            }],
+            ..Usage::default()
+        };
+        let mut spend = Spend::empty();
+        spend.add(Measure::Tokens, &reported(300), 0)?;
+        spend.add(Measure::Tokens, &unreported, 1)?;
+        spend.add(Measure::Tokens, &reported(200), 2)?;
+        spend.add(Measure::Tokens, &unreported, 3)?;
+        // The sum is of what was reported; the first gap is named, and both are counted.
+        assert_eq!(
+            (spend.total, spend.gap, spend.gaps),
+            (Some(500), Some(1), 2)
+        );
+        // A gap in tokens is not a gap in running time.
+        let mut running = Spend::empty();
+        running.add(Measure::RunningMs, &unreported, 0)?;
+        assert_eq!((running.gap, running.gaps), (None, 0));
+        Ok(())
     }
 }

@@ -53,6 +53,10 @@ export function Dial({ percent, face, children }: { percent: number; face?: 'mid
 interface Figure { key: string; figure: string; says: string; percent: number | null; tail: string; value: Value; more?: ReactNode }
 
 const level = (unit: Measure) => unit === 'context_percent' || unit === 'plan_percent';
+/** What a line's records did report when some reported nothing, said as that and never as the figure. */
+const partly = (line: Summed | undefined) => line && line.figure === null && line.partial
+  ? { reported: amount(line.unit, line.partial.figure) + ' reported', rest: line.partial.missing + (line.unit === 'tokens' ? (line.partial.missing === 1 ? ' call' : ' calls') : (line.partial.missing === 1 ? ' report' : ' reports')) + ' reported none' }
+  : null;
 
 /**
  * One of the figures a usage widget can show, by its name, as the agents reported it: a window of an account once for
@@ -108,7 +112,8 @@ function usagePart(scope: Scope, { shows, faces, look }: Chosen): Held {
   const names = KINDS.usage.choices ?? {};
   const medium = (faces ?? KINDS.usage.faces ?? []).map((key) => ({ key, held: read(key) }));
   const face = medium.reduce((sum, each) => sum + Math.max(1, each.held.length), 0) === 1 ? 'large' : 'mid';
-  const why = (key: string) => lines.find((each) => each.unit + '/' + (each.period ?? '') === key)?.missing.join('\n');
+  const lineOf = (key: string) => lines.find((each) => each.unit + '/' + (each.period ?? '') === key);
+  const why = (key: string) => lineOf(key)?.missing.join('\n');
   // The usage of one agent opens on its model calls, each of which can be read whole; of several, on the list to choose from.
   return { label: 'Usage', href: '#/canvas?view=proxy' + (several ? '' : '&agent=' + encodeURIComponent(scope.rows[0].agent.id)), count, ...(small ? { figure: small.length ? small.map((each) => each.figure).join(', ') + small[0].tail : 'Not reported' } : {}),
     percent: small ? (levels.length ? Math.max(...levels) : undefined) : context?.figure ?? undefined,
@@ -118,11 +123,11 @@ function usagePart(scope: Scope, { shows, faces, look }: Chosen): Held {
     faces: !scope.rows.length ? <p className="dim canvas-stat-none">No agent is counted here.</p>
       : !medium.length ? <p className="dim canvas-stat-none">No figure is chosen for this face.</p>
       : <div className="canvas-faces">{medium.flatMap(({ key, held }) => held.length ? held.map((each) => stat(each, look, face))
-        : [<div className={'canvas-stat none ' + face} key={key} data-stat={key} title={why(key)}><b>Not reported</b><span className="sec">{names[key] ?? key}</span></div>])}</div>,
+        : [<div className={'canvas-stat none ' + face} key={key} data-stat={key} title={why(key)}><b>{partly(lineOf(key))?.reported ?? 'Not reported'}</b><span className="sec">{names[key] ?? key}{partly(lineOf(key)) ? ', ' + partly(lineOf(key))!.rest : ''}</span></div>])}</div>,
     body: <table className="dash-table"><tbody>
       {lines.map((line) => <tr key={line.unit + '/' + line.period} data-figure={line.unit} data-period={line.period ?? 'now'}>
         <td>{FIGURE[line.unit]} {line.period ? THIS[line.period] : 'now'}{several && level(line.unit) ? ', highest' : ''}</td>
-        <td className="sec">{line.figure === null ? <span className="dim" title={line.missing.join('\n')}>Not reported</span> : <>
+        <td className="sec">{line.figure === null ? <span className="dim" title={line.missing.join('\n')} data-partial={partly(line) ? 'true' : undefined}>{partly(line) ? partly(line)!.reported + ', ' + partly(line)!.rest : 'Not reported'}</span> : <>
           {level(line.unit) ? bar(line.figure, amount(line.unit, line.figure)) : null}{amount(line.unit, line.figure)}</>}
           {several && line.figure !== null && line.missing.length ? <span className="dim" title={line.missing.join('\n')}> ({line.reported} of {line.reported + line.missing.length} reporting)</span> : null}</td>
       </tr>)}

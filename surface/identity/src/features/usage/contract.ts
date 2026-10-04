@@ -7,7 +7,9 @@ export type Period = { length: Length; zone: string };
 export type Holder = { kind: 'agent' | 'team' | 'person'; id: string };
 export type Budget = { holder: Holder; measure: Measure; limit: number; period: Period | null; act: BudgetAct; version: number; by: string; at: number };
 export type Limit = { unit: Measure; amount: number; period: Length | null; act: BudgetAct; zone?: string };
-export type Used = { unit: Measure; period: Length | null; since_ms: number | null } & ({ figure: number; unavailable: null } | { figure: null; unavailable: string });
+/** What a period's records did report when some reported nothing: their sum, and how many reported nothing. Never a total. */
+export type Reported = { figure: number; missing: number };
+export type Used = { unit: Measure; period: Length | null; since_ms: number | null } & ({ figure: number; unavailable: null } | { figure: null; unavailable: string; reported?: Reported });
 export type BudgetBody = { limits: Limit[]; warn_at: number | null; version: number };
 export type Within = { team: string; name: string; limits: Limit[]; used: Used[] };
 export type Unconfirmed = { requested: Budget; effective: Budget; reason: string };

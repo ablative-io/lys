@@ -89,7 +89,11 @@ export function scopeOf(widget: Widget, links: Link[], groups: Group[], windows:
 }
 
 /** One figure over several agents: how many reported it, and why the others did not. */
-export interface Summed { unit: Measure; period: Length | null; figure: number | null; reported: number; missing: string[] }
+export interface Summed {
+  unit: Measure; period: Length | null; figure: number | null; reported: number; missing: string[];
+  /** When no agent's figure is whole: what their records did report, and how many records reported nothing. Never shown as the figure. */
+  partial?: { figure: number; missing: number };
+}
 
 /** Levels are not amounts: context and an account's percent are shown at their highest, never added. */
 const LEVEL: ReadonlySet<Measure> = new Set<Measure>(['context_percent', 'plan_percent']);
@@ -106,7 +110,10 @@ export function summed(rows: DashboardAgent[]): Summed[] {
     for (const used of (row.usage.figures ?? []) as Used[]) {
       const key = used.unit + '/' + (used.period ?? '');
       const line = lines.get(key) ?? { unit: used.unit, period: used.period, figure: null, reported: 0, missing: [] };
-      if (used.figure === null) line.missing.push(row.agent.display_name + ': ' + used.unavailable);
+      if (used.figure === null) {
+        line.missing.push(row.agent.display_name + ': ' + used.unavailable);
+        if (used.reported && !LEVEL.has(used.unit)) line.partial = { figure: (line.partial?.figure ?? 0) + used.reported.figure, missing: (line.partial?.missing ?? 0) + used.reported.missing };
+      }
       else {
         line.figure = line.figure === null ? used.figure : LEVEL.has(used.unit) ? Math.max(line.figure, used.figure) : line.figure + used.figure;
         line.reported += 1;

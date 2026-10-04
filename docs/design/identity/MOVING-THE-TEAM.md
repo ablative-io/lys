@@ -79,8 +79,9 @@ rules; extra folders), and the working folder.
 
 - The usage widget says "Tokens today: Not reported" although two calls reported tokens: the agent's
   start-up probe is refused by the provider with HTTP 429 and carries no figures, and one call of unknown
-  spend makes the day's total unknown. A call the provider refused spent nothing. Written the same
-  morning: the proxy's usage line carries the HTTP status and the runner counts a refused call as nought.
+  spend makes the day's total unknown. I first wrote that a refused call spent nothing and counted it as
+  nought; Tom refused that the same morning ("don't make any assumptions ever"), and it was taken out: the
+  period says what was reported and how many calls reported none.
 - pancake's "refused account" was only that start-up probe. A typed prompt made real calls.
 
 ## The smallest real move

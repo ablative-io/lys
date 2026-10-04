@@ -26,9 +26,23 @@ pub struct Used {
     pub since_ms: Option<i64>,
     /// Why the figure is unavailable; absent exactly when a figure is present.
     pub unavailable: Option<String>,
+    /// What the period's records did report when some reported nothing: their sum, and how many
+    /// reported nothing. The figure stays absent, since the whole is not known; this is never a total.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reported: Option<Reported>,
     /// The account that reported the highest window, retained only for acts.
     #[serde(skip)]
     pub(crate) account: Option<String>,
+}
+
+/// The part of a period's spend that was reported, beside the count of records that reported none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct Reported {
+    /// The sum of what was reported, in the limit's unit.
+    #[schema(value_type = f64)]
+    pub figure: Number,
+    /// How many records in the period carry no figure.
+    pub missing: usize,
 }
 
 /// Convert checked comparison micros back to the declared unit without a float cast.
@@ -98,6 +112,7 @@ fn unavailable(limit: &Limit, since_ms: Option<i64>, reason: impl Into<String>) 
         figure: None,
         since_ms,
         unavailable: Some(reason.into()),
+        reported: None,
         account: None,
     }
 }
@@ -109,6 +124,7 @@ fn present(limit: &Limit, since_ms: Option<i64>, amount: u64) -> Result<Used, St
         figure: Some(number(limit.unit, amount)?),
         since_ms,
         unavailable: None,
+        reported: None,
         account: None,
     })
 }
@@ -268,7 +284,18 @@ impl Reading<'_> {
                     .get(position)
                     .ok_or("period gap names a missing record")?
             };
-            return Ok(unavailable(limit, since, period_gap(limit.unit, usage)?));
+            let mut used = unavailable(limit, since, period_gap(limit.unit, usage)?);
+            // What the other records reported is said beside the gap, never in place of the figure.
+            used.reported = spend
+                .total
+                .and_then(|total| u64::try_from(total).ok())
+                .map(|total| number(limit.unit, total))
+                .transpose()?
+                .map(|figure| Reported {
+                    figure,
+                    missing: spend.gaps,
+                });
+            return Ok(used);
         }
         if let Some(reason) = spend_gap(limit, agents, &uses, since, purpose, sessions) {
             return Ok(unavailable(limit, since, reason));
@@ -375,6 +402,7 @@ fn plan(
             figure: Some(amount),
             since_ms: Some(since),
             unavailable: None,
+            reported: None,
             account: Some(account),
         }),
         None => Ok(unavailable(

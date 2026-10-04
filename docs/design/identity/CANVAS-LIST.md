@@ -58,12 +58,23 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - A call made on a joined computer is listed, and its body answers `CallKeptElsewhere`: the service reads
   only the proxy home on its own computer.
 - A Chat Completions stream reports no usage to the proxy's reader.
-- A call the provider refused (Claude Code's start-up probe is refused with HTTP 429 at a limit) carried no
-  figures, and one call of unknown spend made the day's and the week's tokens "Not reported", and would
-  refuse a start under a token cap. Written 5 October: the usage line carries the provider's HTTP status,
-  and a call refused at its head is a spend of nought (installed in 25fe25d2 and walked: the probe of
-  08:56 is kept with nought of each). Uses kept before that install stay as they were
-  kept: an agent with an earlier refused probe shows its tokens from the next day and the next week.
+- A call the provider refused (Claude Code's start-up probe, a one-token message, is answered HTTP 429
+  `rate_limit_error` each time an agent starts) carries no figures, and one call of unknown spend made the
+  day's and the week's tokens "Not reported". On 5 October I made such a call count as nought (installed in
+  25fe25d2). Tom, 10:08 the same day: "No, calls counts as the tokens that they've made. Like don't make any
+  assumptions ever... we get the reporting back, so why assume?" Written after: the nought is taken out; a
+  call that reported nothing is unknown again, its record naming the HTTP status; and a period with such calls
+  says what was reported and how many reported none ("1,180 tokens reported, 1 call reported none"), never a
+  total. A token cap over such a period is still unjudged, as before 25fe25d2; whether a refused probe should
+  hold a start under a cap is Tom's to say. Why the provider refuses the probe is not known; to compare with
+  a start outside Lys.
+- The Proxy screen. Tom, 5 October 10:10 and 10:13: "A lot of things are coming back as unrecorded, or
+  something like that... it would be good if we could get syntax highlighting on the JSON... a few things
+  that we could do to make the proxy slightly nicer, easier to navigate, like, you know, see the input, see
+  the output." Written 5 October: a call opens on Read, what went in (settings, system prompt, tools by name,
+  each turn folded, the last open) and what came out (words, tools asked for, why it stopped, or the
+  provider's error by name); the JSON is in colour; the list says "No complete response" where it said
+  "unrecorded". Still owed: the HTTP status on the list's row, which the service does not hand the list yet.
 - Shown on the install of 0feba1e8, 5 October: two calls with tokens on the Proxy screen and the account's
   two windows on the usage widget. A context percent still needs a window declared for the model.
 - The proxy's admission write is on the call's path without a disk sync since a4f6eff3: 0.57 ms on the one

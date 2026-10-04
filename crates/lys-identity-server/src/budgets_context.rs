@@ -230,6 +230,7 @@ impl Availability {
             unavailable: gap
                 .or_else(|| figure.is_none().then_some(NO_CONTEXT))
                 .map(str::to_owned),
+            reported: None,
             account: None,
         }
     }
@@ -245,6 +246,7 @@ impl Availability {
                     figure: None,
                     since_ms: None,
                     unavailable: Some(reason.to_owned()),
+                    reported: None,
                     account: None,
                 };
             }
@@ -258,6 +260,7 @@ impl Availability {
             figure: figure.map(Into::into),
             since_ms: None,
             unavailable: figure.is_none().then(|| NO_CONTEXT.to_owned()),
+            reported: None,
             account: None,
         }
     }

@@ -149,30 +149,33 @@ fn a_call_whose_spend_is_not_known_is_still_on_the_record_with_how_it_ended() {
 }
 
 #[test]
-fn a_call_the_provider_refused_spent_nothing_and_that_is_known() {
+fn a_call_the_provider_refused_is_not_counted_as_nought() {
     // A start-up probe refused at a limit: an error at the head, no figures.
+    // What it spent was not reported, so no figure is put in its place.
     let mut refused = line("anthropic-messages", "unrecorded", None);
     refused["http"] = json!(429);
     let bodies = read(&refused);
-    assert!(states(&bodies).is_empty(), "{bodies:?}");
+    assert_eq!(states(&bodies), vec!["usage_unreported"], "{bodies:?}");
     let [record] = usage(&bodies)[..] else {
         panic!("one record: {bodies:?}");
     };
-    assert_eq!(
-        (
-            record.figures.input_tokens,
-            record.figures.output_tokens,
-            record.figures.cache_creation_tokens,
-            record.figures.cache_read_tokens,
-        ),
-        (Some(0), Some(0), Some(0), Some(0))
-    );
+    assert_eq!(record.figures, Figures::default());
+    for figure in ["input_tokens", "output_tokens", "cache_read_tokens"] {
+        assert!(
+            record.unavailable.iter().any(|gap| gap.figure == figure),
+            "{figure}: {:?}",
+            record.unavailable
+        );
+    }
     assert_eq!(
         record.record.as_ref().map(|kept| kept.status.as_str()),
         Some("unrecorded")
     );
+    // The coverage entry names the status the provider gave.
+    let words = serde_json::to_string(&bodies).expect("bodies as JSON");
+    assert!(words.contains("answered HTTP 429"), "{words}");
     // A response the provider did answer, whose figures could not be read,
-    // is still unknown; so is a call lost in flight, whatever head it had.
+    // is unknown as well; so is a call lost in flight, whatever head it had.
     for (status, http, state) in [
         ("unrecorded", 200, "usage_unreported"),
         ("lost", 500, "call_lost"),
