@@ -284,9 +284,9 @@ impl Reading<'_> {
                     .get(position)
                     .ok_or("period gap names a missing record")?
             };
-            let mut used = unavailable(limit, since, period_gap(limit.unit, usage)?);
+            let mut answer = unavailable(limit, since, period_gap(limit.unit, usage)?);
             // What the other records reported is said beside the gap, never in place of the figure.
-            used.reported = spend
+            answer.reported = spend
                 .total
                 .and_then(|total| u64::try_from(total).ok())
                 .map(|total| number(limit.unit, total))
@@ -295,7 +295,7 @@ impl Reading<'_> {
                     figure,
                     missing: spend.gaps,
                 });
-            return Ok(used);
+            return Ok(answer);
         }
         if let Some(reason) = spend_gap(limit, agents, &uses, since, purpose, sessions) {
             return Ok(unavailable(limit, since, reason));
