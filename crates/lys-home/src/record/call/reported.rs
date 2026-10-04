@@ -41,13 +41,16 @@ const CHAT: [(&str, TokenFigure); 2] = [
 const CACHED: [(&str, TokenFigure); 1] = [("cached_tokens", TokenFigure::CacheRead)];
 const REASONING: [(&str, TokenFigure); 1] = [("reasoning_tokens", TokenFigure::Reasoning)];
 
+/// An api's member names, each with the figure it reports.
+type Names = [(&'static str, TokenFigure)];
+
 impl Tokens {
     /// Take each figure `usage` names by `api`'s own member names, leaving a
     /// figure it does not name as it was.
     pub fn read_usage(&mut self, api: Api, usage: &Value) {
         // The members beside the others, and where the two details objects
         // are when the api has them.
-        let (names, details): (&[(&str, TokenFigure)], Option<(&str, &str)>) = match api {
+        let (names, details): (&Names, Option<(&str, &str)>) = match api {
             Api::Messages => (&MESSAGES, None),
             Api::Responses => (
                 &RESPONSES,
