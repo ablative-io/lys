@@ -31,6 +31,8 @@ export interface Widget extends Box {
   /** How a figure that is a percent is drawn: as its number alone when absent, with a bar, or as a dial. */
   look?: 'bar' | 'dial';
   colour?: string;
+  /** Locked, it is not moved, changed or taken away until it is unlocked. */
+  locked?: boolean;
 }
 /**
  * The colours a person gives a box, a note or a widget: a few that sit with Lys's own, each by its name. A thing with no
@@ -65,7 +67,7 @@ export const isBox = (value: unknown): value is Box => record(value) && ['x', 'y
 const worded = (value: unknown, word: string): boolean => record(value) && typeof value.id === 'string' && typeof value[word] === 'string' && (value.colour === undefined || typeof value.colour === 'string');
 const isGroup = (value: unknown): value is Group => isBox(value) && worded(value, 'label');
 const isNote = (value: unknown): value is Note => isBox(value) && worded(value, 'text');
-const isWidget = (value: unknown): value is Widget => isBox(value) && worded(value, 'kind') && ((value as Widget).shows === undefined || typeof (value as Widget).shows === 'string') && [undefined, 'detail', 'settings'].includes((value as Widget).view) && [undefined, 'bar', 'dial'].includes((value as Widget).look);
+const isWidget = (value: unknown): value is Widget => isBox(value) && worded(value, 'kind') && ((value as Widget).shows === undefined || typeof (value as Widget).shows === 'string') && [undefined, 'detail', 'settings'].includes((value as Widget).view) && [undefined, 'bar', 'dial'].includes((value as Widget).look) && [undefined, true, false].includes((value as Widget).locked);
 const sided = (value: unknown): boolean => value === undefined || SIDES.includes(value as Side);
 const isLink = (value: unknown): value is Link => worded(value, 'from') && worded(value, 'to') && sided((value as Link).from_side) && sided((value as Link).to_side);
 /** A list that was not kept at all is an empty one; a list holding anything else cannot be read. */

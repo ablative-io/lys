@@ -387,13 +387,15 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
     if (!chosen) return;
     const take = (event: globalThis.KeyboardEvent) => {
       if ((event.key !== 'Delete' && event.key !== 'Backspace') || (event.target instanceof Element && event.target.closest('input, textarea, select, .terminal, [contenteditable]'))) return;
+      // A locked widget stays.
+      if (marks.widgets.some((each) => each.id === chosen && each.locked)) return;
       event.preventDefault();
       removeMark(chosen);
       setChosen(null);
     };
     window.addEventListener('keydown', take);
     return () => window.removeEventListener('keydown', take);
-  }, [chosen]);
+  }, [chosen, marks.widgets]);
   const reworded = (id: string, words: string) => {
     setMarks((all) => ({ ...all, groups: all.groups.map((each) => each.id === id ? { ...each, label: words } : each), notes: all.notes.map((each) => each.id === id ? { ...each, text: words } : each) }));
     changed();

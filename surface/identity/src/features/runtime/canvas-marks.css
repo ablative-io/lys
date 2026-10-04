@@ -131,3 +131,11 @@
 /* The small red cross a chosen widget, or one showing its settings, holds out on the diagonal from its top right corner, clear of it. */
 .canvas-widget-remove { position: absolute; left: calc(100% + 4px); top: -24px; z-index: 6; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 1.5px solid var(--danger); border-radius: 50%; background: transparent; color: var(--danger); font-size: 13px; line-height: 1; cursor: pointer; }
 .canvas-widget-remove:hover { background: var(--danger); color: #1a0d0d; }
+/* The lock at a widget's bottom right: its shackle swings open and shut. It shows on a widget under the pointer, and always while it is locked. */
+.canvas-widget-lock { position: absolute; right: -9px; bottom: -9px; z-index: 6; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 1px solid var(--border-default); border-radius: 50%; background: var(--surface-card); color: var(--text-secondary); cursor: pointer; opacity: 0; transition: opacity .15s ease; }
+.canvas-widget:hover > .canvas-widget-lock, .canvas-widget-lock[aria-pressed="true"], .canvas-widget-lock:focus-visible { opacity: 1; }
+.canvas-widget-lock[aria-pressed="true"] { color: var(--tint, var(--accent)); border-color: var(--tint, var(--accent)); }
+.canvas-widget-lock svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.canvas-lock-shackle { transform-origin: 16px 11px; transform: rotate(38deg) translateY(-1px); transition: transform .28s cubic-bezier(.3, 1.4, .5, 1); }
+.canvas-widget-lock[aria-pressed="true"] .canvas-lock-shackle { transform: none; }
+.canvas-widget-turn:disabled { opacity: .3; cursor: default; }

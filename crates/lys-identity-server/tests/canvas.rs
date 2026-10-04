@@ -48,7 +48,7 @@ fn arrangement(x: f64) -> Value {
             {"id": "link:c", "from": "agent:one", "to": "widget:a", "from_side": "right", "to_side": "left"},
         ],
         "widgets": [
-            {"id": "widget:a", "kind": "usage", "shows": "window/300", "view": "settings", "look": "dial", "colour": "blue", "x": 820.0, "y": 40.0, "w": 340.0, "h": 250.0},
+            {"id": "widget:a", "kind": "usage", "shows": "window/300", "view": "settings", "look": "dial", "locked": true, "colour": "blue", "x": 820.0, "y": 40.0, "w": 340.0, "h": 250.0},
             {"id": "widget:b", "kind": "goals", "x": 820.0, "y": 90.0, "w": 340.0, "h": 190.0},
         ],
     })

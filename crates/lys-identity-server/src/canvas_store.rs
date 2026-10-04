@@ -126,6 +126,9 @@ pub struct Widget {
     /// How a level is drawn; absent for its number alone.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub look: Option<WidgetLook>,
+    /// Locked, it is not moved, changed or taken away until it is unlocked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locked: Option<bool>,
     /// The colour the person gave it, by the palette's name; absent for Lys's own.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub colour: Option<String>,

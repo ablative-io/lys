@@ -144,7 +144,7 @@ export function WidgetCard({ widget, scope, board, morph, chosen, pick, move, si
   chosen: boolean;
   pick: Press | undefined; move: Press; size: Press; link: (side: Side) => Press; remove: () => void;
   /** Changes what the person chose for it: which figure it shows, how a level is drawn, the view it is in. */
-  set: (change: Pick<Widget, 'shows'> | Pick<Widget, 'look'> | Pick<Widget, 'view'> | Pick<Widget, 'colour'>) => void;
+  set: (change: Pick<Widget, 'shows'> | Pick<Widget, 'look'> | Pick<Widget, 'view'> | Pick<Widget, 'colour'> | Pick<Widget, 'locked'>) => void;
   /** Opened out, it is as tall as what it holds, so nothing in it has to be scrolled to; this says how tall that came to. */
   fit: (height: number) => void;
 }) {
@@ -166,10 +166,10 @@ export function WidgetCard({ widget, scope, board, morph, chosen, pick, move, si
   const next = widget.view === undefined ? 'Open it out' : widget.view === 'detail' ? 'Its settings' : 'Back to a pill';
   return <article className={'canvas-widget' + (widget.view ? ' wide' : '') + (morph ? ' morph' : '') + (pick ? ' picking' : '')} data-widget={widget.id} data-kind={widget.kind} data-view={widget.view ?? 'pill'}
     ref={card} aria-label={label + (whose ? ' of ' + whose : '')} style={{ left: now.x, top: now.y, width: now.w, height: widget.view ? undefined : now.h, ...tint(widget.colour) }} onPointerDownCapture={pick}
-    onContextMenu={(event) => { event.preventDefault(); set({ view: 'settings' }); }}>
-    <header className="canvas-widget-bar" onPointerDown={move}>
+    onContextMenu={(event) => { event.preventDefault(); if (!widget.locked) set({ view: 'settings' }); }}>
+    <header className="canvas-widget-bar" onPointerDown={widget.locked ? undefined : move}>
       <KindSymbol kind={widget.kind} /><h3>{whose || label}</h3>{part?.percent !== undefined && widget.look === 'dial' ? <Dial percent={part.percent} /> : null}<b className="canvas-widget-figure">{figure}</b>
-      <button type="button" className="canvas-widget-turn" data-act="widget-view" aria-label={next + ': ' + label + (whose ? ' of ' + whose : '')} title={next} onClick={() => set({ view: nextView(widget.view) })}>
+      <button type="button" className="canvas-widget-turn" data-act="widget-view" aria-label={next + ': ' + label + (whose ? ' of ' + whose : '')} title={next} disabled={widget.locked} onClick={() => set({ view: nextView(widget.view) })}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d={widget.view === 'settings' ? 'M7 14l5-5 5 5' : 'M7 10l5 5 5-5'} /></svg></button>
       {part?.percent !== undefined && widget.look === 'bar' ? <span className={'canvas-widget-level' + (part.percent >= 100 ? ' full' : '')} aria-hidden="true"><span style={{ width: full(part.percent) + '%' }} /></span> : null}
     </header>
@@ -190,8 +190,12 @@ export function WidgetCard({ widget, scope, board, morph, chosen, pick, move, si
         </div></td></tr>
       </tbody></table>
     </div> : null}
-    {widget.view ? <span className="session-canvas-grip" aria-hidden="true" onPointerDown={size} /> : null}
+    {widget.view && !widget.locked ? <span className="session-canvas-grip" aria-hidden="true" onPointerDown={size} /> : null}
+    {/* The lock: closed, the widget is not moved, changed or taken away by a stray press. */}
+    <button type="button" className="canvas-widget-lock" data-act="widget-lock" aria-pressed={!!widget.locked} aria-label={(widget.locked ? 'Unlock the ' : 'Lock the ') + label + ' widget' + (whose ? ' of ' + whose : '')} title={widget.locked ? 'Unlock' : 'Lock'}
+      onClick={() => set({ locked: widget.locked ? undefined : true })}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path className="canvas-lock-shackle" d="M8 11V8a4 4 0 0 1 8 0v3" /><rect x="6" y="11" width="12" height="9" rx="2" /></svg></button>
     <Anchors from={link} />
-    {chosen || widget.view === 'settings' ? <button type="button" className="canvas-widget-remove" data-act="remove-widget" aria-label={'Remove the ' + label + ' widget' + (whose ? ' of ' + whose : '')} title="Remove" onClick={remove}>×</button> : null}
+    {(chosen || widget.view === 'settings') && !widget.locked ? <button type="button" className="canvas-widget-remove" data-act="remove-widget" aria-label={'Remove the ' + label + ' widget' + (whose ? ' of ' + whose : '')} title="Remove" onClick={remove}>×</button> : null}
   </article>;
 }

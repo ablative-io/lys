@@ -168,6 +168,15 @@ describe('Widgets on the canvas', () => {
     expect([figure(), $('[data-look]')]).toEqual(['Not reported', null]);
     await click($('[data-variant=""]'));
     expect(kept().widgets[0].shows).toBeUndefined();
+    // Locked, it is not opened, moved or taken away; unlocked, it is again.
+    await click(card.querySelector('[data-act="widget-lock"]'));
+    expect([(kept().widgets[0] as { locked?: boolean }).locked, (card.querySelector('[data-act="widget-view"]') as HTMLButtonElement).disabled, $('[data-act="remove-widget"]')]).toEqual([true, true, null]);
+    await pointer(card.querySelector('.canvas-widget-bar'), 'pointerdown', 710, 310);
+    await pointer($('.session-canvas-scroll'), 'pointermove', 900, 500);
+    await pointer($('.session-canvas-scroll'), 'pointerup', 900, 500);
+    expect([card.style.left, card.style.top]).toEqual(['700px', '300px']);
+    await click(card.querySelector('[data-act="widget-lock"]'));
+    expect((kept().widgets[0] as { locked?: boolean }).locked).toBeUndefined();
     // A press with the other button opens the settings from any view, and the small cross there takes the widget away.
     await turn();
     expect(card.dataset.view).toBe('pill');
