@@ -59,3 +59,74 @@
 .session-canvas-node, .canvas-note { overflow: visible; }
 .session-canvas-node > .terminal, .canvas-note > textarea { overflow: hidden; }
 .session-canvas-lines path.drawing-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
+
+/* A widget is a pill: its symbol, whose it is, its one figure. Pressed, it opens out, the way an island does, and its list scrolls inside it. */
+.canvas-widget { position: absolute; box-sizing: border-box; z-index: 2; display: flex; flex-direction: column; border: 1px solid var(--border-default); border-radius: 17px; background: #0b0b0e; color: var(--text-primary); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); overflow: visible; }
+.canvas-widget.wide { border-radius: 20px; z-index: 3; }
+.canvas-widget.morph { transition: width .34s cubic-bezier(.3, 1.35, .45, 1), border-radius .34s ease; }
+.canvas-widget.morph > .canvas-widget-body { animation: canvas-widget-in .3s ease; }
+@keyframes canvas-widget-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.canvas-widget-bar { flex: none; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 4px 0 12px; cursor: grab; user-select: none; border-radius: inherit; }
+.canvas-widget-bar:active { cursor: grabbing; }
+.canvas-widget-turn { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.canvas-widget-turn:hover { background: var(--surface-hover); color: var(--text-primary); }
+.canvas-widget-turn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.canvas-widget-bar h3 { flex: 1; min-width: 0; margin: 0; font-size: 12.5px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.canvas-widget-figure { flex: none; max-width: 60%; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.canvas-widget.wide .canvas-widget-bar { height: 38px; padding: 0 8px 0 14px; }
+.canvas-widget-settings .canvas-widget-variants { padding: 0; }
+.canvas-widget-settings td:first-child { width: 1%; white-space: nowrap; color: var(--text-secondary); }
+.canvas-widget.wide .canvas-widget-bar h3 { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+.canvas-widget-variants { flex: none; display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px; }
+.canvas-widget-variants button { padding: 2px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--surface-hover); color: var(--text-secondary); font: inherit; font-size: 11.5px; cursor: pointer; }
+.canvas-widget-variants button[aria-pressed="true"] { background: var(--text-primary); color: #0b0b0e; }
+.canvas-widget-body { flex: none; padding: 0 14px 12px; font-size: 13px; }
+.canvas-widget-body .dash-table { width: 100%; }
+.canvas-widget-body .dash-table td { padding: 5px 8px 5px 0; }
+.canvas-widget-open { flex: none; padding: 0 14px 10px; font-size: 11.5px; color: var(--text-secondary); }
+.canvas-widget:hover > .canvas-anchor { opacity: 1; }
+.session-canvas-scroll.tool-line .canvas-widget { cursor: crosshair; outline: 1px dashed var(--accent); outline-offset: 2px; }
+.session-canvas-scroll.tool-widget, .session-canvas-scroll.tool-widget .session-canvas-node { cursor: copy; }
+
+/* Each kind of widget has its own symbol: on its bar, in the panel that offers it, and beside an agent's window. */
+.canvas-kind-symbol { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+/* What an agent's window in front holds out beside it: one symbol for each kind of widget it can add. */
+.canvas-adders { position: absolute; left: calc(100% + 8px); top: 0; z-index: 4; display: flex; flex-direction: column; gap: 2px; padding: 3px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-card); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); }
+.canvas-adders .canvas-symbol { width: 26px; height: 26px; }
+.canvas-adders .canvas-kind-symbol { width: 16px; height: 16px; }
+.canvas-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.canvas-kinds .btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 12.5px; }
+.canvas-stat { display: flex; flex-direction: column; gap: 2px; padding: 8px 2px; }
+.canvas-stat b { font-size: 30px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.canvas-stat-none { padding: 8px 2px; margin: 0; }
+/* What was last pressed is chosen: it shows it, and the Delete key takes it away. */
+.canvas-chosen { position: absolute; box-sizing: border-box; z-index: 5; pointer-events: none; border-radius: 20px; outline: 1.5px solid var(--accent); outline-offset: 3px; }
+.session-canvas-lines .person-line { pointer-events: stroke; cursor: pointer; }
+.session-canvas-lines .person-line.chosen { stroke: var(--accent); stroke-width: 2.5; }
+/* A level drawn as a dial, or as a bar along the foot of the pill. */
+.canvas-dial { position: relative; flex: none; display: inline-grid; place-items: center; }
+.canvas-dial circle { fill: none; }
+.canvas-dial-track { stroke: var(--surface-hover); }
+.canvas-dial-level { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray .4s ease; }
+.canvas-dial.full .canvas-dial-level { stroke: var(--danger); }
+.canvas-dial.large > b { position: absolute; font-size: 26px; }
+.canvas-stat.dial { align-items: center; text-align: center; }
+.canvas-widget-bar { position: relative; }
+.canvas-widget-level { position: absolute; left: 14px; right: 14px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--surface-hover); overflow: hidden; }
+.canvas-widget-level > span { display: block; height: 100%; background: var(--accent); }
+.canvas-widget-level.full > span { background: var(--danger); }
+/* Colour: a thing wears its tint where it would wear Lys's accent. */
+.canvas-widget .canvas-kind-symbol { color: var(--tint, var(--accent)); }
+.canvas-widget .canvas-dial-level { stroke: var(--tint, var(--accent)); }
+.canvas-widget .canvas-widget-level > span, .canvas-widget .dash-bar > span:not(.full) { background: var(--tint, var(--accent)); }
+.canvas-group[style*="--tint"] { border-color: var(--tint); }
+.canvas-group[style*="--tint"] .canvas-group-bar input { color: var(--tint); }
+.canvas-note[style*="--tint"] { border-left-color: var(--tint); }
+.canvas-swatch { flex: none; width: 12px; height: 12px; padding: 0; border: 1.5px solid transparent; border-radius: 50%; background: var(--tint, var(--accent)); cursor: pointer; }
+.canvas-swatch[aria-pressed="true"] { border-color: var(--text-primary); }
+.canvas-swatches { display: flex; gap: 6px; align-items: center; }
+.canvas-swatches .canvas-swatch { width: 16px; height: 16px; }
+.canvas-group-bar .canvas-swatch, .canvas-note-bar .canvas-swatch { margin-left: auto; margin-right: 4px; opacity: .55; }
+.canvas-group-bar .canvas-swatch:hover, .canvas-note-bar .canvas-swatch:hover { opacity: 1; }
+/* The small red cross a chosen widget, or one showing its settings, holds out at its corner. */
+.canvas-widget-remove { position: absolute; right: -9px; top: -9px; z-index: 6; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--danger); color: #1a0d0d; font-size: 14px; line-height: 1; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }

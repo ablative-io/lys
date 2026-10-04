@@ -6,9 +6,9 @@
 /** Where a thing sits on the surface and how large it is, in the surface's own units. */
 export interface Box { x: number; y: number; w: number; h: number }
 /** A labelled box drawn around windows: "the people working on Iridium". */
-export interface Group extends Box { id: string; label: string }
+export interface Group extends Box { id: string; label: string; colour?: string }
 /** A note the person writes on the surface. */
-export interface Note extends Box { id: string; text: string }
+export interface Note extends Box { id: string; text: string; colour?: string }
 /** An edge of a thing: where its dot is, and where a line leaves it or meets it. */
 export type Side = 'top' | 'right' | 'bottom' | 'left';
 export const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
@@ -17,11 +17,44 @@ export const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
  * leaves from that edge and meets the edge it was let go nearest; drawn by pressing two things, it takes the facing edges.
  */
 export interface Link { id: string; from: string; to: string; from_side?: Side; to_side?: Side }
-export interface Marks { groups: Group[]; notes: Note[]; links: Link[] }
+/**
+ * A widget: one kind of what Lys holds about agents, put on the surface. The lines drawn to it feed it: it counts each
+ * agent, and each box of agents, a line joins it to. With no line it counts the agents in the box it sits in, and every
+ * agent when it sits in none.
+ */
+export interface Widget extends Box {
+  id: string; kind: string;
+  /** Which one of the kind's figures it shows, when the person chose one; everything the kind holds otherwise. */
+  shows?: string;
+  /** The view it is in beyond the pill: everything it holds, or its settings. `w` and `h` are its size in either. */
+  view?: 'detail' | 'settings';
+  /** How a figure that is a percent is drawn: as its number alone when absent, with a bar, or as a dial. */
+  look?: 'bar' | 'dial';
+  colour?: string;
+}
+/**
+ * The colours a person gives a box, a note or a widget: a few that sit with Lys's own, each by its name. A thing with no
+ * colour, or one this page does not know, wears Lys's accent.
+ */
+export const COLOURS: Record<string, string> = { green: '#74b584', amber: '#fbbf24', red: '#f87171', blue: '#7aa7d9', violet: '#a58bd6', teal: '#6dbfb8', rose: '#d98aa5', grey: '#9a9aa3' };
+/** The style that tints a thing its colour. */
+export const tint = (colour: string | undefined): Record<string, string> => colour && COLOURS[colour] ? { '--tint': COLOURS[colour] } : {};
+/** The colour after this one, going round: Lys's own, then each of the others. */
+export function nextColour(colour: string | undefined): string | undefined {
+  const names = Object.keys(COLOURS);
+  return names[colour === undefined ? 0 : names.indexOf(colour) + 1 || names.length];
+}
+/** A widget's views in the order its own button goes through them: the pill, everything it holds, its settings. */
+export const nextView = (view: Widget['view']): Widget['view'] => view === undefined ? 'detail' : view === 'detail' ? 'settings' : undefined;
+/** The size of a widget that is not opened out: a pill holding its symbol, whose it is, and its one figure. */
+export const PILL: [number, number] = [248, 34];
+/** A widget as it stands on the surface now: a pill, or its own size when it is opened out. */
+export const standing = (widget: Widget): Widget => widget.view ? widget : { ...widget, w: PILL[0], h: PILL[1] };
+export interface Marks { groups: Group[]; notes: Note[]; links: Link[]; widgets: Widget[] }
 /** Everything a person arranged: where each window sits, which terminals are open, and what they drew. */
 export interface Arrangement extends Marks { boxes: Record<string, Box>; open: string[] }
 
-export const NO_MARKS: Marks = { groups: [], notes: [], links: [] };
+export const NO_MARKS: Marks = { groups: [], notes: [], links: [], widgets: [] };
 /** The size a note or a box is made at when it was not drawn out, and the smallest each is dragged to. */
 export const NOTE: [number, number] = [260, 180];
 export const GROUP: [number, number] = [520, 360];
@@ -29,9 +62,10 @@ export const SMALLEST_MARK: [number, number] = [140, 80];
 
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 export const isBox = (value: unknown): value is Box => record(value) && ['x', 'y', 'w', 'h'].every((key) => Number.isFinite(value[key]));
-const worded = (value: unknown, word: string): boolean => record(value) && typeof value.id === 'string' && typeof value[word] === 'string';
+const worded = (value: unknown, word: string): boolean => record(value) && typeof value.id === 'string' && typeof value[word] === 'string' && (value.colour === undefined || typeof value.colour === 'string');
 const isGroup = (value: unknown): value is Group => isBox(value) && worded(value, 'label');
 const isNote = (value: unknown): value is Note => isBox(value) && worded(value, 'text');
+const isWidget = (value: unknown): value is Widget => isBox(value) && worded(value, 'kind') && ((value as Widget).shows === undefined || typeof (value as Widget).shows === 'string') && [undefined, 'detail', 'settings'].includes((value as Widget).view) && [undefined, 'bar', 'dial'].includes((value as Widget).look);
 const sided = (value: unknown): boolean => value === undefined || SIDES.includes(value as Side);
 const isLink = (value: unknown): value is Link => worded(value, 'from') && worded(value, 'to') && sided((value as Link).from_side) && sided((value as Link).to_side);
 /** A list that was not kept at all is an empty one; a list holding anything else cannot be read. */
@@ -46,13 +80,13 @@ export function readArrangement(value: unknown): Arrangement | null {
   const { boxes, open } = value;
   if (!record(boxes) || !Object.values(boxes).every(isBox)) return null;
   if (!Array.isArray(open) || !open.every((id) => typeof id === 'string')) return null;
-  const [groups, notes, links] = [listOf(value.groups, isGroup), listOf(value.notes, isNote), listOf(value.links, isLink)];
-  if (!groups || !notes || !links) return null;
-  return { boxes: boxes as Record<string, Box>, open: open as string[], groups, notes, links };
+  const [groups, notes, links, widgets] = [listOf(value.groups, isGroup), listOf(value.notes, isNote), listOf(value.links, isLink), listOf(value.widgets, isWidget)];
+  if (!groups || !notes || !links || !widgets) return null;
+  return { boxes: boxes as Record<string, Box>, open: open as string[], groups, notes, links, widgets };
 }
 
 /** A name for a new mark that no other has. */
-export function markId(kind: 'group' | 'note' | 'link'): string {
+export function markId(kind: 'group' | 'note' | 'link' | 'widget'): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
   return kind + ':' + [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');

@@ -24,6 +24,7 @@ import { Gate } from '../signin/Gate';
 import type { Team } from '../teams/contract';
 import { AgentTree, RunningNow, entryOf, liveOf, whereOf } from './AgentTree';
 import type { Asked, RowContext } from './AgentTree';
+import { orRefused } from './board';
 import { readDashboard, refusedPart } from './contract';
 import type { DashboardAgent, DashboardAnswer, Waiting } from './contract';
 import { readCord, stoppedWhy } from './cord';
@@ -34,9 +35,6 @@ import './dashboard.css';
 
 interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
 
-/** A part of the page that could not be read is its refusal; the rest of the page still reads. */
-const orRefused = <T,>(read: Promise<T>, name: string): Promise<T | Refused> =>
-  read.then((value) => value, (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: name, reason: String(problem) }));
 type Read = Ready | { kind: 'registered' };
 
 async function readPage(): Promise<Read> {

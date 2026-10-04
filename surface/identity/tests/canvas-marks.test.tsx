@@ -290,7 +290,9 @@ describe('The command palette', () => {
 
 describe('What a person drew, as it is kept', () => {
   it('reads an arrangement kept before there were marks, and refuses one that is not an arrangement', () => {
-    expect(readArrangement({ boxes: { a: { x: 1, y: 2, w: 3, h: 4 } }, open: ['a'] })).toEqual({ boxes: { a: { x: 1, y: 2, w: 3, h: 4 } }, open: ['a'], groups: [], notes: [], links: [] });
+    expect(readArrangement({ boxes: { a: { x: 1, y: 2, w: 3, h: 4 } }, open: ['a'] })).toEqual({ boxes: { a: { x: 1, y: 2, w: 3, h: 4 } }, open: ['a'], groups: [], notes: [], links: [], widgets: [] });
+    expect(readArrangement({ boxes: {}, open: [], widgets: [{ id: 'widget:a', kind: 'usage', x: 0, y: 0, w: 1, h: 1 }] })?.widgets).toHaveLength(1);
+    expect(readArrangement({ boxes: {}, open: [], widgets: [{ id: 'widget:a', x: 0, y: 0, w: 1, h: 1 }] })).toBeNull();
     expect(readArrangement({ boxes: {}, open: [], groups: [{ id: 'group:a', x: 0, y: 0, w: 1, h: 1 }] })).toBeNull();
     expect(readArrangement({ boxes: {}, open: [], links: [{ id: 'link:a', from: 'a' }] })).toBeNull();
     expect(readArrangement({ boxes: { a: { x: 'left' } }, open: [] })).toBeNull();

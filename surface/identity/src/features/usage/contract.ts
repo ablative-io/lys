@@ -15,7 +15,13 @@ export type BudgetsView = { holder: Holder; limits: Limit[]; warn_at: number | n
 export type Stands = 'accepted' | 'delivered' | 'confirmed' | 'uncertain' | 'refused' | 'told';
 export type Crossing = { operation: string; holder: Holder; measure: Measure; version: number; limit: number; figure: number; limit_index: number; warning: boolean; account?: string; act: BudgetAct; agent: string; at_ms: number };
 export type Receipt = { crossing: Crossing; acted: { stands: Stands; words: string; at_ms: number } | null };
-export type UsageView = { agent: string; used: Used[]; receipts: Receipt[]; last_reported_ms: number | null };
+/** One account's reported windows: how much of each is used and when it resets. */
+export type AccountWindows = { account: string; at_ms: number; windows: { duration_minutes: number; used_percent: number; resets_at_ms: number }[] };
+/**
+ * `used` pairs with the agent's limits. `figures` is what the agent used whether or not a limit is set (context now,
+ * tokens, running time and dollars today and this week), and `accounts` each account's windows as last reported.
+ */
+export type UsageView = { agent: string; used: Used[]; receipts: Receipt[]; last_reported_ms: number | null; figures?: Used[]; accounts?: AccountWindows[] };
 export type GoalKind = 'goal' | 'expectation' | 'deliverable';
 export type Standing = 'open' | 'met' | 'missed' | 'dropped';
 export type GoalItem = { goal: { id: string; kind: GoalKind; words: string; deadline: number | null; active: boolean; evidence: 'commit' | 'document' | 'check' | null }; standing: Standing };

@@ -5,7 +5,7 @@ export const UNITS: Record<Measure, string> = { dollars: 'dollars', plan_percent
 
 export const PERIOD_WORDS: Record<Length, string> = { five_hour: '5-hour window', day: 'day', week: 'week', month: 'month' };
 
-const THIS: Record<Length, string> = { five_hour: 'this 5-hour window', day: 'today', week: 'this week', month: 'this month' };
+export const THIS: Record<Length, string> = { five_hour: 'this 5-hour window', day: 'today', week: 'this week', month: 'this month' };
 
 const ADJECTIVE: Record<Length, string> = { five_hour: '5-hour', day: 'daily', week: 'weekly', month: 'monthly' };
 

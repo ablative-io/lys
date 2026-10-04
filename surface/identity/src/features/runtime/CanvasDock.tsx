@@ -14,11 +14,12 @@ import { clock } from '../file/time';
 import { RunningList } from './Sessions';
 import type { SessionGraph } from './session-graph';
 import { said } from './canvas-kept';
+import { KINDS } from './canvas-widgets';
 import type { Keeping, SavedLayout } from './canvas-kept';
 
-export type Tool = 'box' | 'line' | 'note' | null;
-export type Panel = 'agents' | 'layouts' | 'connections' | null;
-export const PANELS: Record<Exclude<Panel, null>, string> = { agents: 'Agents', layouts: 'Layouts', connections: 'Connections' };
+export type Tool = 'box' | 'line' | 'note' | 'widget' | null;
+export type Panel = 'agents' | 'layouts' | 'connections' | 'widgets' | null;
+export const PANELS: Record<Exclude<Panel, null>, string> = { agents: 'Agents', layouts: 'Layouts', connections: 'Connections', widgets: 'Widgets' };
 
 /** The bar's symbols, drawn in the rail's own line style. */
 const SYMBOLS = {
@@ -26,6 +27,7 @@ const SYMBOLS = {
   box: <><rect x="3.5" y="7" width="17" height="13" rx="2" strokeDasharray="3 2.5" /><path d="M6 4h6" /></>,
   line: <><rect x="3" y="4" width="7" height="6" rx="1.2" /><rect x="14" y="14" width="7" height="6" rx="1.2" /><path d="M10 9l4 6" /></>,
   note: <path d="M5 4h14v10l-6 6H5zM13 20v-6h6" />,
+  widget: <><rect x="3.5" y="4" width="17" height="16" rx="2" /><path d="M7.5 16v-3M12 16V8M16.5 16v-5" /></>,
   layouts: <><rect x="3.5" y="4" width="7.5" height="7" rx="1.2" /><rect x="13" y="4" width="7.5" height="7" rx="1.2" /><rect x="3.5" y="13" width="7.5" height="7" rx="1.2" /><rect x="13" y="13" width="7.5" height="7" rx="1.2" /></>,
   connections: <><circle cx="6" cy="7" r="2.2" /><circle cx="18" cy="6" r="2.2" /><circle cx="12" cy="17" r="2.2" /><path d="M8.1 7.6 15.8 6.4M7.1 9 10.9 15M16.9 8 13.1 15" /></>,
   out: <path d="M6 12h12" />,
@@ -109,7 +111,32 @@ function Layouts({ keeping, layouts, save, remove }: {
   </>;
 }
 
-export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, says, connections, ...layouts }: {
+/** A kind of widget's own symbol, the same wherever the kind is named. */
+export function KindSymbol({ kind }: { kind: string }) {
+  return <svg className="canvas-kind-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d={KINDS[kind]?.symbol ?? 'M5 5h14v14H5z'} /></svg>;
+}
+
+/**
+ * Every kind of widget: its symbol and its name. One is dragged onto the canvas and goes where it is let go; pressed
+ * without dragging it is held as a tool, and the next press on the canvas places it.
+ */
+function Widgets({ held, place, drop }: { held: string | null; place: (kind: string) => void; drop: (kind: string, x: number, y: number) => void }) {
+  const from = useRef<[number, number] | null>(null);
+  const dragged = useRef(false);
+  return <div className="canvas-kinds" role="toolbar" aria-label="Widgets to place">{Object.entries(KINDS).map(([kind, each]) =>
+    <button key={kind} type="button" className="btn" data-act="place-widget" data-kind={kind} aria-pressed={held === kind} title={'Drag ' + each.label + ' onto the canvas, or press it and then press where it goes'}
+      onPointerDown={(event) => { from.current = [event.clientX, event.clientY]; event.currentTarget.setPointerCapture?.(event.pointerId); }}
+      onPointerUp={(event) => {
+        const start = from.current;
+        from.current = null;
+        if (!start || Math.hypot(event.clientX - start[0], event.clientY - start[1]) <= 6) return;
+        dragged.current = true;
+        drop(kind, event.clientX, event.clientY);
+      }}
+      onClick={() => { if (dragged.current) dragged.current = false; else place(kind); }}><KindSymbol kind={kind} />{each.label}</button>)}</div>;
+}
+
+export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPanel, zoom, zoomBy, home, says, connections, kind, place, drop, ...layouts }: {
   graph: SessionGraph; show: (node: string) => void; tool: Tool; setTool: (tool: Tool) => void; picking: boolean;
   panel: Panel; setPanel: (panel: Panel) => void;
   /** How far the surface is zoomed, in percent; `zoomBy` steps it, or with null puts it back to actual size; `home` brings the windows back into view. */
@@ -117,6 +144,10 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
   /** What went wrong that the person has to know, each said once over the bar. */
   says: ReactNode;
   connections: ReactNode;
+  /** The kind of widget held to be placed, and the act that takes one in hand. */
+  kind: string | null; place: (kind: string) => void;
+  /** Places a widget of a kind where it was let go on the page, when that is on the canvas. */
+  drop: (kind: string, x: number, y: number) => void;
   keeping: Keeping; layouts: SavedLayout[]; save: (name: string) => Promise<void>; remove: (name: string) => Promise<void>;
 }) {
   const hold = (name: Exclude<Tool, null>) => () => setTool(tool === name ? null : name);
@@ -133,13 +164,15 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
   <div className="canvas-dock">
     <div className="canvas-dock-says">
       {says}
-      {tool ? <span role="status">{tool === 'box' ? 'Drag on the canvas to draw the box.' : tool === 'note' ? 'Press on the canvas where the note goes.' : picking ? 'Now press the thing the line goes to.' : 'Press the thing the line starts from.'} Escape leaves it.</span> : null}
+      {tool ? <span role="status">{tool === 'box' ? 'Drag on the canvas to draw the box.' : tool === 'note' ? 'Press on the canvas where the note goes.'
+        : tool === 'widget' ? 'Press an agent’s window to feed it from that agent, or press the canvas and draw lines into it.' : picking ? 'Now press the thing the line goes to.' : 'Press the thing the line starts from.'} Escape leaves it.</span> : null}
     </div>
     {/* Each part stays on the page while the panel is away, so nothing in it is read again when it opens. */}
     <section className={'canvas-pop' + (panel ? ' open' : '')} aria-label={panel ? PANELS[panel] : 'Canvas panel'} aria-hidden={!panel}>
       <div className="canvas-pop-body" hidden={panel !== 'agents'}><Agents graph={graph} show={show} open={panel === 'agents'} /></div>
       <div className="canvas-pop-body" hidden={panel !== 'layouts'}><Layouts {...layouts} /></div>
       <div className="canvas-pop-body" hidden={panel !== 'connections'}>{connections}</div>
+      <div className="canvas-pop-body" hidden={panel !== 'widgets'}><Widgets held={tool === 'widget' ? kind : null} place={place} drop={drop} /></div>
     </section>
     {/* Drawing is one bar and finding is another, apart, the drawing to the left: each drawing tool is held, then used on the canvas, and shows that it is held. */}
     <div className="canvas-bars">
@@ -147,6 +180,7 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
         <Symbol act="draw-box" says="Box: drag on the canvas to draw a box around windows, then label it" on={hold('box')} pressed={tool === 'box'} />
         <Symbol act="draw-line" says="Line: press one thing, then another, to draw a line between them; or drag from a dot on a thing's edge to another thing" on={hold('line')} pressed={tool === 'line'} />
         <Symbol act="draw-note" says="Note: press on the canvas where the note goes" on={hold('note')} pressed={tool === 'note'} />
+        <Symbol act="draw-widget" says="Widget: choose what to show about your agents, then press where it goes" on={slide('widgets')} pressed={tool === 'widget'} expanded={panel === 'widgets'} />
       </div>
       <div className="canvas-bar" role="toolbar" aria-label="Canvas tools">
         <Symbol act="agents" says={'Agents: ' + running + ' running. Find one and go to it'} on={slide('agents')} expanded={panel === 'agents'} count={running} />
