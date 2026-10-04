@@ -70,7 +70,7 @@ describe('Running: the list and the canvas', () => {
   it('says an empty Running page is empty once, in the list\'s own body, under a title with no paragraph of instructions', async () => {
     await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [], unanswered: [] }) });
     expect(text().split('Nothing is running.')).toHaveLength(2);
-    expect($('.running-list tbody tr.empty td')?.textContent).toBe('Nothing is running.');
+    expect($('.running-list .empty')?.textContent).toBe('Nothing is running.');
     expect(text()).not.toMatch(/No running sessions? (was|were) returned|Nothing here yet|0 running sessions/);
     expect($('.session-canvas-page .head .sub')).toBeNull();
     expect(text()).not.toContain('Drag a window');
@@ -108,14 +108,36 @@ describe('Running: the list and the canvas', () => {
     await click($('.session-canvas-node button'));
     expect($('.terminal')).not.toBeNull();
     expect(posted.some((entry) => entry.path === base + '/read-bytes')).toBe(true);
-    await click($('.session-canvas-node button'));
+    // An open window has one bar; its controls are in the menu the bar opens.
+    expect($('.session-canvas-node [data-act="toggle"]')).toBeNull();
+    await click($('.session-canvas-node [data-act="window-menu"]'));
+    expect($$('.session-canvas-menu [role="menuitem"]').map((item) => item.textContent)).toEqual(['Full screen', 'Separate window', 'Close terminal view']);
+    expect($('.session-canvas-menu [data-act="separate-window"]')?.getAttribute('href')).toBe('#/window/' + session + '?agent=' + SCRIBE);
+    await click($('.session-canvas-menu [data-act="toggle"]'));
     expect($('.terminal')).toBeNull();
+    expect($('.session-canvas-menu')).toBeNull();
     expect(posted.some((entry) => entry.path.endsWith('/end'))).toBe(false);
+  });
+
+  it('zooms the surface by its buttons and by a pinch about the pointer, and back to actual size', async () => {
+    await mount('#/canvas', routes);
+    const drawn = () => ($('.session-canvas') as HTMLElement).style.transform;
+    expect(drawn()).not.toContain('scale');
+    await click($('[data-act="zoom-in"]'));
+    expect(drawn()).toMatch(/scale\(1\.25\)$/);
+    expect($('[data-act="zoom-reset"]')?.textContent).toBe('125%');
+    // A trackpad's pinch arrives as a wheel with Control held.
+    await act(async () => { $('.session-canvas-scroll')?.dispatchEvent(new WheelEvent('wheel', { deltaY: -50, ctrlKey: true, bubbles: true, cancelable: true })); });
+    expect(Number(/scale\(([0-9.]+)\)/.exec(drawn())?.[1])).toBeGreaterThan(1.25);
+    await click($('[data-act="zoom-reset"]'));
+    expect(drawn()).not.toContain('scale');
+    expect($('[data-act="zoom-reset"]')?.textContent).toBe('100%');
   });
 
   it('is its own place in the rail, and an agent opens straight onto its terminal', async () => {
     await mount('#/canvas/' + SCRIBE, routes);
     expect($('#rail a.on')?.dataset.nav).toBe('canvas');
+    await click($('.session-canvas-node [data-act="window-menu"]'));
     expect($$('button[aria-expanded="true"]').map((button) => button.textContent)).toContain('Close terminal view');
     expect([...document.querySelectorAll('button')].map((button) => button.textContent ?? '').filter((words) => /refresh|again/i.test(words))).toEqual([]);
   });

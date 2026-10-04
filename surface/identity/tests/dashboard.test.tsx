@@ -95,6 +95,52 @@ describe('The Dashboard is the front page', () => {
     expect(requests.filter((path) => /\/usage|\/goals|\/budgets/.test(path))).toEqual([]);
   });
 
+  it('shows the widgets: waiting requests and drafts item by item, budgets nearest the limit first, goals missed first, and a part that could not be read by its refusal name', async () => {
+    const asked = { id: 'r-1', asked_by: SCRIBE, asked_by_name: 'Scribe', responsible: { id: ADA, display_name: 'Ada (test person)', state: 'active' }, resource: { kind: 'store', id: 's-1' },
+      relation: 'reader', actions: ['read'], ends_at: null, why: 'to read the ward list', asked_at: 1790000000, state: 'waiting', approvers: [], sources: [], can_decide: true };
+    const decided = { ...asked, id: 'r-2', state: 'approved', why: 'already decided' };
+    const prepared = { id: 'op-' + '9'.repeat(32), agent: { id: SCRIBE, display_name: 'Scribe' }, responsible: { id: ADA, display_name: 'Ada (test person)', state: 'active' },
+      target: { kind: 'grant', id: 'g-1', action: 'grant.give' }, method: 'POST', path: '/grants', body: '{}', note: 'for the night shift', created_at: 1790000000, creation_hash: 'h', state: 'waiting' };
+    await mount('#/', { ...routes, '/requests': ok({ requests: [decided, asked] }), '/drafts?state=waiting': ok({ drafts: [prepared] }), '/dashboard': ok(dashboard({
+      [SCRIBE]: { budget: scribeBudget, usage: scribeUsage, goals: { goals: [goal('g-1', at(9), 'open'), goal('g-2', at(6), 'open'), goal('g-3', null, 'missed'), goal('g-4', null, 'met')] } },
+      [COURIER]: { goals: { goals: [goal('g-5', null, 'missed')] } },
+      [ARCHIVIST]: { budget: { refusal: 'BudgetsUnavailable', reason: 'the budgets store is closed' }, goals: { refusal: 'GoalsUnavailable', reason: 'the goals store is closed' } },
+    })) });
+    const widget = (label: string) => $('section.dash-widget[aria-label="' + label + '"]');
+    expect(widget('Requests')?.querySelector('.dash-count')?.textContent).toBe('1');
+    const request = widget('Requests')?.querySelector('tr[data-request="r-1"]');
+    expect([...(request?.querySelectorAll('td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe', 'reader: readto read the ward list', 'Decide']);
+    expect(request?.querySelector('a')?.getAttribute('href')).toBe('#/requests');
+    expect(widget('Requests')?.textContent).not.toContain('already decided');
+    expect(widget('Drafts')?.querySelector('.dash-count')?.textContent).toBe('1');
+    expect([...(widget('Drafts')?.querySelectorAll('tr[data-draft] td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe', 'grant.give on grantfor the night shift', 'Decide']);
+    expect(widget('Drafts')?.textContent).not.toMatch(/op-[0-9a-f]{32}/);
+    // Budget: the part that could not be read first, by its name; then the agent nearest its limit; the rest counted once.
+    expect(widget('Budget')?.querySelector('.dash-count')?.textContent).toBe('1 limited');
+    expect([...(widget('Budget')?.querySelectorAll('tr[data-budget]') ?? [])].map((tr) => tr.getAttribute('data-budget'))).toEqual([ARCHIVIST, SCRIBE]);
+    expect(widget('Budget')?.querySelector('tr[data-budget="' + ARCHIVIST + '"]')?.textContent).toBe('ArchivistBudgetsUnavailable');
+    expect(widget('Budget')?.querySelector('tr[data-budget="' + SCRIBE + '"] .dash-bar')?.getAttribute('aria-label')).toBe('90% of the nearest limit');
+    expect(widget('Budget')?.querySelector('tr.empty')?.textContent).toBe('1 other agent has no limit.');
+    // Goals: missed first, then open by deadline, then met; an agent whose goals could not be read is named.
+    expect(widget('Goals')?.querySelector('.dash-count')?.textContent).toBe('2 open, 2 missed');
+    expect([...(widget('Goals')?.querySelectorAll('tr[data-goal]') ?? [])].map((tr) => tr.getAttribute('data-goal'))).toEqual(['missed', 'missed', 'open', 'open', 'met', 'unread']);
+    const goals = widget('Goals')?.textContent ?? '';
+    expect(goals.indexOf('due 6 Oct')).toBeGreaterThan(-1);
+    expect(goals.indexOf('due 6 Oct')).toBeLessThan(goals.indexOf('due 9 Oct'));
+    expect(widget('Goals')?.querySelector('tr[data-goal="unread"]')?.textContent).toBe('ArchivistIts goals could not be read. GoalsUnavailable');
+    expect(unreachable()).toEqual([]);
+  });
+
+  it('says a widget whose own read was refused by the refusal name, with the rest of the Dashboard still shown', async () => {
+    await mount('#/', { ...routes, '/requests': { status: 503, body: { refusal: 'RequestsUnavailable', reason: 'the requests store is closed' } }, '/drafts?state=waiting': { status: 503, body: { refusal: 'DraftsUnavailable', reason: 'closed' } } });
+    expect($('section.dash-widget[aria-label="Requests"]')?.textContent).toContain('Requests could not be read. RequestsUnavailable');
+    expect($('section.dash-widget[aria-label="Drafts"]')?.textContent).toContain('Drafts could not be read. DraftsUnavailable');
+    expect($('section.dash-widget[aria-label="Requests"] .dash-count')?.textContent).toBe('?');
+    expect(rowOf('Scribe')).not.toBeNull();
+    expect($('section.dash-widget[aria-label="Budget"] tr.empty')?.textContent).toBe('No agent has a limit.');
+    expect($('section.dash-widget[aria-label="Goals"] tr.empty')?.textContent).toBe('No goal is set.');
+  });
+
   it('says No limit and No goal for an agent with neither', async () => {
     await mount('#/', routes);
     expect(cells('Courier').slice(2, 4)).toEqual(['No limit', 'No goal']);

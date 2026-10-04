@@ -1,7 +1,17 @@
 /* The Dashboard fills the screen: the agents in the wide left panel, what waits and what runs stacked on the right, each scrolling inside itself; the picture sits over the bottom right corner. */
 .dash-page { position: relative; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 26px; }
 .dash-page > .head { flex: none; margin-bottom: 8px; }
-.dash-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); gap: 24px; }
+.dash-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); gap: 20px 24px; }
+/* The widgets: one row of cards under the agents, each scrolling inside itself. */
+.dash-widgets { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.dash-widget { min-height: 0; display: flex; flex-direction: column; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.dash-widget > .section-h { flex: none; display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; }
+.dash-widget > .section-h a { margin-left: auto; font: inherit; letter-spacing: 0; text-transform: none; color: var(--text-secondary); }
+.dash-count { font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-primary); }
+.dash-widget .note { margin-top: 2px; }
+.dash-bar { display: block; height: 4px; margin: 2px 0 5px; border-radius: 2px; background: var(--surface-hover); overflow: hidden; }
+.dash-bar > span { display: block; height: 100%; background: var(--accent, var(--text-secondary)); }
+.dash-bar > span.full { background: var(--danger); }
 .dash-agents { min-height: 0; }
 .dash-side { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 20px; }
 .dash-side > .you-panel { min-height: 0; }
@@ -13,8 +23,9 @@
 .dash-table .you-act { text-align: right; white-space: nowrap; }
 .dash-table .you-asked td { padding: 4px 12px 14px; }
 .dash-picture { position: absolute; right: 20px; bottom: 20px; z-index: 30; width: min(560px, 46vw); height: min(360px, 48vh); display: flex; flex-direction: column; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgb(0 0 0 / 0.28); overflow: hidden; }
-/* While the picture is shown the right-hand panels end above it, so it never covers a row or its controls. */
-.dash-watching .dash-side { padding-bottom: min(360px, 48vh); }
+/* While the picture is shown the widgets' row is as tall as the picture and ends to its left, so it covers no row and no control. */
+.dash-watching .dash-body { grid-template-rows: minmax(0, 1fr) min(360px, 48vh); }
+.dash-watching .dash-widgets { padding-right: calc(min(560px, 46vw) + 20px); }
 .dash-picture-bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border-subtle); }
 .dash-picture-bar h2 { margin: 0; font-size: 13px; }
 .dash-picture-bar .sec { flex: 1; font-size: 12px; }

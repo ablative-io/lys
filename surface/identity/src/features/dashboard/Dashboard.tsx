@@ -15,6 +15,9 @@ import type { Entry } from '../people/directory';
 import { agentsOf, buildTree } from '../people/tree';
 import type { Node } from '../people/tree';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
+import { readDrafts } from '../drafts/contract';
+import type { Draft } from '../drafts/contract';
+import type { AccessRequest } from '../requests/contract';
 import { Terminal } from '../runtime/Terminal';
 import '../runtime/terminal.css';
 import { Gate } from '../signin/Gate';
@@ -26,20 +29,27 @@ import type { DashboardAgent, DashboardAnswer, Waiting } from './contract';
 import { readCord, stoppedWhy } from './cord';
 import type { CordView } from './cord';
 import { CordLine, StopEverythingButton, StopEverythingRow, pullPending } from './StopEverything';
+import { BudgetWidget, DraftsWidget, GoalsWidget, RequestsWidget } from './Widgets';
 import './dashboard.css';
 
-interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; teams: Team[] | Refused; cord: CordView | Refused }
+interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
+
+/** A part of the page that could not be read is its refusal; the rest of the page still reads. */
+const orRefused = <T,>(read: Promise<T>, name: string): Promise<T | Refused> =>
+  read.then((value) => value, (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: name, reason: String(problem) }));
 type Read = Ready | { kind: 'registered' };
 
 async function readPage(): Promise<Read> {
   const me = await api.me();
   if (me.person.state === 'registered') return { kind: 'registered' };
-  const { answer, teams, cord } = await readTogether({
+  const { answer, teams, cord, requests, drafts } = await readTogether({
+    requests: orRefused<AccessRequest[]>(request<{ requests: AccessRequest[] }>('/requests').then((list) => list.requests), 'RequestsUnreadable'),
+    drafts: orRefused(readDrafts('waiting'), 'DraftsUnreadable'),
     cord: readCord(),
     answer: readDashboard(),
     teams: request<{ teams: Team[] }>('/teams').then((list) => list.teams, (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: 'TeamsUnreadable', reason: String(problem) })),
   });
-  return { kind: 'active', me, answer, teams, cord };
+  return { kind: 'active', me, answer, teams, cord, requests, drafts };
 }
 
 /**
@@ -112,6 +122,12 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
         <div className="you-scroll"><RunningNow rows={every} context={context}
           first={pulling ? <StopEverythingRow columns={3} close={() => setPulling(false)} changed={reload} /> : null} /></div>
       </section>
+    </div>
+    <div className="dash-widgets">
+      <RequestsWidget requests={data.requests} me={data.me.person.id} />
+      <DraftsWidget drafts={data.drafts} />
+      <BudgetWidget rows={rows} />
+      <GoalsWidget rows={rows} />
     </div>
   </div></>;
 }

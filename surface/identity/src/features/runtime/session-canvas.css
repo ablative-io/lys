@@ -26,14 +26,18 @@
 .session-canvas-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .session-canvas-bar > h3 { flex: 0 1 auto; min-width: 96px; margin: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 .session-canvas-bar > .note { flex: 0 100 auto; min-width: 0; margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
-.session-canvas-bar > .btn { margin-left: auto; padding: 3px 9px; font-size: 12px; }
+/* The bar's one control at its right: Open terminal on a closed window, the menu on an open one. */
+.session-canvas-acts { flex: none; margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.session-canvas-acts .btn { padding: 3px 9px; font-size: 12px; line-height: 1.3; }
 .session-canvas-node:not(.sessions) > .session-canvas-bar { height: 100%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; }
 /* An open window has one bar: the terminal's own state and Stop sit in it, left of the close control, and its second name is not shown. */
 .session-canvas-node.open > .session-canvas-bar { padding-right: 6px; border-bottom: 1px solid var(--border-subtle); }
 .session-canvas-node .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; gap: 0; border: 0; border-radius: 0; }
-.session-canvas-slot { flex: none; width: 190px; margin-left: auto; }
-.session-canvas-node.open > .session-canvas-bar > .btn { flex: none; width: 150px; margin-left: 0; }
-.session-canvas-node .terminal-head { position: absolute; top: 0; right: 166px; width: 190px; height: 34px; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 10px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+/* A window has one bar. Its controls are a small menu over the window, opened from the bar: how the session stands and Stop first (the terminal's own line, placed there), then full screen, a separate window and close. */
+.session-canvas-menu { position: absolute; top: 38px; right: 6px; z-index: 6; display: flex; flex-direction: column; gap: 4px; width: 200px; box-sizing: border-box; padding: 42px 8px 8px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: 0 10px 28px rgba(0, 0, 0, .45); }
+.session-canvas-menu .btn { justify-content: flex-start; text-align: left; padding: 5px 9px; font-size: 12px; text-decoration: none; }
+.session-canvas-node .terminal-head { display: none; }
+.session-canvas-node.menu-open .terminal-head { display: flex; position: absolute; top: 44px; right: 14px; z-index: 7; width: 184px; box-sizing: border-box; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; white-space: nowrap; }
 .session-canvas-node .terminal-state { margin: 0; overflow: hidden; text-overflow: ellipsis; }
 .session-canvas-node .terminal-head > div { display: none; }
 .session-canvas-node .terminal-head .btn { padding: 2px 9px; font-size: 12px; }
@@ -48,7 +52,8 @@
 .session-canvas-node.resources { border-left: 3px solid var(--accent); }
 .session-canvas-node:not(.sessions) > .session-canvas-bar > .session-canvas-kind { order: -1; }
 /* How a session ended is a sentence: it takes its own line under the bar and is read whole. */
-.session-canvas-node .terminal-head:has([data-ended="true"]) { position: static; width: auto; height: auto; padding: 4px 12px; justify-content: flex-start; white-space: normal; overflow: visible; }
+.session-canvas-node .terminal-head:has([data-ended="true"]), .session-canvas-node.menu-open .terminal-head:has([data-ended="true"]) { display: flex; position: static; width: auto; height: auto; padding: 4px 12px; justify-content: flex-start; white-space: normal; overflow: visible; }
+.session-canvas-node:has(.terminal-state[data-ended="true"]) .session-canvas-menu { padding-top: 8px; }
 .session-canvas-node.open:has(.terminal-state[data-ended="true"]) .session-canvas-slot { display: none; }
 .session-canvas-node.open:has(.terminal-state[data-ended="true"]) > .session-canvas-bar > .btn { margin-left: auto; }
 /* A runner that did not answer: the window says so under its bar, and the terminal does not say Running over it. */
@@ -56,9 +61,17 @@
 .session-canvas-node.unanswered .terminal-state[data-ended="false"] { display: none; }
 
 /* The page: what is running down the left, the canvas taking the rest. Each scrolls on its own; the page does not. */
-.canvas-with-list { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(280px, 26%) minmax(0, 1fr); gap: 16px; }
-.canvas-with-list .running-list { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.canvas-with-list .running-list .listing { flex: 1; min-height: 0; }
-.canvas-side { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* The canvas is the whole page. What is running is one line of names across its top, each going to that agent's window. */
+.canvas-side { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.running-list { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; }
+.running-chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-card); }
+.running-chip a[aria-current="page"] { color: var(--text-primary); font-weight: 600; }
+.running-chip .dot { margin-right: 5px; }
+/* A terminal alone in its own browser window, and a canvas window in full screen: the screen takes everything. */
+.terminal-window { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--surface-default); }
+.terminal-window .terminal { flex: 1; min-height: 0; margin: 0; border: 0; border-radius: 0; }
+.terminal-window .terminal-display, .session-canvas-node:fullscreen .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.terminal-window .terminal-display .terminal-screen, .session-canvas-node:fullscreen .terminal-screen { flex: 1; height: auto; min-height: 0; }
+.session-canvas-node:fullscreen .terminal { flex: 1; min-height: 0; }
 .canvas-connections, .canvas-about { max-height: 120px; overflow: auto; overscroll-behavior: contain; }
 .canvas-connections h4 { margin: 0 0 4px; }

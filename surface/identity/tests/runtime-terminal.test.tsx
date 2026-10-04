@@ -48,7 +48,7 @@ describe('Running sessions', () => {
       ['POST ' + base + '/read-bytes']: output(0, '', exited),
       ['POST ' + secondBase + '/read-bytes']: ok({ session: second, answer: { kind: 'bytes', output: { session: second, from: 0, cursor: 0, oldest: 0, data: [], ended: exited } }, receipt: { index: 2 } }),
     });
-    expect($$('.running-list tbody tr[data-href="#/canvas/' + SCRIBE + '"]')).toHaveLength(2);
+    expect($$('.running-list .running-chip a[href="#/canvas/' + SCRIBE + '"]')).toHaveLength(2);
     expect(posted.some((entry) => entry.path.endsWith('/end'))).toBe(false);
   });
 
@@ -78,7 +78,8 @@ describe('Running sessions', () => {
     await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered }) });
     expect(text()).toContain('runner_unreachable');
     expect(text()).toContain('Its runner did not answer; last reported running');
-    expect($$('.running-list td').some((cell) => cell.textContent?.startsWith('Running'))).toBe(false);
+    expect($$('.running-list .running-state')).toHaveLength(1);
+    expect($$('.running-list .running-state').some((cell) => cell.textContent?.startsWith('Running'))).toBe(false);
   });
 
   it('refuses a list that does not say which runners answered, by name', async () => {

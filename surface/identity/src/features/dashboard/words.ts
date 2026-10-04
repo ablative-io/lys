@@ -13,6 +13,12 @@ const nearness = (budget: BudgetsView, index: number): number => {
   return used && used.figure !== null && amount > 0 ? used.figure / amount : -1;
 };
 
+/** How near the agent's nearest limit is to being reached, 1 being reached; null when no limit has a reported figure. */
+export const tightest = (budget: BudgetsView): number | null => {
+  const near = Math.max(-1, ...budget.limits.map((_, index) => nearness(budget, index)));
+  return near < 0 ? null : near;
+};
+
 /**
  * Each limit as used of limit with its unit and period, the tightest first, paired exactly as the agent's Limits and goals
  * page pairs them; "No limit" when there is none; the refusal name when the budget or the usage could not be read.
