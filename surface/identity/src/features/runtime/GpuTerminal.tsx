@@ -71,6 +71,21 @@ export function GpuTerminal({ session, onEnd, onFailure }: {
         void resizeWork.catch(failed);
       };
       opened.on('resize', resize);
+      // A window holds as many columns as its own width has room for, whatever the canvas's zoom. The library counts
+      // them from the size the window is drawn at, which a zoomed canvas scales, so a window on a canvas zoomed out
+      // was given too few columns and its terminal stopped short of its edge. They are counted here instead, from the
+      // width the layout gives the window, and the library's own count is switched off so the two never take turns.
+      (opened as unknown as { resizeObserver?: ResizeObserver }).resizeObserver?.disconnect();
+      const fill = () => {
+        const { cellWidthPx, cellHeightPx } = opened.geometry;
+        const [width, height, ratio] = [container.clientWidth, container.clientHeight, Math.max(1, window.devicePixelRatio || 1)];
+        if (!width || !height || !cellWidthPx || !cellHeightPx) return;
+        opened.resize(Math.max(1, Math.floor(width * ratio / cellWidthPx)), Math.max(1, Math.floor(height * ratio / cellHeightPx)));
+      };
+      const watching = new ResizeObserver(fill);
+      watching.observe(container);
+      controller.signal.addEventListener('abort', () => watching.disconnect());
+      fill();
       resize(opened.geometry);
       // One session has one size, and another window showing it may have set its own. The window a person is using
       // says its size again when they click or type into it, so what they look at always fills what they see.

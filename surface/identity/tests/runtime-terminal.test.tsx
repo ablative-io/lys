@@ -6,7 +6,7 @@ import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { RuntimeSession } from '../src/features/runtime/RuntimeSessions';
 import { byteOutput } from '../src/features/runtime/terminal-transport';
-import { browser, listeners, mockTerminal, sent, written } from './terminal-double';
+import { browser, cell, listeners, mockTerminal, ownCount, sent, sized, written } from './terminal-double';
 import { MAC_KEYS } from '../src/features/runtime/GpuTerminal';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
@@ -79,6 +79,26 @@ describe('Running sessions', () => {
     expect(press('ArrowLeft', { ctrlKey: true, altKey: true })).toBe(false);
     expect(press('c', { metaKey: true })).toBe(false);
     expect(sent).toHaveLength(8);
+  });
+
+  it('gives a terminal as many columns as its window has room for, counted from the window and not from how the canvas is zoomed', async () => {
+    // A window 800 by 510 on a screen of two device pixels to one, in a font whose cell is 16 by 34 device pixels: 100 columns, 30 rows.
+    cell.cellWidthPx = 16; cell.cellHeightPx = 34;
+    vi.stubGlobal('devicePixelRatio', 2);
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) { return this.classList.contains('terminal-screen') ? 800 : 0; });
+    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) { return this.classList.contains('terminal-screen') ? 510 : 0; });
+    // The canvas is zoomed out to a half: the window is drawn 400 wide. That is not what its columns are counted from.
+    const drawn = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 255, width: 400, height: 255, toJSON: () => ({}) });
+    let asked = 0;
+    const live = (() => { asked += 1; return asked === 1 ? output(0, '$ ') : new Promise(() => {}); }) as unknown as Route;
+    const { posted } = await mount('#/canvas/' + SCRIBE, { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), ['POST ' + base + '/read-bytes']: live });
+    for (let turn = 0; turn < 20 && $('.terminal-screen')?.getAttribute('data-renderer') === 'starting'; turn++) await settle();
+    expect(sized).toEqual([[100, 30]]);
+    expect(ownCount.disconnect).toHaveBeenCalledTimes(1);
+    const sizes = posted.filter((entry) => entry.path === base + '/resize').map((entry) => entry.body);
+    expect(sizes.at(-1)).toEqual({ columns: 100, rows: 30 });
+    width.mockRestore(); height.mockRestore(); drawn.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('never opens a terminal that was not returned in the permitted session list', async () => {
