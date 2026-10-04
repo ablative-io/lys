@@ -1,0 +1,19 @@
+/* The proxy view: three columns filling the page, each scrolling in itself; the page never scrolls. */
+.proxy-view { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(170px, 230px) minmax(420px, 1fr) minmax(420px, 1.3fr); gap: 12px; }
+.proxy-view > section { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-card); padding: 8px 10px; }
+.proxy-view table { width: 100%; }
+.proxy-view th.num, .proxy-view td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.proxy-view tr[aria-current="true"] > td { background: var(--accent-glow, var(--surface-default)); }
+.proxy-call-line { margin: 2px 0 8px; font-size: 12.5px; color: var(--text-secondary); }
+.proxy-shows { padding: 0 0 8px; }
+.proxy-shows a { padding: 2px 9px; border-radius: 999px; background: var(--surface-hover); color: var(--text-secondary); font-size: 11.5px; text-decoration: none; }
+.proxy-shows a[aria-current="true"] { background: var(--text-primary); color: #0b0b0e; }
+.proxy-copy { float: right; margin: 0 0 6px 8px; font-size: 11.5px; padding: 2px 9px; }
+.proxy-json { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: #0b0b0e; color: var(--text-primary); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; clear: both; }
+.proxy-headers td:first-child { white-space: nowrap; }
+/* Operations swaps between the canvas and the proxy by one small bar at the top of the page, over either view. */
+.operations-swap { position: absolute; z-index: 9; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; padding: 3px; border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-card); box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
+.operations-swap a { padding: 4px 14px; border-radius: 999px; color: var(--text-secondary); font-size: 12.5px; text-decoration: none; }
+.operations-swap a:hover { color: var(--text-primary); }
+.operations-swap a[aria-current="page"] { background: var(--accent-glow, var(--surface-default)); color: var(--accent); }
+.session-canvas-page > .proxy-view { padding: 56px 12px 12px; box-sizing: border-box; height: 100%; }

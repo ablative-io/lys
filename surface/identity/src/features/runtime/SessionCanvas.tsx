@@ -17,6 +17,7 @@ import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, markId, nearestSide, nextColour, 
 import type { Arrangement, Box, Marks, Side } from './canvas-marks';
 import { keepArrangement, readKeeping, removeLayout, said, saveLayout } from './canvas-kept';
 import type { Keeping, SavedLayout } from './canvas-kept';
+import { ProxyView, proxyHref } from '../proxy/ProxyView';
 import { CanvasDock, KindSymbol, PANELS } from './CanvasDock';
 import type { Panel, Tool } from './CanvasDock';
 import { Anchors, GroupBox, LinkHandles, LinkLines, NoteCard } from './CanvasMarks';
@@ -546,15 +547,19 @@ export function SessionCanvas() {
   const messages = useLoad(firstMessagePage, 'canvas-message-edges');
   const keeping = useLoad(readKeeping, 'canvas-kept');
   const board = useLive(readBoard, 'canvas-board');
+  const [search] = useSearchParams();
+  const proxy = search.get('view') === 'proxy';
   return <div className="page fill session-canvas-page">
-    <div className="head"><div><h1>Operations</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}</div></div>
-    <div className="canvas-side">
+    <div className="head"><div><h1>Operations</h1>{load.status === 'refused' && !proxy ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}</div></div>
+    {/* Operations is two views of the same agents: the canvas they are arranged on, and the model calls they made. */}
+    <nav className="operations-swap" aria-label="Operations views"><a href="#/canvas" aria-current={proxy ? undefined : 'page'}>Canvas</a><a href={proxyHref({})} aria-current={proxy ? 'page' : undefined}>Proxy</a></nav>
+    {proxy ? <ProxyView board={board} /> : <div className="canvas-side">
         {/* With agents running, who is running is behind the bar's Agents button. With none, or while the canvas cannot be read, it is said here. */}
         {load.status === 'ok' && load.data.nodes.some((node) => node.session) ? null : <RunningList />}
         <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? (keeping.status === 'ok' ? <Whole graph={graph} messages={messages} keeping={keeping.data} board={board} /> : <p role="status">Reading your canvas…</p>) : <>
           {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
           {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}
         </>} />
-    </div>
+    </div>}
   </div>;
 }
