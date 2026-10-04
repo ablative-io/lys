@@ -448,7 +448,7 @@ fn view_held(
     })
 }
 
-fn current_usage(
+pub(crate) fn current_usage(
     held: &crate::budgets_state::Held,
     limit: &Limit,
     agents: &std::collections::BTreeSet<String>,

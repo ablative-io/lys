@@ -65,6 +65,11 @@ pub struct UsageView {
     pub last_reported_ms: Option<i64>,
     /// One measured figure or named gap for each current effective limit.
     pub used: Vec<crate::budgets_usage::Used>,
+    /// What the agent used whether or not a limit is set: context now, then
+    /// tokens, dollars and running time today and this week.
+    pub figures: Vec<crate::budgets_usage::Used>,
+    /// Each account's windows as the agent's usage last reported them.
+    pub accounts: Vec<crate::budgets_figures::AccountWindows>,
 }
 
 /// The usage routes.
@@ -138,12 +143,15 @@ fn view(state: &AppState, agent: &str) -> Result<UsageView, ServerError> {
             id: agent.to_owned(),
         },
     )?;
+    let (figures, accounts) = crate::budgets_figures::figures(state, agent)?;
     with_budgets(state, |store| {
         Ok(UsageView {
             agent: agent.to_owned(),
             receipts: store.held().crossings.of_agent(agent),
             last_reported_ms: store.held().index.last_reported(agent),
             used: budget.used,
+            figures,
+            accounts,
         })
     })
 }

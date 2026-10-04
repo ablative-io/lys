@@ -22,6 +22,8 @@ struct Agent {
     sessions: BTreeMap<String, Session>,
     unbound: Session,
     totals: crate::budgets_totals::Totals,
+    /// Each account's reports of its windows, whichever session made them.
+    accounts: BTreeMap<String, Timeline>,
 }
 
 /// Rebuilt from retained records on open; never part of signed state.
@@ -60,6 +62,23 @@ impl Index {
             .get(agent)
             .and_then(|agent| agent.periods.last_key_value())
             .map(|((at, _), _)| *at)
+    }
+
+    /// The position of each account's latest report of its windows for
+    /// `agent`, by the account's name: one lookup for each account, never a
+    /// walk of the uses.
+    pub(crate) fn account_reports(&self, agent: &str) -> Vec<(&str, usize)> {
+        self.agents.get(agent).map_or_else(Vec::new, |agent| {
+            agent
+                .accounts
+                .iter()
+                .filter_map(|(account, timeline)| {
+                    timeline
+                        .last_key_value()
+                        .map(|(_, position)| (account.as_str(), *position))
+                })
+                .collect()
+        })
     }
 
     pub(crate) fn has_usage(&self, agent: &str) -> bool {
@@ -165,6 +184,13 @@ impl Index {
 
 impl Agent {
     fn insert(&mut self, usage: &Usage, position: usize) -> Result<(), String> {
+        if let (Some(account), Some(_)) = (&usage.account, &usage.plan_windows) {
+            insert(
+                self.accounts.entry(account.clone()).or_default(),
+                usage,
+                position,
+            );
+        }
         self.totals.record(usage, position)?;
         insert(&mut self.periods, usage, position);
         if let Some(named) = usage.session.as_deref() {
