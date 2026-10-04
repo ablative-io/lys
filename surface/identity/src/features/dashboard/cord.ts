@@ -32,16 +32,17 @@ export const readCord = (): Promise<CordView | Refused> => request<CordView>(PUL
 
 const who = (pull: CordPull): string => pull.by_name ?? 'an administrator';
 
-/** The one line across the top while everything is stopped. */
 /**
  * The line across the top while the cord is pulled. It says everything is stopped only when the pull's own result
- * left nothing running and reached every computer; otherwise it says what has not stopped, since a page that read
+ * left nothing running and reached every computer; with no result kept for this pull yet it says so; otherwise it
+ * says what has not stopped, since a page that read
  * "everything is stopped" over a running agent would be believed.
  */
 export function stoppedLine(pull: CordPull, last: CordResult | null): string {
   const told = pull.reason + ', by ' + who(pull) + ', ' + clock(pull.at) + '. No agent can be started.';
-  const still = last?.still_running.length ?? 0;
-  const unreached = last?.unreached.length ?? 0;
+  if (!last || last.operation !== pull.operation) return 'Stop everything was pulled; what it stopped is not yet known. ' + told;
+  const still = last.still_running.length;
+  const unreached = last.unreached.length;
   if (!still && !unreached) return 'Everything is stopped: ' + told;
   const left = [
     still ? still + (still === 1 ? ' agent is still running' : ' agents are still running') : '',

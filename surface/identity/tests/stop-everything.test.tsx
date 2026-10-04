@@ -15,7 +15,9 @@ const LAB = 'op-' + 'b'.repeat(32);
 const AWAY = 'op-' + 'c'.repeat(32);
 const AT = 1790000000;
 const PULLED = { operation: 'op-' + '7'.repeat(32), by: ADA, by_name: 'Ada (test person)', reason: 'the building is on fire', kill: false, at: AT };
-const stopping = (pulled: typeof PULLED | null, may_pull: boolean) => ok({ ...CORD, pulled, may_pull });
+const CLEAN = { operation: PULLED.operation, pulled: PULLED, stopped: [], still_running: [], unreached: [], handles_ended: [], handles_refused: [] };
+/** A pulled cord whose own result is kept and left nothing running; `last` null is a pull no runner has answered yet. */
+const stopping = (pulled: typeof PULLED | null, may_pull: boolean, last: unknown = pulled ? CLEAN : null) => ok({ ...CORD, pulled, last, may_pull });
 const session = (id: string, agent: string, agent_name: string, machine: string, machine_name: string) => ({ session: id, agent, agent_name, machine, machine_name });
 const row = () => $('section[aria-label="Running now"] tr.dash-cord');
 const pulls = (posted: { path: string; body: unknown }[]) => posted.filter((entry) => entry.path === '/runtime/stop-everything');
@@ -89,6 +91,14 @@ describe('Stop everything', () => {
     const line = $('.dash-cord-line p')?.textContent ?? '';
     expect(line).not.toContain('Everything is stopped');
     expect(line).toBe('Stop everything was pulled, and not everything has stopped: 1 agent is still running and 1 computer could not be reached. the building is on fire, by Ada (test person), ' + clock(AT) + '. No agent can be started.');
+  });
+
+  it('does not say everything is stopped while the pull has no kept result, or the kept result is another pull\'s', async () => {
+    const unknown = 'Stop everything was pulled; what it stopped is not yet known. the building is on fire, by Ada (test person), ' + clock(AT) + '. No agent can be started.';
+    await mount('#/', { ...SERVICE, '/runtime/stop-everything': stopping(PULLED, true, null) });
+    expect($('.dash-cord-line p')?.textContent).toBe(unknown);
+    await mount('#/', { ...SERVICE, '/runtime/stop-everything': stopping(PULLED, true, { ...CLEAN, operation: 'op-' + '8'.repeat(32) }) });
+    expect($('.dash-cord-line p')?.textContent).toBe(unknown);
   });
 
   it('shows a person who is not the administrator the line and no button', async () => {
