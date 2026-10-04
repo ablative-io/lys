@@ -170,7 +170,7 @@ fn unfinished(file: &mut std::fs::File) -> std::io::Result<bool> {
     file.seek(SeekFrom::End(-1))?;
     let mut last = [0_u8; 1];
     file.read_exact(&mut last)?;
-    Ok(last != [b'\n'])
+    Ok(last != *b"\n")
 }
 
 /// The first kept value of a header on one side.
