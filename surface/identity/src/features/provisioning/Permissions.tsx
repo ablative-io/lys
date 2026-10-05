@@ -104,13 +104,13 @@ function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
         <label className="tick"><input type="checkbox" name="grantable" checked={grantable} onChange={(event) => setGrantable(event.target.checked)} />An access permission may allow this call</label>
         {grantable ? <>{field('resource_kind', 'Type of thing the permission covers')}{field('resource_id', 'Name of the thing the permission covers')}{field('action', 'Action')}</> : null}
       </td>
-      <td><button type="button" className="btn primary" disabled={!ready} onClick={() => {
+      <td><Act symbol="add" name="Add rule" word="Add" tone="primary" disabled={!ready} onClick={() => {
         if (!ready) return;
         const rule: PolicyRule = { id: value('id'), tool: value('tool'), kind: denies,
           authority: grantable ? { permission: { resource: { kind: value('resource_kind'), id: value('resource_id') }, action: value('action') } } : 'hard' };
         if (denies !== 'tool') rule.target = value('target');
         addPolicy(rule); setPolicy(blank); setDenies('tool'); setGrantable(false);
-      }}>Add rule</button></td>
+      }} /></td>
     </tr>;
   }
   return <tr className="add-rule" role="group" aria-label="Add a rule">

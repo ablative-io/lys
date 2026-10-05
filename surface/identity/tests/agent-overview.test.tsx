@@ -213,7 +213,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect($('.file .head')?.textContent).not.toContain('finish setting it up');
     expect($('.file .head')?.textContent).not.toContain('Scribe is ready');
     expect(run()?.textContent).toContain('No computer is allowed to run Scribe.');
-    expect([...(run()?.querySelectorAll('button') ?? [])].map((entry) => entry.textContent)).toEqual(['Allow on this computer']);
+    expect([...(run()?.querySelectorAll('button') ?? [])].map((entry) => entry.getAttribute('aria-label') + ', drawn ' + entry.textContent)).toEqual(['Allow on this computer, drawn Allow']);
     expect(run()?.querySelector('a[href^="#/team"]')).toBeNull();
     expect(posted).toEqual([]);
   });

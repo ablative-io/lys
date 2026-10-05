@@ -118,9 +118,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       <Act symbol="open" name="Choose its program" word="Choose" tone="primary" onClick={settings} />
     </div> : null}
     {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/file/' + encodeURIComponent(agent) + '/sessions'}>See what its runner reported</a></p> : null}
-    {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => <button key={computer.id} type="button" className="btn primary" disabled={busy} onClick={() => { void run(computer.id); }}>
-      {busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name}
-    </button>)}</div> : null}
+    {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => <Act key={computer.id} symbol="start" name={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} word={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void run(computer.id); }} />)}</div> : null}
     {!stopped && !noProgram && choices.length === 1 ? <p className="dim team-start-where">On {choices[0].name}, in the folder {profile?.working_folder}.</p> : null}
   </div>;
 }

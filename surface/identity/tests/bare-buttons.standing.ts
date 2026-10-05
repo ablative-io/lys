@@ -15,9 +15,7 @@ export const STANDING: Record<string, number> = {
   'features/network/Network.tsx': 2,
   'features/people/People.tsx': 1,
   'features/provisioning/FolderChooser.tsx': 5,
-  'features/provisioning/Permissions.tsx': 1,
   'features/requests/Requests.tsx': 1,
-  'features/runtime/CannotStart.tsx': 3,
   'features/runtime/CanvasDock.tsx': 7,
   'features/runtime/CanvasMarks.tsx': 4,
   'features/runtime/CanvasTogether.tsx': 4,
@@ -27,14 +25,12 @@ export const STANDING: Record<string, number> = {
   'features/settings/Settings.tsx': 4,
   'features/setup/Setup.tsx': 3,
   'features/sign-in/SignIn.tsx': 1,
-  'features/team/Start.tsx': 1,
   'features/teams/Teams.tsx': 1,
   'shell/Dock.tsx': 3,
   'shell/Explain.tsx': 2,
   'shell/Listing.tsx': 3,
   'shell/Picker.tsx': 2,
   'shell/Rail.tsx': 1,
-  'shell/Upgraded.tsx': 1,
 };
 
 /** How many stood when the count began. The sum above never passes it. */

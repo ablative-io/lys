@@ -21,6 +21,7 @@ import { FolderChooser } from '../provisioning/FolderChooser';
 import { saveFolder } from '../provisioning/working-folder';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { readRoles } from '../roles/AssignedRoles';
+import { Act } from '../../shell/Act';
 
 /** What refused a start: the refusal's name and its reason, as answered. */
 export interface StartRefusal { refusal: string; reason: string }
@@ -73,7 +74,7 @@ export function CannotStart({ agent, name, refusal, machines, again }: {
     {fix.kind === 'turn-on' ? <TurnOn agent={agent} name={name} label={fix.label} transition={fix.transition} again={again} /> : null}
     {fix.kind === 'allow-computer' ? <AllowComputer agent={agent} name={name} machines={machines} again={again} /> : null}
     {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} name={name} machines={machines} again={again} /> : null}
-    {fix.kind === 'try-again' ? <button type="button" className="btn primary" onClick={again}>Try again</button> : null}
+    {fix.kind === 'try-again' ? <Act symbol="retry" name="Try again" word="Try again" tone="primary" onClick={again} /> : null}
   </div>;
 }
 
@@ -98,7 +99,7 @@ function TurnOn({ agent, name, label, transition, again }: {
     finally { working.current = false; setBusy(false); }
   };
   return <>
-    <button type="button" className="btn primary" disabled={busy} onClick={() => { void turnOn(); }}>{label}</button>
+    <Act symbol="start" name={label} word={label} tone="primary" disabled={busy} onClick={() => { void turnOn(); }} />
     <Failed refusal={failed} />
   </>;
 }
@@ -174,9 +175,7 @@ function AllowComputer({ agent, name, machines, again }: { agent: string; name: 
     <a className="btn primary" href="#/network?add=computer">Add a computer</a>
   </>;
   return <>
-    {computers.map((computer) => <button key={computer.id} type="button" className="btn primary" disabled={busy} onClick={() => { void allow(computer.id); }}>
-      {computers.length === 1 ? 'Allow on this computer' : 'Allow on ' + computer.name}
-    </button>)}
+    {computers.map((computer) => <Act key={computer.id} symbol="approve" name={computers.length === 1 ? 'Allow on this computer' : 'Allow on ' + computer.name} word={computers.length === 1 ? 'Allow' : 'Allow on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void allow(computer.id); }} />)}
     {computers.length === 1 ? <p className="sec">{name} will be allowed to run on {computers[0].name}.</p> : null}
     <Failed refusal={failed} />
   </>;

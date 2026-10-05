@@ -37,7 +37,7 @@ async function shown(refusal: StartRefusal, routes: Record<string, Route> = {}) 
   await settle();
   return { host: shownIn, posted, calls };
 }
-const buttons = (scope: HTMLElement) => [...scope.querySelectorAll('button, a.btn')].map((entry) => entry.textContent?.trim());
+const buttons = (scope: HTMLElement) => [...scope.querySelectorAll('button, a.btn')].map((entry) => (entry.getAttribute('aria-label') ?? entry.textContent)?.trim());
 
 describe('why an agent cannot start', () => {
   it('says each reason in one sentence and names the one act that fixes it', () => {

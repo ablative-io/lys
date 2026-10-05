@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { subscribeChanges } from '../live';
+import { Act } from './Act';
 
 /** How the page is reloaded; a test stands in for the browser's own. */
 export const page = { reload: (): void => location.reload() };
@@ -36,7 +37,7 @@ export function Upgraded() {
   return (
     <div className="upgraded" role="status">
       <span>Lys was upgraded. Reload to use the new screens.</span>
-      <button type="button" className="btn primary" onClick={() => page.reload()}>Reload</button>
+      <Act symbol="retry" name="Reload" word="Reload" tone="primary" onClick={() => page.reload()} />
     </div>
   );
 }
