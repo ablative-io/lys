@@ -211,6 +211,9 @@ pub struct Sessions {
     state_dir: PathBuf,
     /// The proxy's `usage` directory on this machine, once said.
     proxy_usage: std::sync::OnceLock<PathBuf>,
+    /// The socket this runner serves on, once bound: where a proxied run's
+    /// status line hands what its harness reported.
+    serving: std::sync::OnceLock<PathBuf>,
     scrollback: usize,
     pub(crate) writer: crate::durable::Writer,
     #[cfg(test)]
@@ -352,6 +355,7 @@ impl Sessions {
                 state,
                 state_dir,
                 proxy_usage: std::sync::OnceLock::new(),
+                serving: std::sync::OnceLock::new(),
                 scrollback,
                 writer,
                 #[cfg(test)]
@@ -506,6 +510,9 @@ impl Sessions {
             .transpose()?;
         let harness = launch.config.as_ref().and_then(|config| config.harness);
         crate::launch_config::prepare(&self.state_dir, &mut launch)?;
+        if proxy.is_some() {
+            self.status_line_named(&mut launch);
+        }
         let id = launch.session.clone();
         let cwd = lifecycle::bound_directory(&launch.directory);
         // Naming the folder is the trust answer: a Claude Code run's folder

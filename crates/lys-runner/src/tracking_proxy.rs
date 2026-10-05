@@ -28,6 +28,13 @@
 //! - The account windows the response's headers reported are one snapshot
 //!   record, id `<call id>:plan`, kept only when the windows or the account
 //!   differ from the last kept, as a Codex rollout's are.
+//!
+//! Beside the file, the run's harness reports two figures no call's response
+//! carries: its cost in dollars and its running time. A Claude Code run is
+//! given a status line that hands them to the runner ([`ProxyReading::status`]);
+//! they are kept as a snapshot record, the dollars as what was added since
+//! the last one kept. Tokens and the context in use are never taken from it:
+//! those are counted from the calls.
 
 use std::path::{Path, PathBuf};
 
@@ -39,7 +46,7 @@ use serde_json::Value;
 use crate::error::RunnerError;
 use crate::tracking::{Measure, RECORD_VERSION, UsageRecord};
 use crate::tracking_budget::PlanWindow;
-use crate::tracking_fields::{Figures, Unavailable, note};
+use crate::tracking_fields::{Figures, Unavailable, count, note};
 use crate::tracking_store::{Body, Coverage, SourceState};
 
 /// The proxy adapter: the proxy's per-run usage file.
@@ -299,6 +306,56 @@ impl ProxyReading<'_> {
             ));
         }
         bodies
+    }
+
+    /// A status line's dollars and running time, kept as record `id`; none
+    /// when both repeat the last kept. Nothing is put where the harness
+    /// reported nothing: an absent figure is named as absent.
+    pub fn status(&self, source: &mut SourceState, input: &Value, id: String) -> Option<Body> {
+        let mut unavailable = Vec::new();
+        let running_ms = input
+            .get("cost")
+            .and_then(|cost| count(cost, "total_duration_ms"));
+        note("running_ms", running_ms, "field_absent", &mut unavailable);
+        let mut figures = Figures {
+            running_ms,
+            dollars_micros: crate::tracking_budget::dollars(input, &mut unavailable),
+            ..Figures::default()
+        };
+        if source.snapshot.as_ref() == Some(&figures) {
+            return None;
+        }
+        source.snapshot = Some(figures.clone());
+        crate::tracking_budget::cost_delta(source, &mut figures, &mut unavailable);
+        for figure in [
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_tokens",
+            "cache_read_tokens",
+            "context_tokens",
+        ] {
+            unavailable.push(Unavailable {
+                figure: figure.to_owned(),
+                reason: "counted_from_the_calls_through_the_proxy".to_owned(),
+            });
+        }
+        let model = input
+            .get("model")
+            .and_then(|model| model.get("id"))
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let account = source
+            .plan_account
+            .clone()
+            .or_else(|| self.tracking.account.clone());
+        Some(self.record(
+            source,
+            (id, source.offset),
+            Some(self.now),
+            Measure::Snapshot,
+            (figures, unavailable),
+            (model, account, None),
+        ))
     }
 
     fn record(

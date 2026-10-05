@@ -75,6 +75,7 @@ pub mod scrollback;
 pub mod session;
 pub mod socket;
 pub mod state;
+pub mod status_line;
 pub mod terminal_bytes;
 pub mod tracking;
 pub mod tracking_budget;

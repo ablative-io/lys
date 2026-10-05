@@ -199,3 +199,73 @@ fn a_line_of_another_run_or_one_that_does_not_read_is_never_a_record() {
     assert_eq!(states(&bodies), vec!["record_unreadable"]);
     assert!(usage(&bodies).is_empty());
 }
+
+fn status(source: &mut SourceState, input: &Value) -> Option<UsageRecord> {
+    let tracking = ProxyTracking {
+        run: RUN.to_owned(),
+        context_window: 0,
+        profile_version: 1,
+        account: Some("declared".to_owned()),
+    };
+    let reading = ProxyReading {
+        runner: "runner",
+        session: "session",
+        tracking: &tracking,
+        now: 9,
+    };
+    match reading.status(source, input, "status-line:session:1".to_owned()) {
+        Some(Body::Usage(record)) => Some(record),
+        _ => None,
+    }
+}
+
+#[test]
+fn a_status_line_gives_a_proxied_run_its_dollars_and_running_time_and_nothing_else() {
+    let mut source = SourceState::default();
+    let first = status(
+        &mut source,
+        &json!({"model": {"id": "m"}, "cost": {"total_cost_usd": 0.25, "total_duration_ms": 4000},
+            "context_window": {"current_usage": {"input_tokens": 700}}}),
+    )
+    .expect("the first report is kept");
+    assert_eq!(first.measure, Measure::Snapshot);
+    assert_eq!(first.figures.dollars_micros, Some(250_000));
+    assert_eq!(first.figures.running_ms, Some(4000));
+    // Tokens and the context in use are counted from the calls, never taken
+    // from the status line, and each is named as not taken.
+    assert_eq!(first.figures.context_tokens, None);
+    assert_eq!(first.figures.input_tokens, None);
+    for figure in ["input_tokens", "output_tokens", "context_tokens"] {
+        assert!(first.unavailable.iter().any(|note| note.figure == figure
+            && note.reason == "counted_from_the_calls_through_the_proxy"));
+    }
+    assert_eq!(first.adapter, PROXY_ADAPTER);
+    assert_eq!(first.run.as_deref(), Some(RUN));
+    assert_eq!(first.account.as_deref(), Some("declared"));
+    // The next report's dollars are what was added since the last kept.
+    let second = status(
+        &mut source,
+        &json!({"cost": {"total_cost_usd": 0.4, "total_duration_ms": 9000}}),
+    )
+    .expect("a changed report is kept");
+    assert_eq!(second.figures.dollars_micros, Some(150_000));
+    assert_eq!(second.figures.running_ms, Some(9000));
+    // The same report again is not a second record.
+    assert!(
+        status(
+            &mut source,
+            &json!({"cost": {"total_cost_usd": 0.4, "total_duration_ms": 9000}}),
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn a_status_line_that_reports_no_cost_puts_no_figure_in_its_place() {
+    let record = status(&mut SourceState::default(), &json!({"cost": {}}))
+        .expect("a report with no figures is still the first report");
+    assert_eq!(record.figures.dollars_micros, None);
+    assert_eq!(record.figures.running_ms, None);
+    assert!(record.unavailable.iter().any(|note| note.figure == "dollars_micros"));
+    assert!(record.unavailable.iter().any(|note| note.figure == "running_ms"));
+}

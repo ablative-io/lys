@@ -61,6 +61,7 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
             scrollback,
         } => crate::commands::runner_join::run(&server, &machine, server_ca, scrollback),
         RunnerCommand::Judge { socket, harness } => judge(&socket, harness),
+        RunnerCommand::StatusLine { socket } => status_line(&socket),
     }
 }
 
@@ -84,6 +85,25 @@ fn serve(runner: Runner, socket: &Path) -> CliResult<()> {
         context: "writing that the runner listens".to_owned(),
         source,
     })
+}
+
+/// Runs `lys runner status-line`: one line for the harness to show. The
+/// command exits zero whatever happened, so the harness shows the line that
+/// says what did.
+fn status_line(socket: &Path) -> CliResult<()> {
+    let mut stdin = String::new();
+    let handed = std::io::Read::read_to_string(&mut std::io::stdin(), &mut stdin)
+        .map_err(|error| RunnerError::Malformed {
+            reason: format!("the status line's input could not be read: {error}"),
+        })
+        .and_then(|_| lys_runner::status_line::hand(socket, &stdin));
+    let mut out = std::io::stdout();
+    writeln!(out, "{}", lys_runner::status_line::shown(&handed))
+        .and_then(|()| out.flush())
+        .map_err(|source| crate::commands::error::CliError::Io {
+            context: "writing the status line".to_owned(),
+            source,
+        })
 }
 
 /// Runs `lys runner judge`: the hook's answer, a deny on any failure.

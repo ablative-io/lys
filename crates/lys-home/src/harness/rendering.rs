@@ -60,6 +60,23 @@ pub const PROXY_VARIABLE: &str = "ANTHROPIC_BASE_URL";
 /// ([`LaunchFields::run`]).
 pub const RUN_VARIABLE: &str = "LYS_RUN";
 
+/// The variable a runner names its own `lys` program in, for a run whose
+/// model calls go through the proxy: the program the run's status line runs.
+pub const PROGRAM_VARIABLE: &str = "LYS_PROGRAM";
+
+/// The variable a runner names its own socket in, for the same run: where
+/// the run's status line hands what the harness reported.
+pub const SOCKET_VARIABLE: &str = "LYS_RUNNER_SOCKET";
+
+/// The status line of a run whose model calls go through the proxy. The
+/// proxy counts the calls; the cost in dollars and the running time are what
+/// the harness itself reports to its status line, and this command hands
+/// them to the runner. It names the two variables the runner sets, never a
+/// path of its own, so one template writes one sequence of bytes on every
+/// machine.
+pub const STATUS_LINE_COMMAND: &str =
+    "\"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\"";
+
 /// The proxy's address with `run` put first on its path:
 /// `http://host:port/anthropic` becomes `http://host:port/<run>/anthropic`.
 /// None when `proxy` is not an address with a scheme and a host.

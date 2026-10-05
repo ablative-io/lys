@@ -64,8 +64,9 @@ pub fn confinement_named(template: &Template) -> Result<(), HomeError> {
 }
 
 /// The settings file's bytes: `{"env": {...}}`, keys sorted, with the
-/// template's `permissions` beside `env` when it sets them; one trailing
-/// newline.
+/// template's `permissions` beside `env` when it sets them, and a
+/// `statusLine` when the template names a run key (its calls go through the
+/// proxy); one trailing newline.
 pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     let mut env: BTreeMap<&str, &str> = template
         .env
@@ -75,7 +76,16 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     for secret in &template.use_only {
         env.insert(secret.env.as_str(), secret.handle.as_str());
     }
+    let proxied = env.contains_key(crate::harness::rendering::RUN_VARIABLE);
     let mut value = json!({ "env": env });
+    if proxied {
+        // A run counted through the proxy reports its dollars and running
+        // time through its status line (Tom, 4 October 2026 20:20).
+        value["statusLine"] = json!({
+            "type": "command",
+            "command": crate::harness::rendering::STATUS_LINE_COMMAND,
+        });
+    }
     if let Some(permissions) = &template.permissions {
         value["permissions"] = serde_json::Value::Object(permissions.clone());
         if permissions

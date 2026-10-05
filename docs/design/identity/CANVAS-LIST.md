@@ -82,8 +82,14 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 - Dollars and running time. Tom, 4 October 20:20: "The cost in US dollars is definitely there... I'm pretty
   sure it's available through the status line alone." It is: Claude Code's status line reports the cost in US
   dollars and the running time, and Lys has the adapter that reads it. A run counted through the proxy starts
-  with that adapter off (the start gives the runner one way of tracking, not both). Next round: both together,
-  the proxy for calls and the status line for dollars and time. Codex's own figure is still to be found.
+  with that adapter off (the start gives the runner one way of tracking, not both). Written 5 October, not yet
+  built or installed: a Claude Code run counted through the proxy is given a status line in the settings file
+  Lys already hands it (`lys runner status-line`, reaching the runner through two variables the runner sets,
+  `LYS_PROGRAM` and `LYS_RUNNER_SOCKET`); the runner keeps the dollars, as what was added since the last
+  report, and the running time, and writes them with the run's next calls and when it ends. Tokens and context
+  are still counted only from the calls. The run's status line says "Lys: counted", or that the figures were
+  not counted and why. A run handed to another runner keeps the first runner's socket in its environment
+  until it is started again; not yet looked at. Codex's own figure is still to be found.
 - Claude Code mods are not needed for this. Tom, 4 October 20:25: "if it's just those things, they're also
   available in the status line... we don't need to dive into mods unless there's anything extra available."
   What a mod would add beyond the status line is turn boundaries and sub-agent spawns as events; neither is

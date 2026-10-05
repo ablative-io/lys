@@ -107,6 +107,7 @@ impl Runner {
         refuse_live(&options.socket)?;
         let sessions = Sessions::open(&options.state, options.scrollback)?;
         let listener = bind(&options.socket)?;
+        sessions.serving_on(&options.socket);
         Ok(Self {
             sessions,
             listener,

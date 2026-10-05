@@ -124,6 +124,17 @@ pub enum RunnerCommand {
         #[arg(long, value_enum)]
         harness: JudgeHarness,
     },
+    /// Hand a run's status line to its runner: the command a run counted
+    /// through the proxy is given as its harness's status line. Reads the
+    /// harness's input on standard input, hands it to the runner on
+    /// --socket, and writes one line for the harness to show: that Lys
+    /// counts the run, or that its dollars and running time were not
+    /// counted and why.
+    StatusLine {
+        /// The runner's Unix socket.
+        #[arg(long)]
+        socket: PathBuf,
+    },
 }
 
 /// The harnesses `lys runner judge` speaks for.

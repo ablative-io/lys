@@ -509,3 +509,28 @@ fn refused_without_writing(dir: &Path, config: Option<&Path>, name: &str) -> Gat
     );
     Ok(())
 }
+
+#[test]
+fn a_run_counted_through_the_proxy_is_given_the_status_line_and_no_other_run_is() {
+    let mut template = parse_template(&std::fs::read(TEMPLATE).unwrap()).unwrap();
+    let plain: Value = serde_json::from_slice(&env_settings(&template).unwrap()).unwrap();
+    assert!(plain.get("statusLine").is_none());
+    template.env.insert(
+        lys_home::harness::rendering::RUN_VARIABLE.to_owned(),
+        "0123456789abcdef0123456789abcdef".to_owned(),
+    );
+    let proxied: Value = serde_json::from_slice(&env_settings(&template).unwrap()).unwrap();
+    assert_eq!(
+        proxied["statusLine"],
+        json!({
+            "type": "command",
+            "command": "\"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\""
+        })
+    );
+    // The command names the two variables the runner sets and no path of
+    // this machine, so one template writes one sequence of bytes anywhere.
+    assert_eq!(
+        lys_home::harness::rendering::STATUS_LINE_COMMAND,
+        proxied["statusLine"]["command"]
+    );
+}

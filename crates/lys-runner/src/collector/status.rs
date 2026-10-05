@@ -127,6 +127,45 @@ pub(crate) fn flush_status(table: &mut Table, id: &str) -> Result<bool, RunnerEr
     Ok(true)
 }
 
+/// Hold what the status line of session `id`, tracked through the proxy,
+/// reported of its dollars and running time. It is written with the next
+/// calls read from the run's usage file, and when the session ends.
+fn proxied_status(
+    runner: &str,
+    table: &mut Table,
+    id: &str,
+    proxy: &crate::tracking_proxy::ProxyTracking,
+    input: &Value,
+) -> Result<String, RunnerError> {
+    let Some(mut source) = table.feed.source(id).cloned() else {
+        return Ok("no usage file is bound yet: the figures are not kept".to_owned());
+    };
+    let previous = table
+        .sessions
+        .get(id)
+        .and_then(|session| session.pending_status.as_ref());
+    if let Some(pending) = previous {
+        pending.apply(&mut source)?;
+    }
+    let reading = crate::tracking_proxy::ProxyReading {
+        runner,
+        session: id,
+        tracking: proxy,
+        now: now_ms(),
+    };
+    let record = format!("status-line:{id}:{}", table.feed.end());
+    let Some(Body::Usage(record)) = reading.status(&mut source, input, record) else {
+        return Ok("the figures repeat the last ones held".to_owned());
+    };
+    let pending = PendingStatus::new(record, &source, previous)?;
+    table
+        .sessions
+        .get_mut(id)
+        .ok_or_else(|| crate::session::unknown(id))?
+        .pending_status = Some(pending);
+    Ok("dollars and running time held until the run's next calls are read".to_owned())
+}
+
 impl Sessions {
     pub(super) fn status_line(&self, id: &str, input: &Value) -> Result<String, RunnerError> {
         let mut table = self.lock()?;
@@ -135,7 +174,11 @@ impl Sessions {
             .get(id)
             .ok_or_else(|| crate::session::unknown(id))?;
         let Some(tracking) = session.guard.tracking.as_ref() else {
-            return Ok("the session is not tracked: nothing is kept".to_owned());
+            let proxy = session.guard.proxy.clone();
+            return match proxy {
+                Some(proxy) => proxied_status(self.runner(), &mut table, id, &proxy, input),
+                None => Ok("the session is not tracked: nothing is kept".to_owned()),
+            };
         };
         let Some(mut source) = table.feed.source(id).cloned() else {
             return Ok("no stream is bound yet: the snapshot is not kept".to_owned());

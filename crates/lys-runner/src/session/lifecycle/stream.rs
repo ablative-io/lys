@@ -243,7 +243,11 @@ impl Sessions {
                 drop(table);
                 continue;
             }
-            if source.generation != before.generation {
+            // What a status line reported is written before the lines read
+            // after it: at a new generation, and, for a run tracked through
+            // the proxy, with each read that found a call.
+            let calls = proxied.is_some() && harness.is_none() && !bodies.is_empty();
+            if source.generation != before.generation || calls {
                 if let Err(error) = crate::collector::status::flush_status(&mut table, id) {
                     crate::error::said(&format!(
                         "session {id}: source_status_record_failed: {error}"
