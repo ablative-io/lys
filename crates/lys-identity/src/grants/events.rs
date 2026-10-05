@@ -8,7 +8,9 @@
 //!
 //! A signed event is a `COSE_Sign1` message (RFC 9052, tag 18) in the shape of
 //! `lys/identity-event/v1`, with its own content type, [`GRANT_ENVELOPE`], in
-//! the protected header. The body is a canonical CBOR map: `1` version, `2`
+//! the protected header; an event naming a service account is version 2 under
+//! [`SERVICE_ACCOUNT_ENVELOPE`], and one naming a connector version 3 under
+//! [`CONNECTOR_ENVELOPE`], so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
 //! operation id, `3` caller, `4` recorded-at, `5` change kind (`1` issue, `2`
 //! revoke, `3` use) and `6` the change: the grant's own map; for a revocation
 //! `1` grant id and `2` reason; for a use `1` grant id and `2` route (`1`
@@ -37,19 +39,27 @@ use crate::operation::OperationId;
 pub const GRANT_EVENT_VERSION: u64 = 1;
 /// Separate signed envelope for service-account grant events.
 pub const SERVICE_ACCOUNT_ENVELOPE: &str = "application/vnd.lys.grant-event.v2+cbor";
+/// Separate signed envelope for grant events that name a connector.
+pub const CONNECTOR_ENVELOPE: &str = "application/vnd.lys.grant-event.v3+cbor";
 
 const COSE_SIGN1_TAG: u64 = 18;
 const SIGNATURE_LEN: usize = 64;
 const KEY_LEN: usize = 32;
 
-/// The first grant event version able to name `kind`.
-fn kind_version(kind: super::types::RecipientKind) -> u64 {
+/// The first grant event version able to name `kind`, and the content type
+/// that signs it.
+fn kind_envelope(kind: super::types::RecipientKind) -> (u64, &'static str) {
     use super::types::RecipientKind;
     match kind {
-        RecipientKind::Person | RecipientKind::Agent => GRANT_EVENT_VERSION,
-        RecipientKind::ServiceAccount => 2,
-        RecipientKind::Connector => 3,
+        RecipientKind::Person | RecipientKind::Agent => (GRANT_EVENT_VERSION, GRANT_ENVELOPE),
+        RecipientKind::ServiceAccount => (2, SERVICE_ACCOUNT_ENVELOPE),
+        RecipientKind::Connector => (3, CONNECTOR_ENVELOPE),
     }
+}
+
+/// Whether the grants read events of `version`.
+fn version_read(version: u64) -> bool {
+    matches!(version, GRANT_EVENT_VERSION | 2 | 3)
 }
 
 /// One change to the grants.
@@ -88,25 +98,30 @@ impl GrantEvent {
     /// Version three adds the connector. Each event takes the version of the
     /// newest kind it names.
     pub fn version(&self) -> u64 {
-        use super::types::{PassOn, RecipientKind};
-        let mut version = kind_version(RecipientKind::of(self.caller));
-        if let GrantChange::Issue(grant) = &self.change {
-            version = version.max(kind_version(RecipientKind::of(grant.holder())));
-            if let PassOn::To { recipients, .. } = grant.pass_on() {
-                for kind in recipients {
-                    version = version.max(kind_version(*kind));
-                }
-            }
-        }
-        version
+        self.newest().0
     }
 
     fn content_type(&self) -> &'static str {
-        if self.version() == 2 {
-            SERVICE_ACCOUNT_ENVELOPE
-        } else {
-            GRANT_ENVELOPE
+        self.newest().1
+    }
+
+    /// The version and content type of the newest kind the event names.
+    fn newest(&self) -> (u64, &'static str) {
+        use super::types::{PassOn, RecipientKind};
+        let mut newest = kind_envelope(RecipientKind::of(self.caller));
+        if let GrantChange::Issue(grant) = &self.change {
+            let mut kinds = vec![RecipientKind::of(grant.holder())];
+            if let PassOn::To { recipients, .. } = grant.pass_on() {
+                kinds.extend(recipients.iter().copied());
+            }
+            for kind in kinds {
+                let named = kind_envelope(kind);
+                if named.0 > newest.0 {
+                    newest = named;
+                }
+            }
         }
+        newest
     }
 
     /// The event recording `change`, requested by `caller` under `operation`.
@@ -142,17 +157,12 @@ impl GrantEvent {
             }
             GrantChange::Use { .. } => {}
         }
-        let event = Self {
+        Ok(Self {
             operation,
             caller,
             recorded_at,
             change,
-        };
-        // No envelope signs a connector until version three is written.
-        match event.version() {
-            1 | 2 => Ok(event),
-            version => Err(GrantError::VersionUnsupported { version }),
-        }
+        })
     }
 
     /// The operation id the caller gave the change.
@@ -272,7 +282,7 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
         && let Some((_, version)) = pairs.first()
     {
         let version = as_uint(version, SHAPE)?;
-        if version != GRANT_EVENT_VERSION && version != 2 {
+        if !version_read(version) {
             return Err(GrantError::VersionUnsupported { version });
         }
     }
@@ -432,7 +442,9 @@ pub fn verify_grant_event(
         as_bytes(signature, SHAPE)?,
     );
     let (content_type, kid) = header(&protected)?;
-    if content_type != GRANT_ENVELOPE && content_type != SERVICE_ACCOUNT_ENVELOPE {
+    if ![GRANT_ENVELOPE, SERVICE_ACCOUNT_ENVELOPE, CONNECTOR_ENVELOPE]
+        .contains(&content_type.as_str())
+    {
         return Err(GrantError::EnvelopeMismatch {
             reason: format!("it names {content_type}"),
         });

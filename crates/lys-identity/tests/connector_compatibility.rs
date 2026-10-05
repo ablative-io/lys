@@ -15,7 +15,7 @@ use lys_identity::grants::{
 };
 use lys_identity::log::Coordinate;
 use lys_identity::signer::load_service_key;
-use lys_identity::{AgentId, IdentityId, OperationId, PersonId, ServiceAccountId};
+use lys_identity::{AgentId, ConnectorId, IdentityId, OperationId, PersonId, ServiceAccountId};
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -164,6 +164,39 @@ fn a_signed_grant_event_of_each_envelope_version_keeps_its_bytes() -> TestResult
         let body = encode_event_body(&event);
         assert_eq!(decode_event_body(&body)?, event);
     }
+    Ok(())
+}
+
+/// The version 3 event, written by the code that first signed a connector
+/// (box 10 part 2) from the same inputs, and never regenerated.
+const FIXTURE_V3: &str = include_str!("fixtures/connector-v3.json");
+const CONNECTOR: [u8; 16] = [0xc0; 16];
+
+fn to_connector() -> Result<Grant, GrantError> {
+    grant(
+        IdentityId::Connector(ConnectorId::from_bytes(CONNECTOR)),
+        &[
+            RecipientKind::Person,
+            RecipientKind::Agent,
+            RecipientKind::ServiceAccount,
+            RecipientKind::Connector,
+        ],
+    )
+}
+
+#[test]
+fn a_grant_body_and_signed_event_to_a_connector_keep_their_version_three_bytes() -> TestResult {
+    let fixture: Value = serde_json::from_str(FIXTURE_V3)?;
+    let grant = to_connector()?;
+    let body = pinned(&fixture, "grant_body_to_connector", &encode_grant(&grant))?;
+    assert_eq!(decode_grant(&body)?, grant, "today's reader");
+    let event = issued(grant)?;
+    assert_eq!(event.version(), 3);
+    let (message, public) = signed(event.clone())?;
+    assert_eq!(fixture["public_key"], hex(&public), "the fixed service key");
+    let bytes = pinned(&fixture, "event_v3_person_to_connector", &message)?;
+    let read = verify_grant_event(&bytes, &public)?;
+    assert_eq!(read.event(), &event, "today's reader");
     Ok(())
 }
 

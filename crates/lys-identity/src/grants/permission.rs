@@ -30,8 +30,10 @@ definition agent {}
 
 definition service_account {}
 
+definition connector {}
+
 definition grant {
-  relation holder: person | person with unexpired | agent | agent with unexpired | service_account | service_account with unexpired
+  relation holder: person | person with unexpired | agent | agent with unexpired | service_account | service_account with unexpired | connector | connector with unexpired
   relation source: grant | person
 }
 ";

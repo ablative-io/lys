@@ -137,6 +137,7 @@ pub(crate) fn decode_refusal(value: Value) -> Result<GrantError, Unreadable> {
                 1 => RecipientKind::Person,
                 2 => RecipientKind::Agent,
                 3 => RecipientKind::ServiceAccount,
+                4 => RecipientKind::Connector,
                 other => return Err(format!("recipient kind {other} is not a kind")),
             },
             grant: next_text(members)?,
@@ -218,6 +219,10 @@ mod tests {
             },
             GrantError::RecipientRefused {
                 kind: RecipientKind::Agent,
+                grant: "g".to_owned(),
+            },
+            GrantError::RecipientRefused {
+                kind: RecipientKind::Connector,
                 grant: "g".to_owned(),
             },
             GrantError::WithheldFromAgents {

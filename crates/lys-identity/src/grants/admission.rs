@@ -94,17 +94,14 @@ fn answered_for_by(directory: &Projection, identity: IdentityId) -> Result<Perso
         })?;
     match identity {
         IdentityId::Person(person) => Ok(person),
-        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => {
+        // A connector's record names the administrator who approved its app.
+        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
             record.responsible().ok_or_else(|| {
                 GrantError::from(IdentityError::IdentityUnknown {
                     identity: identity.to_string(),
                 })
             })
         }
-        // The directory records no connector: the apps log does.
-        IdentityId::Connector(_) => Err(GrantError::from(IdentityError::IdentityUnknown {
-            identity: identity.to_string(),
-        })),
     }
 }
 

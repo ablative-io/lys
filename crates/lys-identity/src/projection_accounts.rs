@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use super::{Projection, Record};
-use crate::{IdentityId, LifecycleState, LoginBinding, PersonId, Profile, ServiceAccountId};
+use crate::{
+    ConnectorId, IdentityId, LifecycleState, LoginBinding, PersonId, Profile, ServiceAccountId,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Account {
@@ -13,7 +15,8 @@ struct Account {
     states: [Record; 4],
 }
 
-/// The separately folded service-account records used for grant decisions.
+/// The separately folded service-account and connector records used for
+/// grant decisions.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Accounts {
     records: BTreeMap<IdentityId, Arc<Account>>,
@@ -24,6 +27,42 @@ impl Accounts {
     pub fn put(
         &mut self,
         id: ServiceAccountId,
+        owner: PersonId,
+        profile: &Profile,
+        retired: bool,
+        created_by: &LoginBinding,
+    ) {
+        self.insert(
+            IdentityId::ServiceAccount(id),
+            owner,
+            profile,
+            retired,
+            created_by,
+        );
+    }
+
+    /// Insert or update an approved app's connector, read from the apps log,
+    /// answering to `approver`, the administrator who approved the app. The
+    /// connector is active while its approver is and stops when they do.
+    pub fn put_connector(
+        &mut self,
+        id: ConnectorId,
+        approver: PersonId,
+        profile: &Profile,
+        approved_by: &LoginBinding,
+    ) {
+        self.insert(
+            IdentityId::Connector(id),
+            approver,
+            profile,
+            false,
+            approved_by,
+        );
+    }
+
+    fn insert(
+        &mut self,
+        identity: IdentityId,
         owner: PersonId,
         profile: &Profile,
         retired: bool,
@@ -46,7 +85,7 @@ impl Accounts {
             events: Vec::new(),
         });
         self.records.insert(
-            IdentityId::ServiceAccount(id),
+            identity,
             Arc::new(Account {
                 owner,
                 retired,
