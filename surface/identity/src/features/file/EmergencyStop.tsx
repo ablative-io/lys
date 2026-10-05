@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { operationId } from '../../api';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
+import { Act } from '../../shell/Act';
 
 /** The answer of `POST /agents/{id}/stop`. */
 export interface StopAnswer {
@@ -17,12 +18,12 @@ export function EmergencyStop({ id, active, stopped }: { id: string; active: boo
   const change = useRoleChange<StopAnswer>('lys.pending.stop.' + id, '/agents/' + encodeURIComponent(id) + '/stop',
     (result, body) => { if (result.agent !== id || result.operation !== body.operation || result.state !== 'suspended') return false; stopped(result); return true; }, () => undefined);
   return <>
-    {active && !open ? <button className="btn danger icon" data-act="stop" aria-label="Emergency stop" title="Emergency stop: suspend access, withdraw certificates and ask the credential service and runtimes to end their use" disabled={change.blocked} onClick={() => setOpen(true)}><span aria-hidden="true">■</span></button> : null}
+    {active && !open ? <Act symbol="stop" name="Emergency stop" hint="Emergency stop: suspend access, withdraw certificates and ask the credential service and runtimes to end their use" tone="danger" data-act="stop" disabled={change.blocked} onClick={() => setOpen(true)} /> : null}
     {open && active ? <form className="card" aria-label="Confirm emergency stop" onSubmit={(event) => { event.preventDefault(); if (reason.trim()) change.submit({ operation: operationId(), reason: reason.trim() }); }}>
       <p>This suspends the agent at once, withdraws its certificates, asks the credential service to end every credential it holds, and asks the runtime of each of its sessions to end it. A session shows unconfirmed until its runtime reports it stopped.</p>
       <label className="field">Why<input required value={reason} disabled={change.blocked} onChange={(event) => setReason(event.target.value)} placeholder="What happened" /></label>
-      <button className="btn danger" type="submit" disabled={change.blocked || !reason.trim()}>Stop this agent now</button>{' '}
-      <button className="btn" type="button" disabled={change.busy} onClick={() => setOpen(false)}>Cancel</button>
+      <Act symbol="stop" name="Stop this agent now" word="Stop now" tone="danger" type="submit" disabled={change.blocked || !reason.trim()} />{' '}
+      <Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setOpen(false)} />
     </form> : null}
     <ChangeStatus change={change} />
   </>;

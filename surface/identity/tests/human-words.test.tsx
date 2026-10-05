@@ -129,7 +129,7 @@ it('keeps the recorded request on screen without replacing it with an older list
 });
 
 async function clickNamed(view: HTMLElement, name: string) {
-  const button = [...view.querySelectorAll('button')].find((entry) => entry.textContent === name);
+  const button = [...view.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === name);
   if (!button) throw new Error('Missing button: ' + name);
   await act(async () => button.click());
 }

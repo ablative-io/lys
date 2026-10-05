@@ -29,6 +29,10 @@ describe('The act control', () => {
     expect(worded.getAttribute('aria-label')).toBe('Retire Waffles the Terrible');
     expect(worded.textContent).toBe('Retire');
     expect(worded.classList.contains('worded')).toBe(true);
+
+    const hinted = button(draw(<Act symbol="stop" name="Emergency stop" hint="Emergency stop: suspend access and end every session" />));
+    expect(hinted.getAttribute('aria-label')).toBe('Emergency stop');
+    expect(hinted.title).toBe('Emergency stop: suspend access and end every session');
   });
 
   it('draws every symbol of the set, and each symbol is a drawing of its own', () => {

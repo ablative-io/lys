@@ -5,7 +5,8 @@ import { ADA, ME, SCRIBE, SERVICE, ok, refused } from './fixtures';
 const view = { scope: 'personal', revision: 4, judged_at: 1790000000, decisions_recorded: true, unanswered: [], due: [{ agent: { id: SCRIBE, display_name: 'Builder', state: 'active' }, reviewer: ME.person, last_kept: null, grant: { id: 'grant-1', relation: 'editor', resource: { kind: 'project', id: 'Lys' }, actions: ['edit'] } }] };
 const routes = { ...SERVICE, '/reviews': ok(view) };
 const path = '/reviews/grant-1/keep';
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+// A button is found by what a screen reader calls it: its spoken name where it has one, else its words.
+const button = (label: string) => [...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === label) ?? null;
 const kept = (body: unknown) => ok({ ...(body as Record<string, unknown>), grant: 'grant-1', kept_by: ADA, at: 1790000000, revision: 4 });
 beforeEach(() => sessionStorage.clear());
 describe('Keep access', () => {

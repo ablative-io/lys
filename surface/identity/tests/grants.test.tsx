@@ -844,7 +844,8 @@ describe('Reviews shows the chosen grant whole (walk of 4 Oct)', () => {
     expect([...(panel?.querySelectorAll('dt') ?? [])].map((dt) => dt.textContent)).toEqual(['Holder', 'Allows', 'On', 'Relation', 'Path to a person', 'Window', 'Last used', 'Stands']);
     expect([...(panel?.querySelectorAll('.chain .pill') ?? [])].map((pill) => pill.textContent)).toEqual(['Ada (test person)', 'Scribe']);
     expect(panel?.textContent).toContain('27 Sep to 4 Oct');
-    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual(['Keep access', 'Revoke']);
+    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.getAttribute('aria-label'))).toEqual(['Keep access', 'Revoke']);
+    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual(['Keep', 'Revoke']);
     await click($(`section[aria-label="Grant to review"] [data-act="revoke"][data-g="${SCRIBE_G}"]`));
     expect($('.act-panel h2')?.textContent).toBe('Revoke viewer of project:identity');
     expect(unreachable()).toEqual([]);

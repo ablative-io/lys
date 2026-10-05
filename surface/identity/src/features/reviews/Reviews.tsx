@@ -25,6 +25,7 @@ import '../grants/grants.css';
 import { KeepGrant } from './KeepGrant';
 import type { Kept } from './KeepGrant';
 import { IdentityName, ReadFailure } from '../signin/words';
+import { Act } from '../../shell/Act';
 
 /** crates/lys-identity-server/src/reviews_api.rs: ReviewView. */
 interface ReviewsView {
@@ -99,7 +100,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
         {last(open) ? <p className="note">Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} />{last(open)?.note ? ': ' + last(open)?.note : '.'}</p> : null}
         <div className="grant-acts">
           {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p>This service does not record keep decisions.</p>}
-          {drawn && world.status === 'ok' && !drawn.revoked ? <button className="btn danger" type="button" data-act="revoke" data-g={drawn.id} onClick={(event) => setRevoking(event.currentTarget)}>Revoke</button> : null}
+          {drawn && world.status === 'ok' && !drawn.revoked ? <Act symbol="revoke" name="Revoke" word="Revoke" tone="danger" data-act="revoke" data-g={drawn.id} onClick={(event) => setRevoking(event.currentTarget)} /> : null}
         </div>
         {revoking && drawn && world.status === 'ok' ? <ActPanel key={drawn.id} label="Revoke" opener={revoking} close={() => setRevoking(null)}>
           <ActForm w={world.data} g={drawn} act="revoke" done={reload} close={() => setRevoking(null)} />

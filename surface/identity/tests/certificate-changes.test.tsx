@@ -7,7 +7,8 @@ const path = '/agents/' + SCRIBE + '/certificates';
 const certificate = { serial: 'op-' + 'a'.repeat(32), person: ADA, claims: {}, der: 'AQID', issued_at: 1790000000, withdrawn: null, entry: { leaf: 0, leaf_bytes: '010203', tree_size: 1, root: 'aaaa', proof: 'bbbb' } };
 const view = { agent: SCRIBE, recorded: null, certificates: [certificate], claims_are_live: false };
 const routes = { ...SERVICE, [path]: ok(view) };
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+// A button is found by what a screen reader calls it: its spoken name where it has one, else its words.
+const button = (label: string) => [...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === label) ?? null;
 async function input(selector: string, value: string) {
   const element = $(selector); if (!(element instanceof HTMLInputElement) && !(element instanceof HTMLTextAreaElement)) throw new Error('Input missing');
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;

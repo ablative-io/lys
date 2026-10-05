@@ -1,5 +1,6 @@
 /** The one menu in a page's head: the acts nobody presses every day (Tom, 5 October 2026: "the suspend and retire button should be under maybe the drop down"). Escape or a press elsewhere closes it; choosing sends nothing, it opens that act's form. */
 import { useEffect, useRef, useState } from 'react';
+import { Act } from '../../shell/Act';
 
 export interface HeadAct { act: string; label: string; danger?: boolean;
   /** The mark a test or a walk finds the item by, when it is not the act's own word. */
@@ -18,7 +19,7 @@ export function HeadMenu({ items, chosen, choose }: { items: HeadAct[]; chosen: 
   }, [open]);
   if (!items.length) return null;
   return <div className="head-menu" ref={box}>
-    <button type="button" className="btn icon" aria-haspopup="menu" aria-expanded={open} aria-label="More actions" title="More actions" onClick={() => setOpen(!open)}><span aria-hidden="true">⋯</span></button>
+    <Act symbol="more" name="More actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} />
     {open ? <div role="menu" className="head-menu-list">
       {items.map((item) => <button key={item.act} type="button" role="menuitem" className={'head-menu-item' + (item.danger ? ' danger' : '')} data-act={item.mark ?? item.act} aria-pressed={chosen === item.act} onClick={() => { setOpen(false); choose(item.act); }}>{item.label}</button>)}
     </div> : null}

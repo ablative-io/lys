@@ -4,7 +4,8 @@ import { click, mount, text, unmountAll } from './harness';
 import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 const handle = 'public-handle-one';
 const routes = { ...SERVICE, ['/secrets/handles?holder=' + SCRIBE]: ok({ holder: SCRIBE, handles: [{ id: handle, secret: 'calendar', used: 0, max_uses: 4, not_after_ms: 1990000000000, dropped: false, spend_cap: null, settled: 0, parent: null }] }) };
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+// A button is found by what a screen reader calls it: its spoken name where it has one, else its words.
+const button = (label: string) => [...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === label) ?? null;
 const receipt = (body: unknown) => ok({ ...(body as Record<string, unknown>), outcome: 'ended', ended: [handle], stopped_here: true, upstream: 'unconfirmed', upstream_reason: 'Provider has not answered' });
 beforeEach(() => sessionStorage.clear());
 describe('Handle withdrawal', () => {

@@ -11,6 +11,8 @@ export type ActProps = Given & {
   symbol: SymbolName;
   /** The whole act, as a sentence would say it: "Retire Waffles the Terrible". */
   name: string;
+  /** What hovering shows, where it says more than the name; left out, hovering shows the name. */
+  hint?: string;
   /** One short word drawn beside the symbol. Left out, the symbol stands alone. */
   word?: string;
   tone?: 'plain' | 'primary' | 'danger';
@@ -18,10 +20,10 @@ export type ActProps = Given & {
   type?: 'button' | 'submit';
 };
 
-export function Act({ symbol, name, word, tone = 'plain', type = 'button', className, ...rest }: ActProps) {
+export function Act({ symbol, name, hint, word, tone = 'plain', type = 'button', className, ...rest }: ActProps) {
   const classes = ['act', tone === 'plain' ? '' : tone, word ? 'worded' : '', className ?? ''].filter(Boolean).join(' ');
   return (
-    <button {...rest} type={type} className={classes} aria-label={name} title={name} data-symbol={symbol}>
+    <button {...rest} type={type} className={classes} aria-label={name} title={hint ?? name} data-symbol={symbol}>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">{SYMBOLS[symbol]}</svg>
       {word ? <span className="act-word">{word}</span> : null}
     </button>

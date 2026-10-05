@@ -22,7 +22,12 @@ describe("An agent's file", () => {
     expect($('#state')?.textContent).toBe('Active');
     expect($('[aria-label="About this agent"] .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
     // The day it was added is a line of its Overview; the head is the name, the stop, the state and one menu.
-    expect($('.file .head')?.textContent).toBe('Scribe■Active⋯');
+    // The head, in order: the name, the stop (a symbol, so it has no words), the state and the one menu.
+    expect($('.file .head')?.textContent).toBe('ScribeActive');
+    const head = [...($('.file .head')?.querySelectorAll('h1, button, .state') ?? [])];
+    expect(head.map((each) => each.getAttribute('aria-label') ?? each.textContent)).toEqual(['Scribe', 'Emergency stop', 'Active', 'More actions']);
+    expect((head[3] as HTMLElement).dataset.symbol).toBe('more');
+    expect((head[1] as HTMLElement).dataset.symbol).toBe('stop');
     expect($('[aria-label="About this agent"]')?.textContent).toContain('Added22 Sep');
     expect($('.agent-details')).toBeNull();
     expect($('.file details')).toBeNull();
@@ -47,7 +52,7 @@ describe("An agent's file", () => {
     const reason = $('form[aria-label="Confirm emergency stop"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
-    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Stop this agent now') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Stop this agent now') ?? null);
     expect(posted).toEqual([{ path: '/agents/' + SCRIBE + '/stop', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), reason: 'leaked its key' } }]);
     expect(text()).toContain('The agent’s access is suspended.');
     expect(text()).toContain('The credential service did not confirm that credentials ended.');
@@ -63,7 +68,7 @@ describe("An agent's file", () => {
     const reason = $('form[aria-label="Confirm emergency stop"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'Key exposed'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
-    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Stop this agent now') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Stop this agent now') ?? null);
     expect(first.posted).toHaveLength(1);
     unmountAll(); document.body.innerHTML = '';
     const later = await mount('#/file/' + SCRIBE, { ...SERVICE, ['/directory/agents/' + SCRIBE]: ok({ ...SCRIBE_VIEW, state: 'suspended' }), ['POST ' + path]: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: [], credentials_ended: null, credentials_refused: 'Broker unavailable', sessions_asked: [], reason: 'Key exposed' }) });
