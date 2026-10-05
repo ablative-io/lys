@@ -1905,6 +1905,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "An approved app holds and gives permissions as its own connector, a grant reaches what is placed under it, an app waits on change, and a seat is an agent of the person signed in to the app (DIRECTORY-080)",
+      "items": [
+        {
+          "id": "C489",
+          "text": "An approved app's credential is its connector at every grant route, judged by the ordinary engine with nothing held by being approved; the app's service-account binding is gone; a root grant is held by a person and the refusal says so (DIRECTORY-080 R1).",
+          "done": false
+        },
+        {
+          "id": "C490",
+          "text": "A holder passes on, on a resource placed under the one their grant is on, a relation of that resource's kind; a removed placement refuses and never revokes (DIRECTORY-080 R2).",
+          "done": false
+        },
+        {
+          "id": "C491",
+          "text": "An approved app waits at /changes with its own credential and is judged again when the signal fires (DIRECTORY-080 R3).",
+          "done": false
+        },
+        {
+          "id": "C492",
+          "text": "One stamp differs whenever a permission answer could have changed and is the same otherwise, and an allowed batch answer says when it ends by time (DIRECTORY-080 R4).",
+          "done": false
+        },
+        {
+          "id": "C493",
+          "text": "An app registers an agent only for the person signed in to it, proved by the token Lys issued, and reads the agents it has given a grant to (DIRECTORY-080 R5).",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -218,6 +218,10 @@
         {
           "id": "S180",
           "text": "As an administrator, I want a person I suspend and an app I retire to stop signing in at once, so that my decision takes effect everywhere."
+        },
+        {
+          "id": "S265",
+          "text": "As an administrator, I want every permission an app gives to show the app as its giver with a chain back to me, so that I can read all of it and end any of it in one place."
         }
       ]
     },
@@ -270,6 +274,10 @@
         {
           "id": "S182",
           "text": "As a person who signs in, I want signing out of Lys to end every app I signed in to, so that nothing keeps acting as me after I leave."
+        },
+        {
+          "id": "S264",
+          "text": "As a person signed in to an app, I want a seat I start there to be registered in Lys as an agent I answer for, and only while I am signed in there, so that nobody is made responsible for an AI they did not start."
         }
       ]
     },
@@ -568,6 +576,18 @@
         {
           "id": "S181",
           "text": "As the developer of an app that signs in with Lys, I want to sign a person out through Lys and to read their email when I ask for it, so that my app matches people as it always has."
+        },
+        {
+          "id": "S261",
+          "text": "As the developer of an approved app, I want my app to give and take away permissions on its own kinds as itself, out of what an administrator gave it, so that letting someone in is one act in my app and every permission still traces to the administrator."
+        },
+        {
+          "id": "S262",
+          "text": "As the developer of an approved app, I want to give a permission on one thing inside a space my app was given, so that a guest can be let into one room without the whole building."
+        },
+        {
+          "id": "S263",
+          "text": "As the developer of an approved app, I want to be told when a permission answer could have changed, and to know when an answer ends by time, so that a person removed in Lys stops being served by my app at once and my app does not ask again and again."
         }
       ]
     },

@@ -1,0 +1,227 @@
+---
+type: brief
+id: DIRECTORY-080
+cluster: directory
+title: An approved app holds and gives permissions as its own connector: the grant routes take its credential, a grant reaches what is placed under it, an app waits on change and reads one stamp, and a seat is an agent of the person signed in to the app
+---
+
+# DIRECTORY-080: An approved app holds and gives permissions as its own connector: the grant routes take its credential, a grant reaches what is placed under it, an app waits on change and reads one stamp, and a seat is an agent of the person signed in to the app
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-048, DIRECTORY-079
+> **Design anchor:**
+> - ADR-116 — Every app registers with Lys through one published API; Lys depends on no app — An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.
+> - ADR-126 — Applications have connector identities; people register them with explicit permission — An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.
+> **Checklist:**
+> - C489 — An approved app's credential is its connector at every grant route, judged by the ordinary engine with nothing held by being approved; the app's service-account binding is gone; a root grant is held by a person and the refusal says so (DIRECTORY-080 R1).
+> - C490 — A holder passes on, on a resource placed under the one their grant is on, a relation of that resource's kind; a removed placement refuses and never revokes (DIRECTORY-080 R2).
+> - C491 — An approved app waits at /changes with its own credential and is judged again when the signal fires (DIRECTORY-080 R3).
+> - C492 — One stamp differs whenever a permission answer could have changed and is the same otherwise, and an allowed batch answer says when it ends by time (DIRECTORY-080 R4).
+> - C493 — An app registers an agent only for the person signed in to it, proved by the token Lys issued, and reads the agents it has given a grant to (DIRECTORY-080 R5).
+> **Stories:**
+> - S261 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an approved app, I want my app to give and take away permissions on its own kinds as itself, out of what an administrator gave it, so that letting someone in is one act in my app and every permission still traces to the administrator.
+> - S262 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an approved app, I want to give a permission on one thing inside a space my app was given, so that a guest can be let into one room without the whole building.
+> - S263 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an approved app, I want to be told when a permission answer could have changed, and to know when an answer ends by time, so that a person removed in Lys stops being served by my app at once and my app does not ask again and again.
+> - S264 (Person who signs in, Keeps their sign-in identities to themselves) — As a person signed in to an app, I want a seat I start there to be registered in Lys as an agent I answer for, and only while I am signed in there, so that nobody is made responsible for an AI they did not start.
+> - S265 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator, I want every permission an app gives to show the app as its giver with a chain back to me, so that I can read all of it and end any of it in one place.
+
+## Purpose
+
+Tom, 5 October 2026 (relayed by Waffles 15:04): "we want to get Cambium working so we can have other people authenticating through Lys" and "that's going to mean doing the permissions really properly, making sure that they all make sense." An app that holds its permissions in Lys needs five things from it: to give and take away a permission on its own kinds, to give one on a single thing inside a space it was given, to be told when an answer could have changed, to know when an answer ends by time, and to register an AI seat under the person who started it. Archie read Lys main at 2011ca7a against that need and named nine gaps (Cambium docs/design/PERMISSIONS-LYS-SIDE-2026-10-05.md, efca920d). Read again by Waffles at 224ed3f9, they come to this. First, the ground they stand on is decided and not built. ADR-126 (Tom, 29 September) and DIRECTORY-048 R1 make an approved app its own connector identity that holds grants, never a service account. At 224ed3f9 IdentityId has a person, an agent and a service account (crates/lys-identity/src/id.rs:182-187); an app acts as an optional service account its registration named (apps_binding.rs:70-75, 252-261); the files 048 R1 names for the connector (grants_connector.rs, tests/app_connector_grants.rs, lys-identity/tests/connector_compatibility.rs) do not exist; and the registrar credential 048 R1 removes is still read (apps_binding.rs:30, 204-223). This brief does not write the connector again: it depends on DIRECTORY-048, whose R1 is written first in the same piece of work, and it carries only what 048 does not. Gaps 4 and 5 (an app reaches the single-grant routes only through a named service account, and can give nothing): R1, the connector at every grant route, judged by the ordinary engine. Gap 5 has a second half the list did not name: passing on demands the very resource the source grant is on (admission.rs:323, lineage.rs:43), so a holder of a whole space can never give one room in it and only the root authority can; R2. Gap 3 (the single check judges the caller only): closed by decision in R1, the batch is how an app asks about a named subject and it records nothing; one test proves the two agree. Gap 6 (a root grant's holder is a person): stays, by ADR-135's reason that a person does not shed responsibility; R1 gives the refusal its name. Gap 1 (an app cannot wait on /changes): R3. Gap 2 (nothing says whether anything changed): R4, with the end of an answer by time, which no signal can carry. Gaps 7 and 8 (a seat is not a Lys identity, and an app cannot read who answers for one): R5; today an app-bound service account registers agents that all answer to the account's owner (routes.rs:372-420), which would make one person responsible for every seat anyone starts. Gap 9 (a relation carrying no action is refused, schema.rs:257-262) is not a defect of Lys: a relation nothing can act through is rightly refused, and an app that wants a guest gives that person relations on named resources (R2) and declares no empty relation. Found and not this brief's: the wait at /changes is bounded at 128 waiters (changes.rs:31), a limit this brief neither raises nor relies on; an app now takes one of the places, and whether that bound stands is a question for Tom. A grant an app's people use shows no last use in Lys, because a batch records nothing; whether Tom wants use shown for app grants is a design question of its own.
+
+## Task
+
+With DIRECTORY-048 R1's connector identity in place, take an approved app's credential as its connector at every grant route and judge it there exactly as a person is judged, with nothing held by being approved; remove the app's service-account binding so there is one way for an app to act. Let a holder pass on, on a resource placed under the one their grant is on, a relation of that resource's kind, and hold the same rule on every hop of a lineage, so a removed placement refuses and never revokes. Admit an app's credential at /changes. Answer one stamp that differs whenever a permission answer could have changed, and give every allowed batch answer the moment it ends by time. Register an agent, on an app's request, under the person who is signed in to that app and proves it with the token Lys issued, and let the app read the agents it has given a grant to. Nothing here names any app. Every refusal is named; nothing is written by a question; the only limits are the ones Tom's words or the standards set.
+
+## Requirements
+
+### R1: An approved app's credential is its connector at every grant route, with no authority of its own
+
+Behavioural. WHEN a request to POST /grants, GET /grants, GET /grants/{id}, POST /grants/{id}/revoke, POST /grants/check, POST /grants/why, POST /grants/who, POST /grants/reach or GET /grants/cannot-give carries an approved app's credential, THE SYSTEM SHALL take the caller to be that app's connector identity (DIRECTORY-048 R1) and judge the act by the ordinary grant engine as it judges a person: the connector passes on only a grant it holds, sees only a grant it holds, issued or that derives from one of those (grant_sight.rs:20-66), and has nothing by being approved or by owning its prefix. On each of those routes a connector naming a kind outside its own app is refused not_your_app naming the owning app, by the admit_kind the batch already applies (grants_batch.rs:177), where the handlers today pass no app (grants/handlers.rs:80, 96, 176, 199, 228). A connector answers to the administrator who approved its app: a grant passed on to a connector names that person as responsible and is refused ResponsibleMismatch otherwise, by the rule every non-person holder already meets (lys-identity grants/admission.rs:123-139). The app's service-account binding goes: RegisterBody.service_account (apps_api.rs:67), Binding (apps_binding.rs:33-44), the service_account member of Acting::App and the app arm of service_account_grants::caller (service_account_grants.rs:117-128) are removed, an app is never a service account, and a service account keeps its own purpose and its own bearer path unchanged. An apps log written before this brief whose approval names a service account still opens, and that app acts as its connector. POST /grants/roots stays the root authority's alone and its holder a person: a root request naming a holder that is not a person is refused root_holder_not_person naming the holder's kind, where today it is refused as an unreadable id (grant_contract/requests.rs:160). POST /grants/check stays the caller's own check and the only one that records a use; an app asks about a named subject through POST /grants/check/batch, which records nothing (grants_batch.rs:12-13), and the two answer the same decision. The route table marks the nine routes as taking the app credential (openapi_table.rs:159-171); POST /grants/agent-roots and the grant token routes (openapi_table.rs:157-158, 164) are not among them and stay as they are.
+
+**Acceptance:**
+- An app approved and given nothing is refused NotHolder at POST /grants, and POST /grants/who on its own kind answers no holders: approval alone gave nothing.
+- The root authority issues a root on a kind of the app to themselves, passable to people, agents and connectors, and passes part of it on to the app's connector naming the approving administrator as responsible; the connector's grant reads back with a path that reaches the root.
+- The app then passes on a narrower relation on the same resource to a person, and to an agent naming the agent's recorded responsible person; each grant reads back with the connector as issuer, GET /grants by the app lists both, and a batch check for each recipient is allowed with that grant on its path.
+- The app revokes a grant it issued; the next batch check for that recipient is refused Revoked naming the grant, and every grant derived from it is revoked with it.
+- The app, holding a grant, names a kind of another app at POST /grants, /grants/who, /grants/reach and /grants/check: each is refused not_your_app naming the owning app, and nothing is written.
+- A grant passed on to a connector naming a responsible person other than the administrator who approved its app is refused ResponsibleMismatch.
+- A root request naming an agent, a service account or a connector as holder is refused root_holder_not_person naming the kind, and nothing is written.
+- A registration naming service_account is refused by the unknown-member reading; an apps log written before this brief whose approval names a service account opens, and that app acts as its connector.
+- For one subject, resource and action, a batch of one check asked by the app and POST /grants/check asked by that subject answer the same decision and the same grant; the batch writes no use and the check writes one.
+- A retired app's credential is refused app_retired at each of the nine routes; a credential that does not verify is refused credential_refused naming no secret and is never passed over for a session cookie.
+- A service account's own bearer still reaches the routes it reaches today, with every existing service-account test standing unchanged.
+- The OpenAPI document lists the app credential on the nine routes with the refusals they answer, and the test that walks every route passes.
+
+**Files:**
+- create: crates/lys-identity-server/tests/app_gives.rs
+- modify: crates/lys-identity-server/src/apps_binding.rs
+- modify: crates/lys-identity-server/src/apps_binding_tests.rs
+- modify: crates/lys-identity-server/src/apps_api.rs
+- modify: crates/lys-identity-server/src/apps_state.rs
+- modify: crates/lys-identity-server/src/apps_views.rs
+- modify: crates/lys-identity-server/src/service_account_grants.rs
+- modify: crates/lys-identity-server/src/grants/handlers.rs
+- modify: crates/lys-identity-server/src/grants_reach.rs
+- modify: crates/lys-identity-server/src/grant_contract/requests.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity/src/grants/error.rs
+- modify: crates/lys-identity/src/grants/refusal_codec.rs
+- modify: crates/lys-identity-server/tests/apps.rs
+- modify: surface/identity/src/features/apps/Apps.tsx
+
+**Checklist:**
+- C489 — An approved app's credential is its connector at every grant route, judged by the ordinary engine with nothing held by being approved; the app's service-account binding is gone; a root grant is held by a person and the refusal says so (DIRECTORY-080 R1).
+
+**Stories:**
+- S261 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an approved app, I want my app to give and take away permissions on its own kinds as itself, out of what an administrator gave it, so that letting someone in is one act in my app and every permission still traces to the administrator.
+- S265 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator, I want every permission an app gives to show the app as its giver with a chain back to me, so that I can read all of it and end any of it in one place.
+
+### R2: A grant reaches what is placed under its resource: a holder passes on, on a placed resource, a relation of that resource's kind
+
+Behavioural. WHEN a caller passes on from a source grant and names a resource that is not the source's own but is placed under it, directly or through further placements, along kinds each of which lists the one above as a parent (the walk a check already makes upward, lys-identity grants/schema.rs:554-581), THE SYSTEM SHALL issue the grant on the placed resource when the relation is one of that resource's own kind and every action it carries is among those the source lets be passed on; the new grant's source is the grant on the parent, and every other rule of passing on (holder, window, recipient kind, responsible person, what may be passed on in turn, what is withheld from agents) is judged unchanged, on the placed resource's kind. Lineage holds the same rule on every hop (grants/lineage.rs:43): a grant's resource is its source's, or is placed under it at the moment of the decision. WHEN the placement that put the resource under the source's is removed, THE SYSTEM SHALL refuse every decision that rests on that grant ResourceOutside naming the grant and its source, write nothing and revoke nothing; when the placement is made again the same grant answers again. A resource that is not under the source's is refused ResourceOutside as today (grants/admission.rs:323-328). The rule is judged in lys-identity; whether one resource lies under another is asked of the placements the apps' record holds (apps_state.rs:195, 403, 469) and passed in as a question, so lys-identity never reads the apps' store.
+
+**Acceptance:**
+- A holder of a passable grant on a resource passes on a relation of a child kind on a resource placed under it; a batch check for the recipient on the placed resource is allowed with a path running through the parent's grant, and a check on a sibling placed under the same parent is refused NotHeld.
+- The same holds through two placements, a grant on the top resource giving a relation on a resource two levels beneath it.
+- A resource that is not placed under the source's resource is refused ResourceOutside naming it and the source grant, and nothing is written.
+- A relation of the placed resource's kind that carries an action the source does not let be passed on is refused ActionsOutside naming the actions.
+- A relation that is not one of the placed resource's kind is refused naming the relation and the kind.
+- After the placement is removed, the next check for the recipient is refused ResourceOutside naming the grant and its source; the grant reads back unrevoked; after the placement is made again the check is allowed by the same grant id.
+- Revoking the grant on the parent revokes the grant on the placed resource with it, as a derived grant is revoked today.
+- Passing on to an agent on a placed resource is refused WithheldFromAgents when the placed kind's relation carries an act no agent may hold, judged on the placed resource's kind.
+- POST /grants/which for the recipient lists the placed resource.
+- Every existing delegation and lineage test stands unchanged: a grant on the source's own resource is judged exactly as before.
+
+**Files:**
+- create: crates/lys-identity/tests/placed_delegation.rs
+- modify: crates/lys-identity/src/grants/admission.rs
+- modify: crates/lys-identity/src/grants/lineage.rs
+- modify: crates/lys-identity/src/grants/authority.rs
+- modify: crates/lys-identity/src/grants/projection.rs
+- modify: crates/lys-identity-server/src/grants.rs
+- modify: crates/lys-identity-server/src/grants/handlers.rs
+- modify: crates/lys-identity-server/src/apps_state.rs
+- modify: crates/lys-identity-server/src/apps_store.rs
+- modify: crates/lys-identity-server/tests/app_gives.rs
+
+**Checklist:**
+- C490 — A holder passes on, on a resource placed under the one their grant is on, a relation of that resource's kind; a removed placement refuses and never revokes (DIRECTORY-080 R2).
+
+**Stories:**
+- S262 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an approved app, I want to give a permission on one thing inside a space my app was given, so that a guest can be let into one room without the whole building.
+
+### R3: An app waits on change with its own credential
+
+Behavioural. WHEN GET /changes carries an approved app's credential, THE SYSTEM SHALL admit it as that app, wait as it waits for a session, and judge the credential again when the signal fires (changes.rs:47-55, 106-109), so an app retired while it waits is answered app_retired and never a generation. The signal carries what it carries today, a generation and nothing else (changes.rs:1-2). A credential that is carried and does not verify is refused credential_refused and is never passed over for a session cookie, as acting already rules (apps_binding.rs:183-229). The route table marks /changes as taking the app credential (openapi_table.rs:328).
+
+**Acceptance:**
+- An approved app waiting at GET /changes after a generation is answered the next generation when a grant is given, revoked or a placement is made, and is not answered by a batch check, a which or a stamp.
+- An app retired while it waits is answered app_retired when the signal fires, and no generation.
+- A credential that does not verify is refused credential_refused naming no secret, with or without a session cookie on the request.
+- A person's session, an agent's pass and the operator are admitted at /changes exactly as before, each existing test standing unchanged.
+- The OpenAPI document lists the app credential on /changes with its refusals, and the test that walks every route passes.
+
+**Files:**
+- modify: crates/lys-identity-server/src/changes.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/tests/app_gives.rs
+
+**Checklist:**
+- C491 — An approved app waits at /changes with its own credential and is judged again when the signal fires (DIRECTORY-080 R3).
+
+**Stories:**
+- S263 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an approved app, I want to be told when a permission answer could have changed, and to know when an answer ends by time, so that a person removed in Lys stops being served by my app at once and my app does not ask again and again.
+
+### R4: One stamp says whether any permission answer could have changed, and an allowed answer says when it ends by time
+
+Behavioural. WHEN GET /grants/stamp is asked by the administrator or by an approved app, THE SYSTEM SHALL answer {stamp, revision}: revision is the grants' revision as the batch names it (lys-identity grants/authority.rs:231-234), and stamp is an opaque word that is different after any committed change a grant decision reads and the same when none has been committed. At 224ed3f9 a decision reads the grants, the directory (an identity's state, who answers for it, whom it reports to: grants/admission.rs:107-174), the service accounts (service_account_grants.rs:77-103) and the apps' record (standing, approved schema, placements: grants_batch.rs:177-178, 250-257); the stamp is made from the committed position of each, read under the hold a batch decides under (grants_batch.rs:212), and is kept nowhere. POST /grants/check/batch and POST /grants/which answer the same stamp beside their revision. WHEN a batch check is allowed, THE SYSTEM SHALL answer ends_at, the earliest moment any grant on its path ends, the value the grant view already computes as effective_ends_at (grant_sight.rs:184); it is absent when no grant on the path has an end, and on a refused answer. An app that holds an answer with its stamp and its ends_at knows the answer stands until the stamp differs or that moment passes. The stamp is a question: it writes nothing and does not fire the change signal.
+
+**Acceptance:**
+- The stamp differs after each of: a grant given, a grant revoked, a person suspended, an agent retired, a service account retired, an app retired, a schema approved, a placement made and a placement removed; one test for each.
+- The stamp is the same after a batch check, a which, a stamp, a wait at /changes and any read, however many are made.
+- The stamp in a batch answer equals GET /grants/stamp taken with nothing committed between, and both name the same revision.
+- An allowed batch answer whose path holds a grant with an end carries ends_at equal to the earliest end on the path; an allowed answer whose path has no end carries none; a refused answer carries none.
+- A signed-in person who is not the administrator is refused NotAdmitted at GET /grants/stamp, as the batch refuses them; a retired app is refused app_retired.
+- After a restart with nothing committed the stamp is the same as before it.
+- The OpenAPI document describes GET /grants/stamp and the new members of the batch and which answers, and the test that walks every route passes.
+
+**Files:**
+- create: crates/lys-identity-server/src/grants_stamp.rs
+- create: crates/lys-identity-server/src/grants_stamp_tests.rs
+- modify: crates/lys-identity-server/src/grants_batch.rs
+- modify: crates/lys-identity-server/src/grants.rs
+- modify: crates/lys-identity-server/src/routes_table.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/changes.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_typed.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/src/apps_store.rs
+
+**Checklist:**
+- C492 — One stamp differs whenever a permission answer could have changed and is the same otherwise, and an allowed batch answer says when it ends by time (DIRECTORY-080 R4).
+
+**Stories:**
+- S263 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an approved app, I want to be told when a permission answer could have changed, and to know when an answer ends by time, so that a person removed in Lys stops being served by my app at once and my app does not ask again and again.
+
+### R5: A seat is an agent of the person signed in to the app that registers it, and the app reads the agents it has given a grant to
+
+Behavioural. WHEN POST /agents carries an approved app's credential and, in the header Lys-Person-Token, an access token Lys's provider issued to that same app for a person whose Lys session is live, THE SYSTEM SHALL register the agent with that person as the one who answers for it, record the connector as the actor that registered it, and answer as a registration answers today. The connector must hold the ordinary edit grant on the agents collection that a service account must hold today (service_account_grants.rs:52-74), given to it explicitly; the person's token proves the person is present at that app and replaces nothing. Without the token the request is refused person_token_absent; with a token issued to another app, person_token_not_this_app naming neither; with one that is unknown, expired or whose Lys session has ended, TokenUnknown, as userinfo answers it (provider/endpoints.rs:523-545); for a person who is not active, IdentityNotActive; in each case nothing is registered. The token is read from the header, compared by its digest as userinfo compares it, and is never logged, stored, put in a receipt or named in a refusal. Today an app-bound service account registers agents that all answer to the account's owner (routes.rs:372-420); with R1 that arm is a service account's alone and an app registers only for a person who is there. WHEN GET /agents/{id} carries the credential of an app whose connector issued a grant that the agent holds, revoked or not, THE SYSTEM SHALL answer the agent's view with the person who answers for it and its state (directory_views.rs:166-184); any other agent is AgentNotVisible to that app (agent_sight.rs:24-48). A batch check naming an agent that is not active is refused IdentityNotActive naming the agent, so an app learns a seat was retired in Lys from the answer it already asks for.
+
+**Acceptance:**
+- An app whose connector holds edit on the agents collection, presenting a live token it was issued for a person, registers an agent; the agent's record names that person as the one who answers for it and the connector as the actor that registered it.
+- Without the edit grant the registration is refused NotHeld and nothing is registered.
+- Without the header the registration is refused person_token_absent and nothing is registered.
+- With a token Lys issued to another app for the same person the registration is refused person_token_not_this_app, naming neither the token nor the other app.
+- With a token whose Lys session has ended, and with one past its expiry, the registration is refused TokenUnknown.
+- For a person suspended after the token was issued the registration is refused IdentityNotActive naming the person.
+- An operation id used again answers the first registration and registers no second agent.
+- The person's token appears in no log line, no directory event, no receipt and no refusal: a test reads each after a registration and after each refusal.
+- The app reads at GET /agents/{id} an agent its connector has issued a grant to, with the responsible person and the state; an agent it has issued nothing to is AgentNotVisible; the responsible person's own read and the administrator's are unchanged.
+- A batch check naming a retired agent is refused IdentityNotActive naming the agent.
+- A service account registering an agent with its own bearer is judged exactly as before, every existing test standing unchanged.
+- The OpenAPI document lists the app credential and the Lys-Person-Token header on POST /agents and the app credential on GET /agents/{id}, with their refusals, and the test that walks every route passes.
+
+**Files:**
+- create: crates/lys-identity-server/src/app_seats.rs
+- create: crates/lys-identity-server/src/app_seats_tests.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/agent_sight.rs
+- modify: crates/lys-identity-server/src/read_api.rs
+- modify: crates/lys-identity-server/src/provider_tokens.rs
+- modify: crates/lys-identity-server/src/provider/endpoints.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_provider.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+
+**Checklist:**
+- C493 — An app registers an agent only for the person signed in to it, proved by the token Lys issued, and reads the agents it has given a grant to (DIRECTORY-080 R5).
+
+**Stories:**
+- S264 (Person who signs in, Keeps their sign-in identities to themselves) — As a person signed in to an app, I want a seat I start there to be registered in Lys as an agent I answer for, and only while I am signed in there, so that nobody is made responsible for an AI they did not start.
+
+## Boundaries
+
+- SHALL NOT give a connector anything by its approval, its binding or its ownership of a kind prefix: every act it takes is judged on a grant whose chain reaches the root authority (ADR-126).
+- SHALL NOT keep the app's service-account binding, the registrar credential or any second way for an app to act alongside its connector.
+- SHALL NOT name, call, wait on or read any app from Lys; nothing in the code, the tests' names or the configuration names a product (ADR-116).
+- SHALL NOT record a use, write an event or fire the change signal for a batch, a which, a stamp or a wait.
+- SHALL NOT store, log, put in a receipt or name in a refusal an app's secret or a person's token.
+- SHALL NOT take from an app the name of whoever asked inside it: Lys records the connector as the giver, and who asked inside the app is the app's own record.
+- SHALL NOT revoke, rewrite or hide a grant when a placement is removed; the refusal is made at each decision and ends when the placement returns.
+- SHALL NOT let a root grant be held by anything but a person, or let an agent be registered by an app for a person who is not signed in to that app.
+- SHALL NOT change the bytes or the meaning of any existing grant event, directory event or apps line; a new member is added in a way the old records still read.
+- SHALL NOT cache a decision, a stamp, a placement or a token lookup beyond the request that read it.
+- SHALL NOT add a timeout, deadline, watchdog, poll, cap, unsafe, ignored test, allow attribute, underscore rename or discarded result; the 128-waiter bound at changes.rs:31 is neither raised nor relied on here.
+
+## Verification
+
+- This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; checklist.json gains C489 to C493, stories.json gains S261 to S265, and the rendered CHECKLIST.md, USER-STORIES.md and brief match what render-cluster.py writes.
+- Written whole before anything is built (Tom, 3 October), DIRECTORY-048 R1's connector identity first and in the same piece; each box's own crate tests run with 0 failed before its push; then one check cycle on Dean's laptop: cargo fmt, cargo clippy --workspace --all-targets -- -D warnings, cargo nextest run on crates/lys-identity and crates/lys-identity-server, cargo test --doc, ast-grep and the 500-line file limit, with the OpenAPI route test green. Every result is judged by its parsed failures.
+- A scratch install walks the whole story with no file edited and no restart: an app is registered and approved and can do nothing; the root authority gives its connector a passable grant on a top resource; the app gives a person a relation there and a second person a relation on one resource placed beneath it; a batch answers each with its stamp and, where a window was set, its ends_at; the app waits at /changes, the first person's grant is revoked on the Grants screen, the wait is answered, the stamp differs and the batch refuses; the placement is removed and the second person is refused ResourceOutside, then made again and allowed; a signed-in person's seat is registered with their token and read back by the app; each refusal in this brief is produced once and recorded in its words.
+- Every handback carries BLOCKED ON, CHANGED, FOUND and NOT CONFIRMED (and where was looked), and the sentence: "If this code were used in a hospital, the worst credible failure is ___, and it could harm about ___ people."

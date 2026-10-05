@@ -502,3 +502,11 @@
 - [ ] **C486** — An approved app is the provider's only kind of sign-in client, judged from the apps' record at each request; the configured client list is gone (DIRECTORY-079 R1).
 - [ ] **C487** — An administrator sets an approved app's exact return addresses and its profile scope at approval and afterwards on the Apps screen, in force at the next request (DIRECTORY-079 R2).
 - [ ] **C488** — An app given the profile scope and asking for it receives the person's display name as the name claim; one not asking receives the subject only; one asking for a scope it was not given is refused by name (DIRECTORY-079 R3).
+
+## An approved app holds and gives permissions as its own connector, a grant reaches what is placed under it, an app waits on change, and a seat is an agent of the person signed in to the app (DIRECTORY-080)
+
+- [ ] **C489** — An approved app's credential is its connector at every grant route, judged by the ordinary engine with nothing held by being approved; the app's service-account binding is gone; a root grant is held by a person and the refusal says so (DIRECTORY-080 R1).
+- [ ] **C490** — A holder passes on, on a resource placed under the one their grant is on, a relation of that resource's kind; a removed placement refuses and never revokes (DIRECTORY-080 R2).
+- [ ] **C491** — An approved app waits at /changes with its own credential and is judged again when the signal fires (DIRECTORY-080 R3).
+- [ ] **C492** — One stamp differs whenever a permission answer could have changed and is the same otherwise, and an allowed batch answer says when it ends by time (DIRECTORY-080 R4).
+- [ ] **C493** — An app registers an agent only for the person signed in to it, proved by the token Lys issued, and reads the agents it has given a grant to (DIRECTORY-080 R5).

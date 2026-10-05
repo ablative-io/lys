@@ -104,6 +104,8 @@
 
 **S180.** As an administrator, I want a person I suspend and an app I retire to stop signing in at once, so that my decision takes effect everywhere.
 
+**S265.** As an administrator, I want every permission an app gives to show the app as its giver with a chain back to me, so that I can read all of it and end any of it in one place.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -127,6 +129,8 @@
 **S139.** As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
 
 **S182.** As a person who signs in, I want signing out of Lys to end every app I signed in to, so that nothing keeps acting as me after I leave.
+
+**S264.** As a person signed in to an app, I want a seat I start there to be registered in Lys as an agent I answer for, and only while I am signed in there, so that nobody is made responsible for an AI they did not start.
 
 ## Directory administrator — Resolves a refused act
 
@@ -253,6 +257,12 @@
 **S179.** As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
 
 **S181.** As the developer of an app that signs in with Lys, I want to sign a person out through Lys and to read their email when I ask for it, so that my app matches people as it always has.
+
+**S261.** As the developer of an approved app, I want my app to give and take away permissions on its own kinds as itself, out of what an administrator gave it, so that letting someone in is one act in my app and every permission still traces to the administrator.
+
+**S262.** As the developer of an approved app, I want to give a permission on one thing inside a space my app was given, so that a guest can be let into one room without the whole building.
+
+**S263.** As the developer of an approved app, I want to be told when a permission answer could have changed, and to know when an answer ends by time, so that a person removed in Lys stops being served by my app at once and my app does not ask again and again.
 
 ## Person or agent using Lys through an AI assistant — Reads and changes Lys through an MCP client, with only their own rights
 
