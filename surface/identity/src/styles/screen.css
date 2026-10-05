@@ -12,6 +12,8 @@
 .eyebrow { font: 500 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); }
 .eyebrow a { text-decoration: none; }
 h1 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; margin: 6px 0 4px; }
+/* A heading given focus by the screen, so a screen reader starts there, is not a control: it draws no ring. */
+h1[tabindex="-1"]:focus { outline: none; }
 h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
 .sub { color: var(--text-secondary); margin: 0 0 18px; }
 .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
