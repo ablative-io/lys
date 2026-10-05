@@ -9,6 +9,7 @@ import type { FormEvent } from 'react';
 import { operationId, Refused } from '../../api';
 import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 import { secretsApi } from './secretsApi';
+import { Act } from '../../shell/Act';
 
 /** A kept change of one secret: its operation, never a value. */
 export interface PendingChange { version: 1; operation: string; secret: string }
@@ -92,9 +93,9 @@ export function ReplaceValue({ secret, changed }: { secret: string; changed: () 
     <h2>Change its value</h2>
     <p className="note">Only its owner can change it. The value is sent once and never shown again.</p>
     <label className="field">New value<input type="password" autoComplete="new-password" value={value} disabled={kept.blocked} onChange={(event) => setValue(event.target.value)} /></label>
-    <button className="btn primary" type="submit" disabled={kept.blocked}>Change the value</button>
+    <Act symbol="save" name="Change the value" word="Change" tone="primary" type="submit" disabled={kept.blocked} />
     {kept.pending ? <div role="status"><p>This change is not confirmed. The new value was not kept, so it is not sent again.</p>
-      <button className="btn" type="button" disabled={kept.busy} onClick={check}>Check whether it was changed</button></div> : null}
+      <Act symbol="again" name="Check whether it was changed" word="Check" disabled={kept.busy} onClick={check} /></div> : null}
     {kept.done ? <p className="note" role="status">{kept.done}</p> : null}
     {kept.failure ? <p className="why-not" role="alert">{kept.failure}</p> : null}
   </form>;
@@ -131,9 +132,9 @@ export function RetireSecret({ secret, retired }: { secret: string; retired: (me
     <h2>Retire this secret</h2>
     <p className="note">Every handle on it ends, its value leaves the broker, and its name is never used again.</p>
     <label><input type="checkbox" checked={sure} disabled={kept.blocked} onChange={(event) => setSure(event.target.checked)} /> Retire {secret} for good</label>
-    <button className="btn" type="submit" disabled={kept.blocked || !sure}>Retire this secret</button>
+    <Act symbol="retire" name="Retire this secret" word="Retire" tone="danger" type="submit" disabled={kept.blocked || !sure} />
     {kept.pending ? <div role="status"><p>Retiring {secret} is not confirmed. Its original request is kept.</p>
-      <button className="btn" type="button" disabled={kept.busy} onClick={() => { if (kept.pending) send(kept.pending); }}>Check whether it was retired</button></div> : null}
+      <Act symbol="again" name="Check whether it was retired" word="Check" disabled={kept.busy} onClick={() => { if (kept.pending) send(kept.pending); }} /></div> : null}
     {kept.failure ? <p className="why-not" role="alert">{kept.failure}</p> : null}
   </form>;
 }

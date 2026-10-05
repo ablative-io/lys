@@ -24,6 +24,7 @@ import type {
 import { pendingKey, unconfirmed } from './pendingChange';
 import { useOwnerChange } from './useOwnerChange';
 import type { PendingStore } from './pendingChange';
+import { Act } from '../../shell/Act';
 
 const refusedOf = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
@@ -126,7 +127,7 @@ export function RevocationCheck({ handle, check }: { handle: string; check: (han
     }
   };
   return <>
-    {outcome.at === 'answered' ? null : <button className="btn" type="button" aria-label={'Check revocation of handle ' + handle} disabled={outcome.at === 'checking'} onClick={() => { void ask(); }}>Check</button>}
+    {outcome.at === 'answered' ? null : <Act symbol="again" name={'Check revocation of handle ' + handle} word="Check" disabled={outcome.at === 'checking'} onClick={() => { void ask(); }} />}
     <RevocationView outcome={outcome} />
   </>;
 }
@@ -265,8 +266,8 @@ export function ScopeChange({ change, secret: initial = '', store = tabStore(), 
     </select></label>
       : <label className="field">Name<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={name} list={kind === 'team' && teams ? 'scope-teams' : undefined} onChange={(event) => { edited(); setName(event.target.value); }} placeholder={kind === 'personal' ? 'The person\'s id' : 'Its name'} /></label>}
     {teams ? <datalist id="scope-teams">{teams.map((team) => <option key={team} value={team} />)}</datalist> : null}
-    <button className="btn primary" type="submit" disabled={!maySend(outcome) || !ready}>Save</button>
-    {retry ? <button className="btn" type="button" onClick={retry}>Retry original change</button> : null}
+    <Act symbol="save" name="Save who can see this secret" word="Save" tone="primary" type="submit" disabled={!maySend(outcome) || !ready} />
+    {retry ? <Act symbol="retry" name="Retry original change" word="Retry" onClick={retry} /> : null}
     <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${scopeWords(answer.scope)}.`} />
   </form>;
 }
@@ -299,8 +300,8 @@ export function RecipientsChange({ change, secret: initial = '', store = tabStor
     <label className="field">Can be handed to<select disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={recipients} onChange={(event) => { edited(); setRecipients(recipientsOf(event.target.value)); }}>
       <option value="anyone">Anyone who is permitted</option><option value="people_only">People only</option>
     </select></label>
-    <button className="btn primary" type="submit" disabled={!maySend(outcome) || !ready}>Save</button>
-    {retry ? <button className="btn" type="button" onClick={retry}>Retry original change</button> : null}
+    <Act symbol="save" name="Save who it can be handed to" word="Save" tone="primary" type="submit" disabled={!maySend(outcome) || !ready} />
+    {retry ? <Act symbol="retry" name="Retry original change" word="Retry" onClick={retry} /> : null}
     <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${RECIPIENT_WORDS[answer.recipients]}.`} />
   </form>;
 }

@@ -10,6 +10,7 @@ import { operationId, Refused } from '../../api';
 import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 import { secretsApi } from './secretsApi';
 import type { AddedClass, SecretAdded, SecretAsked } from './secretsApi';
+import { Act } from '../../shell/Act';
 
 /** What a pending addition keeps: everything but the value. */
 export interface PendingAddition { version: 1; operation: string; asked: SecretAsked }
@@ -146,9 +147,9 @@ export function AddSecretRow({ person, changed }: { person: string; changed: (me
     <td>
       <input form={id} name="value" type="password" autoComplete="new-password" aria-label="Value" placeholder="Value, shown never again" value={value} disabled={blocked} onChange={(event) => setValue(event.target.value)} />
       {pending ? <div role="status"><p>Adding {pending.asked.name} is not confirmed. What you entered is kept, except the value, which is never kept.</p>
-        <button className="btn" type="button" disabled={busy} onClick={() => { void check(); }}>Check whether it was added</button></div> : null}
+        <Act symbol="again" name="Check whether it was added" word="Check" disabled={busy} onClick={() => { void check(); }} /></div> : null}
       {failure ? <p className="why-not" role="alert">{failure}</p> : null}
-      <button form={id} className="btn primary" type="submit" disabled={blocked}>Add this secret</button>
+      <Act symbol="add" name="Add this secret" word="Add" tone="primary" type="submit" form={id} disabled={blocked} />
     </td>
   </tr>;
 }

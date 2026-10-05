@@ -10,6 +10,7 @@ import { RecipientsChange, ScopeChange } from './SecretsDetail';
 import { secretsApi } from './secretsApi';
 import { CurrentSettings } from './CurrentSettings';
 import { ReplaceValue, RetireSecret } from './ValueChange';
+import { Act } from '../../shell/Act';
 
 export function SecretControls({ listing, changed: listed }: { listing: SecretListing; changed?: (message: string) => void }) {
   const [params, setParams] = useSearchParams();
@@ -20,7 +21,7 @@ export function SecretControls({ listing, changed: listed }: { listing: SecretLi
   if (!selected) return null;
   if (!listing.secrets.some((entry) => entry.name === selected)) return <p className="why-not" role="alert">No secret named {selected} is visible to this account.</p>;
   return <section className="secrets-view secret-controls" aria-label={'Controls of ' + selected} key={selected}>
-    <div className="row"><h2>{selected}</h2><button type="button" className="btn" onClick={() => setParams({})}>Close</button></div>
+    <div className="row"><h2>{selected}</h2><Act symbol="close" name="Close" word="Close" onClick={() => setParams({})} /></div>
     <div className="form-grid">
       <CurrentSettings secret={selected} revision={revision} />
       <section className="card"><ScopeChange secret={selected} change={secretsApi.scope} changed={changed}

@@ -170,7 +170,7 @@ describe('A settled owner change', () => {
 });
 
 async function retryOriginal(container: HTMLElement): Promise<void> {
-  const button = [...container.querySelectorAll('button')].find((entry) => entry.textContent === 'Retry original change');
+  const button = [...container.querySelectorAll('button')].find((entry) => entry.getAttribute('aria-label') === 'Retry original change');
   if (!button) throw new Error('No original-change retry offered');
   await act(async () => button.click());
   await settle();
@@ -229,7 +229,7 @@ describe('Owner operation receipts', () => {
     const container = await show(<RecipientsChange secret="calendar" store={store} change={() => { count += 1; return unanswered(); }} />);
     await submit(container);
     expect(count).toBe(0);
-    expect([...container.querySelectorAll('button')].some((button) => button.textContent === 'Retry original change')).toBe(false);
+    expect([...container.querySelectorAll('button')].some((button) => button.getAttribute('aria-label') === 'Retry original change')).toBe(false);
     expect(store.entries.size).toBe(1);
   });
 
