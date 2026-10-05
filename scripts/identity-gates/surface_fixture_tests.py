@@ -1,12 +1,28 @@
 """A failed builder cannot publish; concurrent consumers share one complete build."""
 
 from concurrent.futures import ThreadPoolExecutor
+import io
 from pathlib import Path
+import tarfile
 import tempfile
 from threading import Event
 import unittest
 
-from surface_fixture import publish
+from surface_fixture import extract, publish
+
+
+def archive_of(path, member, data=b""):
+    with tarfile.open(path, "w") as archive:
+        member.size = len(data)
+        archive.addfile(member, io.BytesIO(data))
+    return path
+
+
+def link(name, linkname):
+    member = tarfile.TarInfo(name)
+    member.type = tarfile.SYMTYPE
+    member.linkname = linkname
+    return member
 
 
 def build(stage):
@@ -20,6 +36,31 @@ def build(stage):
 
 
 class FixtureTests(unittest.TestCase):
+    def test_extraction_refuses_members_outside_the_stage_on_every_python(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            scratch = Path(temporary)
+            stage = scratch / "stage"
+            stage.mkdir()
+            good = archive_of(scratch / "good.tar", tarfile.TarInfo("surface/index.html"), b"fixture")
+            extract(good, stage)
+            self.assertEqual((stage / "surface/index.html").read_text(), "fixture")
+            setuid = tarfile.TarInfo("surface/tool")
+            setuid.mode = 0o4755
+            extract(archive_of(scratch / "setuid.tar", setuid, b"x"), stage)
+            self.assertEqual((stage / "surface/tool").stat().st_mode & 0o7000, 0)
+            extract(archive_of(scratch / "absolute.tar", tarfile.TarInfo("/absolute"), b"x"), stage)
+            self.assertEqual((stage / "absolute").read_text(), "x")
+            for name, member in [
+                ("escape.tar", tarfile.TarInfo("../escape")),
+                ("link.tar", link("surface/out", "../../outside")),
+                ("rooted.tar", link("surface/rooted", "/etc")),
+            ]:
+                with self.assertRaisesRegex(RuntimeError, "surface_fixture_unsafe_member"):
+                    extract(archive_of(scratch / name, member, b"x"), stage)
+            self.assertFalse((scratch / "escape").exists())
+            self.assertFalse((stage / "surface/out").is_symlink())
+            self.assertFalse((stage / "surface/rooted").is_symlink())
+
     def test_failure_publishes_nothing_and_retry_builds(self):
         with tempfile.TemporaryDirectory() as temporary:
             scratch = Path(temporary)

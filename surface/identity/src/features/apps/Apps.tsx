@@ -75,7 +75,12 @@ function approvalAnswer(value: unknown, id: string): ApprovalAnswer {
 const LYS = 'lys';
 const who = (by: By) => (by.kind === 'operator' ? 'the install operator for ' + (by.login?.subject ?? 'the administrator') : by.kind === 'person' ? by.login?.subject ?? 'a person' : by.kind === 'service_account' ? 'service account ' + (by.id ?? '') : 'Lys at start');
 const path = (id: string, rest: string) => '/apps/' + encodeURIComponent(id) + rest;
-const refusalWords = (error: unknown) => (error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error));
+/** A refusal in Lys's words, its name said once: Lys words each reason as "name: words" already. */
+const refusalWords = (error: unknown) => {
+  if (!(error instanceof Refused)) return String(error);
+  const { refusal, reason } = error.refusal;
+  return reason.startsWith(refusal + ': ') ? reason : refusal + ': ' + reason;
+};
 const lines = (text: string) => text.split('\n').map((line) => line.trim()).filter(Boolean);
 
 type SchemaShape = { kinds?: Record<string, MatrixKind>; relations?: Record<string, string[]> } | null;

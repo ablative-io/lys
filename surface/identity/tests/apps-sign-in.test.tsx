@@ -93,6 +93,14 @@ it('shows a refused address in Lys’s words and keeps the settings as they were
   expect(text()).not.toContain('now sends people back to');
 });
 
+it('says a refusal’s name once when Lys’s reason already carries it', async () => {
+  const reason = 'redirect_invalid: `not-an-address` is not an absolute address';
+  await mount('#/apps', routes(() => refused(400, 'redirect_invalid', reason)));
+  await type(addresses(), 'not-an-address');
+  await click(button('Save the sign-in of Notes fixture'));
+  expect(alert()).toBe(reason);
+});
+
 it('shows a non-administrator’s refusal in Lys’s words and tries nothing again on its own', async () => {
   const { posted } = await mount('#/apps', routes(() => refused(403, 'NotAdmitted', 'only the administrator sets an app’s sign-in')));
   await type(addresses(), MOVED);

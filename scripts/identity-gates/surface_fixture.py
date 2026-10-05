@@ -39,13 +39,49 @@ def prepared(root, scratch):
             "git", "archive", "--format=tar", "--output", str(archive),
             commit, "surface/identity", "docs",
         ], cwd=root, check=True)
-        with tarfile.open(archive) as source:
-            source.extractall(stage, filter="data")
+        extract(archive, stage)
         surface = stage / "surface/identity"
         for argv in [["npm", "ci", "--include=dev"], ["npm", "run", "build"]]:
             subprocess.run(argv, cwd=surface, stdout=sys.stderr, check=True)
 
     return publish(scratch, identity, build)
+
+
+def unsafe(member, why):
+    return RuntimeError("surface_fixture_unsafe_member: " + member.name + " " + why)
+
+
+def extract(archive, stage):
+    """Extract `archive` into `stage` as tarfile's data filter would: a leading
+    slash is dropped from a name, a member that would then land or link outside
+    the stage is refused, as is one that is neither a file nor a directory, and
+    no file keeps a setuid, setgid or sticky bit. A Python without the filter
+    (3.9) makes the same checks here, and every refusal carries one name."""
+    with tarfile.open(archive) as source:
+        filter_error = getattr(tarfile, "FilterError", None)
+        if filter_error is not None:
+            try:
+                source.extractall(stage, filter="data")
+            except filter_error as error:
+                raise unsafe(error.tarinfo, "is refused by the data filter") from error
+            return
+        root = stage.resolve()
+        members = []
+        for member in source.getmembers():
+            member.name = member.name.lstrip("/")
+            target = (root / member.name).resolve()
+            if target != root and root not in target.parents:
+                raise unsafe(member, "would land outside the stage")
+            if member.issym() or member.islnk():
+                base = target.parent if member.issym() else root
+                linked = (base / member.linkname).resolve()
+                if linked != root and root not in linked.parents:
+                    raise unsafe(member, "links outside the stage")
+            elif not (member.isfile() or member.isdir()):
+                raise unsafe(member, "is neither a file nor a directory")
+            member.mode &= 0o777
+            members.append(member)
+        source.extractall(stage, members=members)
 
 
 def publish(scratch, identity, build):
