@@ -33,6 +33,10 @@ mod parent_tests;
 mod status_tests;
 
 #[cfg(test)]
+#[path = "../tests/status_proxied/cases.rs"]
+mod status_proxied_tests;
+
+#[cfg(test)]
 thread_local! {
     static ROLLOUT_DIRECTORIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
