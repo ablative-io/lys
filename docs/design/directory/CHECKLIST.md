@@ -496,3 +496,9 @@
 - [ ] **C483** — A test's fake services end when its process ends, including SIGKILL. (DIRECTORY-078 R1).
 - [ ] **C484** — A fake service the fixture cannot stop fails its test by name. (DIRECTORY-078 R1).
 - [ ] **C485** — The folder a killed test leaves is swept and named the next time a Scratch is made. (DIRECTORY-078 R2).
+
+## Approved apps are the provider's only sign-in clients; the Apps screen sets return addresses and the profile scope; the name claim (DIRECTORY-079)
+
+- [ ] **C486** — An approved app is the provider's only kind of sign-in client, judged from the apps' record at each request; the configured client list is gone (DIRECTORY-079 R1).
+- [ ] **C487** — An administrator sets an approved app's exact return addresses and its profile scope at approval and afterwards on the Apps screen, in force at the next request (DIRECTORY-079 R2).
+- [ ] **C488** — An app given the profile scope and asking for it receives the person's display name as the name claim; one not asking receives the subject only; one asking for a scope it was not given is refused by name (DIRECTORY-079 R3).

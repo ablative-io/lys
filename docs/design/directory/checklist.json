@@ -1885,6 +1885,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Approved apps are the provider's only sign-in clients; the Apps screen sets return addresses and the profile scope; the name claim (DIRECTORY-079)",
+      "items": [
+        {
+          "id": "C486",
+          "text": "An approved app is the provider's only kind of sign-in client, judged from the apps' record at each request; the configured client list is gone (DIRECTORY-079 R1).",
+          "done": false
+        },
+        {
+          "id": "C487",
+          "text": "An administrator sets an approved app's exact return addresses and its profile scope at approval and afterwards on the Apps screen, in force at the next request (DIRECTORY-079 R2).",
+          "done": false
+        },
+        {
+          "id": "C488",
+          "text": "An app given the profile scope and asking for it receives the person's display name as the name claim; one not asking receives the subject only; one asking for a scope it was not given is refused by name (DIRECTORY-079 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

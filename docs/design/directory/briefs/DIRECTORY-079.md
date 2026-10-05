@@ -1,0 +1,143 @@
+---
+type: brief
+id: DIRECTORY-079
+cluster: directory
+title: Approved apps are the provider's only sign-in clients; an administrator sets an app's return addresses and its profile scope on the Apps screen; the name claim
+---
+
+# DIRECTORY-079: Approved apps are the provider's only sign-in clients; an administrator sets an app's return addresses and its profile scope on the Apps screen; the name claim
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-067, DIRECTORY-068
+> **Design anchor:**
+> - ADR-116 — Every app registers with Lys through one published API; Lys depends on no app — An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.
+> - ADR-126 — Applications have connector identities; people register them with explicit permission — An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.
+> **Checklist:**
+> - C486 — An approved app is the provider's only kind of sign-in client, judged from the apps' record at each request; the configured client list is gone (DIRECTORY-079 R1).
+> - C487 — An administrator sets an approved app's exact return addresses and its profile scope at approval and afterwards on the Apps screen, in force at the next request (DIRECTORY-079 R2).
+> - C488 — An app given the profile scope and asking for it receives the person's display name as the name claim; one not asking receives the subject only; one asking for a scope it was not given is refused by name (DIRECTORY-079 R3).
+> **Stories:**
+> - S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
+> - S179 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
+
+## Purpose
+
+Tom, 5 October 2026 (relayed by Waffles 15:04): "we want to get Cambium working so we can have other people authenticating through Lys." Today the sign-in provider serves only the clients its configuration file lists: OpenIdProvider::open copies settings.clients (crates/lys-identity-server/src/provider.rs:189) and every lookup at authorize and token reads that copy (provider.rs:204-209, 212-218; provider/endpoints.rs:79, 339). Approving an app on the Apps screen writes Line::Approved with its Client {client_id, secret_sha256} (apps_state.rs:82-88; apps_api.rs:380-478) and apps_binding::sign_in_client already judges that record with four named refusals (apps_binding.rs:283-334), but nothing calls it from the provider. So approving Cambium makes nothing a person can sign in to, and making it one means editing a file on the server and restarting. DIRECTORY-067 R1 already asks for the approved record to be a provider client, but keeps the configured clients alongside with a client_id_conflict refusal, which is a second way of doing the same thing kept for compatibility; nothing installed anywhere needs the configured list (Waffles, 15:34). An app's return addresses are set once at registration (apps_api.rs:269-282, RegisterBody.redirects) and no route changes them, so a moved Cambium would have to be registered again. And Lys gives an app the subject only (claims_supported, provider.rs:249; userinfo endpoints.rs:427): Waffles' corrected ruling of 15:30 is that an app whose approval includes the standard profile scope is given the person's display name as the standard name claim, by the administrator's explicit act, per app, never by default. This brief carries only what 067 and 068 do not: configured clients go, the Apps screen sets return addresses and the profile scope, and the name claim is served.
+
+## Task
+
+Make the apps' folded record the provider's one source of sign-in clients, read at each request, and remove the configured client list and everything that writes it. Give an administrator one act on the Apps screen that sets an approved app's exact return addresses and whether it is given the person's name; approval itself takes the same two settings, so an approval is complete without a second act. Serve the profile scope: an app allowed it and asking for it gets the person's display name as the name claim in the ID token and at userinfo; an app not allowed it is refused by name when it asks; an app not asking gets the subject only, as today. Every refusal is named; nothing is dropped silently; the only limits are the ones Tom's words or the standards set. Withdrawal of an approval is DIRECTORY-067 R2, retiring the app, which also ends its codes and tokens. Open question for Tom, not a requirement here: whether he needs a reversible "approval taken away" short of retiring, so that an app paused for a day comes back with the same client id and secret; today the only act is retire, and a retired app registers again as new.
+
+## Requirements
+
+### R1: Approved apps are the provider's only sign-in clients
+
+Behavioural. WHEN authorize names a client id and a return address, THE SYSTEM SHALL resolve them against the apps' folded record at that request, admitting only an app whose standing is approved and whose current return addresses (R2) list the address exactly, and WHEN token presents a client id, a secret and a return address, THE SYSTEM SHALL judge them with apps_binding::sign_in_client, so an approval or a retirement is in force on the next request with no restart. The refusals are the ones sign_in_client already names: a pending or declined app app_not_approved naming the app, a retired app app_retired naming the app, an unknown id or a secret that does not verify credential_refused naming no secret, and an address the app does not list redirect_invalid naming the address; at authorize no secret is presented and the same refusals stand without it. ProviderSettings.clients, ProductClient and every writer of a configured client list are removed, including the install's reading of /provider/clients (crates/lys/src/identity/install/server_config.rs:233) and the provider tests' fixtures that build clients from settings (tests/provider.rs:64, tests/accounts.rs:216, provider_tests.rs:74), which instead register and approve an app. The provider module comment (provider.rs:15) that says products are the configuration's clients is corrected. Nothing is kept alongside: there is no configured client and no conflict refusal.
+
+**Acceptance:**
+- An app approved on the Apps screen completes authorize and token with its issued secret and PKCE S256, with no configuration edited and no restart, and its ID token's subject is the person's directory id.
+- An approval taken at one request is in force at the next request on the same running server.
+- A pending app's client id is refused app_not_approved naming the app, at authorize and at token.
+- A declined app's client id is refused app_not_approved naming the app.
+- A retired app's client id is refused app_retired naming the app, at authorize and at token.
+- A client id no app holds is refused credential_refused; the refusal names no secret and no app.
+- A token request with a wrong secret for an approved app is refused credential_refused; the refusal names no secret.
+- A return address the app does not currently list is refused redirect_invalid naming the address, and the browser is sent nowhere.
+- ProviderSettings has no clients member and the type ProductClient does not exist; a configuration file naming provider.clients is refused at start naming the key, by the existing unknown-field reading.
+- Every existing provider test still stands, each with an approved app in place of a configured client; none proves less.
+
+**Files:**
+- modify: crates/lys-identity-server/src/provider.rs
+- modify: crates/lys-identity-server/src/provider/endpoints.rs
+- modify: crates/lys-identity-server/src/provider_tests.rs
+- modify: crates/lys-identity-server/src/apps_binding.rs
+- modify: crates/lys-identity-server/src/apps_binding_tests.rs
+- modify: crates/lys-identity-server/tests/provider.rs
+- modify: crates/lys-identity-server/tests/accounts.rs
+- modify: crates/lys/src/identity/install/server_config.rs
+
+**Checklist:**
+- C486 — An approved app is the provider's only kind of sign-in client, judged from the apps' record at each request; the configured client list is gone (DIRECTORY-079 R1).
+
+**Stories:**
+- S179 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
+
+### R2: An administrator sets an approved app's return addresses and its profile scope on the Apps screen
+
+Behavioural. WHEN an administrator approves an app, THE SYSTEM SHALL take with the approval the app's exact return addresses and whether it is given the person's name (the profile scope), and keep them as one new line Line::SignInSet {operation, app, redirects, profile, by, at} beside Line::Approved under the same operation, so that an approval is complete without a second act; the registration's redirects are what the screen offers to approve, never what the provider reads. WHEN an administrator later posts the same two settings for an approved app at POST /apps/{app}/sign_in, THE SYSTEM SHALL keep a further SignInSet line, and the folded app's current return addresses and profile setting are those of its latest SignInSet. Each address is judged by the rule registration already applies (apps_api.rs:190-200, redirect_invalid naming the address); a list with no address is refused redirect_invalid saying an app with no return address can sign nobody in; an app that is not approved is refused app_not_approved; a caller who is not an administrator is refused as the other Apps decisions refuse. The Apps screen (surface/identity/src/features/apps/Apps.tsx) shows the approved app's current return addresses and whether it is given the person's name, lets an administrator change them, and shows every refusal in its words. The view of an app (apps_views.rs) carries the current settings. The change is in force at the provider's next request by R1.
+
+**Acceptance:**
+- Approving an app records its return addresses and its profile setting under the approval's operation, and the provider admits the approved addresses at the next authorize.
+- An administrator changes an approved app's return addresses on the Apps screen; the next authorize admits the new address and refuses the old one redirect_invalid naming it, with no restart.
+- An administrator turns the profile scope on and then off for an app on the Apps screen; the next token after each change follows it (R3).
+- A list with no address is refused redirect_invalid, in words that say the app could sign nobody in.
+- An address that is not absolute, or carries a fragment, is refused redirect_invalid naming it, exactly as registration refuses it.
+- Setting the sign-in settings of a pending, declined or retired app is refused by that standing's name.
+- A signed-in person who is not an administrator is refused and nothing is kept.
+- The app's view answers its current return addresses and profile setting; the screen shows them.
+- The OpenAPI document describes the new route with its request, response and refusals, and the route test that walks every route passes.
+- An operation id already used for a sign-in setting answers the same settings and keeps nothing new; one reused for another app is refused app_operation_reused.
+
+**Files:**
+- create: crates/lys-identity-server/src/apps_sign_in.rs
+- create: crates/lys-identity-server/src/apps_sign_in_tests.rs
+- modify: crates/lys-identity-server/src/apps_state.rs
+- modify: crates/lys-identity-server/src/apps_store.rs
+- modify: crates/lys-identity-server/src/apps_api.rs
+- modify: crates/lys-identity-server/src/apps_views.rs
+- modify: crates/lys-identity-server/src/apps_error.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/tests/apps.rs
+- modify: surface/identity/src/features/apps/Apps.tsx
+- modify: surface/identity/src/features/apps/apps.css
+
+**Checklist:**
+- C487 — An administrator sets an approved app's exact return addresses and its profile scope at approval and afterwards on the Apps screen, in force at the next request (DIRECTORY-079 R2).
+
+**Stories:**
+- S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
+
+### R3: An app given the profile scope receives the person's name; one without it receives the subject only
+
+Behavioural. WHEN authorize asks for a scope that includes profile and the app's current setting (R2) gives it the profile scope, THE SYSTEM SHALL record that on the code, and at token SHALL read the person's display name from their directory record at that moment (the same read read_api.rs:87 makes for the person's own view) and put it in the ID token as the standard name claim, and SHALL answer it at userinfo for that token, reading it again at that request and keeping it nowhere in the provider's records. WHEN authorize asks for a scope the app's setting does not give it, THE SYSTEM SHALL refuse scope_not_granted naming the scope and the app, sending the browser nowhere. WHEN an app does not ask for profile, THE SYSTEM SHALL answer the subject only, as today, whatever its setting. A scope word that is neither openid, profile nor email (DIRECTORY-068 R3) is refused scope_unknown naming the word. Discovery lists profile in scopes_supported and name in claims_supported. A person whose display name is empty gets no name claim and the app is told nothing else. No claim names the issuer inside Lys.
+
+**Acceptance:**
+- A sign-in by an app given the profile scope, asking for openid profile, carries the person's current display name as the name claim in the ID token.
+- The same token's userinfo answers the name, and after the person's display name changes, the next token and the next userinfo answer the new one.
+- A sign-in by an app given the profile scope but asking for openid alone carries no name claim; userinfo answers sub alone.
+- A sign-in by an app not given the profile scope, asking for openid profile, is refused scope_not_granted naming profile and the app, and the browser is sent nowhere.
+- A scope word that is not openid, profile or email is refused scope_unknown naming the word.
+- Discovery lists profile among scopes_supported and name among claims_supported.
+- A person with an empty display name gets a token with no name claim and nothing else about them.
+- No token or userinfo answer names the issuer inside Lys.
+- The provider's durable token record (provider_tokens.rs Access) carries no name.
+
+**Files:**
+- modify: crates/lys-identity-server/src/provider.rs
+- modify: crates/lys-identity-server/src/provider/endpoints.rs
+- modify: crates/lys-identity-server/src/provider_tests.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/tests/provider.rs
+
+**Checklist:**
+- C488 — An app given the profile scope and asking for it receives the person's display name as the name claim; one not asking receives the subject only; one asking for a scope it was not given is refused by name (DIRECTORY-079 R3).
+
+**Stories:**
+- S179 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
+
+## Boundaries
+
+- SHALL NOT keep a configured client, a second client list or a conflict refusal alongside the apps' record; there is one source of sign-in clients.
+- SHALL NOT store, log or name in any refusal a client secret, a code, a token or a person's name; the secret is compared by its digest as today.
+- SHALL NOT cache an approval, a retirement, a return address, a scope setting or a display name beyond the request that read it.
+- SHALL NOT change the meaning or bytes of any existing apps line; SignInSet is a new line kind and an approved app with no SignInSet line reads its registration's redirects and no profile scope.
+- SHALL NOT give any claim by default: profile is the administrator's explicit act per app, and email stays DIRECTORY-068 R3.
+- SHALL NOT show the issuer inside Lys, or any address but Lys's own, to a person or a product.
+- SHALL NOT add a timeout, deadline, watchdog, poll, cap, unsafe, ignored test, allow attribute, underscore rename or discarded result.
+
+## Verification
+
+- This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; checklist.json gains C486 to C488 and the rendered CHECKLIST.md and brief match what render-cluster.py writes.
+- Written whole before anything is built (Tom, 3 October); then one check cycle by its author on Dean's laptop: cargo fmt, clippy pedantic in both configurations on the touched crates, cargo nextest run on crates/lys-identity-server and crates/lys, ast-grep and the 500-line file limit, with the OpenAPI route test green.
+- A scratch install registers and approves an app on the Apps screen with one return address and the profile scope, signs a person in through it with no configuration edited and no restart, reads the name claim, changes the return address on the screen and sees the next sign-in follow it, turns the profile scope off and sees the next token carry sub only, retires the app and sees the next sign-in refused app_retired; each refusal is recorded in its words.
