@@ -178,6 +178,14 @@ pub enum AppError {
         /// The rule it broke.
         reason: &'static str,
     },
+    /// The sign-in settings list no return address at all.
+    #[error(
+        "redirect_invalid: the app `{app}` would be left with no return address, and an app with no return address can sign nobody in"
+    )]
+    NoRedirect {
+        /// The app.
+        app: String,
+    },
     /// A resource cannot be placed in the parent named.
     #[error("placement_invalid: {reason}")]
     PlacementInvalid {
@@ -217,6 +225,7 @@ impl AppError {
             Self::AppIdInvalid { .. }
             | Self::SchemaInvalid { .. }
             | Self::RedirectInvalid { .. }
+            | Self::NoRedirect { .. }
             | Self::ActionNotDeclared { .. }
             | Self::PlacementInvalid { .. } => StatusCode::BAD_REQUEST,
             Self::AppUnknown { .. } | Self::SchemaVersionUnknown { .. } | Self::BenchUnknown => {
@@ -245,7 +254,9 @@ impl AppError {
             Self::AppIdInvalid { .. } => vec![at("/id".to_owned())],
             Self::SchemaInvalid { pointer, .. } => vec![at(format!("/schema{pointer}"))],
             Self::SchemaVersionMoved { .. } => vec![at("/replaces".to_owned())],
-            Self::RedirectInvalid { .. } => vec![at("/redirects".to_owned())],
+            Self::RedirectInvalid { .. } | Self::NoRedirect { .. } => {
+                vec![at("/redirects".to_owned())]
+            }
             Self::SchemaChangeStrandsGrants { stranded } => stranded
                 .iter()
                 .map(|strand| Field {

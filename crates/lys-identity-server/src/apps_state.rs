@@ -9,7 +9,11 @@
 //! an administrator approves it; every version stays in the record. A
 //! retired app stays in the record, with its versions, and nothing it held
 //! is removed. The app `lys` is recorded once, from Lys's own model, and is
-//! never retired. Every operation id names one line only.
+//! never retired. Every operation id names one line only, except that an
+//! approval's sign-in settings are kept as a second line beside it under the
+//! approval's operation, so that an approval is complete without a second
+//! act; an administrator's later change of those settings is a line of its
+//! own, and the latest is what the provider reads at each request.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -18,12 +22,16 @@ use std::sync::Arc;
 #[path = "apps_index.rs"]
 mod index;
 
+#[path = "apps_fold.rs"]
+mod fold;
+
 #[cfg(test)]
 #[path = "apps_operation_tests.rs"]
 mod operation_tests;
 
 use crate::apps_binding::{Binding, Registrar};
 use crate::read_views::Login;
+use fold::{allows_on, apply, beside_its_approval, lys_app};
 
 /// The snapshot domain the apps' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/apps-state/v1";
@@ -100,6 +108,28 @@ pub struct Approved {
     /// The binding of the registration's service account to the app, when it names one.
     pub binding: Option<Binding>,
     /// Who approved it.
+    pub by: By,
+    /// When.
+    pub at: u64,
+}
+
+/// An approved app's sign-in settings: the exact addresses its client may
+/// send a person back to, and whether its ID token carries the person's
+/// name (the profile scope). Kept beside the approval under the approval's
+/// operation, and under an operation of its own each time an administrator
+/// changes them; the latest is in force at the provider's next request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignInSet {
+    /// The operation id it was kept under: the approval's, or its own.
+    pub operation: String,
+    /// The app.
+    pub app: String,
+    /// The addresses the sign-in client may send a person back to, exactly.
+    pub redirects: Vec<String>,
+    /// Whether the app is given the person's name.
+    pub profile: bool,
+    /// Who set them.
     pub by: By,
     /// When.
     pub at: u64,
@@ -205,6 +235,8 @@ pub enum Line {
     Registered(Registered),
     /// A registration approved.
     Approved(Approved),
+    /// An approved app's sign-in settings set.
+    SignInSet(SignInSet),
     /// A registration declined.
     Declined(Decided),
     /// An app retired.
@@ -228,6 +260,7 @@ impl Line {
             Self::Lys(line) => &line.operation,
             Self::Registered(line) => &line.operation,
             Self::Approved(line) => &line.operation,
+            Self::SignInSet(line) => &line.operation,
             Self::Declined(line) | Self::Retired(line) | Self::ChangeDeclined(line) => {
                 &line.operation
             }
@@ -244,6 +277,7 @@ impl Line {
             Self::Lys(_) => Some(lys_identity::grants::LYS_APP),
             Self::Registered(line) => Some(&line.app),
             Self::Approved(line) => Some(&line.app),
+            Self::SignInSet(line) => Some(&line.app),
             Self::Declined(line) | Self::Retired(line) | Self::ChangeDeclined(line) => {
                 Some(&line.app)
             }
@@ -293,6 +327,9 @@ pub struct App {
     pub registered: Registered,
     /// Its approval, once it has one.
     pub approved: Option<Approved>,
+    /// Its sign-in settings as last set: the addresses the provider admits and
+    /// whether the app is given the person's name. Set with the approval.
+    pub sign_in: Option<SignInSet>,
     /// Its registration declined, once it is.
     pub declined: Option<Decided>,
     /// Its retirement, once it has one.
@@ -474,7 +511,9 @@ impl Held {
         if line.app() == Some("") {
             return Err("this line names no app".to_owned());
         }
-        if self.operation(line.operation()).is_some() {
+        if let Some(kept) = self.operation(line.operation())
+            && !beside_its_approval(&kept, &line)
+        {
             return Err(format!(
                 "operation `{}` already names a line",
                 line.operation()
@@ -497,6 +536,7 @@ impl Held {
                 self.apps.push(App {
                     registered,
                     approved: None,
+                    sign_in: None,
                     declined: None,
                     retired: None,
                     versions: Vec::new(),
@@ -572,101 +612,5 @@ impl Held {
             ));
         }
         Ok(sealed.held)
-    }
-}
-
-/// The app `lys` as its one line records it: approved at the model's version.
-fn lys_app(lys: LysRecorded) -> App {
-    let version = Version {
-        version: lys.version,
-        schema: lys.schema.clone(),
-        operation: lys.operation.clone(),
-        by: By::Start,
-        at: lys.at,
-    };
-    App {
-        registered: Registered {
-            operation: lys.operation,
-            app: lys_identity::grants::LYS_APP.to_owned(),
-            name: "Lys".to_owned(),
-            redirects: Vec::new(),
-            schema: lys.schema,
-            service_account: None,
-            by: By::Start,
-            at: lys.at,
-        },
-        approved: None,
-        declined: None,
-        retired: None,
-        versions: vec![version],
-        pending: None,
-        history: Vec::new(),
-    }
-}
-
-/// Whether `line` may be kept on `app` as it stands.
-fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refused> {
-    let standing = app.standing();
-    let current = app.current().map_or(0, |version| version.version);
-    match line {
-        Line::Approved(_) | Line::Declined(_) if standing != Standing::Pending => {
-            Err(Refused::Standing(standing))
-        }
-        Line::Retired(_) if app.registered.app == lys_identity::grants::LYS_APP => {
-            Err(Refused::Lys)
-        }
-        Line::Retired(_) | Line::Proposed(_) | Line::Applied(_) | Line::Placed(_)
-            if standing != Standing::Approved =>
-        {
-            Err(Refused::Standing(standing))
-        }
-        Line::Proposed(_) if app.pending.is_some() => Err(Refused::Pending),
-        Line::Proposed(proposed) if proposed.replaces != current => Err(Refused::Moved(current)),
-        Line::Applied(applied) if applied.version != current + 1 => Err(Refused::Moved(current)),
-        Line::Applied(Applied {
-            proposal: Some(proposal),
-            ..
-        }) if app.pending.as_ref().map(|pending| &pending.operation) != Some(proposal) => {
-            Err(Refused::NothingPending)
-        }
-        Line::Applied(Applied { proposal: None, .. }) if app.pending.is_some() => {
-            Err(Refused::Pending)
-        }
-        Line::ChangeDeclined(_) if app.pending.is_none() => Err(Refused::NothingPending),
-        Line::Placed(placed) if held.parent(&placed.child_kind, &placed.child_id).is_some() => {
-            Err(Refused::Placed)
-        }
-        _ => Ok(()),
-    }
-}
-
-/// Apply `line`, already allowed, to `app`.
-fn apply(app: &mut App, line: &Line) {
-    match line {
-        Line::Approved(approved) => {
-            app.versions.push(Version {
-                version: 1,
-                schema: app.registered.schema.clone(),
-                operation: approved.operation.clone(),
-                by: approved.by.clone(),
-                at: approved.at,
-            });
-            app.approved = Some(approved.clone());
-        }
-        Line::Declined(declined) => app.declined = Some(declined.clone()),
-        Line::Retired(retired) => app.retired = Some(retired.clone()),
-        Line::Proposed(proposed) => app.pending = Some(proposed.clone()),
-        Line::ChangeDeclined(_) => app.pending = None,
-        Line::Applied(applied) => {
-            app.pending = None;
-            app.versions.push(Version {
-                version: applied.version,
-                schema: applied.schema.clone(),
-                operation: applied.operation.clone(),
-                by: applied.by.clone(),
-                at: applied.at,
-            });
-        }
-        Line::Lys(_) | Line::Registered(_) | Line::Placed(_) | Line::Registrar(_) => {}
     }
 }

@@ -10,7 +10,9 @@ use std::sync::Arc;
 
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
-use identity_contract::apps::{Auth, approve, ok, post, registration, workspace_schema};
+use identity_contract::apps::{
+    Auth, approve, approve_with, ok, post, registration, workspace_schema,
+};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::OperationId;
@@ -498,6 +500,132 @@ async fn an_app_is_a_client_from_its_approval_to_its_retirement_with_no_restart(
     // The first product, approved in the fixture, still signs in.
     let (status, _, _) = authorize_answer(&service, &cookie, PRODUCT, CALLBACK).await?;
     assert_eq!(status, 303);
+    Ok(())
+}
+
+/// DIRECTORY-079 R2: the approval carries the app's return addresses and the
+/// provider admits them at the next authorize; an administrator's change on
+/// the Apps screen's route is in force at the next authorize, admitting the
+/// new address and refusing the old one by name, with no restart; the app's
+/// view answers the settings as last set, the name setting included.
+#[tokio::test]
+async fn the_sign_in_settings_are_in_force_at_the_provider_s_next_request() -> TestResult {
+    const MOVED: &str = "https://second.example.test/moved-here";
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let mut body = registration(SECOND, &workspace_schema(SECOND))?;
+    body["redirects"] = json!([BACK]);
+    ok(post(&service, "/apps", Auth::Cookie(&cookie), &body).await?)?;
+    let approval = approve_with(&service, &cookie, SECOND, json!([BACK]), false).await?;
+    assert_eq!(approval["app"]["sign_in"]["redirects"], json!([BACK]));
+    assert_eq!(approval["app"]["sign_in"]["profile"], false);
+    let (status, _, _) = authorize_answer(&service, &cookie, SECOND, BACK).await?;
+    assert_eq!(status, 303, "the approved address is admitted");
+    let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, MOVED).await?;
+    assert_eq!((status, location), (400, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "redirect_invalid");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains(MOVED))
+    );
+    // The administrator moves the app's return address and turns the name on.
+    let change =
+        json!({"operation": identity_contract::apps::op()?, "redirects": [MOVED], "profile": true});
+    let changed = ok(post(
+        &service,
+        &format!("/apps/{SECOND}/sign_in"),
+        Auth::Cookie(&cookie),
+        &change,
+    )
+    .await?)?;
+    assert_eq!(changed["sign_in"]["redirects"], json!([MOVED]));
+    assert_eq!(changed["sign_in"]["profile"], true);
+    let (status, _, _) = authorize_answer(&service, &cookie, SECOND, MOVED).await?;
+    assert_eq!(status, 303, "the next authorize follows the change");
+    let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, BACK).await?;
+    assert_eq!((status, location), (400, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "redirect_invalid");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains(BACK))
+    );
+    // The name turned off again: the view follows; the token follows in R3.
+    let off = json!({"operation": identity_contract::apps::op()?, "redirects": [MOVED], "profile": false});
+    let read = ok(post(
+        &service,
+        &format!("/apps/{SECOND}/sign_in"),
+        Auth::Cookie(&cookie),
+        &off,
+    )
+    .await?)?;
+    assert_eq!(read["sign_in"]["profile"], false);
+    let view = ok(identity_contract::apps::get(
+        &service,
+        &format!("/apps/{SECOND}"),
+        Auth::Cookie(&cookie),
+    )
+    .await?)?;
+    assert_eq!(view["sign_in"], read["sign_in"]);
+    assert_eq!(
+        view["redirects"],
+        json!([BACK]),
+        "the registration's addresses stay what was asked for"
+    );
+    Ok(())
+}
+
+/// DIRECTORY-079 R1, acceptance 4: a declined app's client id is refused
+/// `app_not_approved` naming the app, at authorize and at token, and the
+/// browser is sent nowhere.
+#[tokio::test]
+async fn a_declined_apps_client_id_is_refused_app_not_approved_at_authorize_and_token() -> TestResult
+{
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let mut body = registration(SECOND, &workspace_schema(SECOND))?;
+    body["redirects"] = json!([BACK]);
+    ok(post(&service, "/apps", Auth::Cookie(&cookie), &body).await?)?;
+    let decline = json!({"operation": identity_contract::apps::op()?, "reason": "not this one"});
+    ok(post(
+        &service,
+        &format!("/apps/{SECOND}/decline"),
+        Auth::Cookie(&cookie),
+        &decline,
+    )
+    .await?)?;
+    let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, BACK).await?;
+    assert_eq!((status, location), (403, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "app_not_approved");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains(SECOND))
+    );
+    let token = reqwest::Client::new()
+        .post(format!("{}/oauth/token", service.base))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!(
+                "Basic {}",
+                STANDARD.encode(format!("{SECOND}:{}", secret()))
+            ),
+        )
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", "a-code-nobody-issued"),
+            ("redirect_uri", BACK),
+            ("code_verifier", "v"),
+        ])
+        .send()
+        .await?;
+    assert_eq!(token.status().as_u16(), 403);
+    let refused: Value = serde_json::from_str(&token.text().await?)?;
+    assert_eq!(refused["refusal"], "app_not_approved");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains(SECOND))
+    );
     Ok(())
 }
 

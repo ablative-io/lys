@@ -10,8 +10,8 @@ use std::error::Error;
 use std::path::Path;
 
 use identity_contract::apps::{
-    Auth, BEA, FILES, NOTES, TestResult, check, get, login, ok, op, post, refused, register,
-    registered, registration, root, seeded, workspace_schema,
+    Auth, BEA, FILES, NOTES, TestResult, approve, check, get, login, ok, op, post, refused,
+    register, registered, registration, root, seeded, workspace_schema,
 };
 use identity_contract::harness::ADMINISTRATOR;
 use serde_json::{Value, json};
@@ -138,6 +138,181 @@ async fn approval_confirms_custody_without_returning_secrets_and_a_sign_in_and_c
     )
     .await?)?;
     assert!(permit["grant"].is_string(), "{permit}");
+    Ok(())
+}
+
+/// DIRECTORY-079 R2: an approved app's sign-in settings are set by the
+/// administrator and nobody else; each address is judged as a registration's
+/// is, a list with no address is refused in words that say the app could
+/// sign nobody in, an app that is not approved is refused by its standing's
+/// name, and an operation id reused answers the same and keeps nothing new.
+#[tokio::test]
+async fn sign_in_settings_are_the_administrators_judged_by_address_and_by_standing() -> TestResult {
+    let (service, _) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let path = format!("/apps/{NOTES}/sign_in");
+    let settings = |redirects: Value, profile: bool| -> Result<Value, Box<dyn Error>> {
+        Ok(json!({"operation": op()?, "redirects": redirects, "profile": profile}))
+    };
+    let listed = json!(["https://app.example.test/signed-in"]);
+    register(&service, &admin, NOTES).await?;
+    let mut refusals = 0;
+    // Pending: refused by the standing's name.
+    refused(
+        &post(
+            &service,
+            &path,
+            Auth::Cookie(&admin),
+            &settings(listed.clone(), false)?,
+        )
+        .await?,
+        403,
+        "app_not_approved",
+    )?;
+    refusals += 1;
+    // An approval with no return address is refused whole, and the app stays pending.
+    let empty = json!({"operation": op()?, "redirects": [], "profile": false});
+    let answer = post(
+        &service,
+        &format!("/apps/{NOTES}/approve"),
+        Auth::Cookie(&admin),
+        &empty,
+    )
+    .await?;
+    refused(&answer, 400, "redirect_invalid")?;
+    assert!(
+        answer.1["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("can sign nobody in")),
+        "{}",
+        answer.1
+    );
+    assert_eq!(answer.1["fields"][0]["at"], "/redirects");
+    refusals += 1;
+    let still = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(still["state"], "pending");
+    assert!(still["sign_in"].is_null());
+    // Approved with its registration's addresses: the view carries them.
+    approve(&service, &admin, NOTES).await?;
+    let approved = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(approved["sign_in"]["redirects"], listed, "{approved}");
+    assert_eq!(approved["sign_in"]["profile"], false);
+    // Address rules: none, not absolute, a fragment, http away from this machine.
+    let none = post(
+        &service,
+        &path,
+        Auth::Cookie(&admin),
+        &settings(json!([]), false)?,
+    )
+    .await?;
+    refused(&none, 400, "redirect_invalid")?;
+    assert!(
+        none.1["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("can sign nobody in")),
+        "{}",
+        none.1
+    );
+    refusals += 1;
+    for address in [
+        "signed-in",
+        "https://app.example.test/signed-in#fragment",
+        "http://app.example.test/signed-in",
+    ] {
+        let answer = post(
+            &service,
+            &path,
+            Auth::Cookie(&admin),
+            &settings(json!([address]), false)?,
+        )
+        .await?;
+        refused(&answer, 400, "redirect_invalid")?;
+        assert!(
+            answer.1["reason"]
+                .as_str()
+                .is_some_and(|words| words.contains(address)),
+            "{}",
+            answer.1
+        );
+        refusals += 1;
+    }
+    // A signed-in person who is not the administrator changes nothing.
+    let bea = service.sign_in(login(BEA)).await?;
+    let moved = json!(["https://app.example.test/moved"]);
+    refused(
+        &post(
+            &service,
+            &path,
+            Auth::Cookie(&bea),
+            &settings(moved.clone(), true)?,
+        )
+        .await?,
+        403,
+        "NotAdmitted",
+    )?;
+    refusals += 1;
+    let unchanged = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(unchanged["sign_in"], approved["sign_in"]);
+    // The administrator's change, and the same operation again: the same
+    // answer, nothing new kept; the same operation for another app: refused.
+    let change = settings(moved.clone(), true)?;
+    let changed = ok(post(&service, &path, Auth::Cookie(&admin), &change).await?)?;
+    assert_eq!(changed["sign_in"]["redirects"], moved);
+    assert_eq!(changed["sign_in"]["profile"], true);
+    let again = ok(post(&service, &path, Auth::Cookie(&admin), &change).await?)?;
+    assert_eq!(again["sign_in"], changed["sign_in"]);
+    register(&service, &admin, FILES).await?;
+    let reused = post(
+        &service,
+        &format!("/apps/{FILES}/sign_in"),
+        Auth::Cookie(&admin),
+        &change,
+    )
+    .await?;
+    refused(&reused, 409, "app_operation_reused")?;
+    refusals += 1;
+    // Declined and retired: refused by the standing's name.
+    let decline = json!({"operation": op()?, "reason": "not this one"});
+    ok(post(
+        &service,
+        &format!("/apps/{FILES}/decline"),
+        Auth::Cookie(&admin),
+        &decline,
+    )
+    .await?)?;
+    refused(
+        &post(
+            &service,
+            &format!("/apps/{FILES}/sign_in"),
+            Auth::Cookie(&admin),
+            &settings(listed.clone(), false)?,
+        )
+        .await?,
+        403,
+        "app_not_approved",
+    )?;
+    refusals += 1;
+    let retire = json!({"operation": op()?, "reason": "done"});
+    ok(post(
+        &service,
+        &format!("/apps/{NOTES}/retire"),
+        Auth::Cookie(&admin),
+        &retire,
+    )
+    .await?)?;
+    refused(
+        &post(
+            &service,
+            &path,
+            Auth::Cookie(&admin),
+            &settings(listed, false)?,
+        )
+        .await?,
+        403,
+        "app_retired",
+    )?;
+    refusals += 1;
+    assert_eq!(refusals, 10);
     Ok(())
 }
 

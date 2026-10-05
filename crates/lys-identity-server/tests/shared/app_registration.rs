@@ -106,7 +106,7 @@ async fn approval_binds_the_service_account_the_registration_names() -> TestResu
         &service,
         &format!("/apps/{NOTES}/approve"),
         Auth::Cookie(&admin),
-        &json!({"operation": op()?}),
+        &json!({"operation": op()?, "redirects": body["redirects"], "profile": false}),
     )
     .await?)?;
     assert_eq!(

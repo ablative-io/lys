@@ -271,7 +271,11 @@ async fn wrong_operator_cannot_be_bypassed_by_an_app_bearer() -> TestResult {
         .post(
             &path,
             Some(&cookie),
-            &json!({"operation": OperationId::generate()?.to_string()}),
+            &json!({
+                "operation": OperationId::generate()?.to_string(),
+                "redirects": body["redirects"],
+                "profile": false,
+            }),
         )
         .await?;
     assert_eq!(status, 200, "{approved}");

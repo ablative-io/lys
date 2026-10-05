@@ -349,19 +349,22 @@ fn approved_client<'a>(
     Ok((app, approved))
 }
 
-/// Refuse `redirect` unless the app's registration lists it exactly.
+/// Refuse `redirect` unless the app's sign-in settings, as an administrator
+/// last set them, list it exactly. The registration's addresses are what the
+/// screen offered to approve, never what is read here.
 fn listed(app: &App, redirect: &str) -> Result<(), AppError> {
-    if app
-        .registered
-        .redirects
-        .iter()
-        .any(|listed| listed == redirect)
-    {
+    let Some(settings) = app.sign_in.as_ref() else {
+        return Err(AppError::RedirectInvalid {
+            address: redirect.to_owned(),
+            reason: "is not admitted: the app has no sign-in settings, so no address is listed",
+        });
+    };
+    if settings.redirects.iter().any(|listed| listed == redirect) {
         return Ok(());
     }
     Err(AppError::RedirectInvalid {
         address: redirect.to_owned(),
-        reason: "is not an address the app's registration lists",
+        reason: "is not an address the app's sign-in settings list",
     })
 }
 

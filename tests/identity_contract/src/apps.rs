@@ -188,9 +188,26 @@ pub async fn register(service: &Service, admin: &str, app: &str) -> Result<Value
     ok(post(service, "/apps", Auth::Cookie(admin), &body).await?)
 }
 
-/// Approve `app` as the administrator, answering the approval.
+/// Approve `app` as the administrator, answering the approval. The approval
+/// carries the app's sign-in settings as the Apps screen offers them: the
+/// addresses its registration asked for, and the person's name withheld.
 pub async fn approve(service: &Service, admin: &str, app: &str) -> Result<Value, Box<dyn Error>> {
-    let body = json!({"operation": op()?});
+    let registered = ok(get(service, &format!("/apps/{app}"), Auth::Cookie(admin)).await?)?;
+    let redirects = registered["redirects"].clone();
+    approve_with(service, admin, app, redirects, false).await
+}
+
+/// Approve `app` as the administrator with the sign-in settings given:
+/// `redirects` as the JSON list of addresses, and whether the app is given
+/// the person's name.
+pub async fn approve_with(
+    service: &Service,
+    admin: &str,
+    app: &str,
+    redirects: Value,
+    profile: bool,
+) -> Result<Value, Box<dyn Error>> {
+    let body = json!({"operation": op()?, "redirects": redirects, "profile": profile});
     ok(post(
         service,
         &format!("/apps/{app}/approve"),

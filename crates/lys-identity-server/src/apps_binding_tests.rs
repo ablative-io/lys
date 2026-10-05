@@ -9,7 +9,7 @@ use serde_json::json;
 
 use super::{sha256_hex, sign_in_client, sign_in_redirect};
 use crate::apps_error::AppError;
-use crate::apps_state::{Approved, By, Client, Decided, Held, Line, Registered};
+use crate::apps_state::{Approved, By, Client, Decided, Held, Line, Registered, SignInSet};
 
 type Outcome = Result<(), Box<dyn Error>>;
 
@@ -42,6 +42,14 @@ fn approved() -> Result<Held, Box<dyn Error>> {
             secret_sha256: sha256_hex(SECRET),
         },
         binding: None,
+        by: By::Start,
+        at: 2,
+    }))?;
+    held.hold(Line::SignInSet(SignInSet {
+        operation: "approve".to_owned(),
+        app: APP.to_owned(),
+        redirects: vec![BACK.to_owned()],
+        profile: false,
         by: By::Start,
         at: 2,
     }))?;

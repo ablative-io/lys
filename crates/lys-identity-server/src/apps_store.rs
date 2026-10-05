@@ -256,6 +256,18 @@ impl<S: LeafStore> AppStore<S> {
         Ok(line)
     }
 
+    /// Keep `line` beside the approval already kept under its operation: the
+    /// one line an operation names besides its first, an approval's sign-in
+    /// settings. Refused, as [`Self::keep`] refuses, when the apps as they
+    /// stand do not take it.
+    pub fn keep_beside_approval(&mut self, line: Line) -> Result<(), ServerError> {
+        self.settle()?;
+        self.held
+            .allows(&line)
+            .map_err(|refused| refusal(&line, refused))?;
+        self.append(line)
+    }
+
     /// The current schema of the approved, unretired app `app`.
     pub fn schema(&self, app: &str) -> Option<&AppSchema> {
         self.schemas.get(app)

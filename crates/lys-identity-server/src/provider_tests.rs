@@ -23,6 +23,26 @@ fn a_query_value_is_percent_encoded_except_its_unreserved_characters() {
     assert_eq!(encoded("é"), "%C3%A9");
 }
 
+/// DIRECTORY-079 R1, acceptance 9: the provider's settings have no clients
+/// member, so a configuration naming `provider.clients` is refused as it is
+/// read, by the existing unknown-field rule, naming the key.
+#[test]
+fn a_configuration_naming_provider_clients_is_refused_naming_the_key() {
+    let read = serde_json::from_value::<ProviderSettings>(json!({
+        "key_file": "/srv/lys/state/provider.key",
+        "clients": [],
+    }));
+    let refusal = match read {
+        Ok(_) => panic!("a configuration naming provider.clients was read"),
+        Err(error) => error.to_string(),
+    };
+    assert!(refusal.contains("unknown field `clients`"), "{refusal}");
+    let without = serde_json::from_value::<ProviderSettings>(json!({
+        "key_file": "/srv/lys/state/provider.key",
+    }));
+    assert!(without.is_ok(), "{without:?}");
+}
+
 #[test]
 fn text_is_the_same_only_when_every_byte_is() {
     assert!(same("abc", "abc"));

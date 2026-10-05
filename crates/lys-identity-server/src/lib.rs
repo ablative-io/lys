@@ -28,6 +28,7 @@ mod apps_credentials;
 pub mod apps_error;
 mod apps_refresh;
 pub mod apps_schema_api;
+pub mod apps_sign_in;
 pub mod apps_state;
 pub mod apps_store;
 mod apps_upgrade;

@@ -9,6 +9,9 @@
 .apps .app-list li + li { margin-top: 2px; }
 .apps .app-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 10px; }
 .apps .app-actions .field { margin-top: 0; min-width: 260px; }
+/* The sign-in settings: the addresses take a whole line each, the name tick sits beside the button. */
+.apps .app-signin .field textarea { min-width: 420px; min-height: 64px; font-family: var(--font-mono); }
+.apps .app-signin .tick { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); margin-bottom: 6px; }
 .apps .app-waiting { display: block; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--warn-glow); border-radius: var(--radius-md); background: var(--surface-default); }
 .apps .app-waiting .btn { margin-right: 8px; }
 .apps .app-secret { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--accent-deep); border-radius: var(--radius-md); background: var(--accent-wash); color: var(--text-primary); }

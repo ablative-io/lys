@@ -8,7 +8,9 @@
 //! `POST /apps` records the registration as pending and nothing else: no
 //! client exists anywhere and no kind of the app is judged. Approval creates
 //! the app's sign-in client only after confirmed broker custody. The app log keeps only the
-//! secret's SHA-256. Approval binds the service
+//! secret's SHA-256. Approval takes the app's sign-in settings, the exact
+//! return addresses and whether it is given the person's name, kept beside
+//! it (`apps_sign_in`); it binds the service
 //! account the registration names, makes the registered schema version 1
 //! and gives its kinds to the grants. A declined app never takes effect. A
 //! retired app's client credential is refused and every check on its kinds
@@ -39,7 +41,9 @@ use serde_json::Value;
 
 use crate::apps_binding::{Acting, Binding, Registrar, acting, new_secret};
 use crate::apps_error::AppError;
-use crate::apps_state::{Approved, By, Client, Decided, Line, LysRecorded, Registered, Standing};
+use crate::apps_state::{
+    Approved, By, Client, Decided, Line, LysRecorded, Registered, SignInSet, Standing,
+};
 use crate::apps_store::AppStore;
 use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued};
 use crate::config::Config;
@@ -71,6 +75,20 @@ pub(crate) struct DecideBody {
     reason: String,
 }
 
+/// An approval: with it the administrator sets the app's sign-in settings,
+/// the exact return addresses and whether it is given the person's name, so
+/// an approval is complete without a second act. The registration's
+/// addresses are what the screen offers; what is sent here is what is kept.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApproveBody {
+    operation: String,
+    /// The addresses the sign-in client may send a person back to, exactly.
+    redirects: Vec<String>,
+    /// Whether the app is given the person's name (the profile scope).
+    profile: bool,
+}
+
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RegistrarBody {
@@ -86,6 +104,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/apps/registrars", post(registrar))
         .route("/apps/{app}", get(one))
         .route("/apps/{app}/approve", post(approve))
+        .route("/apps/{app}/sign_in", post(crate::apps_sign_in::set))
         .route(
             "/apps/{app}/credentials/save",
             post(crate::apps_credentials::save),
@@ -138,7 +157,7 @@ pub fn opened(
     Ok(store)
 }
 
-fn malformed(reason: impl Into<String>) -> ServerError {
+pub(crate) fn malformed(reason: impl Into<String>) -> ServerError {
     ServerError::RequestMalformed {
         reason: reason.into(),
     }
@@ -188,8 +207,9 @@ fn words(name: &str, text: &str) -> Result<String, ServerError> {
 }
 
 /// Refuse a redirect address a sign-in client does not take: an absolute
-/// `https` address, or `http` to this machine, with no fragment.
-fn redirect(address: &str) -> Result<String, AppError> {
+/// `https` address, or `http` to this machine, with no fragment. The one
+/// rule for a registration's addresses and for the sign-in settings' alike.
+pub(crate) fn redirect(address: &str) -> Result<String, AppError> {
     let refused = |reason| AppError::RedirectInvalid {
         address: address.to_owned(),
         reason,
@@ -291,7 +311,7 @@ pub(crate) async fn register(
     .map(Json)
 }
 
-fn view(apps: &AppStore, id: &str) -> Result<AppView, ServerError> {
+pub(crate) fn view(apps: &AppStore, id: &str) -> Result<AppView, ServerError> {
     apps.app(id)
         .map(AppView::from)
         .ok_or_else(|| AppError::AppUnknown { app: id.to_owned() }.into())
@@ -366,7 +386,7 @@ async fn me(
 }
 
 /// The administrator acting on `headers`, with the apps held.
-fn administrator(
+pub(crate) fn administrator(
     state: &AppState,
     apps: &AppStore,
     headers: &HeaderMap,
@@ -381,10 +401,13 @@ async fn approve(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     UrlPath(id): UrlPath<String>,
-    body: Result<Json<DecideBody>, JsonRejection>,
+    body: Result<Json<ApproveBody>, JsonRejection>,
 ) -> Result<Json<Approval>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
+    // The sign-in settings are judged before any broker work: an approval
+    // that would leave the app unable to sign anyone in is refused whole.
+    let redirects = crate::apps_sign_in::redirects(&id, &body.redirects)?;
     // Authenticate and check pending state before doing any broker work. Never
     // hold directory/apps locks across a network wait; recheck after custody.
     let pending = crate::apps_credentials::pending(&state, &headers, &id, &operation)?;
@@ -430,10 +453,18 @@ async fn approve(
             secret_sha256: digest,
         };
         apps.keep(Line::Approved(Approved {
-            operation,
+            operation: operation.clone(),
             app: id.clone(),
             client,
             binding,
+            by: by.clone(),
+            at,
+        }))?;
+        apps.keep_beside_approval(Line::SignInSet(SignInSet {
+            operation,
+            app: id.clone(),
+            redirects,
+            profile: body.profile,
             by,
             at,
         }))?;

@@ -11,7 +11,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::apps_error::Strand;
-use crate::apps_state::{App, By, Proposed, Standing};
+use crate::apps_state::{App, By, Proposed, SignInSet, Standing};
 
 /// A schema change waiting for an administrator.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -42,6 +42,35 @@ impl From<&Proposed> for PendingView {
     }
 }
 
+/// An approved app's sign-in settings as last set: what the provider admits
+/// at its next request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct SignInView {
+    /// The addresses the sign-in client may send a person back to, exactly.
+    pub redirects: Vec<String>,
+    /// Whether the app is given the person's name (the profile scope).
+    pub profile: bool,
+    /// The operation the settings were set under.
+    pub operation: String,
+    /// Who set them.
+    #[schema(value_type = Object)]
+    pub by: By,
+    /// When.
+    pub at: u64,
+}
+
+impl From<&SignInSet> for SignInView {
+    fn from(set: &SignInSet) -> Self {
+        Self {
+            redirects: set.redirects.clone(),
+            profile: set.profile,
+            operation: set.operation.clone(),
+            by: set.by.clone(),
+            at: set.at,
+        }
+    }
+}
+
 /// An app as the routes answer it.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct AppView {
@@ -51,8 +80,12 @@ pub struct AppView {
     pub name: String,
     /// Where it stands.
     pub state: Standing,
-    /// The addresses its sign-in client may send a person back to.
+    /// The addresses its registration asked for: what the screen offers to
+    /// approve, never what the provider reads.
     pub redirects: Vec<String>,
+    /// Its sign-in settings as last set, once approved: the addresses the
+    /// provider admits and whether the app is given the person's name.
+    pub sign_in: Option<SignInView>,
     /// The current schema; the registered one while it waits for approval.
     #[schema(value_type = Object)]
     pub schema: Value,
@@ -87,6 +120,7 @@ impl From<&App> for AppView {
             name: registered.name.clone(),
             state: app.standing(),
             redirects: registered.redirects.clone(),
+            sign_in: app.sign_in.as_ref().map(SignInView::from),
             schema: current.map_or_else(|| registered.schema.clone(), |held| held.schema.clone()),
             version: current.map_or(0, |held| held.version),
             versions: app.versions.iter().map(|held| held.version).collect(),
