@@ -133,7 +133,10 @@ fn a_proxied_runs_status_reports_are_held_and_written_before_its_next_calls()
     assert_eq!(spend.figures.dollars_micros, None);
     // A later report adds only what was added since the one written.
     tick(&sessions, 0.55, 12_000)?;
-    crate::collector::status::flush_status(&mut sessions.lock()?, "session")?;
+    {
+        let mut table = sessions.lock()?;
+        crate::collector::status::flush_status(&mut table, "session")?;
+    }
     let records = usage(&sessions)?;
     let last = records.last().ok_or("a third record")?;
     assert_eq!(last.figures.dollars_micros, Some(150_000));

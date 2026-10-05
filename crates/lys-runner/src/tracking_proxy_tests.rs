@@ -266,6 +266,16 @@ fn a_status_line_that_reports_no_cost_puts_no_figure_in_its_place() {
         .expect("a report with no figures is still the first report");
     assert_eq!(record.figures.dollars_micros, None);
     assert_eq!(record.figures.running_ms, None);
-    assert!(record.unavailable.iter().any(|note| note.figure == "dollars_micros"));
-    assert!(record.unavailable.iter().any(|note| note.figure == "running_ms"));
+    assert!(
+        record
+            .unavailable
+            .iter()
+            .any(|note| note.figure == "dollars_micros")
+    );
+    assert!(
+        record
+            .unavailable
+            .iter()
+            .any(|note| note.figure == "running_ms")
+    );
 }

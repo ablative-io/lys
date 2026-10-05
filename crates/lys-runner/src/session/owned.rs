@@ -108,7 +108,9 @@ impl Sessions {
                 launch
                     .environment
                     .insert(PROGRAM_VARIABLE.to_owned(), program);
-                launch.environment.insert(SOCKET_VARIABLE.to_owned(), socket);
+                launch
+                    .environment
+                    .insert(SOCKET_VARIABLE.to_owned(), socket);
             }
             (program, socket) => {
                 for error in [program.err(), socket.err()].into_iter().flatten() {
