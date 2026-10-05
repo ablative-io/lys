@@ -181,3 +181,33 @@ impl super::Live {
         }
     }
 }
+
+/// Report a lost session's cleanup without treating a group number as ownership.
+/// Missing ownership and members left running are named beside any signal sent.
+pub(super) fn left_behind(
+    id: &str,
+    leader: Option<&crate::peer::Leader>,
+) -> (Option<String>, Option<String>) {
+    let Some(leader) = leader else {
+        return (
+            None,
+            Some("start identity not recorded; process group not ended".to_owned()),
+        );
+    };
+    let pid = leader.pid;
+    match crate::pty::end_left_group(leader) {
+        Ok(crate::pty::Left::Gone) => (None, None),
+        Ok(crate::pty::Left::Ended { reason }) => {
+            crate::error::said(&format!(
+                "session {id}: proved members of process group {pid} were sent SIGKILL"
+            ));
+            (Some("SIGKILL".to_owned()), reason)
+        }
+        Ok(crate::pty::Left::Reused) => (None, Some("process group reused, not ended".to_owned())),
+        Ok(crate::pty::Left::Unended { reason }) => (None, Some(reason)),
+        Err(error) => {
+            crate::error::said(&format!("session {id}: {error}"));
+            (None, Some(error.to_string()))
+        }
+    }
+}
