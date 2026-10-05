@@ -9,9 +9,11 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_core::Ed25519Identity;
 use serde_json::json;
+use sha2::Digest;
 
 use super::endpoints::{Exchange, presented};
-use super::{Access, OpenIdProvider, ProviderSettings, encoded, same};
+use super::{Access, Grant, OpenIdProvider, ProviderSettings, encoded, held, same};
+use crate::error::ServerError;
 
 #[test]
 fn a_query_value_is_percent_encoded_except_its_unreserved_characters() {
@@ -174,5 +176,117 @@ fn discovery_lists_the_openid_and_profile_scopes_and_the_name_claim() -> Result<
             "name"
         ])
     );
+    Ok(())
+}
+
+/// A provider with one code for the fixture client, exchangeable with the
+/// verifier `v` at the address `back`.
+fn provider_with_code(code: &str) -> Result<(tempfile::TempDir, OpenIdProvider), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let key_file = dir.path().join("provider.key");
+    std::fs::write(&key_file, [3u8; 32])?;
+    let settings = ProviderSettings {
+        key_file,
+        code_seconds: 60,
+    };
+    let provider = OpenIdProvider::open(&settings, "http://localhost:8490".to_owned())?;
+    held(&provider.codes)?.insert(
+        code.to_owned(),
+        Grant {
+            session_id: "a".repeat(32),
+            client_id: "notes".to_owned(),
+            redirect_uri: "https://notes.example.test/back".to_owned(),
+            challenge: URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(b"v")),
+            nonce: None,
+            subject: format!("person-{}", "b".repeat(32)),
+            person: format!("person-{}", "b".repeat(32)).parse()?,
+            profile: false,
+            authenticated_at: 1,
+            expires_at: 1000,
+            sign_in_ends_at: 1000,
+            used: false,
+            replayed: false,
+            issued_access: None,
+        },
+    );
+    // The table of tokens lives beside the key, so the directory stays.
+    Ok((dir, provider))
+}
+
+fn access() -> Access {
+    Access {
+        session_id: "a".repeat(32),
+        subject: format!("person-{}", "b".repeat(32)),
+        app: "notes".to_owned(),
+        profile: false,
+        expires_at: 1000,
+    }
+}
+
+/// A code exchanged a second time between the exchange's two acts ends with no
+/// live token: the replay is refused `CodeUsed` and marks the code, and the
+/// first exchange then keeps nothing and answers `CodeUsed` too.
+#[test]
+fn a_code_replayed_between_the_two_acts_of_an_exchange_leaves_no_live_token()
+-> Result<(), Box<dyn Error>> {
+    let (_dir, provider) = provider_with_code("code-1")?;
+    let lookup = "c".repeat(64);
+    provider.take_grant(
+        "code-1",
+        "notes",
+        "https://notes.example.test/back",
+        "v",
+        10,
+    )?;
+    assert!(matches!(
+        provider.take_grant(
+            "code-1",
+            "notes",
+            "https://notes.example.test/back",
+            "v",
+            11
+        ),
+        Err(ServerError::CodeUsed)
+    ));
+    assert!(matches!(
+        provider.issue("code-1", lookup.clone(), access(), 12),
+        Err(ServerError::CodeUsed)
+    ));
+    assert!(matches!(
+        held(&provider.tokens)?.get(&lookup, 12),
+        Err(ServerError::TokenUnknown)
+    ));
+    Ok(())
+}
+
+/// A code exchanged once keeps its token and remembers it; a replay after the
+/// issue revokes that token.
+#[test]
+fn a_code_replayed_after_its_exchange_revokes_the_token_it_issued() -> Result<(), Box<dyn Error>> {
+    let (_dir, provider) = provider_with_code("code-2")?;
+    let lookup = "c".repeat(64);
+    provider.take_grant(
+        "code-2",
+        "notes",
+        "https://notes.example.test/back",
+        "v",
+        10,
+    )?;
+    provider.issue("code-2", lookup.clone(), access(), 10)?;
+    assert_eq!(held(&provider.tokens)?.get(&lookup, 11)?.app, "notes");
+    assert!(matches!(
+        provider.take_grant(
+            "code-2",
+            "notes",
+            "https://notes.example.test/back",
+            "v",
+            12
+        ),
+        Err(ServerError::CodeUsed)
+    ));
+    assert!(matches!(
+        held(&provider.tokens)?.get(&lookup, 12),
+        Err(ServerError::TokenUnknown)
+    ));
     Ok(())
 }

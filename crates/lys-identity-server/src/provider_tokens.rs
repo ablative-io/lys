@@ -44,11 +44,22 @@ pub(super) struct Tokens {
     file: PathBuf,
     live: HashMap<String, Access>,
     failed: bool,
+    /// How many stored tokens this open could not read and dropped.
+    dropped: usize,
+}
+
+/// The one line said when a table drops tokens it cannot read: the count and
+/// the file, never a key or a member.
+pub(super) fn dropped_words(dropped: usize, file: &Path) -> String {
+    format!(
+        "the access table {} dropped {dropped} token(s) it could not read; each is a sign-in asked for again",
+        file.display()
+    )
 }
 
 impl Tokens {
     pub(super) fn open(file: PathBuf, at: u64) -> Result<Self, ServerError> {
-        let mut dropped = false;
+        let mut dropped = 0usize;
         let mut live = match std::fs::read(&file) {
             Ok(bytes) => {
                 let stored: Stored = serde_json::from_slice(&bytes).map_err(|error| {
@@ -67,7 +78,7 @@ impl Tokens {
                     // the scope this one keeps, cannot be honoured: that one
                     // sign-in is asked for again, and nothing else is refused.
                     let Ok(access) = serde_json::from_value::<Access>(token.access) else {
-                        dropped = true;
+                        dropped += 1;
                         continue;
                     };
                     validate(&token.key, &access)?;
@@ -89,11 +100,23 @@ impl Tokens {
             file,
             live,
             failed: false,
+            dropped,
         };
-        if dropped {
+        if dropped > 0 {
             tokens.change(None, None)?;
         }
         Ok(tokens)
+    }
+
+    /// How many stored tokens this open dropped as unreadable; the provider
+    /// says so once, in [`dropped_words`].
+    pub(super) fn dropped(&self) -> usize {
+        self.dropped
+    }
+
+    /// The file the table is kept in.
+    pub(super) fn file(&self) -> &Path {
+        &self.file
     }
 
     fn ready(&self) -> Result<(), ServerError> {

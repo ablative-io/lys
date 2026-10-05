@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 
 use serde_json::json;
 
-use super::{Access, FORMAT, Tokens};
+use super::{Access, FORMAT, Tokens, dropped_words};
 use crate::error::ServerError;
 
 fn access(ends: u64) -> Access {
@@ -47,6 +47,15 @@ fn a_token_of_an_earlier_shape_is_dropped_alone_at_open() -> Result<(), Box<dyn 
         Err(ServerError::TokenUnknown)
     ));
     assert_eq!(tokens.get(&kept, 10)?.app, "notes");
+    // One line is said, with the count and the file, never a key or a member.
+    assert_eq!(tokens.dropped(), 1);
+    let said = dropped_words(tokens.dropped(), &file);
+    assert!(said.contains("dropped 1 token"), "{said}");
+    assert!(said.contains("provider.tokens.json"), "{said}");
+    assert!(
+        !said.contains(&old) && !said.contains("session_id"),
+        "{said}"
+    );
     drop(tokens);
     let written: serde_json::Value = serde_json::from_slice(&std::fs::read(&file)?)?;
     let keys: Vec<&str> = written["tokens"]

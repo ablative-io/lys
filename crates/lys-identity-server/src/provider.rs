@@ -45,6 +45,7 @@ mod token_store;
 use token_store::Tokens;
 
 mod endpoints;
+mod exchange;
 pub use endpoints::routes;
 
 /// How long a code lives when the configuration says nothing, in seconds:
@@ -90,6 +91,9 @@ struct Grant {
     /// When the Lys sign-in the code states ends; its tokens end with it.
     sign_in_ends_at: u64,
     used: bool,
+    /// Set when the code was exchanged again before its first exchange had
+    /// kept a token: that first exchange then keeps none.
+    replayed: bool,
     issued_access: Option<String>,
 }
 
@@ -182,16 +186,22 @@ impl OpenIdProvider {
         })?;
         let digest = Sha256::digest(key.public_key_bytes());
         let kid = hex(digest.get(..8).unwrap_or_default());
+        let tokens = Tokens::open(settings.key_file.with_extension("tokens.json"), now())?;
+        // Tokens the table could not read are dropped, each a sign-in asked
+        // for again, and said once: the count and the file, never a key.
+        if tokens.dropped() > 0 {
+            tracing::warn!(
+                "{}",
+                token_store::dropped_words(tokens.dropped(), tokens.file())
+            );
+        }
         Ok(Self {
             issuer,
             key,
             kid,
             code_seconds: settings.code_seconds,
             codes: Mutex::new(HashMap::new()),
-            tokens: Mutex::new(Tokens::open(
-                settings.key_file.with_extension("tokens.json"),
-                now(),
-            )?),
+            tokens: Mutex::new(tokens),
         })
     }
 

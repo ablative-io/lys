@@ -1,15 +1,13 @@
 //! The provider's endpoints: discovery, keys, authorize, the token exchange
 //! and userinfo, each refusal answered in OAuth's own words.
 //!
-//! Locks. Four are taken here: the apps store (`admitted_client`,
-//! `name_granted`), the directory (`display_name`, the person at authorize),
-//! the provider's codes and the provider's tokens. No guard is held while
-//! another is taken: each is taken, read or changed, and released in its own
-//! block, so there is no order to get wrong and no path that nests them.
+//! Locks. The provider's own two are taken in one order, codes then tokens,
+//! never the other way round (`exchange.rs`). The apps store
+//! (`admitted_client`, `name_granted`), the directory (`display_name`, the
+//! person at authorize) and the sessions are each taken and released on their
+//! own, and never under a provider guard.
 
-use super::{
-    Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, random, same, unavailable,
-};
+use super::{Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, random, unavailable};
 use crate::apps_binding::{sign_in_client, sign_in_redirect};
 use crate::apps_error::AppError;
 use crate::error::ServerError;
@@ -22,7 +20,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::Engine;
-use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use base64::engine::general_purpose::STANDARD;
 use lys_identity::{IdentityId, PersonId};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -233,6 +231,7 @@ pub(super) async fn authorize(
                 expires_at: at.saturating_add(provider.code_seconds),
                 sign_in_ends_at: session.ends_at,
                 used: false,
+                replayed: false,
                 issued_access: None,
             },
         );
@@ -456,59 +455,37 @@ pub(super) fn exchange(
     let admitted = admitted_client(state, &client_id, Some(&secret), &form.redirect_uri)?;
     let client_id = admitted.app;
     let at = now();
-    let (subject, nonce, authenticated_at, expires_at, session_id, person, profile) = {
-        let mut codes = held(&provider.codes)?;
-        let grant = codes.get_mut(&form.code).ok_or(ServerError::CodeUnknown)?;
-        if grant.client_id != client_id {
-            return Err(ServerError::CodeUnknown);
-        }
-        if grant.used {
-            if let Some(key) = &grant.issued_access {
-                held(&provider.tokens)?.revoke(key)?;
-            }
-            return Err(ServerError::CodeUsed);
-        }
-        if at >= grant.expires_at || at >= grant.sign_in_ends_at {
-            return Err(ServerError::CodeExpired);
-        }
-        if grant.redirect_uri != form.redirect_uri {
-            return Err(ServerError::RedirectUnregistered);
-        }
-        grant.used = true;
-        let verified = URL_SAFE_NO_PAD.encode(Sha256::digest(form.code_verifier.as_bytes()));
-        if !same(&verified, &grant.challenge) {
-            return Err(ServerError::VerifierWrong);
-        }
-        (
-            grant.subject.clone(),
-            grant.nonce.clone(),
-            grant.authenticated_at,
-            grant.sign_in_ends_at,
-            grant.session_id.clone(),
-            grant.person,
-            // The name goes into the token only when the authorization asked
-            // for it and the app's setting still grants it at this exchange.
-            grant.profile && admitted.profile,
-        )
-    };
-    if !state.sessions.is_live(&session_id)? {
+    // The first act on the provider's state: the code verified and marked used.
+    let taken = provider.take_grant(
+        &form.code,
+        &client_id,
+        &form.redirect_uri,
+        &form.code_verifier,
+        at,
+    )?;
+    // Between the two acts, with no provider guard held: the session, the
+    // setting and the name. The name goes into the token only when the
+    // authorization asked for it and the app's setting still grants it at
+    // this exchange; it is read from the directory now and kept nowhere.
+    if !state.sessions.is_live(&taken.session_id)? {
         return Err(ServerError::CodeExpired);
     }
-    // The name is read from the directory at this issue and kept nowhere.
+    let profile = taken.profile && admitted.profile;
     let name = if profile {
-        display_name(state, person)?
+        display_name(state, taken.person)?
     } else {
         None
     };
+    let expires_at = taken.expires_at;
     let mut claims = json!({
         "iss": provider.issuer,
-        "sub": subject,
+        "sub": taken.subject,
         "aud": client_id,
         "iat": at,
         "exp": expires_at.min(at.saturating_add(ID_TOKEN_SECONDS)),
-        "auth_time": authenticated_at,
+        "auth_time": taken.authenticated_at,
     });
-    if let Some(nonce) = nonce {
+    if let Some(nonce) = taken.nonce {
         claims["nonce"] = Value::String(nonce);
     }
     if let Some(name) = name {
@@ -516,26 +493,20 @@ pub(super) fn exchange(
     }
     let access = random::<32>()?;
     let lookup = hex(&Sha256::digest(access.as_bytes()));
-    {
-        let mut tokens = held(&provider.tokens)?;
-        tokens.insert(
-            lookup.clone(),
-            Access {
-                session_id,
-                subject,
-                app: client_id,
-                profile,
-                expires_at,
-            },
-            at,
-        )?;
-    }
-    // The code remembers the token it issued, so a replay revokes it. A code
-    // retired meanwhile as expired is unknown to a replay, and the token ends
-    // at its own instant.
-    if let Some(grant) = held(&provider.codes)?.get_mut(&form.code) {
-        grant.issued_access = Some(lookup);
-    }
+    // The second act: the token kept and remembered by its code, or refused
+    // when the code was replayed in between.
+    provider.issue(
+        &form.code,
+        lookup,
+        Access {
+            session_id: taken.session_id,
+            subject: taken.subject,
+            app: client_id,
+            profile,
+            expires_at,
+        },
+        at,
+    )?;
     Ok(json!({
         "access_token": access,
         "token_type": "Bearer",
