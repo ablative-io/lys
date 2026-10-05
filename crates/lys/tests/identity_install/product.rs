@@ -13,8 +13,8 @@
 //! the app's client authentication for it. Until then the in-process tests
 //! in lys-identity-server's tests/provider.rs prove them through the custody
 //! fixture, among them
-//! a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys
-//! and an_app_is_a_client_from_its_approval_to_its_retirement_with_no_restart.
+//! `a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys`
+//! and `an_app_is_a_client_from_its_approval_to_its_retirement_with_no_restart`.
 
 use std::path::Path;
 use std::process::Command;
