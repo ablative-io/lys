@@ -123,7 +123,7 @@ describe('Choosing where an agent can run', () => {
     plain('NetworkUnavailable', 'Lys could not confirm this computer permission.');
     const original = first.posted[0]; routes['POST ' + path] = (body) => ok(receipt(body as Body, false));
     const next = await remount(routes);
-    const retry = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Check computer permission');
+    const retry = [...document.querySelectorAll('button')].find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Check computer permission');
     if (!retry) throw new Error('The uncertain tick has no retry action');
     await act(async () => { retry.click(); });
     expect(next.posted).toEqual([original]);
@@ -178,7 +178,7 @@ describe('Choosing where an agent can run', () => {
       return ok(named);
     };
     const { posted } = await open(routes);
-    const add = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Add this computer');
+    const add = [...document.querySelectorAll('button')].find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Add this computer');
     if (!add) throw new Error('The settings page with no computer has no add-computer action');
     await act(async () => { add.click(); });
     const form = $('form[aria-label="Add a computer"]');

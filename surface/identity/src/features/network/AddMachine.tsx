@@ -11,6 +11,7 @@ import type { Machine, PendingMachine } from './contract';
 import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 import { askJoinCode, joinFailure } from './JoinCode';
 import type { Connecting, JoinCode } from './JoinCode';
+import { Act } from '../../shell/Act';
 
 export async function recordComputer(initial: PendingMachine, person: string, keep: (next: PendingMachine) => void): Promise<Machine> {
   let current = initial;
@@ -78,7 +79,7 @@ function useAddition({ person, agent, changed, remote = false, connect }: Adding
   const blocked = busy || pending !== null || Boolean(restored.error);
   /** How the addition stands: kept and unconfirmed, with its check, or why it failed. */
   const standing = <>
-    {pending ? <div role="status"><p>Adding {pending.body.name} is not confirmed. Its original request is kept.</p><button className="btn" type="button" disabled={busy} onClick={() => void send(pending, true)}>Check whether it was added</button></div> : null}
+    {pending ? <div role="status"><p>Adding {pending.body.name} is not confirmed. Its original request is kept.</p><Act symbol="again" name="Check whether it was added" word="Check" disabled={busy} onClick={() => void send(pending, true)} /></div> : null}
     {failure ? <><p className="why-not" role="alert">Lys could not confirm this computer addition.</p><p><small className="refusal-name">{failure}</small></p></> : null}
   </>;
   return { submit, blocked, standing, pendingRemote: pending?.remote === true };
@@ -91,7 +92,7 @@ export function AddMachine({ person, agent, changed, cancel }: Adding & { cancel
     <h2>Add this computer</h2>
     <fieldset disabled={blocked} style={{ border: 0, padding: 0, margin: 0 }}>
       <label className="field">Name<input name="name" /></label>
-      <div className="chain"><button className="btn primary" type="submit">Add this computer</button><button className="btn" type="button" onClick={cancel}>Cancel</button></div>
+      <div className="chain"><Act symbol="add" name="Add this computer" word="Add" tone="primary" type="submit" /><Act symbol="close" name="Cancel" word="Cancel" onClick={cancel} /></div>
     </fieldset>
     {standing}
   </form>;
@@ -114,6 +115,6 @@ export function AddComputerRow({ person, changed, name, connect }: Omit<Adding, 
       {([['this', 'This computer'], ['another', 'Another computer']] as const).map(([key, label]) =>
         <button key={key} type="button" className={where === key ? 'on' : ''} aria-pressed={where === key} disabled={blocked} onClick={() => setChosen(key)}>{label}</button>)}
     </div></td>
-    <td><button form={id} className="btn primary" type="submit" disabled={blocked}>{where === 'another' ? 'Add and get its code' : 'Add this computer'}</button></td>
+    <td><Act symbol="add" name={where === 'another' ? 'Add and get its code' : 'Add this computer'} word="Add" tone="primary" type="submit" form={id} disabled={blocked} /></td>
   </tr>;
 }

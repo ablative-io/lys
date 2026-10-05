@@ -7,7 +7,7 @@ import { ADA, SERVICE, ok, refused } from './fixtures';
 const loader = 'op-' + 'c'.repeat(32);
 const plan = { version:1, agents:[{display_name:'Scribe'}], resources:[{kind:'cambium.channel',id:'lys',relation:'participant',actions:['read','send'],seats:['Scribe'],evidence:'fixture evidence'}] };
 const routes = {...SERVICE, '/identity/estate-plan':ok({plan,loader})};
-const approve = () => [...document.querySelectorAll('button')].find((button) => button.textContent === 'Approve and apply estate grants') ?? null;
+const approve = () => [...document.querySelectorAll('button')].find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Approve and apply estate grants') ?? null;
 // The test checks stable operation reuse, not the browser's SHA implementation.
 beforeEach(()=>{vi.stubGlobal('crypto',{randomUUID:()=> 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',subtle:{digest:async()=>new Uint8Array(32).buffer}});});
 it('loading previews exact actions and recipients without recording a grant',async()=>{

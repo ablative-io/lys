@@ -10,6 +10,7 @@ import type { Computer } from './Network';
 import type { Machine } from './contract';
 import { NewCode } from './JoinCode';
 import type { Connecting } from './JoinCode';
+import { Act } from '../../shell/Act';
 
 export type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
 
@@ -91,7 +92,7 @@ function OwningTeam({ machine, admin, me, teams, changed }: { machine: Machine; 
       {admin || !machine.team ? <option value="">No team</option> : null}
       {offered.map((each) => <option key={each.id} value={each.id}>{each.name}</option>)}
     </select>
-    <span><button className="btn" type="submit" disabled={change.blocked || team === (machine.team ?? '')}>Save team</button></span>
+    <span><Act symbol="save" name="Save team" word="Save" type="submit" disabled={change.blocked || team === (machine.team ?? '')} /></span>
     <ChangeStatus change={change} />
   </form>;
 }
@@ -109,6 +110,6 @@ function Retire({ machine, changed }: { machine: Machine; changed: (message: str
     } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
     finally { setBusy(false); }
   };
-  return <div className="machine-retire" style={{ marginTop: 20 }}>{confirm ? <><p>Retire {machine.name}? No agent can be started on it afterwards. Agents already running on it keep running.</p><button className="btn danger" disabled={busy} onClick={() => void retire()}>Confirm retirement</button>{' '}<button className="btn" disabled={busy} onClick={() => setConfirm(false)}>Cancel</button></>
-    : <button className="btn" onClick={() => setConfirm(true)}>Retire this computer</button>}{failure ? <p role="alert">{failure}</p> : null}</div>;
+  return <div className="machine-retire" style={{ marginTop: 20 }}>{confirm ? <><p>Retire {machine.name}? No agent can be started on it afterwards. Agents already running on it keep running.</p><Act symbol="approve" name="Confirm retirement" word="Confirm" tone="danger" disabled={busy} onClick={() => void retire()} />{' '}<Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setConfirm(false)} /></>
+    : <Act symbol="retire" name="Retire this computer" word="Retire" onClick={() => setConfirm(true)} />}{failure ? <p role="alert">{failure}</p> : null}</div>;
 }

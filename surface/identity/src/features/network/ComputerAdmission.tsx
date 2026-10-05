@@ -6,6 +6,7 @@ import { AddMachine } from './AddMachine';
 import { confirmAdmission, machineAdmissionServed, savedAdmissions } from './machine-admission';
 import type { MachineAdmission, PendingAdmissions } from './machine-admission';
 import { keepRecord, releaseRecord } from '../../kept';
+import { Act } from '../../shell/Act';
 
 export function ComputerAdmission({ agent, name, person, admin, machines, roles, changed }: {
   agent: string; name: string; person: string; admin: boolean; machines: Machine[]; roles: Role[]; changed: (machine: Machine) => void;
@@ -41,7 +42,7 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
     } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
     finally { working.current.delete(machine); setBusy([...working.current]); }
   };
-  const retry = (machine: string) => <button className="btn" type="button" disabled={!admin || !served || Boolean(initial.error) || busy.includes(machine)} onClick={() => void send(machine, pending[machine])}>Check computer permission</button>;
+  const retry = (machine: string) => <Act symbol="again" name="Check computer permission" word="Check" disabled={!admin || !served || Boolean(initial.error) || busy.includes(machine)} onClick={() => void send(machine, pending[machine])} />;
   return <section className="computer-admission" aria-label={'Where can ' + name + ' run?'}>
     <h2>Where can {name} run?</h2>
     {computers.map((machine) => {
@@ -61,6 +62,6 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
     {failure ? <><p role="alert">{initial.error ? 'Lys could not read the saved computer permission.' : 'Lys could not confirm this computer permission.'}</p><p><small className="refusal-name">{failure}</small></p></> : null}
     {Object.keys(pending).filter((machine) => !computers.some((entry) => entry.id === machine)).map((machine) => <div key={machine}><p>A retained permission names a computer outside this list: {machine}.</p>{retry(machine)}</div>)}
     {notice ? <p role="status">{notice}</p> : null}
-    {!computers.length && admin ? adding ? <AddMachine person={person} agent={agent} cancel={() => setAdding(false)} changed={(message, machine) => { setAdding(false); changed(machine); setNotice(message); setFailure(''); }} /> : <button className="btn" type="button" onClick={() => setAdding(true)}>Add this computer</button> : null}
+    {!computers.length && admin ? adding ? <AddMachine person={person} agent={agent} cancel={() => setAdding(false)} changed={(message, machine) => { setAdding(false); changed(machine); setNotice(message); setFailure(''); }} /> : <Act symbol="add" name="Add this computer" word="Add" onClick={() => setAdding(true)} /> : null}
   </section>;
 }

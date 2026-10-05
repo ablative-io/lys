@@ -63,7 +63,7 @@ function locked(): boolean {
 }
 
 async function retry() {
-  const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether it was added');
+  const button = [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Check whether it was added');
   if (!button) throw new Error('The retained addition has no retry action');
   await act(async () => { button.click(); });
 }
@@ -238,12 +238,12 @@ describe('Adding another computer', () => {
     return routes;
   }
   const choose = async (label: string) => {
-    const choice = [...document.querySelectorAll('[aria-label="Which computer"] button')].find((each) => each.textContent === label);
+    const choice = [...document.querySelectorAll('[aria-label="Which computer"] button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === label);
     if (!(choice instanceof HTMLElement)) throw new Error('The choice ' + label + ' is missing');
     await act(async () => { choice.click(); });
   };
   const kept = () => Object.keys(sessionStorage).map((key) => sessionStorage.getItem(key) ?? '').join('\n');
-  const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+  const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 
   it('offers this computer or another in a cell of its own, this one chosen first', async () => {
     await open(service());
@@ -252,7 +252,7 @@ describe('Adding another computer', () => {
     expect([...choice?.querySelectorAll('button') ?? []].map((each) => each.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
     await choose('Another computer');
     expect([...choice?.querySelectorAll('button') ?? []].map((each) => each.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
-    expect(cells[3]?.textContent).toBe('Add and get its code');
+    expect([cells[3]?.querySelector('button')?.getAttribute('aria-label'), cells[3]?.textContent]).toEqual(['Add and get its code', 'Add']);
   });
 
   it('names it, asks for its code, and shows the command and the code once, each with Copy, keeping neither', async () => {
@@ -270,7 +270,9 @@ describe('Adding another computer', () => {
     expect(row?.textContent).toContain('Run this on that computer. The code works once and is not shown again.');
     expect(row?.querySelector('[data-join="command"]')?.textContent).toBe(command(id));
     expect(row?.querySelector('[data-join="code"]')?.textContent).toBe(CODE);
-    expect([...row?.querySelectorAll('button') ?? []].filter((each) => each.textContent === 'Copy')).toHaveLength(2);
+    const copies = [...row?.querySelectorAll<HTMLButtonElement>('button') ?? []].filter((each) => each.dataset.symbol === 'copy');
+    expect(copies).toHaveLength(2);
+    expect(copies.every((each) => each.getAttribute('aria-label')?.startsWith('Copy '))).toBe(true);
     await act(async () => { $('button[aria-label="Copy the command"]')?.click(); });
     await act(async () => { $('button[aria-label="Copy the code"]')?.click(); });
     expect(writes).toEqual([command(id), CODE]);

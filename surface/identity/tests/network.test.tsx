@@ -10,7 +10,7 @@ import { refreshLive } from '../src/live';
 beforeEach(() => sessionStorage.clear());
 const machine: Machine = { id: 'op-' + 'a'.repeat(32), name: 'Workshop laptop', kind: 'laptop', runtime: null, slots: 0, may_run: [], may_reach: [], named_by: ADA, named_at: 1790000000, state: 'in_use', retired_at: null, last_report_at: null };
 const routes = { ...SERVICE, '/network': ok({ machines: [machine], reports_served: false }), ['/network/machines/' + machine.id + '/runner']: ok({ machine: machine.id, runner: null, answers: null }) };
-const button = (label: string) => [...document.querySelectorAll('button')].find((value) => value.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((value) => (value.getAttribute('aria-label') ?? value.textContent) === label) ?? null;
 function input(name: string, value: string) {
   const element = $('[name="' + name + '"]');
   if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) throw new Error('Missing ' + name);

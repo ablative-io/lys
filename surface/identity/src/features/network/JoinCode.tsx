@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Refused, operationId, request } from '../../api';
 import { isRecord } from './contract';
+import { Act } from '../../shell/Act';
 
 /** A connection code as the service answers it, once. */
 export interface JoinCode { machine: string; server: string; command: string; code: string }
@@ -39,7 +40,7 @@ function Copy({ text, what }: { text: string; what: string }) {
       setSaid(what + ' is copied.');
     } catch (error) { setSaid(what + ' was not copied (' + (error instanceof Error ? error.message : String(error)) + '). Select it and copy it yourself.'); }
   };
-  return <><button type="button" className="btn" aria-label={'Copy ' + what.toLowerCase()} onClick={() => void copy()}>Copy</button>{said ? <span role="status" className="sec"> {said}</span> : null}</>;
+  return <><Act symbol="copy" name={'Copy ' + what.toLowerCase()} onClick={() => void copy()} />{said ? <span role="status" className="sec"> {said}</span> : null}</>;
 }
 
 /** The command and the code, each with its Copy button, shown until the person is done with them. */
@@ -49,7 +50,7 @@ export function JoinShown({ name, given, done }: { name: string; given: JoinCode
     <p className="sec">The command asks for the code: paste it there.</p>
     <p><code data-join="command">{given.command}</code> <Copy text={given.command} what="The command" /></p>
     <p><code data-join="code">{given.code}</code> <Copy text={given.code} what="The code" /></p>
-    <button type="button" className="btn" onClick={done}>Done</button>
+    <Act symbol="approve" name="Done" word="Done" onClick={done} />
   </div>;
 }
 
@@ -58,7 +59,7 @@ export function ConnectingNow({ connecting, renew, busy, done }: { connecting: C
   return <>
     {connecting.given ? <JoinShown name={connecting.name} given={connecting.given} done={done} /> : null}
     {connecting.failure ? <><p className="why-not" role="alert">Lys could not give a connection code for {connecting.name}. If one was given, it is not shown again: a new code replaces it.</p><p><small className="refusal-name">{connecting.failure}</small></p></> : null}
-    {connecting.given ? null : <button type="button" className="btn" disabled={busy} onClick={renew}>Get a new connection code</button>}
+    {connecting.given ? null : <Act symbol="again" name="Get a new connection code" word="New code" disabled={busy} onClick={renew} />}
   </>;
 }
 
@@ -88,7 +89,7 @@ export function NewCode({ machine, name, connecting, connect, done }: { machine:
     {connecting ? <ConnectingNow connecting={connecting} renew={renew} busy={busy} done={done} /> : null}
     {connecting?.failure ? null : <>
       <p className="sec">To connect it from that computer, get a connection code. A new code replaces any code given before, and the earlier one stops working.</p>
-      <button type="button" className="btn" disabled={busy} onClick={renew}>Get a new connection code</button>
+      <Act symbol="again" name="Get a new connection code" word="New code" disabled={busy} onClick={renew} />
     </>}
   </div>;
 }
