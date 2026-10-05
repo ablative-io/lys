@@ -965,3 +965,47 @@ async fn a_scope_lys_does_not_serve_is_refused_and_discovery_says_what_is_served
     );
     Ok(())
 }
+
+/// The name a token gives is read from the directory at that issue and at
+/// each user-information request, never kept: after the administrator renames
+/// the person through `POST /identities/{id}/profile`, the next code and
+/// exchange carry the new name, and a token issued under the old name answers
+/// the new one at its next request.
+#[tokio::test]
+async fn a_renamed_person_is_named_anew_at_the_next_issue_and_request() -> TestResult {
+    let (service, cookie, person) = table(CODE_SECONDS).await?;
+    set_profile(&service, &cookie, true).await?;
+    let issued = code_scoped(&service, &cookie, "openid profile").await?;
+    let (status, before) = exchange(&service, &issued, "v").await?;
+    assert_eq!(status, 200, "{before}");
+    assert_eq!(claims_of(&before)?["name"], "Ada", "{before}");
+    let earlier = before["access_token"].as_str().ok_or("a token")?.to_owned();
+    let rename = json!({
+        "operation": OperationId::generate()?.to_string(),
+        "display_name": "Ada Lovelace",
+    });
+    let (status, receipt) = service
+        .post(
+            &format!("/identities/{person}/profile"),
+            Some(&cookie),
+            &rename,
+        )
+        .await?;
+    assert_eq!(status, 200, "{receipt}");
+    let issued = code_scoped(&service, &cookie, "openid profile").await?;
+    let (status, after) = exchange(&service, &issued, "v").await?;
+    assert_eq!(status, 200, "{after}");
+    assert_eq!(claims_of(&after)?["name"], "Ada Lovelace", "{after}");
+    let later = after["access_token"].as_str().ok_or("a token")?;
+    let (status, info) = userinfo_with(&service, later).await?;
+    assert_eq!(status, 200, "{info}");
+    assert_eq!(info, json!({ "sub": person, "name": "Ada Lovelace" }));
+    let (status, info) = userinfo_with(&service, &earlier).await?;
+    assert_eq!(status, 200, "{info}");
+    assert_eq!(
+        info,
+        json!({ "sub": person, "name": "Ada Lovelace" }),
+        "the name is read at each request, not kept in the token"
+    );
+    Ok(())
+}
