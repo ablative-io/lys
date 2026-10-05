@@ -1,6 +1,6 @@
 //! Gates on what the record keeps of the headers: every name of each side in
-//! the order received, values only for the named ones, never a credential's
-//! value, and the whole of it on the call's record with the bytes that
+//! the order received, every value but a credential's, never a credential's
+//! value however its header is named, and the whole of it on the call's record with the bytes that
 //! passed unchanged.
 
 use std::collections::BTreeMap;
@@ -9,7 +9,7 @@ use http_body_util::BodyExt;
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::{HeaderMap, StatusCode};
 
-use super::{ANSWERED_FAMILIES, NEVER_VALUED, answered, asked, kept};
+use super::{NEVER_VALUED, answered, asked, credential, kept};
 use crate::proxy::forward_tests::{
     Harness, KEY, Res, fake, message_response, messages_request, send, whole,
 };
@@ -49,7 +49,7 @@ const CREDENTIALS: [(&str, &str); 5] = [
 ];
 
 #[test]
-fn every_request_header_is_named_and_only_the_listed_ones_keep_a_value() {
+fn every_request_header_is_named_and_every_value_but_a_credentials_is_kept() {
     let mut sent = vec![
         ("accept-encoding", "gzip, br"),
         ("anthropic-beta", "one"),
@@ -58,10 +58,12 @@ fn every_request_header_is_named_and_only_the_listed_ones_keep_a_value() {
         ("anthropic-version", "2023-06-01"),
         ("content-type", "application/json"),
         ("user-agent", "claude-cli/9"),
-        (
-            "request-id",
-            "a response header's name, not valued of a request",
-        ),
+        ("x-stainless-runtime", "node"),
+        ("x-stainless-runtime-version", "v22.1.0"),
+        ("x-stainless-package-version", "0.60.0"),
+        ("x-stainless-os", "MacOS"),
+        ("x-stainless-arch", "arm64"),
+        ("x-claude-code-session-id", "0f0e"),
     ];
     sent.extend(CREDENTIALS);
     let side = asked(&headers(&sent));
@@ -73,20 +75,27 @@ fn every_request_header_is_named_and_only_the_listed_ones_keep_a_value() {
             ("anthropic-version", &["2023-06-01"]),
             ("content-type", &["application/json"]),
             ("user-agent", &["claude-cli/9"]),
+            ("x-claude-code-session-id", &["0f0e"]),
+            ("x-stainless-arch", &["arm64"]),
+            ("x-stainless-lang", &["js"]),
+            ("x-stainless-os", &["MacOS"]),
+            ("x-stainless-package-version", &["0.60.0"]),
+            ("x-stainless-runtime", &["node"]),
+            ("x-stainless-runtime-version", &["v22.1.0"]),
         ])
     );
-    // No header vanishes: each of the thirteen lines is named once, and a
+    // No header vanishes: each of the eighteen lines is named once, and a
     // header map keeps a repeated name's lines together.
     let mut named = side.names.clone();
     named.sort();
     let mut every: Vec<String> = sent.iter().map(|(name, _)| (*name).to_owned()).collect();
     every.sort();
     assert_eq!(named, every);
-    assert_eq!(side.names.len(), 13);
+    assert_eq!(side.names.len(), 18);
 }
 
 #[test]
-fn every_response_header_is_named_and_the_providers_own_keep_their_values() {
+fn every_response_header_is_named_and_every_value_but_a_credentials_is_kept() {
     let mut came = vec![
         ("content-encoding", "br"),
         ("content-type", "application/json"),
@@ -94,14 +103,12 @@ fn every_response_header_is_named_and_the_providers_own_keep_their_values() {
         ("retry-after", "3"),
         ("x-request-id", "req_openai"),
         ("anthropic-ratelimit-requests-remaining", "7"),
+        ("anthropic-ratelimit-tokens-remaining", "900"),
         ("anthropic-ratelimit-unified-5h-utilization", "0.42"),
         ("anthropic-organization-id", "org_1"),
         ("x-ratelimit-remaining-tokens", "900"),
-        ("server", "named, not valued"),
-        (
-            "user-agent",
-            "a request header's name, not valued of a response",
-        ),
+        ("server", "cloudflare"),
+        ("cf-ray", "8a1"),
     ];
     came.extend(CREDENTIALS);
     let side = answered(&headers(&came));
@@ -110,11 +117,14 @@ fn every_response_header_is_named_and_the_providers_own_keep_their_values() {
         values(&[
             ("anthropic-organization-id", &["org_1"]),
             ("anthropic-ratelimit-requests-remaining", &["7"]),
+            ("anthropic-ratelimit-tokens-remaining", &["900"]),
             ("anthropic-ratelimit-unified-5h-utilization", &["0.42"]),
+            ("cf-ray", &["8a1"]),
             ("content-encoding", &["br"]),
             ("content-type", &["application/json"]),
             ("request-id", &["req_011"]),
             ("retry-after", &["3"]),
+            ("server", &["cloudflare"]),
             ("x-ratelimit-remaining-tokens", &["900"]),
             ("x-request-id", &["req_openai"]),
         ])
@@ -129,20 +139,44 @@ fn every_response_header_is_named_and_the_providers_own_keep_their_values() {
 }
 
 #[test]
-fn a_credential_header_is_named_and_never_valued_whatever_list_would_keep_it() {
+fn a_credential_header_is_named_and_never_valued_from_either_side() {
     let came = headers(&CREDENTIALS);
-    for side in [asked(&came), answered(&came), kept(&came, |_| true)] {
+    for side in [asked(&came), answered(&came), kept(&came)] {
         assert_eq!(side.values, BTreeMap::new());
         assert_eq!(side.names.len(), 5, "each is on the record by name");
     }
     for (name, _) in CREDENTIALS {
         assert!(NEVER_VALUED.contains(&name), "{name}");
-        assert!(
-            !ANSWERED_FAMILIES
-                .iter()
-                .any(|start| name.starts_with(start)),
-            "{name}"
-        );
+    }
+}
+
+#[test]
+fn a_credential_header_nobody_listed_is_refused_a_value_by_how_it_is_named() {
+    // None of these is in the list; each is named as a credential is.
+    let unlisted = [
+        ("x-goog-api-key", "never-kept"),
+        ("openai-apikey", "never-kept"),
+        ("x-amz-security-token", "never-kept"),
+        ("x-auth", "never-kept"),
+        ("x-upstream-authorization", "never-kept"),
+        ("x-client-secret", "never-kept"),
+        ("x-hub-signature", "never-kept"),
+        ("x-csrf-token", "never-kept"),
+        ("x_session_cookie", "never-kept"),
+    ];
+    let side = kept(&headers(&unlisted));
+    assert_eq!(side.values, BTreeMap::new());
+    assert_eq!(side.names.len(), unlisted.len());
+    // A word is matched whole: a header that counts tokens, or names an
+    // author, carries no credential and keeps its value.
+    for name in [
+        "anthropic-ratelimit-tokens-remaining",
+        "x-ratelimit-remaining-tokens",
+        "x-author",
+        "x-tokenizer",
+        "x-claude-code-session-id",
+    ] {
+        assert!(!credential(name), "{name}");
     }
 }
 

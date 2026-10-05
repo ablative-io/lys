@@ -62,6 +62,20 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
 
 ## Usage and the proxy
 
+- Header values. The proxy kept every header's name and the values of a short list. Tom, 5 October, 16:23, by
+  voice, reading a call on the Proxy screen: "there's all these values not kept... there were a fair few things
+  that I would have thought would be worth keeping that we aren't keeping there. You know, like runtime,
+  runtime version... Package version, OS, language, architecture... Claude Code Session ID, like all of these
+  things are incredibly valuable." Written 5 October, not yet built: no list chooses; every header's value is
+  kept unless the header carries a credential, by the list or by how it is named (`proxy/headers.rs`).
+- The proxy swaps the account. Tom, the same minute: "Things like authorization, it'd be great if we could sort
+  of swap out the authorization so we could rotate through our tokens without having to restart sessions... And
+  you can see... what requests were attributed to which account." Not written. Said back by Waffles, unmeasured:
+  today a run that reaches an account's window is ended and started again on the next account; the proxy sits
+  on every call and already knows the run, so it could put the next registered account's credential on the call
+  itself, as a gate, and write which account each call drew from on its record. To design against PROXY.md
+  (a gate holds the call; the credential comes from the broker, never from a file or the record).
+
 - A sub-agent's calls on the same model as the main thread set the agent's context for a moment. Codex
   marks them (`x-openai-subagent`, `x-codex-parent-thread-id`); Claude Code's mark is not yet found.
 - Codex's account-window header names and its response stream are unmeasured until a Codex agent has run
