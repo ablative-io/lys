@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { Refused } from '../../api';
 import { send } from './SchemaBuilder';
 import type { ClientIssued } from './Apps';
+import { Act } from '../../shell/Act';
 
 export type StoredCredentials = { app: string; client_secret_ref: string; api_credential_ref: string };
 export async function saveCredentials(app: string, client: ClientIssued): Promise<StoredCredentials> {
@@ -21,7 +22,7 @@ export function SaveCredentials({app, client, saved}:{app:string; client:ClientI
     catch(error){setError(error instanceof Refused ? error.refusal.reason : error instanceof Error ? error.message : String(error));}
     finally{working.current=false;setBusy(false);}
   };
-  return <section className="app-secret" aria-label="Save app credentials"><p>Approving made two secrets for this app: the secret it signs people in with, and its key for calling Lys. They are held on this page only, and are never shown. Save them before you leave.</p><button className="btn primary" type="button" disabled={busy} onClick={()=>void save()}>Save credentials in Lys secrets</button>
+  return <section className="app-secret" aria-label="Save app credentials"><p>Approving made two secrets for this app: the secret it signs people in with, and its key for calling Lys. They are held on this page only, and are never shown. Save them before you leave.</p><Act symbol="save" name="Save credentials in Lys secrets" word="Save" tone="primary" disabled={busy} onClick={()=>void save()} />
     {error?<div role="alert"><p>The save was not confirmed, so both secrets are still held on this page. Nothing is tried again on its own. Keep this page open and choose Save again: it sends the same two secrets and never replaces one already saved.</p><p className="sec">Lys said: {error}</p></div>:null}</section>;
 }
 export function SavedCredentials({answer}:{answer:StoredCredentials}) {

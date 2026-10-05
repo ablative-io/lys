@@ -156,7 +156,7 @@ it('shows app approval from its response without relying on another list read', 
   expect(sent).toHaveLength(1);
   expect(reads).toBe(1);
   expect(view.querySelector('article')?.textContent).toContain('approved');
-  expect([...view.querySelectorAll('button')].some((entry) => entry.textContent === 'Approve Notes')).toBe(false);
+  expect([...view.querySelectorAll('button')].some((entry) => entry.getAttribute('aria-label') === 'Approve Notes')).toBe(false);
 });
 
 it('removes only the sign-in session confirmed ended without another list read', async () => {
@@ -234,5 +234,5 @@ it('does not let the saved approval hide a later retirement answer', async () =>
   expect(reads).toBe(1);
   await clickNamed(view, 'Retire Notes');
   expect(view.querySelector('article .app-state')?.textContent).toBe('retired');
-  expect([...view.querySelectorAll('button')].some((entry) => entry.textContent === 'Retire Notes')).toBe(false);
+  expect([...view.querySelectorAll('button')].some((entry) => entry.getAttribute('aria-label') === 'Retire Notes')).toBe(false);
 });

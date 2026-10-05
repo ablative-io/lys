@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Refused } from '../../api';
 import { send } from './SchemaBuilder';
 import type { Draft, SchemaJson } from './SchemaBuilder';
+import { Act } from '../../shell/Act';
 
 /** An example holding: X holds a relation on a resource. */
 interface Holding { subject: string; relation: string; kind: string; id: string }
@@ -74,7 +75,7 @@ export function SchemaBench({ app, schema, draft }: { app: string; schema: Schem
           {typed('Example ' + (index + 1) + ' resource id', holding.id, (id) => set({ id }))}
         </div>;
       })}
-      <button type="button" className="sb-chip" onClick={() => setHoldings([...holdings, { ...blankHolding }])}>Add an example holding</button>
+      <Act symbol="add" name="Add an example holding" word="Holding" className="small" onClick={() => setHoldings([...holdings, { ...blankHolding }])} />
     </div>
     <div className="sb-examples" aria-label="Example placements">
       {placements.map((placement, index) => {
@@ -87,14 +88,14 @@ export function SchemaBench({ app, schema, draft }: { app: string; schema: Schem
           {typed('Placement ' + (index + 1) + ' parent id', placement.parentId, (parentId) => set({ parentId }))}
         </div>;
       })}
-      <button type="button" className="sb-chip" onClick={() => setPlacements([...placements, { ...blankPlacement }])}>Add an example placement</button>
+      <Act symbol="add" name="Add an example placement" word="Placement" className="small" onClick={() => setPlacements([...placements, { ...blankPlacement }])} />
     </div>
     <div className="sb-row sb-question" aria-label="Question">
       <span className="note">May</span>{typed('Who asks', question.subject, (subject) => setQuestion({ ...question, subject }))}
       {pick('Action', question.action, actionsOf(question.kind), (action) => setQuestion({ ...question, action }))}
       {pick('Kind asked about', question.kind, kinds, (kind) => setQuestion({ ...question, kind, action: '' }))}
       {typed('Resource id asked about', question.id, (id) => setQuestion({ ...question, id }))}
-      <button type="button" className="btn primary" disabled={!question.subject || !question.action || !question.kind || !question.id} onClick={() => { void ask(); }}>Ask the draft</button>
+      <Act symbol="send" name="Ask the draft" word="Ask" tone="primary" disabled={!question.subject || !question.action || !question.kind || !question.id} onClick={() => { void ask(); }} />
     </div>
     {answer ? <div className={'sb-answer ' + (answer.allowed ? 'sb-allowed' : 'sb-refused')} role="status">
       <b>{answer.allowed ? 'Allowed' : 'Refused' + (answer.refusal ? ' (' + answer.refusal + ')' : '')}</b>

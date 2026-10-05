@@ -7,7 +7,7 @@ const BACK='https://notes.example.test/signed-in';
 // The registration asks for one return address; approval keeps it as the sign-in settings, the name withheld.
 const pending={id:'fixture_notes',name:'Notes fixture',state:'pending',redirects:[BACK],sign_in:null,schema:{kinds:{}},version:0,versions:[],pending:null,client_id:null,service_account:null,registered_by:{kind:'start'},registered_at:1};
 const approvedApp={...pending,state:'approved',sign_in:{redirects:[BACK],profile:false,operation:'op-approve',by:{kind:'start'},at:2}};
-const button=(label:string)=>[...document.querySelectorAll('button')].find((b)=>b.textContent===label)??null;
+const button=(label:string)=>[...document.querySelectorAll('button')].find((b)=>(b.getAttribute('aria-label')??b.textContent)===label)??null;
 function routes(){let approved=false;return {...SERVICE,'/apps':()=>ok({apps:[approved?approvedApp:pending]}),
   'POST /apps/fixture_notes/approve':()=>{approved=true;return ok({app:approvedApp,client:{client_id:'fixture_notes',client_secret:secret,credential:'lys-app.fixture_notes.'+secret}});}};}
 it('saves without copying and removes credential values after broker confirmation',async()=>{

@@ -22,6 +22,7 @@ import type { SchemaJson } from './SchemaBuilder';
 import './apps.css';
 import { SaveCredentials, SavedCredentials } from './SaveCredentials';
 import type { StoredCredentials } from './SaveCredentials';
+import { Act } from '../../shell/Act';
 
 /** Who made an act on the apps. */
 export interface By { kind: 'person' | 'operator' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
@@ -113,7 +114,7 @@ export function Apps() {
   const [editing, setEditing] = useState<string | null>(null);
   return <div className="page fill apps">
     <div className="head"><div><h1>Configuration</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
-      <button type="button" className="btn primary" onClick={() => setRegistering(!registering)}>{registering ? 'Close the new app' : 'Register an app'}</button></div>
+      <Act symbol={registering ? 'close' : 'add'} name={registering ? 'Close the new app' : 'Register an app'} word={registering ? 'Close' : 'Register'} tone="primary" onClick={() => setRegistering(!registering)} /></div>
     <ConfigTabs on="apps" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {
@@ -122,7 +123,7 @@ export function Apps() {
       const edited = apps.find((app) => app.id === editing);
       if (registering) return <div className="pane"><Register changed={changed} /></div>;
       if (edited) return <div className="pane"><section className="card" aria-label={'Permission template of ' + edited.id}>
-        <div className="row"><h3>Permission template of {edited.name}</h3><button type="button" className="btn" onClick={() => setEditing(null)}>Close the template</button></div>
+        <div className="row"><h3>Permission template of {edited.name}</h3><Act symbol="close" name="Close the template" word="Close" onClick={() => setEditing(null)} /></div>
         <SchemaBuilder app={edited.id} version={edited.version} initial={edited.schema as SchemaJson} onSaved={(message) => { setEditing(null); changed(message); }} />
       </section></div>;
       // The app is chosen above; its card and its matrix take the whole width below and scroll inside their own pane.
@@ -172,19 +173,19 @@ function AppCard({ app, issued, issue, changed, stored, saved, approved, edit }:
     {app.state === 'pending' ? <div className="app-actions app-signin">
       <SignInFields app={app.id} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
       <label className="field">Why, if you decline<input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-      <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/approve', { redirects: lines(redirects), profile }, (answer) => { const approval = approvalAnswer(answer, app.id); if (approval.client) issue(approval.client); if (approval.credentials) saved(approval.credentials); approved(approval.app); }); }}>Approve {app.name}</button>
-      <button type="button" className="btn danger" disabled={busy} onClick={() => { void act('/decline', { reason }, () => changed(app.name + ' was declined and never took effect.')); }}>Decline {app.name}</button>
+      <Act symbol="approve" name={'Approve ' + app.name} word="Approve" tone="primary" disabled={busy} onClick={() => { void act('/approve', { redirects: lines(redirects), profile }, (answer) => { const approval = approvalAnswer(answer, app.id); if (approval.client) issue(approval.client); if (approval.credentials) saved(approval.credentials); approved(approval.app); }); }} />
+      <Act symbol="decline" name={'Decline ' + app.name} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/decline', { reason }, () => changed(app.name + ' was declined and never took effect.')); }} />
     </div> : null}
     {app.pending ? <div className="app-waiting" aria-label={'Change waiting for ' + app.id}>
       <b>A change waits for you, replacing version {app.pending.replaces}, from {who(app.pending.by)}</b>
       <SchemaTable app={app.id} schema={app.pending.schema} label={'Schema waiting for ' + app.id} />
-      <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/schema/approve', {}, () => changed('The change to ' + app.name + ' is approved.')); }}>Approve the change</button>
-      <button type="button" className="btn danger" disabled={busy} onClick={() => { void act('/schema/decline', { reason }, () => changed('The change to ' + app.name + ' was declined.')); }}>Decline the change</button>
+      <Act symbol="approve" name={'Approve the change'} word="Approve" tone="primary" disabled={busy} onClick={() => { void act('/schema/approve', {}, () => changed('The change to ' + app.name + ' is approved.')); }} />
+      <Act symbol="decline" name={'Decline the change'} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/schema/decline', { reason }, () => changed('The change to ' + app.name + ' was declined.')); }} />
     </div> : null}
     {app.state === 'approved' && app.id !== LYS ? <SignInSettings app={app} busy={busy} act={act} changed={changed} /> : null}
     {app.state === 'approved' && app.id !== LYS ? <div className="app-actions">
-      <button type="button" className="btn" onClick={edit}>Edit the permission template</button>
-      <button type="button" className="btn danger" disabled={busy} onClick={() => { void act('/retire', { reason }, () => changed(app.name + ' is retired: its client is disabled, and its grants stay readable.')); }}>Retire {app.name}</button>
+      <Act symbol="edit" name="Edit the permission template" word="Template" onClick={edit} />
+      <Act symbol="retire" name={'Retire ' + app.name} word="Retire" tone="danger" disabled={busy} onClick={() => { void act('/retire', { reason }, () => changed(app.name + ' is retired: its client is disabled, and its grants stay readable.')); }} />
     </div> : null}
     {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
   </article>;
@@ -196,7 +197,7 @@ function SignInSettings({ app, busy, act, changed }: { app: AppRecord; busy: boo
   const [profile, setProfile] = useState(app.sign_in?.profile ?? false);
   return <div className="app-actions app-signin" aria-label={'Change the sign-in of ' + app.id}>
     <SignInFields app={app.id} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
-    <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/sign_in', { redirects: lines(redirects), profile }, (answer) => { const kept = appAnswer(answer, app.id, 'approved', 'sign-in settings'); changed(kept.name + '’s sign-in now sends people back to ' + kept.sign_in?.redirects.join(', ') + (kept.sign_in?.profile ? ' and gives it their name.' : ' and withholds their name.')); }); }}>Save the sign-in of {app.name}</button>
+    <Act symbol="save" name={'Save the sign-in of ' + app.name} word="Save" tone="primary" disabled={busy} onClick={() => { void act('/sign_in', { redirects: lines(redirects), profile }, (answer) => { const kept = appAnswer(answer, app.id, 'approved', 'sign-in settings'); changed(kept.name + '’s sign-in now sends people back to ' + kept.sign_in?.redirects.join(', ') + (kept.sign_in?.profile ? ' and gives it their name.' : ' and withholds their name.')); }); }} />
   </div>;
 }
 

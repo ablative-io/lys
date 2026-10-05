@@ -4,10 +4,8 @@
 export const STANDING: Record<string, number> = {
   'features/access/Access.tsx': 1,
   'features/access/Graph.tsx': 4,
-  'features/apps/Apps.tsx': 10,
-  'features/apps/SaveCredentials.tsx': 1,
-  'features/apps/SchemaBench.tsx': 3,
-  'features/apps/SchemaBuilder.tsx': 7,
+  'features/apps/Apps.tsx': 1,
+  'features/apps/SchemaBuilder.tsx': 1,
   'features/connections/SignInProviders.tsx': 3,
   'features/dashboard/AgentTree.tsx': 5,
   'features/drafts/Drafts.tsx': 1,

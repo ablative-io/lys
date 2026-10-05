@@ -17,7 +17,9 @@ select.sb-name { appearance: none; padding-right: 20px; background-image: linear
 .sb-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-default); background: var(--surface-default); color: var(--text-secondary); font-size: 12px; }
 .sb-chip:hover { background: var(--surface-hover); color: var(--text-primary); }
 .sb-chip:disabled { opacity: .5; cursor: default; }
-.sb-chip button { color: var(--text-muted); padding: 0 2px; }
+.sb-chip .act { min-width: 16px; min-height: 16px; padding: 0; border: 0; background: none; color: var(--text-muted); }
+.sb-chip .act svg { width: 12px; height: 12px; }
+.sb-chip .act:hover { color: var(--text-primary); }
 .sb-remove { justify-self: start; color: var(--danger); border-color: rgba(248,113,113,.25); }
 .sb-tick { appearance: none; width: 14px; height: 14px; margin: 0; border: 1px solid var(--border-default); border-radius: 3px; background: var(--surface-code); display: inline-grid; place-content: center; cursor: pointer; }
 .sb-tick:checked { background: var(--accent); border-color: var(--accent-deep); }

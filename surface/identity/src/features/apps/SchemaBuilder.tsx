@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import { Refused, operationId, send } from '../../api';
 import { SchemaBench } from './SchemaBench';
 import './schema-builder.css';
+import { Act } from '../../shell/Act';
 
 /** A kind as the schema JSON writes it. */
 export interface SchemaKindJson { actions: string[]; relations?: Record<string, string[]>; parents?: string[] }
@@ -142,9 +143,9 @@ export function SchemaBuilder({ app, version, initial, onSaved, register }: { ap
       <SchemaBench app={app} schema={schema} draft={draft} />
     </div>
     <div className="sb-save">
-      {version === null ? null : <button type="button" className="btn" disabled={busy || !draft.kinds.length} onClick={() => { void dryRun(); }}>Check the change</button>}
+      {version === null ? null : <Act symbol="again" name="Check the change" word="Check" disabled={busy || !draft.kinds.length} onClick={() => { void dryRun(); }} />}
       {version !== null && check ? <CheckAnswer check={check} /> : null}
-      <button type="button" className="btn primary" disabled={busy || !draft.kinds.length || (version !== null && (!check || !check.applies))} onClick={() => { void save(); }}>{version === null ? 'Register the app' : 'Save version ' + (version + 1)}</button>
+      <Act symbol={version === null ? 'add' : 'save'} name={version === null ? 'Register the app' : 'Save version ' + (version + 1)} word={version === null ? 'Register' : 'Save'} tone="primary" disabled={busy || !draft.kinds.length || (version !== null && (!check || !check.applies))} onClick={() => { void save(); }} />
       {refusal ? <p role="alert" className="sb-refused">{refusal}</p> : null}
     </div>
   </section>;
@@ -162,20 +163,20 @@ function KindNode({ app, draft, kind, seen, change }: { app: string; draft: Draf
     <fieldset className="sb-kind" aria-label={'Kind ' + kind.name}>
       <legend><span className="sb-prefix">{app}.</span><input className="sb-name" aria-label={'Name of kind ' + kind.name} value={kind.name} onChange={(event) => { const name = event.target.value; change((next) => { for (const other of next.kinds) other.parents = other.parents.map((parent) => (parent === kind.name ? name : parent)); const own = at(next); if (own) own.name = name; }); }} /></legend>
       <div className="sb-row"><span className="note">Actions</span>
-        {kind.actions.map((action) => <span className="sb-chip" key={action}>{action}<button type="button" aria-label={'Remove action ' + action + ' from ' + kind.name} onClick={() => change((next) => { const own = at(next); if (own) { own.actions = own.actions.filter((held) => held !== action); for (const relation of own.relations) relation.actions = relation.actions.filter((held) => held !== action); } })}>×</button></span>)}
+        {kind.actions.map((action) => <span className="sb-chip" key={action}>{action}<Act symbol="close" name={'Remove action ' + action + ' from ' + kind.name} onClick={() => change((next) => { const own = at(next); if (own) { own.actions = own.actions.filter((held) => held !== action); for (const relation of own.relations) relation.actions = relation.actions.filter((held) => held !== action); } })} /></span>)}
         <AddName label={'Add an action to ' + kind.name} placeholder="action" onAdd={(name) => change((next) => { const own = at(next); if (own && !own.actions.includes(name)) own.actions.push(name); })} />
       </div>
       <table className="sb-relations"><thead><tr><th scope="col">Relation</th>{kind.actions.map((action) => <th scope="col" key={action}>{action}</th>)}<th /></tr></thead>
         <tbody>{kind.relations.map((relation, index) => <tr key={index}>
           <th scope="row"><input className="sb-name" aria-label={'Name of relation ' + relation.name + ' on ' + kind.name} value={relation.name} onChange={(event) => { const name = event.target.value; change((next) => { const own = at(next)?.relations[index]; if (own) own.name = name; }); }} /></th>
           {kind.actions.map((action) => <td key={action}><input type="checkbox" className="sb-tick" aria-label={relation.name + ' carries ' + action} checked={relation.actions.includes(action)} onChange={(event) => { const on = event.target.checked; change((next) => { const own = at(next)?.relations[index]; if (own) own.actions = on ? [...own.actions, action] : own.actions.filter((held) => held !== action); }); }} /></td>)}
-          <td><button type="button" className="sb-chip" aria-label={'Remove relation ' + relation.name + ' from ' + kind.name} onClick={() => change((next) => { const own = at(next); if (own) own.relations.splice(index, 1); })}>Remove</button></td>
+          <td><Act symbol="remove" name={'Remove relation ' + relation.name + ' from ' + kind.name} className="small" onClick={() => change((next) => { const own = at(next); if (own) own.relations.splice(index, 1); })} /></td>
         </tr>)}</tbody></table>
       <AddName label={'Add a relation to ' + kind.name} placeholder="relation" onAdd={(name) => change((next) => { const own = at(next); if (own && !own.relations.some((relation) => relation.name === name)) own.relations.push({ name, actions: [] }); })} />
       <div className="sb-row"><span className="note">Parents</span>
         {draft.kinds.filter((other) => other.name !== kind.name).map((other) => <label className="sb-chip" key={other.name}><input type="checkbox" className="sb-tick" aria-label={'Parent ' + other.name + ' of ' + kind.name} checked={kind.parents.includes(other.name)} onChange={(event) => { const on = event.target.checked; change((next) => { const own = at(next); if (own) own.parents = on ? [...own.parents, other.name] : own.parents.filter((held) => held !== other.name); }); }} />{other.name}</label>)}
       </div>
-      <button type="button" className="sb-chip sb-remove" onClick={() => change((next) => { next.kinds = next.kinds.filter((entry) => entry.name !== kind.name); for (const other of next.kinds) other.parents = other.parents.filter((parent) => parent !== kind.name); })}>Remove kind {kind.name}</button>
+      <Act symbol="remove" name={'Remove kind ' + kind.name} word="Remove kind" tone="danger" className="small sb-remove" onClick={() => change((next) => { next.kinds = next.kinds.filter((entry) => entry.name !== kind.name); for (const other of next.kinds) other.parents = other.parents.filter((parent) => parent !== kind.name); })} />
     </fieldset>
     {children.length ? <div className="sb-children">{children.map((child) => <KindNode key={draft.kinds.indexOf(child)} app={app} draft={draft} kind={child} seen={[...seen, kind.name]} change={change} />)}</div> : null}
   </div>;
@@ -185,7 +186,7 @@ function KindNode({ app, draft, kind, seen, change }: { app: string; draft: Draf
 function AddName({ label, placeholder, onAdd }: { label: string; placeholder: string; onAdd: (name: string) => void }) {
   const [name, setName] = useState('');
   const add = () => { const trimmed = name.trim(); if (trimmed) { onAdd(trimmed); setName(''); } };
-  return <span className="sb-add"><input className="sb-name" aria-label={label} placeholder={placeholder} value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} /><button type="button" className="sb-chip" onClick={add} disabled={!name.trim()}>{label}</button></span>;
+  return <span className="sb-add"><input className="sb-name" aria-label={label} placeholder={placeholder} value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} /><Act symbol="add" name={label} className="small" onClick={add} disabled={!name.trim()} /></span>;
 }
 
 function CheckAnswer({ check }: { check: SchemaCheck }) {

@@ -55,7 +55,7 @@ async function type(el: Element | null, value: string): Promise<void> {
   await settle();
 }
 
-const button = (label: string) => $$('button').find((entry) => entry.textContent === label) ?? null;
+const button = (label: string) => $$('button').find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 const labelled = (label: string) => document.querySelector('[aria-label="' + label + '"]');
 const ok = (body: unknown): Answer => ({ status: 200, body });
 const noDiff = { kinds_added: [], kinds_removed: [], relations_added: [], relations_removed: [], actions_added: [], actions_removed: [], parents_added: [], parents_removed: [] };

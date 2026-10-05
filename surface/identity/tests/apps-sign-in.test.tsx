@@ -23,7 +23,7 @@ const signIn = { redirects: [BACK], profile: true, operation: 'op-approve', by: 
 const approved = { id: APP, name: 'Notes fixture', state: 'approved', redirects: [BACK], sign_in: signIn, schema: { kinds: {} }, version: 1, versions: [1], pending: null, client_id: APP, service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
 const ada = { kind: 'person', login: { issuer: 'https://issuer.example.test', subject: 'ada' } };
 
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 const addresses = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Return addresses of ' + APP + '"]');
 const nameTick = () => document.querySelector<HTMLInputElement>('[aria-label="Change the sign-in of ' + APP + '"] input[type="checkbox"]');
 const settings = () => document.querySelector('[aria-label="Sign-in settings of ' + APP + '"]')?.textContent ?? '';
