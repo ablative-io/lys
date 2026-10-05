@@ -32,6 +32,7 @@ import type { CordView } from './cord';
 import { CordLine, StopEverythingButton, StopEverythingRow, pullPending } from './StopEverything';
 import { BudgetWidget, DraftsWidget, GoalsWidget, RequestsWidget } from './Widgets';
 import './dashboard.css';
+import { Act } from '../../shell/Act';
 
 interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
 
@@ -139,7 +140,7 @@ function Picture({ watched, close }: { watched: Watched; close: () => void }) {
       <h2>{watched.name}</h2>
       <span className="sec">{whereOf(watched.session)}</span>
       <a className="btn" data-act="full-size" href={'#/canvas/' + encodeURIComponent(watched.agent)}>Open full size</a>
-      <button type="button" className="btn" data-act="close-picture" onClick={close}>Close</button>
+      <Act symbol="close" name="Close" data-act="close-picture" onClick={close} />
     </header>
     <Terminal key={watched.session.session} session={watched.session.session} agent={watched.agent} bare />
   </aside>;
@@ -161,7 +162,7 @@ export function Dashboard() {
   if (watched && live.some((each) => each.session === watched.session.session)) for (const each of live) beside.current.add(each.session);
   const shown = watched && live.length === 1 && !beside.current.has(live[0].session) ? { ...watched, session: live[0] } : watched;
   return <div className={'page fill dash-page' + (shown ? ' dash-watching' : '')}>
-    <div className="head"><div><h1>Dashboard</h1></div>{read.status === 'refused' ? <button type="button" className="btn" onClick={refreshLive}>Reconnect</button> : null}</div>
+    <div className="head"><div><h1>Dashboard</h1></div>{read.status === 'refused' ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}</div>
     <Gate load={load} title="your dashboard" ok={(data) => data.kind === 'registered' ? <Navigate replace to="/me" />
       : <Page data={data} reload={() => setVersion((v) => v + 1)} watching={shown?.session.session ?? null}
         watch={(row, session) => { beside.current = new Set(liveOf(row).map((each) => each.session)); setWatched({ agent: row.agent.id, name: row.agent.display_name, session }); }} />} />

@@ -10,6 +10,7 @@ import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 import { PULL, RELEASE, pullSentences, stoppedLine } from './cord';
 import type { CordResult, CordView, Listed } from './cord';
+import { Act } from '../../shell/Act';
 
 const PULL_KEY = 'lys.pending.stop-everything';
 const RELEASE_KEY = 'lys.pending.stop-everything.release';
@@ -24,7 +25,7 @@ export const pullPending = (): boolean => sessionStorage.getItem(PULL_KEY) !== n
  */
 export function StopEverythingButton({ cord, open }: { cord: CordView | Refused; open: () => void }) {
   if (!(cord instanceof Refused) && !cord.may_pull) return null;
-  return <button type="button" className="btn danger" data-act="stop-everything" onClick={open}>Stop everything</button>;
+  return <Act symbol="stop" name="Stop everything" word="Stop all" tone="danger" data-act="stop-everything" onClick={open} />;
 }
 
 /** The row Stop everything opens: why, whether to kill what does not stop, and then what the pull did. */
@@ -38,7 +39,7 @@ export function StopEverythingRow({ columns, close, changed }: { columns: number
   return <tr className="you-asked dash-cord"><td colSpan={columns}>
     {result ? <div role="status" aria-label="What stopping everything did">
       {pullSentences(result).map((sentence, index) => <p key={index}>{sentence}</p>)}
-      <button type="button" className="btn" data-act="close" onClick={close}>Close</button>
+      <Act symbol="close" name="Close" data-act="close" onClick={close} />
     </div> : <form aria-label="Stop everything" onSubmit={(event) => {
       event.preventDefault();
       if (reason.trim()) change.submit({ operation: operationId(), reason: reason.trim(), kill });
@@ -46,8 +47,8 @@ export function StopEverythingRow({ columns, close, changed }: { columns: number
       <p>This tells every running agent on every computer to stop, and no agent can be started until you let them start again. What stopped and what did not is listed here afterwards.</p>
       <label className="field">Why<input required value={reason} disabled={change.blocked} onChange={(event) => setReason(event.target.value)} placeholder="What happened" /></label>
       <label className="check"><input type="checkbox" checked={kill} disabled={change.blocked} onChange={(event) => setKill(event.target.checked)} /> Kill anything that does not stop. Without this, an agent that ignores the stop keeps running.</label>
-      <button className="btn danger" type="submit" data-act="stop-everything-now" disabled={change.blocked || !reason.trim()}>Stop everything now</button>{' '}
-      <button className="btn" type="button" data-act="close" disabled={change.busy} onClick={close}>Cancel</button>
+      <Act symbol="stop" name="Stop everything now" word="Stop now" tone="danger" type="submit" data-act="stop-everything-now" disabled={change.blocked || !reason.trim()} />{' '}
+      <Act symbol="close" name="Cancel" word="Cancel" data-act="close" disabled={change.busy} onClick={close} />
     </form>}
     {result ? null : <ChangeStatus change={change} />}
   </td></tr>;
@@ -69,7 +70,7 @@ function Release({ changed }: { changed: () => void }) {
   const change = useRoleChange<CordView>(RELEASE_KEY, RELEASE,
     (answer, body) => answer.pulled === null && answer.released?.operation === body.operation, changed);
   return <>
-    <button type="button" className="btn" data-act="let-agents-start" disabled={change.blocked} onClick={() => change.submit({ operation: operationId() })}>Let agents start again</button>
+    <Act symbol="start" name="Let agents start again" word="Start again" data-act="let-agents-start" disabled={change.blocked} onClick={() => change.submit({ operation: operationId() })} />
     <ChangeStatus change={change} />
   </>;
 }

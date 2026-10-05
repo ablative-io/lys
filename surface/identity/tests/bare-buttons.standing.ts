@@ -10,8 +10,6 @@ export const STANDING: Record<string, number> = {
   'features/apps/SchemaBuilder.tsx': 7,
   'features/connections/SignInProviders.tsx': 3,
   'features/dashboard/AgentTree.tsx': 5,
-  'features/dashboard/Dashboard.tsx': 2,
-  'features/dashboard/StopEverything.tsx': 5,
   'features/drafts/Drafts.tsx': 6,
   'features/file/AgentOverview.tsx': 1,
   'features/file/HeadMenu.tsx': 1,

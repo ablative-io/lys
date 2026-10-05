@@ -25,7 +25,7 @@ const pulls = (posted: { path: string; body: unknown }[]) => posted.filter((entr
 describe('Stop everything', () => {
   it('is offered in the head of Running now to an administrator, and to no one else', async () => {
     await mount('#/', SERVICE);
-    expect($('section[aria-label="Running now"] .section-h [data-act="stop-everything"]')?.textContent).toBe('Stop everything');
+    expect($('section[aria-label="Running now"] .section-h [data-act="stop-everything"]')?.getAttribute('aria-label')).toBe('Stop everything');
     expect($('.dash-cord-line')).toBeNull();
     expect(unreachable()).toEqual([]);
     unmountAll();
@@ -49,7 +49,7 @@ describe('Stop everything', () => {
     expect(row()?.textContent).toContain('This tells every running agent on every computer to stop, and no agent can be started until you let them start again.');
     expect(row()?.textContent).not.toContain('Nothing Lys started is left running');
     expect(pulls(posted)).toEqual([]);
-    const now = $$('section[aria-label="Running now"] tr.dash-cord button').find((button) => button.textContent === 'Stop everything now');
+    const now = $$('section[aria-label="Running now"] tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Stop everything now');
     expect(now?.hasAttribute('disabled')).toBe(true);
     await type(row()?.querySelector('input:not([type="checkbox"])') ?? null, 'a runaway loop');
     // Killing what ignores the stop is on unless the person takes it off: stop everything means everything.
@@ -68,7 +68,7 @@ describe('Stop everything', () => {
       "Away box could not be reached: this computer's runner is not connected to Lys right now.",
     ]);
     expect(row()?.textContent).not.toMatch(/op-|agent-/);
-    await click($$('tr.dash-cord button').find((button) => button.textContent === 'Close') ?? null);
+    await click($$('tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Close') ?? null);
     expect(row()).toBeNull();
   });
 
@@ -82,7 +82,7 @@ describe('Stop everything', () => {
       expect(start.hasAttribute('disabled')).toBe(true);
       expect(start.title).toContain('the building is on fire');
     }
-    expect($('.dash-cord-line [data-act="let-agents-start"]')?.textContent).toBe('Let agents start again');
+    expect($('.dash-cord-line [data-act="let-agents-start"]')?.getAttribute('aria-label')).toBe('Let agents start again');
   });
 
   it('does not say everything is stopped when the pull left an agent running or a computer unreached', async () => {
@@ -116,7 +116,7 @@ describe('Stop everything', () => {
   it('keeps the button when how the cord stands could not be read, and says the read was refused', async () => {
     await mount('#/', { ...SERVICE, '/runtime/stop-everything': { status: 503, body: { refusal: 'cord_unavailable', reason: 'the cord store is closed' } } as Route });
     expect($('.dash-cord-line')?.textContent).toContain('Lys could not say whether everything is stopped.');
-    expect($('[data-act="stop-everything"]')?.textContent).toBe('Stop everything');
+    expect($('[data-act="stop-everything"]')?.getAttribute('aria-label')).toBe('Stop everything');
   });
 
   it('shows a person who is not the administrator the line and no button', async () => {
@@ -147,15 +147,15 @@ describe('Stop everything', () => {
     const first = await mount('#/', { ...SERVICE, 'POST /runtime/stop-everything': fault });
     await click($('[data-act="stop-everything"]'));
     await type(row()?.querySelector('input:not([type="checkbox"])') ?? null, 'a runaway loop');
-    await click($$('tr.dash-cord button').find((button) => button.textContent === 'Stop everything now') ?? null);
+    await click($$('tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Stop everything now') ?? null);
     expect(pulls(first.posted)).toHaveLength(1);
     expect(row()?.textContent).toContain('This change has no confirmed answer.');
     unmountAll();
 
     const again = await mount('#/', SERVICE);
     expect(row()?.textContent).toContain('This change has no confirmed answer.');
-    expect($$('tr.dash-cord button').find((button) => button.textContent === 'Stop everything now')?.hasAttribute('disabled')).toBe(true);
-    await click($$('tr.dash-cord button').find((button) => button.textContent === 'Check whether Lys saved it') ?? null);
+    expect($$('tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Stop everything now')?.hasAttribute('disabled')).toBe(true);
+    await click($$('tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Check whether Lys saved it') ?? null);
     expect(pulls(again.posted).map((entry) => entry.body)).toEqual(pulls(first.posted).map((entry) => entry.body));
     expect(row()?.textContent).toContain('Nothing was running, so nothing needed stopping.');
   });
