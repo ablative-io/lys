@@ -8,11 +8,13 @@ use super::support;
 use std::error::Error;
 
 use lys_identity::grants::{
-    DelegateRequest, GrantError, MemoryRelationships, PassOn, RecipientKind, Relation,
-    RevokeRequest, RootRequest, Route, Window,
+    Action, DelegateRequest, ExerciseRequest, GrantError, MemoryRelationships, PassOn,
+    RecipientKind, Relation, RevokeRequest, RootRequest, Route, Window,
 };
 use lys_identity::projection::Projection;
-use lys_identity::{IdentityId, LoginBinding, OperationId, Profile, ServiceAccountId};
+use lys_identity::{
+    IdentityId, LifecycleState, LoginBinding, OperationId, Profile, ServiceAccountId,
+};
 use support::{T0, World, alpha, pass};
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -127,6 +129,91 @@ fn delegated_service_account_survives_restart_and_reimport_then_revocation_stops
     let mut after = onward;
     after.operation = OperationId::from_bytes([96; 16]);
     assert!(world.grants.delegate(&projection, &after, T0 + 5).is_err());
+    Ok(())
+}
+
+/// A check whose only path runs through a grant a retired service account
+/// holds is refused naming Retired, with nothing recorded; with a second
+/// standing grant beside it, the check is allowed by that one.
+#[test]
+fn a_check_through_a_retired_service_accounts_grant_is_refused_and_another_grant_allows_it()
+-> Outcome {
+    let mut world = World::new()?;
+    let root = world.root(
+        world.dana,
+        "kite",
+        pass(
+            &["read", "write"],
+            &[RecipientKind::ServiceAccount, RecipientKind::Person],
+        )?,
+        None,
+    )?;
+    let (active, service) = account(&mut world, false)?;
+    let held = world
+        .grants
+        .delegate(
+            &active,
+            &DelegateRequest {
+                operation: OperationId::from_bytes([81; 16]),
+                caller: IdentityId::Person(world.dana),
+                route: Route::Api,
+                source: root,
+                recipient: service,
+                responsible: world.dana,
+                resource: alpha()?,
+                relation: Relation::new("heron")?,
+                pass_on: pass(&["read"], &[RecipientKind::Person])?,
+                window: Window::new(T0, None)?,
+            },
+            T0,
+        )?
+        .event
+        .grant();
+    let tom = world.tom;
+    let onward = |operation: u8, caller: IdentityId, source| -> Result<_, GrantError> {
+        Ok(DelegateRequest {
+            operation: OperationId::from_bytes([operation; 16]),
+            caller,
+            route: Route::Api,
+            source,
+            recipient: IdentityId::Person(tom),
+            responsible: tom,
+            resource: alpha()?,
+            relation: Relation::new("tern")?,
+            pass_on: PassOn::UseOnly,
+            window: Window::new(T0, None)?,
+        })
+    };
+    world
+        .grants
+        .delegate(&active, &onward(82, service, held)?, T0 + 1)?;
+    let read = ExerciseRequest {
+        caller: IdentityId::Person(tom),
+        route: Route::Api,
+        resource: alpha()?,
+        action: Action::new("read")?,
+    };
+    let (retired, _) = account(&mut world, true)?;
+    let count = world.events();
+    let refused = world.grants.check(&retired, &read, T0 + 2, None);
+    assert!(
+        matches!(
+            &refused,
+            Err(GrantError::IdentityNotActive { identity, state: LifecycleState::Retired })
+                if *identity == service.to_string()
+        ),
+        "{refused:?}"
+    );
+    assert_eq!(world.events(), count, "a refused check records nothing");
+
+    let beside = onward(83, IdentityId::Person(world.dana), root)?;
+    let standing = world
+        .grants
+        .delegate(&retired, &beside, T0 + 3)?
+        .event
+        .grant();
+    let permit = world.grants.check(&retired, &read, T0 + 4, None)?;
+    assert_eq!(permit.grant, standing, "allowed by the standing grant");
     Ok(())
 }
 
