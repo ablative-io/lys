@@ -48,7 +48,9 @@ of it.
 
 ## Capture: everything, whole, now
 
-- Every call that passes is stored whole: request, response, headers that matter, timing.
+- Every call that passes is stored whole: request, response, every header by name with its value, timing.
+  The one exception is a header that carries a credential: its name is kept and its value never is (Tom,
+  5 October: the values "not kept" should be kept).
   There is no size bound, no slot count, no state that ends a call "unrecorded" because of
   the proxy's own budget. Tom: "if it comes back from an API, we don't apply a size limit… no
   arbitrary limits… absolutely not under any circumstances." If the API did not refuse it and
