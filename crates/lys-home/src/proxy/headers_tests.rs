@@ -252,23 +252,37 @@ async fn a_calls_record_carries_its_status_request_id_and_headers() -> Res {
     assert_eq!(calls[0].request_id.as_deref(), Some("req_011"));
     let head = calls[0].head.as_ref().ok_or("the record has no head")?;
     assert_eq!(head.status, Some(429));
-    assert_eq!(
-        head.request.values,
-        values(&[
-            ("accept-encoding", &["gzip, br"]),
-            ("anthropic-version", &["2023-06-01"]),
-            ("content-type", &["application/json"]),
-        ])
-    );
-    assert_eq!(
-        head.response.values,
-        values(&[
-            ("anthropic-ratelimit-requests-remaining", &["0"]),
-            ("content-type", &["application/json"]),
-            ("request-id", &["req_011"]),
-            ("retry-after", &["3"]),
-        ])
-    );
+    // What was sent and what came back is on the record with its values,
+    // beside whatever the transport added itself (a content length among
+    // it), so each expected value is asserted and then the rule for all.
+    for (side, expected) in [
+        (
+            &head.request,
+            values(&[
+                ("accept-encoding", &["gzip, br"]),
+                ("anthropic-version", &["2023-06-01"]),
+                ("content-type", &["application/json"]),
+            ]),
+        ),
+        (
+            &head.response,
+            values(&[
+                ("anthropic-ratelimit-requests-remaining", &["0"]),
+                ("content-type", &["application/json"]),
+                ("request-id", &["req_011"]),
+                ("retry-after", &["3"]),
+            ]),
+        ),
+    ] {
+        for (name, value) in &expected {
+            assert_eq!(side.values.get(name), Some(value), "{name}");
+        }
+        // Every header named has its value kept exactly when it carries no
+        // credential: nothing else is left out, and nothing more is let in.
+        for name in &side.names {
+            assert_eq!(side.values.contains_key(name), !credential(name), "{name}");
+        }
+    }
     // The credential of each side is on the record by name and by name only;
     // the names the transport adds itself are there too, so only presence is
     // asserted.
