@@ -31,7 +31,7 @@ use lys_log_store::{
 };
 
 use crate::apps_error::AppError;
-use crate::apps_state::{App, DOMAIN, Held, Line, Refused, Standing};
+use crate::apps_state::{App, Approved, DOMAIN, Held, Line, Refused, SignInSet, Standing};
 use crate::error::ServerError;
 
 /// How the leaf store is opened again after an append whose outcome is not known.
@@ -168,30 +168,51 @@ impl<S: LeafStore> AppStore<S> {
     /// Append one line as one leaf. A failed append is settled by reading
     /// back: the line is kept only if the leaf store holds exactly it.
     fn append(&mut self, line: Line) -> Result<(), ServerError> {
-        let advance = match &line {
-            Line::Lys(lys) => lys.version,
-            Line::Approved(_) | Line::Applied(_) | Line::Retired(_) => 1,
-            _ => 0,
-        };
+        self.append_lines(vec![line])
+    }
+
+    /// Append `lines` as consecutive leaves in one durable act: the leaf
+    /// store is handed them with one flush, so every one lands or none does.
+    /// A failed append is settled by reading back: the lines are kept only if
+    /// the leaf store holds exactly them, in order.
+    fn append_lines(&mut self, lines: Vec<Line>) -> Result<(), ServerError> {
+        let mut advance = 0_u64;
+        let mut schema_apps = Vec::new();
+        let mut bytes = Vec::with_capacity(lines.len());
+        for line in &lines {
+            let step = match line {
+                Line::Lys(lys) => lys.version,
+                Line::Approved(_) | Line::Applied(_) | Line::Retired(_) => 1,
+                _ => 0,
+            };
+            advance = advance
+                .checked_add(step)
+                .ok_or_else(|| unavailable("app model revision exceeds its range"))?;
+            if matches!(
+                line,
+                Line::Lys(_) | Line::Approved(_) | Line::Applied(_) | Line::Retired(_)
+            ) && let Some(app) = line.app()
+            {
+                schema_apps.push(app.to_owned());
+            }
+            bytes.push(serde_json::to_vec(line).map_err(unavailable)?);
+        }
         let model_revision = self
             .model_revision
             .checked_add(advance)
             .ok_or_else(|| unavailable("app model revision exceeds its range"))?;
-
-        let schema_app = match &line {
-            Line::Lys(_) | Line::Approved(_) | Line::Applied(_) | Line::Retired(_) => {
-                line.app().map(str::to_owned)
-            }
-            _ => None,
-        };
-        let bytes = serde_json::to_vec(&line).map_err(unavailable)?;
+        let count = u64::try_from(bytes.len())
+            .map_err(|_overflow| unavailable("more lines than the log can count"))?;
         let index = self.log.len();
-        let Err(failure) = self.log.append(&bytes) else {
-            if let Err(reason) = self.held.hold(line) {
-                self.uncertain = true;
-                return Err(unavailable(reason).into());
+        let leaves: Vec<&[u8]> = bytes.iter().map(Vec::as_slice).collect();
+        let Err(failure) = self.log.append_batch(&leaves) else {
+            for line in lines {
+                if let Err(reason) = self.held.hold(line) {
+                    self.uncertain = true;
+                    return Err(unavailable(reason).into());
+                }
             }
-            if let Some(id) = schema_app {
+            for id in schema_apps {
                 let refreshed = self.held.app(&id).map(schema_of).transpose();
                 match refreshed {
                     Ok(Some(Some(schema))) => {
@@ -207,22 +228,28 @@ impl<S: LeafStore> AppStore<S> {
                 }
             }
             self.model_revision = model_revision;
-            self.since_snapshot += 1;
+            self.since_snapshot += count;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
                 self.write_snapshot();
             }
             return Ok(());
         };
+        let failure = failure.to_string();
         self.uncertain = true;
         self.settle()?;
-        match self.log.leaf_bytes(index).map_err(unavailable)? {
-            Some(held) if held == bytes => Ok(()),
-            Some(_) => Err(unavailable(format!(
-                "leaf {index} was written by another writer: {failure}"
-            ))
-            .into()),
-            None => Err(unavailable(failure).into()),
+        for (offset, expected) in (index..).zip(&bytes) {
+            match self.log.leaf_bytes(offset).map_err(unavailable)? {
+                Some(held) if held == *expected => {}
+                Some(_) => {
+                    return Err(unavailable(format!(
+                        "leaf {offset} was written by another writer: {failure}"
+                    ))
+                    .into());
+                }
+                None => return Err(unavailable(failure).into()),
+            }
         }
+        Ok(())
     }
 
     /// What the log folds to.
@@ -256,16 +283,32 @@ impl<S: LeafStore> AppStore<S> {
         Ok(line)
     }
 
-    /// Keep `line` beside the approval already kept under its operation: the
-    /// one line an operation names besides its first, an approval's sign-in
-    /// settings. Refused, as [`Self::keep`] refuses, when the apps as they
-    /// stand do not take it.
-    pub fn keep_beside_approval(&mut self, line: Line) -> Result<(), ServerError> {
+    /// Keep an approval with its sign-in settings as one durable act: the two
+    /// leaves are handed to the leaf store with one flush, so an app is never
+    /// approved without the addresses its client may send a person back to.
+    /// Sent again under the same operation in the same words it is kept once;
+    /// the same operation in other words is refused, and so is an approval the
+    /// app as it stands does not take.
+    pub fn keep_approval(
+        &mut self,
+        approved: Approved,
+        settings: SignInSet,
+    ) -> Result<(), ServerError> {
         self.settle()?;
+        let line = Line::Approved(approved);
+        if let Some(kept) = self.held.operation(line.operation()) {
+            if !same_act(&kept, &line) {
+                return Err(AppError::AppOperationReused {
+                    operation: line.operation().to_owned(),
+                }
+                .into());
+            }
+            return Ok(());
+        }
         self.held
             .allows(&line)
             .map_err(|refused| refusal(&line, refused))?;
-        self.append(line)
+        self.append_lines(vec![line, Line::SignInSet(settings)])
     }
 
     /// The current schema of the approved, unretired app `app`.
@@ -499,3 +542,7 @@ fn schema_revision(held: &Held) -> Result<u64, ServerError> {
 #[cfg(test)]
 #[path = "apps_store_schema_tests.rs"]
 mod schema_tests;
+
+#[cfg(test)]
+#[path = "apps_store_batch_tests.rs"]
+mod batch_tests;

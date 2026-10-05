@@ -452,22 +452,26 @@ async fn approve(
             client_id: id.clone(),
             secret_sha256: digest,
         };
-        apps.keep(Line::Approved(Approved {
-            operation: operation.clone(),
-            app: id.clone(),
-            client,
-            binding,
-            by: by.clone(),
-            at,
-        }))?;
-        apps.keep_beside_approval(Line::SignInSet(SignInSet {
-            operation,
-            app: id.clone(),
-            redirects,
-            profile: body.profile,
-            by,
-            at,
-        }))?;
+        // The approval and its sign-in settings land as one durable act, or
+        // neither does: an approved app always has somewhere to send a person.
+        apps.keep_approval(
+            Approved {
+                operation: operation.clone(),
+                app: id.clone(),
+                client,
+                binding,
+                by: by.clone(),
+                at,
+            },
+            SignInSet {
+                operation,
+                app: id.clone(),
+                redirects,
+                profile: body.profile,
+                by,
+                at,
+            },
+        )?;
         Ok(Approval {
             app: view(apps, &id)?,
             client: None,
