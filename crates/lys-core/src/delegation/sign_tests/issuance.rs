@@ -159,53 +159,36 @@ fn issuance_refuses_an_invalid_kind_role_pair_through_both_entry_points() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn issuance_refuses_a_claim_the_verifier_would_reject() {
-    // The defect: the artifact cap was enforced at decode only, so a subject
-    // value of 3884 bytes signed and verified while 3885 signed SUCCESSFULLY and failed
-    // every verification afterwards — a file that fails at a later, far less
-    // debuggable moment, which is precisely what assembling-with-verification
-    // exists to prevent, arriving through the one door that check did not cover.
-    //
-    // The boundary is DERIVED here, never hardcoded: it moved by nine bytes when
-    // `sequence` was added, and a literal would have gone stale in silence.
+fn a_subject_of_any_length_that_issues_also_verifies_by_both_paths() {
+    // The defect this guards: a size cap was once enforced at decode only, so a
+    // subject value of 3884 bytes signed and verified while 3885 signed
+    // SUCCESSFULLY and failed every verification afterwards — a file that fails
+    // at a later, far less debuggable moment. The cap is gone (no arbitrary
+    // limits), so the rule that remains is the pair: whatever issues, verifies,
+    // and the two-phase path makes the same artifact. The lengths straddle the
+    // old boundary and every CBOR text head width a subject can cross.
     let key = root();
     let root_key = key.public_key_bytes();
 
-    let mut longest_ok = None;
-    for len in (1..4000usize).rev() {
-        if sign_delegation(&key, &claim_at(&"o".repeat(len), 300)).is_ok() {
-            longest_ok = Some(len);
-            break;
-        }
+    let mut checked = 0;
+    for len in [23, 24, 255, 256, 3884, 3885, 4096, 65_535, 65_536] {
+        let claim = claim_at(&"o".repeat(len), 300);
+
+        // Issuable AND verifiable. The pair is the point — either one alone is
+        // what the defect looked like.
+        let artifact = sign_delegation(&key, &claim).unwrap();
+        let verified =
+            verify_delegation(&artifact, &root_key, DOMAIN, &claim.subject_value).unwrap();
+        assert_eq!(verified.claim, claim, "length {len}");
+
+        // And the air-gapped route produces exactly what the convenience route
+        // does, so neither can issue what the other would not.
+        let signature = key.sign(&delegation_preimage(&root_key, &claim));
+        let assembled = assemble_delegation(&root_key, &claim, &signature).unwrap();
+        assert_eq!(assembled, artifact, "length {len}");
+        checked += 1;
     }
-    let longest_ok = longest_ok.expect("some subject length must be issuable");
-
-    // At the boundary: issuable AND verifiable. The pair is the point — either
-    // one alone is what the defect looked like.
-    let at_limit = claim_at(&"o".repeat(longest_ok), 300);
-    let artifact = sign_delegation(&key, &at_limit).unwrap();
-    verify_delegation(&artifact, &root_key, DOMAIN, &at_limit.subject_value).unwrap();
-
-    // One byte over: refused at ISSUANCE, with an actionable reason rather than
-    // the non-oracle value. This is the operator's side; no stranger is being
-    // kept in the dark.
-    let over = claim_at(&"o".repeat(longest_ok + 1), 300);
-    let err = sign_delegation(&key, &over).unwrap_err();
-    let TrustError::DelegationEncoding { reason } = &err else {
-        panic!("expected an encoding error naming the constraint, got {err:?}");
-    };
-    assert!(
-        reason.contains("cap"),
-        "the reason must name the constraint, got: {reason}"
-    );
-
-    // And the two-phase path refuses it too, so the air-gapped route cannot
-    // produce what the convenience route refuses.
-    let signature = key.sign(&delegation_preimage(&root_key, &over));
-    assert!(matches!(
-        assemble_delegation(&root_key, &over, &signature),
-        Err(TrustError::DelegationEncoding { .. })
-    ));
+    assert_eq!(checked, 9, "every length must have been exercised");
 }
 
 #[test]
