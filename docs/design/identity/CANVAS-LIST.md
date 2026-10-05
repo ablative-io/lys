@@ -104,6 +104,45 @@ Seen by Waffles on the walk he asked for (installed a1678ae6, pictures w40, w41)
   been reported; three sentences for one fact. The add-a-limit row lays nine choices and four actions out in a
   table of their own with "Add this limit" at its end.
 
+## The button audit (Tom asked at 16:43; counted by Waffles, 5 October, 21:57, from the source at 1a25a8fd)
+
+Counted by a script over every `<button` in `surface/identity/src` outside the tests (the table it wrote is kept
+with the session; the script is twenty lines and is run again before the work starts):
+
+- 246 buttons in 80 files. 238 carry words only, 4 a symbol and words, 4 a symbol only.
+- The front end has no set of symbols and no shared button: every one of the 246 is a bare `<button>` styled where
+  it stands. That is why the words grew; there was nothing else to reach for.
+- 159 labels are fixed words and 79 are built in code (a name, a state). Of the fixed ones 74 are one word, 32 two,
+  29 three, 13 four, 10 five and one seven ("Save policy rules for the next start").
+- What they open with, most used first: cancel 16, add 12, remove 11, check 10, save 8, close 6 (and eight more
+  that are a bare "×"), stop 6, approve 4, confirm 4, retire 4, keep 4, reconnect 3, revoke 3, done 3, then
+  decline, copy, refuse, give, get, retry, edit, start, issue, withdraw, end, send, open.
+- Where the words-only ones are: runtime 28, apps 21, file 18, network 18, provisioning 16, dashboard 12, secrets
+  12, the shell 12, requests 11, roles 11, teams 11, team 9, grants 7, people 7, settings 7, drafts 6, access 5,
+  service accounts 5, usage 5, reviews 4, connections 3, sessions 3, setup 3, proxy 2, import 1, sign-in 1.
+- The longest, as they read today: "Save policy rules for the next start", "Save credentials in Lys secrets",
+  "Approve and apply estate grants", "Edit the permission template", "Check whether it was changed", "Retire this
+  service account", "Let me give agents access", "Get a new connection code", "Stop everything now".
+
+What is to be written, as one piece, so it is done once and stays done:
+
+1. One act control in the shell, used for every button: a symbol, and one short word beside it where the symbol
+   alone would not be known. Its name for a screen reader is always the full act ("Retire Waffles the Terrible"),
+   whatever is drawn.
+2. One small set of symbols drawn in the repository (no library is added), one per act the list above names:
+   add, remove, save, cancel and close, stop, start, approve, decline, retire, suspend, revoke, copy, edit, retry,
+   read again (the "Check whether..." family), open, send, more. An act not in the set is added to the set, never
+   drawn where it is used.
+3. A test that fails the front end when a bare `<button>` stands anywhere but inside that control and the few rows
+   that are themselves the thing pressed (a list row, a tab), each of those named in the test. So the audit cannot
+   come undone.
+4. Every one of the 238 moved to the control, screen by screen, with Tom's own words above applied where he gave
+   them: "set" for "Set goal", a plus for "Add this limit", "suspend" and "retire" under the drop-down, the stop
+   symbol left of the badge.
+5. Walked in a browser with pictures, every screen, before it is called done.
+
+Not started. It needs no build to write and one battery to install.
+
 ## The canvas as wiring (Tom, the same walk)
 
 - An emergency stop widget: "that emergency stop would be a good widget to have... a really common sense kind of
