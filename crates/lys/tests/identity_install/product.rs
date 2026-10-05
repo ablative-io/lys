@@ -29,8 +29,9 @@ use super::{EMAIL, Heard, PASSWORD, ask, operation};
 
 /// The fixture product's client id, an app id.
 const PRODUCT: &str = "fixture_product";
-/// The one address the fixture product registered for its codes.
-pub const CALLBACK: &str = "http://product.example.test/auth/callback";
+/// The one address the fixture product registered for its codes: https, as
+/// the service requires of any address that is not this machine's.
+pub const CALLBACK: &str = "https://product.example.test/auth/callback";
 /// The fixture product's PKCE verifier.
 const VERIFIER: &str = "a-fixture-product-verifier-of-enough-length-0123456789";
 
@@ -177,7 +178,7 @@ fn handed_a_code(
 ) -> TestResult<String> {
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
     let authorize = format!(
-        "/oauth/authorize?client_id={PRODUCT}&redirect_uri=http%3A%2F%2Fproduct.example.test%2Fauth%2Fcallback&response_type=code&scope=openid&state=product-state&nonce=product-nonce&code_challenge={challenge}&code_challenge_method=S256"
+        "/oauth/authorize?client_id={PRODUCT}&redirect_uri=https%3A%2F%2Fproduct.example.test%2Fauth%2Fcallback&response_type=code&scope=openid&state=product-state&nonce=product-nonce&code_challenge={challenge}&code_challenge_method=S256"
     );
     let unsigned = ask(installed.service_port, "GET", &authorize, None, None)?;
     assert_eq!(unsigned.status, 303, "{}", unsigned.body);
