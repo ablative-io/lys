@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 import { CONCEPTS } from './concepts';
 import type { Concept } from './concepts';
 import { useShell } from './ShellContext';
+import { Act } from './Act';
 
 interface Mark {
   concept: Concept;
@@ -122,9 +123,7 @@ export function Explain() {
       ))}
       <div className="xbar">
         {marks.length} things explained · click a number{' '}
-        <button className="btn" data-xoff="" onClick={swallow}>
-          Done <span className="kbd">Esc</span>
-        </button>
+        <Act symbol="approve" name="Done" hint="Done (Esc)" word="Done" data-xoff="" onClick={swallow} />
       </div>
       <div className="xcard" id="xcard" style={card ? { display: 'block', left: card.left, top: card.top } : { display: 'none' }}>
         {card ? (

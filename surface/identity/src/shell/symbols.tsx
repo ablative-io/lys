@@ -23,6 +23,8 @@ export const SYMBOLS = {
   open: <path d="M14 5h5v5M19 5l-8 8M11 6H6.5A1.5 1.5 0 0 0 5 7.5v10A1.5 1.5 0 0 0 6.5 19h10a1.5 1.5 0 0 0 1.5-1.5V13" />,
   send: <path d="M4 12l16-7-6 16-3-6.5zM11 14.5L20 5" />,
   fit: <path d="M4 9V5h4M16 5h4v4M20 15v4h-4M8 19H4v-4" />,
+  back: <path d="M14.5 6l-6 6 6 6" />,
+  help: <><circle cx="12" cy="12" r="8" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.4 2c-.8.5-1.2 1-1.2 1.9M12 16.4v.1" /></>,
   more: <><circle cx="6" cy="12" r="1.4" {...solid} /><circle cx="12" cy="12" r="1.4" {...solid} /><circle cx="18" cy="12" r="1.4" {...solid} /></>,
 } as const satisfies Record<string, ReactNode>;
 

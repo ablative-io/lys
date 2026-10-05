@@ -3,6 +3,7 @@ import { CONCEPTS } from './concepts';
 import type { Concept } from './concepts';
 import { keyable } from './keyable';
 import { useShell } from './ShellContext';
+import { Act } from './Act';
 
 function ConceptRow({ concept, brief }: { concept: Concept; brief?: boolean }) {
   const shell = useShell();
@@ -25,19 +26,13 @@ function HelpPanel() {
       <div className="dock-head">
         <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {chosen ? (
-            <button className="icon-btn" data-help="" title="Back" onClick={() => shell.showHelp(null)}>
-              ‹
-            </button>
+            <Act symbol="back" name="Back" className="small quiet" data-help="" onClick={() => shell.showHelp(null)} />
           ) : null}
           <b style={{ fontWeight: 600 }}>{chosen ? chosen.t : 'Help'}</b>
         </span>
         <span style={{ display: 'flex', gap: 4 }}>
-          <button className="btn" data-act="explain" title="Number everything on this screen (?)" onClick={shell.explainOn}>
-            Explain this screen <span className="kbd">?</span>
-          </button>
-          <button className="icon-btn" data-dockbtn-close="" title="Close" onClick={shell.closeDock}>
-            ×
-          </button>
+          <Act symbol="help" name="Explain this screen" hint="Number everything on this screen (?)" word="Explain" data-act="explain" onClick={shell.explainOn} />
+          <Act symbol="close" name="Close" className="small quiet" data-dockbtn-close="" onClick={shell.closeDock} />
         </span>
       </div>
       <div className="dock-body">

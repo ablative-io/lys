@@ -211,7 +211,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
       {folders.length ? null : <tr><td colSpan={2} className="dim">{kept ? 'Not available with Kept to its folder: that setting keeps the agent to its one working folder.' : 'None. It works in its working folder only.'}</td></tr>}
       {kept && folders.length ? <tr><td colSpan={2} className="dim">Not available with Kept to its folder: that setting keeps the agent to its one working folder. Remove these before it can start as Kept to its folder.</td></tr> : null}
     </tbody>
-    {kept ? null : <tfoot><tr><td colSpan={2}><FolderChooser computers={computers} preferred={computer} chosen="" choose={(folder) => add('additional_directories', folder)} label="Add an extra folder" confirm="Add" /></td></tr></tfoot>}
+    {kept ? null : <tfoot><tr><td colSpan={2}><FolderChooser computers={computers} preferred={computer} chosen="" choose={(folder) => add('additional_directories', folder)} label="Add an extra folder" word="Add" confirm="Add" /></td></tr></tfoot>}
   </table>;
   return <div className="permissions wide" role="group" aria-label="What this agent may do">
     {program ? <table className="usage-table modes" aria-label="How it works">

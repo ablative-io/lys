@@ -156,7 +156,7 @@ describe('an agent with no folder to work in', () => {
     if (under === '/Users/ada/Developer/receipts') return held(under, []);
     return refused(409, 'folder_unreadable', under + ' could not be read');
   };
-  const button = (scope: HTMLElement, label: string) => [...scope.querySelectorAll('button')].find((entry) => entry.textContent?.trim() === label) ?? null;
+  const button = (scope: HTMLElement, label: string) => [...scope.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent)?.trim() === label) ?? null;
 
   it('is chosen from the computer’s own folders, saved, and the start follows without a second press', async () => {
     const { host, posted, calls } = await shown({ refusal: 'WorkingFolderUnnamed', reason: 'the launch names no working folder' }, {
