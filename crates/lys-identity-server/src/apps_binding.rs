@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::apps_error::AppError;
-use crate::apps_state::{App, By, Held, Standing};
+use crate::apps_state::{App, Approved, By, Held, Standing};
 use crate::error::ServerError;
 use crate::read_api::login;
 use crate::routes::{AppState, hex};
@@ -281,21 +281,52 @@ fn active_account(state: &AppState, id: &str) -> Result<(), ServerError> {
 }
 
 /// The app whose sign-in client is `client_id`, when that client may complete
-/// a sign-in to `redirect` with `secret`: the lookup Lys's provider makes of a
-/// client. A client exists only once its app is approved, so a pending or
-/// declined app's is refused `app_not_approved`, a retired app's
-/// `app_retired`, an unknown id or a secret that does not verify
-/// `credential_refused`, and an address the registration does not list
-/// `redirect_invalid`. The secret is compared by its SHA-256 and named in no
-/// refusal.
+/// a sign-in to `redirect` with `secret`: the lookup Lys's provider makes at
+/// the token exchange, judged from the apps' record at the request. A client
+/// exists only once its app is approved, so a pending or declined app's is
+/// refused `app_not_approved`, a retired app's `app_retired`, an id no app
+/// holds or a secret that does not verify `credential_refused`, and an
+/// address the registration does not list `redirect_invalid`. The secret is
+/// compared by its SHA-256 and named in no refusal.
 pub fn sign_in_client<'a>(
     held: &'a Held,
     client_id: &str,
     secret: &str,
     redirect: &str,
 ) -> Result<&'a App, AppError> {
+    let (app, approved) = approved_client(held, client_id)?;
+    if !same(&approved.client.secret_sha256, &sha256_hex(secret)) {
+        return Err(AppError::CredentialRefused {
+            reason: "no client by that id holds that secret",
+        });
+    }
+    listed(app, redirect)?;
+    Ok(app)
+}
+
+/// The app whose sign-in client is `client_id`, when `redirect` is an address
+/// its registration lists: the lookup Lys's provider makes at authorize, where
+/// a product presents no secret. The refusals are `sign_in_client`'s, without
+/// the secret's.
+pub fn sign_in_redirect<'a>(
+    held: &'a Held,
+    client_id: &str,
+    redirect: &str,
+) -> Result<&'a App, AppError> {
+    let (app, _approved) = approved_client(held, client_id)?;
+    listed(app, redirect)?;
+    Ok(app)
+}
+
+/// The approved app `client_id` names, with its approval; a pending or
+/// declined app is `app_not_approved`, a retired one `app_retired`, and an
+/// id no approved app's client holds `credential_refused`.
+fn approved_client<'a>(
+    held: &'a Held,
+    client_id: &str,
+) -> Result<(&'a App, &'a Approved), AppError> {
     let refused = || AppError::CredentialRefused {
-        reason: "no client by that id holds that secret",
+        reason: "no approved app holds that client id",
     };
     let app = held.app(client_id).ok_or_else(refused)?;
     match app.standing() {
@@ -312,23 +343,26 @@ pub fn sign_in_client<'a>(
         Standing::Approved => {}
     }
     let approved = app.approved.as_ref().ok_or_else(refused)?;
-    if approved.client.client_id != client_id
-        || !same(&approved.client.secret_sha256, &sha256_hex(secret))
-    {
+    if approved.client.client_id != client_id {
         return Err(refused());
     }
-    if !app
+    Ok((app, approved))
+}
+
+/// Refuse `redirect` unless the app's registration lists it exactly.
+fn listed(app: &App, redirect: &str) -> Result<(), AppError> {
+    if app
         .registered
         .redirects
         .iter()
         .any(|listed| listed == redirect)
     {
-        return Err(AppError::RedirectInvalid {
-            address: redirect.to_owned(),
-            reason: "is not an address the app's registration lists",
-        });
+        return Ok(());
     }
-    Ok(app)
+    Err(AppError::RedirectInvalid {
+        address: redirect.to_owned(),
+        reason: "is not an address the app's registration lists",
+    })
 }
 
 #[cfg(test)]

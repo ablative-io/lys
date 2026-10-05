@@ -7,7 +7,7 @@ use std::error::Error;
 
 use serde_json::json;
 
-use super::{sha256_hex, sign_in_client};
+use super::{sha256_hex, sign_in_client, sign_in_redirect};
 use crate::apps_error::AppError;
 use crate::apps_state::{Approved, By, Client, Decided, Held, Line, Registered};
 
@@ -61,6 +61,32 @@ fn a_pending_apps_client_cannot_complete_a_sign_in() -> Outcome {
     assert!(
         matches!(refused, AppError::AppNotApproved { .. }),
         "{refused}"
+    );
+    Ok(())
+}
+
+/// Authorize presents no secret: the lookup without one admits an approved
+/// app's listed address and refuses an unlisted one, a pending app, and an id
+/// no app holds, each by the same name the secret-bearing lookup gives.
+#[test]
+fn the_lookup_without_a_secret_judges_the_approval_and_the_address() -> Outcome {
+    let held = approved()?;
+    assert_eq!(sign_in_redirect(&held, APP, BACK)?.registered.app, APP);
+    let unlisted = sign_in_redirect(&held, APP, "https://elsewhere.example.test/");
+    assert!(
+        matches!(unlisted, Err(AppError::RedirectInvalid { .. })),
+        "{unlisted:?}"
+    );
+    let unknown = sign_in_redirect(&held, "nobody_here", BACK);
+    assert!(
+        matches!(unknown, Err(AppError::CredentialRefused { .. })),
+        "{unknown:?}"
+    );
+    let registered = registered()?;
+    let pending = sign_in_redirect(&registered, APP, BACK);
+    assert!(
+        matches!(pending, Err(AppError::AppNotApproved { .. })),
+        "{pending:?}"
     );
     Ok(())
 }

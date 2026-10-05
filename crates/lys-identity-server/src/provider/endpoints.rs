@@ -4,6 +4,8 @@
 use super::{
     Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, random, same, unavailable,
 };
+use crate::apps_binding::{sign_in_client, sign_in_redirect};
+use crate::apps_error::AppError;
 use crate::error::ServerError;
 use crate::routes::{AppState, cookie_header, hex, with_directory};
 use crate::session::now;
@@ -66,6 +68,33 @@ pub(super) fn malformed(reason: &str) -> ServerError {
     }
 }
 
+/// The client id of the approved app `client_id` names, judged from the apps'
+/// record as it stands at this request: its approval, its secret when the
+/// token exchange presents one, and `redirect` against the addresses its
+/// registration lists. Nothing is kept between requests, so an approval or a
+/// retirement is in force at the next one. The apps lock is taken and
+/// released here, before any provider lock.
+fn admitted_client(
+    state: &AppState,
+    client_id: &str,
+    secret: Option<&str>,
+    redirect: &str,
+) -> Result<String, ServerError> {
+    let mut apps = state
+        .apps
+        .lock()
+        .map_err(|error| AppError::AppsUnavailable {
+            reason: format!("the apps lock is poisoned: {error}"),
+        })?;
+    apps.settle()?;
+    let held = apps.held();
+    let app = match secret {
+        Some(secret) => sign_in_client(held, client_id, secret, redirect)?,
+        None => sign_in_redirect(held, client_id, redirect)?,
+    };
+    Ok(app.registered.app.clone())
+}
+
 pub(super) async fn authorize(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -76,10 +105,7 @@ pub(super) async fn authorize(
     let Query(asked) = asked.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    let client = provider.client(&asked.client_id)?;
-    if !client.redirect_uris.contains(&asked.redirect_uri) {
-        return Err(ServerError::RedirectUnregistered);
-    }
+    let client_id = admitted_client(&state, &asked.client_id, None, &asked.redirect_uri)?;
     if asked.response_type != "code" {
         return Err(malformed("a product asks for a code"));
     }
@@ -114,7 +140,7 @@ pub(super) async fn authorize(
             code.clone(),
             Grant {
                 session_id: session.id,
-                client_id: client.client_id.clone(),
+                client_id,
                 redirect_uri: asked.redirect_uri.clone(),
                 challenge,
                 nonce: asked.nonce,
@@ -168,8 +194,14 @@ pub(super) fn presented(headers: &HeaderMap, form: &Exchange) -> Option<(String,
 /// An OAuth error answer carrying the refusal by name.
 pub(super) fn oauth_refusal(error: &ServerError) -> Response {
     let code = match error {
-        ServerError::ClientUnknown => "invalid_client",
-        ServerError::CodeUsed
+        ServerError::ClientUnknown
+        | ServerError::App(
+            AppError::CredentialRefused { .. }
+            | AppError::AppNotApproved { .. }
+            | AppError::AppRetired { .. },
+        ) => "invalid_client",
+        ServerError::App(AppError::RedirectInvalid { .. })
+        | ServerError::CodeUsed
         | ServerError::CodeExpired
         | ServerError::CodeUnknown
         | ServerError::VerifierWrong
@@ -336,12 +368,12 @@ pub(super) fn exchange(
         return Err(malformed("a product exchanges an authorization code"));
     }
     let (client_id, secret) = presented(headers, &form).ok_or(ServerError::ClientUnknown)?;
-    let client = provider.authenticated(&client_id, &secret)?;
+    let client_id = admitted_client(state, &client_id, Some(&secret), &form.redirect_uri)?;
     let at = now();
     let mut codes = held(&provider.codes)?;
     let grant = codes.get_mut(&form.code).ok_or(ServerError::CodeUnknown)?;
     let (subject, nonce, authenticated_at, expires_at, session_id) = {
-        if grant.client_id != client.client_id {
+        if grant.client_id != client_id {
             return Err(ServerError::CodeUnknown);
         }
         if grant.used {
@@ -375,7 +407,7 @@ pub(super) fn exchange(
     let mut claims = json!({
         "iss": provider.issuer,
         "sub": subject,
-        "aud": client.client_id,
+        "aud": client_id,
         "iat": at,
         "exp": expires_at.min(at.saturating_add(ID_TOKEN_SECONDS)),
         "auth_time": authenticated_at,

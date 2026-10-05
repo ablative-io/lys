@@ -88,7 +88,10 @@ fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box
         rendered.get("administrator").is_none(),
         "a new install names no administrator"
     );
-    assert_eq!(rendered["provider"]["clients"], serde_json::json!([]));
+    assert!(
+        rendered["provider"].get("clients").is_none(),
+        "the provider's clients are the approved apps, never configuration"
+    );
     assert_eq!(
         rendered["provider"]["key_file"],
         root.join("state")
@@ -138,39 +141,79 @@ fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box
     Ok(())
 }
 
+/// An install run again keeps the administrator and keeps every approved app
+/// a client. The provider's clients are the approved apps in the apps'
+/// record (DIRECTORY-079 R1), so the configuration names none, whatever an
+/// earlier file held. The record, beside the grant log, and the key the
+/// provider signs with are data the install never touches: the run again
+/// names both at the same paths, leaves the record's bytes as they were and
+/// loads the same key rather than generating another. The service reads
+/// that record at each sign-in request (`tests/provider.rs`), so the app's
+/// approval and client stand across the run again as they stood before it.
 #[test]
-fn an_install_run_again_keeps_the_administrator_and_the_registered_products()
+fn an_install_run_again_keeps_the_administrator_and_every_approved_app()
 -> Result<(), Box<dyn Error>> {
     let dir = tempfile::TempDir::new()?;
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
     let layout = Layout::at(dir.path().to_path_buf());
     let config = DeploymentConfig::parse(&render_deployment(None), dir.path().to_path_buf())?;
+    private_files::ensure_dir(&config.state_dir())?;
     let first = server_config::render(
         &layout,
         &config,
         &server_config::carried(&layout)?.unwrap_or_default(),
         true,
     );
-    assert_eq!(first["provider"]["clients"], serde_json::json!([]));
+    super::provider_key(&config)?;
+    assert!(first["provider"].get("clients").is_none());
     assert!(first.get("administrator").is_none());
-    let product = serde_json::json!([{
-        "client_id": "fixture-product",
-        "secret_sha256": "00",
-        "redirect_uris": ["http://product.example.test/auth/callback"],
-    }]);
+    let key_file = PathBuf::from(
+        first["provider"]["key_file"]
+            .as_str()
+            .ok_or("no key file")?,
+    );
+    let key = std::fs::read(&key_file)?;
+    let grant_log = PathBuf::from(first["grant_log_dir"].as_str().ok_or("no grant log")?);
+    let apps = grant_log.with_file_name("apps");
+    private_files::ensure_dir(&apps)?;
+    let record = apps.join("0000000000000001.json");
+    let approved = br#"{"line":"Approved","app":"fixture_product","client_id":"fixture_product"}"#;
+    private_files::write(&record, approved)?;
+
     let administrator = serde_json::json!({"login": "ada"});
-    let mut registered = first;
-    registered["provider"]["clients"] = product.clone();
-    registered["administrator"] = administrator.clone();
-    private_files::write(&layout.service_config(), &serde_json::to_vec(&registered)?)?;
+    let mut earlier = first.clone();
+    earlier["provider"]["clients"] = serde_json::json!([{
+        "client_id": "fixture_product",
+        "secret_sha256": "00",
+        "redirect_uris": ["https://product.example.test/auth/callback"],
+    }]);
+    earlier["administrator"] = administrator.clone();
+    private_files::write(&layout.service_config(), &serde_json::to_vec(&earlier)?)?;
     let again = server_config::render(
         &layout,
         &config,
         &server_config::carried(&layout)?.unwrap_or_default(),
         true,
     );
-    assert_eq!(again["provider"]["clients"], product);
+    super::provider_key(&config)?;
+
     assert_eq!(again["administrator"], administrator);
+    assert!(
+        again["provider"].get("clients").is_none(),
+        "an earlier file's client list is not carried: the apps' record is the client list"
+    );
+    assert_eq!(again["grant_log_dir"], first["grant_log_dir"]);
+    assert_eq!(again["provider"]["key_file"], first["provider"]["key_file"]);
+    assert_eq!(
+        std::fs::read(&record)?,
+        approved,
+        "the approved app's record is as it was before the run again"
+    );
+    assert_eq!(
+        std::fs::read(&key_file)?,
+        key,
+        "the provider signs with the key it signed with before the run again"
+    );
     Ok(())
 }
 

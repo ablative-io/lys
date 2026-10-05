@@ -10,14 +10,16 @@ use std::sync::Arc;
 
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use identity_contract::apps::{Auth, approve, ok, post, registration, workspace_schema};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::OperationId;
 use lys_identity::signer::load_service_key;
 use lys_identity_server::configuration_store::ConfigurationStore;
-use lys_identity_server::provider::{CODE_SECONDS, ProductClient, ProviderSettings};
+use lys_identity_server::provider::{CODE_SECONDS, ProviderSettings};
 use lys_identity_server::routes::open_directory;
 use lys_identity_server::runner_acts::ActStore;
+use lys_identity_server::secrets_api::SecretsSettings;
 use openidconnect::core::{
     CoreAuthenticationFlow, CoreClient, CoreJwsSigningAlgorithm, CoreProviderMetadata,
 };
@@ -30,24 +32,38 @@ use sha2::{Digest, Sha256};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const PRODUCT: &str = "fixture-product";
-const SECRET: &str = "fixture-product-secret";
-const CALLBACK: &str = "http://product.example.test/auth/callback";
+/// The fixture product: an app registered and approved in `table`, so the
+/// provider serves it as a client with no configuration naming it.
+const PRODUCT: &str = "fixture_product";
+const CALLBACK: &str = "https://product.example.test/auth/callback";
+/// A second app, registered during a test to be approved and retired while
+/// the service runs.
+const SECOND: &str = "second_product";
+const BACK: &str = "https://second.example.test/callback";
 
-fn hex(bytes: &[u8]) -> String {
-    let digits: Vec<String> = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
-    digits.concat()
+/// The product's client secret, as the custody fixture issued it at approval.
+fn secret() -> String {
+    identity_contract::app_custody::secret()
 }
 
 /// A service with the fixture product registered, codes living
 /// `code_seconds`, and the administrator set up as a person, signed in.
+/// A service with the provider on and the fixture product registered and
+/// approved by the administrator, answering the service, the administrator's
+/// cookie and their person id.
 async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn Error>> {
+    let broker = identity_contract::app_custody::start().await?;
     let (service, ()) = Service::start_adjusted(
         GRANT_MODEL,
         None,
         None,
         None,
-        |config| {
+        move |config| {
+            config.secrets = Some(SecretsSettings {
+                broker,
+                service: "identity".to_owned(),
+                service_key_file: config.event_key_file.clone(),
+            });
             config.requests_dir = None;
             config.certificates_dir = None;
             config.network_file = None;
@@ -63,11 +79,6 @@ async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn E
             config.reviews_dir = None;
             config.provider = Some(ProviderSettings {
                 key_file: config.log_dir.with_file_name("provider.key"),
-                clients: vec![ProductClient {
-                    client_id: PRODUCT.to_owned(),
-                    secret_sha256: hex(&Sha256::digest(SECRET.as_bytes())),
-                    redirect_uris: vec![CALLBACK.to_owned()],
-                }],
                 code_seconds,
             });
         },
@@ -107,6 +118,12 @@ async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn E
     let (status, set_up) = service.post("/setup", Some(&cookie), &body).await?;
     assert_eq!(status, 200, "{set_up}");
     let person = set_up["person"].as_str().ok_or("a person")?.to_owned();
+    // The product is an app the administrator registers and approves; the
+    // provider reads it from the apps' record at each request.
+    let mut body = registration(PRODUCT, &workspace_schema(PRODUCT))?;
+    body["redirects"] = json!([CALLBACK]);
+    ok(post(&service, "/apps", Auth::Cookie(&cookie), &body).await?)?;
+    approve(&service, &cookie, PRODUCT).await?;
     Ok((service, cookie, person))
 }
 
@@ -179,7 +196,10 @@ async fn exchange_at(
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
-            format!("Basic {}", STANDARD.encode(format!("{PRODUCT}:{SECRET}"))),
+            format!(
+                "Basic {}",
+                STANDARD.encode(format!("{PRODUCT}:{}", secret()))
+            ),
         )
         .form(&[
             ("grant_type", "authorization_code"),
@@ -256,7 +276,7 @@ async fn a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys(
     let client = CoreClient::from_provider_metadata(
         metadata,
         ClientId::new(PRODUCT.to_owned()),
-        Some(ClientSecret::new(SECRET.to_owned())),
+        Some(ClientSecret::new(secret())),
     )
     .set_redirect_uri(RedirectUrl::new(CALLBACK.to_owned())?);
     let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
@@ -347,8 +367,137 @@ async fn a_redirect_address_not_registered_is_refused_and_never_followed() -> Te
     assert_eq!(answer.status(), 400);
     assert!(answer.headers().get(reqwest::header::LOCATION).is_none());
     let body: Value = serde_json::from_str(&answer.text().await?)?;
-    assert_eq!(body["refusal"], "RedirectUnregistered");
+    assert_eq!(body["refusal"], "redirect_invalid");
     assert!(!body.to_string().contains(service.issuer.loopback()));
+    Ok(())
+}
+
+/// The authorize answer for `client_id` and `redirect`, as a signed-in
+/// browser gets it: the status, the Location header if any, and the body.
+async fn authorize_answer(
+    service: &Service,
+    cookie: &str,
+    client_id: &str,
+    redirect: &str,
+) -> Result<(u16, Option<String>, Value), Box<dyn Error>> {
+    let browser = browser()?;
+    let answer = browser
+        .get(format!("{}/oauth/authorize", service.base))
+        .query(&[
+            ("client_id", client_id),
+            ("redirect_uri", redirect),
+            ("response_type", "code"),
+            ("code_challenge", &challenge_of("v")),
+            ("code_challenge_method", "S256"),
+        ])
+        .header(reqwest::header::COOKIE, cookie)
+        .send()
+        .await?;
+    let status = answer.status().as_u16();
+    let location = answer
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let text = answer.text().await?;
+    let body = if text.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_str(&text)?
+    };
+    Ok((status, location, body))
+}
+
+/// DIRECTORY-079 R1 with DIRECTORY-067 R1 and R2: an app is a sign-in client
+/// from the request after its approval to the request after its retirement,
+/// judged from the apps' record each time, with nothing restarted; before
+/// approval and after retirement it is refused by name, as are an id no app
+/// holds and a wrong secret; no refusal sends the browser anywhere.
+#[tokio::test]
+async fn an_app_is_a_client_from_its_approval_to_its_retirement_with_no_restart() -> TestResult {
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let mut body = registration(SECOND, &workspace_schema(SECOND))?;
+    body["redirects"] = json!([BACK]);
+    ok(post(&service, "/apps", Auth::Cookie(&cookie), &body).await?)?;
+    // Registered and pending: refused app_not_approved, the browser sent nowhere.
+    let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, BACK).await?;
+    assert_eq!((status, location), (403, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "app_not_approved");
+    // Approved: the next request is served, with no restart.
+    approve(&service, &cookie, SECOND).await?;
+    let (status, location, _) = authorize_answer(&service, &cookie, SECOND, BACK).await?;
+    assert_eq!(status, 303);
+    let back = reqwest::Url::parse(&location.ok_or("a code is sent back")?)?;
+    assert!(back.as_str().starts_with(BACK), "{back}");
+    let code = back
+        .query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, value)| value.into_owned())
+        .ok_or("the product is given a code")?;
+    // A wrong secret at the exchange: credential_refused, naming no secret.
+    let wrong = reqwest::Client::new()
+        .post(format!("{}/oauth/token", service.base))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!(
+                "Basic {}",
+                STANDARD.encode(format!("{SECOND}:not-the-secret"))
+            ),
+        )
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", code.as_str()),
+            ("redirect_uri", BACK),
+            ("code_verifier", "v"),
+        ])
+        .send()
+        .await?;
+    assert_eq!(wrong.status().as_u16(), 401);
+    let refused: Value = serde_json::from_str(&wrong.text().await?)?;
+    assert_eq!(refused["error"], "invalid_client");
+    assert_eq!(refused["refusal"], "credential_refused");
+    assert!(!refused.to_string().contains("not-the-secret"));
+    // Retired: the next authorize and the code issued before it are refused app_retired.
+    let retire = json!({"operation": identity_contract::apps::op()?, "reason": "done"});
+    ok(post(
+        &service,
+        &format!("/apps/{SECOND}/retire"),
+        Auth::Cookie(&cookie),
+        &retire,
+    )
+    .await?)?;
+    let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, BACK).await?;
+    assert_eq!((status, location), (403, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "app_retired");
+    let late = reqwest::Client::new()
+        .post(format!("{}/oauth/token", service.base))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!(
+                "Basic {}",
+                STANDARD.encode(format!("{SECOND}:{}", secret()))
+            ),
+        )
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", code.as_str()),
+            ("redirect_uri", BACK),
+            ("code_verifier", "v"),
+        ])
+        .send()
+        .await?;
+    assert_eq!(late.status().as_u16(), 403);
+    let refused: Value = serde_json::from_str(&late.text().await?)?;
+    assert_eq!(refused["refusal"], "app_retired");
+    // An id no app holds: credential_refused, naming no app and no secret.
+    let (status, location, refusal) =
+        authorize_answer(&service, &cookie, "nobody_here", BACK).await?;
+    assert_eq!((status, location), (401, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "credential_refused");
+    assert!(!refusal.to_string().contains("nobody_here"));
+    // The first product, approved in the fixture, still signs in.
+    let (status, _, _) = authorize_answer(&service, &cookie, PRODUCT, CALLBACK).await?;
+    assert_eq!(status, 303);
     Ok(())
 }
 

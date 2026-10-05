@@ -61,8 +61,6 @@ pub struct Carried {
     pub ports: Ports,
     /// The administrator an earlier configuration named.
     pub administrator: Option<Value>,
-    /// The products an earlier configuration registered as clients of Lys.
-    pub products: Option<Value>,
     /// The message service bridge an earlier configuration declared.
     pub message_service: Option<Value>,
     /// Explicit front-proxy trust, absent unless an operator configured it.
@@ -156,7 +154,6 @@ pub fn render(
         },
         "provider": {
             "key_file": state.join(PROVIDER_KEY_FILE).display().to_string(),
-            "clients": carried.products.clone().unwrap_or_else(|| json!([])),
         },
         "requests_dir": dir("requests"),
         "certificates_dir": dir("certificates"),
@@ -230,7 +227,6 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     Ok(Some(Carried {
         ports: Ports::from_value(&earlier)?,
         administrator: named(earlier.get("administrator")),
-        products: named(earlier.pointer("/provider/clients")),
         message_service: message_service(&earlier, &path)?,
         trusted_proxies: named(earlier.get("trusted_proxies")),
         issuer: named(earlier.get("issuer")).and_then(|issuer| issuer.as_str().map(str::to_owned)),

@@ -163,7 +163,6 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
         administrator: Some(
             serde_json::json!({"issuer": "http://localhost:18080/auth/v1/", "subject": "recorded-subject"}),
         ),
-        products: None,
         message_service: None,
         trusted_proxies: None,
         issuer: None,

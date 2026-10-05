@@ -12,15 +12,17 @@ use std::sync::Arc;
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 
+use identity_contract::apps::{Auth, approve, ok, post, registration, workspace_schema};
 use identity_contract::fake_rauthy::{API_KEY, FakeRauthy};
 use identity_contract::harness::{GRANT_MODEL, Service, session_cookie};
 use lys_identity::OperationId;
 use lys_identity::signer::load_service_key;
 use lys_identity_server::accounts;
 use lys_identity_server::configuration_store::ConfigurationStore;
-use lys_identity_server::provider::{ProductClient, ProviderSettings};
+use lys_identity_server::provider::ProviderSettings;
 use lys_identity_server::routes::open_directory;
 use lys_identity_server::runner_acts::ActStore;
+use lys_identity_server::secrets_api::SecretsSettings;
 use lys_identity_server::setup::SetupSettings;
 use lys_identity_server::sign_in_providers::{SignInProviders, SignInProvidersSettings};
 use serde_json::{Value, json};
@@ -31,9 +33,15 @@ type TestResult = Result<(), Box<dyn Error>>;
 const CODE: &str = "accounts-first-run-code";
 const EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
-const PRODUCT: &str = "accounts-fixture";
-const SECRET: &str = "accounts-fixture-secret";
-const CALLBACK: &str = "http://product.example.test/callback";
+/// The fixture product: an app the administrator registers and approves in
+/// `table`, served by the provider from the apps' record.
+const PRODUCT: &str = "accounts_fixture";
+const CALLBACK: &str = "https://product.example.test/callback";
+
+/// The product's client secret, as the custody fixture issued it at approval.
+fn secret() -> String {
+    identity_contract::app_custody::secret()
+}
 
 fn held_account() -> Value {
     json!({
@@ -181,6 +189,7 @@ async fn account_update_keeps_absent_optionals_distinct_from_explicit_null() -> 
 /// A service whose administrator Ada was made on the setup page, signed in.
 async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
     let rauthy = FakeRauthy::start().await?;
+    let broker = identity_contract::app_custody::start().await?;
     let settings = SignInProvidersSettings {
         api: rauthy.api().to_owned(),
         api_key_file: rauthy.api_key_file(),
@@ -190,7 +199,7 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
         None,
         None,
         Some(settings),
-        |config| {
+        move |config| {
             config.password_policy = Some(accounts::PasswordPolicy {
                 length_min: 14,
                 length_max: 128,
@@ -213,17 +222,13 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
             config.policies_dir = None;
             config.goals_dir = None;
             config.reviews_dir = None;
+            config.secrets = Some(SecretsSettings {
+                broker,
+                service: "identity".to_owned(),
+                service_key_file: config.event_key_file.clone(),
+            });
             config.provider = Some(ProviderSettings {
                 key_file: config.log_dir.with_file_name("provider.key"),
-                clients: vec![ProductClient {
-                    client_id: PRODUCT.to_owned(),
-                    secret_sha256: Sha256::digest(SECRET.as_bytes())
-                        .iter()
-                        .map(|byte| format!("{byte:02x}"))
-                        .collect::<Vec<_>>()
-                        .concat(),
-                    redirect_uris: vec![CALLBACK.to_owned()],
-                }],
                 code_seconds: 60,
             });
             config.administrator = None;
@@ -278,6 +283,12 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
         .send()
         .await?;
     let ada = session_cookie(made).await?;
+    // The product is an app Ada registers and approves; the provider reads it
+    // from the apps' record at each request.
+    let mut body = registration(PRODUCT, &workspace_schema(PRODUCT))?;
+    body["redirects"] = json!([CALLBACK]);
+    ok(post(&service, "/apps", Auth::Cookie(&ada), &body).await?)?;
+    approve(&service, &ada, PRODUCT).await?;
     Ok((service, rauthy, ada))
 }
 
@@ -532,7 +543,10 @@ async fn product_token(
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
-            format!("Basic {}", STANDARD.encode(format!("{PRODUCT}:{SECRET}"))),
+            format!(
+                "Basic {}",
+                STANDARD.encode(format!("{PRODUCT}:{}", secret()))
+            ),
         )
         .form(&[
             ("grant_type", "authorization_code"),

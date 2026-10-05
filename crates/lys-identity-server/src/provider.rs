@@ -11,14 +11,16 @@
 //! issuer behind Lys, so the configuration a product receives names only
 //! Lys's address.
 //!
-//! A product is a client registered with Lys: until products register
-//! themselves (DIRECTORY-048) the clients are the ones the configuration
-//! lists, each with its secret's SHA-256 digest and its exact redirect
-//! addresses. Refusals are named, and none sends the browser anywhere: a
-//! redirect address not registered (`RedirectUnregistered`), a code used
-//! twice (`CodeUsed`), a wrong PKCE verifier (`VerifierWrong`), a code past
-//! its instant (`CodeExpired`). An instant is data compared on use, never a
-//! wait.
+//! A product is an app approved on the Apps screen, and nothing else: the
+//! provider's clients are the approved apps in the apps' record, read at each
+//! request (`apps_binding::sign_in_client`), so an approval or a retirement
+//! is in force at the next request with no file edited and nothing
+//! restarted. Refusals are named, and none sends the browser anywhere: an
+//! app not approved or retired, an id no app holds, an address the
+//! registration does not list (the apps' own refusals), a code exchanged for
+//! another address (`RedirectUnregistered`), a code used twice (`CodeUsed`),
+//! a wrong PKCE verifier (`VerifierWrong`), a code past its instant
+//! (`CodeExpired`). An instant is data compared on use, never a wait.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -52,27 +54,13 @@ pub const CODE_SECONDS: u64 = 600;
 /// Offline identity assertions must be renewed through a live sign-in.
 const ID_TOKEN_SECONDS: u64 = 300;
 
-/// A product registered as a client of Lys.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ProductClient {
-    /// The product's client id.
-    pub client_id: String,
-    /// Lowercase hex SHA-256 of the product's client secret.
-    pub secret_sha256: String,
-    /// The exact addresses Lys may send the product's codes to.
-    pub redirect_uris: Vec<String>,
-}
-
-/// What the provider is started with.
+/// What the provider is started with. Its clients are the approved apps,
+/// read from the apps' record at each request, never from here.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderSettings {
     /// The file holding the Ed25519 seed ID tokens are signed with.
     pub key_file: PathBuf,
-    /// The products registered as clients.
-    #[serde(default)]
-    pub clients: Vec<ProductClient>,
     /// How long a code lives, in seconds.
     #[serde(default = "code_seconds")]
     pub code_seconds: u64,
@@ -112,7 +100,6 @@ pub struct OpenIdProvider {
     issuer: String,
     key: Ed25519Identity,
     kid: String,
-    clients: Vec<ProductClient>,
     code_seconds: u64,
     codes: Mutex<HashMap<String, Grant>>,
     tokens: Mutex<Tokens>,
@@ -186,7 +173,6 @@ impl OpenIdProvider {
             issuer,
             key,
             kid,
-            clients: settings.clients.clone(),
             code_seconds: settings.code_seconds,
             codes: Mutex::new(HashMap::new()),
             tokens: Mutex::new(Tokens::open(
@@ -199,24 +185,6 @@ impl OpenIdProvider {
     /// Lys's issuer name.
     pub fn issuer(&self) -> &str {
         &self.issuer
-    }
-
-    fn client(&self, client_id: &str) -> Result<&ProductClient, ServerError> {
-        self.clients
-            .iter()
-            .find(|client| client.client_id == client_id)
-            .ok_or(ServerError::ClientUnknown)
-    }
-
-    /// The client whose id and secret a token request presents.
-    fn authenticated(&self, client_id: &str, secret: &str) -> Result<&ProductClient, ServerError> {
-        let client = self.client(client_id)?;
-        let digest = hex(&Sha256::digest(secret.as_bytes()));
-        if same(&digest, &client.secret_sha256) {
-            Ok(client)
-        } else {
-            Err(ServerError::ClientUnknown)
-        }
     }
 
     /// Sign `claims` as a compact JWS with the provider's key.

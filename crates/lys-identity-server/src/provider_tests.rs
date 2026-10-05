@@ -73,7 +73,6 @@ fn an_id_token_verifies_under_the_key_its_jwks_names() -> Result<(), Box<dyn Err
     std::fs::write(&key_file, [7u8; 32])?;
     let settings = ProviderSettings {
         key_file: key_file.clone(),
-        clients: Vec::new(),
         code_seconds: 60,
     };
     let provider = OpenIdProvider::open(&settings, "http://localhost:8490".to_owned())?;
