@@ -29,7 +29,7 @@ pub struct Used {
     /// What the period's records did report when some reported nothing: their sum, and how many
     /// reported nothing. The figure stays absent, since the whole is not known; this is never a total.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reported: Option<Reported>,
+    pub reported: Option<ReportedPart>,
     /// The account that reported the highest window, retained only for acts.
     #[serde(skip)]
     pub(crate) account: Option<String>,
@@ -37,7 +37,7 @@ pub struct Used {
 
 /// The part of a period's spend that was reported, beside the count of records that reported none.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
-pub struct Reported {
+pub struct ReportedPart {
     /// The sum of what was reported, in the limit's unit.
     #[schema(value_type = f64)]
     pub figure: Number,
@@ -291,7 +291,7 @@ impl Reading<'_> {
                 .and_then(|total| u64::try_from(total).ok())
                 .map(|total| number(limit.unit, total))
                 .transpose()?
-                .map(|figure| Reported {
+                .map(|figure| ReportedPart {
                     figure,
                     missing: spend.gaps,
                 });
