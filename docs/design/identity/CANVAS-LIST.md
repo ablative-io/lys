@@ -141,7 +141,12 @@ What is to be written, as one piece, so it is done once and stays done:
    symbol left of the badge.
 5. Walked in a browser with pictures, every screen, before it is called done.
 
-Not started. It needs no build to write and one battery to install.
+Steps 1 to 3 are written (6 October, by Waffles): the control is `surface/identity/src/shell/Act.tsx`, the set of
+eighteen symbols `shell/symbols.tsx`, and `tests/bare-buttons.test.tsx` holds every file's count of bare buttons in
+`tests/bare-buttons.standing.ts` (80 files, 246 buttons, the audit's own numbers): a new bare button anywhere turns
+it red by the file's name, and a file's number is lowered in the commit that moves its buttons. No screen uses the
+control yet. Steps 4 and 5 are not started: no button a person sees has changed. It needs no build to write and one
+battery to install.
 
 ## The canvas as wiring (Tom, the same walk)
 
