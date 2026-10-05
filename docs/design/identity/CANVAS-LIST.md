@@ -79,6 +79,10 @@ His words, in the order said, on a person's page (he had Waffles' open):
 - The system prompt, 16:41: "the options are to keep this agent's own prompt or add to it. Those aren't mutually
   exclusive options. You can keep it unchanged. You can... add to it... you can replace it altogether. And yeah,
   I really suspect you should have a bit of a better look at all of this stuff."
+- Settings, 16:42: "a few things are a bit cramped up and not aligned properly, like the rules part. And you're
+  saying connected tools this agent can use... if we're just talking about MCP servers... just call them MCP
+  servers. If we're talking about more than that... we should just break things out into separate sort of
+  things. So tools, plugins... MCP servers, plugins, skills."
 
 Seen by Waffles on the walk he asked for (installed a1678ae6, pictures w40, w41), beside his own:
 
