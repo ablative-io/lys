@@ -11,7 +11,7 @@ const version: RoleVersion = { ...words, number: 1, made_by: ADA, made_at: 17900
 const holder: RoleHolder = { assignment: 'op-' + 'b'.repeat(32), holder: SCRIBE, display_name: 'Scribe', version: 1, behind: true, assigned_by: ADA, assigned_at: 1790000001, ends_at: 1990000000, moves_at: null, state: 'holding', moves: [], ended_by: null, ended_at: null };
 const role: Role = { id: 'op-' + 'a'.repeat(32), name: 'Reviewer', latest: 2, policy: 'stays_until_moved', versions: [version, { ...version, number: 2, responsibilities: 'Review code and docs', note: 'Include docs' }], holders: [holder] };
 const routes = { ...SERVICE, '/roles': ok({ roles: [role] }) };
-const button = (label: string) => [...document.querySelectorAll('button')].find((value) => value.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((value) => (value.getAttribute('aria-label') ?? value.textContent) === label) ?? null;
 function input(name: string, value: string) {
   const element = $('[name="' + name + '"]');
   if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) throw new Error('Missing ' + name);

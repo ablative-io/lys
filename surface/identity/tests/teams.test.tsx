@@ -14,7 +14,7 @@ beforeEach(() => sessionStorage.clear());
 describe('Teams', () => {
   it('creates an owned team without grants or credentials', async () => {
     const { posted } = await open({ ...routes, 'POST /teams': (body) => { const request = body as Record<string, string>; return receipt(body, 'created', null, { ...team, id: request.operation, name: request.name, description: request.description }); } });
-    await click(button('+ Create a team'));
+    await click(button('Create a team'));
     const input = $('form[aria-label="Create team"] input'); if (!(input instanceof HTMLInputElement)) throw new Error('Team name missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Reviewers'); input.dispatchEvent(new Event('input', { bubbles: true })); }); await settle();
     posted.length = 0; await click(button('Create team')); expect(posted).toEqual([{ path: '/teams', body: { operation: expect.stringMatching(/^op-/), name: 'Reviewers', description: '' } }]); expect(text()).toContain('Your team was recorded');

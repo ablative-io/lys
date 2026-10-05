@@ -8,6 +8,7 @@ import { roleWordsOf, sameWords } from './contract';
 import type { GrantTemplate, Role } from './contract';
 import { useRoleChange } from './useRoleChange';
 import { ChangeStatus } from './ChangeStatus';
+import { Act } from '../../shell/Act';
 
 export function RoleEditor({ role, person, model, changed }: { role?: Role; person: string; model: GrantModel; changed: (answer: Role) => void }) {
   const current = role?.versions.find((version) => version.number === role.latest);
@@ -49,17 +50,17 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
             <td><input name={'resource-' + id} aria-label="Name of the thing this access covers" required list="role-ids" autoComplete="off" defaultValue={template.resource.id} /></td>
             <td><select name={'relation-' + id} aria-label="Access level" required defaultValue={template.relation}><option value="">Choose access</option>{Object.entries(model.relations).map(([name, actions]) => <option key={name} value={name}>{name} · {actions.join(', ')}</option>)}</select></td>
             <td><input name={'days-' + id} aria-label="Usual duration in days, empty for no expiry of its own" type="number" min={1} step={1} defaultValue={template.days ?? ''} /></td>
-            <td><button className="btn" type="button" onClick={() => setRows((values) => values.filter((row) => row.id !== id))}>Remove template</button></td>
+            <td><Act symbol="remove" name="Remove template" onClick={() => setRows((values) => values.filter((row) => row.id !== id))} /></td>
           </tr>)}
           {rows.length ? null : <tr><td colSpan={5} className="dim">No access template. A template grants nothing by itself.</td></tr>}
         </tbody>
-        <tfoot><tr><td colSpan={5} className="usage-add"><button className="btn" type="button" onClick={() => setRows((values) => [...values, { id: Math.max(-1, ...values.map((value) => value.id)) + 1, template: { resource: { kind: '', id: '' }, relation: '', days: null } }])}>Add access template</button></td></tr></tfoot>
+        <tfoot><tr><td colSpan={5} className="usage-add"><Act symbol="add" name="Add access template" word="Add" onClick={() => setRows((values) => [...values, { id: Math.max(-1, ...values.map((value) => value.id)) + 1, template: { resource: { kind: '', id: '' }, relation: '', days: null } }])} /></td></tr></tfoot>
       </table>
       <datalist id="role-kinds">{[...new Set(resources.map((resource) => resource.kind))].sort().map((kind) => <option key={kind} value={kind} />)}</datalist>
       <datalist id="role-ids">{resources.map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} label={resource.kind} />)}</datalist>
       {known.status === 'refused' ? <p className="note">The things already named in grants could not be read, so a template’s kind and name are typed. <small className="refusal-name">{known.refused.refusal.refusal}</small></p> : null}
       <label className="field wide">Reason for this version<textarea name="note" rows={2} required /></label>
-      <p><button className="btn primary" type="submit">{role ? 'Save this version' : 'Create role'}</button></p>
+      <p><Act symbol="save" name={role ? 'Save this version' : 'Create role'} word={role ? 'Save' : 'Create'} tone="primary" type="submit" /></p>
     </fieldset>
     {failure ? <p role="alert">{failure}</p> : null}<ChangeStatus change={change} />
   </form>;

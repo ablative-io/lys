@@ -10,6 +10,7 @@ import { RoleEditor } from './RoleEditor';
 import { RoleHolders } from './RoleHolders';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
+import { Act } from '../../shell/Act';
 
 export function Roles() {
   const { id } = useParams();
@@ -32,7 +33,7 @@ export function Roles() {
   const me = authority.status === 'ok' ? authority.data.me.person.id : '';
   const editor = editing && admin && authority.status === 'ok' ? <RoleEditor key={(role?.id ?? 'new') + ':' + (role?.latest ?? 0)} role={role} person={me} model={authority.data.model} changed={changed} /> : null;
   return <div className="page fill"><div className="head"><div><div className="eyebrow">{id ? <a href="#/roles">Roles</a> : 'Directory'}</div><h1>{role ? role.name : 'Roles'}</h1>{id ? null : <p className="sub">Describe a job, assign it to people or agents, and review changes before updating their assigned version.</p>}</div>
-    {admin && (!id || role) ? <button className="btn" onClick={() => setEditing((value) => !value)}>{editing ? 'Close editor' : role ? 'New version' : 'Create a role'}</button> : null}</div>
+    {admin && (!id || role) ? <Act symbol={editing ? 'close' : 'add'} name={editing ? 'Close editor' : role ? 'New version' : 'Create a role'} word={editing ? 'Close' : role ? 'New version' : 'Create'} onClick={() => setEditing((value) => !value)} /> : null}</div>
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Roles" ok={() => {
       if (id && !role) return <p className="why-not">This role was not returned by the service.</p>;
@@ -77,7 +78,7 @@ function RoleText({ role }: { role: Role }) {
     <section className="card" aria-label="Version history"><h3>Version history</h3>
       <table className="usage-table"><thead><tr><th>Version</th><th>Made</th><th>By</th><th>Note</th><th>Read</th></tr></thead><tbody>
         {role.versions.map((version) => <tr key={version.number} aria-current={version.number === shown.number ? 'true' : undefined}><td>{version.number}</td><td>{clock(version.made_at)}</td><td><IdentityName id={version.made_by} /></td><td>{version.note}</td>
-          <td>{version.number === shown.number ? <span className="sec">Shown above</span> : <button className="btn" type="button" onClick={() => setNumber(version.number)}>Read version {version.number}</button>}</td></tr>)}
+          <td>{version.number === shown.number ? <span className="sec">Shown above</span> : <Act symbol="open" name={'Read version ' + version.number} word="Read" onClick={() => setNumber(version.number)} />}</td></tr>)}
       </tbody></table>
     </section>
   </>;

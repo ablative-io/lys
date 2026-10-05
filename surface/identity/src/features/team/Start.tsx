@@ -12,6 +12,7 @@ import type { StartRefusal } from '../runtime/CannotStart';
 import { pendingStartOf, profileRequest, startRequest } from '../runtime/start-requests';
 import type { Pending } from '../runtime/start-requests';
 import { sendKept, releaseRecord } from '../../kept';
+import { Act } from '../../shell/Act';
 
 /** A refusal as the service named it; a failure the screen found itself keeps the name it was thrown with. */
 function refusalOf(error: unknown): StartRefusal {
@@ -106,7 +107,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
   if (load.status === 'loading') return wanted.current ? <p role="status" className="team-start-line">Starting {name}…</p> : null;
   if (load.status === 'refused') return <div className="team-start" role="alert">
     <p className="team-start-line">Lys could not read what {name} needs to start. {load.refused.message} <small className="refusal-name">{load.refused.refusal.refusal}</small></p>
-    <div className="team-start-acts"><button type="button" className="btn primary" onClick={() => setRound((value) => value + 1)}>Try again</button></div>
+    <div className="team-start-acts"><Act symbol="retry" name="Try again" word="Try again" tone="primary" onClick={() => setRound((value) => value + 1)} /></div>
   </div>;
   const stopped = refusal ?? known;
   return <div className="team-start">
@@ -114,7 +115,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     {stopped && data ? <CannotStart agent={agent} name={name} refusal={stopped} machines={data.machines} again={again} /> : null}
     {!stopped && noProgram ? <div role="alert" className="cannot-start">
       <p>{name} has no program chosen yet.</p>
-      <button type="button" className="btn primary" onClick={settings}>Choose its program</button>
+      <Act symbol="open" name="Choose its program" word="Choose" tone="primary" onClick={settings} />
     </div> : null}
     {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/file/' + encodeURIComponent(agent) + '/sessions'}>See what its runner reported</a></p> : null}
     {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => <button key={computer.id} type="button" className="btn primary" disabled={busy} onClick={() => { void run(computer.id); }}>

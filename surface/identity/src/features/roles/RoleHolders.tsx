@@ -9,6 +9,7 @@ import type { Role, RoleAnswer, RoleHolder, RoleVersion } from './contract';
 import { useRoleChange } from './useRoleChange';
 import { ChangeStatus } from './ChangeStatus';
 import { IdentityName, PART } from '../people/Words';
+import { Act } from '../../shell/Act';
 
 /** The holders table's last row: who, until when, and the button that assigns the latest saved version. */
 function AssignRole({ role, person, identities, changed }: { role: Role; person: string; identities: { id: string; name: string }[]; changed: (answer: RoleAnswer) => void }) {
@@ -28,7 +29,7 @@ function AssignRole({ role, person, identities, changed }: { role: Role; person:
       <Picker name="holder" label="Find a person or agent" options={identities} />
       <input type="datetime-local" name="expires" aria-label="Role until, your local time" required={!noExpiry} disabled={noExpiry} />
       <label className="tick">No expiry<input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /></label>
-      <span><button className="btn primary" type="submit">Assign role</button></span>
+      <span><Act symbol="add" name="Assign role" word="Assign" tone="primary" type="submit" /></span>
     </fieldset>{failure ? <p role="alert">{failure}</p> : null}<ChangeStatus change={change} />
   </form>;
 }
@@ -64,15 +65,15 @@ function HolderRow({ role, holder, person, admin, changed }: { role: Role; holde
         {holder.moves.map((entry, index) => <div className="note" key={index}>Version {entry.from} → {entry.to}, {clock(entry.at)}, by <IdentityName id={entry.by} /></div>)}
         {holder.ended_at !== null ? <div className="note">Ended {clock(holder.ended_at)} by {holder.ended_by ? <IdentityName id={holder.ended_by} /> : 'Name unavailable'}</div> : null}</td>
       {admin ? <td>{holder.state !== 'holding' ? null : !holder.assignment ? <span className="why-not">The server must identify this assignment before it can be changed safely.</span> : open ? null : <>
-        {holder.behind ? <button className="btn" type="button" onClick={() => setConfirm('move')}>{titles.move}</button> : null}
-        <button className="btn" type="button" onClick={() => setConfirm('end')}>{titles.end}</button></>}
+        {holder.behind ? <Act symbol="again" name={titles.move} word="Review" onClick={() => setConfirm('move')} /> : null}
+        <Act symbol="remove" name={titles.end} word="Remove" onClick={() => setConfirm('end')} /></>}
         <ChangeStatus change={move} /><ChangeStatus change={end} /></td> : null}
     </tr>
     {open && admin && holder.assignment ? <tr className="review-row"><td colSpan={6}>
       <h4>{titles[open]} for {name}?</h4>
       {open === 'move' && before && after ? <VersionDifference before={before} after={after} /> : null}
       <p>{open === 'move' ? 'The expiry stays ' + (holder.ends_at === null ? 'unset' : clock(holder.ends_at)) + '. Existing grants are not changed.' : 'The assignment stays in its history. This does not retire the identity or revoke separately issued grants.'}</p>
-      {!change.pending ? <><button className="btn primary" type="button" disabled={change.blocked || (open === 'move' && (!before || !after))} onClick={() => change.submit(open === 'move' ? { assignment: holder.assignment, from_version: holder.version, to_version: role.latest } : { assignment: holder.assignment })}>{open === 'move' ? 'Apply version ' + role.latest : 'Yes, remove this assignment'}</button>{' '}<button className="btn" type="button" disabled={change.busy} onClick={() => setConfirm(null)}>Cancel</button></> : null}
+      {!change.pending ? <><Act symbol="approve" name={open === 'move' ? 'Apply version ' + role.latest : 'Yes, remove this assignment'} word={open === 'move' ? 'Apply' : 'Remove'} tone="primary" disabled={change.blocked || (open === 'move' && (!before || !after))} onClick={() => change.submit(open === 'move' ? { assignment: holder.assignment, from_version: holder.version, to_version: role.latest } : { assignment: holder.assignment })} />{' '}<Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setConfirm(null)} /></> : null}
     </td></tr> : null}
   </>;
 }

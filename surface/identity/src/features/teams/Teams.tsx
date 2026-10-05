@@ -13,6 +13,7 @@ import { sameLogin } from './contract';
 import type { Team, TeamChanged } from './contract';
 import type { MeView, PeopleView } from '../../generated';
 import { subtree, treeOrder } from '../../shell/org';
+import { Act } from '../../shell/Act';
 /** The organisation's teams, as /teams serves them, parent and lead included. */
 export async function readTeams(): Promise<Team[]> {
   return (await request<{ teams: Team[] }>('/teams')).teams;
@@ -58,7 +59,7 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
     <div className="tools">
       <input className="search" type="search" aria-label="Search teams" placeholder={'Search ' + (teams.length - (retired ? 0 : retiredCount)).toLocaleString('en-AU') + (teams.length - (retired ? 0 : retiredCount) === 1 ? ' team' : ' teams')} value={query} onChange={(event) => setQuery(event.target.value)} />
       {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
-      <button className="btn primary" onClick={() => { setCreating(true); setNotice(''); }}>+ Create a team</button>
+      <Act symbol="add" name="Create a team" word="Team" tone="primary" onClick={() => { setCreating(true); setNotice(''); }} />
       {notice ? <span role="status" className="note">{notice}</span> : null}
     </div>
     <div className="body halves">
@@ -104,7 +105,7 @@ function TeamRow({ team, depth, teams, current, manages, person, login, name, ho
     <td className="sec">{edits ? <select aria-label={'Lead of ' + team.name} value={lead} disabled={change.blocked} onChange={(event) => setLead(event.target.value)}><option value="">None named</option>{leads.map((id) => <option key={id} value={id}>{name(id)}</option>)}</select>
       : team.lead ? name(team.lead) : <span className="dim">none named</span>}</td>
     <td className="sec">{holds}</td>
-    <td>{edits && (dirty || change.pending) ? <button className="btn" type="button" disabled={change.blocked || !dirty} onClick={(event) => { event.stopPropagation(); change.submit({ operation: operationId(), parent: parent || null, lead: lead || null }); }}>Save place</button> : null}<ChangeStatus change={change} /></td>
+    <td>{edits && (dirty || change.pending) ? <Act symbol="save" name="Save place" word="Save" disabled={change.blocked || !dirty} onClick={(event) => { event.stopPropagation(); change.submit({ operation: operationId(), parent: parent || null, lead: lead || null }); }} /> : null}<ChangeStatus change={change} /></td>
   </tr>;
 }
 function Create({ person, login, changed }: { person: string; login: Login; changed: (answer: TeamChanged, message: string) => void }) {
@@ -113,6 +114,6 @@ function Create({ person, login, changed }: { person: string; login: Login; chan
   return <form className="card" aria-label="Create team" onSubmit={(event) => { event.preventDefault(); if (name.trim()) change.submit({ operation: operationId(), name: name.trim(), description: description.trim() }); }}><h3>Create a team</h3>
     <label className="field">Team name<input value={name} required disabled={change.blocked} onChange={(event) => setName(event.target.value)} /></label>
     <label className="field">What the team does<textarea value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
-    <button className="btn primary" type="submit" disabled={change.blocked || !name.trim()}>Create team</button><ChangeStatus change={change} />
+    <Act symbol="add" name="Create team" word="Create" tone="primary" type="submit" disabled={change.blocked || !name.trim()} /><ChangeStatus change={change} />
   </form>;
 }
