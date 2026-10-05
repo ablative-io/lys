@@ -80,7 +80,8 @@ fn sign_in(installed: &Installed<'_>, read: &mut Heard, what: &str) -> TestResul
     Ok(signed_in.cookie.ok_or("the sign-in began a session")?)
 }
 
-/// Registers the fixture product through `POST /apps` as the signed-in
+/// Registers the fixture product through `POST /api/apps` (an install serves
+/// the service's routes under `/api`, beside its screens) as the signed-in
 /// administrator and approves it with its one return address, as the Apps
 /// screen does. The approval confirms broker custody: its credentials name
 /// the app, no client is issued in the answer, and no answer holds a secret.
@@ -112,7 +113,7 @@ fn register(installed: &Installed<'_>, read: &mut Heard, cookie: &str) -> TestRe
     let registered = ask(
         installed.service_port,
         "POST",
-        "/apps",
+        "/api/apps",
         Some(cookie),
         Some(&registration),
     )?;
@@ -123,7 +124,7 @@ fn register(installed: &Installed<'_>, read: &mut Heard, cookie: &str) -> TestRe
     let approved = ask(
         installed.service_port,
         "POST",
-        &format!("/apps/{PRODUCT}/approve"),
+        &format!("/api/apps/{PRODUCT}/approve"),
         Some(cookie),
         Some(&approval),
     )?;
@@ -236,7 +237,7 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
     let kept = ask(
         installed.service_port,
         "GET",
-        &format!("/apps/{PRODUCT}"),
+        &format!("/api/apps/{PRODUCT}"),
         Some(&cookie),
         None,
     )?;
