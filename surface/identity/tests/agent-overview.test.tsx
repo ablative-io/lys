@@ -71,8 +71,13 @@ describe('An agent page explains the agent before its controls', () => {
     expect($$('.file nav.tabs a').map((entry) => entry.getAttribute('href'))).toEqual(expect.arrayContaining(['#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']));
     expect($('[data-act="start"]')).toBeNull();
     expect(run()?.textContent).not.toContain('is not running');
-    expect($('.file .head')?.textContent).toContain('Edit name');
-    expect($('.file .head [data-act="suspend"]')).not.toBeNull();
+    // The head is the name, the stop, the state and one menu; the name is edited from the Overview.
+    expect($('.file .head')?.textContent).not.toContain('Edit name');
+    expect($('.file [data-act="rename"]')?.getAttribute('aria-label')).toBe('Edit name');
+    expect($('.file .head [data-act="stop"]')?.getAttribute('aria-label')).toBe('Emergency stop');
+    await click($('.file .head [aria-label="More actions"]'));
+    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Suspend');
+    expect($('.file .head [data-act="retire"]')?.textContent).toBe('Retire');
     expect(requests).not.toContain('/receipts/4');
     expect($('.agent-details')).toBeNull();
     expect($('.file details')).toBeNull();
@@ -183,6 +188,7 @@ describe('An agent page explains the agent before its controls', () => {
   it('reads receipts only when the Record tab is opened and keeps lifecycle changes in the head', async () => {
     const first = await open();
     expect(first.requests).not.toContain('/receipts/4');
+    await click($('.file .head [aria-label="More actions"]'));
     expect($('.file .head [data-act="suspend"]')).not.toBeNull();
     expect(first.posted).toEqual([]);
     act(() => root?.unmount()); root = null;
@@ -194,6 +200,7 @@ describe('An agent page explains the agent before its controls', () => {
     await settle();
     expect($('.file .pane')?.textContent).toContain('by Ada (test person)');
     expect($('.file .pane')?.textContent).not.toContain('by ada');
+    await click($('.file .head [aria-label="More actions"]'));
     expect($('.file .head [data-act="suspend"]')).not.toBeNull();
     expect($('.file details.agent-details')).toBeNull();
     expect(posted).toEqual([]);

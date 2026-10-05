@@ -68,4 +68,6 @@ function ReadName({ id }: { id: string }) {
 
 export const STATUS: Record<string, string> = { registered: 'Awaiting activation', active: 'Active', suspended: 'Access suspended', retired: 'Permanently retired' };
 export const ACTION: Record<string, string> = { activate: 'Activate access', suspend: 'Suspend access', retire: 'Retire permanently', reinstate: 'Restore access', resume: 'Restore access' };
+/** The same acts in one word, for a menu or a small button; the full words stay on the form each opens. */
+export const ACTION_SHORT: Record<string, string> = { activate: 'Activate', suspend: 'Suspend', retire: 'Retire', reinstate: 'Restore', resume: 'Restore' };
 export const PART: Record<string, string> = { responsibilities: 'Responsibilities', goals: 'Goals', practice: 'How the work is done', profile: 'Starting instructions for an agent' };

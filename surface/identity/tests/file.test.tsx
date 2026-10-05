@@ -21,7 +21,9 @@ describe("An agent's file", () => {
     expect($('.file .head')?.textContent).not.toContain(SCRIBE);
     expect($('#state')?.textContent).toBe('Active');
     expect($('[aria-label="About this agent"] .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
-    expect($('.file .head')?.textContent).toContain('Added 22 Sep');
+    // The day it was added is a line of its Overview; the head is the name, the stop, the state and one menu.
+    expect($('.file .head')?.textContent).toBe('Scribe■Active⋯');
+    expect($('[aria-label="About this agent"]')?.textContent).toContain('Added22 Sep');
     expect($('.agent-details')).toBeNull();
     expect($('.file details')).toBeNull();
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Settings', 'Access1', 'Limits and goals', 'Sessions', 'Credentials', 'Record2']);
@@ -32,8 +34,9 @@ describe("An agent's file", () => {
     expect($('nav[aria-label="Next steps"]')).toBeNull();
     expect($('section[aria-label="Run"]')?.textContent).toContain('Scribe is not running.');
     expect($('a[href^="#/team"]')).toBeNull();
+    expect($('.file .head button[data-act="stop"]')?.getAttribute('aria-label')).toBe('Emergency stop');
+    await click($('.file .head [aria-label="More actions"]'));
     expect($('.file .head [data-act="suspend"]')).not.toBeNull();
-    expect($('.file .head button[data-act="stop"]')).not.toBeNull();
     expect($$('.file [data-act="stop"]').length).toBe(1);
   });
 
@@ -140,6 +143,7 @@ describe("An agent's file", () => {
 
   it('opens the lifecycle form in the head of the file itself, without leaving the page or changing identity state before submission', async () => {
     const { posted } = await mount('#/file/' + SCRIBE);
+    await click($('.file .head [aria-label="More actions"]'));
     await click($('.file .head [data-act="suspend"]'));
     expect(location.hash).toBe('#/file/' + SCRIBE);
     const form = $('.file form[aria-label="Record lifecycle change"]');
@@ -150,9 +154,10 @@ describe("An agent's file", () => {
     expect(posted).toHaveLength(0);
   });
 
-  it('edits the name in the head of the file itself', async () => {
+  it('edits the name from the Overview of the file itself', async () => {
     const { posted } = await mount('#/file/' + SCRIBE);
-    await click($('.file .head [data-act="rename"]'));
+    expect($('.file .head [data-act="rename"]')).toBeNull();
+    await click($('.file [aria-label="About this agent"] [data-act="rename"]'));
     expect(location.hash).toBe('#/file/' + SCRIBE);
     expect(document.querySelector<HTMLInputElement>('.file form[aria-label="Save name"] input[name="display_name"]')?.value).toBe('Scribe');
     expect(posted).toHaveLength(0);

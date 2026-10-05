@@ -32,9 +32,10 @@ function recorded(body: unknown, grant = false) {
 }
 
 const profile = '/identities/' + ADA + '/profile';
-/** The form a button in the head of Ada's file opens. */
+/** The form an act in the head of Ada's file opens: pressed in the head itself, or in the head's one menu once that is opened. */
 async function head(act: string, title: string, routes: Record<string, unknown> = SERVICE, at = '#/file/' + ADA) {
   const world = await mount(at, routes as typeof SERVICE);
+  if (!$('.file .head [data-act="' + act + '"]')) await click($('.file .head [aria-label="More actions"]'));
   await click($('.file .head [data-act="' + act + '"]'));
   return { ...world, page: form(title) };
 }

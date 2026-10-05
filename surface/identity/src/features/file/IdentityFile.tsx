@@ -5,7 +5,7 @@ import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
 import { EmergencyStop, StopReceipt } from './EmergencyStop';
 import type { StopAnswer } from './EmergencyStop';
-import { DirectoryGate as Gate, ErrorWords, ACTION, STATUS } from '../people/Words';
+import { DirectoryGate as Gate, ErrorWords, ACTION, ACTION_SHORT, STATUS } from '../people/Words';
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';
 import { TabBody } from './sections';
@@ -15,6 +15,7 @@ import { day } from './time';
 import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { AgentOverview } from './AgentOverview';
+import { HeadMenu } from './HeadMenu';
 import { AssignedRoles } from '../roles/AssignedRoles';
 import './agent-overview.css';
 
@@ -81,28 +82,23 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
   };
   return (
     <div className="page fill">
-      <div className="eyebrow">
-        <a href="#/people">People and agents</a> / {x.display_name}
-      </div>
       {/* One flat look for a person and an agent: the name, no raw id under it, no folder tab. */}
       <div className={'file flat-file' + (agent ? ' agent-page' : ' person-page')}>
         <div className="head">
           <div>
-            <h1 style={{ fontSize: 24, marginTop: 0 }}>{x.display_name}</h1>
-            {agent ? <p className="sec">{x.state === 'active' ? '' : x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}{since ? (x.state === 'active' ? 'Added ' : ' Added ') + day(since) + '.' : ''}</p>
+            <h1>{x.display_name}</h1>
+            {agent ? (x.state === 'active' ? null : <p className="sec">{x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}</p>)
               : person ? <p className="sec">Answers to <Pill x={person} /></p> : null}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button type="button" className="btn" data-act="rename" aria-pressed={changing === 'name'} onClick={() => setChanging(changing === 'name' ? null : 'name')}>Edit name</button>
-            <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
-            {ACTIONS[x.state].map((a) => (
-              <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} aria-pressed={changing === a} onClick={() => setChanging(changing === a ? null : a)}>
-                {ACTION[a]}
-              </button>
-            ))}
+            {/* The head holds the name, the stop, the state and one menu, and nothing else (Tom, 5 October 2026). */}
+            {ACTIONS[x.state].includes('activate') ? <button className="btn primary" data-act="activate" aria-pressed={changing === 'activate'} onClick={() => setChanging(changing === 'activate' ? null : 'activate')}>{ACTION_SHORT.activate}</button> : null}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
               <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
             ) : null}
+            <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
+            <HeadMenu chosen={changing} choose={(act) => setChanging(changing === act ? null : act)}
+              items={[...(agent ? [] : [{ act: 'name', label: 'Edit name', mark: 'rename' }]), ...ACTIONS[x.state].filter((a) => a !== 'activate').map((a) => ({ act: a, label: ACTION_SHORT[a], danger: a === 'suspend' || a === 'retire' }))]} />
           </div>
         </div>
         {changing === 'name' ? <RecordedForm name="change-profile" title="Save name" heading="Edit name" description="Change the display name while keeping the same identity and audit history." done={reload}
@@ -126,7 +122,7 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
           ))}
         </nav>
         <div className="pane">
-          {agent && tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <><ReadProblems problems={problems} /><AssignedRoles id={x.id} /></>} />
+          {agent && tab === 'profile' ? <AgentOverview key={x.id} agent={agent} added={since ? day(since) : undefined} rename={() => setChanging(changing === 'name' ? null : 'name')} details={(problems) => <><ReadProblems problems={problems} /><AssignedRoles id={x.id} /></>} />
             : agent && tab === 'record' ? <AgentEvidence data={{ ...data, x }} tab="record" reload={reload} />
             : <TabBody tab={tab} data={{ ...data, x }} reload={reload} />}
         </div>

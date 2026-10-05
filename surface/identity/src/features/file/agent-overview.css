@@ -2,7 +2,15 @@
 .flat-file.file { background: none; border: 0; border-radius: 0; padding: 8px 0 0; margin-top: 0; }
 .flat-file.file::before { display: none; }
 .flat-file > .pane { padding: 0 4px 20px 0; }
-.flat-file .head { margin-bottom: 16px; align-items: center; }
+.flat-file .head { margin-bottom: 8px; align-items: center; }
+.flat-file .head h1 { font-size: 20px; margin: 0; }
+.btn.icon { padding: 6px 9px; min-width: 32px; justify-content: center; }
+.btn.icon.small { padding: 2px 6px; min-width: 24px; min-height: 24px; font-size: 12px; }
+.head-menu { position: relative; }
+.head-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 140px; padding: 4px; background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.head-menu-item { all: unset; box-sizing: border-box; padding: 7px 10px; border-radius: 6px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+.head-menu-item:hover, .head-menu-item:focus-visible { background: rgba(255,255,255,.06); }
+.head-menu-item.danger { color: var(--danger); }
 .agent-facts { max-width: 760px; grid-template-columns: 105px minmax(0, 1fr); gap: 16px 24px; }
 .agent-facts dt { color: var(--text-secondary); }
 .agent-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }

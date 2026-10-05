@@ -73,7 +73,9 @@ function modelName(programs: Program[], id: string): string {
 }
 
 /** The agent's run and its saved choices, with every failed read named. The model and the computer are changed here with the settings form's own fields and saver; limits, access and the rest of its settings are the tabs beside this one. */
-export function AgentOverview({ agent, details }: { agent: AgentView; details: (problems: Refused[]) => ReactNode }) {
+export function AgentOverview({ agent, details, added, rename }: { agent: AgentView; details: (problems: Refused[]) => ReactNode;
+  /** The day the agent was added, and the act that opens its name's form: both stood in the page's head until 5 October 2026. */
+  added?: string; rename?: () => void }) {
   const [revision, setRevision] = useState(0);
   const reload = () => setRevision((value) => value + 1);
   const profile = useLoad(() => readProfile(agent.id), 'agent-about-profile:' + agent.id + ':' + revision);
@@ -93,6 +95,8 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
   return <NetworkRead.Provider value={networkRead}><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
   <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
+      <dt>Name</dt><dd>{agent.display_name}{rename ? <>{' '}<button type="button" className="btn icon small" data-act="rename" aria-label="Edit name" title="Edit name" onClick={rename}><span aria-hidden="true">✎</span></button></> : null}</dd>
+      {added ? <><dt>Added</dt><dd>{added}</dd></> : null}
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
       <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : me.status !== 'ok' ? reading(me, 'who is signed in')
         : <AgentTeams key={teamRevision} agent={agent.id} name={agent.display_name} teams={teams.data} person={me.data.person.id} login={me.data.signed_in} administrator={people.status === 'ok' && people.data.scope === 'directory'} changed={() => setTeamRevision((value) => value + 1)} />}</dd>
