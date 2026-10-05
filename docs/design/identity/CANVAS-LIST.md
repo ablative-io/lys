@@ -68,6 +68,30 @@ His words, in the order said, on a person's page (he had Waffles' open):
 - "there's a thing where something's duplicated, so it says like there's no dollar spent has been reported for
   Waffles the Terrible."
 - "walk it in the browser, have a look, see what else you're seeing."
+- The page's head, 16:40: "it's got like people and agents slash Waffles the Terrible and then underneath that
+  it says Waffles the Terrible... and then added 29th of September... it's just using up way too much vertical
+  space before you actually get to the useful stuff. I'd probably just have Waffles the Terrible... We've got
+  people and agents selected in the sidebar, so we don't really need to have that. We certainly don't need
+  Waffles the Terrible a second time. Get rid of all the unnecessary buttons... the header really shouldn't
+  need to be that big before you get to the tabs... the tabs and the active slash suspend retire... drop down
+  hamburger kind of thing and the emergency stop button, then just with the name. And I don't think we really
+  needed like added 29th of September... You can just go in the overview."
+- The system prompt, 16:41: "the options are to keep this agent's own prompt or add to it. Those aren't mutually
+  exclusive options. You can keep it unchanged. You can... add to it... you can replace it altogether. And yeah,
+  I really suspect you should have a bit of a better look at all of this stuff."
+
+Seen by Waffles on the walk he asked for (installed a1678ae6, pictures w40, w41), beside his own:
+
+- The head stands about 180 points tall before the tabs: the path line, the name, "Added 29 Sep.", then four
+  word buttons and the badge on a row of their own height.
+- Overview says the agent's whole name twice in two lines ("Waffles the Terrible is not running." "Waffles the
+  Terrible has no program chosen yet.") above a large word button, "Choose its program".
+- Overview, Computer and Model: "Choose a computer when you start" with "Saved choice for the next start."
+  under it, which says a choice is saved when none is.
+- Limits and goals: the two lines he saw are "No dollar spend has been reported for Waffles the Terrible." and
+  "No plan window has been reported for Waffles the Terrible.", under a banner that already says no usage has
+  been reported; three sentences for one fact. The add-a-limit row lays nine choices and four actions out in a
+  table of their own with "Add this limit" at its end.
 
 ## The canvas as wiring (Tom, the same walk)
 
