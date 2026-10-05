@@ -11,6 +11,7 @@ import type { Role } from '../roles/contract';
 import { changedFrom, profileRequest } from '../runtime/start-requests';
 import { Gate } from '../signin/Gate';
 import type { ProvisioningProfile } from './Provisioning';
+import { Act } from '../../shell/Act';
 
 export function SaveSettings({ agent, profile, settings, refusal, canSave, people, machines, saved, brief = false }: {
   agent: string; profile: ProvisioningProfile | null; settings: Record<string, unknown>; refusal: string; canSave: boolean;
@@ -117,7 +118,7 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then, 
     {failure ? <><p role="alert" className="why-not">Lys could not confirm these settings were saved.</p><p><small className="refusal-name">{failure}</small></p></> : null}
     {saved && !failure ? <p role="status">Saved. {name} uses these settings the next time it starts. <a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
     {brief && !changed && !pending ? null : <>
-    <button type="submit" className="btn primary" disabled={busy || Boolean(why)}>{busy ? 'Saving…' : label}</button>
+    <Act symbol="save" name={busy ? 'Saving…' : label} word={busy ? 'Saving…' : 'Save'} tone="primary" type="submit" disabled={busy || Boolean(why)} />
     {why ? <p className="why-not">{why}{starting && !pending && !initial.error ? <> <a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></> : null}</p> : null}
     </>}
     {initial.error ? <p><small className="refusal-name">{initial.error}</small></p> : null}

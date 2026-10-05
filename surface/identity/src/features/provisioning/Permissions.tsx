@@ -28,6 +28,7 @@ import { RULE_KINDS, ruleFor, summary, wordsFor } from './permission-rules';
 import type { RuleKind } from './permission-rules';
 import type { Permissions as Value } from './Provisioning';
 import './permissions.css';
+import { Act } from '../../shell/Act';
 
 type Computers = { id: string; name: string }[];
 
@@ -131,7 +132,7 @@ function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
       {LISTS.filter((entry) => lists.includes(entry.id)).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
     </select></td>
     <td>{who}</td>
-    <td><button type="button" className="btn primary" disabled={!rule || !list} onClick={() => { if (rule && list) { add(list, rule); setKind(''); setGiven(''); setList(''); } }}>Add this rule</button></td>
+    <td><Act symbol="add" name="Add this rule" word="Add" tone="primary" disabled={!rule || !list} onClick={() => { if (rule && list) { add(list, rule); setKind(''); setGiven(''); setList(''); } }} /></td>
   </tr>;
 }
 
@@ -206,7 +207,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
   const extraFolders = <table className="usage-table" aria-label="Extra folders">
     <thead><tr><th>Extra folders it may also work in</th><th>Change</th></tr></thead>
     <tbody>
-      {folders.map((entry) => <tr key={entry} className="rule-row"><td><code>{entry}</code></td><td><button type="button" className="btn" aria-label={'Remove ' + entry} onClick={() => remove('additional_directories', entry)}>Remove</button></td></tr>)}
+      {folders.map((entry) => <tr key={entry} className="rule-row"><td><code>{entry}</code></td><td><Act symbol="remove" name={'Remove ' + entry} onClick={() => remove('additional_directories', entry)} /></td></tr>)}
       {folders.length ? null : <tr><td colSpan={2} className="dim">{kept ? 'Not available with Kept to its folder: that setting keeps the agent to its one working folder.' : 'None. It works in its working folder only.'}</td></tr>}
       {kept && folders.length ? <tr><td colSpan={2} className="dim">Not available with Kept to its folder: that setting keeps the agent to its one working folder. Remove these before it can start as Kept to its folder.</td></tr> : null}
     </tbody>
@@ -235,7 +236,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
               {LISTS.filter((entry) => offered.includes(entry.id) || entry.id === list).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
             </select>{kept && list === 'allow' ? <p className="why-not">Not available with Kept to its folder: that setting cannot carry rules that run without asking.</p> : null}</td>
             <td className="dim">{programName}</td>
-            <td><button type="button" className="btn" aria-label={'Remove ' + rule} onClick={() => remove(list, rule)}>Remove</button></td>
+            <td><Act symbol="remove" name={'Remove ' + rule} onClick={() => remove(list, rule)} /></td>
           </tr>)}
           {read ? policyRules.map((rule, index) => {
             const written = forcedBy([rule]);
@@ -246,7 +247,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
                 : <span className="why-not">Cannot be written for {programName}</span>}</td>
               <td>Refused</td>
               <td className="dim">from this agent’s policy. {lifts(rule)}</td>
-              <td><button type="button" className="btn" aria-label={'Remove policy rule ' + rule.id} disabled={saving} onClick={() => setStaged(policyRules.filter((_, at) => at !== index))}>Remove</button></td>
+              <td><Act symbol="remove" name={'Remove policy rule ' + rule.id} disabled={saving} onClick={() => setStaged(policyRules.filter((_, at) => at !== index))} /></td>
             </tr>;
           }) : null}
           {unread ? <tr className="rule-row"><td colSpan={5}>{unread}</td></tr> : null}
@@ -254,7 +255,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
           {read ? <tr className="policy-kept"><td colSpan={5}>
             <b>{read.view.policy ? 'Policy: Version ' + read.view.policy.version : 'No policy set'}.</b> A kept version {read.view.applies}. Sessions already running keep their original rules.
             {' '}
-            <button type="button" className="btn" disabled={saving || staged === null} onClick={() => { void keep(); }}>Save policy rules for the next start</button>
+            <Act symbol="save" name="Save policy rules for the next start" word="Save" disabled={saving || staged === null} onClick={() => { void keep(); }} />
             {staged !== null && !saving ? <span className="dim"> The policy rows above are changed and not yet kept.</span> : null}
             {failure ? <ErrorWords problem={failure} /> : null}
           </td></tr> : null}

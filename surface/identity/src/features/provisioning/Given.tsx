@@ -12,6 +12,7 @@
  *   `settings`). This screen adds none; it shows the ones there and lets
  *   each be removed.
  */
+import { Act } from '../../shell/Act';
 const count = (n: number, one: string, many: string) => n + ' ' + (n === 1 ? one : many);
 
 /** The skills that reach a run beside the ones Lys gives, said only for a program it is known of (CLEAN-START.md rows 10 and 16). */
@@ -34,7 +35,7 @@ export function Skills({ program, kept, value, change }: { program: string; kept
             onChange={(event) => change(event.target.checked ? [...value, name] : value.filter((one) => one !== name))} /></td>
           <td>{name}</td>
         </tr>)}
-        {unknown.map((name) => <tr key={name}><td><button type="button" className="btn" onClick={() => change(value.filter((one) => one !== name))}>Remove {name}</button></td>
+        {unknown.map((name) => <tr key={name}><td><Act symbol="remove" name={'Remove ' + name} onClick={() => change(value.filter((one) => one !== name))} /></td>
           <td className="why-not">Lys keeps no skill named {name}, so these settings cannot be saved until it is removed.</td></tr>)}
         {kept === null ? <tr><td colSpan={2} className="why-not">Lys could not list the skills it keeps, so none can be chosen here.</td></tr>
           : offered.length === 0 ? <tr><td colSpan={2} className="dim">Lys keeps no skills yet.</td></tr> : null}
@@ -51,7 +52,7 @@ export function ToolsNamed({ value, change }: { value: string[]; change: (next: 
     <table className="usage-table">
       <thead><tr><th>Tools named in these settings</th><th>Change</th></tr></thead>
       <tbody>{value.map((name) => <tr key={name} className="rule-row"><td><code>{name}</code></td>
-        <td><button type="button" className="btn" onClick={() => change(value.filter((one) => one !== name))}>Remove {name}</button></td></tr>)}</tbody>
+        <td><Act symbol="remove" name={'Remove ' + name} onClick={() => change(value.filter((one) => one !== name))} /></td></tr>)}</tbody>
     </table>
     <p className="dim">Each is added to what this agent may use without asking.</p>
   </section>;

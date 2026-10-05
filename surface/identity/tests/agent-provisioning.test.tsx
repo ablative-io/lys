@@ -11,7 +11,7 @@ const profile: ProvisioningProfile = { version: 1, operation: 'op-' + 'a'.repeat
   permissions: { allow: ['Read'], deny: ['Bash(rm:*)'], ask: ['Edit'], default_mode: 'acceptEdits', additional_directories: ['/srv/a', '/srv/b'] } };
 const answer: ProvisioningAnswer = { agent: SCRIBE, profile, versions: [{ version: 1, set_by: ADA, set_at: 1790000000, note: 'Initial profile' }], enforced: false };
 const routes = { ...SERVICE, [path]: ok(answer) };
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 describe('Agent credential handles', () => {
   it('reads the named agent and renders metadata without any secret-shaped extra members', async () => {
     const { posted, requests } = await mount('#/file/' + SCRIBE + '/credentials', { ...SERVICE,

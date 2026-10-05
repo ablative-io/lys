@@ -191,7 +191,7 @@ describe('The Dashboard is the front page', () => {
     expect($('section[aria-label="Running now"] .you-asked')?.textContent).toContain('Stop Scribe? What it has not saved is lost.');
     expect($('section[aria-label="Agents"] .you-asked')).toBeNull();
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
-    await click($$('section[aria-label="Running now"] .you-asked button').find((el) => el.textContent === 'Stop Scribe') ?? null);
+    await click($$('section[aria-label="Running now"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
     expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
   });
 
@@ -261,7 +261,7 @@ describe('What the Dashboard reads, as the service answers it', () => {
     await click(rowOf('Scribe')?.querySelector(`.dash-acts[data-session="${OTHER}"] [data-act="watch"]`) ?? null);
     expect($('.dash-picture')?.textContent).toContain('on Shed');
     await click(rowOf('Scribe')?.querySelector(`.dash-acts[data-session="${OTHER}"] [data-act="stop"]`) ?? null);
-    await click($$('section[aria-label="Agents"] .you-asked button').find((el) => el.textContent === 'Stop Scribe') ?? null);
+    await click($$('section[aria-label="Agents"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
     expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + OTHER + '/end']);
   });
 

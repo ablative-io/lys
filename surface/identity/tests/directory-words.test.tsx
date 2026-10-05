@@ -31,7 +31,7 @@ async function show(page: ReactNode, more: Record<string, Route> = {}) {
 }
 
 function button(words: string): HTMLButtonElement {
-  const found = [...document.querySelectorAll('button')].find((entry) => entry.textContent === words);
+  const found = [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === words);
   if (!found) throw new Error('Missing button: ' + words);
   return found;
 }

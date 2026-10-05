@@ -23,7 +23,7 @@ const started = (agent: string) => (body: unknown) => {
   return ok({ agent, machine: sent.machine, runtime: 'lys-runner', session: sent.operation, provisioning_version: 1, harness: 'Claude Code', handles: [], template: '', template_sha256: '', command: 'claude', left_out: [], executed: false, runner: { session: sent.operation, state: 'running', pid: 7, started_at: 1790000003 } });
 };
 // A button inside what one agent's Start or Stop opened: the row under it on the front page, or its pane on People and agents. Every stopped agent's row has its own Start, so the whole page is never searched.
-const button = (words: string) => $$('.you-asked button, .agent-run button').find((el) => el.textContent === words) ?? null;
+const button = (words: string) => $$('.you-asked button, .agent-run button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === words) ?? null;
 
 const routes = {
   ...SERVICE,
@@ -71,7 +71,7 @@ describe('An agent\'s run on People and agents', () => {
     unmountAll(); document.body.innerHTML = '';
     await mount('#/file/' + SCRIBE + '/provisioning', { ...stopped, ...provisioning(SCRIBE, null) });
     expect($('section[aria-label="Settings of this agent"]')).not.toBeNull();
-    expect($$('section[aria-label="Settings of this agent"] button[type="submit"]').map((el) => el.textContent)).toEqual(['Save these settings']);
+    expect($$('section[aria-label="Settings of this agent"] button[type="submit"]').map((el) => [el.getAttribute('aria-label'), el.textContent])).toEqual([['Save these settings', 'Save']]);
   });
 
   it('stops a running agent from its row on the front page, after asking', async () => {

@@ -69,7 +69,7 @@ describe('Running: the list and the canvas', () => {
 
   it('asks a person who is not signed in to sign in once, not once for the canvas and again for the list', async () => {
     await mount('#/canvas', { ...routes, '/runtime/live': refused(401, 'NotSignedIn', 'Sign in first') });
-    expect($$('h1').filter((heading) => heading.textContent === 'Sign in')).toHaveLength(1);
+    expect($$('h1').filter((heading) => (heading.getAttribute('aria-label') ?? heading.textContent) === 'Sign in')).toHaveLength(1);
     expect($('.session-canvas')).toBeNull();
   });
 

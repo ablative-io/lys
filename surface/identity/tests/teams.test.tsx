@@ -7,7 +7,7 @@ import { ADA, ME, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import { budgetsView } from './budget-fixtures';
 const team = { id: 'op-' + 'a'.repeat(32), name: 'Delivery', owner: ADA, description: 'Ship work', members: [SCRIBE], state: 'active', created_by: ME.signed_in, created_at: 1790000000, retired_at: null };
 const routes = { ...SERVICE, '/teams': ok({ teams: [team] }), ['/budgets/team/' + team.id]: ok(budgetsView({ kind: 'team', id: team.id })), ['/teams/' + team.id + '/goals']: ok({ goals: [] }) };
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 const receipt = (body: unknown, act: string, member: string | null, current = team) => ok({ ...current, recorded: { operation: (body as Record<string, unknown>).operation, act, member, by: ME.signed_in, at: 1790000000 } });
 async function open(extra: Record<string, Route> = routes) { const mounted = await mount('#/people', extra); await click($('[data-kind="teams"]')); return mounted; }
 beforeEach(() => sessionStorage.clear());

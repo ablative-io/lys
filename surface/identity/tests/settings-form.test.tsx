@@ -65,7 +65,7 @@ describe('The settings form', () => {
     expect(field('machine')).toBeNull();
     expect(document.querySelectorAll('section[aria-label="Settings of this agent"] input[required], section[aria-label="Settings of this agent"] textarea[required]')).toHaveLength(0);
     expect(document.querySelectorAll('section[aria-label="Settings of this agent"] button[type="submit"]')).toHaveLength(1);
-    expect(button()?.textContent).toBe('Save these settings');
+    expect([button()?.getAttribute('aria-label'), button()?.textContent]).toEqual(['Save these settings', 'Save']);
     expect(text()).toContain('No folder chosen yet.');
     expect(posted).toEqual([]);
   });
@@ -172,7 +172,7 @@ describe('The settings form', () => {
     expect(text()).toContain('Kept service'); expect(text()).toContain('Reached at http://localhost:6010');
     expect(text()).toContain('1 skill: review.');
     expect(text()).toContain('This agent uses the program’s own prompt.');
-    await click([...document.querySelectorAll('button')].find((each) => each.textContent === 'Remove reader') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Remove reader') ?? null);
     await click(button());
     expect(posted[0].body).toMatchObject({ tools: [], skills: ['review'], mcp_servers: [{ name: 'Kept service', url: 'http://localhost:6010' }] });
   });
@@ -181,7 +181,7 @@ describe('The settings form', () => {
     expect(text()).toContain('Lys keeps no skill named review');
     await click(button());
     expect(posted).toHaveLength(0);
-    await click([...document.querySelectorAll('button')].find((each) => each.textContent === 'Remove review') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Remove review') ?? null);
     await click(button());
     expect(posted[0].body).toMatchObject({ skills: [] });
   });

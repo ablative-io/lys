@@ -40,7 +40,7 @@ async function type(selector: string, value: string): Promise<void> {
   });
 }
 
-const button = (label: string) => [...document.querySelectorAll('button')].find((b) => b.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((b) => (b.getAttribute('aria-label') ?? b.textContent) === label) ?? null;
 
 const choosePolicy = () => choose($('tr[aria-label="Add a rule"] select[name="rule-enforcer"]'), 'policy');
 const policyRows = () => [...document.querySelectorAll<HTMLTableRowElement>('table[aria-label="Rules"] tr[data-policy]')];

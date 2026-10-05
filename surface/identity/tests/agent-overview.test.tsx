@@ -98,14 +98,14 @@ describe('An agent page explains the agent before its controls', () => {
     await choose($('select[aria-label="Add to a team"]'), 'team-two');
     expect(about()?.textContent).toContain('Add Scribe to Night team?');
     expect(posted).toEqual([]);
-    await click($$('[aria-label="Confirm team change"] button').find((button) => button.textContent === 'Confirm add member') ?? null);
+    await click($$('[aria-label="Confirm team change"] button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Confirm add member') ?? null);
     await settle();
     expect(posted.at(-1)).toMatchObject({ path: '/teams/team-two/members', body: { member: SCRIBE } });
     expect($('button[aria-label="Remove from Night team"]')).not.toBeNull();
     expect($('select[aria-label="Add to a team"]')).toBeNull();
     await click($('button[aria-label="Remove from Care team"]'));
     expect(about()?.textContent).toContain('Remove Scribe from Care team?');
-    await click($$('[aria-label="Confirm team change"] button').find((button) => button.textContent === 'Confirm remove member') ?? null);
+    await click($$('[aria-label="Confirm team change"] button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Confirm remove member') ?? null);
     await settle();
     expect(posted.at(-1)?.path).toBe('/teams/team-one/members/' + SCRIBE + '/remove');
     expect(posted).toHaveLength(2);
@@ -119,10 +119,10 @@ describe('An agent page explains the agent before its controls', () => {
     expect(about()?.querySelector('select[name="runs_on"]')).not.toBeNull();
     expect(about()?.querySelector('form.save-settings button')).toBeNull();
     expect(text()).not.toContain('Save and start');
-    expect($$('button').filter((entry) => entry.textContent === 'Start')).toHaveLength(1);
+    expect($$('button').filter((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Start')).toHaveLength(1);
     await choose(about()?.querySelector('select[name="runs_on"]') ?? null, '');
     expect([...(about()?.querySelectorAll('form.save-settings button') ?? [])].map((entry) => entry.textContent)).toEqual(['Save']);
-    expect($$('button').filter((entry) => entry.textContent === 'Start')).toHaveLength(1);
+    expect($$('button').filter((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Start')).toHaveLength(1);
     await choose(about()?.querySelector('select[name="runs_on"]') ?? null, 'computer-one');
     expect(about()?.querySelector('form.save-settings button')).toBeNull();
     expect(posted).toEqual([]);
@@ -225,7 +225,7 @@ describe('An agent page explains the agent before its controls', () => {
     const { posted } = await open({ ...notRunning, '/network': ok({ machines, reports_served: true }), '/network/machines/computer-one/runner': ok({ runner: null }) });
     expect(run()?.textContent).toContain('No computer is allowed to run Scribe.');
     expect(run()?.textContent).toContain('No computer has Lys running on it yet.');
-    const add = [...(run()?.querySelectorAll('a') ?? [])].find((link) => link.textContent === 'Add a computer') ?? null;
+    const add = [...(run()?.querySelectorAll('a') ?? [])].find((link) => (link.getAttribute('aria-label') ?? link.textContent) === 'Add a computer') ?? null;
     expect(add?.getAttribute('href')).toBe('#/network?add=computer');
     expect($('[data-act="start"]')).toBeNull();
     await follow(add);

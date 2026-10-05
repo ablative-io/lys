@@ -12,7 +12,7 @@ describe('Claude first run', () => {
     const html = renderToStaticMarkup(<ProfileFields profile={null} choices={choices} firstRun render={(fields, settings, refusal) => <form>{fields}<button disabled={Boolean(refusal)}>Add</button><output>{String((settings.permissions as { default_mode: string }).default_mode)}</output></form>} />);
     expect(html).toContain('<output>workspace-only</output>');
     // The only controls that wait are each table's own add row, until something is typed into it.
-    const rest = html.replace(/<button type="button" class="btn primary" disabled="">(Add this rule|Add these tools)<\/button>/g, '');
+    const rest = html.replace(/<button disabled=""[^>]*aria-label="(Add this rule|Add these tools)"[^>]*>.*?<\/button>/g, '');
     expect(rest).not.toContain('disabled=""');
     expect(html).toContain('Kept to its folder');
     expect(html).toContain('Workspace only');

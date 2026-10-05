@@ -6,6 +6,7 @@ import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import { sameLogin } from './contract';
 import type { Member, Team, TeamChanged } from './contract';
+import { Act as Press } from '../../shell/Act';
 type Action = { act: 'added' | 'removed' | 'retired' | 'confirmed'; member: string | null };
 const pathOf = (id: string, action: Action) => '/teams/' + encodeURIComponent(id) + (action.act === 'added' ? '/members' : action.act === 'retired' ? '/retire' : '/members/' + encodeURIComponent(action.member ?? '') + (action.act === 'confirmed' ? '/confirm' : '/remove'));
 function held(key: string, id: string): Action | null {
@@ -37,8 +38,8 @@ export function TeamMembers({ team, person, login, members, name, administrator,
             <td><a href={'#/file/' + id}>{name(id)}</a></td>
             <td>{waiting ? <span className="why-not">Awaiting administrator confirmation. Team reminders and budget actions do not include this member. {waiting.reason}</span> : 'Yes'}</td>
             {manages ? <td>{open ? <>
-              <button className="btn" type="button" aria-label={'Remove ' + name(id)} onClick={() => setAction({ act: 'removed', member: id })}>Remove</button>
-              {administrator && waiting ? <button className="btn" type="button" aria-label={'Allow ' + name(id) + ' to take part'} onClick={() => setAction({ act: 'confirmed', member: id })}>Allow to take part</button> : null}
+              <Press symbol="remove" name={'Remove ' + name(id)} onClick={() => setAction({ act: 'removed', member: id })} />
+              {administrator && waiting ? <Press symbol="approve" name={'Allow ' + name(id) + ' to take part'} word="Allow" onClick={() => setAction({ act: 'confirmed', member: id })} /> : null}
             </> : null}</td> : null}
           </tr>;
         })}
@@ -46,10 +47,10 @@ export function TeamMembers({ team, person, login, members, name, administrator,
       </tbody>
       {open ? <tfoot><tr><td colSpan={3} className="usage-add"><div className="usage-add-row" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }}>
         <select name="member" aria-label="Add a member" value={member} onChange={(event) => setMember(event.target.value)}><option value="">Choose a person or agent</option>{members.filter((entry) => entry.state !== 'retired' && !team.members.includes(entry.id)).map((entry) => <option key={entry.id} value={entry.id}>{entry.display_name}</option>)}</select>
-        <span><button className="btn" type="button" disabled={!member} onClick={() => setAction({ act: 'added', member })}>Add member</button></span>
+        <span><Press symbol="add" name="Add member" word="Add" disabled={!member} onClick={() => setAction({ act: 'added', member })} /></span>
       </div></td></tr></tfoot> : null}
     </table>
-    {open ? <p><button className="btn danger" type="button" onClick={() => setAction({ act: 'retired', member: null })}>Retire team</button></p> : null}
+    {open ? <p><Press symbol="retire" name="Retire team" word="Retire" tone="danger" onClick={() => setAction({ act: 'retired', member: null })} /></p> : null}
   </section>;
 }
 function Act({ team, login, action, memberName, storageKey, changed, cancel }: { team: Team; login: Login; action: Action; memberName: string | null; storageKey: string; changed: (answer: TeamChanged, message: string) => void; cancel: () => void }) {
@@ -57,8 +58,8 @@ function Act({ team, login, action, memberName, storageKey, changed, cancel }: {
   const word = action.act === 'added' ? 'add member' : action.act === 'removed' ? 'remove member' : action.act === 'confirmed' ? 'allow member to take part' : 'retire team';
   const question = action.act === 'confirmed' ? 'Allow ' + memberName + ' to take part in ' + team.name + '?' : action.act === 'added' ? 'Add ' + memberName + ' to ' + team.name + '?' : action.act === 'removed' ? 'Remove ' + memberName + ' from ' + team.name + '?' : 'Retire ' + team.name + '?';
   return <section aria-label="Confirm team change"><p>{question} This does not grant or revoke access.</p>
-    <button className="btn primary" disabled={change.blocked} onClick={() => change.submit({ operation: operationId(), ...(action.act === 'added' ? { member: action.member } : {}) })}>Confirm {word}</button>
-    <button className="btn" disabled={change.busy || change.pending} onClick={cancel}>Cancel</button><ChangeStatus change={change} />
+    <Press symbol="approve" name={'Confirm ' + word} word="Confirm" tone="primary" disabled={change.blocked} onClick={() => change.submit({ operation: operationId(), ...(action.act === 'added' ? { member: action.member } : {}) })} />
+    <Press symbol="close" name="Cancel" word="Cancel" disabled={change.busy || change.pending} onClick={cancel} /><ChangeStatus change={change} />
   </section>;
 }
 
@@ -78,7 +79,7 @@ export function AgentTeams({ agent, name, teams, person, login, administrator, c
   const blocked = Boolean(open) || Boolean(initial.error);
   return <>
     {inTeams.length ? inTeams.map((team) => <span key={team.id} className="agent-team"><a href="#/people/view/teams">{team.name}</a>
-      {manages(team) ? <button className="btn" type="button" aria-label={'Remove from ' + team.name} disabled={blocked} onClick={() => setOpen({ team, action: { act: 'removed', member: agent } })}>Remove</button> : null}</span>) : 'No team yet'}
+      {manages(team) ? <Press symbol="remove" name={'Remove from ' + team.name} disabled={blocked} onClick={() => setOpen({ team, action: { act: 'removed', member: agent } })} /> : null}</span>) : 'No team yet'}
     {addable.length ? <select aria-label="Add to a team" value="" disabled={blocked} onChange={(event) => { const team = addable.find((each) => each.id === event.target.value); if (team) setOpen({ team, action: { act: 'added', member: agent } }); }}>
       <option value="">Add to a team</option>{addable.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select> : null}
     {initial.error ? <p className="why-not" role="alert">{initial.error}</p> : null}

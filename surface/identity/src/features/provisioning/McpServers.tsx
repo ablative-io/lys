@@ -13,6 +13,7 @@
  */
 import { useState } from 'react';
 import type { McpServer } from './Provisioning';
+import { Act } from '../../shell/Act';
 
 export type ServerKind = 'address' | 'program';
 export type BuiltServer = { server: McpServer } | { problem: string };
@@ -72,7 +73,7 @@ function AddServer({ kinds, taken, add }: { kinds: ServerKind[]; taken: string[]
       {server ? <p className="rule-row"><b>{server.name}</b> {serverWords(server)}</p> : null}
       {touched && built && 'problem' in built ? <p className="why-not">{built.problem}</p> : null}
     </td>
-    <td><button type="button" className="btn primary" disabled={!server} onClick={() => { if (server) { add(server); setGiven(empty); } }}>Add these tools</button></td>
+    <td><Act symbol="add" name="Add these tools" word="Add" tone="primary" disabled={!server} onClick={() => { if (server) { add(server); setGiven(empty); } }} /></td>
   </tr>;
 }
 
@@ -102,7 +103,7 @@ export function McpServers({ program, transports, value, change }: { program: st
         {value.map((server) => <tr key={server.name} className="rule-row">
           <td><b>{server.name}</b></td>
           <td>{serverWords(server)}{server.channel === 'wake' ? ', and its messages wake the agent' : ''}</td>
-          <td><button type="button" className="btn" aria-label={'Remove ' + server.name} onClick={() => change(value.filter((one) => one.name !== server.name))}>Remove</button></td>
+          <td><Act symbol="remove" name={'Remove ' + server.name} onClick={() => change(value.filter((one) => one.name !== server.name))} /></td>
         </tr>)}
         {value.length ? null : <tr><td colSpan={3} className="dim">None.</td></tr>}
       </tbody>

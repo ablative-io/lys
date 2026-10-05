@@ -34,7 +34,7 @@ async function shown(program: Program, first: Value, agent?: string, routes = {}
   await act(async () => { root?.render(<Held program={program} first={first} agent={agent} tools={tools} />); });
   return { element, posted, requests };
 }
-const button = (scope: HTMLElement, label: string) => [...scope.querySelectorAll('button')].find((entry) => entry.textContent?.trim() === label) ?? null;
+const button = (scope: HTMLElement, label: string) => [...scope.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent?.trim()) === label) ?? null;
 const radios = (scope: HTMLElement, name: string) => [...scope.querySelectorAll<HTMLInputElement>('input[name="' + name + '"]')];
 const radio = (scope: HTMLElement, name: string, value: string) => radios(scope, name).find((entry) => entry.value === value) ?? null;
 

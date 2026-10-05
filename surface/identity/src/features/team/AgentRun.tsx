@@ -7,6 +7,7 @@ import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { Start } from './Start';
 import './team.css';
 import { answeredNo } from '../../kept';
+import { Act } from '../../shell/Act';
 
 const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unexpected', reason: String(error) });
@@ -27,8 +28,8 @@ export function Stop({ entry, session, changed, done }: { entry: Entry; session:
   return <div className="team-stop" role="alertdialog" aria-label={'Stop ' + entry.display_name}>
     <p>Stop {entry.display_name}? What it has not saved is lost. You can start it again afterwards.</p>
     {refused ? <p role="alert" className="why-not">{refused.message} <small className="refusal-name">{refused.refusal.refusal}</small></p> : null}
-    <button type="button" className="btn danger" disabled={busy} onClick={() => { void stop(); }}>Stop {entry.display_name}</button>
-    <button type="button" className="btn" onClick={done}>Keep it running</button>
+    <Act symbol="stop" name={'Stop ' + entry.display_name} word="Stop" tone="danger" disabled={busy} onClick={() => { void stop(); }} />
+    <Act symbol="close" name="Keep it running" word="Keep running" onClick={done} />
   </div>;
 }
 
@@ -56,8 +57,8 @@ function Restart({ entry, session, changed, done }: { entry: Entry; session: Run
   return <div className="team-stop" role="alertdialog" aria-label={'Restart ' + entry.display_name}>
     <p>Restart {entry.display_name}? This ends the run and starts it again in the same folder, on {session.machine_name ?? session.machine}. What it has not saved is lost.</p>
     {refused ? <p role="alert" className="why-not">{refused.message} <small className="refusal-name">{refused.refusal.refusal}</small></p> : null}
-    <button type="button" className="btn danger" disabled={busy} onClick={() => { void restart(); }}>Restart {entry.display_name}</button>
-    <button type="button" className="btn" onClick={done}>Keep it running</button>
+    <Act symbol="retry" name={'Restart ' + entry.display_name} word="Restart" tone="danger" disabled={busy} onClick={() => { void restart(); }} />
+    <Act symbol="close" name="Keep it running" word="Keep running" onClick={done} />
   </div>;
 }
 
@@ -82,8 +83,8 @@ export function AgentRun({ entry }: { entry: Entry }) {
       <span className="agent-run-words">{session.shown === 'running' && !silent ? entry.display_name + ' is running on ' + where + ', as its runner last reported.'
         : 'Whether ' + entry.display_name + ' is still running on ' + where + ' is not confirmed: its runner has not answered since its last report.'}</span>
       <a className="btn" data-act="watch" href={'#/canvas/' + encodeURIComponent(entry.id)}>Open its terminal</a>
-      <button type="button" className="btn" data-act="restart" onClick={() => setAsking('restart')}>Restart</button>
-      <button type="button" className="btn danger" data-act="stop" onClick={() => setAsking('stop')}>Stop</button>
+      <Act symbol="retry" name="Restart" word="Restart" data-act="restart" onClick={() => setAsking('restart')} />
+      <Act symbol="stop" name="Stop" word="Stop" tone="danger" data-act="stop" onClick={() => setAsking('stop')} />
     </div>
     {session.stop_asked_at && !session.stopped ? <p className="why-not">A stop was requested. The runner has not confirmed it ended.</p> : null}
     {asking === 'stop' ? <Stop entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
