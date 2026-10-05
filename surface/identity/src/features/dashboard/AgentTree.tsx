@@ -19,6 +19,7 @@ import '../team/team.css';
 import { refusedPart } from './contract';
 import type { DashboardAgent } from './contract';
 import { budgetLine, goalsLine } from './words';
+import { Act } from '../../shell/Act';
 
 /**
  * What the person asked from one row: start the agent, or stop one of its sessions. `place` is the row the press came
@@ -62,7 +63,7 @@ function StartHere({ entry, me, pressed, changed, close }: { entry: Entry; me: s
   return <div className="you-start-here">
     <Start entry={entry} me={me} admin={load.status === 'ok' && load.data.scope === 'directory'} changed={changed} straightAway={pressed}
       settings={() => navigate('/file/' + encodeURIComponent(entry.id) + '/provisioning')} />
-    <button type="button" className="you-watch" data-act="close" onClick={close}>Close</button>
+    <Act symbol="close" name="Close" className="small quiet" data-act="close" onClick={close} />
   </div>;
 }
 
@@ -73,16 +74,14 @@ function RowStart({ entry, ask, place, stopped }: { entry: Entry; ask: (next: As
   const unset = load.status === 'ok' && !load.data.profile?.harness;
   return unset
     ? <a className="you-watch you-start" data-act="setup" href={'#/file/' + encodeURIComponent(entry.id) + '/provisioning'} onClick={(event) => event.stopPropagation()}>Set up</a>
-    : <button type="button" className="you-watch you-start" data-act="start" disabled={stopped !== null} title={stopped ?? undefined} onClick={(event) => { event.stopPropagation(); ask({ agent: entry.id, what: 'start', pressed: true, place }); }}>Start</button>;
+    : <Act symbol="start" name="Start" hint={stopped ?? ('Start ' + entry.display_name)} className="small quiet you-start" data-act="start" disabled={stopped !== null} onClick={(event) => { event.stopPropagation(); ask({ agent: entry.id, what: 'start', pressed: true, place }); }} />;
 }
 
 /** Watch and Stop for one live session, the same in the agents table and under Running now. */
 export function RunningActs({ entry, session, context, place }: { entry: Entry; session: RuntimeSession; context: RowContext; place: string }) {
   return <span className="dash-acts" data-session={session.session}>
-    <button type="button" className="you-watch" data-act="watch" aria-pressed={context.watching === session.session} title={'Watch ' + entry.display_name + ' ' + whereOf(session)}
-      onClick={(event) => { event.stopPropagation(); context.watch(entry.id, session.session); }}>Watch</button>
-    <button type="button" className="you-watch" data-act="stop" title={'Stop ' + entry.display_name + ' ' + whereOf(session)}
-      onClick={(event) => { event.stopPropagation(); context.ask({ agent: entry.id, what: 'stop', pressed: true, place, session: session.session }); }}>Stop</button>
+    <Act symbol="watch" name="Watch" hint={'Watch ' + entry.display_name + ' ' + whereOf(session)} className="small quiet" data-act="watch" aria-pressed={context.watching === session.session} onClick={(event) => { event.stopPropagation(); context.watch(entry.id, session.session); }} />
+    <Act symbol="stop" name="Stop" hint={'Stop ' + entry.display_name + ' ' + whereOf(session)} tone="danger" className="small quiet" data-act="stop" onClick={(event) => { event.stopPropagation(); context.ask({ agent: entry.id, what: 'stop', pressed: true, place, session: session.session }); }} />
   </span>;
 }
 

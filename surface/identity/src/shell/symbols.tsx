@@ -25,6 +25,7 @@ export const SYMBOLS = {
   fit: <path d="M4 9V5h4M16 5h4v4M20 15v4h-4M8 19H4v-4" />,
   back: <path d="M14.5 6l-6 6 6 6" />,
   help: <><circle cx="12" cy="12" r="8" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.4 2c-.8.5-1.2 1-1.2 1.9M12 16.4v.1" /></>,
+  watch: <><path d="M3 12s3.3-6 9-6 9 6 9 6-3.3 6-9 6-9-6-9-6z" /><circle cx="12" cy="12" r="2.6" /></>,
   more: <><circle cx="6" cy="12" r="1.4" {...solid} /><circle cx="12" cy="12" r="1.4" {...solid} /><circle cx="18" cy="12" r="1.4" {...solid} /></>,
 } as const satisfies Record<string, ReactNode>;
 
