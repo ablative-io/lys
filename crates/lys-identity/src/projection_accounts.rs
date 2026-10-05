@@ -43,19 +43,21 @@ impl Accounts {
 
     /// Insert or update an approved app's connector, read from the apps log,
     /// answering to `approver`, the administrator who approved the app. The
-    /// connector is active while its approver is and stops when they do.
+    /// connector is active while its approver is and stops when they do; a
+    /// connector whose app is `retired` is retired whatever its approver's state.
     pub fn put_connector(
         &mut self,
         id: ConnectorId,
         approver: PersonId,
         profile: &Profile,
+        retired: bool,
         approved_by: &LoginBinding,
     ) {
         self.insert(
             IdentityId::Connector(id),
             approver,
             profile,
-            false,
+            retired,
             approved_by,
         );
     }

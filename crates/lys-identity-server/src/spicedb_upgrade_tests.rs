@@ -112,3 +112,38 @@ fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
     }
     Ok(())
 }
+
+/// FIXED names exactly the definitions the engine keeps beside the resource
+/// kinds: every one in lys-identity's grant schema and the mirror's schema, so
+/// none is read back from the engine as a resource kind and written a second
+/// time, and nothing else, so no real resource kind is hidden from `kinds()`.
+#[test]
+fn fixed_names_every_definition_of_the_grant_and_mirror_schemas_and_nothing_else() {
+    use std::collections::BTreeSet;
+    let defined: BTreeSet<&str> = [lys_identity::grants::SCHEMA, super::MIRROR_SCHEMA]
+        .iter()
+        .flat_map(|schema| schema.lines())
+        .filter_map(|line| line.strip_prefix("definition "))
+        .filter_map(|rest| rest.split([' ', '{']).next())
+        .collect();
+    assert!(
+        defined.contains("grant") && defined.contains("lys_mirror"),
+        "both schemas are read: {defined:?}"
+    );
+    let fixed: BTreeSet<&str> = super::FIXED.into_iter().collect();
+    assert_eq!(
+        fixed.len(),
+        super::FIXED.len(),
+        "FIXED names each definition once"
+    );
+    let unnamed: Vec<&str> = defined.difference(&fixed).copied().collect();
+    assert!(
+        unnamed.is_empty(),
+        "definitions that FIXED in spicedb.rs does not name: {unnamed:?}"
+    );
+    let stray: Vec<&str> = fixed.difference(&defined).copied().collect();
+    assert!(
+        stray.is_empty(),
+        "names in FIXED that neither schema defines: {stray:?}"
+    );
+}

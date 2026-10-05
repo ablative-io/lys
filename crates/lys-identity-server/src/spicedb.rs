@@ -46,10 +46,11 @@ pub(crate) mod scope;
 /// The line of an environment file that holds the preshared key.
 const KEY_LINE: &str = "SPICEDB_GRPC_PRESHARED_KEY=";
 /// The definitions every schema holds beside the resource kinds.
-const FIXED: [&str; 6] = [
+const FIXED: [&str; 7] = [
     "person",
     "agent",
     "service_account",
+    "connector",
     "grant",
     "lys_revision",
     "lys_mirror",
