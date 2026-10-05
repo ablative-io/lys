@@ -1,6 +1,9 @@
 #![cfg(test)]
-//! Upgrade starts from the old two-principal schema at a private HTTP fixture.
-//! The real `SpiceDb::open` path must write the new subject without losing old kinds.
+//! What open writes to the engine's schema, held two ways. The upgrade
+//! starts from the old two-principal schema at a private HTTP fixture: the
+//! real `SpiceDb::open` path must write the new subject without losing old
+//! kinds. And `FIXED` is held against the grant and mirror schemas: it names
+//! every definition either declares, and nothing that neither does.
 use super::{Model, SpiceDb, SpiceDbSettings};
 use serde_json::{Value, json};
 use std::error::Error;
@@ -123,7 +126,7 @@ fn fixed_names_every_definition_of_the_grant_and_mirror_schemas_and_nothing_else
     let defined: BTreeSet<&str> = [lys_identity::grants::SCHEMA, super::MIRROR_SCHEMA]
         .iter()
         .flat_map(|schema| schema.lines())
-        .filter_map(|line| line.strip_prefix("definition "))
+        .filter_map(|line| line.trim_start().strip_prefix("definition "))
         .filter_map(|rest| rest.split([' ', '{']).next())
         .collect();
     assert!(
