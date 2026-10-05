@@ -7,7 +7,7 @@ const solid = { fill: 'currentColor', stroke: 'none' } as const;
 export const SYMBOLS = {
   add: <path d="M12 5v14M5 12h14" />,
   remove: <path d="M5 12h14" />,
-  save: <path d="M12 4v10M8 10l4 4 4-4M5 19h14" />,
+  save: <path d="M5 5h11l3 3v11H5zM8.5 5v4.5h6V5M8 19v-6h8v6" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="1.5" {...solid} />,
   start: <path d="M8 5.5v13l10-6.5z" {...solid} />,
