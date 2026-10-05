@@ -49,6 +49,17 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
   ideas, unmeasured: the account's windows already reach the canvas through the proxy; Codex models inside
   Claude Code could be the proxy translating the calls. `docs/design/home/MODS.md` is the page to read first.
 
+## The Hub
+
+- A third view beside Canvas and Proxy. Tom, 5 October, 16:20, by voice: "it just makes me think that we could
+  maybe have a third thing in here. So currently we've got... Canvas and Proxy. Perhaps we could have Canvas,
+  hub and proxy and the hub could be sort of like just a swap between the chats for each one kind of thing...
+  more nicely, you know, like just rendered sort of view of the chats that you got running... Sort of like the
+  proxy is kind of like the raw view. And this would be like just the... streaming, nice looking view. Would be
+  handy, I reckon." Said back by Waffles, unmeasured: the proxy already keeps each call's messages and its
+  response stream per run, so the Hub reads the same records and draws them as a conversation, live, with a
+  switcher between the agents running. Not written.
+
 ## Usage and the proxy
 
 - A sub-agent's calls on the same model as the main thread set the agent's context for a moment. Codex
