@@ -60,30 +60,6 @@ fn binaries() -> TestResult<PathBuf> {
             return Err(format!("install_binary_not_executable: {}", path.display()).into());
         }
     }
-}
-
-/// Refuses by name when anything listens on `port` already.
-fn port_free(port: u16, what: &str) -> TestResult {
-    TcpListener::bind(("127.0.0.1", port))
-        .map(drop)
-        .map_err(|error| {
-            format!("port_in_use: {what} port 127.0.0.1:{port} is taken ({error}); stop the install holding it").into()
-        })
-}
-
-/// Reuse the workspace's compiled binaries, refusing an incomplete build.
-fn binaries() -> TestResult<PathBuf> {
-    let directory = Path::new(env!("CARGO_BIN_EXE_lys"))
-        .parent()
-        .ok_or("install_binary_directory_missing: the compiled CLI has no parent")?;
-    for name in ["lys", "lys-identity-server", "lys-secrets"] {
-        let path = directory.join(name);
-        let metadata = std::fs::metadata(&path)
-            .map_err(|error| format!("install_binary_missing: {}: {error}", path.display()))?;
-        if !metadata.is_file() || metadata.permissions().mode() & 0o111 == 0 {
-            return Err(format!("install_binary_not_executable: {}", path.display()).into());
-        }
-    }
     Ok(directory.to_path_buf())
 }
 
@@ -481,7 +457,12 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         },
         &mut read,
     )?;
-    policy::issuer_enforces_lys_policy(estate.root.path(), estate.rauthy_port, &mut read)?;
+    policy::issuer_enforces_lys_policy(
+        estate.root.path(),
+        estate.rauthy_port,
+        estate.service_port,
+        &mut read,
+    )?;
 
     let port = format!(":{}", estate.rauthy_port);
     let mut scanned = 0;

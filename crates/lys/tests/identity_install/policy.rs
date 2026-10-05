@@ -68,7 +68,12 @@ fn update_with(user: &Value, password: &str) -> Value {
 /// The sign-in service at `rauthy_port` enforces Lys's policy on the
 /// administrator's account, set with the key the directory service holds,
 /// and that key may neither write the policy nor rotate signing keys.
-pub fn issuer_enforces_lys_policy(root: &Path, rauthy_port: u16, read: &mut Heard) -> TestResult {
+pub fn issuer_enforces_lys_policy(
+    root: &Path,
+    rauthy_port: u16,
+    service_port: u16,
+    read: &mut Heard,
+) -> TestResult {
     let held = std::fs::read_to_string(root.join("state").join("sign-in-providers-api-key"))?;
     assert!(
         held.starts_with("lys_directory$"),
@@ -102,7 +107,13 @@ pub fn issuer_enforces_lys_policy(root: &Path, rauthy_port: u16, read: &mut Hear
     let (status, body) = request(&address, "PUT", &path, &authorised, Some(&taken))?;
     assert_eq!(status, 200, "a password Lys's policy takes is set: {body}");
     let credentials = json!({ "email": EMAIL, "password": LYS_TAKES }).to_string();
-    let signed_in = ask("POST", "/api/sign-in", None, Some(&credentials))?;
+    let signed_in = ask(
+        service_port,
+        "POST",
+        "/api/sign-in",
+        None,
+        Some(&credentials),
+    )?;
     assert_eq!(signed_in.status, 200, "{}", signed_in.body);
     read.answer("a sign-in with a password Lys's policy took", &signed_in);
 

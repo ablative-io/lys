@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Damage a segment store the way a test needs to: a byte flipped inside a
 //! leaf's record, a leaf replaced by other bytes behind a valid checksum, a
 //! segment cut at or inside a record, and a leaf's bytes read back from its

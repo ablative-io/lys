@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! A run on a model account. With no account named in an agent's settings
 //! the run uses the machine's own login, as every other start test shows.
 //! With one named, a program the catalogue gives no way to run from an

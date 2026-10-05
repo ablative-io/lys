@@ -11,7 +11,7 @@
 //! ```
 //!
 //! A record is the leaf's length, the leaf's bytes, whether a pin follows,
-//! the pin when it does, and a CRC-32C over all of it; see [`segment`]. An
+//! the pin when it does, and a CRC-32C over all of it; see the `segment` module. An
 //! append of any size is one act: every record of it, the last carrying the
 //! pin, is one write and one flush of the segment, and the offsets file is
 //! written after without a flush of its own. So the store's head is the last

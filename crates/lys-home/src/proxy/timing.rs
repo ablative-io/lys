@@ -25,7 +25,8 @@ pub(super) fn mark(stage: &AtomicU64) {
 
 pub(super) fn arriving() {
     let now = tick();
-    let _ = FIRST_BYTE.compare_exchange(0, now, Ordering::Relaxed, Ordering::Relaxed);
+    // Only the first arrival is kept: a later one loses this exchange, and losing it is right.
+    let _later_arrival = FIRST_BYTE.compare_exchange(0, now, Ordering::Relaxed, Ordering::Relaxed);
     LAST_BYTE.store(now, Ordering::Relaxed);
 }
 

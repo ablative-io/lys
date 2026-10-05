@@ -10,7 +10,7 @@
 //! Nothing here waits on a clock.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use crate::routes::AppState;
 use crate::runner_client::RunnerRecord;
@@ -40,14 +40,15 @@ pub struct Links {
 }
 
 impl Links {
-    fn with<T>(&self, act: impl FnOnce(&mut BTreeMap<(Link, String), Standing>) -> T) -> T {
-        // The table holds no half-made state: one entry is put or taken
-        // whole, so it is as true after another holder's panic as before.
-        act(&mut self.held.lock().unwrap_or_else(PoisonError::into_inner))
+    /// `None` when a panic left the table poisoned: nothing is read from it or
+    /// written to it again, so nothing more is begun until the service restarts.
+    fn with<T>(&self, act: impl FnOnce(&mut BTreeMap<(Link, String), Standing>) -> T) -> Option<T> {
+        self.held.lock().ok().map(|mut held| act(&mut held))
     }
 
     /// Take `link` to `machine`'s runner as begun. False when it is live
-    /// already, or ended on a refusal; the caller then begins nothing.
+    /// already, or ended on a refusal, or the table is poisoned; the caller
+    /// then begins nothing.
     pub fn begin(&self, link: Link, machine: &str) -> bool {
         self.with(|held| {
             let key = (link, machine.to_owned());
@@ -57,6 +58,7 @@ impl Links {
             held.insert(key, Standing::Live);
             true
         })
+        .unwrap_or(false)
     }
 
     /// `link` to `machine`'s runner ended. `lost` says the runner was not
@@ -70,7 +72,8 @@ impl Links {
             } else {
                 held.insert(key, Standing::Refused);
             }
-        });
+        })
+        .unwrap_or(());
     }
 }
 

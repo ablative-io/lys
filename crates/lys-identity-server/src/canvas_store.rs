@@ -17,7 +17,7 @@ use std::fs;
 use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
 use lys_identity::PersonId;
 use serde::{Deserialize, Serialize};
@@ -296,8 +296,12 @@ impl CanvasStore {
         person: PersonId,
         change: impl FnOnce(&mut Canvas) -> Result<(), ServerError>,
     ) -> Result<Canvas, ServerError> {
-        // The lock holds no state of its own, so one a panic left poisoned is still good.
-        let _one = self.changing.lock().unwrap_or_else(PoisonError::into_inner);
+        // A lock a panic left poisoned is refused by name, as every other lock of the
+        // service is; the canvas on disk is whole, and reading it is not refused.
+        let _one = self
+            .changing
+            .lock()
+            .map_err(|error| unavailable(format!("the canvas lock is poisoned: {error}")))?;
         let mut canvas = self.read(person)?;
         change(&mut canvas)?;
         let bytes = serde_json::to_vec(&canvas).map_err(unavailable)?;
@@ -330,3 +334,7 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         _ => Ok(()),
     }
 }
+
+#[cfg(test)]
+#[path = "canvas_store_tests.rs"]
+mod tests;

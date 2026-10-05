@@ -45,3 +45,24 @@ fn only_a_runner_that_was_not_there_counts_as_lost() {
         assert!(!lost(refused), "{refused}");
     }
 }
+
+#[test]
+fn a_poisoned_table_begins_nothing_more() {
+    let links = std::sync::Arc::new(Links::default());
+    assert!(links.begin(Link::Feed, "machine-one"));
+    let held = std::sync::Arc::clone(&links);
+    let poisoner = std::thread::spawn(move || {
+        let _guard = held.held.lock();
+        panic!("poison the links table");
+    });
+    assert!(poisoner.join().is_err(), "the holder panicked");
+    assert!(
+        !links.begin(Link::Grants, "machine-one"),
+        "nothing is begun on a poisoned table"
+    );
+    links.ended(Link::Feed, "machine-one", true);
+    assert!(
+        !links.begin(Link::Feed, "machine-one"),
+        "an end is not recorded on a poisoned table, so the link is not begun again"
+    );
+}

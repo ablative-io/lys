@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Adding a secret, changing its value and retiring it, against a stand-in broker that records what
 //! reaches it. A secret's value travels to the broker in the body exactly as
 //! the browser sent it, unread, signed for the signed-in person; a broker
@@ -56,7 +57,7 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
         .to_owned();
     let path = parts.uri.path().to_owned();
     log.lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .expect("the fixture lock is not poisoned")
         .push(Received {
             path: path.clone(),
             on_behalf_of: on_behalf_of.clone(),
@@ -137,7 +138,7 @@ async fn setup(subject: &str) -> Result<Setup, Box<dyn Error>> {
     let say: lys_identity_server::Say = Arc::new(move |line| {
         saying
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("the fixture lock is not poisoned")
             .push(line.to_owned());
     });
     let (service, seeded) = Box::pin(Service::start_saying(
@@ -175,7 +176,7 @@ fn login(subject: &str) -> Login {
 
 fn received(log: &Log) -> Vec<Received> {
     log.lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .expect("the fixture lock is not poisoned")
         .clone()
 }
 
@@ -186,7 +187,7 @@ fn never_kept(setup: &Setup, text: &str) -> TestResult {
         !setup
             .said
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("the fixture lock is not poisoned")
             .iter()
             .any(|line| line.contains(text)),
         "a line the service said carries the value"
