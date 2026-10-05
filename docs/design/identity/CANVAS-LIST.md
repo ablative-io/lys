@@ -83,6 +83,13 @@ His words, in the order said, on a person's page (he had Waffles' open):
   saying connected tools this agent can use... if we're just talking about MCP servers... just call them MCP
   servers. If we're talking about more than that... we should just break things out into separate sort of
   things. So tools, plugins... MCP servers, plugins, skills."
+- The working folder, 16:43: "The Choose folder is pretty stupid... it's not giving you... a place to go. Like you
+  can't type in a path or select... a path for anything."
+- Every button, 16:43: "I want you to do an audit for all of these button labels. Like you're on the settings
+  page and... the label is like save these settings. Like I just want you to go through and just like get rid
+  of everything that's written in words, replace it with a symbol where we can... [a full audit of] that, cause
+  it's really, really pretty shit. Like throughout the entire site, like those kinds of buttons are really kind
+  of dumb."
 
 Seen by Waffles on the walk he asked for (installed a1678ae6, pictures w40, w41), beside his own:
 
