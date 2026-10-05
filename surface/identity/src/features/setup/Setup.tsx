@@ -21,6 +21,7 @@ import { SIGNED_IN, reasonOf } from '../sign-in/SignIn';
 import '../people/recorded-form.css';
 import '../people/manage.css';
 import '../sign-in/sign-in.css';
+import { Act } from '../../shell/Act';
 
 let taken: string | null = null;
 
@@ -85,7 +86,7 @@ function CodeEntry({ refusal, take }: { refusal: string; take: (code: string) =>
       <p id="setup-code-where" className="note">The setup code is in the file named setup-code in the folder the install printed. Use the full path shown on the line “the setup code is in …”. Only the account that ran the install can read it. The copy under state/ is a verification record, not the code.</p>
     </div>
     {why ? <p role="alert" className="why-not">{why}</p> : null}
-    <button className="btn primary" type="submit">Check the code</button>
+    <Act symbol="approve" name="Check the code" word="Check" tone="primary" type="submit" />
   </form>;
 }
 
@@ -172,7 +173,7 @@ export function FirstRunSetup({ code: linked, done = () => location.replace(SIGN
         <input id="setup-confirm" name="confirm" type="password" autoComplete="new-password" required disabled={busy} />
       </div>
       {error ? <p role="alert" className="why-not">{error}</p> : null}
-      <button className="btn primary" type="submit" disabled={busy}>{busy ? 'Setting up…' : firstRun ? 'Set up and sign in' : 'Save and sign in'}</button>
+      <Act symbol="enter" name={busy ? 'Setting up…' : firstRun ? 'Set up and sign in' : 'Save and sign in'} word={busy ? 'Setting up…' : firstRun ? 'Set up and sign in' : 'Save and sign in'} tone="primary" type="submit" disabled={busy} />
     </form> : null}
   </div>;
 }
@@ -266,9 +267,7 @@ export function Setup({ completed }: { completed: () => void }) {
           <p>{saved.error ? 'Your saved setup request could not be restored. Keep this tab open and ask your administrator for help.' : pending ? 'Your request is saved. Choose Retry setup to check it safely.' : 'Your browser could not save the request. Nothing has been submitted. Check browser storage before trying again.'}</p>
           <p><small className="refusal-name">{error}</small></p>
         </div> : null}
-        <button className="btn primary" type="submit" disabled={busy || Boolean(saved.error)}>
-          {busy ? 'Finishing setup…' : pending ? 'Retry setup' : 'Finish setup'}
-        </button>
+        <Act symbol="approve" name={busy ? 'Finishing setup…' : pending ? 'Retry setup' : 'Finish setup'} word={busy ? 'Finishing…' : pending ? 'Retry' : 'Finish'} tone="primary" type="submit" disabled={busy || Boolean(saved.error)} />
         <p role="status" aria-live="polite">{busy ? 'Saving your account. You can stay on this page.' : ''}</p>
       </form>
     </div>

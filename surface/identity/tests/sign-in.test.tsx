@@ -14,14 +14,14 @@ import { ME, SERVICE, ok, refused } from './fixtures';
 /** Lys's configured policy as the service answers it, no default of anyone's. */
 const POLICY = { length_min: 12, length_max: 48, words: 'At least 12 and at most 48 characters, with 2 of the kind: digit.' };
 
-/** Every control on the page is one of the shared ones: fields in `.field`, buttons `.btn`. */
+/** Every control on the page is one of the shared ones: fields in `.field`, buttons the act control. */
 function unstyled(): string[] {
   const bad: string[] = [];
   for (const input of $$('input, select, textarea')) {
     if (!input.closest('.field')) bad.push(input.outerHTML.slice(0, 80));
   }
   for (const button of $$('button')) {
-    if (!button.classList.contains('btn')) bad.push(button.outerHTML.slice(0, 80));
+    if (!button.classList.contains('act')) bad.push(button.outerHTML.slice(0, 80));
   }
   return bad;
 }
@@ -48,7 +48,7 @@ describe('Lys sign-in page', () => {
     await mount('#/sign-in', SERVICE);
     expect($('.page.sign-in h1')?.textContent).toBe('Sign in');
     expect($$('form[aria-label="Sign in"] .field input')).toHaveLength(2);
-    expect($$('form[aria-label="Sign in"] button.btn.primary')).toHaveLength(1);
+    expect($$('form[aria-label="Sign in"] button.act.primary[data-symbol="enter"]')).toHaveLength(1);
     expect(unstyled()).toEqual([]);
     expect(document.querySelectorAll('link[rel="stylesheet"][href^="http"]')).toHaveLength(0);
   });

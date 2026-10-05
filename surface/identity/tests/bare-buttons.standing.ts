@@ -21,8 +21,6 @@ export const STANDING: Record<string, number> = {
   'features/runtime/CanvasWidgets.tsx': 7,
   'features/runtime/SessionCanvas.tsx': 5,
   'features/settings/Settings.tsx': 4,
-  'features/setup/Setup.tsx': 3,
-  'features/sign-in/SignIn.tsx': 1,
   'features/teams/Teams.tsx': 1,
   'shell/Explain.tsx': 1,
   'shell/Listing.tsx': 2,

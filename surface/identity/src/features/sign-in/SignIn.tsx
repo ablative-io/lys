@@ -10,6 +10,7 @@ import { API, Refused, request } from '../../api';
 import type { SignedIn } from '../../generated';
 import '../people/recorded-form.css';
 import './sign-in.css';
+import { Act } from '../../shell/Act';
 
 /** Where a person lands once signed in. */
 export const SIGNED_IN = '/#/';
@@ -119,7 +120,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
         <input id="sign-in-password" name="password" type="password" autoComplete="current-password" required disabled={busy} />
       </div>
       {error ? <p role="alert" className="why-not">{error}</p> : null}
-      <button className="btn primary" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      <Act symbol="enter" name={busy ? 'Signing in…' : 'Sign in'} word={busy ? 'Signing in…' : 'Sign in'} tone="primary" type="submit" disabled={busy} />
     </form>
     <Providers />
   </div>;
