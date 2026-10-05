@@ -49,6 +49,43 @@ it when it is written, built, installed and walked with pictures. Kept by Waffle
   ideas, unmeasured: the account's windows already reach the canvas through the proxy; Codex models inside
   Claude Code could be the proxy translating the calls. `docs/design/home/MODS.md` is the page to read first.
 
+## Tom's walk of People and agents, 5 October, 16:35 to 16:40, by voice
+
+His words, in the order said, on a person's page (he had Waffles' open):
+
+- "the buttons up in the top right hand side. We've got edit name, which is a button, which I don't think needs
+  to be a button at all. That should just be in the settings, the overview kind of thing for editing their
+  names. We can probably get rid of that."
+- "it's got three buttons that say suspend access, retire permanently or emergency stop. I think the suspend and
+  retire button should be under maybe the drop down and the emergency stop button should be just like a stop
+  symbol button and... probably to the left of the active badge."
+- Buttons everywhere: "where... we've used like text label buttons. I really don't like big text label buttons.
+  They look really stupid. I'd really like you to find symbolic buttons with like, you know, labels beside...
+  Even things like... add this limit and set goal. Like you're in the [goal] thing, you could probably just have
+  a button that just says set rather than set goal... a plus button for the add this limit kind of thing...
+  suspend access and retire permanently. Like you could probably just have suspend and retire."
+- The budget screen: "I don't think there's a great use of space."
+- "there's a thing where something's duplicated, so it says like there's no dollar spent has been reported for
+  Waffles the Terrible."
+- "walk it in the browser, have a look, see what else you're seeing."
+
+## The canvas as wiring (Tom, the same walk)
+
+- An emergency stop widget: "that emergency stop would be a good widget to have... a really common sense kind of
+  widget... here's... an emergency stop button and I've wired it up to these things. So if I need to, I can just
+  hit the emergency stop on there."
+- "I wonder even if maybe we could sort of think about sort of like the wiring diagram that the operations
+  canvas becomes... it could almost be like a permissions thing in itself really... These things can go there,
+  can't go here."
+- "having things like a shared prompt field where you can send stuff in."
+- Flows: "it's not [Lys's] primary purpose, but... pretty cool for it nonetheless... running commands in little
+  computational flows, like the output of this one runs to the input of this one... a templating kind of thing
+  where we could wire variables from one thing to the next... flows from one terminal process feeding... back
+  out into other little data processing widgets or templating widgets and then back out into a new terminal
+  would be really interesting... it would give people another reason to use it in their day to day."
+
+None of this section is written yet.
+
 ## The Hub
 
 - A third view beside Canvas and Proxy. Tom, 5 October, 16:20, by voice: "it just makes me think that we could
