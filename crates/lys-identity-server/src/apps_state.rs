@@ -90,8 +90,8 @@ pub struct Registered {
 pub struct Client {
     /// The client id.
     pub client_id: String,
-    /// The SHA-256 of the client secret, in hex. The secret itself is
-    /// shown once to the approving administrator and kept nowhere.
+    /// The SHA-256 of the client secret, in hex. The secret itself is made
+    /// and sealed by the secrets broker at approval and shown to nobody.
     pub secret_sha256: String,
 }
 
