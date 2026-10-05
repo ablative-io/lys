@@ -164,11 +164,13 @@ describe('the permission template builder', () => {
 
 describe('the Apps screen', () => {
   it('shows a pending app in words before approval and never its secret after', async () => {
-    const pending = { id: APP, name: 'Notes fixture', state: 'pending', redirects: ['https://app.example.test/signed-in'], schema: uploadedWorkspace, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'service_account', id: 'op-1' }, registered_at: 1 };
+    const pending = { id: APP, name: 'Notes fixture', state: 'pending', redirects: ['https://app.example.test/signed-in'], sign_in: null, schema: uploadedWorkspace, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'service_account', id: 'op-1' }, registered_at: 1 };
+    // Approval keeps the registration's address as the sign-in settings, the name withheld.
+    const signIn = { redirects: ['https://app.example.test/signed-in'], profile: false, operation: 'op-approve', by: { kind: 'start' }, at: 2 };
     let approved = false;
     const calls = stub({
-      'GET /apps': () => ok({ apps: [approved ? { ...pending, state: 'approved', version: 1, versions: [1], client_id: APP } : pending] }),
-      ['POST /apps/' + APP + '/approve']: () => { approved = true; return ok({ app: { ...pending, state: 'approved' }, client: { client_id: APP, client_secret: 'f'.repeat(64), credential: 'lys-app.' + APP + '.' + 'f'.repeat(64) } }); },
+      'GET /apps': () => ok({ apps: [approved ? { ...pending, state: 'approved', version: 1, versions: [1], client_id: APP, sign_in: signIn } : pending] }),
+      ['POST /apps/' + APP + '/approve']: () => { approved = true; return ok({ app: { ...pending, state: 'approved', sign_in: signIn }, client: { client_id: APP, client_secret: 'f'.repeat(64), credential: 'lys-app.' + APP + '.' + 'f'.repeat(64) } }); },
     });
     await render(<Apps />);
     expect(text()).toContain('https://app.example.test/signed-in');
@@ -179,7 +181,8 @@ describe('the Apps screen', () => {
     expect([...channel?.querySelectorAll('tbody td') ?? []].map((cell) => cell.getAttribute('aria-label'))).toEqual(['poster may read', 'poster may write']);
     expect(channel?.querySelector('tfoot')?.textContent).toBe('What is held on fixture_notes.workspace reaches it.');
     await click(button('Approve Notes fixture'));
-    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ operation: expect.stringMatching(/^op-/) });
+    // The approval sends the sign-in settings it offered: the registration's address, the name withheld.
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ operation: expect.stringMatching(/^op-/), redirects: ['https://app.example.test/signed-in'], profile: false });
     expect(labelled('Save app credentials')).not.toBeNull();
     expect(document.body.innerHTML).not.toContain('f'.repeat(64));
     expect(text()).toContain('approved');
