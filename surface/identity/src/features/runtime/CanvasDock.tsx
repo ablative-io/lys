@@ -17,6 +17,7 @@ import type { SessionGraph } from './session-graph';
 import { said } from './canvas-kept';
 import { KINDS } from './canvas-widgets';
 import type { Keeping, SavedLayout } from './canvas-kept';
+import { Act } from '../../shell/Act';
 
 export type Tool = 'box' | 'line' | 'note' | 'widget' | null;
 export type Panel = 'agents' | 'layouts' | 'connections' | 'widgets' | null;
@@ -97,14 +98,14 @@ function Layouts({ keeping, layouts, save, remove }: {
         {layouts.map((layout) => <tr key={layout.name} data-layout={layout.name}>
           <td><a data-act="open-layout" href={'#' + pathname + '?panel=layouts&layout=' + encodeURIComponent(layout.name)} title="Open this layout">{layout.name}</a></td><td className="sec">{clock(layout.saved_at)}</td>
           <td className="canvas-layout-acts">
-            <button type="button" className="btn" data-act="save-over" disabled={busy} onClick={() => doing(save(layout.name))}>Save over</button>
-            <button type="button" className="btn" data-act="remove-layout" disabled={busy} onClick={() => doing(remove(layout.name))}>Remove</button>
+            <Act symbol="save" name={'Save over ' + layout.name} word="Save over" className="small" data-act="save-over" disabled={busy} onClick={() => doing(save(layout.name))} />
+            <Act symbol="remove" name={'Remove ' + layout.name} className="small" data-act="remove-layout" disabled={busy} onClick={() => doing(remove(layout.name))} />
           </td></tr>)}
         {layouts.length ? null : <tr className="empty"><td colSpan={3} className="dim">No layout is saved yet.</td></tr>}
       </tbody>
       <tfoot><tr data-add="layout">
         <td colSpan={2}><input form="canvas-save-layout" name="name" aria-label="Name for this layout" placeholder="Name this layout" value={name} onChange={(event) => setName(event.target.value)} /></td>
-        <td><button form="canvas-save-layout" type="submit" className="btn primary" disabled={!wanted || busy}>{layouts.some((each) => each.name === wanted) ? 'Save over' : 'Save'}</button></td>
+        <td><Act symbol="save" name={layouts.some((each) => each.name === wanted) ? 'Save over' : 'Save'} word={layouts.some((each) => each.name === wanted) ? 'Save over' : 'Save'} tone="primary" className="small" type="submit" form="canvas-save-layout" disabled={!wanted || busy} /></td>
       </tr></tfoot>
     </table>
     <p className="note">{keeping.where === 'service'

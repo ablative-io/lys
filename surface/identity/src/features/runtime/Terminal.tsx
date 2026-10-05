@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Refused, api, request, useLoad } from '../../api';
 import { clock } from '../file/time';
 import { GpuTerminal } from './GpuTerminal';
+import { Act } from '../../shell/Act';
 
 export interface SessionEnd { how: 'exited' | 'ended_by_runner_restart' | 'accounts_exhausted'; at: number; status: number | null; signal: string | null }
 interface EndAnswer { answer?: { kind?: string; ended?: SessionEnd } }
@@ -49,13 +50,13 @@ export function Terminal({ session, agent, machine, bare = false }: { session: s
     {bare ? null : <div className="terminal-head">
       <div><h2 title={session}>{name}</h2>{machine ? <p className="sec">on {machine}</p> : null}</div>
       <p className="terminal-state" role="status" data-ended={ended ? 'true' : 'false'} title={ended ? endWords(ended) : undefined}>{ended ? endWords(ended) : 'Running'}</p>
-      {!ended ? <button type="button" className="btn" data-act="stop" disabled={busy} onClick={() => setConfirming(true)}>Stop</button> : null}
+      {!ended ? <Act symbol="stop" name="Stop" hint={'Stop ' + name} word="Stop" className="small" data-act="stop" disabled={busy} onClick={() => setConfirming(true)} /> : null}
     </div>}
     {confirming ? <div className="terminal-stop" role="alertdialog" aria-label={'Stop ' + name}>
       <p>Stop {name}? This ends its session on the machine it runs on. What it has not saved is lost.</p>
       <div className="actions">
-        <button type="button" className="btn danger" data-act="confirm-stop" disabled={busy} onClick={() => void stop()}>Stop {name}</button>
-        <button type="button" className="btn" data-act="keep-running" onClick={() => setConfirming(false)}>Keep it running</button>
+        <Act symbol="stop" name={'Stop ' + name} word={'Stop ' + name} tone="danger" className="small" data-act="confirm-stop" disabled={busy} onClick={() => void stop()} />
+        <Act symbol="close" name="Keep it running" word="Keep it running" className="small" data-act="keep-running" onClick={() => setConfirming(false)} />
       </div>
     </div> : null}
     <GpuTerminal session={session} onEnd={setEnded} onFailure={(error) => setRefused(asRefused(error))} />

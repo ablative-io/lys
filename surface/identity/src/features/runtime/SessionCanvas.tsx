@@ -34,6 +34,7 @@ import './session-canvas.css';
 import './canvas-marks.css';
 
 import { CLOSED, OPENED, SMALLEST, lineBetween, placed } from './canvas-place';
+import { Act } from '../../shell/Act';
 export type { Box } from './canvas-marks';
 export { lineBetween, placed } from './canvas-place';
 export type { View } from './canvas-view';
@@ -488,7 +489,7 @@ function Canvas({ graph, keeping, connections, board }: { graph: SessionGraph; k
   <CanvasDock graph={graph} show={show} tool={tool} setTool={setTool} picking={lineFrom !== null} panel={panel} setPanel={setPanel}
     zoom={Math.round(zoomOf(view) * 100)} zoomBy={zoomBy} home={home} tidy={() => tidy()} teams={teamBoxed(graph, boxes, marks) ? () => tidy(teamBoxed(graph, boxes, marks)!) : null} connections={connections} kind={kind} place={(next) => { setKind(next); setTool('widget'); setPanel(null); }} drop={drop} keeping={keeping} layouts={layouts} save={save} remove={remove}
     says={<>
-      {untidy?.at === changes ? <span role="status">Tidied. <button type="button" className="btn" data-act="untidy" onClick={putBack}>Put it back</button></span> : null}
+      {untidy?.at === changes ? <span role="status">Tidied. <Act symbol="revoke" name="Put it back" word="Put it back" className="small" data-act="untidy" onClick={putBack} /></span> : null}
       {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}
       {missing !== null ? <span className="why-not" role="alert">No layout is saved as {missing}.</span> : null}
       {unsent ? <span className="why-not" role="alert">The arrangement was not kept on the service. <small className="refusal-name">{unsent}</small></span> : null}
@@ -543,7 +544,7 @@ export function SessionCanvas() {
   const [search] = useSearchParams();
   const proxy = search.get('view') === 'proxy';
   return <div className="page fill session-canvas-page">
-    <div className="head"><div><h1>Operations</h1>{load.status === 'refused' && !proxy ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}</div></div>
+    <div className="head"><div><h1>Operations</h1>{load.status === 'refused' && !proxy ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}</div></div>
     {/* Operations is two views of the same agents: the canvas they are arranged on, and the model calls they made. */}
     <nav className="operations-swap" aria-label="Operations views"><a href="#/canvas" aria-current={proxy ? undefined : 'page'}>Canvas</a><a href={proxyHref({})} aria-current={proxy ? 'page' : undefined}>Proxy</a></nav>
     {proxy ? <ProxyView board={board} /> : <div className="canvas-side">

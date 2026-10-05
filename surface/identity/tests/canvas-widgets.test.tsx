@@ -304,7 +304,7 @@ describe('Typing to several agents at once', () => {
     await hold(bar(session));
     expect([$('.canvas-together')?.getAttribute('aria-label'), $('[data-node="' + node + '"]')?.className.includes('together')]).toEqual(['Type to 1 agent', true]);
     await click($('[data-act="together-all"]'));
-    expect([$$('[data-together]').map((each) => each.textContent), $('[data-act="together-all"]')]).toEqual([['Scribe×', 'Courier×'], null]);
+    expect([$$('[data-together]').map((each) => each.textContent + ', ' + each.querySelector('button')?.getAttribute('aria-label')), $('[data-act="together-all"]')]).toEqual([['Scribe, Leave Scribe out', 'Courier, Leave Courier out'], null]);
     await write('Run the tests.');
     await act(async () => { $('.canvas-together textarea')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
     await settle();
@@ -313,7 +313,7 @@ describe('Typing to several agents at once', () => {
     expect([$('.canvas-together [role="status"]')?.textContent, ($('.canvas-together textarea') as HTMLTextAreaElement).value]).toEqual(['Typed to 2 agents.', '']);
     // One left out is not typed to; pressed again with Command held, a window leaves; Done puts the form away.
     await click($('[data-together="session:' + other.session + '"] button'));
-    expect($$('[data-together]').map((each) => each.textContent)).toEqual(['Scribe×']);
+    expect($$('[data-together]').map((each) => each.textContent + ', ' + each.querySelector('button')?.getAttribute('aria-label'))).toEqual(['Scribe, Leave Scribe out']);
     await hold(bar(session));
     expect($('.canvas-together')).toBeNull();
     // An agent it did not reach is said by name with why, and the words stay to be sent again by the person, never by the page.

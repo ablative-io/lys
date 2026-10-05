@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { counted } from '../../shell/count';
 import { typed } from './terminal-transport';
+import { Act } from '../../shell/Act';
 
 export interface Together { node: string; session: string; name: string }
 type Outcome = { name: string; failed: string | null };
@@ -36,14 +37,14 @@ export function TypeTogether({ chosen, drop, clear, all }: {
     <div className="canvas-together-whom">
       <span className="sec">To</span>
       {chosen.map((each) => <span key={each.node} className="canvas-together-chip" data-together={each.node}>{each.name}
-        <button type="button" aria-label={'Leave ' + each.name + ' out'} title="Leave out" onClick={() => drop(each.node)}>×</button></span>)}
-      {all ? <button type="button" className="btn" data-act="together-all" onClick={all}>Every running agent</button> : null}
-      <button type="button" className="btn" data-act="together-clear" onClick={clear}>Done</button>
+        <Act symbol="close" name={'Leave ' + each.name + ' out'} onClick={() => drop(each.node)} /></span>)}
+      {all ? <Act symbol="add" name="Every running agent" word="All running" className="small" data-act="together-all" onClick={all} /> : null}
+      <Act symbol="approve" name="Done" word="Done" className="small" data-act="together-clear" onClick={clear} />
     </div>
     <div className="canvas-together-line">
       <textarea aria-label={'What to type to ' + counted(chosen.length, 'agents')} placeholder={'Type once; it goes to ' + counted(chosen.length, 'agents') + '. Enter sends, Shift and Enter makes a new line.'} rows={Math.min(8, words.split('\n').length)} value={words} disabled={busy}
         onChange={(event) => setWords(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} />
-      <button type="submit" className="btn primary" disabled={busy || !words.trim()}>Send</button>
+      <Act symbol="send" name="Send" word="Send" tone="primary" type="submit" disabled={busy || !words.trim()} />
     </div>
     {outcomes && !failed.length ? <p className="sec" role="status">Typed to {counted(outcomes.length, 'agents')}.</p> : null}
     {failed.length ? <p className="why-not" role="alert">Not typed to {failed.map((each) => each.name + ': ' + each.failed).join('; ')}{outcomes && outcomes.length > failed.length ? '. Typed to ' + outcomes.filter((each) => each.failed === null).map((each) => each.name).join(', ') + '.' : ''}</p> : null}
