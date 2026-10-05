@@ -116,7 +116,7 @@ fn an_approval_refused_by_the_store_leaves_the_app_pending_and_lands_whole_when_
         app: APP.to_owned(),
         name: "The notes fixture".to_owned(),
         redirects: vec![BACK.to_owned()],
-        schema: json!({"kinds": {}}),
+        schema: json!({"kinds": {"fixture_notes.doc": {"actions": ["read"], "relations": {"viewer": ["read"]}}}}),
         service_account: None,
         by: By::Start,
         at: 1,

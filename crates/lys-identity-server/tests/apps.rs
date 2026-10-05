@@ -88,7 +88,7 @@ async fn approval_confirms_custody_without_returning_secrets_and_a_sign_in_and_c
     let bea = seeded.people[1].id.to_string();
     register(&service, &admin, NOTES).await?;
     let operation = op()?;
-    let body = json!({"operation": operation});
+    let body = json!({"operation": operation, "redirects": ["https://notes.example.test/signed-in"], "profile": false});
     let path = format!("/apps/{NOTES}/approve");
     let approval = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
     assert_eq!(approval["app"]["state"], "approved", "{approval}");
@@ -105,7 +105,7 @@ async fn approval_confirms_custody_without_returning_secrets_and_a_sign_in_and_c
         Value::Null,
         "approval never returns the secret: {again}"
     );
-    let other = json!({"operation": op()?});
+    let other = json!({"operation": op()?, "redirects": ["https://notes.example.test/signed-in"], "profile": false});
     refused(
         &post(&service, &path, Auth::Cookie(&admin), &other).await?,
         409,
@@ -415,7 +415,7 @@ async fn a_declined_app_never_takes_effect() -> TestResult {
     )
     .await?)?;
     assert_eq!(declined["state"], "declined");
-    let approve = json!({"operation": op()?});
+    let approve = json!({"operation": op()?, "redirects": ["https://notes.example.test/signed-in"], "profile": false});
     let answer = post(
         &service,
         &format!("/apps/{NOTES}/approve"),

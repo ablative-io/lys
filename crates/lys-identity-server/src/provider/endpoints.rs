@@ -11,6 +11,7 @@ use super::{Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, rand
 use crate::apps_binding::{sign_in_client, sign_in_redirect};
 use crate::apps_error::AppError;
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 use crate::routes::{AppState, cookie_header, hex, with_directory};
 use crate::session::now;
 use axum::extract::rejection::FormRejection;
@@ -144,15 +145,15 @@ fn scopes(asked: Option<&str>, app: &str, profile: bool) -> Result<bool, ServerE
             "openid" => openid = true,
             "profile" if profile => name = true,
             "profile" => {
-                return Err(ServerError::ScopeNotGranted {
+                return Err(ServerError::Provider(ProviderError::ScopeNotGranted {
                     scope: scope.to_owned(),
                     app: app.to_owned(),
-                });
+                }));
             }
             _ => {
-                return Err(ServerError::ScopeUnknown {
+                return Err(ServerError::Provider(ProviderError::ScopeUnknown {
                     scope: scope.to_owned(),
-                });
+                }));
             }
         }
     }
@@ -277,19 +278,23 @@ pub(super) fn presented(headers: &HeaderMap, form: &Exchange) -> Option<(String,
 /// An OAuth error answer carrying the refusal by name.
 pub(super) fn oauth_refusal(error: &ServerError) -> Response {
     let code = match error {
-        ServerError::ClientUnknown
+        ServerError::Provider(ProviderError::ClientUnknown)
         | ServerError::App(
             AppError::CredentialRefused { .. }
             | AppError::AppNotApproved { .. }
             | AppError::AppRetired { .. },
         ) => "invalid_client",
         ServerError::App(AppError::RedirectInvalid { .. })
-        | ServerError::CodeUsed
-        | ServerError::CodeExpired
-        | ServerError::CodeUnknown
-        | ServerError::VerifierWrong
-        | ServerError::RedirectUnregistered => "invalid_grant",
-        ServerError::ScopeUnknown { .. } | ServerError::ScopeNotGranted { .. } => "invalid_scope",
+        | ServerError::Provider(
+            ProviderError::CodeUsed
+            | ProviderError::CodeExpired
+            | ProviderError::CodeUnknown
+            | ProviderError::VerifierWrong
+            | ProviderError::RedirectUnregistered,
+        ) => "invalid_grant",
+        ServerError::Provider(
+            ProviderError::ScopeUnknown { .. } | ProviderError::ScopeNotGranted { .. },
+        ) => "invalid_scope",
         ServerError::RequestMalformed { .. }
         | ServerError::BodyTooLarge
         | ServerError::Holding(..) => "invalid_request",
@@ -400,8 +405,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::ReviewReused { .. }
         | ServerError::DirectoryUnavailable { .. }
         | ServerError::SignInProvidersUnavailable { .. }
-        | ServerError::ProviderUnavailable { .. }
-        | ServerError::TokenUnknown
+        | ServerError::Provider(ProviderError::Unavailable { .. } | ProviderError::TokenUnknown)
         | ServerError::ProviderRefused { .. }
         | ServerError::SignInProvidersRefused { .. }
         | ServerError::NotPermitted { .. }
@@ -451,7 +455,8 @@ pub(super) fn exchange(
     if form.grant_type != "authorization_code" {
         return Err(malformed("a product exchanges an authorization code"));
     }
-    let (client_id, secret) = presented(headers, &form).ok_or(ServerError::ClientUnknown)?;
+    let (client_id, secret) =
+        presented(headers, &form).ok_or(ServerError::Provider(ProviderError::ClientUnknown))?;
     let admitted = admitted_client(state, &client_id, Some(&secret), &form.redirect_uri)?;
     let client_id = admitted.app;
     let at = now();
@@ -468,7 +473,7 @@ pub(super) fn exchange(
     // authorization asked for it and the app's setting still grants it at
     // this exchange; it is read from the directory now and kept nowhere.
     if !state.sessions.is_live(&taken.session_id)? {
-        return Err(ServerError::CodeExpired);
+        return Err(ServerError::Provider(ProviderError::CodeExpired));
     }
     let profile = taken.profile && admitted.profile;
     let name = if profile {
@@ -524,7 +529,7 @@ pub(super) async fn userinfo(
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or(ServerError::TokenUnknown)?;
+        .ok_or(ServerError::Provider(ProviderError::TokenUnknown))?;
     let (subject, session_id, app, profile) = {
         let tokens = held(&provider.tokens)?;
         let access = tokens.get(&hex(&Sha256::digest(bearer.trim().as_bytes())), now())?;
@@ -536,7 +541,7 @@ pub(super) async fn userinfo(
         )
     };
     if !state.sessions.is_live(&session_id)? {
-        return Err(ServerError::TokenUnknown);
+        return Err(ServerError::Provider(ProviderError::TokenUnknown));
     }
     let mut answer = json!({ "sub": subject });
     // The name follows the setting: read again at this request, given only

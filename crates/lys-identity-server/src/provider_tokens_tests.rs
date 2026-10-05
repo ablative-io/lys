@@ -7,6 +7,7 @@ use serde_json::json;
 
 use super::{Access, FORMAT, Tokens, dropped_words};
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 
 fn access(ends: u64) -> Access {
     Access {
@@ -44,7 +45,7 @@ fn a_token_of_an_earlier_shape_is_dropped_alone_at_open() -> Result<(), Box<dyn 
     let tokens = Tokens::open(file.clone(), 10)?;
     assert!(matches!(
         tokens.get(&old, 10),
-        Err(ServerError::TokenUnknown)
+        Err(ServerError::Provider(ProviderError::TokenUnknown))
     ));
     assert_eq!(tokens.get(&kept, 10)?.app, "notes");
     // One line is said, with the count and the file, never a key or a member.
@@ -92,7 +93,7 @@ fn an_old_key_only_install_gains_private_persistent_access_and_durable_revocatio
     drop(restarted);
     assert!(matches!(
         Tokens::open(file, 10)?.get(&key, 10),
-        Err(ServerError::TokenUnknown)
+        Err(ServerError::Provider(ProviderError::TokenUnknown))
     ));
     assert_eq!(std::fs::read_dir(dir.path())?.count(), 2);
     Ok(())
@@ -117,13 +118,13 @@ fn a_large_table_takes_another_and_expiry_frees_space_without_waiting() -> Resul
     assert_eq!(Tokens::open(file.clone(), 10)?.live.len(), 5001);
     assert!(matches!(
         tokens.insert("e".repeat(64), access(40), 10),
-        Err(ServerError::ProviderUnavailable { .. })
+        Err(ServerError::Provider(ProviderError::Unavailable { .. }))
     ));
     tokens.insert("f".repeat(64), access(40), 20)?;
     assert_eq!(tokens.live.len(), 2);
     assert!(matches!(
         tokens.get(&"f".repeat(64), 40),
-        Err(ServerError::TokenUnknown)
+        Err(ServerError::Provider(ProviderError::TokenUnknown))
     ));
     assert!(Tokens::open(file, 40)?.live.is_empty());
     Ok(())
@@ -141,15 +142,15 @@ fn a_failed_durable_revoke_refuses_reads_instead_of_exposing_the_token()
     std::fs::create_dir(&file)?;
     assert!(matches!(
         tokens.revoke(&key),
-        Err(ServerError::ProviderUnavailable { .. })
+        Err(ServerError::Provider(ProviderError::Unavailable { .. }))
     ));
     assert!(matches!(
         tokens.get(&key, 10),
-        Err(ServerError::ProviderUnavailable { .. })
+        Err(ServerError::Provider(ProviderError::Unavailable { .. }))
     ));
     assert!(matches!(
         tokens.insert("d".repeat(64), access(100), 10),
-        Err(ServerError::ProviderUnavailable { .. })
+        Err(ServerError::Provider(ProviderError::Unavailable { .. }))
     ));
     assert_eq!(std::fs::read_dir(dir.path())?.count(), 1);
     Ok(())
@@ -167,7 +168,7 @@ fn malformed_or_duplicate_stored_entries_are_refused_without_echoing_input()
     )?;
     assert!(matches!(
         Tokens::open(file.clone(), 10),
-        Err(ServerError::ProviderUnavailable { .. })
+        Err(ServerError::Provider(ProviderError::Unavailable { .. }))
     ));
     std::fs::write(
         &file,

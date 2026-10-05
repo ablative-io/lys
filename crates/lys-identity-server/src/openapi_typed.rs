@@ -12,10 +12,10 @@ use crate::openapi_table::{A, GET, POST, PUT, S};
 
 /// The routes an app codes against, each with the types it takes and answers.
 pub(crate) fn typed(api: &mut Api) {
-    use crate::apps_api::{ApproveBody, DecideBody, RegisterBody, RegistrarBody};
+    use crate::apps_api::{AppApprovalBody, DecideBody, RegisterBody, RegistrarBody};
     use crate::apps_bench::{AskBody, BENCH, BenchAnswer, OpenBody};
     use crate::apps_schema_api::{ChangeBody, ChangeDecision, CheckBody, PlaceBody};
-    use crate::apps_sign_in::SignInBody;
+    use crate::apps_sign_in::AppSignInBody;
     use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued, SchemaChanged};
     use crate::apps_views::{SchemaCheck, SchemaVersionView};
     use crate::grants_batch::{BatchAnswer, BatchBody, WhichBody, WhichPage};
@@ -150,7 +150,7 @@ pub(crate) fn typed(api: &mut Api) {
                 "Approve an app with its sign-in settings, after configured broker credential custody",
             ),
             S,
-            Some(api.schema::<ApproveBody>()),
+            Some(api.schema::<AppApprovalBody>()),
             Some(api.schema::<Approval>()),
             &[
                 DECIDE,
@@ -169,7 +169,7 @@ pub(crate) fn typed(api: &mut Api) {
                 "Set an approved app's return addresses and whether it is given the person's name",
             ),
             S,
-            Some(api.schema::<SignInBody>()),
+            Some(api.schema::<AppSignInBody>()),
             Some(app.clone()),
             &[
                 ADMIN_BODY,

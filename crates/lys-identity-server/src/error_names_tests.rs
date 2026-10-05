@@ -10,6 +10,7 @@ use crate::apps_error::{AppError, Strand};
 use crate::error::ServerError;
 use crate::error_budget::BudgetError;
 use crate::error_cord::CordError;
+use crate::error_provider::ProviderError;
 use crate::error_team::TeamError;
 use crate::goals_types::GoalError;
 
@@ -569,31 +570,49 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "SignInProvidersUnavailable",
         ),
         (
-            ServerError::ProviderUnavailable {
+            ServerError::Provider(ProviderError::Unavailable {
                 reason: detail.to_owned(),
-            },
+            }),
             "ProviderUnavailable",
         ),
-        (ServerError::ClientUnknown, "ClientUnknown"),
-        (ServerError::RedirectUnregistered, "RedirectUnregistered"),
         (
-            ServerError::ScopeUnknown {
+            ServerError::Provider(ProviderError::ClientUnknown),
+            "ClientUnknown",
+        ),
+        (
+            ServerError::Provider(ProviderError::RedirectUnregistered),
+            "RedirectUnregistered",
+        ),
+        (
+            ServerError::Provider(ProviderError::ScopeUnknown {
                 scope: detail.to_owned(),
-            },
+            }),
             "ScopeUnknown",
         ),
         (
-            ServerError::ScopeNotGranted {
+            ServerError::Provider(ProviderError::ScopeNotGranted {
                 scope: detail.to_owned(),
                 app: detail.to_owned(),
-            },
+            }),
             "ScopeNotGranted",
         ),
-        (ServerError::CodeUnknown, "CodeUnknown"),
-        (ServerError::CodeUsed, "CodeUsed"),
-        (ServerError::CodeExpired, "CodeExpired"),
-        (ServerError::VerifierWrong, "VerifierWrong"),
-        (ServerError::TokenUnknown, "TokenUnknown"),
+        (
+            ServerError::Provider(ProviderError::CodeUnknown),
+            "CodeUnknown",
+        ),
+        (ServerError::Provider(ProviderError::CodeUsed), "CodeUsed"),
+        (
+            ServerError::Provider(ProviderError::CodeExpired),
+            "CodeExpired",
+        ),
+        (
+            ServerError::Provider(ProviderError::VerifierWrong),
+            "VerifierWrong",
+        ),
+        (
+            ServerError::Provider(ProviderError::TokenUnknown),
+            "TokenUnknown",
+        ),
         (
             ServerError::ProviderRefused {
                 provider: detail,

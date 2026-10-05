@@ -4,6 +4,9 @@
 
 use super::*;
 
+/// The return address each approval here keeps as the app's sign-in setting.
+const BACK: &str = "https://notes.example.test/signed-in";
+
 #[tokio::test]
 async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_signed_body()
 -> TestResult {
@@ -25,7 +28,7 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         &setup.service,
         &format!("/apps/{app}/approve"),
         Auth::Cookie(&admin),
-        &json!({"operation":approval_operation}),
+        &json!({"operation":approval_operation, "redirects": [BACK], "profile": false}),
     )
     .await?)?;
     assert!(approved["client"].is_null());
@@ -44,7 +47,7 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         &setup.service,
         &format!("/apps/{app}/approve"),
         Auth::Cookie(&admin),
-        &json!({"operation":approval_operation}),
+        &json!({"operation":approval_operation, "redirects": [BACK], "profile": false}),
     )
     .await?)?;
     assert!(replay["client"].is_null());
@@ -120,7 +123,7 @@ async fn approval_with_broker_down_keeps_app_pending() -> TestResult {
         &setup.service,
         &format!("/apps/{app}/approve"),
         Auth::Cookie(&admin),
-        &json!({"operation":op()?}),
+        &json!({"operation":op()?, "redirects": [BACK], "profile": false}),
     )
     .await?;
     let held = ok(get(
@@ -158,7 +161,7 @@ async fn wrong_broker_custody_receipt_keeps_app_pending() -> TestResult {
         &setup.service,
         &format!("/apps/{app}/approve"),
         Auth::Cookie(&admin),
-        &json!({"operation":op()?}),
+        &json!({"operation":op()?, "redirects": [BACK], "profile": false}),
     )
     .await?;
     assert_eq!(answer.0, 502, "{}", answer.1);
@@ -193,7 +196,7 @@ async fn approval_without_configured_broker_keeps_app_pending() -> TestResult {
         &service,
         &format!("/apps/{app}/approve"),
         Auth::Cookie(&admin),
-        &json!({"operation":op()?}),
+        &json!({"operation":op()?, "redirects": [BACK], "profile": false}),
     )
     .await?;
     let held = ok(get(&service, &format!("/apps/{app}"), Auth::Cookie(&admin)).await?)?;

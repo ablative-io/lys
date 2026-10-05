@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 
 use super::{Access, OpenIdProvider, held, same};
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 
 /// What an exchange takes from a code once it is verified and marked used.
 pub(super) struct Taken {
@@ -41,27 +42,29 @@ impl OpenIdProvider {
         at: u64,
     ) -> Result<Taken, ServerError> {
         let mut codes = held(&self.codes)?;
-        let grant = codes.get_mut(code).ok_or(ServerError::CodeUnknown)?;
+        let grant = codes
+            .get_mut(code)
+            .ok_or(ServerError::Provider(ProviderError::CodeUnknown))?;
         if grant.client_id != client_id {
-            return Err(ServerError::CodeUnknown);
+            return Err(ServerError::Provider(ProviderError::CodeUnknown));
         }
         if grant.used {
             match &grant.issued_access {
                 Some(key) => held(&self.tokens)?.revoke(key)?,
                 None => grant.replayed = true,
             }
-            return Err(ServerError::CodeUsed);
+            return Err(ServerError::Provider(ProviderError::CodeUsed));
         }
         if at >= grant.expires_at || at >= grant.sign_in_ends_at {
-            return Err(ServerError::CodeExpired);
+            return Err(ServerError::Provider(ProviderError::CodeExpired));
         }
         if grant.redirect_uri != redirect {
-            return Err(ServerError::RedirectUnregistered);
+            return Err(ServerError::Provider(ProviderError::RedirectUnregistered));
         }
         grant.used = true;
         let hashed = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
         if !same(&hashed, &grant.challenge) {
-            return Err(ServerError::VerifierWrong);
+            return Err(ServerError::Provider(ProviderError::VerifierWrong));
         }
         Ok(Taken {
             subject: grant.subject.clone(),
@@ -89,7 +92,7 @@ impl OpenIdProvider {
         let mut codes = held(&self.codes)?;
         let mut tokens = held(&self.tokens)?;
         match codes.get_mut(code) {
-            Some(grant) if grant.replayed => Err(ServerError::CodeUsed),
+            Some(grant) if grant.replayed => Err(ServerError::Provider(ProviderError::CodeUsed)),
             Some(grant) => {
                 tokens.insert(lookup.clone(), access, at)?;
                 grant.issued_access = Some(lookup);

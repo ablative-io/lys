@@ -90,6 +90,7 @@ pub mod error_machine;
 mod error_names;
 #[cfg(test)]
 mod error_names_tests;
+pub mod error_provider;
 mod error_status;
 pub mod error_team;
 mod estate_api;

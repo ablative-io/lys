@@ -151,9 +151,7 @@ impl ServerError {
             | Self::AgentSignatureRefused { .. }
             | Self::OperatorRefused { .. }
             | Self::SignInRefused
-            | Self::SetupCodeRefused
-            | Self::ClientUnknown
-            | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
+            | Self::SetupCodeRefused => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled | Self::RegistrationThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::BodyTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::Inactive { .. }
@@ -166,7 +164,6 @@ impl ServerError {
             | Self::SecondFactorUnsupported
             | Self::NotPermitted { .. }
             | Self::ReviewerOnly
-            | Self::ScopeNotGranted { .. }
             | Self::McpBeyondRemit { .. } => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::McpServerUnknown { .. }
@@ -224,12 +221,6 @@ impl ServerError {
             | Self::RequestMalformed { .. }
             | Self::AccountRefused { .. }
             | Self::ProviderRefused { .. }
-            | Self::RedirectUnregistered
-            | Self::ScopeUnknown { .. }
-            | Self::CodeUnknown
-            | Self::CodeUsed
-            | Self::CodeExpired
-            | Self::VerifierWrong
             | Self::McpCredentialInline { .. }
             | Self::McpSettingUnrepresentable { .. }
             | Self::ModelUnrepresentable { .. }
@@ -256,7 +247,6 @@ impl ServerError {
             | Self::PolicyUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
             | Self::SetupUnavailable { .. }
-            | Self::ProviderUnavailable { .. }
             | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Runner { refusal, .. } => runner_status(refusal),
@@ -267,6 +257,7 @@ impl ServerError {
             Self::Team(error) => error.status(),
             Self::Budget(error) => error.status(),
             Self::Call(error) => error.status(),
+            Self::Provider(error) => error.status(),
             Self::Holding(error) => error.status(),
             Self::Machine(error) => error.status(),
             Self::Cord(error) => error.status(),

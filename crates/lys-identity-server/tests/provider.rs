@@ -683,12 +683,27 @@ async fn a_code_past_its_instant_is_refused() -> TestResult {
     Ok(())
 }
 
+/// A code is exchanged only at the address it was issued for. An address the
+/// app's sign-in settings do not admit is refused by the setting; one they
+/// admit but the code was not issued for is refused by the code, naming no
+/// address. Neither refusal uses the code up.
 #[tokio::test]
 async fn a_code_exchanged_for_another_redirect_is_refused_and_not_used_up() -> TestResult {
     let (service, cookie, _) = table(CODE_SECONDS).await?;
     let verifier = "a-verifier-of-enough-length-for-pkce-0123456789";
     let code = code(&service, &cookie, &challenge_of(verifier)).await?;
-    let elsewhere = "http://elsewhere.example.test/callback";
+    let elsewhere = "https://elsewhere.example.test/callback";
+    let (status, refused) = exchange_at(&service, &code, verifier, elsewhere).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "redirect_invalid");
+    let admit = json!({"operation": identity_contract::apps::op()?, "redirects": [CALLBACK, elsewhere], "profile": false});
+    ok(post(
+        &service,
+        &format!("/apps/{PRODUCT}/sign_in"),
+        Auth::Cookie(&cookie),
+        &admit,
+    )
+    .await?)?;
     let (status, refused) = exchange_at(&service, &code, verifier, elsewhere).await?;
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "RedirectUnregistered");

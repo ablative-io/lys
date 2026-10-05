@@ -14,6 +14,7 @@ use sha2::Digest;
 use super::endpoints::{Exchange, presented};
 use super::{Access, Grant, OpenIdProvider, ProviderSettings, encoded, held, same};
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 
 #[test]
 fn a_query_value_is_percent_encoded_except_its_unreserved_characters() {
@@ -246,15 +247,15 @@ fn a_code_replayed_between_the_two_acts_of_an_exchange_leaves_no_live_token()
             "v",
             11
         ),
-        Err(ServerError::CodeUsed)
+        Err(ServerError::Provider(ProviderError::CodeUsed))
     ));
     assert!(matches!(
         provider.issue("code-1", lookup.clone(), access(), 12),
-        Err(ServerError::CodeUsed)
+        Err(ServerError::Provider(ProviderError::CodeUsed))
     ));
     assert!(matches!(
         held(&provider.tokens)?.get(&lookup, 12),
-        Err(ServerError::TokenUnknown)
+        Err(ServerError::Provider(ProviderError::TokenUnknown))
     ));
     Ok(())
 }
@@ -282,11 +283,11 @@ fn a_code_replayed_after_its_exchange_revokes_the_token_it_issued() -> Result<()
             "v",
             12
         ),
-        Err(ServerError::CodeUsed)
+        Err(ServerError::Provider(ProviderError::CodeUsed))
     ));
     assert!(matches!(
         held(&provider.tokens)?.get(&lookup, 12),
-        Err(ServerError::TokenUnknown)
+        Err(ServerError::Provider(ProviderError::TokenUnknown))
     ));
     Ok(())
 }

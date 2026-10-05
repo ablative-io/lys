@@ -81,7 +81,7 @@ pub(crate) struct DecideBody {
 /// addresses are what the screen offers; what is sent here is what is kept.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ApproveBody {
+pub(crate) struct AppApprovalBody {
     operation: String,
     /// The addresses the sign-in client may send a person back to, exactly.
     redirects: Vec<String>,
@@ -401,7 +401,7 @@ async fn approve(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     UrlPath(id): UrlPath<String>,
-    body: Result<Json<ApproveBody>, JsonRejection>,
+    body: Result<Json<AppApprovalBody>, JsonRejection>,
 ) -> Result<Json<Approval>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();

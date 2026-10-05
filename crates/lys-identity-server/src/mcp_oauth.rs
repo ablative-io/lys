@@ -26,6 +26,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 use crate::mcp_oauth_store::{Issued, Kind, Limits, Store};
 use crate::routes::{AppState, with_directory};
 use crate::session::now;
@@ -142,8 +143,8 @@ fn redirect_allowed(uri: &str) -> bool {
 }
 
 fn back_to(redirect_uri: &str, pairs: &[(&str, &str)]) -> Result<Response, ServerError> {
-    let mut url =
-        reqwest::Url::parse(redirect_uri).map_err(|_unread| ServerError::RedirectUnregistered)?;
+    let mut url = reqwest::Url::parse(redirect_uri)
+        .map_err(|_unread| ServerError::Provider(ProviderError::RedirectUnregistered))?;
     {
         let mut query = url.query_pairs_mut();
         for (name, value) in pairs {
@@ -192,16 +193,16 @@ impl Apps {
         };
         let text = value
             .to_str()
-            .map_err(|_unread| ServerError::TokenUnknown)?;
+            .map_err(|_unread| ServerError::Provider(ProviderError::TokenUnknown))?;
         let Some(token) = text.strip_prefix("Bearer ") else {
             return Ok(None);
         };
         let store = held(&self.store)?;
         let issued = store
             .token(&digest(token.trim()), Kind::Access, now())
-            .ok_or(ServerError::TokenUnknown)?;
-        let agent =
-            AgentId::from_str(&issued.agent).map_err(|_unread| ServerError::TokenUnknown)?;
+            .ok_or(ServerError::Provider(ProviderError::TokenUnknown))?;
+        let agent = AgentId::from_str(&issued.agent)
+            .map_err(|_unread| ServerError::Provider(ProviderError::TokenUnknown))?;
         Ok(Some((agent, issued.client_id.clone())))
     }
 

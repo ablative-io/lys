@@ -37,6 +37,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 use crate::routes::hex;
 use crate::session::now;
 
@@ -123,9 +124,9 @@ pub struct OpenIdProvider {
 }
 
 fn unavailable(reason: impl Into<String>) -> ServerError {
-    ServerError::ProviderUnavailable {
+    ServerError::Provider(ProviderError::Unavailable {
         reason: reason.into(),
-    }
+    })
 }
 
 fn held<T>(slot: &Mutex<T>) -> Result<MutexGuard<'_, T>, ServerError> {

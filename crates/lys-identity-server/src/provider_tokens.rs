@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Access, unavailable};
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 
 const FORMAT: &str = "lys-provider-access/v1";
 
@@ -134,7 +135,7 @@ impl Tokens {
         self.live
             .get(key)
             .filter(|access| access.expires_at > at)
-            .ok_or(ServerError::TokenUnknown)
+            .ok_or(ServerError::Provider(ProviderError::TokenUnknown))
     }
 
     pub(super) fn insert(

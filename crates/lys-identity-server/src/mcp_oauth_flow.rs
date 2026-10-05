@@ -18,6 +18,7 @@ use super::{
     encoded, escaped, held, malformed, random, redirect_allowed,
 };
 use crate::error::ServerError;
+use crate::error_provider::ProviderError;
 use crate::mcp_oauth_store::{App, Kind};
 use crate::routes::cookie_header;
 use crate::session::now;
@@ -99,9 +100,9 @@ pub(super) async fn authorize(
         let store = held(&apps.store)?;
         let app = store
             .app(&asked.client_id)
-            .ok_or(ServerError::RedirectUnregistered)?;
+            .ok_or(ServerError::Provider(ProviderError::RedirectUnregistered))?;
         if !app.redirect_uris.contains(&asked.redirect_uri) {
-            return Err(ServerError::RedirectUnregistered);
+            return Err(ServerError::Provider(ProviderError::RedirectUnregistered));
         }
         app.name.clone()
     };
@@ -244,9 +245,9 @@ pub(super) async fn consent(
     let asking = held(&apps.asking)?
         .remove(&answer.asking)
         .filter(|asking| asking.expires_at > now())
-        .ok_or(ServerError::CodeUnknown)?;
+        .ok_or(ServerError::Provider(ProviderError::CodeUnknown))?;
     if asking.session_id != session.id {
-        return Err(ServerError::CodeUnknown);
+        return Err(ServerError::Provider(ProviderError::CodeUnknown));
     }
     let state = asking.state.clone().unwrap_or_default();
     let with_state = |mut pairs: Vec<(&'static str, String)>| {
@@ -261,7 +262,7 @@ pub(super) async fn consent(
             let name = held(&apps.store)?
                 .app(&asking.client_id)
                 .map(|app| app.name.clone())
-                .ok_or(ServerError::RedirectUnregistered)?;
+                .ok_or(ServerError::Provider(ProviderError::RedirectUnregistered))?;
             let person = crate::routes::with_directory(&apps.state, |directory| {
                 crate::read_api::own_person(directory.projection()?, &session.actor)
             })?;

@@ -33,7 +33,7 @@ use crate::session::now;
 /// The sign-in settings an administrator sets for an approved app.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct SignInBody {
+pub(crate) struct AppSignInBody {
     operation: String,
     /// The addresses the sign-in client may send a person back to, exactly.
     redirects: Vec<String>,
@@ -63,7 +63,7 @@ pub(crate) async fn set(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     UrlPath(id): UrlPath<String>,
-    body: Result<Json<SignInBody>, JsonRejection>,
+    body: Result<Json<AppSignInBody>, JsonRejection>,
 ) -> Result<Json<AppView>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();

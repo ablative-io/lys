@@ -250,8 +250,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/policy" "An agent's tool-boundary policy" S [SIGNED, &["not_permitted"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]] scope("agent", "agent.policy.set", ["id"]);
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
-    GET "/oauth/authorize" "Begin an authorization" P [&["RedirectUnregistered", "ScopeUnknown", "ScopeNotGranted"]];
-    POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable"]];
+    GET "/oauth/authorize" "Begin an authorization" P [&["RequestMalformed", "RedirectUnregistered", "ScopeUnknown", "ScopeNotGranted", "NoPerson", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["credential_refused", "app_not_approved", "app_retired", "redirect_invalid", "apps_unavailable"]];
+    POST "/oauth/token" "Exchange a code for tokens" P [&["RequestMalformed", "ClientUnknown", "CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["credential_refused", "app_not_approved", "app_retired", "redirect_invalid", "apps_unavailable"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
     GET "/.well-known/oauth-protected-resource" "Where the MCP door's authorization is found" P [];
     GET "/.well-known/oauth-protected-resource/mcp" "Where the MCP door's authorization is found, by its address" P [];
@@ -261,7 +261,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/oauth/mcp/authorize" "Ask the person to connect an app" P [&["RequestMalformed", "RedirectUnregistered"]];
     POST "/oauth/mcp/consent" "The person connects an app or refuses it" P [&["RequestMalformed", "RedirectUnregistered", "CodeUnknown", "NotSignedIn"]];
     POST "/oauth/mcp/token" "Exchange a connected app's code or refresh token for tokens" P [];
-    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable"]];
+    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["apps_unavailable"]];
     POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
