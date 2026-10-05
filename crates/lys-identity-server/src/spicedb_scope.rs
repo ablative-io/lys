@@ -287,7 +287,10 @@ impl SpiceDb {
         for block in definitions {
             let filter = json!({"relationshipFilter": {"resourceType": block.name}});
             let (status, body) = engine.call("/v1/relationships/delete", &filter)?;
-            if status != 200 {
+            // Another writer of the same engine may take the definition away
+            // after the read above; one the engine no longer holds holds no
+            // relationships, so it is already removed.
+            if status != 200 && !unknown_definition(status, &body) {
                 return Err(unavailable(format!(
                     "the scratch relationships of {} could not be removed: {body}",
                     block.name
@@ -328,6 +331,20 @@ impl SpiceDb {
         }
         Ok(scopes.len())
     }
+}
+
+/// Whether the engine refused with `status` and `body` because it holds no
+/// definition by the name asked: `SpiceDB` answers 400 with the reason
+/// `ERROR_REASON_UNKNOWN_DEFINITION`.
+fn unknown_definition(status: u16, body: &str) -> bool {
+    status == 400
+        && serde_json::from_str::<Value>(body).is_ok_and(|refusal| {
+            refusal["details"].as_array().is_some_and(|details| {
+                details
+                    .iter()
+                    .any(|detail| detail["reason"] == "ERROR_REASON_UNKNOWN_DEFINITION")
+            })
+        })
 }
 
 #[cfg(test)]

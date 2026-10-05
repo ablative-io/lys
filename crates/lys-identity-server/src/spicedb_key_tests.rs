@@ -1,5 +1,6 @@
 //! Engine scopes share the credential loaded before serving requests.
 
+use super::scope::blocks;
 use super::{Model, SpiceDb, SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
 use serde_json::{Value, json};
 use std::error::Error;
@@ -16,8 +17,12 @@ fn model() -> Result<Model, Box<dyn Error>> {
     )?)
 }
 
-fn serve(listener: &TcpListener) -> Result<usize, String> {
-    let mut schema = String::new();
+/// The stand-in engine, holding `schema` at the start. It refuses to delete
+/// the relationships of a definition its schema does not hold, as `SpiceDB`
+/// does. With `rival`, another writer of the same engine takes the scope
+/// `rival` out of the schema just after a read shows it, as a writer whose
+/// own schema write was composed from an older read does.
+fn serve(listener: &TcpListener, mut schema: String, rival: Option<&str>) -> Result<usize, String> {
     let mut calls = 0;
     loop {
         let (mut socket, _) = listener.accept().map_err(|error| error.to_string())?;
@@ -61,25 +66,61 @@ fn serve(listener: &TcpListener) -> Result<usize, String> {
             .read_exact(&mut body)
             .map_err(|error| error.to_string())?;
         let request: Value = serde_json::from_slice(&body).map_err(|error| error.to_string())?;
-        let answer = if header.starts_with("POST /v1/schema/read ") {
-            json!({"schemaText": schema})
+        let (status, answer) = if header.starts_with("POST /v1/schema/read ") {
+            let shown = json!({"schemaText": schema});
+            if let Some(rival) = rival {
+                schema = without(&schema, rival);
+            }
+            ("200 OK", shown)
         } else if header.starts_with("POST /v1/schema/write ") {
             schema = request["schema"].as_str().ok_or("no schema")?.to_owned();
-            json!({})
+            ("200 OK", json!({}))
         } else if header.starts_with("POST /v1/relationships/delete ") {
-            json!({})
+            let kind = request["relationshipFilter"]["resourceType"]
+                .as_str()
+                .ok_or("no resource type")?;
+            if blocks(&schema).iter().any(|block| block.name == kind) {
+                ("200 OK", json!({}))
+            } else {
+                ("400 Bad Request", unknown(kind))
+            }
         } else {
             return Err("unexpected fixture request".to_owned());
         };
         let body = answer.to_string();
         write!(
             socket,
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()
         )
         .map_err(|error| error.to_string())?;
         calls += 1;
     }
+}
+
+/// The schema `schema` without the scope `scope`'s names.
+fn without(schema: &str, scope: &str) -> String {
+    blocks(schema)
+        .into_iter()
+        .filter(|block| !block.name.starts_with(&format!("{scope}/")))
+        .map(|block| block.text)
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// `SpiceDB`'s refusal of a request naming the definition `kind` it does
+/// not hold, as the engine at v1.56.2 answers it.
+fn unknown(kind: &str) -> Value {
+    json!({
+        "code": 9,
+        "message": format!("object definition `{kind}` not found"),
+        "details": [{
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            "reason": "ERROR_REASON_UNKNOWN_DEFINITION",
+            "domain": "authzed.com",
+            "metadata": {"definition_name": kind},
+        }],
+    })
 }
 
 #[test]
@@ -90,7 +131,7 @@ fn scratch_open_and_cleanup_reuse_the_key_after_its_file_disappears() -> Result<
     std::fs::write(&key_file, "fixture-only")?;
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let endpoint = listener.local_addr()?.to_string();
-    let worker = std::thread::spawn(move || serve(&listener));
+    let worker = std::thread::spawn(move || serve(&listener, String::new(), None));
     let result = (|| -> Result<(), Box<dyn Error>> {
         let settings = SpiceDbSettings {
             endpoint: endpoint.clone(),
@@ -120,6 +161,42 @@ fn scratch_open_and_cleanup_reuse_the_key_after_its_file_disappears() -> Result<
     result?;
     assert!(calls > 3);
     Ok(())
+}
+
+/// A scratch scope another writer of the engine takes away between the
+/// removal's read and its deletes is already removed: the removal answers
+/// done, and no scratch scope is left.
+#[test]
+fn a_scratch_scope_another_writer_took_away_is_removed_without_refusal()
+-> Result<(), Box<dyn Error>> {
+    let temporary = tempfile::tempdir()?;
+    let key_file = temporary.path().join("key");
+    std::fs::write(&key_file, "fixture-only")?;
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let endpoint = listener.local_addr()?.to_string();
+    let left = "definition lys/bench_rival/person {}\n\n\
+                definition lys/bench_rival/page {\n\trelation reader: lys/bench_rival/person\n}";
+    let worker =
+        std::thread::spawn(move || serve(&listener, left.to_owned(), Some("lys/bench_rival")));
+    let result = (|| -> Result<(), Box<dyn Error>> {
+        let connection = SpiceDbConnection::load(&SpiceDbSettings {
+            endpoint: endpoint.clone(),
+            key_file: key_file.clone(),
+            mirror: "fixture".to_owned(),
+        })?;
+        SpiceDb::remove_scratch(&connection, "lys/bench_rival")?;
+        if SpiceDb::clear_scratch(&connection)? != 0 {
+            return Err("a scratch scope was left".into());
+        }
+        Ok(())
+    })();
+    let stopped = TcpStream::connect(&endpoint)
+        .and_then(|mut socket| socket.write_all(b"fixture complete\r\n\r\n"));
+    worker
+        .join()
+        .map_err(|panic| format!("fixture panicked: {panic:?}"))??;
+    stopped?;
+    result
 }
 
 #[test]
