@@ -68,3 +68,6 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; p
 .permissions .rule-row p, .permissions .add-rule p { margin: 4px 0 0; }
 .action-table td:first-child, .action-table th:first-child { text-align: center; }
 .add-agent-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 28px; align-items: start; }
+/* The remove inside a chosen pill: the control at the pill's own size. */
+.pill .act { min-width: 16px; min-height: 16px; padding: 0; border: 0; background: none; color: inherit; }
+.pill .act svg { width: 12px; height: 12px; }

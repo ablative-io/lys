@@ -25,8 +25,8 @@ export const STANDING: Record<string, number> = {
   'features/sign-in/SignIn.tsx': 1,
   'features/teams/Teams.tsx': 1,
   'shell/Explain.tsx': 1,
-  'shell/Listing.tsx': 3,
-  'shell/Picker.tsx': 2,
+  'shell/Listing.tsx': 2,
+  'shell/Picker.tsx': 1,
   'shell/Rail.tsx': 1,
 };
 

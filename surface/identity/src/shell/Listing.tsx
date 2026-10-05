@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import type { Group } from './org';
 import { keyable } from './keyable';
 import { count, counted } from './count';
+import { Act } from './Act';
 
 export interface Column<T> { head: string; cell: (item: T) => ReactNode }
 
@@ -88,7 +89,7 @@ export function Listing<T>(props: ListingProps<T>) {
         </tr>;
       })}
       {!shut && group.items.length > limit ? <tr className="more"><td colSpan={width}>
-        <button className="btn" onClick={() => setPages((map) => new Map(map).set(group.id, limit + PAGE))}>Show {count(Math.min(PAGE, group.items.length - limit))} more of {count(group.items.length - limit)} in {group.name}</button>
+        <Act symbol="add" name={'Show ' + count(Math.min(PAGE, group.items.length - limit)) + ' more of ' + count(group.items.length - limit) + ' in ' + group.name} word={'Show ' + count(Math.min(PAGE, group.items.length - limit)) + ' more'} onClick={() => setPages((map) => new Map(map).set(group.id, limit + PAGE))} />
       </td></tr> : null}
     </tbody>;
   });
