@@ -5,9 +5,9 @@ import { $, click, mount, settle, text, unmountAll } from './harness';
 import { ADA, ME, SERVICE, ok, refused } from './fixtures';
 const account = { id: 'op-' + 'a'.repeat(32), owner: ADA, name: 'Calendar account', description: 'Appointments', state: 'active', created_by: ME.signed_in, created_at: 1790000000, retired_by: null, retired_at: null };
 const routes = { ...SERVICE, '/service-accounts': ok({ scope: 'personal', service_accounts: [account] }) };
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 async function fillName() {
-  const add = button('+ Register an account'); if (add) await click(add);
+  const add = button('Register an account'); if (add) await click(add);
   const input = $('form[aria-label="Register service account"] input[name="name"]'); if (!(input instanceof HTMLInputElement)) throw new Error('Account name missing');
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Invoice account'); input.dispatchEvent(new Event('input', { bubbles: true })); }); await settle();
 }

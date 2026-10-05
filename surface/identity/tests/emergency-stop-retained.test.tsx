@@ -25,7 +25,7 @@ async function mount(stopped: (answer: unknown) => void) {
 }
 
 async function retry() {
-  const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether Lys saved it');
+  const button = [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Check whether Lys saved it');
   if (!button) throw new Error('Retained stop retry missing');
   await act(async () => { button.click(); });
 }

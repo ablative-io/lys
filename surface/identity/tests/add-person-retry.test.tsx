@@ -35,7 +35,8 @@ describe('Add a person', () => {
     const { entry } = await form({});
     const row = entry.querySelector('.add-person-row');
     expect(row?.querySelector('input[name="display_name"]')).not.toBeNull();
-    expect(row?.querySelector('button[type="submit"]')?.textContent).toBe('Add person');
+    const add = row?.querySelector('button[type="submit"]');
+    expect([add?.getAttribute('aria-label'), add?.textContent]).toEqual(['Add person', 'Add']);
   });
 });
 

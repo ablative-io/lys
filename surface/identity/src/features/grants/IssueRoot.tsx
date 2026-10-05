@@ -11,7 +11,7 @@ import { Picker } from '../../shell/Picker';
 function Form({ people, model, resources, done }: { people: PeopleView; model: GrantModel; resources: ResourceRef[]; done: () => void }) {
   const [noExpiry, setNoExpiry] = useState(false);
   const [kind, setKind] = useState('');
-  return <RecordedForm name="root-grant" title="Issue root grant" submitLabel="Issue" done={done} change={(data) => {
+  return <RecordedForm name="root-grant" title="Issue root grant" submitLabel="Issue" drawn={{ symbol: 'add', word: 'Issue' }} done={done} change={(data) => {
     const relation = field(data, 'relation');
     const actions = model.relations[relation];
     if (!actions) throw new Error('Select a relation from the permission model');

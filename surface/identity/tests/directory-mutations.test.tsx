@@ -144,7 +144,7 @@ describe('Uncertain directory change recovery', () => {
   const key = 'lys.pending.change-profile';
   const retained = JSON.stringify({ path: profile, body: { display_name: 'Original name' }, operation });
   async function recover() {
-    const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether Lys saved it');
+    const button = [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Check whether Lys saved it');
     if (!button) throw new Error('No recovery button');
     await click(button);
     await settle();
@@ -164,7 +164,7 @@ describe('Uncertain directory change recovery', () => {
     await recover();
     expect(sessionStorage.getItem(key)).toBe(retained);
     expect(text()).toContain('NotAdmitted');
-    expect(text()).toContain('Check whether Lys saved it');
+    expect([...document.querySelectorAll('button')].some((entry) => entry.getAttribute('aria-label') === 'Check whether Lys saved it')).toBe(true);
   });
   it.each(['not JSON', JSON.stringify({ path: '/people', body: {}, operation })])('refuses damaged or wrong-form pending evidence without modifying it', async (saved) => {
     sessionStorage.setItem(key, saved);
@@ -172,6 +172,6 @@ describe('Uncertain directory change recovery', () => {
     await submit(form('Save name'));
     expect(posted).toHaveLength(0);
     expect(sessionStorage.getItem(key)).toBe(saved);
-    expect(text()).not.toContain('Check whether Lys saved it');
+    expect([...document.querySelectorAll('button')].some((entry) => entry.getAttribute('aria-label') === 'Check whether Lys saved it')).toBe(false);
   });
 });

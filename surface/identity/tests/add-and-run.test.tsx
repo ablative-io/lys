@@ -141,7 +141,7 @@ describe('Add and run on the first computer', () => {
     expect(($('[name="model"]') as HTMLSelectElement).value).toBe('care');
     await names();
     expect(button.disabled).toBe(false);
-    expect(button.textContent).toBe('Add Clover and run it on this computer');
+    expect([button.getAttribute('aria-label'), button.textContent]).toEqual(['Add Clover and run it on this computer', 'Add and run']);
     expect(document.querySelectorAll('form button[type="submit"]')).toHaveLength(1);
     expect(posted).toEqual([]);
     expect(requests.filter((path) => path === '/network')).toHaveLength(1);
@@ -353,7 +353,7 @@ describe('Add and run on an existing computer', () => {
     expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('New agent');
     await type($('[name="display_name"]'), 'Clover');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
-    expect($('form button[type="submit"]')?.textContent).toBe('Add Clover and run it on this computer');
+    expect([$('form button[type="submit"]')?.getAttribute('aria-label'), $('form button[type="submit"]')?.textContent]).toEqual(['Add Clover and run it on this computer', 'Add and run']);
     expect(requests.filter((path) => path === '/surface-contract')).toHaveLength(1);
     await submit(true);
     expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + agent + '/transitions', prefix + '/provisioning', prefix + '/provisioning/1/review', '/network/machines/' + computer.id + '/agents', prefix + '/start-command']);

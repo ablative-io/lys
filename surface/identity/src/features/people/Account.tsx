@@ -9,6 +9,8 @@ import type { FormEvent, ReactNode } from 'react';
 import { request } from '../../api';
 import { reasonOf } from '../sign-in/SignIn';
 import './recorded-form.css';
+import { Act } from '../../shell/Act';
+import type { SymbolName } from '../../shell/symbols';
 
 interface AccountView { email: string | null; enabled: boolean }
 
@@ -29,11 +31,15 @@ function useAccount(path: string) {
 }
 
 /** One change of an account: a form whose fields are read on submit and cleared after. */
-function Change({ label, submit, children, action, row }: {
+function Change({ label, submit, children, action, row, symbol = 'save', word = 'Save', tone = 'plain' }: {
   label: string;
   submit: (form: FormData) => Promise<string>;
   children: ReactNode;
   action: string;
+  /** How the act is drawn: its symbol and the one word beside it. A change that saves what was typed is drawn as a save. */
+  symbol?: SymbolName;
+  word?: string;
+  tone?: 'plain' | 'danger';
   /** What this change is of, when the form is one row of a table of changes: its fields then sit in a line, with the button at the row's end. */
   row?: string;
 }) {
@@ -62,12 +68,12 @@ function Change({ label, submit, children, action, row }: {
   if (row) return <form className="recorded-form account-row" role="row" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
     <span className="account-row-of" role="rowheader">{row}</span>
     <div className="account-row-fields" role="cell">{children}{said}</div>
-    <span role="cell"><button className="btn" type="submit" disabled={busy}>{busy ? 'Saving…' : action}</button></span>
+    <span role="cell"><Act symbol={symbol} name={busy ? 'Saving…' : action} word={busy ? 'Saving…' : word} tone={tone} type="submit" disabled={busy} /></span>
   </form>;
   return <form className="recorded-form" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
     {children}
     {said}
-    <button className="btn" type="submit" disabled={busy}>{busy ? 'Saving…' : action}</button>
+    <Act symbol={symbol} name={busy ? 'Saving…' : action} word={busy ? 'Saving…' : word} tone={tone} type="submit" disabled={busy} />
   </form>;
 }
 
@@ -127,14 +133,14 @@ export function PersonAccount({ id }: { id: string }) {
     }}>
       <Field id="account-email" label="New email" type="email" autoComplete="off" />
     </Change>
-    <Change label="Reset this person's password" action="Reset password" submit={async (form) => {
+    <Change label="Reset this person's password" action="Reset password" symbol="again" word="Reset" submit={async (form) => {
       await request<AccountView>(path + '/password', { password: samePasswords(form) });
       return 'The new password signs them in; the old one no longer does.';
     }}>
       <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
       <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
     </Change>
-    {account ? <Change label={account.enabled ? 'Disable sign-in' : 'Enable sign-in'} action={account.enabled ? 'Disable sign-in' : 'Enable sign-in'} submit={async () => {
+    {account ? <Change label={account.enabled ? 'Disable sign-in' : 'Enable sign-in'} action={account.enabled ? 'Disable sign-in' : 'Enable sign-in'} symbol={account.enabled ? 'suspend' : 'start'} word={account.enabled ? 'Disable' : 'Enable'} tone={account.enabled ? 'danger' : 'plain'} submit={async () => {
       const changed = await request<AccountView>(path + '/enabled', { enabled: !account.enabled });
       setAccount(changed);
       return changed.enabled ? 'They can sign in again.' : 'They can no longer sign in.';

@@ -73,7 +73,7 @@ describe("An agent's file", () => {
     unmountAll(); document.body.innerHTML = '';
     const later = await mount('#/file/' + SCRIBE, { ...SERVICE, ['/directory/agents/' + SCRIBE]: ok({ ...SCRIBE_VIEW, state: 'suspended' }), ['POST ' + path]: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: [], credentials_ended: null, credentials_refused: 'Broker unavailable', sessions_asked: [], reason: 'Key exposed' }) });
     expect($('[data-act="stop"]')).toBeNull();
-    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether Lys saved it') ?? null);
+    await click([...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Check whether Lys saved it') ?? null);
     expect(later.posted).toEqual(first.posted);
     expect(text()).toContain('Broker unavailable');
     expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();

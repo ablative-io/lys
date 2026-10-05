@@ -6,11 +6,17 @@ import { answeredNo, sendKept, releaseRecord } from '../../kept';
 import { confirmReceipt } from './recorded-receipt';
 import { ErrorWords } from './Words';
 import './recorded-form.css';
+import { Act } from '../../shell/Act';
+import type { SymbolName } from '../../shell/symbols';
 
 export interface Change {
   path: string;
   body: Record<string, unknown>;
 }
+
+/** How a form's own act is drawn: its symbol, the one word beside it, and its tone where it is not the form's plain first act. */
+export interface Drawn { symbol: SymbolName; word: string; tone?: 'primary' | 'danger' }
+const SAVE: Drawn = { symbol: 'save', word: 'Save' };
 
 interface PendingChange extends Change { operation: string }
 const pendingPaths: Record<string, RegExp> = {
@@ -29,12 +35,14 @@ function restored(value: unknown, name: string): PendingChange | null {
   return { path: value.path, operation: value.operation, body: { ...value.body } };
 }
 
-export function RecordedForm({ name, title, heading, description, submitLabel, children, change, done, success }: {
+export function RecordedForm({ name, title, heading, description, submitLabel, drawn = SAVE, children, change, done, success }: {
   name: string;
   title: string;
   heading?: string;
   description?: string;
   submitLabel?: string;
+  /** How the form's own act is drawn; left out, it is drawn as a save. What is said of it stays `submitLabel`, or the title. */
+  drawn?: Drawn;
   children: ReactNode;
   change: (data: FormData) => Change;
   done: () => void;
@@ -113,10 +121,10 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     {description ? <p className="recorded-description">{description}</p> : null}
     <fieldset disabled={pending !== null} style={{ border: 0, padding: 0 }}>
       {children}
-      <button className="btn primary" type="submit">{submitLabel ?? title}</button>
+      <Act symbol={drawn.symbol} name={submitLabel ?? title} word={drawn.word} tone={drawn.tone ?? 'primary'} type="submit" />
     </fieldset>
     {pending ? directory ? <div role="status"><p>Lys has not confirmed whether it saved this change. Do not submit this change again. Use the button below to check the saved request. <small className="refusal-name">{typeof pending === 'string' ? pending : pending.operation}</small></p></div> : <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
-    {pending && typeof pending !== 'string' ? <button className="btn" type="button" onClick={recover}>{directory ? 'Check whether Lys saved it' : 'Check original change'}</button> : null}
+    {pending && typeof pending !== 'string' ? <Act symbol="again" name={directory ? 'Check whether Lys saved it' : 'Check original change'} word="Check" onClick={recover} /> : null}
     {failure ? directory ? <ErrorWords problem={failure} /> : <p className="why-not" role="alert">{failure}</p> : null}
     {message ? <p role="status">{message}</p> : null}
     {answer ? <><h4>Recorded receipt</h4><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></> : null}

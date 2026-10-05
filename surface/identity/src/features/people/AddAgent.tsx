@@ -21,6 +21,7 @@ import { grantOptions, grantOptionKey, newAgentGrants, readGrantChoices } from '
 import type { GrantChoices } from './agent-grants';
 import { resourceNames, resourceWords } from './agent-resource-names';
 import { keepRecord, releaseRecord } from '../../kept';
+import { Act } from '../../shell/Act';
 
 function reportingChoices(people: PeopleView) {
   return people.people.flatMap((person) => [{ ...person, kind: 'person', owner: person.id }, ...person.agents.map((agent) => ({ ...agent, kind: 'agent', owner: person.id }))]);
@@ -190,7 +191,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     {/* The button is never greyed without its reason beside it: the reasons not already said above are said here. */}
     {!sending && !hold && !unavailable && !saved.error && !name.trim() ? <p className="why-not" role="alert">Give this agent a name.</p>
       : !sending && !hold && !unavailable && !saved.error && onePress && !walk && !profileProblem && !computerReady ? <p className="why-not" role="alert">{inUse.length ? 'Choose the computer this agent runs on.' : 'Give this computer a name.'}</p> : null}
-    <p><button className="btn primary" type="submit" disabled={sending || Boolean(hold) || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))}>{hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'}</button></p>
+    <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? 'Add and run' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
   </form>;
   return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun computer={walk ? placementComputer(walk.placement).id : selectedComputer?.id ?? ''} render={renderForm} /> : renderForm(null);
 }

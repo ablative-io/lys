@@ -5,6 +5,7 @@ import { sendKept } from '../../kept';
 import { DirectoryGate, ErrorWords } from './Words';
 import { confirmReceipt } from './recorded-receipt';
 import './add-agent.css';
+import { Act } from '../../shell/Act';
 
 interface PendingPerson { name: string; operation: string }
 function object(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value); }
@@ -55,7 +56,7 @@ function PersonForm({ person }: { person: string }) {
     {/* One row: the name, the width of a name, and its button beside it. */}
     <div className="add-person-row">
       <label className="field">Name<input name="display_name" autoFocus autoComplete="name" value={name} disabled={busy || pending !== null || Boolean(saved.error)} onChange={(event) => setName(event.target.value)} /></label>
-      <button className="btn primary" type="submit" disabled={busy || !name.trim() || Boolean(saved.error)}>{busy ? 'Adding…' : pending ? 'Continue adding this person' : 'Add person'}</button>
+      <Act symbol="add" name={busy ? 'Adding…' : pending ? 'Continue adding this person' : 'Add person'} word={busy ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={busy || !name.trim() || Boolean(saved.error)} />
     </div>
     {pending ? <p role="status">This request has no confirmed answer yet. Its original details are saved; trying again checks the same request.</p> : null}
     {failure ? <ErrorWords problem={failure} /> : null}

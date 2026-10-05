@@ -18,6 +18,7 @@ import { AgentOverview } from './AgentOverview';
 import { HeadMenu } from './HeadMenu';
 import { AssignedRoles } from '../roles/AssignedRoles';
 import './agent-overview.css';
+import { Act } from '../../shell/Act';
 
 /** Everything a file shows, all of it read from the service. */
 export interface FileData {
@@ -92,7 +93,7 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* The head holds the name, the stop, the state and one menu, and nothing else (Tom, 5 October 2026). */}
-            {ACTIONS[x.state].includes('activate') ? <button className="btn primary" data-act="activate" aria-pressed={changing === 'activate'} onClick={() => setChanging(changing === 'activate' ? null : 'activate')}>{ACTION_SHORT.activate}</button> : null}
+            {ACTIONS[x.state].includes('activate') ? <Act symbol="start" name={ACTION.activate} word={ACTION_SHORT.activate} tone="primary" data-act="activate" aria-pressed={changing === 'activate'} onClick={() => setChanging(changing === 'activate' ? null : 'activate')} /> : null}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
               <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
             ) : null}
@@ -106,7 +107,7 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
           change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/profile', body: { display_name: String(form.get('display_name') ?? '').trim() } })}>
           <label className="field">Display name<input name="display_name" required defaultValue={x.display_name} /></label>
         </RecordedForm> : null}
-        {changing && changing !== 'name' ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access. Retirement is permanent.' : changing === 'suspend' ? 'Suspending stops its access until it is restored.' : undefined} submitLabel={ACTION[changing]} done={reload}
+        {changing && changing !== 'name' ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access. Retirement is permanent.' : changing === 'suspend' ? 'Suspending stops its access until it is restored.' : undefined} submitLabel={ACTION[changing]} drawn={{ symbol: changing === 'retire' ? 'retire' : changing === 'suspend' ? 'suspend' : 'start', word: ACTION_SHORT[changing], tone: changing === 'retire' || changing === 'suspend' ? 'danger' : 'primary' }} done={reload}
           success={(asked) => { const now: Record<string, string> = { activate: 'active', suspend: 'suspended', retire: 'retired', reinstate: 'active', resume: 'active' }; const words = x.display_name + ' is now ' + (now[String(asked.body.transition)] ?? 'updated') + '.'; note(words); return words; }}
           change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/transitions', body: { transition: changing, reason: String(form.get('reason') ?? '').trim() } })}>
           <label className="field">Reason<input name="reason" required /></label>

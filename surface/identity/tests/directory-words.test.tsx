@@ -116,7 +116,8 @@ describe('Directory words and write answers', () => {
     await show(<RecordedForm name="register-person" title="Register a person" done={() => undefined} change={(data) => ({ path: '/people', body: { display_name: String(data.get('display_name')) } })}><TextField name="display_name" label="Full name" /></RecordedForm>, { 'POST /people': refused(503, 'StorageUncertain', 'write outcome unknown') });
     await fill('input[name="display_name"]', 'New person');
     await act(async () => document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    expect(visibleWords()).toContain('Check whether Lys saved it');
+    expect(button('Check whether Lys saved it').textContent).toBe('Check');
+    expect(visibleWords()).toContain('Use the button below to check the saved request');
     expect(visibleWords()).not.toContain('StorageUncertain');
     expect(visibleWords()).not.toMatch(/op-[0-9a-f]{32}/);
     expect(sessionStorage.getItem('lys.pending.register-person')).toContain('New person');

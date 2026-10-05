@@ -4,6 +4,7 @@ import { request, useLoad } from '../../api';
 import { clock } from '../file/time';
 import { Gate, SignIn } from '../signin/Gate';
 import { ReadFailure, failureWords } from '../signin/words';
+import { Act } from '../../shell/Act';
 
 /** crates/lys-identity-server/src/sessions_api.rs: SessionView and SessionsView. */
 export interface SessionView {
@@ -52,14 +53,14 @@ export function SessionList({ person }: { person: string }) {
     {confirm ? <section aria-label="Confirm session end" className="card">
       <h2>{confirm.current ? 'Sign out of this session?' : 'End this session?'}</h2>
       <p>{confirm.current ? 'You will need to sign in again to continue.' : 'That session will need to sign in again. Your current session stays open.'}</p>
-      <button className="btn primary" disabled={busy || blockedId === confirm.id} onClick={() => { void finish(confirm); }}>{busy ? 'Ending session…' : 'Confirm end session'}</button>
-      <button className="btn" disabled={busy} onClick={() => setConfirm(null)}>Cancel</button>
+      <Act symbol="stop" name={busy ? 'Ending session…' : 'Confirm end session'} word={busy ? 'Ending…' : 'End'} tone="danger" disabled={busy || blockedId === confirm.id} onClick={() => { void finish(confirm); }} />
+      <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setConfirm(null)} />
     </section> : null}
     <Gate load={load} title="the sign-in sessions" renderError={(error) => <ReadFailure error={error} subject="the sign-in sessions" administrator={Boolean(person)} />} ok={(view) => view.sessions.some((session) => !confirmedEnds.includes(session.id)) ? <table>
       <thead><tr><th>Session</th><th>Started</th><th>Expires</th><th>Action</th></tr></thead>
       <tbody>{view.sessions.filter((session) => !confirmedEnds.includes(session.id)).map((session) => <tr key={session.id}>
         <td>{session.current ? 'This session' : 'Another signed-in session'}<p className="note">Provider: {session.login.issuer}</p></td><td>{clock(session.started_at)}</td><td>{clock(session.ends_at)}</td>
-        <td><button className="btn" disabled={busy || blockedId === session.id} onClick={() => setConfirm(session)}>{session.current ? 'Sign out' : 'End session'}</button></td>
+        <td><Act symbol="stop" name={session.current ? 'Sign out' : 'End session'} word={session.current ? 'Sign out' : 'End'} disabled={busy || blockedId === session.id} onClick={() => setConfirm(session)} /></td>
       </tr>)}</tbody>
     </table> : <p className="note">No live sessions were returned for this person.</p>} />
   </>;

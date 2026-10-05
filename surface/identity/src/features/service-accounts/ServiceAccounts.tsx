@@ -10,6 +10,7 @@ import { clock } from '../file/time';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
 import { Picker } from '../../shell/Picker';
+import { Act } from '../../shell/Act';
 interface AccountsView { scope: 'personal' | 'directory'; service_accounts: ServiceAccount[] }
 /** The service-account records, as a view of People and agents. */
 export function ServiceAccountsList() {
@@ -38,7 +39,7 @@ function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
   ];
   return <>
     <div className="tools"><span className="note">{accounts.scope === 'directory' ? 'Showing the directory’s account records.' : 'Showing your own account records.'}</span>
-      {!adding ? <button className="btn primary" onClick={() => setAdding(true)}>+ Register an account</button> : null}</div>
+      {!adding ? <Act symbol="add" name="Register an account" word="Register" tone="primary" onClick={() => setAdding(true)} /> : null}</div>
     {adding ? <Create key={me.person.id + ':' + revision} person={me.person.id} administrator={accounts.scope === 'directory'} changed={(answer) => { changed(answer); setAdding(false); }} /> : null}
     {!adding && !accounts.service_accounts.length ? <p>No service-account records were returned.</p> : null}
     <div className="body one">
@@ -56,13 +57,13 @@ function Create({ person, administrator, changed }: { person: string; administra
     {administrator ? <Gate load={people} title="Account owners" ok={(view) => <div className="field">Responsible person, if not you<Picker name="owner" label="Find a person" options={view.people.filter((entry) => entry.state !== 'retired').map((entry) => ({ id: entry.id, name: entry.display_name + (entry.id === person ? ' (you)' : '') }))} onChange={(ids) => setOwner(ids[0] ?? person)} /></div>} /> : null}
     <label className="field">Account name<input name="name" required value={name} disabled={change.blocked} onChange={(event) => setName(event.target.value)} placeholder="For example, invoice processing" /></label>
     <label className="field">What it is for<input value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
-    <button className="btn primary" disabled={change.blocked || !name.trim()} type="submit">Register account</button><ChangeStatus change={change} />
+    <Act symbol="add" name="Register account" word="Register" tone="primary" type="submit" disabled={change.blocked || !name.trim()} /><ChangeStatus change={change} />
   </form>;
 }
 function Retire({ account, person, changed }: { account: ServiceAccount; person: string; changed: (answer: ServiceAccount) => void }) {
   const [confirm, setConfirm] = useState(false);
   const change = useRoleChange<ServiceAccount>('lys.pending.service-retire.' + person + '.' + account.id, '/service-accounts/' + encodeURIComponent(account.id) + '/retire', (answer) => answer.id === account.id && answer.state === 'retired' && answer.retired_at !== null, changed);
-  return <>{account.state !== 'retired' && !confirm ? <button className="btn danger" disabled={change.blocked} onClick={() => setConfirm(true)}>Retire this service account</button> : null}
-    {confirm ? <section aria-label="Confirm service account retirement"><p>Retire this service account, {account.name}, in Lys? Lys keeps its history. This does not close its provider account or revoke credentials.</p><button className="btn danger" disabled={change.blocked} onClick={() => change.submit({ operation: operationId() })}>Yes, retire {account.name}</button><button className="btn" disabled={change.busy} onClick={() => setConfirm(false)}>Cancel</button></section> : null}<ChangeStatus change={change} />
+  return <>{account.state !== 'retired' && !confirm ? <Act symbol="retire" name="Retire this service account" word="Retire" tone="danger" disabled={change.blocked} onClick={() => setConfirm(true)} /> : null}
+    {confirm ? <section aria-label="Confirm service account retirement"><p>Retire this service account, {account.name}, in Lys? Lys keeps its history. This does not close its provider account or revoke credentials.</p><Act symbol="retire" name={'Yes, retire ' + account.name} word="Retire" tone="danger" disabled={change.blocked} onClick={() => change.submit({ operation: operationId() })} /><Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setConfirm(false)} /></section> : null}<ChangeStatus change={change} />
   </>;
 }
