@@ -132,6 +132,8 @@ fn server(error: &ServerError) -> &str {
         ServerError::ProviderUnavailable { .. } => "ProviderUnavailable",
         ServerError::ClientUnknown => "ClientUnknown",
         ServerError::RedirectUnregistered => "RedirectUnregistered",
+        ServerError::ScopeUnknown { .. } => "ScopeUnknown",
+        ServerError::ScopeNotGranted { .. } => "ScopeNotGranted",
         ServerError::CodeUnknown => "CodeUnknown",
         ServerError::CodeUsed => "CodeUsed",
         ServerError::CodeExpired => "CodeExpired",

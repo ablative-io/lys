@@ -1,5 +1,11 @@
 //! The provider's endpoints: discovery, keys, authorize, the token exchange
 //! and userinfo, each refusal answered in OAuth's own words.
+//!
+//! Locks. Four are taken here: the apps store (`admitted_client`,
+//! `name_granted`), the directory (`display_name`, the person at authorize),
+//! the provider's codes and the provider's tokens. No guard is held while
+//! another is taken: each is taken, read or changed, and released in its own
+//! block, so there is no order to get wrong and no path that nests them.
 
 use super::{
     Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, random, same, unavailable,
@@ -17,6 +23,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use lys_identity::{IdentityId, PersonId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -56,6 +63,7 @@ pub(super) struct Asked {
     client_id: String,
     redirect_uri: String,
     response_type: String,
+    scope: Option<String>,
     state: Option<String>,
     nonce: Option<String>,
     code_challenge: Option<String>,
@@ -68,31 +76,104 @@ pub(super) fn malformed(reason: &str) -> ServerError {
     }
 }
 
-/// The client id of the approved app `client_id` names, judged from the apps'
-/// record as it stands at this request: its approval, its secret when the
-/// token exchange presents one, and `redirect` against the addresses its
-/// registration lists. Nothing is kept between requests, so an approval or a
-/// retirement is in force at the next one. The apps lock is taken and
-/// released here, before any provider lock.
+/// An approved app admitted as a client at one request: its id, and whether
+/// its sign-in settings give it the person's name.
+struct Admitted {
+    app: String,
+    profile: bool,
+}
+
+/// The approved app `client_id` names, judged from the apps' record as it
+/// stands at this request: its approval, its secret when the token exchange
+/// presents one, `redirect` against the addresses its sign-in settings list,
+/// and whether those settings give it the name. Nothing is kept between
+/// requests, so an approval, a retirement or a changed setting is in force at
+/// the next one. The apps lock is taken and released here, before any
+/// provider lock.
 fn admitted_client(
     state: &AppState,
     client_id: &str,
     secret: Option<&str>,
     redirect: &str,
-) -> Result<String, ServerError> {
-    let mut apps = state
-        .apps
-        .lock()
-        .map_err(|error| AppError::AppsUnavailable {
-            reason: format!("the apps lock is poisoned: {error}"),
-        })?;
+) -> Result<Admitted, ServerError> {
+    let mut apps = apps(state)?;
     apps.settle()?;
     let held = apps.held();
     let app = match secret {
         Some(secret) => sign_in_client(held, client_id, secret, redirect)?,
         None => sign_in_redirect(held, client_id, redirect)?,
     };
-    Ok(app.registered.app.clone())
+    Ok(Admitted {
+        app: app.registered.app.clone(),
+        profile: app
+            .sign_in
+            .as_ref()
+            .is_some_and(|settings| settings.profile),
+    })
+}
+
+fn apps(
+    state: &AppState,
+) -> Result<std::sync::MutexGuard<'_, crate::apps_store::AppStore>, ServerError> {
+    state.apps.lock().map_err(|error| {
+        ServerError::from(AppError::AppsUnavailable {
+            reason: format!("the apps lock is poisoned: {error}"),
+        })
+    })
+}
+
+/// Whether the app's sign-in settings give it the person's name at this
+/// request, read from the apps' record and kept nowhere.
+fn name_granted(state: &AppState, app: &str) -> Result<bool, ServerError> {
+    let mut apps = apps(state)?;
+    apps.settle()?;
+    Ok(apps
+        .app(app)
+        .and_then(|app| app.sign_in.as_ref())
+        .is_some_and(|settings| settings.profile))
+}
+
+/// The scopes a product asks for, judged word by word: `openid` must be among
+/// them, `profile` is granted only by the app's sign-in settings, and a word
+/// Lys does not serve is refused by name. Answers whether the name was asked
+/// for and granted.
+fn scopes(asked: Option<&str>, app: &str, profile: bool) -> Result<bool, ServerError> {
+    let asked = asked.unwrap_or_default();
+    let mut openid = false;
+    let mut name = false;
+    for scope in asked.split_whitespace() {
+        match scope {
+            "openid" => openid = true,
+            "profile" if profile => name = true,
+            "profile" => {
+                return Err(ServerError::ScopeNotGranted {
+                    scope: scope.to_owned(),
+                    app: app.to_owned(),
+                });
+            }
+            _ => {
+                return Err(ServerError::ScopeUnknown {
+                    scope: scope.to_owned(),
+                });
+            }
+        }
+    }
+    if !openid {
+        return Err(malformed("a product asks for the openid scope"));
+    }
+    Ok(name)
+}
+
+/// The person's display name as the directory holds it now, when it holds
+/// one that is not blank.
+fn display_name(state: &AppState, person: PersonId) -> Result<Option<String>, ServerError> {
+    with_directory(state, |directory| {
+        Ok(directory
+            .projection()?
+            .record(IdentityId::Person(person))
+            .map(|record| record.profile().display_name().trim().to_owned())
+            .filter(|name| !name.is_empty()))
+    })
 }
 
 pub(super) async fn authorize(
@@ -105,10 +186,11 @@ pub(super) async fn authorize(
     let Query(asked) = asked.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    let client_id = admitted_client(&state, &asked.client_id, None, &asked.redirect_uri)?;
+    let admitted = admitted_client(&state, &asked.client_id, None, &asked.redirect_uri)?;
     if asked.response_type != "code" {
         return Err(malformed("a product asks for a code"));
     }
+    let profile = scopes(asked.scope.as_deref(), &admitted.app, admitted.profile)?;
     let challenge = match (asked.code_challenge, asked.code_challenge_method.as_deref()) {
         (Some(challenge), Some("S256")) if !challenge.is_empty() => challenge,
         _ => return Err(malformed("a product signs in with a PKCE S256 challenge")),
@@ -140,11 +222,13 @@ pub(super) async fn authorize(
             code.clone(),
             Grant {
                 session_id: session.id,
-                client_id,
+                client_id: admitted.app,
                 redirect_uri: asked.redirect_uri.clone(),
                 challenge,
                 nonce: asked.nonce,
                 subject: person.to_string(),
+                person,
+                profile,
                 authenticated_at,
                 expires_at: at.saturating_add(provider.code_seconds),
                 sign_in_ends_at: session.ends_at,
@@ -206,6 +290,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::CodeUnknown
         | ServerError::VerifierWrong
         | ServerError::RedirectUnregistered => "invalid_grant",
+        ServerError::ScopeUnknown { .. } | ServerError::ScopeNotGranted { .. } => "invalid_scope",
         ServerError::RequestMalformed { .. }
         | ServerError::BodyTooLarge
         | ServerError::Holding(..) => "invalid_request",
@@ -368,11 +453,12 @@ pub(super) fn exchange(
         return Err(malformed("a product exchanges an authorization code"));
     }
     let (client_id, secret) = presented(headers, &form).ok_or(ServerError::ClientUnknown)?;
-    let client_id = admitted_client(state, &client_id, Some(&secret), &form.redirect_uri)?;
+    let admitted = admitted_client(state, &client_id, Some(&secret), &form.redirect_uri)?;
+    let client_id = admitted.app;
     let at = now();
-    let mut codes = held(&provider.codes)?;
-    let grant = codes.get_mut(&form.code).ok_or(ServerError::CodeUnknown)?;
-    let (subject, nonce, authenticated_at, expires_at, session_id) = {
+    let (subject, nonce, authenticated_at, expires_at, session_id, person, profile) = {
+        let mut codes = held(&provider.codes)?;
+        let grant = codes.get_mut(&form.code).ok_or(ServerError::CodeUnknown)?;
         if grant.client_id != client_id {
             return Err(ServerError::CodeUnknown);
         }
@@ -399,11 +485,21 @@ pub(super) fn exchange(
             grant.authenticated_at,
             grant.sign_in_ends_at,
             grant.session_id.clone(),
+            grant.person,
+            // The name goes into the token only when the authorization asked
+            // for it and the app's setting still grants it at this exchange.
+            grant.profile && admitted.profile,
         )
     };
     if !state.sessions.is_live(&session_id)? {
         return Err(ServerError::CodeExpired);
     }
+    // The name is read from the directory at this issue and kept nowhere.
+    let name = if profile {
+        display_name(state, person)?
+    } else {
+        None
+    };
     let mut claims = json!({
         "iss": provider.issuer,
         "sub": subject,
@@ -415,6 +511,9 @@ pub(super) fn exchange(
     if let Some(nonce) = nonce {
         claims["nonce"] = Value::String(nonce);
     }
+    if let Some(name) = name {
+        claims["name"] = Value::String(name);
+    }
     let access = random::<32>()?;
     let lookup = hex(&Sha256::digest(access.as_bytes()));
     {
@@ -424,12 +523,19 @@ pub(super) fn exchange(
             Access {
                 session_id,
                 subject,
+                app: client_id,
+                profile,
                 expires_at,
             },
             at,
         )?;
     }
-    grant.issued_access = Some(lookup);
+    // The code remembers the token it issued, so a replay revokes it. A code
+    // retired meanwhile as expired is unknown to a replay, and the token ends
+    // at its own instant.
+    if let Some(grant) = held(&provider.codes)?.get_mut(&form.code) {
+        grant.issued_access = Some(lookup);
+    }
     Ok(json!({
         "access_token": access,
         "token_type": "Bearer",
@@ -448,13 +554,27 @@ pub(super) async fn userinfo(
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .ok_or(ServerError::TokenUnknown)?;
-    let (subject, session_id) = {
+    let (subject, session_id, app, profile) = {
         let tokens = held(&provider.tokens)?;
         let access = tokens.get(&hex(&Sha256::digest(bearer.trim().as_bytes())), now())?;
-        (access.subject.clone(), access.session_id.clone())
+        (
+            access.subject.clone(),
+            access.session_id.clone(),
+            access.app.clone(),
+            access.profile,
+        )
     };
     if !state.sessions.is_live(&session_id)? {
         return Err(ServerError::TokenUnknown);
     }
-    Ok(Json(json!({ "sub": subject })))
+    let mut answer = json!({ "sub": subject });
+    // The name follows the setting: read again at this request, given only
+    // while the token's scope asked for it and the app is still set to have it.
+    if profile && name_granted(&state, &app)? {
+        let person = subject.parse::<PersonId>().map_err(ServerError::Identity)?;
+        if let Some(name) = display_name(&state, person)? {
+            answer["name"] = Value::String(name);
+        }
+    }
+    Ok(Json(answer))
 }

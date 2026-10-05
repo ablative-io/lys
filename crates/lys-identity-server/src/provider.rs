@@ -29,6 +29,7 @@ use std::sync::{Mutex, MutexGuard};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_core::Ed25519Identity;
+use lys_identity::PersonId;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
@@ -78,6 +79,12 @@ struct Grant {
     challenge: String,
     nonce: Option<String>,
     subject: String,
+    /// The person, for the name read at the exchange when `profile` is set.
+    person: PersonId,
+    /// Whether the product asked for the `profile` scope and the app's
+    /// sign-in settings granted it at this authorization. The name itself is
+    /// kept nowhere: it is read from the directory at each issue.
+    profile: bool,
     authenticated_at: u64,
     expires_at: u64,
     /// When the Lys sign-in the code states ends; its tokens end with it.
@@ -92,6 +99,12 @@ struct Grant {
 struct Access {
     session_id: String,
     subject: String,
+    /// The app the token was issued to.
+    app: String,
+    /// Whether the token was issued for the `profile` scope. The user
+    /// information route reads the name again at each request, and only
+    /// while the app's sign-in settings still grant it.
+    profile: bool,
     expires_at: u64,
 }
 
@@ -213,8 +226,8 @@ impl OpenIdProvider {
             "id_token_signing_alg_values_supported": ["EdDSA"],
             "code_challenge_methods_supported": ["S256"],
             "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-            "scopes_supported": ["openid"],
-            "claims_supported": ["iss", "sub", "aud", "iat", "exp", "auth_time", "nonce"],
+            "scopes_supported": ["openid", "profile"],
+            "claims_supported": ["iss", "sub", "aud", "iat", "exp", "auth_time", "nonce", "name"],
         })
     }
 

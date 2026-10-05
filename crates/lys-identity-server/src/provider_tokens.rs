@@ -23,7 +23,9 @@ struct Stored {
 #[serde(deny_unknown_fields)]
 struct StoredToken {
     key: String,
-    access: Access,
+    /// Read as written, then as an [`Access`]: a token of a shape this build
+    /// does not keep is dropped on its own at open.
+    access: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -46,6 +48,7 @@ pub(super) struct Tokens {
 
 impl Tokens {
     pub(super) fn open(file: PathBuf, at: u64) -> Result<Self, ServerError> {
+        let mut dropped = false;
         let mut live = match std::fs::read(&file) {
             Ok(bytes) => {
                 let stored: Stored = serde_json::from_slice(&bytes).map_err(|error| {
@@ -60,8 +63,15 @@ impl Tokens {
                 }
                 let mut entries = HashMap::new();
                 for token in stored.tokens {
-                    validate(&token.key, &token.access)?;
-                    if entries.insert(token.key, token.access).is_some() {
+                    // A token written by an earlier build, without the app and
+                    // the scope this one keeps, cannot be honoured: that one
+                    // sign-in is asked for again, and nothing else is refused.
+                    let Ok(access) = serde_json::from_value::<Access>(token.access) else {
+                        dropped = true;
+                        continue;
+                    };
+                    validate(&token.key, &access)?;
+                    if entries.insert(token.key, access).is_some() {
                         return Err(unavailable("the access table repeats a token digest"));
                     }
                 }
@@ -75,11 +85,15 @@ impl Tokens {
             }
         };
         live.retain(|_, access| access.expires_at > at);
-        Ok(Self {
+        let mut tokens = Self {
             file,
             live,
             failed: false,
-        })
+        };
+        if dropped {
+            tokens.change(None, None)?;
+        }
+        Ok(tokens)
     }
 
     fn ready(&self) -> Result<(), ServerError> {

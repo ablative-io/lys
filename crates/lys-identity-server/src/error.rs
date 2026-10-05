@@ -671,6 +671,21 @@ pub enum ServerError {
     /// The redirect address is not one registered for the product.
     #[error("RedirectUnregistered: that redirect address is not registered for this product")]
     RedirectUnregistered,
+    /// The authorization asks for a scope Lys does not serve.
+    #[error("ScopeUnknown: Lys does not serve the scope {scope}")]
+    ScopeUnknown {
+        /// The scope asked for.
+        scope: String,
+    },
+    /// The authorization asks for a scope the app's sign-in settings do not
+    /// grant it.
+    #[error("ScopeNotGranted: {app} is not given the scope {scope}")]
+    ScopeNotGranted {
+        /// The scope asked for.
+        scope: String,
+        /// The app asking.
+        app: String,
+    },
     /// The code is not one Lys answered this product with.
     #[error("CodeUnknown: that code is not one Lys gave this product")]
     CodeUnknown,

@@ -576,6 +576,19 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         ),
         (ServerError::ClientUnknown, "ClientUnknown"),
         (ServerError::RedirectUnregistered, "RedirectUnregistered"),
+        (
+            ServerError::ScopeUnknown {
+                scope: detail.to_owned(),
+            },
+            "ScopeUnknown",
+        ),
+        (
+            ServerError::ScopeNotGranted {
+                scope: detail.to_owned(),
+                app: detail.to_owned(),
+            },
+            "ScopeNotGranted",
+        ),
         (ServerError::CodeUnknown, "CodeUnknown"),
         (ServerError::CodeUsed, "CodeUsed"),
         (ServerError::CodeExpired, "CodeExpired"),

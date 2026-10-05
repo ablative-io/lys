@@ -12,8 +12,55 @@ fn access(ends: u64) -> Access {
     Access {
         session_id: "a".repeat(32),
         subject: format!("person-{}", "b".repeat(32)),
+        app: "notes".to_owned(),
+        profile: false,
         expires_at: ends,
     }
+}
+
+/// DIRECTORY-079 R3: a token written before the table kept the app and the
+/// scope is dropped on its own at open, durably; the tokens beside it stand,
+/// and the table opens.
+#[test]
+fn a_token_of_an_earlier_shape_is_dropped_alone_at_open() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let file = dir.path().join("provider.tokens.json");
+    let old = "d".repeat(64);
+    let kept = "e".repeat(64);
+    std::fs::write(
+        &file,
+        serde_json::to_vec(&json!({
+            "format": FORMAT,
+            "tokens": [
+                { "key": old, "access": {
+                    "session_id": "a".repeat(32),
+                    "subject": format!("person-{}", "b".repeat(32)),
+                    "expires_at": 100,
+                } },
+                { "key": kept, "access": serde_json::to_value(access(100))? },
+            ],
+        }))?,
+    )?;
+    let tokens = Tokens::open(file.clone(), 10)?;
+    assert!(matches!(
+        tokens.get(&old, 10),
+        Err(ServerError::TokenUnknown)
+    ));
+    assert_eq!(tokens.get(&kept, 10)?.app, "notes");
+    drop(tokens);
+    let written: serde_json::Value = serde_json::from_slice(&std::fs::read(&file)?)?;
+    let keys: Vec<&str> = written["tokens"]
+        .as_array()
+        .ok_or("tokens")?
+        .iter()
+        .filter_map(|token| token["key"].as_str())
+        .collect();
+    assert_eq!(
+        keys,
+        [kept.as_str()],
+        "the old token is gone from the table"
+    );
+    Ok(())
 }
 
 #[test]

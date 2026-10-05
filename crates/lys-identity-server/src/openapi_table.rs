@@ -250,7 +250,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/policy" "An agent's tool-boundary policy" S [SIGNED, &["not_permitted"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]] scope("agent", "agent.policy.set", ["id"]);
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
-    GET "/oauth/authorize" "Begin an authorization" P [&["RedirectUnregistered"]];
+    GET "/oauth/authorize" "Begin an authorization" P [&["RedirectUnregistered", "ScopeUnknown", "ScopeNotGranted"]];
     POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
     GET "/.well-known/oauth-protected-resource" "Where the MCP door's authorization is found" P [];

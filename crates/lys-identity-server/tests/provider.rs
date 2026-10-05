@@ -382,16 +382,33 @@ async fn authorize_answer(
     client_id: &str,
     redirect: &str,
 ) -> Result<(u16, Option<String>, Value), Box<dyn Error>> {
+    authorize_scoped(service, cookie, client_id, redirect, Some("openid")).await
+}
+
+/// The authorize answer for `client_id`, `redirect` and the `scope` words
+/// given, or no scope at all.
+async fn authorize_scoped(
+    service: &Service,
+    cookie: &str,
+    client_id: &str,
+    redirect: &str,
+    scope: Option<&str>,
+) -> Result<(u16, Option<String>, Value), Box<dyn Error>> {
     let browser = browser()?;
+    let challenge = challenge_of("v");
+    let mut query = vec![
+        ("client_id", client_id),
+        ("redirect_uri", redirect),
+        ("response_type", "code"),
+        ("code_challenge", &challenge),
+        ("code_challenge_method", "S256"),
+    ];
+    if let Some(scope) = scope {
+        query.push(("scope", scope));
+    }
     let answer = browser
         .get(format!("{}/oauth/authorize", service.base))
-        .query(&[
-            ("client_id", client_id),
-            ("redirect_uri", redirect),
-            ("response_type", "code"),
-            ("code_challenge", &challenge_of("v")),
-            ("code_challenge_method", "S256"),
-        ])
+        .query(&query)
         .header(reqwest::header::COOKIE, cookie)
         .send()
         .await?;
@@ -763,6 +780,173 @@ async fn a_product_identity_token_has_a_short_validity_window() -> TestResult {
     assert!(
         expires - issued <= 300,
         "identity token outlives five minutes"
+    );
+    Ok(())
+}
+
+/// The claims an identity token carries.
+fn claims_of(answer: &Value) -> Result<Value, Box<dyn Error>> {
+    let jwt = answer["id_token"].as_str().ok_or("no identity token")?;
+    let claims = jwt
+        .split('.')
+        .nth(1)
+        .ok_or("identity token has no claims")?;
+    Ok(serde_json::from_slice(&URL_SAFE_NO_PAD.decode(claims)?)?)
+}
+
+/// A code for the fixture product asking for `scope`, from a signed-in browser.
+async fn code_scoped(
+    service: &Service,
+    cookie: &str,
+    scope: &str,
+) -> Result<String, Box<dyn Error>> {
+    let (status, location, body) =
+        authorize_scoped(service, cookie, PRODUCT, CALLBACK, Some(scope)).await?;
+    assert_eq!(status, 303, "{body}");
+    let back = reqwest::Url::parse(&location.ok_or("a code is sent back")?)?;
+    assert!(back.as_str().starts_with(CALLBACK), "{back}");
+    back.query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, value)| value.into_owned())
+        .ok_or_else(|| "the product is given a code".into())
+}
+
+/// Set the fixture product's sign-in settings: its address, and whether it is
+/// given the name.
+async fn set_profile(service: &Service, cookie: &str, profile: bool) -> TestResult {
+    let change = json!({
+        "operation": identity_contract::apps::op()?,
+        "redirects": [CALLBACK],
+        "profile": profile,
+    });
+    let view = ok(post(
+        service,
+        &format!("/apps/{PRODUCT}/sign_in"),
+        Auth::Cookie(cookie),
+        &change,
+    )
+    .await?)?;
+    assert_eq!(view["sign_in"]["profile"], profile);
+    Ok(())
+}
+
+/// DIRECTORY-079 R3: the name is given only for the `profile` scope and only
+/// while the app's sign-in settings grant it. Asked for when not granted, the
+/// authorization is refused `ScopeNotGranted` naming the app and the browser
+/// is sent nowhere. Granted, the identity token and the user information
+/// carry the person's name as the directory holds it at that issue; a token
+/// for `openid` alone carries none even then; and when the setting is turned
+/// off, the token already issued stops giving the name at the next request
+/// and the next authorization asking for it is refused.
+#[tokio::test]
+async fn the_name_follows_the_profile_scope_and_the_apps_setting() -> TestResult {
+    let (service, cookie, person) = table(CODE_SECONDS).await?;
+    // Approved with the name off: asking for it is refused, sent nowhere.
+    let (status, location, refusal) =
+        authorize_scoped(&service, &cookie, PRODUCT, CALLBACK, Some("openid profile")).await?;
+    assert_eq!((status, location), (403, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "ScopeNotGranted");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains(PRODUCT) && words.contains("profile")),
+        "{refusal}"
+    );
+    // The administrator turns the name on: the next issue carries it.
+    set_profile(&service, &cookie, true).await?;
+    let issued = code_scoped(&service, &cookie, "openid profile").await?;
+    let (status, answer) = exchange(&service, &issued, "v").await?;
+    assert_eq!(status, 200, "{answer}");
+    let claims = claims_of(&answer)?;
+    assert_eq!(claims["sub"], person);
+    assert_eq!(claims["name"], "Ada", "{claims}");
+    let with_name = answer["access_token"].as_str().ok_or("a token")?.to_owned();
+    let (status, info) = userinfo_with(&service, &with_name).await?;
+    assert_eq!(status, 200, "{info}");
+    assert_eq!(info, json!({ "sub": person, "name": "Ada" }));
+    // Asked for openid alone, the name is not given even while granted.
+    let issued = code_scoped(&service, &cookie, "openid").await?;
+    let (status, answer) = exchange(&service, &issued, "v").await?;
+    assert_eq!(status, 200, "{answer}");
+    assert!(claims_of(&answer)?.get("name").is_none());
+    let plain = answer["access_token"].as_str().ok_or("a token")?;
+    let (status, info) = userinfo_with(&service, plain).await?;
+    assert_eq!(status, 200, "{info}");
+    assert_eq!(info, json!({ "sub": person }));
+    // Turned off again: the token follows the setting at its next request,
+    // and the next authorization asking for the name is refused.
+    set_profile(&service, &cookie, false).await?;
+    let (status, info) = userinfo_with(&service, &with_name).await?;
+    assert_eq!(status, 200, "{info}");
+    assert_eq!(info, json!({ "sub": person }));
+    let (status, location, refusal) =
+        authorize_scoped(&service, &cookie, PRODUCT, CALLBACK, Some("openid profile")).await?;
+    assert_eq!((status, location), (403, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "ScopeNotGranted");
+    Ok(())
+}
+
+/// DIRECTORY-079 R3: the setting is judged again at the exchange. A code
+/// issued while the name was granted, exchanged after the administrator took
+/// the name away, yields a token without the name claim, and its user
+/// information carries none either.
+#[tokio::test]
+async fn a_setting_taken_away_between_authorize_and_exchange_withholds_the_name() -> TestResult {
+    let (service, cookie, person) = table(CODE_SECONDS).await?;
+    set_profile(&service, &cookie, true).await?;
+    let issued = code_scoped(&service, &cookie, "openid profile").await?;
+    set_profile(&service, &cookie, false).await?;
+    let (status, answer) = exchange(&service, &issued, "v").await?;
+    assert_eq!(status, 200, "{answer}");
+    let claims = claims_of(&answer)?;
+    assert_eq!(claims["sub"], person);
+    assert!(claims.get("name").is_none(), "{claims}");
+    let token = answer["access_token"].as_str().ok_or("a token")?;
+    let (status, info) = userinfo_with(&service, token).await?;
+    assert_eq!(status, 200, "{info}");
+    assert_eq!(info, json!({ "sub": person }));
+    Ok(())
+}
+
+/// DIRECTORY-079 R3: a scope Lys does not serve is refused `ScopeUnknown`
+/// naming the word and the browser is sent nowhere; an authorization without
+/// the `openid` scope is malformed; and discovery lists exactly the scopes
+/// and claims Lys serves.
+#[tokio::test]
+async fn a_scope_lys_does_not_serve_is_refused_and_discovery_says_what_is_served() -> TestResult {
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let (status, location, refusal) =
+        authorize_scoped(&service, &cookie, PRODUCT, CALLBACK, Some("openid email")).await?;
+    assert_eq!((status, location), (400, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "ScopeUnknown");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("email")),
+        "{refusal}"
+    );
+    let (status, location, refusal) =
+        authorize_scoped(&service, &cookie, PRODUCT, CALLBACK, None).await?;
+    assert_eq!((status, location), (400, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "RequestMalformed");
+    let discovery: Value =
+        reqwest::get(format!("{}/.well-known/openid-configuration", service.base))
+            .await?
+            .json()
+            .await?;
+    assert_eq!(discovery["scopes_supported"], json!(["openid", "profile"]));
+    assert_eq!(
+        discovery["claims_supported"],
+        json!([
+            "iss",
+            "sub",
+            "aud",
+            "iat",
+            "exp",
+            "auth_time",
+            "nonce",
+            "name"
+        ])
     );
     Ok(())
 }

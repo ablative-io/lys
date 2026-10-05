@@ -11,7 +11,7 @@ use lys_core::Ed25519Identity;
 use serde_json::json;
 
 use super::endpoints::{Exchange, presented};
-use super::{OpenIdProvider, ProviderSettings, encoded, same};
+use super::{Access, OpenIdProvider, ProviderSettings, encoded, same};
 
 #[test]
 fn a_query_value_is_percent_encoded_except_its_unreserved_characters() {
@@ -113,5 +113,66 @@ fn an_id_token_verifies_under_the_key_its_jwks_names() -> Result<(), Box<dyn Err
     forged[0] ^= 1;
     assert!(Ed25519Identity::verify(&public, &forged, &signature).is_err());
     assert_eq!(provider.discovery()["issuer"], "http://localhost:8490");
+    Ok(())
+}
+
+/// DIRECTORY-079 R3: the name is kept nowhere. The access table holds the
+/// token's app and whether it asked for the profile scope, never the name,
+/// and a table carrying one is refused.
+#[test]
+fn the_access_table_keeps_whether_the_name_was_asked_for_and_never_the_name()
+-> Result<(), Box<dyn Error>> {
+    let access = Access {
+        session_id: "session".to_owned(),
+        subject: "person-00000000000000000000000000000000".to_owned(),
+        app: "notes".to_owned(),
+        profile: true,
+        expires_at: 7,
+    };
+    let written = serde_json::to_value(&access)?;
+    let mut keys: Vec<&str> = written
+        .as_object()
+        .ok_or("an object")?
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        ["app", "expires_at", "profile", "session_id", "subject"]
+    );
+    let mut with_name = written;
+    with_name["name"] = json!("Ada");
+    assert!(serde_json::from_value::<Access>(with_name).is_err());
+    Ok(())
+}
+
+/// DIRECTORY-079 R3: discovery says only what is served.
+#[test]
+fn discovery_lists_the_openid_and_profile_scopes_and_the_name_claim() -> Result<(), Box<dyn Error>>
+{
+    let dir = tempfile::tempdir()?;
+    let key_file = dir.path().join("provider.key");
+    std::fs::write(&key_file, [9u8; 32])?;
+    let settings = ProviderSettings {
+        key_file,
+        code_seconds: 60,
+    };
+    let provider = OpenIdProvider::open(&settings, "http://localhost:8490".to_owned())?;
+    let discovery = provider.discovery();
+    assert_eq!(discovery["scopes_supported"], json!(["openid", "profile"]));
+    assert_eq!(
+        discovery["claims_supported"],
+        json!([
+            "iss",
+            "sub",
+            "aud",
+            "iat",
+            "exp",
+            "auth_time",
+            "nonce",
+            "name"
+        ])
+    );
     Ok(())
 }

@@ -166,6 +166,7 @@ impl ServerError {
             | Self::SecondFactorUnsupported
             | Self::NotPermitted { .. }
             | Self::ReviewerOnly
+            | Self::ScopeNotGranted { .. }
             | Self::McpBeyondRemit { .. } => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::McpServerUnknown { .. }
@@ -224,6 +225,7 @@ impl ServerError {
             | Self::AccountRefused { .. }
             | Self::ProviderRefused { .. }
             | Self::RedirectUnregistered
+            | Self::ScopeUnknown { .. }
             | Self::CodeUnknown
             | Self::CodeUsed
             | Self::CodeExpired
