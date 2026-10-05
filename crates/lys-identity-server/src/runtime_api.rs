@@ -268,7 +268,7 @@ fn sees(directory: &Projection, administrator: bool, asker: IdentityId, agent: &
     };
     match asker {
         IdentityId::Agent(own) => own == agent,
-        IdentityId::ServiceAccount(_) => false,
+        IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => false,
         IdentityId::Person(person) => directory
             .record(IdentityId::Agent(agent))
             .is_some_and(|record| record.responsible() == Some(person)),
@@ -297,7 +297,7 @@ async fn report_agent(
         };
         let answers = match asker {
             IdentityId::Agent(own) => own == agent,
-                IdentityId::ServiceAccount(_) => false,
+                IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => false,
             IdentityId::Person(person) => {
                 record.responsible() == Some(person)
                     || state.admission.is_administrator(directory, &signed_in(&state, &headers)?)?

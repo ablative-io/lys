@@ -238,7 +238,13 @@ impl Projection {
                         ),
                     }
                 })?;
-                if !matches!(held.0, IdentityId::Agent(_)) || held.1.responsible != Some(person) {
+                let agent = match held.0 {
+                    IdentityId::Agent(_) => true,
+                    IdentityId::Person(_)
+                    | IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_) => false,
+                };
+                if !agent || held.1.responsible != Some(person) {
                     return Err(IdentityError::LogUnavailable {
                         reason: format!(
                             "person {person}'s agent index disagrees with identity {identity}"
@@ -382,10 +388,15 @@ impl Projection {
         let registered_by = event.actor().binding().clone();
         match event.change() {
             Change::SetupPerson { profile } => {
-                let IdentityId::Person(person) = identity else {
-                    return Err(IdentityError::ChangeMismatch {
-                        reason: "setup names a person",
-                    });
+                let person = match identity {
+                    IdentityId::Person(person) => person,
+                    IdentityId::Agent(_)
+                    | IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_) => {
+                        return Err(IdentityError::ChangeMismatch {
+                            reason: "setup names a person",
+                        });
+                    }
                 };
                 let mut record = fresh(profile, None, registered_by.clone(), index);
                 record.state = LifecycleState::Active;
@@ -436,6 +447,11 @@ impl Projection {
                             reason: "a service account never acquires a sign-in binding",
                         });
                     }
+                    IdentityId::Connector(_) => {
+                        return Err(IdentityError::ChangeMismatch {
+                            reason: "a connector never acquires a sign-in binding",
+                        });
+                    }
                 }
             }
             Change::Transition { to, .. } => {
@@ -451,8 +467,12 @@ impl Projection {
                     .insert(seen.source_operation_id().to_owned(), index);
             }
         }
-        if let IdentityId::Person(person) = identity {
-            Arc::make_mut(&mut self.people).insert(identity.to_string(), person);
+        match identity {
+            IdentityId::Person(person) => {
+                Arc::make_mut(&mut self.people).insert(identity.to_string(), person);
+            }
+            // Only a person is indexed by name.
+            IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {}
         }
         Ok(())
     }

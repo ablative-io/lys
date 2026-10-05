@@ -385,7 +385,7 @@ pub(crate) async fn register_agent(
             let projection = directory.projection()?;
             let own = match crate::caller_admission::active_caller(projection, &actor)? {
                 IdentityId::Person(person) => person,
-                IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => {
+                IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
                     return Err(ServerError::NotAdmitted {
                         reason: "an agent registration requires a person or an admitted service account",
                     });

@@ -171,6 +171,8 @@ pub enum RecipientKind {
     Agent,
     /// A service account owned by a person.
     ServiceAccount,
+    /// An approved app's connector.
+    Connector,
 }
 
 impl RecipientKind {
@@ -180,6 +182,7 @@ impl RecipientKind {
             IdentityId::Person(_) => Self::Person,
             IdentityId::Agent(_) => Self::Agent,
             IdentityId::ServiceAccount(_) => Self::ServiceAccount,
+            IdentityId::Connector(_) => Self::Connector,
         }
     }
 }
@@ -190,6 +193,7 @@ impl fmt::Display for RecipientKind {
             Self::Person => "person",
             Self::Agent => "agent",
             Self::ServiceAccount => "service_account",
+            Self::Connector => "connector",
         })
     }
 }

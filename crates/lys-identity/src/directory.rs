@@ -295,11 +295,13 @@ impl<S: LeafStore> Directory<S> {
         self.settle()?;
         let change = Change::SetupPerson { profile };
         if let Some((event, receipt)) = self.answered(operation)? {
-            if event.actor().binding() == actor.binding()
-                && event.change() == &change
-                && let IdentityId::Person(person) = event.identity()
-            {
-                return Ok((person, receipt));
+            if event.actor().binding() == actor.binding() && event.change() == &change {
+                match event.identity() {
+                    IdentityId::Person(person) => return Ok((person, receipt)),
+                    IdentityId::Agent(_)
+                    | IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_) => {}
+                }
             }
             return Err(IdentityError::OperationReused {
                 operation: operation.to_string(),

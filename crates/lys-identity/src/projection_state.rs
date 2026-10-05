@@ -124,13 +124,21 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
                 IdentityId::ServiceAccount(_) => {
                     return Err("a service account cannot hold login bindings".to_owned());
                 }
+                IdentityId::Connector(_) => {
+                    return Err("a connector cannot hold login bindings".to_owned());
+                }
             };
             if taken {
                 return Err(format!("a login is bound twice, the second time to {id}"));
             }
         }
-        if let IdentityId::Person(person) = id {
-            std::sync::Arc::make_mut(&mut projection.people).insert(id.to_string(), person);
+        match id {
+            IdentityId::Person(person) => {
+                std::sync::Arc::make_mut(&mut projection.people).insert(id.to_string(), person);
+            }
+            // Only a person is indexed by name; the reporting rebuild below
+            // refuses a kind the directory never stores.
+            IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {}
         }
         if Arc::make_mut(&mut projection.records)
             .insert(id, record)
@@ -173,6 +181,9 @@ pub(crate) fn migrate_v2(value: Value) -> Result<Projection, Unreadable> {
             IdentityId::Person(_) => Value::Null,
             IdentityId::ServiceAccount(_) => {
                 return Err("a service account is not a stored directory identity".to_owned());
+            }
+            IdentityId::Connector(_) => {
+                return Err("a connector is not a stored directory identity".to_owned());
             }
         };
         let mut fields = Vec::from(fields);

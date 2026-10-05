@@ -26,11 +26,20 @@ pub struct Lineage {
     pub ends: Option<(u64, GrantId)>,
 }
 
+/// Whether `identity` is an agent, whose responsible person may pass on
+/// between agents they answer for.
+pub(super) fn is_agent(identity: IdentityId) -> bool {
+    match identity {
+        IdentityId::Agent(_) => true,
+        IdentityId::Person(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => false,
+    }
+}
+
 /// Refuse `grant` unless it lies within what `source` let be passed on.
 pub fn check_hop(grant: &Grant, source: &Grant) -> Result<(), GrantError> {
     let parts = grant.parts();
-    let responsible_pass = matches!(source.holder(), IdentityId::Agent(_))
-        && matches!(grant.holder(), IdentityId::Agent(_))
+    let responsible_pass = is_agent(source.holder())
+        && is_agent(grant.holder())
         && parts.issuer == IdentityId::Person(source.responsible())
         && grant.responsible() == source.responsible();
     if parts.issuer != source.holder() && !responsible_pass {
@@ -118,10 +127,15 @@ pub fn resolve<'a>(
     loop {
         let source_id = match current.source() {
             Source::Root => {
-                let IdentityId::Person(person) = current.holder() else {
-                    return Err(GrantError::LineageMalformed {
-                        reason: "a root grant is held by its responsible person",
-                    });
+                let person = match current.holder() {
+                    IdentityId::Person(person) => person,
+                    IdentityId::Agent(_)
+                    | IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_) => {
+                        return Err(GrantError::LineageMalformed {
+                            reason: "a root grant is held by its responsible person",
+                        });
+                    }
                 };
                 return Ok(Lineage {
                     path,

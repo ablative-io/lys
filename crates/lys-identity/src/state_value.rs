@@ -128,6 +128,7 @@ pub(crate) fn identity(value: IdentityId) -> Value {
         IdentityId::Person(id) => (wire::PERSON, *id.as_bytes()),
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
         IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
+        IdentityId::Connector(id) => (wire::CONNECTOR, *id.as_bytes()),
     };
     array(vec![uint(kind), bytes(&id)])
 }
@@ -142,7 +143,10 @@ pub(crate) fn read_identity(value: Value) -> Result<IdentityId, Unreadable> {
         wire::SERVICE_ACCOUNT => Ok(IdentityId::ServiceAccount(
             crate::ServiceAccountId::from_bytes(id),
         )),
-        code => Err(format!("identity kind {code} is not a person or an agent")),
+        wire::CONNECTOR => Ok(IdentityId::Connector(crate::ConnectorId::from_bytes(id))),
+        code => Err(format!(
+            "identity kind {code} is not a person, an agent, a service account or a connector"
+        )),
     }
 }
 
@@ -196,6 +200,27 @@ mod tests {
         let value = array(vec![uint(7), bytes(b"leaf"), text("name")]);
         let [seven, _, _] = tuple::<3>(decode(&encode(&value)?)?, "the test value")?;
         assert_eq!(read_uint(&seven, "seven")?, 7);
+        Ok(())
+    }
+
+    #[test]
+    fn a_connector_identity_is_kind_four_and_an_unknown_kind_is_named_truly() -> Result<(), String>
+    {
+        let written = super::array(vec![uint(4), bytes(&[0x5a; 16])]);
+        let read = super::read_identity(written.clone())?;
+        assert_eq!(
+            read.to_string(),
+            "connector-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+        );
+        assert_eq!(super::identity(read), written);
+        let refused = super::read_identity(super::array(vec![uint(5), bytes(&[0x5a; 16])]));
+        assert_eq!(
+            refused,
+            Err(
+                "identity kind 5 is not a person, an agent, a service account or a connector"
+                    .to_owned()
+            )
+        );
         Ok(())
     }
 

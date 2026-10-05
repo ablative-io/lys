@@ -61,7 +61,7 @@ impl Projection {
                             chain: chain.clone(),
                         })?;
                 }
-                IdentityId::ServiceAccount(_) => {
+                IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
                     return Err(IdentityError::AnswersToUnknown {
                         identity: next.to_string(),
                     });
@@ -80,10 +80,13 @@ impl Projection {
         responsible_to: PersonId,
     ) -> Result<(), IdentityError> {
         let record = self.record(identity).ok_or_else(|| unknown(identity))?;
-        let IdentityId::Agent(agent) = identity else {
-            return Err(IdentityError::ChangeMismatch {
-                reason: "a reporting change names an agent",
-            });
+        let agent = match identity {
+            IdentityId::Agent(agent) => agent,
+            IdentityId::Person(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+                return Err(IdentityError::ChangeMismatch {
+                    reason: "a reporting change names an agent",
+                });
+            }
         };
         if record.reports_to != Some(from) || record.responsible != Some(responsible_from) {
             return Err(IdentityError::ChangeMismatch {
@@ -111,6 +114,11 @@ impl Projection {
             IdentityId::ServiceAccount(_) => {
                 return Err(IdentityError::ChangeMismatch {
                     reason: "a service account is not a reporting target",
+                });
+            }
+            IdentityId::Connector(_) => {
+                return Err(IdentityError::ChangeMismatch {
+                    reason: "a connector is not a reporting target",
                 });
             }
         };
@@ -288,6 +296,11 @@ impl Projection {
                 IdentityId::ServiceAccount(_) => {
                     return Err(IdentityError::ChangeMismatch {
                         reason: "a service account is not a stored directory identity",
+                    });
+                }
+                IdentityId::Connector(_) => {
+                    return Err(IdentityError::ChangeMismatch {
+                        reason: "a connector is not a stored directory identity",
                     });
                 }
             }

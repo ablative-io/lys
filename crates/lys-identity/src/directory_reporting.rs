@@ -62,8 +62,13 @@ impl<S: LeafStore> Directory<S> {
             if target != reports_to || shown != &profile || !same_actor(event.actor(), &actor) {
                 return Err(reused(operation));
             }
-            let IdentityId::Agent(agent) = event.identity() else {
-                return Err(reused(operation));
+            let agent = match event.identity() {
+                IdentityId::Agent(agent) => agent,
+                IdentityId::Person(_)
+                | IdentityId::ServiceAccount(_)
+                | IdentityId::Connector(_) => {
+                    return Err(reused(operation));
+                }
             };
             return Ok(Registered {
                 agent,
@@ -73,15 +78,23 @@ impl<S: LeafStore> Directory<S> {
             });
         }
         let responsible = self.projection.resolve_reporting(reports_to, None)?;
-        if let IdentityId::Person(person) = reports_to {
-            let (agent, receipt) =
-                self.register_agent(actor, operation, person, profile, recorded_at)?;
-            return Ok(Registered {
-                agent,
-                reports_to,
-                responsible,
-                receipt,
-            });
+        match reports_to {
+            IdentityId::Person(person) => {
+                let (agent, receipt) =
+                    self.register_agent(actor, operation, person, profile, recorded_at)?;
+                return Ok(Registered {
+                    agent,
+                    reports_to,
+                    responsible,
+                    receipt,
+                });
+            }
+            IdentityId::Agent(_) => {}
+            IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+                return Err(IdentityError::ChangeMismatch {
+                    reason: "a reporting target must be a person or agent",
+                });
+            }
         }
         let agent = AgentId::generate()?;
         let change = Change::ReportingRegistration {

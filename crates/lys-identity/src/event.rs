@@ -178,15 +178,20 @@ pub struct IdentityEvent {
     change: Change,
 }
 
+/// Whether `target` is a kind a directory identity may report to.
+fn reporting_target(target: IdentityId) -> bool {
+    match target {
+        IdentityId::Person(_) | IdentityId::Agent(_) => true,
+        IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => false,
+    }
+}
+
 /// Refuse `change` if it does not fit `identity`.
 fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError> {
     let invalid_target = match change {
-        Change::ReportingRegistration { reports_to, .. } => {
-            matches!(reports_to, IdentityId::ServiceAccount(_))
-        }
+        Change::ReportingRegistration { reports_to, .. } => !reporting_target(*reports_to),
         Change::ReportsToChanged { from, to, .. } => {
-            matches!(from, IdentityId::ServiceAccount(_))
-                || matches!(to, IdentityId::ServiceAccount(_))
+            !reporting_target(*from) || !reporting_target(*to)
         }
         _ => false,
     };
@@ -195,10 +200,18 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
             reason: "a reporting target must be a person or agent",
         });
     }
-    if matches!(identity, IdentityId::ServiceAccount(_)) {
-        return Err(IdentityError::ChangeMismatch {
-            reason: "service account lifecycle belongs to the service-account log",
-        });
+    match identity {
+        IdentityId::Person(_) | IdentityId::Agent(_) => {}
+        IdentityId::ServiceAccount(_) => {
+            return Err(IdentityError::ChangeMismatch {
+                reason: "service account lifecycle belongs to the service-account log",
+            });
+        }
+        IdentityId::Connector(_) => {
+            return Err(IdentityError::ChangeMismatch {
+                reason: "a connector is recorded with its app's approval in the apps log",
+            });
+        }
     }
     match (change, identity) {
         (Change::RegisterPerson { .. } | Change::SetupPerson { .. }, IdentityId::Agent(_)) => {
@@ -314,6 +327,8 @@ pub(crate) mod wire {
     pub(crate) const AGENT: u64 = 2;
     /// A principal held in the service-account log.
     pub(crate) const SERVICE_ACCOUNT: u64 = 3;
+    /// An approved app's connector, recorded in the apps log.
+    pub(crate) const CONNECTOR: u64 = 4;
 
     /// A person is registered.
     pub(crate) const REGISTER_PERSON: u64 = 1;

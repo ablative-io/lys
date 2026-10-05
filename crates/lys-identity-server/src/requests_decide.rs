@@ -211,7 +211,10 @@ pub(crate) async fn approve(
                     },
                     at,
                 ),
-                (None, IdentityId::Agent(_) | IdentityId::ServiceAccount(_)) => {
+                (
+                    None,
+                    IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_),
+                ) => {
                     return Err(malformed(
                         "an agent's access is lent from a grant a person holds: name the source",
                     ));

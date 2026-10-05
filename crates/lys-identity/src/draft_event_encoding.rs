@@ -111,9 +111,15 @@ fn identity(value: Value) -> Result<IdentityId, IdentityError> {
     if value.starts_with("agent-") {
         return value.parse::<AgentId>().map(IdentityId::Agent);
     }
-    value
-        .parse::<ServiceAccountId>()
-        .map(IdentityId::ServiceAccount)
+    if value.starts_with("op-") {
+        return value
+            .parse::<ServiceAccountId>()
+            .map(IdentityId::ServiceAccount);
+    }
+    Err(IdentityError::IdentifierMalformed {
+        kind: "person, agent or service account",
+        text: value,
+    })
 }
 
 fn read_evidence(value: Value) -> Result<Option<RequestEvidence>, IdentityError> {
@@ -239,4 +245,31 @@ pub fn decode(body: &[u8]) -> Result<DraftEvent, IdentityError> {
         return Err(IdentityError::EventNotCanonical);
     }
     Ok(event)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{IdentityError, Value, identity};
+
+    #[test]
+    fn a_reviewer_of_an_unknown_kind_is_refused_by_name_not_read_as_a_service_account() {
+        for text in [
+            "connector-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+            "team-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        ] {
+            let refused = identity(Value::Text(text.to_owned()));
+            assert!(
+                matches!(
+                    &refused,
+                    Err(IdentityError::IdentifierMalformed { kind, text: named })
+                        if *kind == "person, agent or service account" && named == text
+                ),
+                "{text}: {refused:?}"
+            );
+        }
+        let account = identity(Value::Text(
+            "op-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a".to_owned(),
+        ));
+        assert!(matches!(account, Ok(crate::IdentityId::ServiceAccount(_))));
+    }
 }

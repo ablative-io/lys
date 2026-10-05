@@ -101,6 +101,10 @@ fn answered_for_by(directory: &Projection, identity: IdentityId) -> Result<Perso
                 })
             })
         }
+        // The directory records no connector: the apps log does.
+        IdentityId::Connector(_) => Err(GrantError::from(IdentityError::IdentityUnknown {
+            identity: identity.to_string(),
+        })),
     }
 }
 
@@ -152,12 +156,15 @@ pub fn delegation_authority(
         caller: caller.to_string(),
         grant: source.id().to_string(),
     };
-    let (IdentityId::Person(person), IdentityId::Agent(_), IdentityId::Agent(_)) =
-        (caller, source.holder(), recipient)
-    else {
-        return Err(refused());
+    let person = match caller {
+        IdentityId::Person(person) => person,
+        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+            return Err(refused());
+        }
     };
-    if source.responsible() != person
+    if !super::lineage::is_agent(source.holder())
+        || !super::lineage::is_agent(recipient)
+        || source.responsible() != person
         || directory
             .record(source.holder())
             .and_then(crate::projection::Record::responsible)

@@ -56,6 +56,7 @@ fn named(judged: &Judged<'_>, identity: IdentityId) -> Result<CanGrant, ServerEr
             IdentityId::Person(_) => "person",
             IdentityId::Agent(_) => "agent",
             IdentityId::ServiceAccount(_) => "service_account",
+            IdentityId::Connector(_) => "connector",
         },
         display_name: record.profile().display_name().to_owned(),
     })

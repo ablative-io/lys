@@ -42,6 +42,16 @@ const COSE_SIGN1_TAG: u64 = 18;
 const SIGNATURE_LEN: usize = 64;
 const KEY_LEN: usize = 32;
 
+/// The first grant event version able to name `kind`.
+fn kind_version(kind: super::types::RecipientKind) -> u64 {
+    use super::types::RecipientKind;
+    match kind {
+        RecipientKind::Person | RecipientKind::Agent => GRANT_EVENT_VERSION,
+        RecipientKind::ServiceAccount => 2,
+        RecipientKind::Connector => 3,
+    }
+}
+
 /// One change to the grants.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GrantChange {
@@ -75,14 +85,20 @@ pub struct GrantEvent {
 impl GrantEvent {
     /// Version two adds service-account principals. Events using only the
     /// original principal and recipient kinds retain their original bytes.
+    /// Version three adds the connector. Each event takes the version of the
+    /// newest kind it names.
     pub fn version(&self) -> u64 {
         use super::types::{PassOn, RecipientKind};
-        let named = matches!(self.caller, IdentityId::ServiceAccount(_))
-            || matches!(&self.change, GrantChange::Issue(grant)
-                if matches!(grant.holder(), IdentityId::ServiceAccount(_))
-                || matches!(grant.pass_on(), PassOn::To { recipients, .. }
-                    if recipients.contains(&RecipientKind::ServiceAccount)));
-        if named { 2 } else { GRANT_EVENT_VERSION }
+        let mut version = kind_version(RecipientKind::of(self.caller));
+        if let GrantChange::Issue(grant) = &self.change {
+            version = version.max(kind_version(RecipientKind::of(grant.holder())));
+            if let PassOn::To { recipients, .. } = grant.pass_on() {
+                for kind in recipients {
+                    version = version.max(kind_version(*kind));
+                }
+            }
+        }
+        version
     }
 
     fn content_type(&self) -> &'static str {
@@ -126,12 +142,17 @@ impl GrantEvent {
             }
             GrantChange::Use { .. } => {}
         }
-        Ok(Self {
+        let event = Self {
             operation,
             caller,
             recorded_at,
             change,
-        })
+        };
+        // No envelope signs a connector until version three is written.
+        match event.version() {
+            1 | 2 => Ok(event),
+            version => Err(GrantError::VersionUnsupported { version }),
+        }
     }
 
     /// The operation id the caller gave the change.

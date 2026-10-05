@@ -222,6 +222,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
         IdentityId::Person(id) => (wire::PERSON, *id.as_bytes()),
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
         IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
+        IdentityId::Connector(id) => (wire::CONNECTOR, *id.as_bytes()),
     };
     uint(&mut out, kind);
     uint(&mut out, 2);
@@ -465,7 +466,11 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
     let identity = match as_uint(&identity_kind, "an identity kind is a code")? {
         wire::PERSON => IdentityId::Person(PersonId::from_bytes(identity_id)),
         wire::AGENT => IdentityId::Agent(AgentId::from_bytes(identity_id)),
-        _ => return Err(malformed("an identity kind code is 1 or 2")),
+        _ => {
+            return Err(malformed(
+                "a directory event's identity kind code is 1 for a person or 2 for an agent",
+            ));
+        }
     };
     let event = IdentityEvent::new(
         OperationId::from_bytes(as_id(operation, "an operation id is 16 bytes")?),

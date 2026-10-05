@@ -1,4 +1,4 @@
-//! Enduring identifiers for people and agents.
+//! Enduring identifiers for people, agents, service accounts and connectors.
 //!
 //! An identifier is sixteen bytes drawn from the operating system's secure
 //! random source when the identity is registered, and it never changes. It is
@@ -110,6 +110,46 @@ impl FromStr for ServiceAccountId {
     }
 }
 
+/// An approved app's connector identity (ADR-126, DIRECTORY-048 R1). Its id is
+/// made once from the secure random source and stored with the app's
+/// approval; its text form is `connector-` and 32 hex digits. It is never a
+/// person, an agent or a service account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ConnectorId([u8; ID_LEN]);
+
+impl ConnectorId {
+    const PREFIX: &'static str = "connector-";
+
+    /// A new identifier from the secure random source.
+    pub fn generate() -> Result<Self, IdentityError> {
+        random_bytes().map(Self)
+    }
+
+    /// The identifier these bytes are, as read back from a signed event.
+    pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
+        Self(bytes)
+    }
+
+    /// The identifier's bytes, as a signed event carries them.
+    pub fn as_bytes(&self) -> &[u8; ID_LEN] {
+        &self.0
+    }
+}
+
+impl fmt::Display for ConnectorId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", Self::PREFIX, to_hex(&self.0))
+    }
+}
+
+impl FromStr for ConnectorId {
+    type Err = IdentityError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        parse_prefixed(text, Self::PREFIX, "connector").map(Self)
+    }
+}
+
 impl PersonId {
     const PREFIX: &'static str = "person-";
 
@@ -176,7 +216,8 @@ impl FromStr for AgentId {
     }
 }
 
-/// The identity an event is about: a person or an agent.
+/// An identity Lys knows: a person, an agent, a service account or an
+/// approved app's connector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum IdentityId {
     /// A person.
@@ -185,6 +226,9 @@ pub enum IdentityId {
     Agent(AgentId),
     /// A person-owned service account, authenticated independently.
     ServiceAccount(ServiceAccountId),
+    /// An approved app's connector, answering to the administrator who
+    /// approved the app.
+    Connector(ConnectorId),
 }
 
 impl fmt::Display for IdentityId {
@@ -193,6 +237,7 @@ impl fmt::Display for IdentityId {
             Self::Person(id) => id.fmt(f),
             Self::Agent(id) => id.fmt(f),
             Self::ServiceAccount(id) => id.fmt(f),
+            Self::Connector(id) => id.fmt(f),
         }
     }
 }

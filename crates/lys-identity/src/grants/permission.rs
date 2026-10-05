@@ -60,6 +60,7 @@ impl ObjectRef {
             IdentityId::Person(_) => "person",
             IdentityId::Agent(_) => "agent",
             IdentityId::ServiceAccount(_) => "service_account",
+            IdentityId::Connector(_) => "connector",
         };
         Self {
             kind: kind.to_owned(),

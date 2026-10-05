@@ -47,12 +47,17 @@ pub struct Checked {
 /// The person or agent `value` names.
 ///
 /// # Errors
-/// Refuses a value that is neither a person id nor an agent id.
+/// Refuses a value that is neither a person id nor an agent id, naming it.
 pub fn parse_identity(value: &str) -> Result<IdentityId, crate::IdentityError> {
     if value.starts_with("person-") {
         PersonId::from_str(value).map(IdentityId::Person)
-    } else {
+    } else if value.starts_with("agent-") {
         AgentId::from_str(value).map(IdentityId::Agent)
+    } else {
+        Err(crate::IdentityError::IdentifierMalformed {
+            kind: "person or agent",
+            text: value.to_owned(),
+        })
     }
 }
 
