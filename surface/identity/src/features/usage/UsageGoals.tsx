@@ -6,6 +6,7 @@ import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import type { GoalItem } from './contract';
 import { clock } from '../file/time';
+import { Act } from '../../shell/Act';
 
 type Props = { agent: string; kind?: 'agent' | 'team'; goals: GoalItem[]; changed: (words: string) => void };
 
@@ -60,7 +61,7 @@ function GoalRow({ agent, item, changed }: { agent: string; item: GoalItem; chan
     <td>
       <label className="tick">Active<input type="checkbox" aria-label={'Goal active ' + goal.id} checked={goal.active} disabled={blocked}
         onChange={(event) => { if (!blocked) activity.submit({ operation: operationId(), active: event.target.checked }); }} /></label>
-      <button className="btn" type="submit" form={form} disabled={blocked || !valid || next === goal.words}>Reword goal</button>
+      <Act symbol="edit" name="Reword this goal" word="Reword" type="submit" form={form} disabled={blocked || !valid || next === goal.words} />
       <ChangeStatus change={activity} />
       {item.standing !== 'open' ? <p className="note">Only open goals can be changed.</p> : null}
     </td>
@@ -87,7 +88,7 @@ function useSetGoal({ agent, kind, changed }: { agent: string; kind: 'agent' | '
     <td><textarea form={id} name="words" className="usage-grow" aria-label={'What the ' + kind + ' is reminded of'} rows={1} value={words} required disabled={change.blocked} placeholder="Type a goal and press Enter" onChange={(event) => setWords(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } }} /></td>
     <td><input form={id} name="deadline" aria-label="Deadline, empty for none" type="datetime-local" value={deadline} disabled={change.blocked} onChange={(event) => setDeadline(event.target.value)} /></td>
     <td><ChangeStatus change={change} /></td>
-    <td><button form={id} className="btn primary" type="submit" disabled={change.blocked || !ready}>Set goal</button></td>
+    <td><Act symbol="approve" name="Set this goal" word="Set" tone="primary" type="submit" form={id} disabled={change.blocked || !ready} /></td>
   </tr>;
   return { row, form };
 }

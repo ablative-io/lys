@@ -74,8 +74,6 @@ export const STANDING: Record<string, number> = {
   'features/team/Start.tsx': 3,
   'features/teams/TeamActions.tsx': 7,
   'features/teams/Teams.tsx': 4,
-  'features/usage/UsageBudgets.tsx': 3,
-  'features/usage/UsageGoals.tsx': 2,
   'shell/Dock.tsx': 3,
   'shell/Explain.tsx': 2,
   'shell/Listing.tsx': 3,

@@ -97,7 +97,8 @@ describe('Usage', () => {
     expect(cells[2].querySelector('select[aria-label="When it\'s hit"]')).not.toBeNull();
     expect(cells[3].textContent).toBe('');
     expect(cells[3].children).toHaveLength(0);
-    expect(cells[4].querySelector('button[type="submit"]')?.textContent).toBe('Add this limit');
+    const add = cells[4].querySelector<HTMLButtonElement>('button[type="submit"]');
+    expect([add?.getAttribute('aria-label'), add?.dataset.symbol, add?.textContent]).toEqual(['Add this limit', 'add', '']);
     const form = $('form[aria-label="Set a budget"]');
     expect([...($(addBudget)?.querySelectorAll('input, select, button') ?? [])].every((control) => control.getAttribute('form') === form?.id)).toBe(true);
     expect(text()).not.toContain('New limit');
@@ -115,7 +116,8 @@ describe('Usage', () => {
     expect(what?.classList.contains('usage-grow')).toBe(true);
     expect(cells[2].querySelector('input[name="deadline"]')).not.toBeNull();
     expect(cells[3].textContent).toBe('');
-    expect(cells[4].querySelector('button[type="submit"]')?.textContent).toBe('Set goal');
+    const set = cells[4].querySelector<HTMLButtonElement>('button[type="submit"]');
+    expect([set?.getAttribute('aria-label'), set?.dataset.symbol, set?.textContent]).toEqual(['Set this goal', 'approve', 'Set']);
     const form = $('form[aria-label="Set a goal"]');
     expect([...($(addGoal)?.querySelectorAll('textarea, input, button') ?? [])].every((control) => control.getAttribute('form') === form?.id)).toBe(true);
   });
@@ -281,6 +283,9 @@ describe('Usage', () => {
 
   it('draws no analytics dashboard', async () => {
     await mount(file, { ...keeping(reached(null)), [budgets]: ok(budgetsView(holder, [tokens], { used: [{ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null }] })) });
-    expect(document.querySelectorAll('section.usage svg, section.usage canvas')).toHaveLength(0);
+    // A control's own symbol is a drawing and not a chart; anything else drawn here would be one.
+    const drawn = [...document.querySelectorAll('section.usage svg, section.usage canvas')].filter((each) => !each.closest('button.act'));
+    expect(drawn).toHaveLength(0);
+    expect(document.querySelectorAll('section.usage button.act svg').length).toBeGreaterThan(0);
   });
 });

@@ -9,6 +9,7 @@ import { PERIOD_WORDS, UNITS, limitWords, usedAgainst } from './budgetWords';
 import { answeredNo } from '../../kept';
 import { plain, reasons } from './reasons';
 import type { Named } from './reasons';
+import { Act } from '../../shell/Act';
 
 /** `name` is the holder's name, said wherever the service's words carry its identifier. */
 type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void; name?: string };
@@ -88,7 +89,7 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
             <td className="usage-used">{usedAgainst(budgets, index) ?? 'Nothing reported yet'}</td>
             <td><select name={'act-' + index} aria-label={'When ' + limitWords(limit) + ' is hit'} disabled={busy} value={rows[index].act} onChange={(event) => edit(index, { act: event.target.value as BudgetAct })}>{Object.entries(ACTS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select></td>
             <td>{words}</td>
-            <td><button className="btn" type="button" disabled={busy} aria-label={'Remove ' + limitWords(limit)} onClick={() => remove(index)}>Remove</button></td>
+            <td><Act symbol="remove" name={'Remove ' + limitWords(limit)} disabled={busy} onClick={() => remove(index)} /></td>
           </tr>;
         })}
         {budgets.limits.length ? null : <tr><td colSpan={5} className="dim">No budget is set for this {budgets.holder.kind}.</td></tr>}
@@ -96,7 +97,7 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
       <tfoot>{budgets.limits.length ? <tr>
         <td colSpan={3}><div className="usage-amount"><span id="warn-at-words">Warn me at this % of a limit (leave blank for no warning)</span>
           <input name="warn_at" aria-labelledby="warn-at-words" type="number" min={0} max={100} step="any" value={warning} disabled={busy} onChange={(event) => setWarning(event.target.value)} /></div></td>
-        <td colSpan={2}><button className="btn primary" type="submit" disabled={busy || !valid}>Save these limits</button></td>
+        <td colSpan={2}><Act symbol="save" name="Save these limits" word="Save" tone="primary" type="submit" disabled={busy || !valid} /></td>
       </tr> : null}{add}</tfoot>
     </table>
   </form>;
@@ -131,7 +132,7 @@ function useSetBudget({ budgets, busy, save }: FormProps): { row: ReactNode; for
     <td />
     <td><select form={id} aria-label="When it's hit" value={act} disabled={busy} onChange={(event) => setAct(event.target.value as BudgetAct)}>{Object.entries(ACTS).map(([value, words]) => <option key={value} value={value}>{words}</option>)}</select></td>
     <td />
-    <td><button form={id} className="btn primary" type="submit" disabled={busy || !valid}>Add this limit</button></td>
+    <td><Act symbol="add" name="Add this limit" tone="primary" type="submit" form={id} disabled={busy || !valid} /></td>
   </tr>;
   return { row, form };
 }
