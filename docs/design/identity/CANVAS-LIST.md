@@ -121,6 +121,20 @@ Seen by Waffles on the walk he asked for (installed a1678ae6, pictures w40, w41)
 
 None of this section is written yet.
 
+## Sign in with ChatGPT (Tom, 5 October, 16:50, by voice)
+
+"one of the things during OpenAI's Dev Day... they announced... a sign in with ChatGPT option, which is like...
+sign in with Google, sign in with GitHub... presumably over the next year or so, there'll be a sign in with
+Anthropic as well... if you use AI services in your site... you can offer users the option to sign in with
+ChatGPT and then [it] draws from their inference budget so they can use your service with their inference...
+I wonder if we can get that into our [Rauthy fork]... so you can sign in with your various different ChatGPT
+accounts to use the subscription budget. Cause like I've got for instance, three at the moment that would be
+great to rotate through."
+
+Not read by Waffles: what OpenAI announced and what it offers a relying service. To read on OpenAI's own
+developer pages before anything is said about fitting it to the issuer inside Lys. It sits beside "The proxy
+swaps the account" below: several registered accounts, rotated at the proxy, each call attributed.
+
 ## The Hub
 
 - A third view beside Canvas and Proxy. Tom, 5 October, 16:20, by voice: "it just makes me think that we could
