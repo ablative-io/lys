@@ -142,7 +142,7 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
           selected={null} select={() => undefined} open={(g) => navigate(`/file/${g.holder}/access`)}
           tools={<>
             <WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />
-            <div className="seg">{([['all', 'All'], ['void', 'Not standing']] as ['all' | 'void', string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
+            <div className="seg">{([['all', 'All'], ['void', 'Not standing']] as ['all' | 'void', string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
           </>} />
       </div>
     </>}

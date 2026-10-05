@@ -97,7 +97,7 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
         selected={open?.id ?? null} select={() => undefined} open={(entry) => { setPicked(entry.id); setAsking(false); }}
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={data.teams.list} admin={admin} />
-          <div className="seg">{([['mine', 'Waiting on me'], ['waiting', 'All waiting'], ['decided', 'Decided']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
+          <div className="seg">{([['mine', 'Waiting on me'], ['waiting', 'All waiting'], ['decided', 'Decided']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
         </>} />
       <div className="detail">
         {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm {...each} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }} />} />

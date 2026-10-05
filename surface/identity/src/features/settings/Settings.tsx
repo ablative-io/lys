@@ -29,14 +29,14 @@ export function Settings() {
         <h2>Layout</h2>
               <Row t="Menu side" d="Which edge of the screen the menu and Help sit on.">
                 <div className="seg">
-                  <button data-dock="left" className={shell.dockRight ? '' : 'on'} onClick={() => shell.setDockSide('left')}>Left</button>
-                  <button data-dock="right" className={shell.dockRight ? 'on' : ''} onClick={() => shell.setDockSide('right')}>Right</button>
+                  <button data-dock="left" className={shell.dockRight ? '' : 'on'} aria-pressed={!shell.dockRight} onClick={() => shell.setDockSide('left')}>Left</button>
+                  <button data-dock="right" className={shell.dockRight ? 'on' : ''} aria-pressed={shell.dockRight} onClick={() => shell.setDockSide('right')}>Right</button>
                 </div>
               </Row>
               <Row t="Menu labels" d="Show the name beside every icon in the menu.">
                 <div className="seg">
-                  <button data-labels="icons" className={shell.labels ? '' : 'on'} onClick={() => shell.setLabels(false)}>Icons</button>
-                  <button data-labels="labels" className={shell.labels ? 'on' : ''} onClick={() => shell.setLabels(true)}>Labels</button>
+                  <button data-labels="icons" className={shell.labels ? '' : 'on'} aria-pressed={!shell.labels} onClick={() => shell.setLabels(false)}>Icons</button>
+                  <button data-labels="labels" className={shell.labels ? 'on' : ''} aria-pressed={shell.labels} onClick={() => shell.setLabels(true)}>Labels</button>
                 </div>
               </Row>
         <EffectiveSettings />

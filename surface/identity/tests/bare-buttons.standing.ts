@@ -1,6 +1,7 @@
-/** The bare buttons still standing outside the act control (shell/Act.tsx), file by file, counted from the source on
- *  6 October 2026. A number here goes down in the commit that moves those buttons to the control, and its line goes
- *  when it reaches none. Nothing is added and no number is raised: a new act is an `Act`. */
+/** The bare buttons standing outside the act control (shell/Act.tsx), file by file. Every act has moved to the
+ *  control; what stands here says a state (a tab, a switch, a fold, a menu item), is a thing chosen from a list, or
+ *  is a drawn control its screen owns (the rule in bare-buttons.test.tsx reads each one). A number here only goes
+ *  down, and its line goes when it reaches none. Nothing is added and no number is raised: a new act is an `Act`. */
 export const STANDING: Record<string, number> = {
   'features/access/Access.tsx': 1,
   'features/access/Graph.tsx': 1,

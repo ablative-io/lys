@@ -175,7 +175,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, notice, c
         </> : null}
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />
-          <div className="seg">{([['all', 'All'], ['attention', 'Not answering']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
+          <div className="seg">{([['all', 'All'], ['attention', 'Not answering']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
           {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
         </>} />
       <div className="pane">

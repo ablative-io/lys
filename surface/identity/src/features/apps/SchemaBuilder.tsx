@@ -133,7 +133,7 @@ export function SchemaBuilder({ app, version, initial, onSaved, register }: { ap
   return <section className="sb" aria-label={'Permission template for ' + app}>
     <div className="sb-templates" role="group" aria-label="Start from a template">
       <span className="note">Start from</span>
-      {TEMPLATES.map((template) => <button type="button" className="sb-chip" key={template.id} onClick={() => change((next) => { next.kinds = copy(template.draft).kinds; })}>{template.label}</button>)}
+      {TEMPLATES.map((template) => <button type="button" className="sb-chip" data-choice="" key={template.id} onClick={() => change((next) => { next.kinds = copy(template.draft).kinds; })}>{template.label}</button>)}
     </div>
     <div className="sb-layout">
       <div className="sb-tree" aria-label="Kinds">

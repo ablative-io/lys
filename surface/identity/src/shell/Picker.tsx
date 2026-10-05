@@ -16,6 +16,6 @@ export function Picker({ name, label, options, multiple = false, initial = [], o
     {chosen.map((option) => <span key={option.id} className="pill">{option.name}<input type="hidden" name={name} value={option.id} />{' '}<Act symbol="close" name={'Remove ' + option.name} onClick={() => set(chosen.filter((each) => each.id !== option.id))} /></span>)}
     {multiple || !chosen.length ? <input className="search" type="search" aria-label={label} placeholder={label + ' (' + options.length.toLocaleString('en-AU') + ')'} value={query} onChange={(event) => setQuery(event.target.value)}
       onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); if (matches[0]) pick(matches[0]); } }} /> : null}
-    {matches.length ? <ul className="plain">{matches.map((option) => <li key={option.id}><button type="button" className="btn" onClick={() => pick(option)}>{option.name}</button>{option.detail ? <span className="note"> {option.detail}</span> : null}</li>)}</ul> : null}
+    {matches.length ? <ul className="plain">{matches.map((option) => <li key={option.id}><button type="button" className="btn" data-choice="" onClick={() => pick(option)}>{option.name}</button>{option.detail ? <span className="note"> {option.detail}</span> : null}</li>)}</ul> : null}
   </div>;
 }

@@ -87,7 +87,7 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
       <p>On {name}, in <code>{list.under}</code></p>
       {parent ? <p><Act symbol="back" name={'Back to ' + nameOf(parent)} word={nameOf(parent)} disabled={busy} onClick={() => { void look(list.machine, parent); }} /></p> : null}
       {shown.length ? <ul className="folders">{shown.map((entry) => <li key={entry}>
-        <button type="button" className="btn" disabled={busy} onClick={() => { void look(list.machine, inside(list.under, entry)); }}>{entry}</button>
+        <button type="button" className="btn" data-choice="" disabled={busy} onClick={() => { void look(list.machine, inside(list.under, entry)); }}>{entry}</button>
       </li>)}</ul> : <p>There are no folders inside this one.</p>}
       <p><Act symbol="approve" name={confirm + ' ' + nameOf(list.under)} word={confirm + ' ' + nameOf(list.under)} tone="primary" disabled={busy} onClick={() => { choose(list.under); setOpen(false); }} /></p>
     </> : null}
