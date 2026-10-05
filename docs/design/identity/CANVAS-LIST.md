@@ -135,6 +135,12 @@ Not read by Waffles: what OpenAI announced and what it offers a relying service.
 developer pages before anything is said about fitting it to the issuer inside Lys. It sits beside "The proxy
 swaps the account" below: several registered accounts, rotated at the proxy, each call attributed.
 
+Tom, a few minutes later (about 16:55, by voice): "we can do the one-time password kind of sign-in... to get the
+authentication tokens that... Codex already uses so we don't need to over-complicate things. So yeah, that flow
+is already sort of available to us." So the first way in is the sign-in Codex already has, giving the tokens
+Codex already uses; nothing new is needed in the issuer for it. Not read by Waffles: how Codex's sign-in hands
+its tokens over and where it keeps them.
+
 ## The Hub
 
 - A third view beside Canvas and Proxy. Tom, 5 October, 16:20, by voice: "it just makes me think that we could
