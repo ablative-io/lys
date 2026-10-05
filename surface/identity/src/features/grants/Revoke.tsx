@@ -4,6 +4,7 @@ import type { Grant } from '../../generated/grants';
 import { useShell } from '../../shell/ShellContext';
 import { grantNo, nameOf, onText } from './model';
 import type { GrantWorld } from './model';
+import { Act } from '../../shell/Act';
 
 /** Every grant the caller can see that derives from `g`, at any depth. */
 export function derivedFrom(w: GrantWorld, g: Grant): Grant[] {
@@ -90,8 +91,8 @@ export function Revoke({ w, g, done, close }: { w: GrantWorld; g: Grant; done: (
         </div>
       ) : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn primary" data-act="revokedo" data-g={g.id} disabled={outcome.at === 'sending'} onClick={revoke}>Revoke</button>
-        <button className="btn" data-act="close" onClick={close}>Cancel</button>
+        <Act symbol="revoke" name="Revoke" word="Revoke" tone="primary" data-act="revokedo" data-g={g.id} disabled={outcome.at === 'sending'} onClick={revoke} />
+        <Act symbol="close" name="Cancel" word="Cancel" data-act="close" onClick={close} />
       </div>
     </>
   );

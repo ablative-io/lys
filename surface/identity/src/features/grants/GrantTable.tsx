@@ -9,6 +9,7 @@ import { chainOf, grantNo, lastUsedText, mayText, nameOf, passText, passesToAgen
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
 import './grants.css';
+import { Act } from '../../shell/Act';
 
 /**
  * An identifier broken only where it has its own breaks (after `.`, `:`, `_`, `-`, `/`),
@@ -49,8 +50,8 @@ export function ChangeButtons({ w, g, give, open }: { w: GrantWorld; g: Grant; g
   const mayRevoke = !g.revoked && w.who.get(g.holder)?.state !== 'retired';
   const mayGive = give && g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on);
   return <span className="g-change">
-    {mayGive ? <button className="btn" type="button" data-act="delegate" data-g={g.id} onClick={(event) => { event.stopPropagation(); open('delegate', event.currentTarget); }}>Give to an agent…</button> : null}
-    {mayRevoke ? <button className="btn danger" type="button" data-act="revoke" data-g={g.id} onClick={(event) => { event.stopPropagation(); open('revoke', event.currentTarget); }}>Revoke</button> : null}
+    {mayGive ? <Act symbol="send" name="Give to an agent…" word="Give" data-act="delegate" data-g={g.id} onClick={(event) => { event.stopPropagation(); open('delegate', event.currentTarget); }} /> : null}
+    {mayRevoke ? <Act symbol="revoke" name="Revoke" word="Revoke" tone="danger" data-act="revoke" data-g={g.id} onClick={(event) => { event.stopPropagation(); open('revoke', event.currentTarget); }} /> : null}
   </span>;
 }
 

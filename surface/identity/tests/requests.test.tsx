@@ -11,7 +11,7 @@ const routes = { ...SERVICE, '/requests': ok({ requests: [] }), '/grants/model':
   '/grants': ok({ revision: 1, grants: [{ resource: { kind: 'project', id: 'Lys' } }] }) };
 const kept = (asked: Ask) => ({ ...asked, id: asked.operation, asked_by: ADA, asked_by_name: ME.person.display_name, responsible: ME.person,
   actions: model.relations.reader, asked_at: 1790000000, state: 'waiting', approvers: [ME.person], sources: [], decision: null });
-const button = (label: string) => [...document.querySelectorAll('button')].find((value) => value.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === label) ?? null;
 const form = () => {
   const element = $('form[aria-label="Ask for access"]');
   if (!element) throw new Error('Ask form missing');

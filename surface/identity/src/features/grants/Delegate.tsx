@@ -14,6 +14,7 @@ import { CannotGiveList } from './CannotGiveList';
 import { givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
+import { Act } from '../../shell/Act';
 
 const DAY = 86400;
 
@@ -295,10 +296,8 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
       {damaged ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
         {pending.kind === 'empty' && rest.kind === 'held' ? <div className="note" data-rest-held>{rest.bodies.length} of an earlier run not yet sent: {grantedWords(rest.bodies)}. Give sends them exactly as ticked, nothing else.</div> : null}
-        <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || damaged || !recipient || !leaseKnown || (pending.kind !== 'held' && rest.kind !== 'held' && (toAgent ? picked.length === 0 : !relation))} onClick={give}>
-          {pending.kind === 'held' ? 'Check original grant' : 'Give'}
-        </button>
-        <button className="btn" data-act="close" onClick={close}>Cancel</button>
+        <Act symbol={pending.kind === 'held' ? 'again' : 'send'} name={pending.kind === 'held' ? 'Check original grant' : 'Give'} word={pending.kind === 'held' ? 'Check' : 'Give'} tone="primary" data-act="delegatedo" disabled={outcome.at === 'sending' || damaged || !recipient || !leaseKnown || (pending.kind !== 'held' && rest.kind !== 'held' && (toAgent ? picked.length === 0 : !relation))} onClick={give} />
+        <Act symbol="close" name="Cancel" word="Cancel" data-act="close" onClick={close} />
       </div>
     </>
   );

@@ -20,6 +20,7 @@ import { Gate } from '../signin/Gate';
 import { confirms, readDrafts } from './contract';
 import type { Draft, DraftAnswer, DraftFilter } from './contract';
 import './drafts.css';
+import { Act } from '../../shell/Act';
 
 const COLUMNS = 5;
 const RAW_ID = /^[a-z]+-[0-9a-f]{32}$/;
@@ -69,13 +70,13 @@ function Decide({ draft, person, changed }: { draft: Draft; person: string; chan
     {refusing && !refuse.pending && !refuse.done
       ? <form aria-label={'Refuse the draft of ' + agentOf(draft)} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), creation_hash: draft.creation_hash, reason: reason.trim() }); }}>
         <input aria-label="Why you refuse it" required value={reason} disabled={blocked} placeholder="Why you refuse it" onChange={(event) => setReason(event.target.value)} />
-        <button type="submit" className="btn danger" data-act="refuse-confirm" disabled={blocked || !reason.trim()}>Refuse</button>
-        <button type="button" className="btn" data-act="refuse-cancel" disabled={refuse.busy} onClick={() => setRefusing(false)}>Cancel</button>
+        <Act symbol="decline" name="Refuse" word="Refuse" tone="danger" type="submit" data-act="refuse-confirm" disabled={blocked || !reason.trim()} />
+        <Act symbol="close" name="Cancel" word="Cancel" data-act="refuse-cancel" disabled={refuse.busy} onClick={() => setRefusing(false)} />
       </form>
       : approve.done || refuse.done || approve.pending || refuse.pending ? null
       : <>
-        <button type="button" className="btn primary" data-act="approve" disabled={blocked} onClick={() => approve.submit({ operation: operationId(), creation_hash: draft.creation_hash, application: operationId() })}>Approve</button>
-        <button type="button" className="btn" data-act="refuse" disabled={blocked} onClick={() => setRefusing(true)}>Refuse</button>
+        <Act symbol="approve" name="Approve" word="Approve" tone="primary" data-act="approve" disabled={blocked} onClick={() => approve.submit({ operation: operationId(), creation_hash: draft.creation_hash, application: operationId() })} />
+        <Act symbol="decline" name="Refuse" word="Refuse" data-act="refuse" disabled={blocked} onClick={() => setRefusing(true)} />
       </>}
     <ChangeStatus change={approve} />
     <ChangeStatus change={refuse} />
@@ -129,7 +130,7 @@ export function Drafts() {
   const load = read.status === 'loading' && last.current?.show === show ? last.current.read : read;
   return <div className="page fill drafts-page">
     <div className="head"><div><h1>Access</h1><p className="sub">What your agents prepared for you to decide. Nothing is done until you approve it.</p></div>
-      {read.status === 'refused' ? <button type="button" className="btn" onClick={refreshLive}>Reconnect</button> : null}</div>
+      {read.status === 'refused' ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}</div>
     <AccessTabs on="drafts" />
     <div className="tools">
       <div className="seg">{([['waiting', 'Waiting'], ['decided', 'Decided']] as [DraftFilter, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>

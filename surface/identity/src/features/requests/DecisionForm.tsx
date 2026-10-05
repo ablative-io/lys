@@ -6,6 +6,7 @@ import { answeredNo, sendKept } from '../../kept';
 import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import type { AccessRequest } from './contract';
+import { Act } from '../../shell/Act';
 
 type Decision = { kind: 'approve'; operation: string; route: 'browser'; source: string | null; note: string }
   | { kind: 'decline'; note: string };
@@ -75,7 +76,7 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
   if (pending.kind === 'damaged') return <p role="alert">A retained decision could not be read. New decisions are blocked until its outcome can be established.</p>;
   return <div>
     {pending.kind === 'held' ? <div role="status"><p>This decision has no confirmed answer. Checking sends the same decision again and cannot create a second one.</p>
-      <button type="button" className="btn" disabled={busy} onClick={() => void send(pending.decision, true)}>{busy ? 'Checking…' : 'Check original decision'}</button></div>
+      <Act symbol="again" name={busy ? 'Checking…' : 'Check original decision'} word={busy ? 'Checking…' : 'Check'} disabled={busy} onClick={() => void send(pending.decision, true)} /></div>
       : done ? <p role="status">{done}</p> : action ? <form onSubmit={submit} aria-label="Decide request">
         <h4>{action === 'approve' ? 'Approve this access?' : 'Decline this request?'}</h4>
         {action === 'approve' ? <label className="field">Grant access from<select name="source" required defaultValue="">
@@ -84,10 +85,10 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
         </select></label> : null}
         {action === 'approve' && entry.sources.length ? <><p className="note">Permissions this approval draws on</p><ul>{entry.sources.map((source, index) => <li key={source}>Permission {index + 1}: {source}</li>)}</ul></> : null}
         <label className="field">Reason for your decision<textarea name="note" required /></label>
-        <button type="submit" className="btn primary" disabled={busy}>Confirm {action === 'approve' ? 'approval' : 'decline'}</button>{' '}
-        <button type="button" className="btn" disabled={busy} onClick={() => setAction(null)}>Cancel</button>
-      </form> : <><button type="button" className="btn primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')}>Approve access</button>{' '}
-        <button type="button" className="btn" onClick={() => setAction('decline')}>Decline request</button></>}
+        <Act symbol="approve" name={'Confirm ' + (action === 'approve' ? 'approval' : 'decline')} word="Confirm" tone="primary" type="submit" disabled={busy} />{' '}
+        <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setAction(null)} />
+      </form> : <><Act symbol="approve" name="Approve access" word="Approve" tone="primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')} />{' '}
+        <Act symbol="decline" name="Decline request" word="Decline" onClick={() => setAction('decline')} /></>}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
   </div>;
 }

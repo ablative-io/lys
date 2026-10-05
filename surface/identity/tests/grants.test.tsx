@@ -20,7 +20,7 @@ describe('What you hold', () => {
     expect(requests).toContain('/grants');
     const rows = holdText();
     expect(rows).toEqual([
-      ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+      ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give'],
       ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(unreachable()).toEqual([]);
@@ -560,7 +560,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(meReads).toBeGreaterThan(0);
     expect($('h1')?.textContent).toBe('Ada (test person)');
     expect(holdText()).toEqual([
-      ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+      ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give'],
       ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(grantIdsOnScreen()).toEqual(['delegate:' + ROOT_G, 'revoke:' + ROOT_G, 'revoke:grant-00000000000000000000000000000020']);
@@ -578,7 +578,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     // The second session read its own identity for itself; nothing was carried over.
     expect(bea.requests.filter((r) => r === '/me')).toHaveLength(meReads);
     expect($('h1')?.textContent).toBe('Bea (test person)');
-    expect(holdText()).toEqual([['Edit this resource; View this resource', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
+    expect(holdText()).toEqual([['Edit this resource; View this resource', 'editor', 'project:ledger', 'root', 'yes', 'Give']]);
     expect(grantIdsOnScreen()).toEqual(['delegate:' + BEA_ROOT_G, 'revoke:' + BEA_ROOT_G]);
     // Her agent, and what it holds under her root grant, not Ada's, on its own Access tab where what an agent holds lives.
     location.hash = '#/dashboard';

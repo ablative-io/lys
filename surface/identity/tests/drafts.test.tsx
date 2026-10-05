@@ -17,7 +17,7 @@ const draft = (more: Record<string, unknown> = {}) => ({
 const recorded = (body: unknown) => { const sent = body as { operation: string; creation_hash: string }; return ok({ draft: DRAFT, operation: sent.operation, creation_hash: sent.creation_hash, index: 4, tree_size: 5, leaf_hash: 'cd'.repeat(32), replacement: null }); };
 const routes = { ...SERVICE, '/drafts?state=waiting': ok({ drafts: [draft()] }) };
 const row = () => $(`tr[data-draft="${DRAFT}"]`);
-const button = (words: string) => $$('button').find((el) => el.textContent === words) ?? null;
+const button = (words: string) => $$('button').find((each) => (each.getAttribute('aria-label') ?? each.textContent) === words) ?? null;
 
 describe('Drafts under Access', () => {
   beforeEach(() => { sessionStorage.clear(); });
