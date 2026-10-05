@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { Refused, request } from '../../api';
+import { Act } from '../../shell/Act';
 
 /** The organisation setting as the service keeps it. */
 export interface Organisation { zone: string; version: number; model_windows?: Record<string, number | null> }
@@ -48,12 +49,12 @@ export function ModelWindows({ organisation, undeclared, saved }: { organisation
         <td><input type="text" inputMode="numeric" aria-label={'Context window of ' + row.model} value={row.side ? '' : row.window} disabled={row.side} onChange={(event) => set(row.model, { window: event.target.value })} />
           {wrong.includes(row.model) ? <small className="why-not" role="alert"> Write a count of tokens, such as 200,000.</small> : null}</td>
         <td><input type="checkbox" aria-label={row.model + ' is side work'} checked={row.side} onChange={(event) => set(row.model, { side: event.target.checked })} /></td>
-        <td><button type="button" className="btn" data-act="remove-model" onClick={() => setRows((now) => now.filter((each) => each.model !== row.model))}>Remove</button></td></tr>)}
+        <td><Act symbol="remove" name={'Remove ' + row.model} data-act="remove-model" onClick={() => setRows((now) => now.filter((each) => each.model !== row.model))} /></td></tr>)}
       <tr className="add"><td><input type="text" aria-label="Another model's name" placeholder="Model name, as its calls name it" value={fresh} onChange={(event) => setFresh(event.target.value)}
         onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} /></td>
-        <td colSpan={2}></td><td><button type="button" className="btn" data-act="add-model" disabled={!name || rows.some((row) => row.model === name)} onClick={add}>Add</button></td></tr>
+        <td colSpan={2}></td><td><Act symbol="add" name="Add this model" word="Add" data-act="add-model" disabled={!name || rows.some((row) => row.model === name)} onClick={add} /></td></tr>
     </tbody></table>
-    <p><button type="button" className="btn primary" data-act="save-model-windows" disabled={busy || wrong.length > 0} onClick={save}>{busy ? 'Saving…' : 'Save the table'}</button>
+    <p><Act symbol="save" name={busy ? 'Saving…' : 'Save the table'} word={busy ? 'Saving…' : 'Save'} tone="primary" data-act="save-model-windows" disabled={busy || wrong.length > 0} onClick={save} />
       {refused ? <span className="why-not" role="alert"> The table was not saved. <small className="refusal-name" title={refused.refusal.reason}>{refused.refusal.refusal}</small> {refused.refusal.reason}</span> : null}</p>
   </>;
 }

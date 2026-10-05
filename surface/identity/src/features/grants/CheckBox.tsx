@@ -10,6 +10,7 @@ import type { Answer } from './check';
 import { nameOf, resourceLabel } from './model';
 import type { GrantWorld } from './model';
 import './grants.css';
+import { Act } from '../../shell/Act';
 
 /** Every resource a grant the caller can see is on, and the actions granted on it. */
 export function resourcesSeen(w: GrantWorld): Map<string, { resource: ResourceRef; actions: string[] }> {
@@ -88,9 +89,7 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
         {[...resources].map(([k, v]) => <option key={k} value={k}>{resourceLabel(v.resource, w)}</option>)}
       </select></label>
       <span className="sec">?</span>
-      <button className="btn" data-act="check" onClick={check} disabled={asking || !keys.length}>
-        Check <span className="kbd">c</span>
-      </button>
+      <Act symbol="again" name="Check" hint="Check: press c" word="Check" data-act="check" onClick={check} disabled={asking || !keys.length} />
     </div>
   );
 

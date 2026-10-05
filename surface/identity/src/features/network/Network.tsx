@@ -21,6 +21,7 @@ import { ConnectRow } from './JoinCode';
 import type { Connecting } from './JoinCode';
 import { MachineDetail, status, waiting } from './MachineDetail';
 import type { RunnerRecord } from './MachineDetail';
+import { Act } from '../../shell/Act';
 
 /**
  * What Lys knows of a computer's runner: still being asked; answered, with its record and whether the runner answered
@@ -152,7 +153,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, notice, c
   return <>
     <div className="head">
       <div><div className="eyebrow">Where agents run</div><h1>Network</h1></div>
-      {admin ? <button className="btn primary" onClick={() => name.current?.focus()}>+ Add a computer</button> : null}
+      {admin ? <Act symbol="add" name="Add a computer" word="Computer" tone="primary" onClick={() => name.current?.focus()} /> : null}
     </div>
     {/* How many computers there are is the list's own count; the strip says only what the list does not. */}
     <div className="stat-strip">

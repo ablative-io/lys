@@ -22,6 +22,7 @@ const ENDED: Partial<Record<string, [string, string]>> = {
   lost: ['Lost in flight', 'The proxy stopped before the response ended. What the call spent is not known.'],
 };
 import './proxy.css';
+import { Act } from '../../shell/Act';
 
 const count = (value: number | null): string => value === null ? '' : value.toLocaleString('en-AU');
 const took = (ms: number | null | undefined): string => ms === null || ms === undefined ? '' : ms < 1000 ? ms + ' ms' : (ms / 1000).toLocaleString('en-AU', { maximumFractionDigits: 1 }) + ' s';
@@ -63,7 +64,7 @@ function Calls({ agent, chosen }: { agent: string; chosen: string | null }) {
     {rows.length ? null : <tr className="empty"><td className="dim" colSpan={7}>No call of this agent has been recorded.</td></tr>}
   </tbody>
   {after || refused ? <tfoot><tr><td colSpan={7}>
-    {after ? <button type="button" className="btn" data-act="earlier-calls" onClick={() => { readCalls(agent, after).then((page) => setEarlier((now) => [...now, page]), (problem: unknown) => setRefused(problem instanceof Refused ? problem : new Refused(0, { refusal: 'Unanswered', reason: String(problem) }))); }}>Earlier calls</button> : null}
+    {after ? <Act symbol="add" name="Earlier calls" word="Earlier" data-act="earlier-calls" onClick={() => { readCalls(agent, after).then((page) => setEarlier((now) => [...now, page]), (problem: unknown) => setRefused(problem instanceof Refused ? problem : new Refused(0, { refusal: 'Unanswered', reason: String(problem) }))); }} /> : null}
     {refused ? unread(refused, 'The earlier calls') : null}
   </td></tr></tfoot> : null}</table>;
 }
@@ -83,7 +84,7 @@ function Body({ value, why, what }: { value: unknown; why: string | null; what: 
   if (value === null || value === undefined) return <p className="why-not" role="status">This call has no {what} that can be read as JSON.{why ? ' ' + why : ''}</p>;
   const text = JSON.stringify(value, null, 2);
   return <>
-    <button type="button" className="btn proxy-copy" data-act="copy-json" onClick={() => { void navigator.clipboard?.writeText(text).then(() => setCopied(true)); }}>{copied ? 'Copied' : 'Copy'}</button>
+    <Act symbol={copied ? 'approve' : 'copy'} name={copied ? 'Copied' : 'Copy'} word={copied ? 'Copied' : 'Copy'} className="proxy-copy" data-act="copy-json" onClick={() => { void navigator.clipboard?.writeText(text).then(() => setCopied(true)); }} />
     <pre className="proxy-json" data-json={what} tabIndex={0}><Coloured text={text} /></pre>
   </>;
 }

@@ -15,7 +15,7 @@ const connections = {
 const REDIRECT = 'http://localhost:8490/auth/v1/providers/callback';
 const none: ProvidersView = { providers: [], offered: ['google', 'microsoft', 'github'], redirect_address: REDIRECT };
 const google: ProvidersView['providers'][number] = { id: 'provider-1', provider: 'google', name: 'Google', enabled: true, client_id: '123.apps.googleusercontent.com' };
-const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 
 async function input(selector: string, value: string) {
   const element = $(selector);

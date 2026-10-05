@@ -6,6 +6,7 @@ import { DirectoryGate as Gate, ErrorWords } from '../people/Words';
 import { ACTS, MEASURES, asLimit } from '../usage/contract';
 import { amount } from '../usage/budgetWords';
 import type { Budget, BudgetsView, Limit } from '../usage/contract';
+import { Act } from '../../shell/Act';
 
 type PersonalView = BudgetsView;
 
@@ -75,7 +76,7 @@ function BudgetReview({ path, initial, administrator }: { path: string; initial:
         {view.unconfirmed.flatMap(({ requested, effective, reason }) => [
           <Row key={requested.measure + '.enforced'} label={'Enforced ' + requested.measure} limit={asLimit(effective)} version={effective.version} zone={view.zone} state="Currently enforced" />,
           <Row key={requested.measure + '.requested'} label={'Pending ' + requested.measure} limit={asLimit(requested)} version={requested.version} zone={view.zone} state={'Requested change. ' + reason}>
-            {administrator ? <button className="btn primary" disabled={busy} onClick={() => void confirm(requested)}>Apply the new limit of {amount(requested.measure, requested.limit)}</button>
+            {administrator ? <Act symbol="approve" name={'Apply the new limit of ' + amount(requested.measure, requested.limit)} word="Apply" tone="primary" disabled={busy} onClick={() => void confirm(requested)} />
               : <p>An administrator must confirm this change. The currently enforced budget remains in place.</p>}
           </Row>,
         ])}

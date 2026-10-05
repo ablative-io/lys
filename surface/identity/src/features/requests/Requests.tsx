@@ -20,6 +20,7 @@ import { AskForm } from './AskForm';
 import { DecisionForm } from './DecisionForm';
 import { HeldApproval } from './HeldApproval';
 import type { AccessRequest } from './contract';
+import { Act } from '../../shell/Act';
 
 type Show = 'mine' | 'waiting' | 'decided';
 
@@ -85,7 +86,7 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
   return <>
     <div className="head">
       <div><h1>Access</h1><p className="sub">Ask for permission to use something, and decide what others have asked for, oldest first.</p></div>
-      {!ask ? <button className="btn primary" onClick={() => setAsking(true)}>+ Ask for access</button> : null}
+      {!ask ? <Act symbol="add" name="Ask for access" word="Ask" tone="primary" onClick={() => setAsking(true)} /> : null}
     </div>
     <AccessTabs on="requests" />
     {data.teams.refused ? <p className="why-not">Teams cannot be read, so requests are listed without their team. {data.teams.refused}</p> : null}

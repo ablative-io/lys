@@ -26,6 +26,7 @@ import { calledBy, firstName } from '../people/directory';
 import type { FileData } from './IdentityFile';
 import { clock } from './time';
 import './file.css';
+import { Act } from '../../shell/Act';
 
 function Profile({ data }: { data: FileData }) {
   const { x, agent, agents } = data;
@@ -100,17 +101,17 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
     <>
       {/* The button sits beside the heading, not inside it, so it keeps every other button's font. */}
       <div className="file-section-head"><span className="section-h">Grants</span>
-        {x.kind === 'agent' && x.state !== 'retired' ? <button className="btn" data-act="grant" onClick={(event) => mineToGive && passable.length ? setGiving(event.currentTarget)
-          : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)}>Give access</button> : null}
+        {x.kind === 'agent' && x.state !== 'retired' ? <Act symbol="send" name="Give access" word="Give" data-act="grant" onClick={(event) => mineToGive && passable.length ? setGiving(event.currentTarget)
+          : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)} /> : null}
       </div>
       {giving && passable.length ? <ActPanel label="Give" opener={giving} close={() => setGiving(null)}><Delegate w={w} source={passable[0]} to={x.id} done={reload} close={() => setGiving(null)} /></ActPanel> : null}
       <GrantTable w={w} grants={held} done={reload} give={false} />
       {mineToGive && !passable.length ? (
         <div style={{ marginTop: 12 }}>
           <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record it once, for themselves.</p>
-          <button className="btn" data-act="agent-roots" onClick={() => {
+          <Act symbol="add" name="Let me give agents access" word="Let me give agents access" data-act="agent-roots" onClick={() => {
             request<unknown>('/grants/agent-roots', {}).then(reload, (problem: unknown) => shell.toast(problem instanceof Refused ? problem.refusal.reason : 'Lys could not record access you can give agents.'));
-          }}>Let me give agents access</button>
+          }} />
         </div>
       ) : null}
       {/* After the grant table, the two panels share the width as two halves. */}

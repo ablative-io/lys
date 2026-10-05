@@ -15,6 +15,7 @@ import { AgentTeams } from '../teams/TeamActions';
 import { Pill } from '../people/Pill';
 import { AgentRun } from '../team/AgentRun';
 import './agent-overview.css';
+import { Act } from '../../shell/Act';
 
 function reading<T>(load: Load<T>, subject: string) {
   if (load.status === 'loading') return <span className="dim">Reading {subject}…</span>;
@@ -95,7 +96,7 @@ export function AgentOverview({ agent, details, added, rename }: { agent: AgentV
   return <NetworkRead.Provider value={networkRead}><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
   <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
-      <dt>Name</dt><dd>{agent.display_name}{rename ? <>{' '}<button type="button" className="btn icon small" data-act="rename" aria-label="Edit name" title="Edit name" onClick={rename}><span aria-hidden="true">✎</span></button></> : null}</dd>
+      <dt>Name</dt><dd>{agent.display_name}{rename ? <>{' '}<Act symbol="edit" name="Edit name" className="small" data-act="rename" onClick={rename} /></> : null}</dd>
       {added ? <><dt>Added</dt><dd>{added}</dd></> : null}
       <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
       <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : me.status !== 'ok' ? reading(me, 'who is signed in')

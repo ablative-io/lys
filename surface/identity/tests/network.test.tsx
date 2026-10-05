@@ -27,7 +27,7 @@ const recorded = (body: NameMachine): Machine => ({ ...machine, ...body, id: bod
 async function adding(extra: Record<string, Route> = {}) {
   for (const [path, route] of Object.entries(routes)) if (!(path in extra)) extra[path] = route;
   const mounted = await mount('#/network', extra);
-  await click(button('+ Add a computer'));
+  await click(button('Add a computer'));
   return mounted;
 }
 function naming(runner: (id: string) => Route = (id) => ok({ machine: id, runner: { kind: 'lys' } })): Record<string, Route> {
@@ -159,7 +159,7 @@ describe('Network', () => {
     expect(cells[3].querySelector('button[type="submit"]')?.getAttribute('form')).toBe(form?.id);
     expect($$('form[aria-label="Add a computer"]')).toHaveLength(1);
     expect($('.recorded-form')).toBeNull();
-    await click(button('+ Add a computer'));
+    await click(button('Add a computer'));
     expect(document.activeElement).toBe(form?.querySelector('input[name="name"]'));
   });
   it('puts the keyboard in the add row when the address asks to add a computer', async () => {
@@ -220,10 +220,10 @@ describe('Network', () => {
   });
   it('does not offer changes to non-administrators or when the network is unavailable', async () => {
     await mount('#/network', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
-    expect(button('+ Add a computer')).toBeNull(); expect(button('Retire this computer')).toBeNull();
+    expect(button('Add a computer')).toBeNull(); expect(button('Retire this computer')).toBeNull();
     unmountAll(); document.body.innerHTML = '';
     await mount('#/network', { ...routes, '/network': refused(503, 'NetworkUnavailable', 'not configured') });
-    expect(text()).toContain('NetworkUnavailable'); expect(button('+ Add a computer')).toBeNull();
+    expect(text()).toContain('NetworkUnavailable'); expect(button('Add a computer')).toBeNull();
   });
   it('reads one saved format: an earlier saved addition is said to be unreadable and nothing is sent', async () => {
     const earlier: NameMachine = { operation: 'op-' + 'd'.repeat(32), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] };

@@ -13,6 +13,7 @@ import { installedOf } from './installed';
 import { counted } from '../../shell/count';
 import type { Installed } from './installed';
 import './graph.css';
+import { Act } from '../../shell/Act';
 
 type Kind = 'person' | 'agent' | 'app' | 'resource';
 interface Node { id: string; label: string; kind: Kind; active: boolean; x: number; y: number; vx: number; vy: number }
@@ -179,7 +180,7 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
     </div>
     <div className="graph-split">
       <div className="graph-wrap">
-        <div className="graph-zoom"><button className="btn" onClick={() => zoom(1 / 1.3)} aria-label="Zoom in">+</button><button className="btn" onClick={() => zoom(1.3)} aria-label="Zoom out">−</button><button className="btn" onClick={() => setView(bounds)}>Fit</button></div>
+        <div className="graph-zoom"><Act symbol="add" name="Zoom in" onClick={() => zoom(1 / 1.3)} /><Act symbol="remove" name="Zoom out" onClick={() => zoom(1.3)} /><Act symbol="fit" name="Fit the whole graph in view" onClick={() => setView(bounds)} /></div>
         <svg ref={svg} onClick={clear} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="img" aria-label="Permission graph"
           onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { drag.current = null; }}>
           {edges.map((edge, index) => {

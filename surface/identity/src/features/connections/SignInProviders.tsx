@@ -13,6 +13,7 @@ import { ReadFailure, failureWords } from '../signin/words';
 import { GUIDES } from './provider-guides';
 import type { Provider } from './provider-guides';
 import './providers.css';
+import { Act } from '../../shell/Act';
 interface ProviderView { id: string; provider: Provider | null; name: string; enabled: boolean; client_id: string }
 export interface ProvidersView { providers: ProviderView[]; offered: Provider[]; redirect_address: string }
 interface SetBody { provider: Provider; client_id: string; client_secret: string; tenant?: string }
@@ -35,7 +36,7 @@ function RedirectAddress({ address }: { address: string }) {
   return <div className="field">
     <label htmlFor="sign-in-redirect">Redirect address</label>
     <input id="sign-in-redirect" className="mono" value={address} readOnly onFocus={(event) => event.currentTarget.select()} />
-    <div><button className="btn" type="button" onClick={copy}>Copy address</button> <span role="status">{copied}</span></div>
+    <div><Act symbol="copy" name="Copy address" word="Copy" onClick={copy} /> <span role="status">{copied}</span></div>
   </div>;
 }
 
@@ -119,9 +120,7 @@ export function SignInProviders() {
               {provider === 'microsoft' ? <label className="field">Tenant <span className="hint">the directory (tenant) ID, or its domain</span>
                 <input value={tenant} onChange={(event) => setTenant(event.target.value)} disabled={busy} autoComplete="off" placeholder="contoso.onmicrosoft.com" required />
               </label> : null}
-              <button className="btn primary lg" type="submit" disabled={!ready}>
-                {busy ? 'Checking with ' + NAMES[provider] + '…' : 'Set ' + NAMES[provider]}
-              </button>
+              <Act symbol="approve" name={busy ? 'Checking with ' + NAMES[provider] + '…' : 'Set ' + NAMES[provider]} word={busy ? 'Checking…' : 'Set'} tone="primary" type="submit" disabled={!ready} />
             </form>
           </li>
         </ol>
