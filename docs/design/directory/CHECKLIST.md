@@ -510,3 +510,9 @@
 - [ ] **C491** — An approved app waits at /changes with its own credential and is judged again when the signal fires (DIRECTORY-080 R3).
 - [ ] **C492** — One stamp differs whenever a permission answer could have changed and is the same otherwise, and an allowed batch answer says when it ends by time (DIRECTORY-080 R4).
 - [ ] **C493** — An app registers an agent only for the person signed in to it, proved by the token Lys issued, and reads the agents it has given a grant to (DIRECTORY-080 R5).
+
+## A product signs people in with a virtual client credential an administrator issues, authenticated by the broker (DIRECTORY-081)
+
+- [ ] **C494** — The token exchange authenticates a lys-client. credential by asking the broker, never falls back to the digest path, and refuses a revoked credential whatever its grant (DIRECTORY-081 R1).
+- [ ] **C495** — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them in the same batch as the retirement; the apps snapshot pins the two new lines (DIRECTORY-081 R2).
+- [ ] **C496** — The Apps screen issues a credential shown once with a copy control, lists who issued and revoked each, and revokes with confirmation (DIRECTORY-081 R3).

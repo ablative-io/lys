@@ -222,6 +222,10 @@
         {
           "id": "S265",
           "text": "As an administrator, I want every permission an app gives to show the app as its giver with a chain back to me, so that I can read all of it and end any of it in one place."
+        },
+        {
+          "id": "S266",
+          "text": "As an administrator, I want to issue, list and revoke the credential a product signs people in with, with nobody ever seeing the app's secret, so that I can arm a product and disarm it in one place."
         }
       ]
     },

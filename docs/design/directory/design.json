@@ -5399,6 +5399,31 @@
       "path": "docs/design/directory/briefs/DIRECTORY-078.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-078"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/app_client.rs",
+      "note": "the broker route that authenticates an app's virtual client credential, and issues and revokes it",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/app_client_tests.rs",
+      "note": "the route's tests: issue, authenticate, revoke, end, refusals and audit lines",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/broker/app_client.rs",
+      "note": "the broker's virtual client credentials: digest bound to the app's sealed client entry, issue, check, revoke, end",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/router.rs",
+      "note": "the broker's routes; gains POST /_lys/apps/client",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys/tests/identity_install/product.rs",
+      "note": "the real-install product test; regains its token, userinfo and keys steps through an issued credential",
+      "brief": "DIRECTORY-081"
     }
   ],
   "inventory": [

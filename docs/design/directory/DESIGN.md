@@ -1179,6 +1179,11 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/scratch_hold_tests.rs` | the upgrade tests' hold: the FIFO a Scratch keeps open for its life, the owner it records, the sweep that names each folder it removes, and the tests that kill a Scratch's process | DIRECTORY-078 |
 | `docs/design/directory/briefs/DIRECTORY-078.json` | the brief | DIRECTORY-078 |
 | `docs/design/directory/briefs/DIRECTORY-078.md` | rendered markdown | DIRECTORY-078 |
+| `crates/lys-secrets/src/bin/lys-secrets/app_client.rs` | the broker route that authenticates an app's virtual client credential, and issues and revokes it | DIRECTORY-081 |
+| `crates/lys-secrets/src/bin/lys-secrets/app_client_tests.rs` | the route's tests: issue, authenticate, revoke, end, refusals and audit lines | DIRECTORY-081 |
+| `crates/lys-secrets/src/broker/app_client.rs` | the broker's virtual client credentials: digest bound to the app's sealed client entry, issue, check, revoke, end | DIRECTORY-081 |
+| `crates/lys-secrets/src/bin/lys-secrets/router.rs` | the broker's routes; gains POST /_lys/apps/client | DIRECTORY-081 |
+| `crates/lys/tests/identity_install/product.rs` | the real-install product test; regains its token, userinfo and keys steps through an issued credential | DIRECTORY-081 |
 
 ## Inventory
 

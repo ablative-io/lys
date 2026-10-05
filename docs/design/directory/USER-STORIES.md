@@ -106,6 +106,8 @@
 
 **S265.** As an administrator, I want every permission an app gives to show the app as its giver with a chain back to me, so that I can read all of it and end any of it in one place.
 
+**S266.** As an administrator, I want to issue, list and revoke the credential a product signs people in with, with nobody ever seeing the app's secret, so that I can arm a product and disarm it in one place.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
