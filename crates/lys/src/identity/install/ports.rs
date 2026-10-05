@@ -17,6 +17,7 @@ pub struct Ports {
     pub proxy: u16,
     service_recorded: bool,
     broker_recorded: bool,
+    proxy_recorded: bool,
 }
 
 impl Default for Ports {
@@ -27,6 +28,7 @@ impl Default for Ports {
             proxy: PROXY_PORT,
             service_recorded: false,
             broker_recorded: false,
+            proxy_recorded: false,
         }
     }
 }
@@ -77,6 +79,7 @@ impl Ports {
         let mut ports = Self {
             service_recorded: true,
             broker_recorded: true,
+            proxy_recorded: true,
             ..Self::default()
         };
         if let Some(listen) = value.get("listen") {
@@ -88,7 +91,7 @@ impl Ports {
         if let Some(proxy) = value.get("model_proxy") {
             ports.proxy = port(proxy, "model_proxy")?;
         }
-        ports.chosen(None, None)
+        ports.chosen(None, None, None)
     }
 
     /// Read recorded listeners, retaining defaults for a new install.
@@ -149,14 +152,20 @@ impl Ports {
             service_recorded: true,
             ..Self::default()
         }
-        .chosen(None, None)
+        .chosen(None, None, None)
     }
 
     /// Apply explicit choices after refusing zero or shared listener ports.
-    pub fn chosen(self, service: Option<u16>, broker: Option<u16>) -> IdentityResult<Self> {
+    pub fn chosen(
+        self,
+        service: Option<u16>,
+        broker: Option<u16>,
+        proxy: Option<u16>,
+    ) -> IdentityResult<Self> {
         for (selected, held, recorded, field) in [
             (service, self.service, self.service_recorded, "service-port"),
             (broker, self.broker, self.broker_recorded, "broker-port"),
+            (proxy, self.proxy, self.proxy_recorded, "proxy-port"),
         ] {
             if recorded && selected.is_some_and(|selected| selected != held) {
                 return Err(IdentityError::new(
@@ -170,6 +179,7 @@ impl Ports {
         let ports = Self {
             service: service.unwrap_or(self.service),
             broker: broker.unwrap_or(self.broker),
+            proxy: proxy.unwrap_or(self.proxy),
             ..self
         };
         if ports.service == 0 || ports.broker == 0 || ports.service == ports.broker {
@@ -178,6 +188,14 @@ impl Ports {
                 "choose listeners",
                 "ports",
                 "service and broker need distinct nonzero ports",
+            ));
+        }
+        if ports.proxy == 0 {
+            return Err(IdentityError::new(
+                ErrorKind::ConfigInvalid,
+                "choose listeners",
+                "proxy-port",
+                "the model proxy needs a nonzero port",
             ));
         }
         if ports.proxy == ports.service || ports.proxy == ports.broker {

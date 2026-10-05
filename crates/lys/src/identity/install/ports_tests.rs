@@ -6,8 +6,8 @@ fn default_listeners_stay_at_the_installed_ports() {
     let ports = Ports::default();
     assert_eq!(ports.service, 8490);
     assert_eq!(ports.broker, 8472);
-    assert!(ports.chosen(Some(0), None).is_err());
-    assert!(ports.chosen(Some(9000), Some(9000)).is_err());
+    assert!(ports.chosen(Some(0), None, None).is_err());
+    assert!(ports.chosen(Some(9000), Some(9000), None).is_err());
 }
 
 #[test]
@@ -89,11 +89,12 @@ fn an_existing_install_refuses_listener_changes_before_writes()
     let original = br#"{"listen":"127.0.0.1:19001","secrets":{"broker":"http://127.0.0.1:19002"}}"#;
     crate::identity::private_files::write(&layout.service_config(), original)?;
     let ports = Ports::load(&layout)?;
-    for (service, broker, name) in [
-        (Some(19003), None, "service-port"),
-        (None, Some(19003), "broker-port"),
+    for (service, broker, proxy, name) in [
+        (Some(19003), None, None, "service-port"),
+        (None, Some(19003), None, "broker-port"),
+        (None, None, Some(19003), "proxy-port"),
     ] {
-        let Err(refusal) = ports.chosen(service, broker) else {
+        let Err(refusal) = ports.chosen(service, broker, proxy) else {
             panic!("recorded listener changed");
         };
         assert!(refusal.to_string().contains(name), "{refusal}");
@@ -113,7 +114,7 @@ fn an_interrupted_install_resumes_the_deployment_listener() -> Result<(), Box<dy
     let ports = Ports::load(&layout)?;
     assert_eq!(ports.service, 19001);
     assert_eq!(ports.broker, 8472);
-    assert!(ports.chosen(Some(19003), None).is_err());
+    assert!(ports.chosen(Some(19003), None, None).is_err());
     assert_eq!(
         std::fs::read_to_string(layout.deployment_config())?,
         deployment
@@ -140,7 +141,7 @@ fn an_interrupted_proxied_install_keeps_the_local_default_listener()
         let ports = Ports::load(&layout)?;
         assert_eq!(ports.service, 8490, "public origin {origin}");
         assert_eq!(ports.broker, 8472);
-        assert!(ports.chosen(Some(19001), None).is_err());
+        assert!(ports.chosen(Some(19001), None, None).is_err());
         assert_eq!(
             std::fs::read_to_string(layout.deployment_config())?,
             deployment
@@ -187,5 +188,30 @@ fn the_model_proxy_keeps_its_recorded_listener_and_is_written_for_the_service()
     };
     let rendered = server_config::render(&layout, &config, &carried, false);
     assert_eq!(rendered["model_proxy"], "http://127.0.0.1:19484/anthropic");
+    Ok(())
+}
+
+#[test]
+fn a_new_install_takes_a_chosen_model_proxy_listener_and_refuses_a_shared_one()
+-> Result<(), Box<dyn std::error::Error>> {
+    let chosen = Ports::default().chosen(None, None, Some(19484))?;
+    assert_eq!(chosen.proxy, 19484);
+    assert_eq!(chosen.proxy_url(), "http://127.0.0.1:19484/anthropic");
+    assert_eq!((chosen.service, chosen.broker), (8490, 8472));
+    for (service, broker, proxy) in [
+        (None, None, Some(8490)),
+        (None, None, Some(8472)),
+        (Some(19484), None, Some(19484)),
+        (None, Some(19484), Some(19484)),
+    ] {
+        assert!(
+            Ports::default().chosen(service, broker, proxy).is_err(),
+            "a model proxy sharing a listener was accepted: {service:?} {broker:?} {proxy:?}"
+        );
+    }
+    let Err(refusal) = Ports::default().chosen(None, None, Some(0)) else {
+        panic!("a model proxy on port zero was accepted");
+    };
+    assert!(refusal.to_string().contains("proxy-port"), "{refusal}");
     Ok(())
 }

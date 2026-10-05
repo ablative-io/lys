@@ -300,7 +300,10 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
     let listeners = [
         TcpListener::bind("127.0.0.1:0")?,
         TcpListener::bind("127.0.0.1:0")?,
+        TcpListener::bind("127.0.0.1:0")?,
     ];
+    // A machine that runs Lys already has a model proxy on the installed port.
+    let proxy_port = listeners[2].local_addr()?.port();
     let estate = Estate {
         root: tempfile::TempDir::new()?,
         project: format!("lys-identity-test-install-{}", std::process::id()),
@@ -323,11 +326,22 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         .arg(estate.service_port.to_string())
         .arg("--broker-port")
         .arg(estate.broker_port.to_string())
+        .arg("--proxy-port")
+        .arg(proxy_port.to_string())
         .arg("--surface")
         .arg(&package)
         .env("PATH", &path)
         .output()?;
     succeeded(&installed, "lys identity install")?;
+    let recorded: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(estate.root.path().join("identity.json"))?)?;
+    assert_eq!(
+        recorded["model_proxy"],
+        format!("http://127.0.0.1:{proxy_port}/anthropic"),
+        "the install did not record the chosen model proxy listener"
+    );
+    TcpStream::connect(("127.0.0.1", proxy_port))
+        .map_err(|error| format!("the model proxy does not answer on its chosen port: {error}"))?;
     let mut read = Heard::default();
     read.install(&installed);
 

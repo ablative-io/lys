@@ -77,6 +77,7 @@ fn main() -> ExitCode {
             identity::IdentityCommand::Install {
                 service_port,
                 broker_port,
+                proxy_port,
                 root,
                 admin_email,
                 surface,
@@ -91,6 +92,7 @@ fn main() -> ExitCode {
                     message_service,
                     service_port,
                     broker_port,
+                    proxy_port,
                 },
                 json,
             ),

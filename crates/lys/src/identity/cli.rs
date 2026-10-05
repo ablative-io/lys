@@ -59,6 +59,9 @@ pub enum IdentityCommand {
         /// The local broker listener; absent, keep the installed port or use 8472.
         #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
         broker_port: Option<u16>,
+        /// The local model proxy listener; absent, keep the installed port or use 8484.
+        #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
+        proxy_port: Option<u16>,
         /// The data root; the platform's application data path when absent.
         #[arg(long)]
         root: Option<PathBuf>,

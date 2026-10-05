@@ -109,6 +109,8 @@ pub struct Options {
     pub service_port: Option<u16>,
     /// An explicit local broker listener; otherwise keep the recorded listener.
     pub broker_port: Option<u16>,
+    /// An explicit local model proxy listener; otherwise keep the recorded listener.
+    pub proxy_port: Option<u16>,
 }
 
 fn write_plain(path: &Path, text: &str) -> IdentityResult<()> {
@@ -344,7 +346,11 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         None => Layout::discover()?,
     };
     let mut emitter = Emitter::new(json);
-    let ports = ports::Ports::load(&layout)?.chosen(options.service_port, options.broker_port)?;
+    let ports = ports::Ports::load(&layout)?.chosen(
+        options.service_port,
+        options.broker_port,
+        options.proxy_port,
+    )?;
     let units = upgrade::units_at(&layout, ports);
     swap::recover(&layout, &units, &mut Compose, &mut |line| {
         emitter.note(line);
