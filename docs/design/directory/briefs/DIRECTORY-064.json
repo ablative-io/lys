@@ -57,7 +57,10 @@
           "crates/lys-identity-server/src/runner_acts.rs",
           "crates/lys-identity-server/src/runner_sessions.rs",
           "crates/lys-home/src/harness/claude_code/launch.rs",
-          "crates/lys-home/src/harness/codex/mod.rs"
+          "crates/lys-home/src/harness/codex/mod.rs",
+          "crates/lys-runner/src/operations.rs",
+          "crates/lys-runner/src/operations/delivery.rs",
+          "crates/lys-runner/src/collector.rs"
         ],
         "delete": []
       },
@@ -285,6 +288,12 @@
       "by": "Waffles the Terrible",
       "subject": "R2 modify path crates/lys-home/src/harness/codex/config.rs",
       "ruling": "That file does not exist in the tree at bad8df77. The Codex launch line is composed in crates/lys-home/src/harness/codex/launch.rs, so R2 modifies that file. Found by git ls-tree before BOX 18 (Brisket) started; the box carries the same correction."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1 modifies the three existing 051 owners of delivery and turn boundaries",
+      "ruling": "R1 says keep 051's hooks, collector and operations log and never make a second one, but listed none of them. Brisket (BOX 18, 15:48) found that operations.rs record and set are private, operations/delivery.rs enqueue types the held text through the terminal writer and finish records Delivered on a byte write or Confirmed on a harness saying it is compacting, and collector.rs marks idle and delivers on the Stop hook and confirms on PreCompact. R1 therefore modifies crates/lys-runner/src/operations.rs, crates/lys-runner/src/operations/delivery.rs and crates/lys-runner/src/collector.rs: a receipt transition the managed channel can use (accepted on a pipe write, confirmed only on the adapter's evidence, uncertain otherwise), delivery.rs taking the managed channel in place of the terminal writer for a managed session, and the collector's Stop and PreCompact marks deferring to the managed channel's boundaries on such a session. No second operations log."
     }
   ]
 }

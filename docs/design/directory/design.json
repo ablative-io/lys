@@ -5464,6 +5464,16 @@
       "path": "crates/lys-secrets/src/lib.rs",
       "note": "the broker crate's exports",
       "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-runner/src/operations/delivery.rs",
+      "note": "The operations log's delivery: what an admitted act does to the harness and how its receipt is recorded.",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/collector.rs",
+      "note": "The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session.",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

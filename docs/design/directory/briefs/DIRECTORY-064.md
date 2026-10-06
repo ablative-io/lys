@@ -63,6 +63,9 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - modify: crates/lys-identity-server/src/runner_sessions.rs
 - modify: crates/lys-home/src/harness/claude_code/launch.rs
 - modify: crates/lys-home/src/harness/codex/mod.rs
+- modify: crates/lys-runner/src/operations.rs
+- modify: crates/lys-runner/src/operations/delivery.rs
+- modify: crates/lys-runner/src/collector.rs
 
 **Checklist:**
 - C433 — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).
