@@ -121,6 +121,7 @@ Behavioural. WHEN the dispatcher delivers an act, THE SYSTEM SHALL use a machine
 - create: crates/lys-runner/src/harness_control/codex.rs
 - create: crates/lys-runner/tests/harness_claude.rs
 - create: crates/lys-runner/tests/harness_codex.rs
+- create: crates/lys-runner/src/harness_control/initialize.rs
 - modify: crates/lys-runner/src/harness_control.rs
 - modify: crates/lys-runner/src/harness_control/events.rs
 

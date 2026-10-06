@@ -119,7 +119,8 @@
           "crates/lys-runner/src/harness_control/claude.rs",
           "crates/lys-runner/src/harness_control/codex.rs",
           "crates/lys-runner/tests/harness_claude.rs",
-          "crates/lys-runner/tests/harness_codex.rs"
+          "crates/lys-runner/tests/harness_codex.rs",
+          "crates/lys-runner/src/harness_control/initialize.rs"
         ],
         "modify": [
           "crates/lys-runner/src/harness_control.rs",
@@ -663,6 +664,12 @@
       "by": "Archie",
       "subject": "Amendment 50 also covers tests/context_control.rs and tests/reminder_delivery.rs, whose Claude fixtures bind by injecting init",
       "ruling": "tests/context_control.rs (lines 54 and 105 at e8d905bf) and tests/reminder_delivery.rs (line 40) build a Claude Controller and bind it by injecting a system/init frame (Brisket 38a6de67). Under amendment 50, init no longer binds, so these fixtures supply the correlated initialize success first, and then init at the first turn, as the harness does. Granted for exactly these two files, already R3's and R4's. Only their Claude fixture setup changes. Their assertions, and every other test in them, are unchanged. If a fixture needs init before any turn to pass, that is a finding to post, not something to keep. Amendment 50's product paths, checks and stop conditions are unchanged."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R2 creates harness_control/initialize.rs and moves Controller::bootstrap into it, keeping harness_control.rs under the length line",
+      "ruling": "With amendment 50's handshake and refusal state, harness_control.rs reaches 521 production lines (Brisket e703ac10). Granted: R2 creates crates/lys-runner/src/harness_control/initialize.rs. The whole Controller::bootstrap item moves into it, and nothing else does. The Codex bootstrap body moves byte for byte; the handback shows a diff with the moved Codex lines unchanged. The Claude initialize request is built there, and the Claude response handling stays in claude.rs. Controller::bootstrap stays public, as amendment 41 rules. No persistent shape, no public name and no other module changes, and no lines are packed to meet the length."
     }
   ]
 }

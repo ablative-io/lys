@@ -5671,6 +5671,11 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/src/harness_control/initialize.rs",
+      "note": "Controller::bootstrap: what each harness is first sent, Claude's initialize control_request and Codex's initialize; DIRECTORY-064 R2, amendments 50 and 52",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/src/session/lifecycle/managed.rs",
       "note": "The managed spawn branch of a session's lifecycle: the child entry started and proved.",
       "brief": "DIRECTORY-064"

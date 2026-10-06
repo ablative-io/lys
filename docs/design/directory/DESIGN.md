@@ -1233,6 +1233,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/legacy_input.rs` | the caller-judged compaction path; DIRECTORY-064 R3 routes a context compaction carrying its crossing id through the same attribution, and refuses a boundary reply from anyone but the server | DIRECTORY-064 |
 | `crates/lys-runner/src/session/control.rs` | Manual input and resize of a live session. | DIRECTORY-064 |
 | `crates/lys-runner/src/harness_control/approval.rs` | The policy response to a harness approval request on a managed channel: never fabricated. | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/initialize.rs` | Controller::bootstrap: what each harness is first sent, Claude's initialize control_request and Codex's initialize; DIRECTORY-064 R2, amendments 50 and 52 | DIRECTORY-064 |
 | `crates/lys-runner/src/session/lifecycle/managed.rs` | The managed spawn branch of a session's lifecycle: the child entry started and proved. | DIRECTORY-064 |
 | `docs/design/home/launch-template.schema.json` | The launch template schema. | DIRECTORY-064 |
 | `crates/lys-runner/src/launch_config.rs` | The runner launch Config: the typed members a launch carries. | DIRECTORY-064 |
