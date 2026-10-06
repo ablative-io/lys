@@ -26,12 +26,19 @@ struct Command {
     reserved: Option<Reserved>,
 }
 
+#[cfg(test)]
+#[derive(Default, Clone, Copy)]
+struct Count {
+    syncs: u64,
+    replacement: Option<std::time::Duration>,
+}
+
 struct Inner {
     sender: Option<mpsc::SyncSender<Command>>,
     fault: Arc<Mutex<Option<String>>>,
     worker: Option<JoinHandle<()>>,
     #[cfg(test)]
-    counts: Arc<Mutex<BTreeMap<PathBuf, u64>>>,
+    counts: Arc<Mutex<BTreeMap<PathBuf, Count>>>,
     #[cfg(test)]
     serial: std::sync::atomic::AtomicBool,
 }
@@ -167,7 +174,7 @@ impl Drop for Inner {
 fn run(
     receiver: &mpsc::Receiver<Command>,
     fault: &Mutex<Option<String>>,
-    #[cfg(test)] counts: &Mutex<BTreeMap<PathBuf, u64>>,
+    #[cfg(test)] counts: &Mutex<BTreeMap<PathBuf, Count>>,
 ) {
     while let Ok(first) = receiver.recv() {
         // A batch of at most 32 is one flush; the rest wait for the next pass.
@@ -213,7 +220,7 @@ fn run(
 
 fn batch(
     commands: &mut [Command],
-    #[cfg(test)] counts: &Mutex<BTreeMap<PathBuf, u64>>,
+    #[cfg(test)] counts: &Mutex<BTreeMap<PathBuf, Count>>,
 ) -> ResultLine {
     let mut writes: BTreeMap<PathBuf, WriteKind> = BTreeMap::new();
     for command in commands {
@@ -259,13 +266,24 @@ fn batch(
                             .lock()
                             .map_err(|error| std::io::Error::other(error.to_string()))?;
                         let count = counts.entry(path.clone()).or_default();
-                        *count = count
+                        count.syncs = count
+                            .syncs
                             .checked_add(1)
                             .ok_or_else(|| std::io::Error::other("sync count overflows"))?;
                     }
                     file.sync_data()
                 }),
-            WriteKind::Replace(bytes) => crate::state::replace(&path, &bytes),
+            WriteKind::Replace(bytes) => {
+                #[cfg(test)]
+                let started = std::time::Instant::now();
+                let result = crate::state::replace(&path, &bytes);
+                #[cfg(test)]
+                {
+                    let mut counts = counts.lock().map_err(|error| error.to_string())?;
+                    counts.entry(path.clone()).or_default().replacement = Some(started.elapsed());
+                }
+                result
+            }
         };
         result.map_err(|error| format!("{}: {error}", path.display()))?;
     }
@@ -281,8 +299,16 @@ impl Writer {
             .lock()
             .map_err(refused)?
             .get(path)
-            .copied()
-            .unwrap_or(0))
+            .map_or(0, |count| count.syncs))
+    }
+    pub(crate) fn replacement_cost(&self, path: &Path) -> Result<std::time::Duration, RunnerError> {
+        self.0
+            .counts
+            .lock()
+            .map_err(refused)?
+            .get(path)
+            .and_then(|count| count.replacement)
+            .ok_or_else(|| refused("replacement was not measured"))
     }
     pub(crate) fn serial_appends(&self) {
         self.0

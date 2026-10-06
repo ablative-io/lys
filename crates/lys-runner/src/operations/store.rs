@@ -145,12 +145,20 @@ impl Operations {
     }
 
     fn resume(&mut self, now: u64) -> Result<bool, RunnerError> {
+        #[cfg(test)]
+        let reading = std::time::Instant::now();
         let bytes = match std::fs::read(&self.checkpoint) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(error) => return Err(unavailable(error)),
         };
+        #[cfg(test)]
+        measurement::read(reading.elapsed());
+        #[cfg(test)]
+        let decoding = std::time::Instant::now();
         let snapshot: Snapshot = serde_json::from_slice(&bytes).map_err(unavailable)?;
+        #[cfg(test)]
+        measurement::decode(decoding.elapsed());
         if snapshot.format != STORAGE_FORMAT {
             return Err(unavailable(format!(
                 "checkpoint is in format {}",
@@ -475,6 +483,8 @@ impl Operations {
     }
 
     fn checkpoint_now(&mut self) -> Result<(), RunnerError> {
+        #[cfg(test)]
+        let encoding = std::time::Instant::now();
         let bytes = serde_json::to_vec(&Sealing {
             format: STORAGE_FORMAT,
             offset: self.journal_offset,
@@ -484,6 +494,8 @@ impl Operations {
             original_requests: &self.original_requests,
         })
         .map_err(unavailable)?;
+        #[cfg(test)]
+        measurement::encode(encoding.elapsed());
         let length = u64::try_from(bytes.len()).map_err(unavailable)?;
         // The journal sorts before the checkpoint, so a writer batch flushes its prefix first.
         if let Some(writer) = &self.writer {
@@ -499,6 +511,10 @@ impl Operations {
 
 #[cfg(test)]
 impl Operations {
+    pub(crate) fn test_checkpoint(&mut self) -> Result<(), RunnerError> {
+        self.checkpoint_now()
+    }
+
     pub(crate) fn test_journal_path(&self) -> &Path {
         &self.path
     }
@@ -551,5 +567,45 @@ mod batch_validation_tests {
         assert!(operations.get("second").is_none());
         assert_eq!(operations.journal_offset, 0);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+pub(super) mod measurement {
+    use std::cell::RefCell;
+    use std::time::Duration;
+    #[derive(Default)]
+    pub(crate) struct Costs {
+        pub(crate) encode: Duration,
+        pub(crate) read: Duration,
+        pub(crate) decode: Duration,
+    }
+    thread_local! { static COSTS: RefCell<Option<Costs>> = const { RefCell::new(None) }; }
+    pub(crate) fn begin() {
+        COSTS.with(|costs| *costs.borrow_mut() = Some(Costs::default()));
+    }
+    pub(crate) fn finish() -> Option<Costs> {
+        COSTS.with(|costs| costs.borrow_mut().take())
+    }
+    pub(super) fn encode(elapsed: Duration) {
+        COSTS.with(|costs| {
+            if let Some(costs) = &mut *costs.borrow_mut() {
+                costs.encode += elapsed;
+            }
+        });
+    }
+    pub(super) fn read(elapsed: Duration) {
+        COSTS.with(|costs| {
+            if let Some(costs) = &mut *costs.borrow_mut() {
+                costs.read += elapsed;
+            }
+        });
+    }
+    pub(super) fn decode(elapsed: Duration) {
+        COSTS.with(|costs| {
+            if let Some(costs) = &mut *costs.borrow_mut() {
+                costs.decode += elapsed;
+            }
+        });
     }
 }

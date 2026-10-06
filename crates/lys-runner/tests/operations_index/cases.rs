@@ -927,3 +927,124 @@ fn a_boundary_reply_refuses_a_changed_field_live_and_after_reopen() -> Result<()
     assert_eq!(error.name(), "operation_reused");
     Ok(())
 }
+
+fn typed_checkpoint_cost(count: usize) -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    let at = crate::session::now_ms();
+    let retained = count.min(1_000);
+    {
+        let mut table = sessions.lock()?;
+        let operations = &mut table.operations;
+        operations.seen = (0..count)
+            .map(|index| format!("operation-{index:032x}"))
+            .collect();
+        for index in 0..retained {
+            let id = format!("operation-{index:032x}");
+            let reference = crate::harness_control::ReminderReference {
+                goal: format!("goal-{index}"),
+                occurrence: format!("occurrence-{index}"),
+                version: "version".to_owned(),
+                prior: None,
+            };
+            let request = super::OperationRequest::GoalReminder {
+                text: "private saved input".to_owned(),
+                reference: reference.clone(),
+            };
+            let mut prepared = control_preparation()?;
+            prepared.uuid = crate::harness_control::Pending::for_goal(
+                id.clone(),
+                "private saved input".to_owned(),
+                reference.clone(),
+            )
+            .uuid;
+            prepared.reference = Some(reference);
+            prepared.frame = serde_json::json!({"type":"user","uuid":prepared.uuid,"message":{"content":"private saved input"}});
+            let admission = super::control::Admission {
+                binding: prepared.binding.clone(),
+                uuid: prepared.uuid.clone(),
+                turn: Some(format!("turn-{index}")),
+            };
+            operations
+                .original_requests
+                .insert(id.clone(), request.identity()?);
+            operations.controls.insert(
+                id.clone(),
+                super::control::Control {
+                    prepared: Some(prepared),
+                    original_text: Some(super::TextDigest::of("private saved input")),
+                    certainty: super::Certainty::Observed,
+                    admitted: Some(admission),
+                    decision: None,
+                },
+            );
+            let mut kept = outcome(id);
+            kept.request = "goal_reminder".to_owned();
+            kept.state = OperationState::Confirmed;
+            kept.at = at;
+            kept.text = Some(super::TextDigest::of("private saved input"));
+            operations.fold(kept, at);
+        }
+    }
+    sessions.writer.barrier()?;
+    super::store::measurement::begin();
+    let acquired = std::time::Instant::now();
+    let mut table = sessions.lock()?;
+    let locked = std::time::Instant::now();
+    table.operations.test_checkpoint()?;
+    let bytes = table.operations.checkpoint_bytes;
+    let lock_hold = locked.elapsed();
+    let acquire_and_hold = acquired.elapsed();
+    drop(table);
+    let replacement = std::time::Instant::now();
+    sessions.writer.barrier()?;
+    let replace_wait = replacement.elapsed();
+    let replace_io = sessions
+        .writer
+        .replacement_cost(&dir.path().join("operations.v2.snapshot"))?;
+    let opening = std::time::Instant::now();
+    let restored = Operations::open_at(dir.path(), at)?;
+    let startup = opening.elapsed();
+    let costs =
+        super::store::measurement::finish().ok_or("checkpoint measurement was not active")?;
+    assert_eq!(restored.seen.len(), count);
+    assert_eq!(restored.held.len(), retained);
+    assert_eq!(restored.controls.len(), retained);
+    assert_eq!(restored.original_requests.len(), retained);
+    assert!(
+        restored
+            .controls
+            .values()
+            .all(super::control::Control::matching_admission)
+    );
+    assert_eq!(restored.journal_offset, restored.checkpoint_offset);
+    println!(
+        "typed_checkpoint used_ids={count} held={retained} controls={retained} prepared={retained} identities={retained} bytes={bytes} encode_us={} replace_and_sync_us={} replace_barrier_us={} read_us={} decode_us={} table_hold_us={} table_acquire_and_hold_us={} startup_us={} tail_bytes=0 whole_state_clones=0 table_thread_syncs=0",
+        costs.encode.as_micros(),
+        replace_io.as_micros(),
+        replace_wait.as_micros(),
+        costs.read.as_micros(),
+        costs.decode.as_micros(),
+        lock_hold.as_micros(),
+        acquire_and_hold.as_micros(),
+        startup.as_micros()
+    );
+    Ok(())
+}
+
+#[test]
+fn typed_checkpoint_one_thousand_used_ids() -> Result<(), Box<dyn Error>> {
+    typed_checkpoint_cost(1_000)
+}
+#[test]
+fn typed_checkpoint_ten_thousand_used_ids() -> Result<(), Box<dyn Error>> {
+    typed_checkpoint_cost(10_000)
+}
+#[test]
+fn typed_checkpoint_one_hundred_thousand_used_ids() -> Result<(), Box<dyn Error>> {
+    typed_checkpoint_cost(100_000)
+}
+#[test]
+fn typed_checkpoint_one_million_used_ids() -> Result<(), Box<dyn Error>> {
+    typed_checkpoint_cost(1_000_000)
+}
