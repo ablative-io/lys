@@ -294,6 +294,7 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 
 **Files:**
 - create: surface/identity/tests/acceptance/agent-control.spec.ts
+- create: crates/lys-runner/examples/qualify_adapter.rs
 - modify: surface/identity/src/features/usage/Usage.tsx
 - modify: surface/identity/src/features/usage/usage.css
 - modify: surface/identity/tests/usage.test.tsx
