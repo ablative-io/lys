@@ -670,6 +670,12 @@
       "by": "Archie",
       "subject": "R2 creates harness_control/initialize.rs and moves Controller::bootstrap into it, keeping harness_control.rs under the length line",
       "ruling": "With amendment 50's handshake and refusal state, harness_control.rs reaches 521 production lines (Brisket e703ac10). Granted: R2 creates crates/lys-runner/src/harness_control/initialize.rs. The whole Controller::bootstrap item moves into it, and nothing else does. The Codex bootstrap body moves byte for byte; the handback shows a diff with the moved Codex lines unchanged. The Claude initialize request is built there, and the Claude response handling stays in claude.rs. Controller::bootstrap stays public, as amendment 41 rules. No persistent shape, no public name and no other module changes, and no lines are packed to meet the length."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "Amendment 50's fixture update also covers events.rs's shared cfg(test) gated_fixture Claude arm",
+      "ruling": "At 555e985f the whole lys-runner run failed nine events.rs cfg(test) tests with control_source_unbound: init arrived before a bound turn (Brisket 1f429541, run 4af93177). They share gated_fixture's Claude arm, which injects system/init before any turn (e8d905bf lines 740 to 746, checked here). The nine tests are at lines 886, 890, 895, 1030, 1111, 1168, 1220, 1244 and 1254 (Brisket 8ece061d). This is amendment 51's case, in a file already this box's (R1, R2, R5). Granted for that shared setup only: the Claude arm supplies the correlated initialize success first, and init at the first turn, as the harness does. The nine tests' assertions and every other test are unchanged. If a test needs init before a turn to pass, post it as a finding and do not keep it. The two peer tests failing on operations.jsonl are not covered here. They are ruled separately, once the parent and base runs are quoted."
     }
   ]
 }
