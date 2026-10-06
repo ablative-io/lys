@@ -1,0 +1,7 @@
+{"claims_spawn":false,"fixture":true,"kind":"example-owned","step":"launcher"}
+{"line":"codex-cli 0.1.2","step":"version_report","version":"0.1.2"}
+{"step":"init","version":"0.1.2"}
+{"correlation":"ca5e46f4-126e-48e6-ac24-82853954ef0e","step":"reminder_admitted"}
+{"evidence":"ContextCompaction","step":"compaction","turn_completed":true}
+{"exit_observed":true,"status":"exit status: 0","step":"stop"}
+{"count":0,"step":"terminal_writes"}

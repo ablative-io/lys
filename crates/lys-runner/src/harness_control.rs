@@ -186,7 +186,9 @@ impl Controller {
         })
     }
 
-    pub(crate) fn bootstrap(&self) -> Update {
+    /// Handshake frames only; process launch and adapter qualification remain separate.
+    #[must_use]
+    pub fn bootstrap(&self) -> Update {
         if self.transport != Transport::Codex {
             return Update::default();
         }
