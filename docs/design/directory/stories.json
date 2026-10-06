@@ -536,6 +536,10 @@
         {
           "id": "S161",
           "text": "As the person who installed Lys, I want a service that has ended to be seen as ended at once, whatever else Lys was starting at that moment, so that a stop, a restart and an upgrade never wait on or misread a process that is gone."
+        },
+        {
+          "id": "S267",
+          "text": "As the person who installed Lys, I want `lys identity stop` at this computer to stop every agent on every computer and to record who stopped them, when and why, even when nobody is signed in to the screens and while an upgrade can still be put back, so that one command at the machine is always enough to stop everything."
         }
       ]
     },

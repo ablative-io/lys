@@ -2676,6 +2676,11 @@
       "brief": "DIRECTORY-050"
     },
     {
+      "path": "crates/lys-runner/src/console_stop.rs",
+      "note": "the console stop's one shape, shared by the CLI and the service: its route, signing domain, signature header, body and the signed bytes; DIRECTORY-083 R1",
+      "brief": "DIRECTORY-083"
+    },
+    {
       "path": "crates/lys-runner/tests/conformance.rs",
       "note": "DIRECTORY-050 R2: A published runner protocol; any tool may be the runner",
       "brief": "DIRECTORY-050"
@@ -3069,6 +3074,31 @@
       "path": "crates/lys-identity-server/src/stop_api.rs",
       "note": "R6: Wake with a message; stop through the runner",
       "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/src/cord_api.rs",
+      "note": "the master off switch's routes: pull, release and how it stands; DIRECTORY-083 R2 adds the console route admitted by the service key's signature",
+      "brief": "DIRECTORY-083"
+    },
+    {
+      "path": "crates/lys-identity-server/src/cord_pull.rs",
+      "note": "the work of a pull: every session on every computer stopped and every handle ended; DIRECTORY-083 R2 ends handles for a console pull without a session",
+      "brief": "DIRECTORY-083"
+    },
+    {
+      "path": "crates/lys-identity-server/src/cord_store.rs",
+      "note": "the cord's kept state: pulls, results and releases, each operation spent once; DIRECTORY-083 R2 records a console pull's claim",
+      "brief": "DIRECTORY-083"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/stop_everything.rs",
+      "note": "the cord's route tests over the real router; DIRECTORY-083 R3 joins the console request to it",
+      "brief": "DIRECTORY-083"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_cord.rs",
+      "note": "the cord's refusals by name; DIRECTORY-083 R2 adds the console signature's refusal",
+      "brief": "DIRECTORY-083"
     },
     {
       "path": "surface/identity/src/features/runtime/Sessions.tsx",
@@ -5614,6 +5644,11 @@
       "path": "crates/lys-identity/src/directory_sign_in.rs",
       "note": "The directory's sign-in and refused sign-in changes, committed on the one write path.",
       "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys/src/identity/stop.rs",
+      "note": "`lys identity stop`: asks the service to stop everything, signed with the service key, then stops this computer's runner and services; DIRECTORY-083 R1 builds its request from console_stop.rs",
+      "brief": "DIRECTORY-083"
     }
   ],
   "inventory": [

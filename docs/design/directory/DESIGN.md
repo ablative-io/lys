@@ -634,6 +634,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
 | `crates/lys/src/cli/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
 | `crates/lys-runner/src/protocol.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-runner/src/console_stop.rs` | the console stop's one shape, shared by the CLI and the service: its route, signing domain, signature header, body and the signed bytes; DIRECTORY-083 R1 | DIRECTORY-083 |
 | `crates/lys-runner/tests/conformance.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
 | `crates/lys-identity-server/src/runner_client.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
 | `crates/lys-identity-server/tests/runner_start.rs` | DIRECTORY-050 R3: Start runs the agent | DIRECTORY-050 |
@@ -713,6 +714,11 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/receipts_api.rs` | R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
 | `crates/lys-identity/src/provisioning.rs` | R5: Account rotation on usage limit | DIRECTORY-050 |
 | `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
+| `crates/lys-identity-server/src/cord_api.rs` | the master off switch's routes: pull, release and how it stands; DIRECTORY-083 R2 adds the console route admitted by the service key's signature | DIRECTORY-083 |
+| `crates/lys-identity-server/src/cord_pull.rs` | the work of a pull: every session on every computer stopped and every handle ended; DIRECTORY-083 R2 ends handles for a console pull without a session | DIRECTORY-083 |
+| `crates/lys-identity-server/src/cord_store.rs` | the cord's kept state: pulls, results and releases, each operation spent once; DIRECTORY-083 R2 records a console pull's claim | DIRECTORY-083 |
+| `crates/lys-identity-server/tests/stop_everything.rs` | the cord's route tests over the real router; DIRECTORY-083 R3 joins the console request to it | DIRECTORY-083 |
+| `crates/lys-identity-server/src/error_cord.rs` | the cord's refusals by name; DIRECTORY-083 R2 adds the console signature's refusal | DIRECTORY-083 |
 | `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
 | `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/src/setup.rs` | R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine | DIRECTORY-047 |
@@ -1222,6 +1228,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/src/grants/receipt_answer.rs` | One function that verifies a grant receipt answer against a pinned key. | DIRECTORY-058 |
 | `crates/lys-identity/src/grants/receipt_answer_tests.rs` | The grant receipt answer verifier's tests. | DIRECTORY-058 |
 | `crates/lys-identity/src/directory_sign_in.rs` | The directory's sign-in and refused sign-in changes, committed on the one write path. | DIRECTORY-058 |
+| `crates/lys/src/identity/stop.rs` | `lys identity stop`: asks the service to stop everything, signed with the service key, then stops this computer's runner and services; DIRECTORY-083 R1 builds its request from console_stop.rs | DIRECTORY-083 |
 
 ## Inventory
 

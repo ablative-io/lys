@@ -526,3 +526,11 @@
 - [ ] **C501** — A confirmed upgrade's data/ carries every leaf in segment stores, and data.previous keeps the pre-upgrade copy unchanged (DIRECTORY-082 R2).
 - [ ] **C502** — A put-back or a keep killed mid-copy, at data.restoring or data.previous.partial, leaves no partial copy served, and a second run completes it (DIRECTORY-082 R2).
 - [ ] **C503** — The upgrade proof reads segment stores: every leaf read digests the whole store directory, and old leaves are proved against the kept v1 copy (DIRECTORY-082 R3).
+
+## `lys identity stop` reaches the service (DIRECTORY-083)
+
+- [ ] **C504** — `lys identity stop` and the service take the console stop's route, signing domain, signature header and body from one definition in lys-runner, and the CLI keeps no copy of any of them (DIRECTORY-083 R1).
+- [ ] **C505** — A console stop signed by the service's own key, posted through the service's real router, pulls the cord and records the console's claim as who, the reason and the service's own time (DIRECTORY-083 R2, R3).
+- [ ] **C506** — A console stop with no signature, another key's signature, a body changed after signing or a session cookie beside the signature is refused by name, and the cord is not pulled (DIRECTORY-083 R2, R3).
+- [ ] **C507** — A console stop sent again is answered as the same pull and stops nothing twice; sent after a release it is refused cord_reused (DIRECTORY-083 R2, R3).
+- [ ] **C508** — A console stop is admitted while an upgrade can still be put back, and every start after it is refused everything_stopped in words naming the console's person (DIRECTORY-083 R2, R3).

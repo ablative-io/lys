@@ -240,6 +240,8 @@
 
 **S161.** As the person who installed Lys, I want a service that has ended to be seen as ended at once, whatever else Lys was starting at that moment, so that a stop, a restart and an upgrade never wait on or misread a process that is gone.
 
+**S267.** As the person who installed Lys, I want `lys identity stop` at this computer to stop every agent on every computer and to record who stopped them, when and why, even when nobody is signed in to the screens and while an upgrade can still be put back, so that one command at the machine is always enough to stop everything.
+
 ## Person setting up Lys for the first time — Installs Lys on their own machine with no terminal knowledge and signs in
 
 **S149.** As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
