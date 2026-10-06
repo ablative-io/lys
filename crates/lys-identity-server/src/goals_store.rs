@@ -34,6 +34,9 @@ use lys_runner::operations::{Operation, OperationOutcome, OperationRequest};
 use sha2::{Digest, Sha256};
 use tokio::sync::Notify;
 
+mod control;
+pub(crate) use control::{occurrence_text, text_with_words};
+
 use crate::config::Config;
 use crate::error::ServerError;
 use crate::goals_state::{
@@ -431,30 +434,6 @@ impl<S: LeafStore> GoalStore<S> {
         }
         Ok(())
     }
-
-    /// Keep a responsible person's distinct resend without consuming its regular timer.
-    pub fn resend(&mut self, resent: crate::goals_state::Resent) -> Result<Fired, ServerError> {
-        self.settle()?;
-        if self.held.kept(&resent.fired.operation) {
-            if self.held.resends.get(&resent.fired.operation) != Some(&resent.prior)
-                || self.held.firing(&resent.fired.operation) != Some(&resent.fired)
-                || self
-                    .held
-                    .item(&resent.fired.goal)
-                    .is_none_or(|item| item.goal.responsible != resent.by)
-            {
-                return Err(GoalError::Reused {
-                    operation: resent.fired.operation,
-                }
-                .into());
-            }
-            return Ok(resent.fired);
-        }
-        self.held.check_resent(&resent).map_err(unavailable)?;
-        let fired = resent.fired.clone();
-        self.append(Line::Resent(resent))?;
-        Ok(fired)
-    }
 }
 
 /// An operation id made from `parts`, the same each time.
@@ -466,57 +445,6 @@ fn op_id(parts: &[&str]) -> String {
 /// The reminder's text: the item's words and the time left at `at`.
 fn text(item: &Item, at: u64) -> String {
     text_with_words(item, item.words(), at)
-}
-
-pub(crate) fn text_with_words(item: &Item, words: &str, at: u64) -> String {
-    let goal = &item.goal;
-    let kind = match goal.kind {
-        crate::goals_state::Kind::Goal => "Goal",
-        crate::goals_state::Kind::Expectation => "Expectation",
-        crate::goals_state::Kind::Deliverable => "Deliverable",
-    };
-    match goal.deadline {
-        Some(deadline) => {
-            let left = if deadline >= at {
-                format!("{} left", span(deadline - at))
-            } else {
-                format!("{} past its deadline", span(at - deadline))
-            };
-            format!("Reminder from Lys. {kind}: {words}. {left}.")
-        }
-        None => format!("Reminder from Lys. {kind}: {words}."),
-    }
-}
-
-pub(crate) fn occurrence_text(
-    item: &Item,
-    words: &str,
-    due: u64,
-    at: u64,
-    prior: Option<&str>,
-) -> Result<String, ServerError> {
-    let timestamp = |value: u64| -> Result<String, ServerError> {
-        let seconds = i64::try_from(value).map_err(unavailable)?;
-        jiff::Timestamp::from_second(seconds)
-            .map(|instant| instant.to_string())
-            .map_err(unavailable)
-    };
-    let due_at = timestamp(due)?;
-    let dispatched_at = timestamp(at)?;
-    let late = at.checked_sub(due).map_or_else(String::new, |seconds| {
-        if seconds == 0 {
-            String::new()
-        } else {
-            format!(" Late by {}.", span(seconds))
-        }
-    });
-    let prior = prior.map_or_else(String::new, |operation| {
-        format!("Possible prior delivery of operation {operation}. ")
-    });
-    Ok(format!(
-        "{prior}{} Due: {due_at}. Dispatch time: {dispatched_at}.{late}",
-        text_with_words(item, words, at)
-    ))
 }
 
 fn span(seconds: u64) -> String {

@@ -2,8 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Boundary, Controller, Kind, ReminderDecision, Update};
+use super::events::{apply, runtime};
+use super::{Boundary, Controller, Dispatch, Kind, ReminderDecision, Update};
 use crate::error::RunnerError;
+use crate::operations::{OperationRequest, OperationState};
+use crate::session::now_ms;
 
 /// The service's context decision, without a limit or measured value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -275,5 +278,101 @@ impl Controller {
         }
         self.dispatch(&mut update)?;
         Ok(update)
+    }
+}
+
+impl crate::session::Sessions {
+    pub(crate) fn apply_boundary_reply(
+        &self,
+        operation: crate::operations::Operation,
+    ) -> Result<crate::operations::OperationOutcome, RunnerError> {
+        let OperationRequest::BoundaryReply { reply } = &operation.request else {
+            return Err(RunnerError::refused(
+                "control_boundary_invalid",
+                "the request is not a boundary reply",
+            ));
+        };
+        let encoded = serde_json::to_string(reply)
+            .map_err(|error| RunnerError::refused("control_boundary_invalid", error.to_string()))?;
+        let digest = crate::operations::TextDigest::of(&encoded);
+        let mut table = self.lock()?;
+        if let Some(held) = table.operations.get(&operation.operation) {
+            if held.session != operation.session
+                || held.request != "boundary_reply"
+                || held.text.as_ref() != Some(&digest)
+            {
+                return Err(RunnerError::refused(
+                    "operation_reused",
+                    "the boundary reply already names another decision",
+                ));
+            }
+            let outcome = held.clone();
+            drop(table);
+            self.writer.barrier()?;
+            return Ok(outcome);
+        }
+        table
+            .operations
+            .check_control_identity(&operation.operation)?;
+        let applied = runtime(&mut table, &operation.session, reply.generation)?
+            .controller
+            .boundary_reply(reply);
+        let (state, words, update) = match applied {
+            Ok(update) => (
+                OperationState::Confirmed,
+                "boundary_authority_applied".to_owned(),
+                update,
+            ),
+            Err(error) => {
+                let words = error.to_string();
+                let update = runtime(&mut table, &operation.session, reply.generation)?
+                    .controller
+                    .refuse_held(&words);
+                (OperationState::Refused, words, update)
+            }
+        };
+        let outcome = crate::operations::OperationOutcome {
+            operation: operation.operation,
+            session: operation.session.clone(),
+            request: "boundary_reply".to_owned(),
+            state,
+            at: now_ms(),
+            words,
+            text: Some(digest),
+            ended: None,
+        };
+        table.operations.keep_control(outcome.clone())?;
+        apply(&mut table, &operation.session, reply.generation, update)?;
+        drop(table);
+        self.writer.barrier()?;
+        self.wake();
+        Ok(outcome)
+    }
+}
+
+impl Controller {
+    pub(super) fn preparation(
+        &self,
+        dispatch: &Dispatch,
+    ) -> Result<(crate::operations::Prepared, crate::operations::TextDigest), RunnerError> {
+        let current = self
+            .current
+            .as_ref()
+            .filter(|pending| pending.id == dispatch.operation)
+            .ok_or_else(|| {
+                RunnerError::refused(
+                    "control_preparation_missing",
+                    "the dispatch has no reserved input",
+                )
+            })?;
+        Ok((
+            crate::operations::Prepared {
+                binding: self.binding.clone(),
+                uuid: current.uuid.clone(),
+                frame: dispatch.frame.clone(),
+                reference: current.reminder.clone(),
+            },
+            crate::operations::TextDigest::of(&current.text),
+        ))
     }
 }

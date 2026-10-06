@@ -124,7 +124,7 @@ fn context_policy() -> Result<
         lys_identity_server::budgets_state::Standing {
             agent: "agent".to_owned(),
             person: Some("person".to_owned()),
-            teams: Default::default(),
+            teams: std::collections::BTreeSet::new(),
         },
         lys_runner::harness_control::ControlStatus {
             generation: 1,

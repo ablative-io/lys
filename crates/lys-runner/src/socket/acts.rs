@@ -166,6 +166,23 @@ pub(super) fn perform(
             };
             Ok(Answer::Operation { outcome })
         }
+        Act::ControlReceipt { operation } => sessions
+            .control_receipt(&operation)
+            .map(|receipt| Answer::ControlReceipt { receipt }),
+        Act::ReconcileControl {
+            operation,
+            decision,
+        } => {
+            if context.is_some() {
+                return Err(RunnerError::refused(
+                    "control_reconciliation_service_required",
+                    "reconciliation requires the service's verified responsible person",
+                ));
+            }
+            sessions
+                .reconcile_control(&operation, decision)
+                .map(|receipt| Answer::ControlReceipt { receipt })
+        }
         Act::Feed { cursor, follow } => {
             if follow {
                 sessions.until_any(left, |table| {

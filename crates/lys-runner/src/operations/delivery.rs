@@ -42,7 +42,8 @@ pub(crate) fn accept(
     if let Some(held) = table.operations.get(&operation.operation) {
         let same = held.session == operation.session
             && held.request == operation.request.name()
-            && held.text == operation.request.text().map(TextDigest::of);
+            && table.operations.original_text(&operation.operation)
+                == operation.request.text().map(TextDigest::of).as_ref();
         if !same {
             return Err(RunnerError::refused(
                 "operation_reused",

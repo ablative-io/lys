@@ -284,6 +284,7 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Judged { .. } => "judged",
         Answer::Collected { .. } => "collected",
         Answer::Operation { .. } => "operation",
+        Answer::ControlReceipt { .. } => "control_receipt",
         Answer::Feed { .. } => "feed",
         Answer::Folders { .. } => "folders",
         Answer::GrantChannel => "grant_channel",

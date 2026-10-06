@@ -15,8 +15,8 @@
 //! the text reached the terminal, so the next one reports the operation
 //! `uncertain` and never types it again. A compaction is `confirmed` when
 //! the harness says it is compacting, and a stop only when the session's
-//! exit is seen. The record keeps each outcome and a digest of its text,
-//! never the text itself.
+//! exit is seen. Public receipts contain digests only; a private preparation
+//! retains its exact frame so recovery never needs another transcript.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
@@ -31,8 +31,9 @@ use crate::session::{Sessions, now_ms};
 
 mod control;
 mod store;
-pub use control::{Certainty, ControlReceipt, Reconciled, Reconciliation};
 use control::Control;
+pub(crate) use control::Prepared;
+pub use control::{Certainty, ControlReceipt, Reconciled, Reconciliation};
 
 mod delivery;
 pub(crate) use delivery::{accept, compacting, deliver, ended};
@@ -45,7 +46,7 @@ mod restart;
 mod withdraw;
 pub(crate) use restart::{begin_restart, finish_restart};
 
-/// The format of the record of operations.
+/// The legacy record format accepted by the forward migration.
 pub const FORMAT: &str = "lys-runner-operations/v1";
 const RETAIN_MS: u64 = 24 * 60 * 60 * 1000;
 
@@ -196,8 +197,7 @@ struct Kept {
     operations: Vec<OperationOutcome>,
 }
 
-/// Every operation the runner holds, and the text of those not yet typed,
-/// in memory only.
+/// The current operation projection and each privately retained preparation.
 pub(crate) struct Operations {
     path: PathBuf,
     checkpoint: PathBuf,
@@ -225,7 +225,10 @@ fn unavailable(what: impl std::fmt::Display) -> RunnerError {
 fn terminal(outcome: &OperationOutcome) -> bool {
     match outcome.state {
         OperationState::Accepted | OperationState::Delivering => false,
-        OperationState::Delivered => !matches!(outcome.request.as_str(), "stop" | "compact" | "context_compact"),
+        OperationState::Delivered => !matches!(
+            outcome.request.as_str(),
+            "stop" | "compact" | "context_compact"
+        ),
         OperationState::Confirmed | OperationState::Uncertain | OperationState::Refused => true,
     }
 }
@@ -238,10 +241,14 @@ impl Operations {
     fn fold(&mut self, outcome: OperationOutcome, now: u64) {
         let id = outcome.operation.clone();
         self.seen.insert(id.clone());
-        self.by_session.entry(outcome.session.clone()).or_default().insert(id.clone());
+        self.by_session
+            .entry(outcome.session.clone())
+            .or_default()
+            .insert(id.clone());
         if let Some(previous) = self.held.get(&id).filter(|held| terminal(held)) {
+            let at = self.retention_at(previous);
             self.expires
-                .remove(&(previous.at.saturating_add(RETAIN_MS), id.clone()));
+                .remove(&(at.saturating_add(RETAIN_MS), id.clone()));
         }
         if outcome.state == OperationState::Accepted
             && outcome.request != "stop"
@@ -253,7 +260,10 @@ impl Operations {
                 .push_back(id.clone());
         }
         let unresolved = outcome.state == OperationState::Uncertain
-            && self.controls.get(&id).is_some_and(|control| control.decision.is_none());
+            && self
+                .controls
+                .get(&id)
+                .is_none_or(|control| control.decision.is_none());
         if terminal(&outcome) {
             if let Some(active) = self.active.get_mut(&outcome.session) {
                 active.remove(&id);
@@ -262,7 +272,10 @@ impl Operations {
                 }
             }
             if !unresolved {
-                self.expires.insert((outcome.at.saturating_add(RETAIN_MS), id.clone()));
+                self.expires.insert((
+                    self.retention_at(&outcome).saturating_add(RETAIN_MS),
+                    id.clone(),
+                ));
             }
         } else {
             self.active
@@ -274,15 +287,29 @@ impl Operations {
         self.prune(now);
     }
 
+    fn retention_at(&self, outcome: &OperationOutcome) -> u64 {
+        if outcome.state == OperationState::Uncertain {
+            self.controls
+                .get(&outcome.operation)
+                .and_then(|control| control.decision.as_ref())
+                .map_or(outcome.at, |decision| decision.at)
+        } else {
+            outcome.at
+        }
+    }
+
     pub(crate) fn prune(&mut self, now: u64) {
         while self.expires.first().is_some_and(|(at, _)| *at <= now) {
             let Some((_, id)) = self.expires.pop_first() else {
                 break;
             };
             if let Some(outcome) = self.held.remove(&id)
-                && let Some(operations) = self.by_session.get_mut(&outcome.session) {
+                && let Some(operations) = self.by_session.get_mut(&outcome.session)
+            {
                 operations.remove(&id);
-                if operations.is_empty() { self.by_session.remove(&outcome.session); }
+                if operations.is_empty() {
+                    self.by_session.remove(&outcome.session);
+                }
             }
             self.controls.remove(&id);
             self.texts.remove(&id);

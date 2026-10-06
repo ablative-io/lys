@@ -1,6 +1,7 @@
 //! Current service authority replaces only an occurrence's unsent payload.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use super::{Controller, Kind, Pending, Update, receipt};
 use crate::error::RunnerError;
@@ -83,6 +84,17 @@ impl Controller {
                 ));
             }
         }
+        if by_operation.keys().any(|operation| {
+            !self
+                .pending
+                .iter()
+                .any(|pending| pending.id == *operation && pending.reminder.is_some())
+        }) {
+            return Err(RunnerError::refused(
+                "control_reminder_unknown",
+                "the decision names no queued goal occurrence",
+            ));
+        }
         for pending in &self.pending {
             let Some(held) = &pending.reminder else {
                 continue;
@@ -131,5 +143,29 @@ impl Controller {
             }
         });
         Ok(update)
+    }
+}
+
+impl Pending {
+    /// Construct a correlated input without putting its words into an identity.
+    #[must_use]
+    pub fn new(id: String, kind: Kind, text: String) -> Self {
+        let hash = crate::protocol::hex(&Sha256::digest(id.as_bytes()));
+        let uuid = format!(
+            "{}-{}-4{}-a{}-{}",
+            &hash[..8],
+            &hash[8..12],
+            &hash[13..16],
+            &hash[17..20],
+            &hash[20..32]
+        );
+        Self {
+            id,
+            uuid,
+            kind,
+            text,
+            reminder: None,
+            authorised: None,
+        }
     }
 }

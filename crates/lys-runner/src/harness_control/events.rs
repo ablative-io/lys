@@ -188,6 +188,13 @@ pub(super) fn apply(
     generation: u64,
     update: Update,
 ) -> Result<(), RunnerError> {
+    for (operation, binding, uuid, turn) in update.admissions {
+        if table.operations.get(&operation).is_some() {
+            table
+                .operations
+                .observed(&operation, &binding, &uuid, turn)?;
+        }
+    }
     if !update.events.is_empty() {
         table.feed.append(
             id,
@@ -256,12 +263,13 @@ pub(super) fn apply(
             continue;
         }
         if !dispatch.operation.is_empty() && table.operations.get(&dispatch.operation).is_some() {
-            crate::operations::managed_state(
-                table,
-                &dispatch.operation,
-                OperationState::Delivering,
-                "managed request prepared".to_owned(),
-            )?;
+            let (prepared, text) = runtime(table, id, generation)?
+                .controller
+                .preparation(&dispatch)?;
+            table
+                .operations
+                .prepare(&dispatch.operation, prepared, text)?;
+            table.operations.arm(&dispatch.operation)?;
         }
         let mut bytes = serde_json::to_vec(&dispatch.frame)
             .map_err(|error| RunnerError::refused("control_frame_invalid", error.to_string()))?;
@@ -304,73 +312,6 @@ pub(super) fn apply(
 }
 
 impl Sessions {
-    pub(crate) fn apply_boundary_reply(
-        &self,
-        operation: crate::operations::Operation,
-    ) -> Result<crate::operations::OperationOutcome, RunnerError> {
-        let OperationRequest::BoundaryReply { reply } = &operation.request else {
-            return Err(RunnerError::refused(
-                "control_boundary_invalid",
-                "the request is not a boundary reply",
-            ));
-        };
-        let encoded = serde_json::to_string(reply)
-            .map_err(|error| RunnerError::refused("control_boundary_invalid", error.to_string()))?;
-        let digest = crate::operations::TextDigest::of(&encoded);
-        let mut table = self.lock()?;
-        if let Some(held) = table.operations.get(&operation.operation) {
-            if held.session != operation.session
-                || held.request != "boundary_reply"
-                || held.text.as_ref() != Some(&digest)
-            {
-                return Err(RunnerError::refused(
-                    "operation_reused",
-                    "the boundary reply already names another decision",
-                ));
-            }
-            let outcome = held.clone();
-            drop(table);
-            self.writer.barrier()?;
-            return Ok(outcome);
-        }
-        table
-            .operations
-            .check_control_identity(&operation.operation)?;
-        let applied = runtime(&mut table, &operation.session, reply.generation)?
-            .controller
-            .boundary_reply(reply);
-        let (state, words, update) = match applied {
-            Ok(update) => (
-                OperationState::Confirmed,
-                "boundary_authority_applied".to_owned(),
-                update,
-            ),
-            Err(error) => {
-                let words = error.to_string();
-                let update = runtime(&mut table, &operation.session, reply.generation)?
-                    .controller
-                    .refuse_held(&words);
-                (OperationState::Refused, words, update)
-            }
-        };
-        let outcome = crate::operations::OperationOutcome {
-            operation: operation.operation,
-            session: operation.session.clone(),
-            request: "boundary_reply".to_owned(),
-            state,
-            at: now_ms(),
-            words,
-            text: Some(digest),
-            ended: None,
-        };
-        table.operations.keep_control(outcome.clone())?;
-        apply(&mut table, &operation.session, reply.generation, update)?;
-        drop(table);
-        self.writer.barrier()?;
-        self.wake();
-        Ok(outcome)
-    }
-
     fn managed_input(&self, id: &str, generation: u64, bytes: &[u8]) -> Result<(), RunnerError> {
         let text = std::str::from_utf8(bytes).map_err(|error| {
             RunnerError::refused(

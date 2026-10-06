@@ -4,7 +4,6 @@ use std::collections::{BTreeSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 
 use crate::error::RunnerError;
 use crate::protocol::Launch;
@@ -78,30 +77,6 @@ pub struct Pending {
     pub(crate) authorised: Option<String>,
 }
 
-impl Pending {
-    /// Construct a correlated input without putting its words into an identity.
-    #[must_use]
-    pub fn new(id: String, kind: Kind, text: String) -> Self {
-        let hash = crate::protocol::hex(&Sha256::digest(id.as_bytes()));
-        let uuid = format!(
-            "{}-{}-4{}-a{}-{}",
-            &hash[..8],
-            &hash[8..12],
-            &hash[13..16],
-            &hash[17..20],
-            &hash[20..32]
-        );
-        Self {
-            id,
-            uuid,
-            kind,
-            text,
-            reminder: None,
-            authorised: None,
-        }
-    }
-}
-
 /// One frame whose turn was reserved by the dispatcher.
 #[derive(Debug, Clone)]
 pub struct Dispatch {
@@ -151,6 +126,7 @@ pub struct Update {
     pub receipts: Vec<Receipt>,
     /// Protocol frames to enqueue after their records are durable.
     pub dispatches: Vec<Dispatch>,
+    pub(super) admissions: Vec<(String, Binding, String, Option<String>)>,
 }
 
 /// The projection held under the session table, never an additional store.
@@ -457,6 +433,12 @@ impl Controller {
             Observation::Admitted { uuid, turn } => {
                 if let Some(current) = &self.current {
                     if current.uuid == uuid && !self.admitted {
+                        update.admissions.push((
+                            current.id.clone(),
+                            self.binding.clone(),
+                            uuid,
+                            turn.clone(),
+                        ));
                         self.admitted = true;
                         if let Some(turn) = turn {
                             self.turn = Some(turn.clone());

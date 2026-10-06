@@ -235,7 +235,8 @@ fn kept(state: OperationState, id: &str) -> OperationOutcome {
 fn leave(state_dir: &Path, operations: &[OperationOutcome]) -> TestResult {
     std::fs::create_dir_all(state_dir)?;
     let record = serde_json::json!({ "format": FORMAT, "operations": operations });
-    std::fs::remove_file(state_dir.join("operations.jsonl"))?;
+    std::fs::remove_file(state_dir.join("operations.v2.journal"))?;
+    std::fs::remove_file(state_dir.join("operations.v2.snapshot"))?;
     std::fs::write(state_dir.join("operations.json"), record.to_string())?;
     Ok(())
 }
@@ -256,7 +257,11 @@ fn a_runner_stopped_while_typing_leaves_it_uncertain_and_never_types_it_again() 
     let typing = outcome(&client, "op-typing")?;
     assert_eq!(typing.state, OperationState::Uncertain, "{typing:?}");
     let waiting = outcome(&client, "op-waiting")?;
-    assert_eq!(waiting.state, OperationState::Refused, "{waiting:?}");
+    assert_eq!(waiting.state, OperationState::Uncertain, "{waiting:?}");
+    assert!(
+        waiting.words.contains("control_readback_unavailable"),
+        "{waiting:?}"
+    );
     cat(&client, "s1")?;
     let asked = operation(
         "op-typing",
