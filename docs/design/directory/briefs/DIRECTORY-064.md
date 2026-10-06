@@ -84,6 +84,12 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - modify: crates/lys-identity-server/src/launch_template.rs
 - modify: surface/identity/src/features/provisioning/Provisioning.tsx
 - modify: docs/design/home/launch-template.schema.json
+- modify: surface/identity/src/features/provisioning/ProfileEditor.tsx
+- modify: surface/identity/src/features/usage/Usage.tsx
+- modify: surface/identity/tests/agent-provisioning.test.tsx
+- modify: surface/identity/tests/usage.test.tsx
+- modify: crates/lys-identity-server/src/provisioning_compat_tests.rs
+- modify: crates/lys-identity-server/src/launch_record_config_tests.rs
 
 **Checklist:**
 - C433 — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).

@@ -78,7 +78,13 @@
           "crates/lys-identity-server/src/provisioning_api.rs",
           "crates/lys-identity-server/src/launch_template.rs",
           "surface/identity/src/features/provisioning/Provisioning.tsx",
-          "docs/design/home/launch-template.schema.json"
+          "docs/design/home/launch-template.schema.json",
+          "surface/identity/src/features/provisioning/ProfileEditor.tsx",
+          "surface/identity/src/features/usage/Usage.tsx",
+          "surface/identity/tests/agent-provisioning.test.tsx",
+          "surface/identity/tests/usage.test.tsx",
+          "crates/lys-identity-server/src/provisioning_compat_tests.rs",
+          "crates/lys-identity-server/src/launch_record_config_tests.rs"
         ],
         "delete": []
       },
@@ -348,6 +354,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1: the managed transport is chosen by the agent's setup, never inferred; qualification pins adapter and reported version",
       "ruling": "Archie's read of BOX 18 (17:44) found that selecting the managed transport from an agent's limits or reminders, with no adapter yet qualified, would stop every such agent starting after the install. Ruled: the managed transport is chosen by a field of the agent's setup that the responsible person sets (HOME-037's profile: provisioning_store.rs, provisioning_api.rs, launch_template.rs, the launch template schema and the Provisioning screen), moved one seat at a time as AGENTS-002 says, Waffles's seat first. An agent whose setup does not require controls starts on the terminal as today, whatever limits it holds, and the existing Usage page says in one line that its notices go through the terminal and no managed adapter is qualified. An agent whose setup requires controls is refused control_adapter_unqualified by name until an adapter is qualified. Qualification (R6's proof) pins the adapter and the version the harness reports of itself, checked at launch against the init frame (Claude's system/init, Codex's initialize answer), never the binary's sha256, which the launch record keeps as a fact. In the same read: frames from subagents and hooks are Observation::Other, refused only when they claim our correlation and fail it; every numeric limit is removed or tied to a source named in the code; the collector reads its table under one guard."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1: the setup field is session.requires_controls and reaches the runner as a typed field of the launch, never an environment value",
+      "ruling": "The field is SessionSettings.requires_controls in provisioning_store.rs (absent means false), set on the ProfileEditor form and read back from old installs unchanged (provisioning_compat_tests.rs, launch_record_config_tests.rs). It reaches the runner from the exact reviewed Version through launch_template::from_template as a typed field of the launch request (the managed start wrapper of the third amendment, protocol.rs), never as an environment variable or argument: a transport chosen by a magic value would be a transport nobody signed for. select_transport reads that field and nothing else; the added budget and goal getters of the sixth amendment are withdrawn with the inference they served. The existing Usage page gains one line per agent saying whether its notices go through the terminal or a managed channel and whether an adapter is qualified (Usage.tsx, usage.test.tsx); the schema follows the carried shape. Found by Brisket (BOX 18, 17:48)."
     }
   ]
 }
