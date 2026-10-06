@@ -5499,6 +5499,16 @@
       "path": "docs/design/home/launch-template.schema.json",
       "note": "The launch template schema.",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/launch_config.rs",
+      "note": "The runner launch Config: the typed members a launch carries.",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/launch_config.rs",
+      "note": "The runner launch Config tests.",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

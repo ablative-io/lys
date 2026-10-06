@@ -84,7 +84,11 @@
           "surface/identity/tests/agent-provisioning.test.tsx",
           "surface/identity/tests/usage.test.tsx",
           "crates/lys-identity-server/src/provisioning_compat_tests.rs",
-          "crates/lys-identity-server/src/launch_record_config_tests.rs"
+          "crates/lys-identity-server/src/launch_record_config_tests.rs",
+          "crates/lys-runner/src/launch_config.rs",
+          "crates/lys-identity-server/src/launch_api.rs",
+          "crates/lys-identity-server/src/launch_record_config.rs",
+          "crates/lys-runner/tests/launch_config.rs"
         ],
         "delete": []
       },
@@ -360,6 +364,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1: the setup field is session.requires_controls and reaches the runner as a typed field of the launch, never an environment value",
       "ruling": "The field is SessionSettings.requires_controls in provisioning_store.rs (absent means false), set on the ProfileEditor form and read back from old installs unchanged (provisioning_compat_tests.rs, launch_record_config_tests.rs). It reaches the runner from the exact reviewed Version through launch_template::from_template as a typed field of the launch request (the managed start wrapper of the third amendment, protocol.rs), never as an environment variable or argument: a transport chosen by a magic value would be a transport nobody signed for. select_transport reads that field and nothing else; the added budget and goal getters of the sixth amendment are withdrawn with the inference they served. The existing Usage page gains one line per agent saying whether its notices go through the terminal or a managed channel and whether an adapter is qualified (Usage.tsx, usage.test.tsx); the schema follows the carried shape. Found by Brisket (BOX 18, 17:48)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1: Config.requires_controls set by the two production constructors from the exact Version",
+      "ruling": "Config lives in crates/lys-runner/src/launch_config.rs; its production constructors are launch_api.rs and launch_record_config.rs, each holding the exact reviewed Version; a launch_template helper taking that Version sets Config.requires_controls (absent false) for both, and the native template bytes (rendering_launch::Launch) stay unchanged, since only Lys needs the value. Those three files and crates/lys-runner/tests/launch_config.rs join R1. Any existing test that only gains the new member in a Config literal is a mechanical touch allowed by this amendment and listed by name in the handback. Found by Brisket (BOX 18, 17:49)."
     }
   ]
 }
