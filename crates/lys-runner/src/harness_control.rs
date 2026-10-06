@@ -12,7 +12,9 @@ pub use crate::tracking_store::managed::{Binding, Executable, ManagedEvent};
 mod approval;
 mod context;
 mod reminders;
-pub use context::{BoundaryReply, ContextDecision, ControlStatus};
+pub use context::{
+    AppliedContext, BoundaryReply, ContextDecision, ContextReason, ControlPhase, ControlStatus,
+};
 pub use reminders::{QueuedReminder, ReminderDecision, ReminderReference};
 pub mod claude;
 pub mod codex;

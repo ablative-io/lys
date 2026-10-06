@@ -142,6 +142,13 @@ pub enum Act {
         /// The existing operation identity.
         operation: String,
     },
+    /// Read a bounded page of current receipts on one explicit session.
+    ControlReceipts {
+        /// The session whose receipts are requested.
+        session: String,
+        /// Continue after the preceding page's final operation.
+        after: Option<String>,
+    },
     /// Record the verified responsible person's explicit decision without replay.
     ReconcileControl {
         /// The uncertain operation.

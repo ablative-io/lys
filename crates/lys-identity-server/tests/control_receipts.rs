@@ -128,6 +128,9 @@ fn context_policy() -> Result<
         },
         lys_runner::harness_control::ControlStatus {
             generation: 1,
+            phase: lys_runner::harness_control::ControlPhase::Idle,
+            active: None,
+            context: None,
             boundary: Some("boundary".to_owned()),
             crossing: Some("crossing".to_owned()),
             queued: Vec::new(),

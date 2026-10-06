@@ -256,6 +256,11 @@ pub enum Answer {
         /// The operation's original identities and evidence.
         receipt: crate::operations::ControlReceipt,
     },
+    /// A bounded page of public control evidence.
+    ControlReceipts {
+        /// Continue using its cursor until the owner returns the last page.
+        page: crate::operations::ControlPage,
+    },
     /// A page of the tracking feed.
     Feed {
         /// The page.

@@ -319,3 +319,239 @@ fn an_old_checkpoint_and_a_flushed_tail_recover_without_replaying_the_prefix()
     assert!(operations.journal_offset - offset < operations.checkpoint_bytes);
     Ok(())
 }
+
+#[test]
+fn a_migrated_population_keeps_all_spent_ids_across_large_proportional_updates()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    old_install(dir.path(), 1200)?;
+    let mut operations = Operations::open_at(dir.path(), super::RETAIN_MS + 2)?;
+    let mut written_checkpoints = operations.checkpoint_bytes;
+    let mut checkpoints = 0;
+    for number in 0..16 {
+        let mut large = outcome(format!("large-{number:06}"));
+        large.at = crate::session::now_ms();
+        large.words = "generated-private-evidence".repeat(4096);
+        let before = operations.checkpoint_offset;
+        operations.record(large)?;
+        if before != operations.checkpoint_offset {
+            checkpoints += 1;
+            written_checkpoints += operations.checkpoint_bytes;
+            let kept: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&operations.checkpoint)?)?;
+            assert_eq!(
+                kept["seen"]
+                    .as_array()
+                    .ok_or("guard is not an array")?
+                    .len(),
+                1200 + number + 1
+            );
+        }
+        for id in 0..1200 {
+            assert!(operations.seen.contains(&format!("notice-{id:06}")));
+        }
+        assert!(
+            operations.journal_offset - operations.checkpoint_offset < operations.checkpoint_bytes
+        );
+        let retained = operations.journal_offset + operations.checkpoint_bytes;
+        assert!(
+            operations.journal_offset + written_checkpoints
+                <= 2 * retained + operations.checkpoint_bytes
+        );
+    }
+    assert!(checkpoints >= 3);
+    drop(operations);
+    let operations = Operations::open_at(dir.path(), crate::session::now_ms())?;
+    assert_eq!(operations.seen.len(), 1216);
+    for id in 0..1200 {
+        assert!(operations.seen.contains(&format!("notice-{id:06}")));
+    }
+    Ok(())
+}
+
+fn control_owner(
+    state: OperationState,
+) -> Result<(tempfile::TempDir, std::sync::Arc<crate::session::Sessions>), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    {
+        let mut table = sessions.lock()?;
+        table.operations.writer = None;
+        let mut kept = outcome("control".to_owned());
+        kept.state = state;
+        kept.at = crate::session::now_ms();
+        table.operations.record(kept)?;
+    }
+    Ok((dir, sessions))
+}
+
+fn control_preparation() -> Result<super::Prepared, Box<dyn Error>> {
+    Ok(serde_json::from_value(serde_json::json!({
+        "binding":{"session":"session","generation":1,"leader":{"pid":42,"start":"proved-start"},
+            "conversation":"conversation","entry":{"path":"entry","sha256":"entry-digest"},
+            "harness":{"path":"harness","sha256":"harness-digest"},"harness_version":"9.8.7","adapter":"fixture-adapter/1"},
+        "uuid":"request","frame":{"type":"user","uuid":"request","message":{"content":"private words"}},"reference":null
+    }))?)
+}
+
+fn personal_decision() -> super::Reconciled {
+    super::Reconciled {
+        operation: "decision".to_owned(),
+        by: "person".to_owned(),
+        at: crate::session::now_ms(),
+        decision: super::Reconciliation::NotSeen,
+    }
+}
+
+#[test]
+fn a_refused_control_write_keeps_preparation_arm_and_admission_unchanged()
+-> Result<(), Box<dyn Error>> {
+    for phase in 0..3 {
+        let (dir, sessions) = control_owner(OperationState::Accepted)?;
+        let prepared = control_preparation()?;
+        let mut table = sessions.lock()?;
+        let operations = &mut table.operations;
+        if phase > 0 {
+            operations.prepare(
+                "control",
+                prepared.clone(),
+                super::TextDigest::of("private words"),
+            )?;
+        }
+        if phase > 1 {
+            operations.arm("control")?;
+        }
+        let before_control = operations.controls.get("control").cloned();
+        let before_outcome = operations.get("control").cloned();
+        let before = std::fs::read(&operations.path)?;
+        let archive = dir.path().join("unavailable.journal");
+        std::fs::rename(&operations.path, &archive)?;
+        let result = match phase {
+            0 => operations.prepare(
+                "control",
+                prepared.clone(),
+                super::TextDigest::of("private words"),
+            ),
+            1 => operations.arm("control"),
+            _ => operations.observed("control", &prepared.binding, &prepared.uuid, None),
+        };
+        let error = result
+            .err()
+            .ok_or("an unavailable control journal accepted a write")?;
+        assert!(error.to_string().contains("operations record"), "{error}");
+        assert_eq!(
+            operations.controls.get("control"),
+            before_control.as_ref(),
+            "phase {phase}"
+        );
+        assert_eq!(
+            operations.get("control"),
+            before_outcome.as_ref(),
+            "phase {phase}"
+        );
+        assert_eq!(std::fs::read(&archive)?, before);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_refused_control_enqueue_keeps_memory_and_journal_unchanged() -> Result<(), Box<dyn Error>> {
+    let (dir, sessions) = control_owner(OperationState::Accepted)?;
+    let writer = crate::durable::Writer::new()?;
+    writer.append(dir.path(), vec![1])?;
+    assert!(writer.barrier().is_err());
+    let mut table = sessions.lock()?;
+    let operations = &mut table.operations;
+    let before = std::fs::read(&operations.path)?;
+    let outcome = operations.get("control").cloned();
+    operations.writer(writer);
+    let error = operations
+        .prepare(
+            "control",
+            control_preparation()?,
+            super::TextDigest::of("private words"),
+        )
+        .err()
+        .ok_or("a failed writer accepted metadata")?;
+    assert_eq!(error.name(), "durable_writer_unavailable");
+    assert!(!operations.controls.contains_key("control"));
+    assert_eq!(operations.get("control"), outcome.as_ref());
+    assert_eq!(std::fs::read(&operations.path)?, before);
+    Ok(())
+}
+
+#[test]
+fn a_refused_reconciliation_write_keeps_memory_and_journal_unchanged() -> Result<(), Box<dyn Error>>
+{
+    let (dir, sessions) = control_owner(OperationState::Uncertain)?;
+    let path = dir.path().join("operations.v2.journal");
+    let archive = dir.path().join("unavailable.journal");
+    let before = std::fs::read(&path)?;
+    std::fs::rename(path, &archive)?;
+    assert!(
+        sessions
+            .reconcile_control("control", personal_decision())
+            .is_err()
+    );
+    assert!(!sessions.lock()?.operations.controls.contains_key("control"));
+    assert_eq!(std::fs::read(archive)?, before);
+    Ok(())
+}
+
+#[test]
+fn reconciliation_of_a_non_uncertain_outcome_refuses_without_mutation() -> Result<(), Box<dyn Error>>
+{
+    let (dir, sessions) = control_owner(OperationState::Confirmed)?;
+    let path = dir.path().join("operations.v2.journal");
+    let before = std::fs::read(&path)?;
+    let error = sessions
+        .reconcile_control("control", personal_decision())
+        .err()
+        .ok_or("confirmed evidence was reconciled")?;
+    assert_eq!(error.name(), "control_not_uncertain");
+    assert!(!sessions.lock()?.operations.controls.contains_key("control"));
+    assert_eq!(std::fs::read(path)?, before);
+    Ok(())
+}
+
+#[test]
+fn an_accepted_control_record_survives_a_failed_checkpoint_replace() -> Result<(), Box<dyn Error>> {
+    let (dir, sessions) = control_owner(OperationState::Uncertain)?;
+    let checkpoint = dir.path().join("operations.v2.snapshot");
+    let previous = dir.path().join("previous.snapshot");
+    std::fs::rename(&checkpoint, &previous)?;
+    std::fs::create_dir(&checkpoint)?;
+    sessions.lock()?.operations.checkpoint_bytes = 1;
+    let decision = personal_decision();
+    let before = sessions.lock()?.operations.journal_offset;
+    assert!(
+        sessions
+            .reconcile_control("control", decision.clone())
+            .is_err()
+    );
+    {
+        let table = sessions.lock()?;
+        assert!(table.operations.journal_offset > before);
+        assert_eq!(
+            table
+                .operations
+                .controls
+                .get("control")
+                .and_then(|control| control.decision.as_ref()),
+            Some(&decision)
+        );
+    }
+    std::fs::remove_dir(&checkpoint)?;
+    std::fs::rename(previous, checkpoint)?;
+    drop(sessions);
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    assert_eq!(
+        sessions.control_receipt("control")?.reconciled,
+        Some(decision)
+    );
+    assert_eq!(
+        sessions.outcome("control")?.state,
+        OperationState::Uncertain
+    );
+    Ok(())
+}

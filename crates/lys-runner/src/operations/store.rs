@@ -313,13 +313,37 @@ impl Operations {
     }
 
     fn record_at(&mut self, outcome: OperationOutcome, now: u64) -> Result<(), RunnerError> {
+        self.record_change(outcome, now, None)
+    }
+
+    pub(super) fn record_control(
+        &mut self,
+        outcome: OperationOutcome,
+        control: Control,
+    ) -> Result<(), RunnerError> {
+        control.validate(&outcome)?;
+        self.record_change(outcome, now_ms(), Some(control))
+    }
+
+    fn record_change(
+        &mut self,
+        outcome: OperationOutcome,
+        now: u64,
+        control: Option<Control>,
+    ) -> Result<(), RunnerError> {
         let mut bytes = serde_json::to_vec(&Writing {
             outcome: &outcome,
-            control: self.controls.get(&outcome.operation),
+            control: control
+                .as_ref()
+                .or_else(|| self.controls.get(&outcome.operation)),
         })
         .map_err(unavailable)?;
         bytes.push(b'\n');
         let length = u64::try_from(bytes.len()).map_err(unavailable)?;
+        let offset = self
+            .journal_offset
+            .checked_add(length)
+            .ok_or_else(|| unavailable("journal offset overflows"))?;
         if let Some(writer) = &self.writer {
             writer.append(&self.path, bytes)?;
         } else {
@@ -331,10 +355,10 @@ impl Operations {
                 .and_then(|()| file.sync_data())
                 .map_err(unavailable)?;
         }
-        self.journal_offset = self
-            .journal_offset
-            .checked_add(length)
-            .ok_or_else(|| unavailable("journal offset overflows"))?;
+        self.journal_offset = offset;
+        if let Some(control) = control {
+            self.controls.insert(outcome.operation.clone(), control);
+        }
         self.fold(outcome, now);
         if self.checkpoint_bytes > 0
             && self.journal_offset - self.checkpoint_offset >= self.checkpoint_bytes

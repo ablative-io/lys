@@ -63,8 +63,6 @@ pub struct ControlReceipt {
     pub state: OperationState,
     /// The recorded outcome instant.
     pub at: u64,
-    /// Named evidence or refusal.
-    pub words: String,
     /// The payload's digest, without its contents.
     pub text: Option<TextDigest>,
     /// Whether the exact prepared request was kept.
@@ -81,6 +79,18 @@ pub struct ControlReceipt {
     pub admitted: bool,
     /// The person's recorded decision, without rewriting harness evidence.
     pub reconciled: Option<Reconciled>,
+}
+
+/// A bounded page of current operation evidence for one explicit session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ControlPage {
+    /// The requested session, including an empty page's owner.
+    pub session: String,
+    /// This page's public receipts.
+    pub receipts: Vec<ControlReceipt>,
+    /// Continue strictly after this identity; absent only on the last page.
+    pub after: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -157,7 +167,6 @@ impl ControlReceipt {
             request: outcome.request.clone(),
             state: outcome.state,
             at: outcome.at,
-            words: outcome.words.clone(),
             text: outcome.text.clone(),
             prepared: prepared.is_some(),
             certainty: control.map(|control| control.certainty),
@@ -194,13 +203,11 @@ impl Operations {
             admitted: None,
             decision: None,
         };
-        control.validate(&outcome)?;
-        self.controls.insert(operation.to_owned(), control);
-        self.record(outcome)
+        self.record_control(outcome, control)
     }
 
     pub(crate) fn arm(&mut self, operation: &str) -> Result<(), RunnerError> {
-        let control = self.controls.get_mut(operation).ok_or_else(|| {
+        let mut control = self.controls.get(operation).cloned().ok_or_else(|| {
             RunnerError::refused(
                 "control_preparation_missing",
                 "a pipe write requires its retained preparation",
@@ -213,12 +220,14 @@ impl Operations {
             ));
         }
         control.certainty = Certainty::PossiblySent;
-        self.set(
-            operation,
-            OperationState::Delivering,
-            "control_write_armed: delivery may occur after the durability barrier".to_owned(),
-        )?;
-        Ok(())
+        let mut outcome = self.get(operation).cloned().ok_or_else(|| {
+            RunnerError::refused("operation_unknown", "the prepared operation is not held")
+        })?;
+        outcome.state = OperationState::Delivering;
+        outcome.at = now_ms();
+        "control_write_armed: delivery may occur after the durability barrier"
+            .clone_into(&mut outcome.words);
+        self.record_control(outcome, control)
     }
 
     pub(crate) fn observed(
@@ -228,7 +237,7 @@ impl Operations {
         uuid: &str,
         turn: Option<String>,
     ) -> Result<(), RunnerError> {
-        let control = self.controls.get_mut(operation).ok_or_else(|| {
+        let mut control = self.controls.get(operation).cloned().ok_or_else(|| {
             RunnerError::refused(
                 "control_preparation_missing",
                 "admission requires the original retained preparation",
@@ -254,7 +263,7 @@ impl Operations {
         let outcome = self.get(operation).cloned().ok_or_else(|| {
             RunnerError::refused("operation_unknown", "the admitted operation is not held")
         })?;
-        self.record(outcome)
+        self.record_control(outcome, control)
     }
 
     pub(super) fn original_text(&self, operation: &str) -> Option<&TextDigest> {
@@ -272,6 +281,36 @@ impl Operations {
             .get(operation)
             .ok_or_else(|| RunnerError::refused("operation_unknown", "no operation is held"))?;
         Ok(ControlReceipt::of(outcome, self.controls.get(operation)))
+    }
+
+    fn page(&self, session: &str, after: Option<&str>) -> Result<ControlPage, RunnerError> {
+        use std::ops::Bound;
+        if after == Some("") {
+            return Err(RunnerError::refused(
+                "control_cursor_invalid",
+                "an operation cursor cannot be empty",
+            ));
+        }
+        let mut page = ControlPage {
+            session: session.to_owned(),
+            receipts: Vec::new(),
+            after: None,
+        };
+        let Some(ids) = self.by_session.get(session) else {
+            return Ok(page);
+        };
+        let start = after.map_or(Bound::Unbounded, Bound::Excluded);
+        let mut remaining = ids.range::<str, _>((start, Bound::Unbounded));
+        for id in remaining.by_ref().take(crate::tracking_store::PAGE_MAX) {
+            page.receipts.push(self.receipt(id)?);
+        }
+        if remaining.next().is_some() {
+            page.after = page
+                .receipts
+                .last()
+                .map(|receipt| receipt.operation.clone());
+        }
+        Ok(page)
     }
 
     fn reconcile(
@@ -292,16 +331,22 @@ impl Operations {
         let outcome = self.get(operation).cloned().ok_or_else(|| {
             RunnerError::refused("operation_unknown", "the operation is not held")
         })?;
-        let control = self
-            .controls
-            .entry(operation.to_owned())
-            .or_insert(Control {
+        if outcome.state != OperationState::Uncertain {
+            return Err(RunnerError::refused(
+                "control_not_uncertain",
+                "only an uncertain operation needs a person's reconciliation",
+            ));
+        }
+        let mut control = match self.controls.get(operation) {
+            Some(control) => control.clone(),
+            None => Control {
                 prepared: None,
                 original_text: outcome.text.clone(),
                 certainty: Certainty::PossiblySent,
                 admitted: None,
                 decision: None,
-            });
+            },
+        };
         if let Some(kept) = &control.decision {
             if *kept == decision {
                 return self.receipt(operation);
@@ -311,14 +356,8 @@ impl Operations {
                 "a different decision already reconciles this operation",
             ));
         }
-        if outcome.state != OperationState::Uncertain {
-            return Err(RunnerError::refused(
-                "control_not_uncertain",
-                "only an uncertain operation needs a person's reconciliation",
-            ));
-        }
         control.decision = Some(decision);
-        self.record(outcome)?;
+        self.record_control(outcome, control)?;
         self.receipt(operation)
     }
 }
@@ -332,6 +371,30 @@ impl Sessions {
         let receipt = self.lock()?.operations.receipt(operation)?;
         self.writer.barrier()?;
         Ok(receipt)
+    }
+
+    /// Read every current receipt through bounded, explicit continuation pages.
+    ///
+    /// # Errors
+    /// Refuses an unknown session, malformed cursor or unavailable owner.
+    pub fn control_receipts(
+        &self,
+        session: &str,
+        after: Option<&str>,
+    ) -> Result<ControlPage, RunnerError> {
+        let table = self.lock()?;
+        if !table.sessions.contains_key(session)
+            && !table.operations.by_session.contains_key(session)
+        {
+            return Err(RunnerError::refused(
+                "session_unknown",
+                "no current session or retained operation names this session",
+            ));
+        }
+        let page = table.operations.page(session, after)?;
+        drop(table);
+        self.writer.barrier()?;
+        Ok(page)
     }
 
     pub(crate) fn reconcile_control(

@@ -47,12 +47,118 @@ pub struct BoundaryReply {
     pub reminders: Vec<ReminderDecision>,
 }
 
+/// Only the bound reader or dispatcher can establish the current phase.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlPhase {
+    /// No authoritative boundary has been observed.
+    Unknown,
+    /// A proved turn boundary is available.
+    Idle,
+    /// The dispatcher reserved the next turn.
+    Reserved,
+    /// A matching harness turn is active.
+    Active,
+    /// The managed channel ended.
+    Closed,
+}
+
+/// Public reason codes never carry the service's detailed refusal text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextReason {
+    /// No current measurement exists.
+    MeasurementUnavailable,
+    /// The reported instant is ahead of the observation.
+    MeasurementFuture,
+    /// No fresh measurement follows the completed control act.
+    PostMeasurementMissing,
+    /// The process stop owner has not observed exit.
+    StopPending,
+    /// Possible prior delivery prevents another compaction.
+    DeliveryUncertain,
+    /// Current context still exceeds its limit.
+    AboveLimit,
+    /// Current authority cannot answer.
+    AuthorityUnavailable,
+    /// The applied hold supplied no recognised public reason code.
+    ReasonUnrecognised,
+}
+
+/// The last applied decision, with identifiers and closed reason codes only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AppliedContext {
+    /// Normal input was permitted by this decision.
+    Released,
+    /// One crossing was permitted to compact.
+    Compact {
+        /// The authorised crossing identity.
+        crossing: String,
+    },
+    /// Normal input remains held.
+    Held {
+        /// The crossing whose input remains held, when one exists.
+        crossing: Option<String>,
+        /// The public reason for the applied hold.
+        reason: ContextReason,
+    },
+    /// Current authority ended and queued words were refused.
+    Unavailable {
+        /// The public reason authority could not answer.
+        reason: ContextReason,
+    },
+}
+
+impl AppliedContext {
+    fn of(decision: &ContextDecision) -> Self {
+        match decision {
+            ContextDecision::Released => Self::Released,
+            ContextDecision::Compact { crossing } => Self::Compact {
+                crossing: crossing.clone(),
+            },
+            ContextDecision::Unavailable { .. } => Self::Unavailable {
+                reason: ContextReason::AuthorityUnavailable,
+            },
+            ContextDecision::Held { crossing, reason } => {
+                let reason = match reason
+                    .split_once(':')
+                    .map_or(reason.as_str(), |(code, _)| code)
+                {
+                    "context_measurement_unavailable" => ContextReason::MeasurementUnavailable,
+                    "context_measurement_future" => ContextReason::MeasurementFuture,
+                    "context_post_measurement_missing" => ContextReason::PostMeasurementMissing,
+                    "context_stop_pending" => ContextReason::StopPending,
+                    "context_delivery_uncertain" => ContextReason::DeliveryUncertain,
+                    "context_above_limit" => ContextReason::AboveLimit,
+                    _ => {
+                        crate::error::said(
+                            "control_reason_unrecognised: the applied hold has no recognised public reason code",
+                        );
+                        ContextReason::ReasonUnrecognised
+                    }
+                };
+                Self::Held {
+                    crossing: crossing.clone(),
+                    reason,
+                }
+            }
+        }
+    }
+}
+
 /// Current control identifiers, read directly from the owned live controller.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControlStatus {
     /// The current process generation.
     pub generation: u64,
+    /// The current proved channel phase; silence never changes it.
+    pub phase: ControlPhase,
+    /// The reserved or active operation, without its payload.
+    pub active: Option<String>,
+    /// The last applied decision; absent before any service decision.
+    pub context: Option<AppliedContext>,
     /// The boundary held for a current service decision.
     pub boundary: Option<String>,
     /// The crossing that holds normal input.
@@ -70,6 +176,7 @@ pub(super) struct Authority {
     compact: Option<String>,
     pub(super) normal: bool,
     pub(super) answered: bool,
+    last: Option<AppliedContext>,
 }
 
 impl Controller {
@@ -78,6 +185,18 @@ impl Controller {
     pub fn control_status(&self) -> ControlStatus {
         ControlStatus {
             generation: self.binding.generation,
+            phase: if self.closed {
+                ControlPhase::Closed
+            } else {
+                match self.boundary {
+                    Boundary::Unknown => ControlPhase::Unknown,
+                    Boundary::Idle => ControlPhase::Idle,
+                    Boundary::Reserved => ControlPhase::Reserved,
+                    Boundary::Active(_) => ControlPhase::Active,
+                }
+            },
+            active: self.current.as_ref().map(|pending| pending.id.clone()),
+            context: self.authority.last.clone(),
             boundary: self.authority.waiting.clone(),
             crossing: self.authority.crossing.clone(),
             queued: self
@@ -97,6 +216,9 @@ impl Controller {
     }
 
     pub(super) fn refuse_held(&mut self, reason: &str) -> Update {
+        self.authority.last = Some(AppliedContext::Unavailable {
+            reason: ContextReason::AuthorityUnavailable,
+        });
         let mut update = Update::default();
         for pending in self.pending.drain(..) {
             update.receipts.push(super::receipt(
@@ -244,6 +366,7 @@ impl Controller {
         }
         let mut update = self.review_reminders(boundary, &reply.reminders)?;
         self.authority.answered = true;
+        self.authority.last = Some(AppliedContext::of(&reply.context));
         match &reply.context {
             ContextDecision::Unavailable { reason } => {
                 return Err(RunnerError::refused("control_boundary_unavailable", reason));

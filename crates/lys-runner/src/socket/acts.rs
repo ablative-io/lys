@@ -169,6 +169,9 @@ pub(super) fn perform(
         Act::ControlReceipt { operation } => sessions
             .control_receipt(&operation)
             .map(|receipt| Answer::ControlReceipt { receipt }),
+        Act::ControlReceipts { session, after } => sessions
+            .control_receipts(&session, after.as_deref())
+            .map(|page| Answer::ControlReceipts { page }),
         Act::ReconcileControl {
             operation,
             decision,

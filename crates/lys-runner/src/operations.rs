@@ -33,7 +33,7 @@ mod control;
 mod store;
 use control::Control;
 pub(crate) use control::Prepared;
-pub use control::{Certainty, ControlReceipt, Reconciled, Reconciliation};
+pub use control::{Certainty, ControlPage, ControlReceipt, Reconciled, Reconciliation};
 
 mod delivery;
 pub(crate) use delivery::{accept, compacting, deliver, ended};
