@@ -220,7 +220,8 @@
           "crates/lys-identity-server/tests/goals_edits.rs",
           "crates/lys-identity-server/src/refusals_follow.rs",
           "crates/lys-runner/src/protocol.rs",
-          "crates/lys-identity-server/src/budgets_act.rs"
+          "crates/lys-identity-server/src/budgets_act.rs",
+          "crates/lys-runner/src/operations/delivery.rs"
         ],
         "delete": []
       },
@@ -273,7 +274,8 @@
           "crates/lys-runner/tests/operations_index/cases.rs",
           "crates/lys-runner/tests/operations.rs",
           "crates/lys-identity-server/src/goals_api.rs",
-          "crates/lys-identity-server/src/runner_sessions.rs"
+          "crates/lys-identity-server/src/runner_sessions.rs",
+          "crates/lys-runner/src/operations/delivery.rs"
         ],
         "delete": []
       },
@@ -472,6 +474,12 @@
       "by": "Archie",
       "subject": "R5: an Uncertain operation never expires before the responsible person's decision is recorded",
       "ruling": "crates/lys-runner/src/operations.rs keeps a terminal outcome for RETAIN_MS, 24 hours (line 46): fold() puts it into expires at its at plus 24 hours (lines 331 to 332), and prune() (lines 343 to 352) then removes it from held, texts and compacting, while its id stays in seen and is refused operation_repeated as expired (lines 354 to 361). That rule came before BOX 20 (Pikelet 84c5e348, 1 October). terminal() (lines 189 to 195) counts Uncertain as terminal, so an Uncertain operation would leave held after a day, and the responsible-person reconciliation action R5 requires on that operation would be lost. An Uncertain operation therefore never enters expires until the person's decision on it is recorded; once recorded, it follows the same rule as any other terminal outcome. This covers the legacy Uncertain operations migrated under amendment 20. The test: an Uncertain outcome older than 24 hours still offers the decision after a reopen, and its id is not refused as expired. The 24 hour rule for every other outcome is held for Tom, as an age-based removal: unchanged, not extended and not dropped. Taking open_at's supplied instant on restart, instead of the wall clock, is right (Archie 0225afbd; Waffles 640704fd)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R4 and R5 name operations/delivery.rs: a prepared control's retry is compared against a digest of the original ask",
+      "ruling": "operations/delivery.rs accept (lines 42 to 56) compares a retry's text digest with the held outcome's text. Preparation may replace that text with the current boundary words, so an identical retry of the original ask would be refused operation_reused. The private Control record keeps one digest of the original ask, captured before preparation replaces Outcome.text, and accept compares a prepared control's retry against that digest. No words are exported, nothing is replayed and no owner is added. Tests: the identical original ask after current-word preparation reads the original receipt; a changed ask under the same operation id is still refused operation_reused. Waffles asked for this beside amendment 22, which was already pushed, so it stands as its own amendment (Brisket 2d448866; Waffles 4608151d)."
     }
   ]
 }

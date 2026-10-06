@@ -208,6 +208,7 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - modify: crates/lys-identity-server/src/refusals_follow.rs
 - modify: crates/lys-runner/src/protocol.rs
 - modify: crates/lys-identity-server/src/budgets_act.rs
+- modify: crates/lys-runner/src/operations/delivery.rs
 
 **Checklist:**
 - C436 — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).
@@ -255,6 +256,7 @@ Behavioural. WHEN delivery starts, THE SYSTEM SHALL persist the existing 051 ope
 - modify: crates/lys-runner/tests/operations.rs
 - modify: crates/lys-identity-server/src/goals_api.rs
 - modify: crates/lys-identity-server/src/runner_sessions.rs
+- modify: crates/lys-runner/src/operations/delivery.rs
 
 **Checklist:**
 - C437 — Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).
