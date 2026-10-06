@@ -328,7 +328,8 @@
           "surface/identity/src/features/usage/usage.css",
           "surface/identity/tests/usage.test.tsx",
           "surface/identity/src/features/runtime/Sessions.tsx",
-          "surface/identity/src/api.ts"
+          "surface/identity/src/api.ts",
+          "surface/identity/vite.config.ts"
         ],
         "delete": []
       },
@@ -638,6 +639,12 @@
       "by": "Archie",
       "subject": "R5: apply_boundary_reply's persistence call carries amendment 44's complete-request identity",
       "ruling": "harness_control/context.rs apply_boundary_reply bypasses delivery::accept and persists through Operations::keep_control(outcome). It already compares a digest of the typed reply and refuses changed fields, but it cannot attach amendment 44's named complete-request identity unless the request reaches keep_control (Brisket 76eda9e8). context.rs is already this box's file (R3). Only that persistence and check call changes: keep_control receives the typed request, and the identity is computed with the same named encoding and stored as for goal_reminder and context_compact. A boundary_reply retry is judged exactly as amendments 44 to 46 rule. The existing public text digest, the pure plan, the batch ordering of amendments 40 and 41, and the existing refusal of changed fields are unchanged. The red includes a boundary_reply retried with one changed field, refused live and after a reopen."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R6: vite.config.ts includes the agent-control acceptance file, so focused runs and the final battery discover it",
+      "ruling": "surface/identity/vite.config.ts includes only tests/**/*.test.tsx and tests/acceptance/grants.spec.ts, so vitest finds no test in R6's tests/acceptance/agent-control.spec.ts, and the final battery would skip it as well (Brisket e305f82f). R6 gains vite.config.ts for one change only: tests/acceptance/agent-control.spec.ts is appended to the existing include list. Environment and every other setting are unchanged, and no glob is widened. The handback shows vitest discovering and running the file by name, from parsed output, under the battery's own command."
     }
   ]
 }

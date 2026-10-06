@@ -304,6 +304,7 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - modify: surface/identity/tests/usage.test.tsx
 - modify: surface/identity/src/features/runtime/Sessions.tsx
 - modify: surface/identity/src/api.ts
+- modify: surface/identity/vite.config.ts
 
 **Checklist:**
 - C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6).
