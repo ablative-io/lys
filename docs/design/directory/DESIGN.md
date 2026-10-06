@@ -650,6 +650,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/budgets_state.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
 | `crates/lys-identity-server/tests/budgets.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
 | `crates/lys-identity-server/src/budgets_act.rs` | DIRECTORY-051 R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_act/control.rs` | the service boundary review under budgets_act: reads the runner's current control identifiers and the current context and goal decisions, answers the server-only reply, and refuses held words when the feed ends; DIRECTORY-064 R3 and R4 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/budgets_feed.rs` | the runner feed's page keeper; DIRECTORY-064 R3 and R4 hand its boundary and managed records to the budget and goal owners on the same page and cursor | DIRECTORY-064 |
 | `crates/lys-identity-server/src/budgets_context.rs` | the context availability fold, one reading per agent and session; DIRECTORY-064 R3 reads the current reading at a boundary, a missing measurement included | DIRECTORY-064 |
 | `crates/lys-identity-server/src/refusals_follow.rs` | the signal task that follows a runner's feed into budgets_feed; DIRECTORY-064 R3 and R4 connect the same follow to the boundary reply | DIRECTORY-064 |

@@ -150,6 +150,7 @@ Behavioural. WHEN 051's authoritative context measurement crosses its held thres
 **Files:**
 - create: crates/lys-runner/src/harness_control/context.rs
 - create: crates/lys-runner/tests/context_control.rs
+- create: crates/lys-identity-server/src/budgets_act/control.rs
 - modify: crates/lys-runner/src/harness_control.rs
 - modify: crates/lys-runner/src/operations.rs
 - modify: crates/lys-identity-server/src/budgets_act.rs
@@ -189,6 +190,7 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 **Files:**
 - create: crates/lys-runner/src/harness_control/reminders.rs
 - create: crates/lys-runner/tests/reminder_delivery.rs
+- create: crates/lys-identity-server/src/budgets_act/control.rs
 - modify: crates/lys-identity-server/src/goals_state.rs
 - modify: crates/lys-identity-server/src/goals_store.rs
 - modify: crates/lys-identity-server/src/goals_api.rs
@@ -199,6 +201,7 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - modify: crates/lys-identity-server/tests/goals_edits.rs
 - modify: crates/lys-identity-server/src/refusals_follow.rs
 - modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-identity-server/src/budgets_act.rs
 
 **Checklist:**
 - C436 — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).

@@ -2756,6 +2756,11 @@
       "brief": "DIRECTORY-051"
     },
     {
+      "path": "crates/lys-identity-server/src/budgets_act/control.rs",
+      "note": "the service boundary review under budgets_act: reads the runner's current control identifiers and the current context and goal decisions, answers the server-only reply, and refuses held words when the feed ends; DIRECTORY-064 R3 and R4",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-identity-server/src/budgets_feed.rs",
       "note": "the runner feed's page keeper; DIRECTORY-064 R3 and R4 hand its boundary and managed records to the budget and goal owners on the same page and cursor",
       "brief": "DIRECTORY-064"
