@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::{Controller, Kind, Pending, Update, receipt};
+use super::{
+    Boundary, BoundaryReply, ContextDecision, Controller, Kind, Pending, Transport, Update, receipt,
+};
 use crate::error::RunnerError;
 use crate::operations::OperationState;
 
@@ -66,11 +68,10 @@ impl Pending {
 }
 
 impl Controller {
-    pub(super) fn review_reminders(
-        &mut self,
-        boundary: &str,
-        decisions: &[ReminderDecision],
-    ) -> Result<Update, RunnerError> {
+    fn reminder_decisions<'a>(
+        &self,
+        decisions: &'a [ReminderDecision],
+    ) -> Result<Decisions<'a>, RunnerError> {
         let mut by_operation = std::collections::BTreeMap::new();
         for decision in decisions {
             let operation = match decision {
@@ -119,6 +120,14 @@ impl Controller {
                 ));
             }
         }
+        Ok(by_operation)
+    }
+
+    pub(super) fn apply_reminders(
+        &mut self,
+        boundary: &str,
+        by_operation: &Decisions<'_>,
+    ) -> Update {
         let mut update = Update::default();
         self.pending.retain_mut(|pending| {
             let Some(decision) = by_operation.get(pending.id.as_str()) else {
@@ -142,7 +151,7 @@ impl Controller {
                 }
             }
         });
-        Ok(update)
+        update
     }
 }
 
@@ -167,5 +176,123 @@ impl Pending {
             reminder: None,
             authorised: None,
         }
+    }
+}
+
+type Decisions<'a> = std::collections::BTreeMap<&'a str, &'a ReminderDecision>;
+
+pub(super) enum BoundaryPlan<'a> {
+    Unavailable(&'a str),
+    Current {
+        reply: &'a BoundaryReply,
+        boundary: &'a str,
+        decisions: Decisions<'a>,
+        next: Option<Box<(Pending, serde_json::Value)>>,
+    },
+}
+
+impl Controller {
+    /// Apply current service authority only to the exact waiting boundary.
+    ///
+    /// # Errors
+    /// Refuses stale generations, unmatched boundaries and mismatched crossings.
+    pub fn boundary_reply(&mut self, reply: &BoundaryReply) -> Result<Update, RunnerError> {
+        let plan = self.plan_boundary_reply(reply)?;
+        Ok(self.apply_boundary_plan(plan))
+    }
+
+    pub(super) fn plan_boundary_reply<'a>(
+        &self,
+        reply: &'a BoundaryReply,
+    ) -> Result<BoundaryPlan<'a>, RunnerError> {
+        if self.closed
+            || !self.authority.required
+            || reply.generation != self.binding.generation
+            || self.authority.waiting != reply.boundary
+        {
+            return Err(RunnerError::refused(
+                "control_boundary_changed",
+                "the reply does not name the currently held owned boundary",
+            ));
+        }
+        if let ContextDecision::Unavailable { reason } = &reply.context {
+            return Ok(BoundaryPlan::Unavailable(reason));
+        }
+        let boundary = reply.boundary.as_deref().ok_or_else(|| {
+            RunnerError::refused(
+                "control_boundary_missing",
+                "a release names a currently held boundary",
+            )
+        })?;
+        if self.boundary != Boundary::Idle {
+            return Err(RunnerError::refused(
+                "control_boundary_active",
+                "a service reply cannot release an active turn",
+            ));
+        }
+        if let ContextDecision::Compact { crossing } = &reply.context
+            && self.authority.crossing.as_deref() != Some(crossing.as_str())
+        {
+            return Err(RunnerError::refused(
+                "control_crossing_changed",
+                "compaction is not the held crossing",
+            ));
+        }
+        let decisions = self.reminder_decisions(&reply.reminders)?;
+        let next = self
+            .boundary_next(boundary, &reply.context, &decisions)?
+            .map(Box::new);
+        Ok(BoundaryPlan::Current {
+            reply,
+            boundary,
+            decisions,
+            next,
+        })
+    }
+
+    fn boundary_next(
+        &self,
+        boundary: &str,
+        context: &ContextDecision,
+        decisions: &Decisions<'_>,
+    ) -> Result<Option<(Pending, serde_json::Value)>, RunnerError> {
+        let next = self.pending.iter().find(|pending| {
+            let refused = matches!(
+                decisions.get(pending.id.as_str()),
+                Some(ReminderDecision::Refuse { .. })
+            );
+            let released_compact = matches!(context, ContextDecision::Released)
+                && pending.kind == Kind::Compact
+                && self.authority.crossing.as_deref() == Some(pending.id.as_str());
+            !(refused || released_compact)
+        });
+        let Some(next) = next else {
+            return Ok(None);
+        };
+        let permitted = match context {
+            ContextDecision::Released => true,
+            ContextDecision::Compact { crossing } => {
+                next.kind == Kind::Compact && next.id == *crossing
+            }
+            ContextDecision::Held { .. } | ContextDecision::Unavailable { .. } => false,
+        };
+        if !permitted {
+            return Ok(None);
+        }
+        let mut next = next.clone();
+        if let Some(ReminderDecision::Deliver {
+            reference, text, ..
+        }) = decisions.get(next.id.as_str())
+        {
+            next.reminder = Some(reference.clone());
+            next.text.clone_from(text);
+            next.authorised = Some(boundary.to_owned());
+        }
+        let frame = match self.transport {
+            Transport::Claude => super::claude::request(&self.binding.conversation, &next),
+            Transport::Codex => super::codex::request(&self.binding.conversation, &next),
+            Transport::Pty => return Err(super::unsupported()),
+        };
+        Ok(Some((next, frame)))
     }
 }

@@ -647,6 +647,14 @@ mod tests {
         human: bool,
         test: impl FnOnce(&Arc<Sessions>, &Binding, &mpsc::Receiver<Vec<u8>>, &AtomicUsize) -> Result,
     ) -> Result {
+        controlled_fixture(transport, human, true, test)
+    }
+    fn controlled_fixture(
+        transport: Transport,
+        human: bool,
+        automatic: bool,
+        test: impl FnOnce(&Arc<Sessions>, &Binding, &mpsc::Receiver<Vec<u8>>, &AtomicUsize) -> Result,
+    ) -> Result {
         let directory = tempfile::tempdir()?;
         let sessions = Sessions::open(directory.path(), 4096)?;
         let cleanup = Cleanup(Arc::clone(&sessions));
@@ -738,7 +746,11 @@ mod tests {
             }
             Transport::Pty => return Err("fixture requires a managed adapter".into()),
         }
-        let service = Service::start(&sessions, &binding)?;
+        let service = if automatic {
+            Some(Service::start(&sessions, &binding)?)
+        } else {
+            None
+        };
         let result = test(&sessions, &binding, &frames, &terminal);
         drop(service);
         drop(cleanup);
@@ -751,6 +763,81 @@ mod tests {
             session: "fixture".to_owned(),
             request,
         }
+    }
+
+    #[test]
+    fn a_boundary_journal_refusal_keeps_authority_and_queued_words_unchanged() -> Result {
+        controlled_fixture(
+            Transport::Claude,
+            false,
+            false,
+            |sessions, source, frames, terminal| {
+                let reference = crate::harness_control::ReminderReference {
+                    goal: "goal".to_owned(),
+                    occurrence: "occurrence".to_owned(),
+                    version: "old".to_owned(),
+                    prior: None,
+                };
+                sessions.operate(operation(
+                    "delivery",
+                    OperationRequest::GoalReminder {
+                        text: "old words".to_owned(),
+                        reference: reference.clone(),
+                    },
+                ))?;
+                let (before, offset) = {
+                    let mut table = sessions.lock()?;
+                    let status = super::runtime(&mut table, "fixture", source.generation)?
+                        .controller
+                        .control_status();
+                    let offset = table.operations.test_journal_offset(u64::MAX);
+                    (status, offset)
+                };
+                let mut reference = reference;
+                reference.version = "current".to_owned();
+                let reply = operation(
+                    "decision",
+                    OperationRequest::BoundaryReply {
+                        reply: crate::harness_control::BoundaryReply {
+                            generation: source.generation,
+                            boundary: before.boundary.clone(),
+                            context: crate::harness_control::ContextDecision::Released,
+                            reminders: vec![crate::harness_control::ReminderDecision::Deliver {
+                                operation: "delivery".to_owned(),
+                                reference,
+                                text: "current words".to_owned(),
+                            }],
+                        },
+                    },
+                );
+                let refused = sessions.apply_boundary_reply(reply.clone());
+                let after = {
+                    let mut table = sessions.lock()?;
+                    table.operations.test_journal_offset(offset);
+                    assert!(table.operations.get("decision").is_none());
+                    super::runtime(&mut table, "fixture", source.generation)?
+                        .controller
+                        .control_status()
+                };
+                assert!(
+                    refused
+                        .err()
+                        .ok_or("journal refusal was accepted")?
+                        .to_string()
+                        .contains("journal offset overflows")
+                );
+                assert_eq!(after, before);
+                assert!(matches!(frames.try_recv(), Err(mpsc::TryRecvError::Empty)));
+                assert_eq!(terminal.load(Ordering::SeqCst), 0);
+                assert_eq!(
+                    sessions.apply_boundary_reply(reply)?.state,
+                    OperationState::Confirmed
+                );
+                let frame: Value = serde_json::from_slice(&frames.recv()?)?;
+                assert_eq!(frame["message"]["content"], "Lys reminder\ncurrent words");
+                Ok(())
+            },
+        )
     }
 
     #[test]

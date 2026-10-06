@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::events::{apply, runtime};
+use super::reminders::BoundaryPlan;
 use super::{Boundary, Controller, Dispatch, Kind, ReminderDecision, Update};
 use crate::error::RunnerError;
 use crate::operations::{OperationRequest, OperationState};
@@ -325,83 +326,6 @@ impl Controller {
         }
         Ok(update)
     }
-
-    /// Apply current service authority only to the exact waiting boundary.
-    ///
-    /// # Errors
-    /// Refuses stale generations, unmatched boundaries and mismatched crossings.
-    pub fn boundary_reply(&mut self, reply: &BoundaryReply) -> Result<Update, RunnerError> {
-        if self.closed
-            || !self.authority.required
-            || reply.generation != self.binding.generation
-            || self.authority.waiting != reply.boundary
-        {
-            return Err(RunnerError::refused(
-                "control_boundary_changed",
-                "the reply does not name the currently held owned boundary",
-            ));
-        }
-        if let ContextDecision::Unavailable { reason } = &reply.context {
-            return Ok(self.refuse_held(reason));
-        }
-        let boundary = reply.boundary.as_deref().ok_or_else(|| {
-            RunnerError::refused(
-                "control_boundary_missing",
-                "a release names a currently held boundary",
-            )
-        })?;
-        if self.boundary != Boundary::Idle {
-            return Err(RunnerError::refused(
-                "control_boundary_active",
-                "a service reply cannot release an active turn",
-            ));
-        }
-        if let ContextDecision::Compact { crossing } = &reply.context
-            && self.authority.crossing.as_deref() != Some(crossing.as_str())
-        {
-            return Err(RunnerError::refused(
-                "control_crossing_changed",
-                "compaction is not the held crossing",
-            ));
-        }
-        let mut update = self.review_reminders(boundary, &reply.reminders)?;
-        self.authority.answered = true;
-        self.authority.last = Some(AppliedContext::of(&reply.context));
-        match &reply.context {
-            ContextDecision::Unavailable { reason } => {
-                return Err(RunnerError::refused("control_boundary_unavailable", reason));
-            }
-            ContextDecision::Released => {
-                if let Some(crossing) = self.authority.crossing.take()
-                    && let Some(position) = self
-                        .pending
-                        .iter()
-                        .position(|pending| pending.kind == Kind::Compact && pending.id == crossing)
-                {
-                    self.pending.remove(position);
-                    self.pending_ids.remove(&crossing);
-                    update.receipts.push(super::receipt(
-                        &crossing,
-                        crate::operations::OperationState::Refused,
-                        "context_policy_released: compaction was not written",
-                    ));
-                }
-                self.authority.normal = true;
-                self.authority.compact = None;
-            }
-            ContextDecision::Compact { crossing } => {
-                self.authority.normal = false;
-                self.authority.compact = Some(crossing.clone());
-            }
-            ContextDecision::Held { crossing, .. } => {
-                self.authority.crossing.clone_from(crossing);
-                self.authority.normal = false;
-                self.authority.compact = None;
-            }
-        }
-        self.dispatch(&mut update)?;
-        Ok(update)
-    }
 }
 
 impl crate::session::Sessions {
@@ -437,22 +361,15 @@ impl crate::session::Sessions {
         table
             .operations
             .check_control_identity(&operation.operation)?;
-        let applied = runtime(&mut table, &operation.session, reply.generation)?
+        let plan = runtime(&mut table, &operation.session, reply.generation)?
             .controller
-            .boundary_reply(reply);
-        let (state, words, update) = match applied {
-            Ok(update) => (
+            .plan_boundary_reply(reply);
+        let (state, words) = match &plan {
+            Ok(_) => (
                 OperationState::Confirmed,
                 "boundary_authority_applied".to_owned(),
-                update,
             ),
-            Err(error) => {
-                let words = error.to_string();
-                let update = runtime(&mut table, &operation.session, reply.generation)?
-                    .controller
-                    .refuse_held(&words);
-                (OperationState::Refused, words, update)
-            }
+            Err(error) => (OperationState::Refused, error.to_string()),
         };
         let outcome = crate::operations::OperationOutcome {
             operation: operation.operation,
@@ -465,6 +382,11 @@ impl crate::session::Sessions {
             ended: None,
         };
         table.operations.keep_control(outcome.clone())?;
+        let controller = &mut runtime(&mut table, &operation.session, reply.generation)?.controller;
+        let update = match plan {
+            Ok(plan) => controller.apply_boundary_plan(plan),
+            Err(_) => controller.refuse_held(&outcome.words),
+        };
         apply(&mut table, &operation.session, reply.generation, update)?;
         drop(table);
         self.writer.barrier()?;
@@ -521,5 +443,72 @@ impl crate::session::Sessions {
             .as_ref()
             .and_then(|live| live.control.as_ref())
             .map(|control| control.controller.control_status()))
+    }
+}
+
+impl Controller {
+    pub(super) fn apply_boundary_plan(&mut self, plan: BoundaryPlan<'_>) -> Update {
+        let (reply, boundary, decisions, next) = match plan {
+            BoundaryPlan::Unavailable(reason) => return self.refuse_held(reason),
+            BoundaryPlan::Current {
+                reply,
+                boundary,
+                decisions,
+                next,
+            } => (reply, boundary, decisions, next),
+        };
+        let mut update = self.apply_reminders(boundary, &decisions);
+        self.authority.answered = true;
+        self.authority.last = Some(AppliedContext::of(&reply.context));
+        match &reply.context {
+            ContextDecision::Released => {
+                if let Some(crossing) = self.authority.crossing.take()
+                    && let Some(position) = self
+                        .pending
+                        .iter()
+                        .position(|pending| pending.kind == Kind::Compact && pending.id == crossing)
+                {
+                    self.pending.remove(position);
+                    self.pending_ids.remove(&crossing);
+                    update.receipts.push(super::receipt(
+                        &crossing,
+                        OperationState::Refused,
+                        "context_policy_released: compaction was not written",
+                    ));
+                }
+                self.authority.normal = true;
+                self.authority.compact = None;
+            }
+            ContextDecision::Compact { crossing } => {
+                self.authority.normal = false;
+                self.authority.compact = Some(crossing.clone());
+            }
+            ContextDecision::Held { crossing, .. } => {
+                self.authority.crossing.clone_from(crossing);
+                self.authority.normal = false;
+                self.authority.compact = None;
+            }
+            ContextDecision::Unavailable { .. } => {}
+        }
+        if let Some(next) = next {
+            let (pending, frame) = *next;
+            self.pending.pop_front();
+            self.pending_ids.remove(&pending.id);
+            self.boundary = Boundary::Reserved;
+            self.authority.waiting = None;
+            self.authority.answered = false;
+            self.compacted = None;
+            self.admitted = false;
+            self.turn = None;
+            update
+                .events
+                .push(self.event("control_prepared", None, Some(pending.id.clone())));
+            update.dispatches.push(Dispatch {
+                operation: pending.id.clone(),
+                frame,
+            });
+            self.current = Some(pending);
+        }
+        update
     }
 }

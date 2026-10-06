@@ -389,3 +389,10 @@ impl Operations {
         Ok(())
     }
 }
+
+#[cfg(test)]
+impl Operations {
+    pub(crate) fn test_journal_offset(&mut self, offset: u64) -> u64 {
+        std::mem::replace(&mut self.journal_offset, offset)
+    }
+}
