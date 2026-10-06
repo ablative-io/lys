@@ -140,8 +140,8 @@ liminal carries the bus; nothing in liminal decides authority on its own.
 ## 6. Order of work (each is a brief; the ids are given in the briefs themselves)
 
 1. Lys: grant mode; rights in the access token; `lys-pass`; hot/deliberate marking on schema actions;
-   restricted placements; roles in the schema. (DIRECTORY-082 to -085 in this repository.)
-2. Lys: the machine identity (DIRECTORY-086).
+   restricted placements; roles in the schema. (ACCESS-001 to ACCESS-004 in this repository, cluster docs/design/access.)
+2. Lys: the machine identity (ACCESS-005).
 3. Cambium: sign in through Lys (081 installed first); permissions by Lys rights with the matrix; invite,
    seat and configure as deliberate routes; places as placements; the surface defects found on 6 October.
 4. aion: namespaces as resources; start/cancel/signal/deploy deliberate; reads hot; workers as machines or
