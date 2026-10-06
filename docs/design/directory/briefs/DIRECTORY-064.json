@@ -449,6 +449,12 @@
       "by": "Archie",
       "subject": "R4 and R5 name the control children of goals_state, goals_store, goals_api and receipts_api, and R5 names runner_sessions.rs for the control receipt's kind",
       "ruling": "So that no file passes the 500-line limit, the control work moves into whole-item children of its existing owners, each declared from its parent, with no second store, loop or owner. goals_state/control.rs holds the current-control and index reads and the Resent validation, goals_store/control.rs holds the resend append and its rendering, and goals_api/control.rs holds the boundary reminder judgement and the explicit reconciliation and resend route, and receipts_api/control.rs holds the current-controls readback and the reconciliation endpoints. runner_sessions.rs kind() (line 275) gains one arm for the ControlReceipt answer, and one for a ControlReceipts page if one is added; driven() stays untouched as ruled (Brisket 65bd921a; Waffles 2bb8cb97)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R5's migration carries every interrupted v1 Accepted or Delivering operation over as Uncertain, and the restart assertion at tests/operations.rs line 259 reads Uncertain instead of Refused",
+      "ruling": "harness_control/events.rs managed_written (lines 343 to 371) sets a Delivering operation to Accepted only after its pipe write succeeded, so an installed v1 Accepted may already have been sent. Reading it as Refused tells the person it never happened, and that invites a second delivery. So the migration carries every interrupted v1 Accepted or Delivering operation over as Uncertain, with a private control record whose preparation is named absent and whose certainty is possibly_sent. No request id, frame or admission is invented, and nothing is replayed. The assertion at tests/operations.rs line 259 that expected the v1 Accepted operation Refused now expects it Uncertain, with that named lack-of-preparation evidence. This is a stronger check, not a narrowed one. Three cases are added beside it: a migrated legacy Uncertain is never resent on its own and offers the responsible person's decision; that decision passes the same boundary and authority checks as any resend; a newly prepared SafelyUnsent operation still reads Refused and is kept (Brisket d81030d7; Waffles bfb64be0)."
     }
   ]
 }
