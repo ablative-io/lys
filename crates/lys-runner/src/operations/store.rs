@@ -18,6 +18,7 @@ const STORAGE_FORMAT: &str = "lys-runner-operations/v2";
 struct Record {
     outcome: OperationOutcome,
     control: Option<Control>,
+    original_request: Option<[u8; 32]>,
 }
 
 #[derive(Deserialize)]
@@ -36,6 +37,7 @@ enum Row {
 struct Writing<'a> {
     outcome: &'a OperationOutcome,
     control: Option<&'a Control>,
+    original_request: Option<&'a [u8; 32]>,
 }
 
 #[derive(Deserialize)]
@@ -46,6 +48,7 @@ struct Snapshot {
     seen: HashSet<String>,
     held: HashMap<String, OperationOutcome>,
     controls: HashMap<String, Control>,
+    original_requests: HashMap<String, [u8; 32]>,
 }
 
 #[derive(Serialize)]
@@ -55,6 +58,7 @@ struct Sealing<'a> {
     seen: &'a HashSet<String>,
     held: &'a HashMap<String, OperationOutcome>,
     controls: &'a HashMap<String, Control>,
+    original_requests: &'a HashMap<String, [u8; 32]>,
 }
 
 impl Operations {
@@ -71,6 +75,7 @@ impl Operations {
             checkpoint_offset: 0,
             checkpoint_bytes: 0,
             controls: HashMap::new(),
+            original_requests: HashMap::new(),
             by_session: BTreeMap::new(),
             held: HashMap::new(),
             seen: HashSet::new(),
@@ -171,10 +176,25 @@ impl Operations {
                     .ok_or_else(|| unavailable("checkpoint preparation has no outcome"))?,
             )?;
         }
+        if snapshot
+            .original_requests
+            .keys()
+            .any(|id| !snapshot.held.contains_key(id))
+        {
+            return Err(unavailable(
+                "checkpoint contains an orphaned request identity",
+            ));
+        }
+        self.original_requests = snapshot.original_requests;
         self.controls = snapshot.controls;
         for (id, outcome) in snapshot.held {
             if id != outcome.operation || !self.seen.contains(&id) {
                 return Err(unavailable("checkpoint outcome identity is inconsistent"));
+            }
+            if super::control::managed_request(&outcome.request)
+                && !self.original_requests.contains_key(&id)
+            {
+                return Err(unavailable("managed request has no original identity"));
             }
             self.fold(outcome, now);
         }
@@ -204,7 +224,23 @@ impl Operations {
                 return Err(unavailable("a journal decision batch is empty"));
             }
             let mut prepared = BTreeSet::new();
+            let mut identities = BTreeMap::new();
             for record in &records {
+                let original = identities
+                    .get(&record.outcome.operation)
+                    .or_else(|| self.original_requests.get(&record.outcome.operation));
+                if super::control::managed_request(&record.outcome.request)
+                    && record.original_request.is_none()
+                    || original
+                        .is_some_and(|original| Some(original) != record.original_request.as_ref())
+                {
+                    return Err(unavailable(
+                        "journal record drops or changes the original request identity",
+                    ));
+                }
+                if let Some(identity) = record.original_request {
+                    identities.insert(record.outcome.operation.clone(), identity);
+                }
                 if let Some(control) = &record.control {
                     control.validate(&record.outcome)?;
                     prepared.insert(record.outcome.operation.as_str());
@@ -221,6 +257,10 @@ impl Operations {
                 .checked_add(u64::try_from(read).map_err(unavailable)?)
                 .ok_or_else(|| unavailable("journal offset overflows"))?;
             for record in records {
+                if let Some(identity) = record.original_request {
+                    self.original_requests
+                        .insert(record.outcome.operation.clone(), identity);
+                }
                 if let Some(control) = record.control {
                     self.controls
                         .insert(record.outcome.operation.clone(), control);
@@ -293,6 +333,12 @@ impl Operations {
         output: &mut impl Write,
         outcome: &OperationOutcome,
     ) -> Result<(), RunnerError> {
+        if super::control::managed_request(&outcome.request) {
+            return Err(RunnerError::refused(
+                "operation_legacy_request_invalid",
+                "the installed legacy record cannot contain a managed request",
+            ));
+        }
         let legacy = matches!(
             outcome.state,
             OperationState::Accepted | OperationState::Delivering | OperationState::Uncertain
@@ -309,6 +355,7 @@ impl Operations {
             &Writing {
                 outcome,
                 control: legacy.as_ref(),
+                original_request: None,
             },
         )
         .map_err(unavailable)?;
@@ -343,7 +390,7 @@ impl Operations {
     }
 
     fn record_at(&mut self, outcome: OperationOutcome, now: u64) -> Result<(), RunnerError> {
-        self.record_change(outcome, now, None)
+        self.record_change(outcome, now, None, None)
     }
 
     pub(super) fn record_control(
@@ -352,7 +399,15 @@ impl Operations {
         control: Control,
     ) -> Result<(), RunnerError> {
         control.validate(&outcome)?;
-        self.record_change(outcome, now_ms(), Some(control))
+        self.record_change(outcome, now_ms(), Some(control), None)
+    }
+
+    pub(super) fn record_request(
+        &mut self,
+        outcome: OperationOutcome,
+        identity: [u8; 32],
+    ) -> Result<(), RunnerError> {
+        self.record_change(outcome, now_ms(), None, Some(identity))
     }
 
     fn record_change(
@@ -360,12 +415,16 @@ impl Operations {
         outcome: OperationOutcome,
         now: u64,
         control: Option<Control>,
+        original_request: Option<[u8; 32]>,
     ) -> Result<(), RunnerError> {
         let mut bytes = serde_json::to_vec(&Writing {
             outcome: &outcome,
             control: control
                 .as_ref()
                 .or_else(|| self.controls.get(&outcome.operation)),
+            original_request: original_request
+                .as_ref()
+                .or_else(|| self.original_requests.get(&outcome.operation)),
         })
         .map_err(unavailable)?;
         let length = if let Some(batch) = &self.batch {
@@ -392,6 +451,10 @@ impl Operations {
                 .map_err(unavailable)?;
         }
         self.journal_offset = offset;
+        if let Some(identity) = original_request {
+            self.original_requests
+                .insert(outcome.operation.clone(), identity);
+        }
         if let Some(control) = control {
             self.controls.insert(outcome.operation.clone(), control);
         }
@@ -418,6 +481,7 @@ impl Operations {
             seen: &self.seen,
             held: &self.held,
             controls: &self.controls,
+            original_requests: &self.original_requests,
         })
         .map_err(unavailable)?;
         let length = u64::try_from(bytes.len()).map_err(unavailable)?;
@@ -473,8 +537,8 @@ mod batch_validation_tests {
             decision: None,
         };
         let mut bytes = serde_json::to_vec(&serde_json::json!({"batch":[
-            serde_json::to_value(Writing {outcome:&first,control:None})?,
-            serde_json::to_value(Writing {outcome:&second,control:Some(&invalid)})?,
+            serde_json::to_value(Writing {outcome:&first,control:None,original_request:None})?,
+            serde_json::to_value(Writing {outcome:&second,control:Some(&invalid),original_request:None})?,
         ]}))?;
         bytes.push(b'\n');
         std::fs::write(&operations.path, bytes)?;

@@ -6,9 +6,19 @@ use lys_runner::harness_control::{Kind, Pending};
 use lys_runner::operations::{OperationState, TextDigest};
 use lys_runner::{Act, Sessions};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::error::Error;
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+fn request_identity(value: Value) -> Result<Value, Box<dyn Error>> {
+    let request: lys_runner::operations::OperationRequest = serde_json::from_value(value)?;
+    let mut hash = Sha256::new();
+    hash.update(b"lys-operation-request-json/v1\n");
+    hash.update(serde_json::to_vec(&request)?);
+    let identity: [u8; 32] = hash.finalize().into();
+    Ok(serde_json::to_value(identity)?)
+}
 
 fn prepared(certainty: &str) -> Result<tempfile::TempDir, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
@@ -33,7 +43,10 @@ fn prepared(certainty: &str) -> Result<tempfile::TempDir, Box<dyn Error>> {
             "message":{"role":"user","content":"Lys reminder\nprivate goal words"}},
         "reference":{"goal":"goal","occurrence":"occurrence","version":"original","prior":null}},
         "original_text":TextDigest::of("private goal words"),"certainty":certainty,"admitted":null,"decision":null});
-    let record = json!({"outcome":outcome,"control":control});
+    let identity = request_identity(
+        json!({"request":"goal_reminder", "text":"private goal words", "reference":control["prepared"]["reference"]}),
+    )?;
+    let record = json!({"outcome":outcome,"control":control,"original_request":identity});
     let mut bytes = serde_json::to_vec(&record)?;
     bytes.push(b'\n');
     std::fs::write(dir.path().join("operations.v2.journal"), bytes)?;
@@ -221,6 +234,9 @@ fn an_original_ask_reads_the_current_prepared_receipt_but_changed_words_are_refu
     let path = dir.path().join("operations.v2.journal");
     let mut record: Value = serde_json::from_slice(&std::fs::read(&path)?)?;
     record["control"]["original_text"] = serde_json::to_value(TextDigest::of("original ask"))?;
+    record["original_request"] = request_identity(
+        json!({"request":"goal_reminder", "text":"original ask", "reference":record["control"]["prepared"]["reference"]}),
+    )?;
     let mut bytes = serde_json::to_vec(&record)?;
     bytes.push(b'\n');
     std::fs::write(path, bytes)?;

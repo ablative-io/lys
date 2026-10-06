@@ -668,3 +668,258 @@ fn a_dropped_nonempty_decision_batch_faults_the_writer_without_a_prefix()
     );
     Ok(())
 }
+
+fn request_identity_owner()
+-> Result<(tempfile::TempDir, std::sync::Arc<crate::session::Sessions>), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let kept = crate::state::Kept::new(vec![crate::state::KeptSession {
+        session: "session".to_owned(),
+        pid: None,
+        leader_start: None,
+        started_at: 1,
+        columns: 80,
+        rows: 24,
+        ended: None,
+    }]);
+    std::fs::write(dir.path().join("sessions.json"), serde_json::to_vec(&kept)?)?;
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    Ok((dir, sessions))
+}
+
+fn original_request(request: super::OperationRequest) -> super::Operation {
+    super::Operation {
+        operation: "original-request".to_owned(),
+        session: "session".to_owned(),
+        request,
+    }
+}
+
+fn refuse_changed_request(
+    sessions: &crate::session::Sessions,
+    operation: super::Operation,
+) -> Result<(), Box<dyn Error>> {
+    let error = sessions
+        .operate(operation)
+        .err()
+        .ok_or("a changed request returned another request's outcome")?;
+    assert_eq!(error.name(), "operation_reused");
+    assert!(!error.to_string().contains("private initial words"));
+    Ok(())
+}
+
+#[test]
+fn a_goal_request_refuses_every_changed_reference_live_and_after_reopen()
+-> Result<(), Box<dyn Error>> {
+    let (dir, sessions) = request_identity_owner()?;
+    let original = original_request(super::OperationRequest::GoalReminder {
+        text: "private initial words".to_owned(),
+        reference: crate::harness_control::ReminderReference {
+            goal: "goal".to_owned(),
+            occurrence: "occurrence".to_owned(),
+            version: "version".to_owned(),
+            prior: None,
+        },
+    });
+    let held = sessions.operate(original.clone())?;
+    for field in 0..4 {
+        let mut changed = original.clone();
+        if let super::OperationRequest::GoalReminder { reference, .. } = &mut changed.request {
+            match field {
+                0 => reference.goal = "another-goal".to_owned(),
+                1 => reference.occurrence = "another-occurrence".to_owned(),
+                2 => reference.version = "another-version".to_owned(),
+                _ => reference.prior = Some("possible-prior".to_owned()),
+            }
+        }
+        refuse_changed_request(&sessions, changed)?;
+    }
+    assert_eq!(sessions.operate(original.clone())?, held);
+    drop(sessions);
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    assert_eq!(sessions.operate(original.clone())?, held);
+    let mut changed = original;
+    if let super::OperationRequest::GoalReminder { reference, .. } = &mut changed.request {
+        reference.goal = "another-goal".to_owned();
+    }
+    refuse_changed_request(&sessions, changed)?;
+    Ok(())
+}
+
+#[test]
+fn a_context_request_refuses_a_changed_crossing_live_and_after_reopen() -> Result<(), Box<dyn Error>>
+{
+    let (dir, sessions) = request_identity_owner()?;
+    let original = original_request(super::OperationRequest::ContextCompact {
+        text: "private initial words".to_owned(),
+        crossing: "original-request".to_owned(),
+    });
+    let held = sessions.operate(original.clone())?;
+    let changed = original_request(super::OperationRequest::ContextCompact {
+        text: "private initial words".to_owned(),
+        crossing: "another-crossing".to_owned(),
+    });
+    refuse_changed_request(&sessions, changed.clone())?;
+    assert_eq!(sessions.operate(original.clone())?, held);
+    drop(sessions);
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    assert_eq!(sessions.operate(original)?, held);
+    refuse_changed_request(&sessions, changed)?;
+    Ok(())
+}
+
+fn managed_v1_refusal(kind: &str) -> Result<(), Box<dyn Error>> {
+    for journal in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let mut record = outcome("managed-in-v1".to_owned());
+        record.request = kind.to_owned();
+        if journal {
+            let mut bytes = serde_json::to_vec(&record)?;
+            bytes.push(b'\n');
+            std::fs::write(dir.path().join("operations.jsonl"), bytes)?;
+        } else {
+            std::fs::write(
+                dir.path().join("operations.json"),
+                serde_json::to_vec(&Kept {
+                    format: FORMAT.to_owned(),
+                    operations: vec![record],
+                })?,
+            )?;
+        }
+        let error = Operations::open_at(dir.path(), 1)
+            .err()
+            .ok_or("an installed v1 record accepted a managed request kind")?;
+        assert_eq!(error.name(), "operation_legacy_request_invalid");
+        assert!(!dir.path().join("operations.v2.journal").exists());
+    }
+    Ok(())
+}
+
+#[test]
+fn v1_migration_refuses_goal_reminder() -> Result<(), Box<dyn Error>> {
+    managed_v1_refusal("goal_reminder")
+}
+#[test]
+fn v1_migration_refuses_context_compact() -> Result<(), Box<dyn Error>> {
+    managed_v1_refusal("context_compact")
+}
+#[test]
+fn v1_migration_refuses_boundary_reply() -> Result<(), Box<dyn Error>> {
+    managed_v1_refusal("boundary_reply")
+}
+
+#[test]
+fn the_original_request_digest_survives_a_changed_preparation_and_reopen()
+-> Result<(), Box<dyn Error>> {
+    use sha2::{Digest, Sha256};
+    let (dir, sessions) = request_identity_owner()?;
+    let original = original_request(super::OperationRequest::GoalReminder {
+        text: "private initial words".to_owned(),
+        reference: crate::harness_control::ReminderReference {
+            goal: "goal".to_owned(),
+            occurrence: "occurrence".to_owned(),
+            version: "version".to_owned(),
+            prior: None,
+        },
+    });
+    let canonical = r#"{"request":"goal_reminder","text":"private initial words","reference":{"goal":"goal","occurrence":"occurrence","version":"version","prior":null}}"#;
+    assert_eq!(serde_json::to_string(&original.request)?, canonical);
+    let mut hash = Sha256::new();
+    hash.update(b"lys-operation-request-json/v1\n");
+    hash.update(canonical.as_bytes());
+    let expected: [u8; 32] = hash.finalize().into();
+    assert_eq!(original.request.identity()?, expected);
+    sessions.operate(original.clone())?;
+    {
+        let mut table = sessions.lock()?;
+        let operations = &mut table.operations;
+        operations.set(
+            &original.operation,
+            OperationState::Accepted,
+            "waiting".to_owned(),
+        )?;
+        let mut prepared = control_preparation()?;
+        prepared.reference = Some(crate::harness_control::ReminderReference {
+            goal: "goal".to_owned(),
+            occurrence: "occurrence".to_owned(),
+            version: "current-version".to_owned(),
+            prior: None,
+        });
+        prepared.frame = serde_json::json!({"type":"user","message":"private current words"});
+        operations.prepare(
+            &original.operation,
+            prepared,
+            super::TextDigest::of("private current words"),
+        )?;
+        operations.arm(&original.operation)?;
+        operations.set(
+            &original.operation,
+            OperationState::Uncertain,
+            "write was unconfirmed".to_owned(),
+        )?;
+        assert_eq!(
+            operations.original_request(&original.operation),
+            Some(&expected)
+        );
+    }
+    let held = sessions.outcome(&original.operation)?;
+    assert_eq!(sessions.operate(original.clone())?, held);
+    drop(sessions);
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    assert_eq!(original.request.identity()?, expected);
+    assert_eq!(
+        sessions
+            .lock()?
+            .operations
+            .original_request(&original.operation),
+        Some(&expected)
+    );
+    assert_eq!(sessions.operate(original.clone())?, held);
+    let mut changed = original;
+    if let super::OperationRequest::GoalReminder { reference, .. } = &mut changed.request {
+        reference.version = "current-version".to_owned();
+    }
+    refuse_changed_request(&sessions, changed)?;
+    Ok(())
+}
+
+#[test]
+fn a_boundary_reply_refuses_a_changed_field_live_and_after_reopen() -> Result<(), Box<dyn Error>> {
+    let (dir, sessions) = request_identity_owner()?;
+    let reply = crate::harness_control::BoundaryReply {
+        generation: 1,
+        boundary: Some("boundary".to_owned()),
+        context: crate::harness_control::ContextDecision::Released,
+        reminders: Vec::new(),
+    };
+    let original = original_request(super::OperationRequest::BoundaryReply {
+        reply: reply.clone(),
+    });
+    let mut held = outcome(original.operation.clone());
+    held.request = "boundary_reply".to_owned();
+    held.state = OperationState::Confirmed;
+    held.at = crate::session::now_ms();
+    held.text = Some(super::TextDigest::of(&serde_json::to_string(&reply)?));
+    sessions
+        .lock()?
+        .operations
+        .keep_control(held.clone(), &original.request)?;
+    assert_eq!(sessions.apply_boundary_reply(original.clone())?, held);
+    let mut changed = original.clone();
+    if let super::OperationRequest::BoundaryReply { reply } = &mut changed.request {
+        reply.generation = 2;
+    }
+    let error = sessions
+        .apply_boundary_reply(changed.clone())
+        .err()
+        .ok_or("a changed reply returned the original decision")?;
+    assert_eq!(error.name(), "operation_reused");
+    drop(sessions);
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    assert_eq!(sessions.apply_boundary_reply(original)?, held);
+    let error = sessions
+        .apply_boundary_reply(changed)
+        .err()
+        .ok_or("a changed reply returned the original decision after reopen")?;
+    assert_eq!(error.name(), "operation_reused");
+    Ok(())
+}

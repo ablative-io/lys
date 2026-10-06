@@ -42,8 +42,13 @@ pub(crate) fn accept(
     if let Some(held) = table.operations.get(&operation.operation) {
         let same = held.session == operation.session
             && held.request == operation.request.name()
-            && table.operations.original_text(&operation.operation)
-                == operation.request.text().map(TextDigest::of).as_ref();
+            && match table.operations.original_request(&operation.operation) {
+                Some(original) => original == &operation.request.identity()?,
+                None => {
+                    table.operations.original_text(&operation.operation)
+                        == operation.request.text().map(TextDigest::of).as_ref()
+                }
+            };
         if !same {
             return Err(RunnerError::refused(
                 "operation_reused",
@@ -87,7 +92,9 @@ pub(crate) fn accept(
         text: operation.request.text().map(TextDigest::of),
         ended: None,
     };
-    table.operations.record(outcome.clone())?;
+    table
+        .operations
+        .record_request(outcome.clone(), operation.request.identity()?)?;
     feed(table, &outcome);
     if state == OperationState::Refused {
         return Ok(outcome);

@@ -347,6 +347,8 @@ impl crate::session::Sessions {
             if held.session != operation.session
                 || held.request != "boundary_reply"
                 || held.text.as_ref() != Some(&digest)
+                || table.operations.original_request(&operation.operation)
+                    != Some(&operation.request.identity()?)
             {
                 return Err(RunnerError::refused(
                     "operation_reused",
@@ -383,7 +385,9 @@ impl crate::session::Sessions {
         };
         table.operations.begin_journal_batch()?;
         let applied = (|| {
-            table.operations.keep_control(outcome.clone())?;
+            table
+                .operations
+                .keep_control(outcome.clone(), &operation.request)?;
             let controller =
                 &mut runtime(&mut table, &operation.session, reply.generation)?.controller;
             let update = match plan {

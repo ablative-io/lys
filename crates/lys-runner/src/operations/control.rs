@@ -3,10 +3,38 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{OperationOutcome, OperationState, Operations, TextDigest};
+use super::{OperationOutcome, OperationRequest, OperationState, Operations, TextDigest};
 use crate::error::RunnerError;
 use crate::harness_control::{Binding, ReminderReference};
 use crate::session::{Sessions, now_ms};
+use sha2::{Digest, Sha256};
+
+const REQUEST_ENCODING: &[u8] = b"lys-operation-request-json/v1\n";
+
+struct RequestHash(Sha256);
+impl std::io::Write for RequestHash {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.update(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl OperationRequest {
+    // Typed JSON fixes declaration order and decimal integers without retaining private input.
+    pub(crate) fn identity(&self) -> Result<[u8; 32], RunnerError> {
+        let mut writer = RequestHash(Sha256::new());
+        writer.0.update(REQUEST_ENCODING);
+        serde_json::to_writer(&mut writer, self).map_err(super::unavailable)?;
+        Ok(writer.0.finalize().into())
+    }
+}
+
+pub(super) fn managed_request(name: &str) -> bool {
+    matches!(name, "goal_reminder" | "context_compact" | "boundary_reply")
+}
 
 /// What durable evidence says about an attempted pipe delivery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

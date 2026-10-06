@@ -206,6 +206,7 @@ pub(crate) struct Operations {
     checkpoint_offset: u64,
     checkpoint_bytes: u64,
     controls: HashMap<String, Control>,
+    original_requests: HashMap<String, [u8; 32]>,
     by_session: BTreeMap<String, BTreeSet<String>>,
     held: HashMap<String, OperationOutcome>,
     seen: HashSet<String>,
@@ -313,6 +314,7 @@ impl Operations {
                 }
             }
             self.controls.remove(&id);
+            self.original_requests.remove(&id);
             self.texts.remove(&id);
             self.compacting.remove(&id);
         }
@@ -328,13 +330,21 @@ impl Operations {
         Ok(())
     }
 
-    pub(crate) fn keep_control(&mut self, outcome: OperationOutcome) -> Result<(), RunnerError> {
+    pub(crate) fn keep_control(
+        &mut self,
+        outcome: OperationOutcome,
+        request: &OperationRequest,
+    ) -> Result<(), RunnerError> {
         self.repeated(&outcome.operation)?;
-        self.record(outcome)
+        self.record_request(outcome, request.identity()?)
     }
 
     pub(crate) fn check_control_identity(&self, operation: &str) -> Result<(), RunnerError> {
         self.repeated(operation)
+    }
+
+    pub(crate) fn original_request(&self, operation: &str) -> Option<&[u8; 32]> {
+        self.original_requests.get(operation)
     }
 
     /// The outcome of `operation`.
