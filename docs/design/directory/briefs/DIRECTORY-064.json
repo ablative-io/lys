@@ -98,7 +98,7 @@
           "crates/lys-runner/src/harness_control.rs",
           "crates/lys-runner/src/harness_control/events.rs",
           "crates/lys-home/src/harness/claude_code/launch.rs",
-          "crates/lys-home/src/harness/codex/config.rs"
+          "crates/lys-home/src/harness/codex/launch.rs"
         ],
         "delete": []
       },
@@ -278,5 +278,13 @@
     "Card implementation follows card_build_v3, src_pr and src_land with Jev, fmt, Clippy pedantic, all required tests, ast-grep and full gate on Dean.",
     "Record actual harness versions and protocol observations from scratch launches, with separate admission/compaction/stop evidence and browser evidence. No installed-production claim follows from a scratch proof.",
     "Grounding: Claude documentation https://code.claude.com/docs/en/agent-sdk/slash-commands and https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode; installed Claude 2.1.284 --help lists stream-json and replay-user-messages. Codex contract source 7cbba483, codex-rs/app-server-protocol/src/protocol and app-server/src/request_processors/thread_processor.rs. These sources define fixtures; launched-binary proof remains required."
+  ],
+  "amendments": [
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R2 modify path crates/lys-home/src/harness/codex/config.rs",
+      "ruling": "That file does not exist in the tree at bad8df77. The Codex launch line is composed in crates/lys-home/src/harness/codex/launch.rs, so R2 modifies that file. Found by git ls-tree before BOX 18 (Brisket) started; the box carries the same correction."
+    }
   ]
 }

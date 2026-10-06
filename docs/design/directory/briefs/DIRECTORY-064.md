@@ -97,7 +97,7 @@ Behavioural. WHEN the dispatcher delivers an act, THE SYSTEM SHALL use a machine
 - modify: crates/lys-runner/src/harness_control.rs
 - modify: crates/lys-runner/src/harness_control/events.rs
 - modify: crates/lys-home/src/harness/claude_code/launch.rs
-- modify: crates/lys-home/src/harness/codex/config.rs
+- modify: crates/lys-home/src/harness/codex/launch.rs
 
 **Checklist:**
 - C434 — Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).
