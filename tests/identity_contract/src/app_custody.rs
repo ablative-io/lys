@@ -50,38 +50,55 @@ pub struct Custody {
 }
 
 impl Custody {
-    fn kept(&self) -> std::sync::MutexGuard<'_, Kept> {
+    /// What the stand-in holds; a lock poisoned by a panicking test is
+    /// refused by name, never recovered.
+    fn kept(&self) -> std::io::Result<std::sync::MutexGuard<'_, Kept>> {
         self.kept
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .map_err(|error| std::io::Error::other(format!("fixture_lock_poisoned: {error}")))
     }
 
     /// Take the stand-in down: every request is refused until `up`.
-    pub fn down(&self) {
-        self.kept().down = true;
+    ///
+    /// # Errors
+    /// Returns `fixture_lock_poisoned` when the stand-in's lock is poisoned.
+    pub fn down(&self) -> std::io::Result<()> {
+        self.kept()?.down = true;
+        Ok(())
     }
 
     /// Bring the stand-in back.
-    pub fn up(&self) {
-        self.kept().down = false;
+    ///
+    /// # Errors
+    /// Returns `fixture_lock_poisoned` when the stand-in's lock is poisoned.
+    pub fn up(&self) -> std::io::Result<()> {
+        self.kept()?.down = false;
+        Ok(())
     }
 
     /// The stand-in no longer holds `app`'s sealed client secret, as a
     /// broker whose store was lost: issuing to it is refused in the broker's
     /// words.
-    pub fn lose(&self, app: &str) {
-        self.kept().lost.push(app.to_owned());
+    ///
+    /// # Errors
+    /// Returns `fixture_lock_poisoned` when the stand-in's lock is poisoned.
+    pub fn lose(&self, app: &str) -> std::io::Result<()> {
+        self.kept()?.lost.push(app.to_owned());
+        Ok(())
     }
 
     /// The ids of `app`'s credentials the stand-in has ended.
-    #[must_use]
-    pub fn ended(&self, app: &str) -> Vec<String> {
-        self.kept()
+    ///
+    /// # Errors
+    /// Returns `fixture_lock_poisoned` when the stand-in's lock is poisoned.
+    pub fn ended(&self, app: &str) -> std::io::Result<Vec<String>> {
+        Ok(self
+            .kept()?
             .issued
             .iter()
             .filter(|held| held.app == app && held.ended)
             .map(|held| held.credential_id.clone())
-            .collect()
+            .collect())
     }
 }
 
@@ -136,12 +153,27 @@ fn down() -> Response {
     )
 }
 
+/// The stand-in's lock was poisoned: every request is refused by that name.
+fn poisoned(error: &std::io::Error) -> Response {
+    refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+}
+
+/// What the stand-in holds, or the refusal its poisoned lock answers.
+macro_rules! kept {
+    ($custody:expr) => {
+        match $custody.kept() {
+            Ok(kept) => kept,
+            Err(error) => return poisoned(&error),
+        }
+    };
+}
+
 async fn prepare(
     State(custody): State<Custody>,
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
-    if custody.kept().down {
+    if kept!(custody).down {
         return down();
     }
     let owner = owner(&headers);
@@ -160,7 +192,7 @@ async fn issue(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
-    let mut kept = custody.kept();
+    let mut kept = kept!(custody);
     if kept.down {
         return down();
     }
@@ -190,7 +222,7 @@ async fn issue(
 }
 
 async fn authenticate(State(custody): State<Custody>, Json(body): Json<Value>) -> Response {
-    let mut kept = custody.kept();
+    let mut kept = kept!(custody);
     if kept.down {
         return down();
     }
@@ -227,7 +259,7 @@ async fn authenticate(State(custody): State<Custody>, Json(body): Json<Value>) -
 }
 
 async fn end(State(custody): State<Custody>, Json(body): Json<Value>) -> Response {
-    let mut kept = custody.kept();
+    let mut kept = kept!(custody);
     if kept.down {
         return down();
     }

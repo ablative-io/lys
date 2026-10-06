@@ -150,7 +150,7 @@ async fn an_issued_credential_signs_a_product_in_until_it_is_revoked_and_a_refre
         revoked["client_credentials"][0]["revoked_reason"],
         "rotated"
     );
-    assert_eq!(custody.ended(PRODUCT), vec![first_id.clone()]);
+    assert_eq!(custody.ended(PRODUCT)?, vec![first_id.clone()]);
     let (status, refused) = sign_in_with(&service, &cookie, &first_value, true).await?;
     assert_eq!(status, 401, "{refused}");
     assert_eq!(refused["error"], "invalid_client");
@@ -225,13 +225,13 @@ async fn with_the_broker_down_a_credential_is_refused_by_name_and_never_judged_b
         )
         .await?,
     )?;
-    custody.down();
+    custody.down()?;
     let (status, refused) = sign_in_with(&service, &cookie, &credential, true).await?;
     assert_ne!(status, 200, "{refused}");
     // Judged by the approved digest it would be credential_refused; it is the
     // broker's absence, by name.
     assert_eq!(refused["refusal"], "SecretsUnavailable", "{refused}");
-    custody.up();
+    custody.up()?;
     let (status, answer) = sign_in_with(&service, &cookie, &credential, true).await?;
     assert_eq!(status, 200, "{answer}");
     Ok(())
@@ -250,7 +250,7 @@ async fn a_credential_of_an_app_retired_while_the_broker_was_down_never_authenti
     .await?;
     let credential = value(&issued)?;
     let id = issued["credential_id"].as_str().ok_or("an id")?.to_owned();
-    custody.down();
+    custody.down()?;
     // Retirement is never refused for the broker's absence.
     let retired = ok(post(
         &service,
@@ -266,7 +266,7 @@ async fn a_credential_of_an_app_retired_while_the_broker_was_down_never_authenti
         true
     );
     assert_eq!(retired["client_credentials"][0]["ended_at_broker"], false);
-    custody.up();
+    custody.up()?;
     // The app is refused app_retired before the broker is asked.
     let (status, refused) = token(
         &service,
@@ -283,7 +283,7 @@ async fn a_credential_of_an_app_retired_while_the_broker_was_down_never_authenti
     .await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "app_retired");
-    assert!(custody.ended(PRODUCT).is_empty());
+    assert!(custody.ended(PRODUCT)?.is_empty());
     // The broker's digest is ended when it next answers an administrator's act.
     let mut body = registration(SECOND, &workspace_schema(SECOND))?;
     body["redirects"] = json!([BACK]);
@@ -296,7 +296,7 @@ async fn a_credential_of_an_app_retired_while_the_broker_was_down_never_authenti
         &OperationId::generate()?.to_string(),
     )
     .await?;
-    assert_eq!(custody.ended(PRODUCT), vec![id]);
+    assert_eq!(custody.ended(PRODUCT)?, vec![id]);
     assert_eq!(listed(&service, &cookie).await?[0]["ended_at_broker"], true);
     Ok(())
 }
@@ -343,7 +343,7 @@ async fn only_the_administrator_issues_and_revokes() -> TestResult {
 async fn a_broker_that_holds_no_sealed_client_secret_is_refused_by_name_and_nothing_is_kept()
 -> TestResult {
     let (service, cookie, _person, custody) = table_kept(CODE_SECONDS).await?;
-    custody.lose(PRODUCT);
+    custody.lose(PRODUCT)?;
     let refused = post(
         &service,
         &format!("/apps/{PRODUCT}/credentials/issue"),
