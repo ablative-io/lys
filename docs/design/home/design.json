@@ -2267,7 +2267,7 @@
     },
     {
       "path": "rust-toolchain.toml",
-      "note": "pins the toolchain at 1.97.1 with clippy and rustfmt"
+      "note": "pins the toolchain at 1.98.1 with clippy and rustfmt"
     },
     {
       "path": "$CAMBIUM/rules/ast-grep",

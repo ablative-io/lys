@@ -314,8 +314,7 @@ fn the_narrowing_is_unreachable_through_verify() {
             // editing `verify` cannot silently edit the baseline it is being
             // compared against.
             let before = ed25519_dalek::VerifyingKey::from_bytes(&non_canonical)
-                .ok()
-                .is_some_and(|key| key.verify_strict(message, &signature.into()).is_ok());
+                .is_ok_and(|key| key.verify_strict(message, &signature.into()).is_ok());
             let after = Ed25519Identity::verify(&non_canonical, message, &signature).is_ok();
             assert!(
                 !before,

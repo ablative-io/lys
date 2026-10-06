@@ -197,10 +197,11 @@ fn json(status: StatusCode, body: String) -> Response {
 }
 
 fn named(status: StatusCode, error: &str, words: &str) -> Response {
-    json(
-        status,
-        serde_json::json!({ "error": error, "words": words }).to_string(),
-    )
+    json(status, named_body(error, words))
+}
+
+fn named_body(error: &str, words: &str) -> String {
+    serde_json::json!({ "error": error, "words": words }).to_string()
 }
 
 fn status(error: &StartError) -> StatusCode {
@@ -225,26 +226,31 @@ where
 {
     match answer_with(service, headers, act).await {
         Ok(body) => json(StatusCode::OK, body),
-        Err(refused) => refused,
+        Err((status, body)) => json(status, body),
     }
 }
 
 /// Run `act` as [`answer`] does, handing back what it made, or the answer
 /// that refuses it.
-async fn answer_with<F, T>(service: Shared, headers: &HeaderMap, act: F) -> Result<T, Response>
+async fn answer_with<F, T>(
+    service: Shared,
+    headers: &HeaderMap,
+    act: F,
+) -> Result<T, (StatusCode, String)>
 where
     F: FnOnce(&StartService, &mut LaunchRecords, &str) -> Result<T, StartError> + Send + 'static,
     T: Send + 'static,
 {
-    service
-        .callers
-        .check_admission()
-        .map_err(|error| named(error.status(), &error.name(), &error.to_string()))?;
+    service.callers.check_admission().map_err(|error| {
+        (
+            error.status(),
+            named_body(&error.name(), &error.to_string()),
+        )
+    })?;
     let Some(caller) = service.callers.caller(headers) else {
-        return Err(named(
+        return Err((
             StatusCode::UNAUTHORIZED,
-            "not_signed_in",
-            "sign in to start an agent",
+            named_body("not_signed_in", "sign in to start an agent"),
         ));
     };
     let task = tokio::task::spawn_blocking(move || {
@@ -253,11 +259,10 @@ where
     });
     match task.await {
         Ok(Ok(made)) => Ok(made),
-        Ok(Err(error)) => Err(json(status(&error), error.to_json())),
-        Err(failed) => Err(named(
+        Ok(Err(error)) => Err((status(&error), error.to_json())),
+        Err(failed) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            "start_task_failed",
-            &failed.to_string(),
+            named_body("start_task_failed", &failed.to_string()),
         )),
     }
 }
@@ -327,7 +332,7 @@ async fn start(
     .await;
     let (given, caller) = match given {
         Ok(given) => given,
-        Err(refused) => return refused,
+        Err((status, body)) => return json(status, body),
     };
     launch_given(&service, given, &caller).await
 }
@@ -382,7 +387,7 @@ async fn start_again(
     .await;
     let (given, caller) = match given {
         Ok(given) => given,
-        Err(refused) => return refused,
+        Err((status, body)) => return json(status, body),
     };
     launch_given(&service, given, &caller).await
 }

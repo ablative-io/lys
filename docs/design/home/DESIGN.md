@@ -549,7 +549,7 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 - `.land/gates.sh` — the gate: scripts/design/gate.sh, cargo fmt --check, clippy in both feature shapes, cargo test --workspace --all-features, cargo doc in both shapes; every leg runs, red if any leg is
 - `scripts/design/gate.sh` — the design leg: validate, coverage and rendered markdown equal to what the JSON renders
 - `Cargo.toml` — [workspace.lints.clippy] sets pedantic = warn with unwrap_used, expect_used, panic and others; lys-home inherits them
-- `rust-toolchain.toml` — pins the toolchain at 1.97.1 with clippy and rustfmt
+- `rust-toolchain.toml` — pins the toolchain at 1.98.1 with clippy and rustfmt
 - `$CAMBIUM/rules/ast-grep` — the estate sweep rules at df4dca5de6899df89b06b94cdeeec3619877fc1d: mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async (haematite carries the same four byte for byte)
 - `crates/lys-home/src/harness/claude_code/render.rs` — on 0073b966 record_uuid gives an entry id that is not uuid-shaped a fresh random uuid (record::fresh_id) on every render, so two renders of a session holding the importer's `<uuid>-r<i>` ids differ; the launch template then shaped one from the SHA-256 of the entry id alone, outside any namespace, without a role or a session; it reads no clock and iterates no map or set
 - `crates/lys-home/src/harness/claude_code/import.rs` — a user record's tool results each become an entry with id `<uuid>-r<i>`; only the last keeps the record's uuid, and only when the record has no parts of its own; unchanged by this cluster's determinism work

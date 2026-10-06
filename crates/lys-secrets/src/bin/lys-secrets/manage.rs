@@ -307,15 +307,16 @@ pub async fn lease(
 }
 
 /// The caller of a signed lease act, whose body the signature covers.
-async fn lease_caller(shared: &Arc<Shared>, request: Request) -> Result<Caller, Response> {
+async fn lease_caller(
+    shared: &Arc<Shared>,
+    request: Request,
+) -> Result<Caller, (StatusCode, String)> {
     let (parts, body) = request.into_parts();
     // Guarded: read before the caller is known, as the caller's signature covers it.
     let body: Bytes = axum::body::to_bytes(body, MAX_BODY)
         .await
-        .map_err(|error| malformed("request body", error.to_string()).into_response())?;
-    caller(shared, &parts, &body)
-        .await
-        .map_err(IntoResponse::into_response)
+        .map_err(|error| malformed("request body", error.to_string()))?;
+    caller(shared, &parts, &body).await
 }
 
 /// One lease act by the caller on the lease named by the path.
@@ -334,7 +335,7 @@ async fn lease_act(
 ) -> Response {
     let who = match lease_caller(shared, request).await {
         Ok(who) => who,
-        Err(refusal) => return refusal,
+        Err(refusal) => return refusal.into_response(),
     };
     let lease = HandleId::from_text(lease_id);
     let answered = on_broker(shared, move |broker| {

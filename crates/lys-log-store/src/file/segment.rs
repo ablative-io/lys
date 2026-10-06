@@ -186,12 +186,11 @@ pub(super) fn read_offsets(path: &Path) -> StoreResult<Vec<u64>> {
     // A short last entry is a write that never finished; it is cut with the
     // rest of the tail check.
     Ok(bytes
-        .chunks_exact(8)
-        .map(|chunk| {
-            let mut entry = [0u8; 8];
-            entry.copy_from_slice(chunk);
-            u64::from_le_bytes(entry)
-        })
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .copied()
+        .map(u64::from_le_bytes)
         .collect())
 }
 

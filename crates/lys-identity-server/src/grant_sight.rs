@@ -103,7 +103,7 @@ pub(crate) fn on_callers_path(judged: &Judged<'_>, caller: IdentityId, id: Grant
 
 /// Whether a refusal may name the grant `text` to `caller`.
 pub(crate) fn grant_seen(judged: &Judged<'_>, caller: IdentityId, text: &str) -> bool {
-    GrantId::from_str(text).ok().is_some_and(|id| {
+    GrantId::from_str(text).is_ok_and(|id| {
         on_callers_path(judged, caller, id)
             || judged
                 .grants
