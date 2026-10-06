@@ -425,3 +425,164 @@ fn a_first_replay_is_not_confirmed_until_its_serving_version_is_proved() -> Resu
     }
     Ok(())
 }
+
+fn boundary(trigger: &str) -> Value {
+    json!({"type":"system","subtype":"compact_boundary","session_id":"conversation",
+        "compact_metadata":{"trigger":trigger}})
+}
+
+#[test]
+fn a_manual_boundary_before_its_replay_confirms_the_current_compaction() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    assert!(
+        control
+            .ingest(&binding(), &boundary("manual"))?
+            .receipts
+            .is_empty()
+    );
+    assert!(
+        control
+            .ingest(&binding(), &replay(&uuid))?
+            .receipts
+            .is_empty()
+    );
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Confirmed);
+    assert_eq!(update.receipts[0].reason, "harness_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_manual_boundary_after_its_replay_confirms_the_current_compaction() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    assert!(
+        control
+            .ingest(&binding(), &boundary("manual"))?
+            .receipts
+            .is_empty()
+    );
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Confirmed);
+    assert_eq!(update.receipts[0].reason, "harness_compacted");
+    Ok(())
+}
+
+#[test]
+fn an_auto_boundary_does_not_confirm_a_requested_compaction() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    control.ingest(&binding(), &boundary("auto"))?;
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Refused);
+    assert_eq!(update.receipts[0].reason, "not_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_boundary_without_a_current_compaction_changes_nothing() -> Result {
+    let mut control = ready()?;
+    let before = control.control_status();
+    let update = control.ingest(&binding(), &boundary("manual"))?;
+    assert!(update.events.is_empty());
+    assert!(update.receipts.is_empty());
+    assert!(update.dispatches.is_empty());
+    assert_eq!(control.control_status(), before);
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Refused);
+    assert_eq!(update.receipts[0].reason, "not_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_held_boundary_does_not_confirm_the_next_compaction() -> Result {
+    let mut control = ready()?;
+    let first = pending("first-compact", Kind::Compact);
+    let first_uuid = first.uuid.clone();
+    control.enqueue(first)?;
+    control.ingest(&binding(), &boundary("manual"))?;
+    control.ingest(&binding(), &replay(&first_uuid))?;
+    let first = control.ingest(&binding(), &result("first-result"))?;
+    assert_eq!(first.receipts[0].state, OperationState::Confirmed);
+    let second = pending("second-compact", Kind::Compact);
+    let second_uuid = second.uuid.clone();
+    control.enqueue(second)?;
+    control.ingest(&binding(), &replay(&second_uuid))?;
+    let second = control.ingest(&binding(), &result("second-result"))?;
+    assert_eq!(second.receipts[0].state, OperationState::Refused);
+    assert_eq!(second.receipts[0].reason, "not_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_boundary_requires_a_closed_trigger_and_names_only_its_field() -> Result {
+    for metadata in [
+        json!({}),
+        json!({"trigger":"private fixture phrase"}),
+        json!({"trigger":1}),
+    ] {
+        let mut control = ready()?;
+        let mut frame = boundary("manual");
+        frame["compact_metadata"] = metadata;
+        let error = control
+            .ingest(&binding(), &frame)
+            .err()
+            .ok_or("invalid trigger was accepted")?;
+        assert_eq!(error.name(), "control_protocol_unsupported");
+        assert!(error.to_string().contains("compact_metadata.trigger"));
+        assert!(!error.to_string().contains("private fixture phrase"));
+    }
+    Ok(())
+}
+
+#[test]
+fn a_manual_boundary_still_requires_matching_admission_and_success() -> Result {
+    for admitted in [true, false] {
+        let mut control = ready()?;
+        let input = pending("compact", Kind::Compact);
+        let uuid = input.uuid.clone();
+        control.enqueue(input)?;
+        control.ingest(&binding(), &boundary("manual"))?;
+        control.ingest(&binding(), &replay(if admitted { &uuid } else { "other" }))?;
+        let mut end = result("compact-result");
+        end["is_error"] = json!(admitted);
+        let update = control.ingest(&binding(), &end);
+        if admitted {
+            let update = update?;
+            assert_eq!(update.receipts[0].state, OperationState::Refused);
+            assert_eq!(update.receipts[0].reason, "not_compacted");
+        } else {
+            let error = update
+                .err()
+                .ok_or("a result without matching admission was accepted")?;
+            assert_eq!(error.name(), "control_correlation_unsupported");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_status_success_without_a_manual_boundary_is_not_compaction_proof() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    control.ingest(&binding(), &json!({"type":"system","subtype":"status","session_id":"conversation","status":null,"compact_result":"success"}))?;
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Refused);
+    Ok(())
+}

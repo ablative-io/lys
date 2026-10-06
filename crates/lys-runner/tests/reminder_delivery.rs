@@ -250,7 +250,7 @@ fn a_compaction_triggered_reminder_waits_for_completion_and_context_release() ->
         controller
             .ingest(
                 &binding,
-                &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation"})
+                &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":{"trigger":"manual"}})
             )?
             .dispatches
             .is_empty()

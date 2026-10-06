@@ -463,13 +463,7 @@ impl Controller {
                 }
             }
             Observation::Compacted { turn } => {
-                if self
-                    .current
-                    .as_ref()
-                    .is_some_and(|current| current.kind == Kind::Compact)
-                    && ((self.transport == Transport::Claude && self.admitted)
-                        || (turn.is_some() && turn == self.turn))
-                {
+                if self.compaction_matches(turn.as_deref()) {
                     self.compacted = Some(turn.unwrap_or_default());
                 }
             }
@@ -515,6 +509,7 @@ impl Controller {
                 }
                 self.boundary = Boundary::Idle;
                 self.turn = None;
+                self.compacted = None;
                 self.request_boundary(&mut update)?;
                 self.dispatch(&mut update)?;
             }

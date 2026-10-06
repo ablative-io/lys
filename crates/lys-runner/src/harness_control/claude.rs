@@ -89,7 +89,19 @@ pub(super) fn observe(
                     .any(|command| command.as_str() == Some("compact")),
             })
         }
-        (Some("system"), Some("compact_boundary")) => Ok(Observation::Compacted { turn: None }),
+        (Some("system"), Some("compact_boundary")) => {
+            match value
+                .pointer("/compact_metadata/trigger")
+                .and_then(Value::as_str)
+            {
+                Some("manual") => Ok(Observation::Compacted { turn: None }),
+                Some("auto") => Ok(Observation::Other),
+                _ => Err(RunnerError::refused(
+                    "control_protocol_unsupported",
+                    "compact_metadata.trigger must be manual or auto",
+                )),
+            }
+        }
         (Some("user"), _) => {
             let Some(uuid) = value
                 .get("uuid")
@@ -139,6 +151,14 @@ pub(super) fn passive_frame(value: &Value) -> bool {
 }
 
 impl Controller {
+    pub(super) fn compaction_matches(&self, turn: Option<&str>) -> bool {
+        self.current
+            .as_ref()
+            .is_some_and(|current| current.kind == Kind::Compact)
+            && (self.transport == super::Transport::Claude
+                || turn.is_some_and(|turn| Some(turn) == self.turn.as_deref()))
+    }
+
     pub(super) fn observe_claude(&mut self, value: &Value) -> Result<Observation, RunnerError> {
         match observe(
             &self.binding.conversation,

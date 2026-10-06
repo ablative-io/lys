@@ -22,6 +22,13 @@ enum CompactResult {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum Trigger {
+    Manual,
+    Auto,
+}
+
+#[derive(Serialize)]
 struct StatusFrame {
     status: Option<Status>,
     compact_result: Option<CompactResult>,
@@ -34,6 +41,7 @@ pub(super) struct Compaction {
     #[serde(skip)]
     uuid: String,
     compact_boundary_seen: bool,
+    boundary_triggers: Vec<Trigger>,
     matching_user_replay_seen: bool,
     replay_before_boundary: bool,
     replay_after_boundary: bool,
@@ -48,6 +56,7 @@ impl Compaction {
             conversation: conversation.to_owned(),
             uuid: uuid.to_owned(),
             compact_boundary_seen: false,
+            boundary_triggers: Vec::new(),
             matching_user_replay_seen: false,
             replay_before_boundary: false,
             replay_after_boundary: false,
@@ -65,7 +74,15 @@ impl Compaction {
             frame.get("type").and_then(Value::as_str),
             frame.get("subtype").and_then(Value::as_str),
         ) {
-            (Some("system"), Some("compact_boundary")) => self.compact_boundary_seen = true,
+            (Some("system"), Some("compact_boundary")) => {
+                self.compact_boundary_seen = true;
+                let trigger = match frame.pointer("/compact_metadata/trigger").and_then(Value::as_str) {
+                    Some("manual") => Trigger::Manual,
+                    Some("auto") => Trigger::Auto,
+                    _ => return Err("qualification_compaction_boundary_invalid: compact_metadata.trigger must be manual or auto".to_owned()),
+                };
+                self.boundary_triggers.push(trigger);
+            }
             (Some("user"), _)
                 if frame.get("uuid").and_then(Value::as_str) == Some(self.uuid.as_str())
                     && frame.pointer("/message/role").and_then(Value::as_str) == Some("user")

@@ -5,7 +5,7 @@ use lys_runner::harness_control::{Executable, Update, claude, codex, process};
 use lys_runner::peer::{Leader, start_identity};
 use serde_json::{Value, json};
 use std::fs::File;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
@@ -41,7 +41,39 @@ pub(super) struct Owned {
     writer: Option<ChildStdin>,
     frames: mpsc::Receiver<Result<Message>>,
     reader: Option<JoinHandle<()>>,
-    exits: Signal,
+    exits: ExitEvents,
+    exited: Option<ExitStatus>,
+}
+
+enum ExitEvents {
+    Child(Signal),
+    #[cfg(test)]
+    Queued {
+        events: mpsc::Receiver<()>,
+        observed: Option<tokio::sync::oneshot::Sender<()>>,
+    },
+}
+impl ExitEvents {
+    async fn recv(&mut self) -> Result<()> {
+        match self {
+            Self::Child(signal) => signal
+                .recv()
+                .await
+                .ok_or_else(|| "qualification_child_signal_ended".to_owned()),
+            #[cfg(test)]
+            Self::Queued { events, observed } => {
+                events
+                    .recv()
+                    .await
+                    .ok_or("qualification_fixture_exit_ended")?;
+                observed
+                    .take()
+                    .ok_or("qualification_fixture_exit_repeated")?
+                    .send(())
+                    .map_err(|()| "qualification_fixture_observer_ended".to_owned())
+            }
+        }
+    }
 }
 
 impl Owned {
@@ -72,7 +104,8 @@ impl Owned {
             leader: None,
             frames,
             reader: None,
-            exits,
+            exits: ExitEvents::Child(exits),
+            exited: None,
         };
         let stdout = owned
             .child
@@ -111,6 +144,16 @@ impl Owned {
                         }
                     } else {
                         loop {
+                            match reader.fill_buf() {
+                                Ok([]) => break,
+                                Ok(_) => {}
+                                Err(error) => {
+                                    if send.blocking_send(Err(io_failed(error))).is_err() {
+                                        eprintln!("qualification_receiver_ended");
+                                    }
+                                    break;
+                                }
+                            }
                             let result = process::frame(&mut (&mut reader).take(1_048_576))
                                 .map(Message::Frame)
                                 .map_err(|error| error.to_string());
@@ -157,13 +200,21 @@ impl Owned {
         loop {
             tokio::select! {
                 biased;
-                frame = self.frames.recv() => return frame.ok_or_else(|| "qualification_pipe_ended: the harness output ended before the awaited frame".to_owned())?,
-                () = cancel.received() => return Err("qualification_cancelled: the qualification was stopped".to_owned()),
-                ended = self.exits.recv() => {
-                    ended.ok_or("qualification_child_signal_ended")?;
-                    if let Some(status) = self.child.as_mut().ok_or("qualification_child_missing")?.try_wait().map_err(io_failed)? {
-                        return Err(format!("qualification_child_exited: the owned harness exited with {status} before the awaited frame"));
+                frame = self.frames.recv() => {
+                    if let Some(frame) = frame {
+                        return frame;
                     }
+                    if self.exited.is_none() {
+                        self.exited = self.child.as_mut().ok_or("qualification_child_missing")?.try_wait().map_err(io_failed)?;
+                    }
+                    return Err(self.exited.map_or_else(
+                        || "qualification_pipe_ended: the harness output ended before the awaited frame".to_owned(),
+                        |status| format!("qualification_child_exited: the owned harness exited with {status} before the awaited frame")));
+                },
+                () = cancel.received() => return Err("qualification_cancelled: the qualification was stopped".to_owned()),
+                ended = self.exits.recv(), if self.exited.is_none() => {
+                    ended?;
+                    self.exited = self.child.as_mut().ok_or("qualification_child_missing")?.try_wait().map_err(io_failed)?;
                 }
             }
         }
@@ -309,5 +360,48 @@ mod tests {
         reader.read_to_string(&mut remaining)?;
         assert_eq!(remaining, "{\"id\":\"next-frame\"}\n");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+pub(super) struct ExitFixture {
+    pub(super) owned: Owned,
+    pub(super) sender: mpsc::Sender<Result<Message>>,
+    pub(super) observed: tokio::sync::oneshot::Receiver<()>,
+}
+
+#[cfg(test)]
+impl Owned {
+    pub(super) fn queued_exit() -> Result<ExitFixture> {
+        let mut child = Command::new("/usr/bin/true")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(io_failed)?;
+        if !child.wait().map_err(io_failed)?.success() {
+            return Err("qualification_fixture_child_failed".to_owned());
+        }
+        let (notice, events) = mpsc::channel(1);
+        notice.try_send(()).map_err(io_failed)?;
+        drop(notice);
+        let (observed, notification) = tokio::sync::oneshot::channel();
+        let (sender, frames) = mpsc::channel(1);
+        Ok(ExitFixture {
+            owned: Self {
+                child: Some(child),
+                leader: None,
+                writer: None,
+                frames,
+                reader: None,
+                exits: ExitEvents::Queued {
+                    events,
+                    observed: Some(observed),
+                },
+                exited: None,
+            },
+            sender,
+            observed: notification,
+        })
     }
 }

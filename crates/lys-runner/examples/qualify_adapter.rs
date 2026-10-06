@@ -681,7 +681,7 @@ mod tests {
     #[test]
     fn compaction_facts_keep_only_correlated_closed_values_and_frame_order() -> Result<()> {
         let mut facts = Compaction::new("private-conversation", "private-uuid");
-        let boundary = json!({"type":"system","subtype":"compact_boundary", "session_id":"private-conversation", "compact_metadata":{"secret":"private fixture phrase"}});
+        let boundary = json!({"type":"system","subtype":"compact_boundary", "session_id":"private-conversation", "compact_metadata":{"trigger":"manual","secret":"private fixture phrase"}});
         let replay = json!({"type":"user","session_id":"private-conversation", "uuid":"private-uuid", "parent_tool_use_id":null, "message":{"role":"user","content":"private fixture phrase"}});
         let status = json!({"type":"system","subtype":"status", "session_id":"private-conversation", "status":"compacting", "compact_result":"failed", "compact_error":"private fixture phrase"});
         for frame in [
@@ -708,7 +708,7 @@ mod tests {
         assert_eq!(
             value,
             json!({
-                "compact_boundary_seen":true,"matching_user_replay_seen":true,
+                "compact_boundary_seen":true,"boundary_triggers":["manual"],"matching_user_replay_seen":true,
                 "replay_before_boundary":true,"replay_after_boundary":true,
                 "result_seen":true,"result_is_error":true,
                 "statuses":[{"status":"compacting","compact_result":"failed"},
@@ -758,7 +758,7 @@ mod tests {
         for boundary_first in [true, false] {
             let mut facts = Compaction::new("conversation", "uuid");
             if boundary_first {
-                facts.observe(&json!({"type":"system","subtype":"compact_boundary","session_id":"conversation"}))?;
+                facts.observe(&json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":{"trigger":"manual"}}))?;
             }
             facts.observe(&replay)?;
             facts
@@ -878,6 +878,138 @@ mod tests {
             serde_json::to_value(Compaction::new("conversation", "next-uuid"))
                 .map_err(io_failed)?["statuses"],
             json!([])
+        );
+        Ok(())
+    }
+    async fn after_queued_exit(
+        message: Option<Message>,
+    ) -> Result<std::result::Result<Message, String>> {
+        let owned::ExitFixture {
+            mut owned,
+            sender,
+            observed,
+        } = Owned::queued_exit()?;
+        let mut cancel = Cancellation::new()?;
+        let (received, delivered) = tokio::join!(owned.next(&mut cancel), async {
+            observed.await.map_err(io_failed)?;
+            if let Some(message) = message {
+                sender
+                    .send(Ok(message))
+                    .await
+                    .map_err(|_| "qualification_fixture_output_ended".to_owned())?;
+            }
+            drop(sender);
+            Ok::<(), String>(())
+        });
+        delivered?;
+        if !owned.wait_exit()?.success() {
+            return Err("qualification_fixture_child_failed".to_owned());
+        }
+        Ok(received)
+    }
+
+    #[tokio::test]
+    async fn an_exit_before_a_version_keeps_the_reader_message() -> Result<()> {
+        let Message::Version(bytes) =
+            after_queued_exit(Some(Message::Version(b"codex-cli 0.159.2\n".to_vec()))).await??
+        else {
+            return Err("qualification_fixture_version_missing".to_owned());
+        };
+        assert_eq!(bytes, b"codex-cli 0.159.2\n");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn an_exit_before_a_frame_keeps_the_reader_message() -> Result<()> {
+        let frame = json!({"type":"fixture-frame"});
+        let Message::Frame(actual) =
+            after_queued_exit(Some(Message::Frame(frame.clone()))).await??
+        else {
+            return Err("qualification_fixture_frame_missing".to_owned());
+        };
+        assert_eq!(actual, frame);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn an_exit_with_no_reader_message_reports_its_status() -> Result<()> {
+        let error = after_queued_exit(None)
+            .await?
+            .err()
+            .ok_or("empty output was accepted")?;
+        assert!(error.starts_with("qualification_child_exited:"));
+        assert!(error.contains("exit status: 0"));
+        Ok(())
+    }
+
+    #[test]
+    fn compaction_facts_record_each_closed_boundary_trigger() -> Result<()> {
+        let mut facts = Compaction::new("conversation", "uuid");
+        for trigger in ["manual", "auto", "manual"] {
+            facts.observe(&json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":{"trigger":trigger,"private":"private fixture phrase"}}))?;
+        }
+        let value = serde_json::to_value(&facts).map_err(io_failed)?;
+        assert_eq!(
+            value["boundary_triggers"],
+            json!(["manual", "auto", "manual"])
+        );
+        assert!(!value.to_string().contains("private fixture phrase"));
+        Ok(())
+    }
+
+    #[test]
+    fn compaction_facts_refuse_a_boundary_without_a_closed_trigger() -> Result<()> {
+        for metadata in [
+            json!({}),
+            json!({"trigger":"private fixture phrase"}),
+            json!({"trigger":null}),
+        ] {
+            let mut facts = Compaction::new("conversation", "uuid");
+            let error = facts.observe(&json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":metadata}))
+                .err().ok_or("invalid boundary trigger was accepted")?;
+            assert!(error.contains("compact_metadata.trigger"));
+            assert!(!error.contains("private fixture phrase"));
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cancellation_still_stops_a_reader_after_an_observed_exit() -> Result<()> {
+        let owned::ExitFixture {
+            mut owned,
+            sender,
+            observed,
+        } = Owned::queued_exit()?;
+        let mut cancel = Cancellation::new()?;
+        let (finished, completion) = tokio::sync::oneshot::channel();
+        let (received, cancelled) = tokio::join!(
+            async {
+                let result = owned.next(&mut cancel).await;
+                finished
+                    .send(())
+                    .map_err(|()| "qualification_fixture_completion_ended".to_owned())?;
+                Ok::<_, String>(result)
+            },
+            async {
+                observed.await.map_err(io_failed)?;
+                rustix::process::kill_process(
+                    rustix::process::getpid(),
+                    rustix::process::Signal::INT,
+                )
+                .map_err(io_failed)?;
+                completion.await.map_err(io_failed)?;
+                drop(sender);
+                Ok::<(), String>(())
+            }
+        );
+        cancelled?;
+        let received = received?;
+        if !owned.wait_exit()?.success() {
+            return Err("qualification_fixture_child_failed".to_owned());
+        }
+        assert_eq!(
+            received.err().as_deref(),
+            Some("qualification_cancelled: the qualification was stopped")
         );
         Ok(())
     }

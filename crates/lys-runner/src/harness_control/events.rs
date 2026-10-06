@@ -1110,7 +1110,7 @@ mod tests {
                 observe(
                     sessions,
                     source,
-                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation"}),
+                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":{"trigger":"manual"}}),
                 )?;
                 observe(
                     sessions,
@@ -1198,7 +1198,7 @@ mod tests {
                 observe(
                     sessions,
                     source,
-                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation"}),
+                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":{"trigger":"manual"}}),
                 )?;
                 observe(
                     sessions,
