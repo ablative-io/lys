@@ -965,6 +965,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/budgets_store.rs` | R2: Budgets on agents, teams and people | DIRECTORY-051 |
 | `crates/lys-runner/src/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
 | `crates/lys-runner/tests/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-runner/tests/operations_index/cases.rs` | the operations index cases, included from operations.rs; DIRECTORY-064 R5 reads them through the new journal and checkpoint | DIRECTORY-064 |
 | `crates/lys-runner/src/state.rs` | R3: A reached budget acts once | DIRECTORY-051 |
 | `crates/lys-identity-server/src/runner_acts.rs` | R3: A reached budget acts once | DIRECTORY-051 |
 | `crates/lys-identity-server/src/goals_store.rs` | R4: Goals, expectations and deliverables, with deadlines and reminders | DIRECTORY-051 |
@@ -1145,6 +1146,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/input_no_screen/shared_lock.rs` | A full input pipe leaves a second session answering without a clock (DIRECTORY-073 R3) | DIRECTORY-073 |
 | `crates/lys-runner/src/session/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
 | `crates/lys-runner/src/operations/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
+| `crates/lys-runner/src/operations/store.rs` | the operations owner's durable store: the journal, the checkpoint taken in proportion to its own size, the permanent used-id guard, and the forward migration from the v1 operations.jsonl at open; DIRECTORY-064 R5 | DIRECTORY-064 |
+| `crates/lys-runner/src/operations/control.rs` | the operations owner's control types: prepared requests, delivery certainty and the identifier-only control receipt; DIRECTORY-064 R5 | DIRECTORY-064 |
 | `crates/lys-runner/tests/peer_restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
 | `crates/lys-runner/tests/peer_restart/cases.rs` | Peer proof, held launch and operation replay through an injected process tree | DIRECTORY-073 |
 | `crates/lys-identity-server/src/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |

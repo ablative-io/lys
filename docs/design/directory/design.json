@@ -4331,6 +4331,11 @@
       "brief": "DIRECTORY-051"
     },
     {
+      "path": "crates/lys-runner/tests/operations_index/cases.rs",
+      "note": "the operations index cases, included from operations.rs; DIRECTORY-064 R5 reads them through the new journal and checkpoint",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/src/state.rs",
       "note": "R3: A reached budget acts once",
       "brief": "DIRECTORY-051"
@@ -5229,6 +5234,16 @@
       "path": "crates/lys-runner/src/operations/restart.rs",
       "note": "Prove a peer restart of its own held launch",
       "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/src/operations/store.rs",
+      "note": "the operations owner's durable store: the journal, the checkpoint taken in proportion to its own size, the permanent used-id guard, and the forward migration from the v1 operations.jsonl at open; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/operations/control.rs",
+      "note": "the operations owner's control types: prepared requests, delivery certainty and the identifier-only control receipt; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "crates/lys-runner/tests/peer_restart.rs",

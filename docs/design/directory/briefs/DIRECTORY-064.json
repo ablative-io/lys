@@ -244,7 +244,9 @@
       "files": {
         "create": [
           "crates/lys-runner/tests/control_recovery.rs",
-          "crates/lys-identity-server/tests/control_receipts.rs"
+          "crates/lys-identity-server/tests/control_receipts.rs",
+          "crates/lys-runner/src/operations/store.rs",
+          "crates/lys-runner/src/operations/control.rs"
         ],
         "modify": [
           "crates/lys-runner/src/operations.rs",
@@ -256,7 +258,9 @@
           "crates/lys-runner/src/protocol.rs",
           "crates/lys-identity-server/src/goals_state.rs",
           "crates/lys-identity-server/src/goals_index.rs",
-          "crates/lys-identity-server/src/goals_store.rs"
+          "crates/lys-identity-server/src/goals_store.rs",
+          "crates/lys-runner/tests/operations_index/cases.rs",
+          "crates/lys-runner/tests/operations.rs"
         ],
         "delete": []
       },
@@ -425,6 +429,12 @@
       "by": "Archie",
       "subject": "R5's operations checkpoint is triggered in proportion to its own size, never by a fixed count",
       "ruling": "The operations owner checkpoints by borrowing its folded projection, with no whole-state clone. It syncs the journal before it replaces the checkpoint outside the table lock, and at start it reads one checkpoint and folds only the tail after it (Brisket 1baebfad). The permanent used-id guard stays whole. The checkpoint is taken when the journal tail since the last checkpoint holds at least as many bytes as that checkpoint. A fixed count of transitions is refused: Brisket's figures show a checkpoint of 45 MB at 1 million used ids, so a fixed trigger costs 45 MB / N per operation, growing with the guard for good, the write amplification Tom asked about at 19:04. A proportional trigger keeps total bytes written within about twice the bytes kept, and a start replays at most one checkpoint's worth of tail, never all history. It is the size of the thing kept, not a timer or a constant, as ADR-001 allows. Tests: after K operations, journal plus checkpoint bytes written are at most twice the bytes kept plus one checkpoint; a reopen replays no more tail than the last checkpoint's size; the used-id guard is whole after a reopen at every boundary; a crash between the journal sync and the checkpoint replace reopens on the old checkpoint and its full tail. The handback names the proportional rule and shows the written-bytes bound, posts the final typed projection's encode, replace and decode cost at 1 thousand, 10 thousand, 100 thousand and 1 million used ids, and gives the table-lock hold at a checkpoint and the start read on the final shape at 100 thousand and 1 million. The rule bounds what is written, not what is kept: the used-id guard still grows by one id per operation for good, and that is a later storage box, not this one (Archie 0f0c729d; Waffles b56bb01f, 265ebe9d)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R5 names operations/store.rs and operations/control.rs, the two operations test paths, and the v1 migration fixture they keep",
+      "ruling": "The operations owner splits whole items into operations/store.rs (the journal, the proportional checkpoint of amendment 17, the used-id guard and the v1 forward migration) and operations/control.rs (prepared requests, certainty and the identifier-only control receipt), declared from operations.rs. tests/operations.rs (line 238) and tests/operations_index/cases.rs (lines 44 to 88) are tied to the v1 operations.jsonl name and raw outcome lines; they move to the new journal and checkpoint, and their deduplication, torn-tail, append-only and interrupted-operation assertions stay as strong as they are. No assertion is weakened, no test is ignored and no v1 writer is kept. One v1 fixture stays, written as the old build wrote operations.jsonl, with a torn tail and an interrupted operation: it is the forward migration's input. The tests prove that the migration at open carries every outcome over, keeps the interrupted operation uncertain, writes nothing back in v1 form, and does not migrate again on a second open (Brisket 3d6ae80c; Waffles 864316c5)."
     }
   ]
 }
