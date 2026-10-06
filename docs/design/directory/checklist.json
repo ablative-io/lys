@@ -1965,6 +1965,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A put-back keeps the window's writes (DIRECTORY-082)",
+      "items": [
+        {
+          "id": "C499",
+          "text": "A put-back moves the window's data/ to data.rolled-back/<rfc3339>/ and removes none of it, and prints that folder with the count of leaves per store (DIRECTORY-082 R1).",
+          "done": false
+        },
+        {
+          "id": "C500",
+          "text": "After a put-back that follows writes in the window, the previous build reads every pre-window leaf, and every window leaf is found and counted in data.rolled-back (DIRECTORY-082 R1).",
+          "done": false
+        },
+        {
+          "id": "C501",
+          "text": "A confirmed upgrade's data/ carries every leaf in segment stores, and data.previous keeps the pre-upgrade copy unchanged (DIRECTORY-082 R2).",
+          "done": false
+        },
+        {
+          "id": "C502",
+          "text": "A put-back or a keep killed mid-copy, at data.restoring or data.previous.partial, leaves no partial copy served, and a second run completes it (DIRECTORY-082 R2).",
+          "done": false
+        },
+        {
+          "id": "C503",
+          "text": "The upgrade proof reads segment stores: every leaf read digests the whole store directory, and old leaves are proved against the kept v1 copy (DIRECTORY-082 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

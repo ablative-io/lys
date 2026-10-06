@@ -686,6 +686,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/intent.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/intent_tests.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/swap.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/data_kept.rs` | the data an upgrade starts from, kept whole in data.previous; DIRECTORY-082 R1 moves the window's data to data.rolled-back on a put-back instead of removing it | DIRECTORY-082 |
+| `crates/lys/src/identity/upgrade/data_kept_tests.rs` | the put-back, confirm and crash proofs of the kept data (DIRECTORY-082 R1, R2) | DIRECTORY-082 |
 | `crates/lys-identity-server/src/apps_api.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
 | `crates/lys-identity-server/src/apps_state.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
 | `crates/lys-identity-server/src/apps_store.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
@@ -1097,6 +1099,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `docs/design/directory/PROOF-CODEX-POLICY.md` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
 | `crates/lys/src/identity/install/ports_tests.rs` | Tests that the service and broker ports come from the deployment configuration and a clash is refused | DIRECTORY-070 |
 | `scripts/identity-gates/upgrade_live.py` | touched by DIRECTORY-070 R2: the old install's ports come from its deployment configuration, not layout.rs | DIRECTORY-070 |
+| `scripts/identity-gates/upgrade_window.py` | the upgrade proof's reversible-window checks; DIRECTORY-082 R3 reads segment stores | DIRECTORY-082 |
+| `scripts/identity-gates/upgrade_restart.py` | the upgrade proof's restart and settle checks; DIRECTORY-082 R3 reads segment stores | DIRECTORY-082 |
+| `scripts/identity-gates/test_upgrade_restart.py` | units for the restart checks over segment and v1 stores (DIRECTORY-082 R3) | DIRECTORY-082 |
+| `scripts/identity-gates/test_upgrade_window.py` | units for the window checks over segment and v1 stores (DIRECTORY-082 R3) | DIRECTORY-082 |
 | `scripts/identity-gates/test_upgrade_fixture.py` | touched by DIRECTORY-070 R2: fixture ports read from the old deployment configuration | DIRECTORY-070 |
 | `scripts/identity-gates/UPGRADE.md` | touched by DIRECTORY-070 R2: how the upgrade gate finds the old install's ports | DIRECTORY-070 |
 | `crates/lys/tests/identity_install.rs` | The first-install test on ports the operating system hands it, in folders it removes, built into the workspace target | DIRECTORY-070 |

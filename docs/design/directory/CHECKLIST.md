@@ -518,3 +518,11 @@
 - [ ] **C494** — The token exchange authenticates a lys-client. credential by asking the broker, never falls back to the digest path, and refuses a revoked credential whatever its grant (DIRECTORY-081 R1).
 - [ ] **C495** — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them by its one line, never waiting on the broker; the apps snapshot pins the three new lines (DIRECTORY-081 R2).
 - [ ] **C496** — The Apps screen issues a credential shown once with a copy control, lists who issued and revoked each, and revokes with confirmation (DIRECTORY-081 R3).
+
+## A put-back keeps the window's writes (DIRECTORY-082)
+
+- [ ] **C499** — A put-back moves the window's data/ to data.rolled-back/<rfc3339>/ and removes none of it, and prints that folder with the count of leaves per store (DIRECTORY-082 R1).
+- [ ] **C500** — After a put-back that follows writes in the window, the previous build reads every pre-window leaf, and every window leaf is found and counted in data.rolled-back (DIRECTORY-082 R1).
+- [ ] **C501** — A confirmed upgrade's data/ carries every leaf in segment stores, and data.previous keeps the pre-upgrade copy unchanged (DIRECTORY-082 R2).
+- [ ] **C502** — A put-back or a keep killed mid-copy, at data.restoring or data.previous.partial, leaves no partial copy served, and a second run completes it (DIRECTORY-082 R2).
+- [ ] **C503** — The upgrade proof reads segment stores: every leaf read digests the whole store directory, and old leaves are proved against the kept v1 copy (DIRECTORY-082 R3).

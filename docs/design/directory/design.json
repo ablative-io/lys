@@ -2936,6 +2936,16 @@
       "brief": "DIRECTORY-045"
     },
     {
+      "path": "crates/lys/src/identity/upgrade/data_kept.rs",
+      "note": "the data an upgrade starts from, kept whole in data.previous; DIRECTORY-082 R1 moves the window's data to data.rolled-back on a put-back instead of removing it",
+      "brief": "DIRECTORY-082"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/data_kept_tests.rs",
+      "note": "the put-back, confirm and crash proofs of the kept data (DIRECTORY-082 R1, R2)",
+      "brief": "DIRECTORY-082"
+    },
+    {
       "path": "crates/lys-identity-server/src/apps_api.rs",
       "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
       "brief": "DIRECTORY-048"
@@ -4989,6 +4999,26 @@
       "path": "scripts/identity-gates/upgrade_live.py",
       "note": "touched by DIRECTORY-070 R2: the old install's ports come from its deployment configuration, not layout.rs",
       "brief": "DIRECTORY-070"
+    },
+    {
+      "path": "scripts/identity-gates/upgrade_window.py",
+      "note": "the upgrade proof's reversible-window checks; DIRECTORY-082 R3 reads segment stores",
+      "brief": "DIRECTORY-082"
+    },
+    {
+      "path": "scripts/identity-gates/upgrade_restart.py",
+      "note": "the upgrade proof's restart and settle checks; DIRECTORY-082 R3 reads segment stores",
+      "brief": "DIRECTORY-082"
+    },
+    {
+      "path": "scripts/identity-gates/test_upgrade_restart.py",
+      "note": "units for the restart checks over segment and v1 stores (DIRECTORY-082 R3)",
+      "brief": "DIRECTORY-082"
+    },
+    {
+      "path": "scripts/identity-gates/test_upgrade_window.py",
+      "note": "units for the window checks over segment and v1 stores (DIRECTORY-082 R3)",
+      "brief": "DIRECTORY-082"
     },
     {
       "path": "scripts/identity-gates/test_upgrade_fixture.py",
