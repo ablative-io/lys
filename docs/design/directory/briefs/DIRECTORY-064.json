@@ -201,7 +201,9 @@
         "create": [
           "crates/lys-runner/src/harness_control/reminders.rs",
           "crates/lys-runner/tests/reminder_delivery.rs",
-          "crates/lys-identity-server/src/budgets_act/control.rs"
+          "crates/lys-identity-server/src/budgets_act/control.rs",
+          "crates/lys-identity-server/src/goals_state/control.rs",
+          "crates/lys-identity-server/src/goals_api/control.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/goals_state.rs",
@@ -246,7 +248,11 @@
           "crates/lys-runner/tests/control_recovery.rs",
           "crates/lys-identity-server/tests/control_receipts.rs",
           "crates/lys-runner/src/operations/store.rs",
-          "crates/lys-runner/src/operations/control.rs"
+          "crates/lys-runner/src/operations/control.rs",
+          "crates/lys-identity-server/src/goals_state/control.rs",
+          "crates/lys-identity-server/src/goals_store/control.rs",
+          "crates/lys-identity-server/src/goals_api/control.rs",
+          "crates/lys-identity-server/src/receipts_api/control.rs"
         ],
         "modify": [
           "crates/lys-runner/src/operations.rs",
@@ -260,7 +266,9 @@
           "crates/lys-identity-server/src/goals_index.rs",
           "crates/lys-identity-server/src/goals_store.rs",
           "crates/lys-runner/tests/operations_index/cases.rs",
-          "crates/lys-runner/tests/operations.rs"
+          "crates/lys-runner/tests/operations.rs",
+          "crates/lys-identity-server/src/goals_api.rs",
+          "crates/lys-identity-server/src/runner_sessions.rs"
         ],
         "delete": []
       },
@@ -435,6 +443,12 @@
       "by": "Archie",
       "subject": "R5 names operations/store.rs and operations/control.rs, the two operations test paths, and the v1 migration fixture they keep",
       "ruling": "The operations owner splits whole items into operations/store.rs (the journal, the proportional checkpoint of amendment 17, the used-id guard and the v1 forward migration) and operations/control.rs (prepared requests, certainty and the identifier-only control receipt), declared from operations.rs. tests/operations.rs (line 238) and tests/operations_index/cases.rs (lines 44 to 88) are tied to the v1 operations.jsonl name and raw outcome lines; they move to the new journal and checkpoint, and their deduplication, torn-tail, append-only and interrupted-operation assertions stay as strong as they are. No assertion is weakened, no test is ignored and no v1 writer is kept. One v1 fixture stays, written as the old build wrote operations.jsonl, with a torn tail and an interrupted operation: it is the forward migration's input. The tests prove that the migration at open carries every outcome over, keeps the interrupted operation uncertain, writes nothing back in v1 form, and does not migrate again on a second open (Brisket 3d6ae80c; Waffles 864316c5)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R4 and R5 name the control children of goals_state, goals_store, goals_api and receipts_api, and R5 names runner_sessions.rs for the control receipt's kind",
+      "ruling": "So that no file passes the 500-line limit, the control work moves into whole-item children of its existing owners, each declared from its parent, with no second store, loop or owner. goals_state/control.rs holds the current-control and index reads and the Resent validation, goals_store/control.rs holds the resend append and its rendering, and goals_api/control.rs holds the boundary reminder judgement and the explicit reconciliation and resend route, and receipts_api/control.rs holds the current-controls readback and the reconciliation endpoints. runner_sessions.rs kind() (line 275) gains one arm for the ControlReceipt answer, and one for a ControlReceipts page if one is added; driven() stays untouched as ruled (Brisket 65bd921a; Waffles 2bb8cb97)."
     }
   ]
 }

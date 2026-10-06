@@ -2786,9 +2786,19 @@
       "brief": "DIRECTORY-051"
     },
     {
+      "path": "crates/lys-identity-server/src/goals_api/control.rs",
+      "note": "the goals routes' control under goals_api: the boundary reminder judgement and the explicit reconciliation and resend route; DIRECTORY-064 R4 and R5",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-identity-server/src/goals_state.rs",
       "note": "DIRECTORY-051 R4: Goals with deadlines and reminders",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/goals_state/control.rs",
+      "note": "the goals fold's control reads under goals_state: current-control and index reads, and Resent validation before any append; DIRECTORY-064 R4 and R5",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "crates/lys-identity-server/src/goals_index.rs",
@@ -3064,6 +3074,11 @@
       "path": "crates/lys-identity-server/src/receipts_api.rs",
       "note": "R4: Type, keys, read, wait, resize and compact through Lys",
       "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/src/receipts_api/control.rs",
+      "note": "the receipts routes' control under receipts_api: the current-controls readback and the reconciliation endpoints; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "crates/lys-identity/src/provisioning.rs",
@@ -4349,6 +4364,11 @@
       "path": "crates/lys-identity-server/src/goals_store.rs",
       "note": "R4: Goals, expectations and deliverables, with deadlines and reminders",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/goals_store/control.rs",
+      "note": "the goals store's resend under goals_store: appends a validated Resent and renders the resent words; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "surface/identity/tests/usage.test.tsx",

@@ -656,7 +656,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/budgets_context.rs` | the context availability fold, one reading per agent and session; DIRECTORY-064 R3 reads the current reading at a boundary, a missing measurement included | DIRECTORY-064 |
 | `crates/lys-identity-server/src/refusals_follow.rs` | the signal task that follows a runner's feed into budgets_feed; DIRECTORY-064 R3 and R4 connect the same follow to the boundary reply | DIRECTORY-064 |
 | `crates/lys-identity-server/src/goals_api.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_api/control.rs` | the goals routes' control under goals_api: the boundary reminder judgement and the explicit reconciliation and resend route; DIRECTORY-064 R4 and R5 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/goals_state.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_state/control.rs` | the goals fold's control reads under goals_state: current-control and index reads, and Resent validation before any append; DIRECTORY-064 R4 and R5 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/goals_index.rs` | the goals fold's derived locations; DIRECTORY-064 R4 adds pending deliveries by session and goal, so a boundary reads only the affected occurrences | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/goals_edits.rs` | the goal edit fixtures; DIRECTORY-064 R4 makes Held::unsettled answer a Result, so an invalid pending location is refused by name, and these calls propagate it | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/goals.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
@@ -712,6 +714,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/install/deployment.template.toml` | R7: Lys depends on no app | DIRECTORY-048 |
 | `surface/styles/tokens.css` | R7: Lys depends on no app | DIRECTORY-048 |
 | `crates/lys-identity-server/src/receipts_api.rs` | R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity-server/src/receipts_api/control.rs` | the receipts routes' control under receipts_api: the current-controls readback and the reconciliation endpoints; DIRECTORY-064 R5 | DIRECTORY-064 |
 | `crates/lys-identity/src/provisioning.rs` | R5: Account rotation on usage limit | DIRECTORY-050 |
 | `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
 | `crates/lys-identity-server/src/cord_api.rs` | the master off switch's routes: pull, release and how it stands; DIRECTORY-083 R2 adds the console route admitted by the service key's signature | DIRECTORY-083 |
@@ -969,6 +972,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/state.rs` | R3: A reached budget acts once | DIRECTORY-051 |
 | `crates/lys-identity-server/src/runner_acts.rs` | R3: A reached budget acts once | DIRECTORY-051 |
 | `crates/lys-identity-server/src/goals_store.rs` | R4: Goals, expectations and deliverables, with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_store/control.rs` | the goals store's resend under goals_store: appends a validated Resent and renders the resent words; DIRECTORY-064 R5 | DIRECTORY-064 |
 | `surface/identity/tests/usage.test.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
 | `surface/identity/src/shell/Shell.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
 | `crates/lys-identity-server/src/refusals_api.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
