@@ -737,12 +737,71 @@ mod tests {
             )
         };
         match transport {
-            Transport::Claude => observe(
-                &sessions,
-                &binding,
-                &json!({"type":"system","subtype":"init",
-                "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
-            )?,
+            Transport::Claude => {
+                let initialize = {
+                    let mut table = sessions.lock()?;
+                    super::runtime(&mut table, "fixture", binding.generation)?
+                        .controller
+                        .bootstrap()
+                };
+                let correlation = initialize
+                    .dispatches
+                    .first()
+                    .ok_or("fixture initialize missing")?
+                    .frame["request_id"]
+                    .as_str()
+                    .ok_or("fixture initialize uncorrelated")?;
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"control_response",
+                    "response":{"subtype":"success","request_id":correlation,"response":{}}}),
+                )?;
+                let uuid = {
+                    let mut table = sessions.lock()?;
+                    let controller =
+                        &mut super::runtime(&mut table, "fixture", binding.generation)?.controller;
+                    let pending = super::Pending::new(
+                        "fixture-initialization".to_owned(),
+                        super::Kind::Human,
+                        "first turn".to_owned(),
+                    );
+                    let uuid = pending.uuid.clone();
+                    controller.enqueue(pending)?;
+                    let status = controller.control_status();
+                    let update =
+                        controller.boundary_reply(&crate::harness_control::BoundaryReply {
+                            generation: status.generation,
+                            boundary: status.boundary,
+                            context: crate::harness_control::ContextDecision::Released,
+                            reminders: Vec::new(),
+                        })?;
+                    assert_eq!(update.dispatches.len(), 1);
+                    assert_eq!(
+                        update.dispatches[0].frame["message"]["content"],
+                        "first turn"
+                    );
+                    uuid
+                };
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"system","subtype":"init",
+                    "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
+                )?;
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"user","session_id":"conversation","uuid":uuid,
+                    "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
+                )?;
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"result","session_id":"conversation",
+                    "uuid":"fixture-initialization-result","is_error":false}),
+                )?;
+            }
             Transport::Codex => {
                 observe(
                     &sessions,

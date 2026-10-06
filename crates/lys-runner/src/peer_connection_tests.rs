@@ -130,8 +130,14 @@ fn a_connection_refuses_an_ended_or_restarted_launch() -> Result<(), Box<dyn Err
     connection.proved_with(&held.sessions, &tree, (u32::MAX, 5, 5))?;
     held.sessions
         .restart_proved("proved", "replace-proved", &tree.leader)?;
-    let operations = std::fs::read_to_string(held.dir.path().join("operations.jsonl"))?;
-    assert!(operations.contains("replace-proved"));
+    let operations = crate::operations::Operations::open(held.dir.path())?;
+    let kept = operations
+        .get("replace-proved")
+        .ok_or("restart was not kept")?;
+    assert_eq!(kept.operation, "replace-proved");
+    assert_eq!(kept.session, "proved");
+    assert_eq!(kept.request, "restart");
+    assert_eq!(kept.state, crate::operations::OperationState::Confirmed);
     let after = held.tree()?;
     let error = connection
         .proved_with(&held.sessions, &after, (u32::MAX, 5, 5))

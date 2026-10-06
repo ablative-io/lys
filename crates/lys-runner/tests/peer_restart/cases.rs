@@ -92,7 +92,10 @@ impl Held {
 impl Drop for Held {
     fn drop(&mut self) {
         if let Err(error) = self.sessions.stop_all() {
-            crate::error::said(&format!("restart fixture could not stop: {error}"));
+            crate::error::said(&format!(
+                "restart fixture {} could not stop: {error}",
+                self.dir.path().display()
+            ));
         }
     }
 }
@@ -190,20 +193,16 @@ fn a_replayed_operation_answers_the_kept_restart_once() -> Result<(), Box<dyn Er
     )?;
     assert_eq!(again, first);
     assert_eq!(held.leader("own")?, after);
-    let text = std::fs::read_to_string(held.dir.path().join("operations.jsonl"))?;
-    let mut folded = BTreeMap::new();
-    for line in text.lines() {
-        let record: serde_json::Value = serde_json::from_str(line)?;
-        let id = record["operation"]
-            .as_str()
-            .ok_or("no operation id")?
-            .to_owned();
-        folded.insert(id, record);
-    }
-    let operations = folded.into_values().collect::<Vec<_>>();
-    assert_eq!(operations.len(), 1);
-    assert_eq!(operations[0]["operation"], "restart-own");
-    assert_eq!(operations[0]["state"], "confirmed");
+    let kept = held.sessions.outcome("restart-own")?;
+    assert_eq!(kept, first);
+    let page = held.sessions.control_receipts("own", None)?;
+    assert_eq!(page.receipts.len(), 1);
+    assert!(page.after.is_none());
+    assert_eq!(page.receipts[0].operation, "restart-own");
+    assert_eq!(page.receipts[0].state, OperationState::Confirmed);
+    let other = held.sessions.control_receipts("other", None)?;
+    assert!(other.receipts.is_empty());
+    assert!(other.after.is_none());
     Ok(())
 }
 
