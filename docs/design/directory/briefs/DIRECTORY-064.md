@@ -308,6 +308,8 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - modify: surface/identity/src/features/runtime/Sessions.tsx
 - modify: surface/identity/src/api.ts
 - modify: surface/identity/vite.config.ts
+- modify: crates/lys-runner/src/pty.rs
+- modify: crates/lys-runner/tests/pty_stop.rs
 
 **Checklist:**
 - C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6).

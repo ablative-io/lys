@@ -1254,6 +1254,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/src/directory_sign_in.rs` | The directory's sign-in and refused sign-in changes, committed on the one write path. | DIRECTORY-058 |
 | `crates/lys/src/identity/stop.rs` | `lys identity stop`: asks the service to stop everything, signed with the service key, then stops this computer's runner and services; DIRECTORY-083 R1 builds its request from console_stop.rs | DIRECTORY-083 |
 | `crates/lys-runner/tests/injection/cases.rs` | DIRECTORY-084: runner operation IDs carry their issue time | DIRECTORY-084 |
+| `crates/lys-runner/tests/pty_stop.rs` | a left process group is ended or proved gone; an exited, unreaped child's group is never read as gone from EPERM; DIRECTORY-064 R6, amendment 55 | DIRECTORY-064 |
 
 ## Inventory
 
