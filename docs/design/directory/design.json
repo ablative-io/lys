@@ -5686,6 +5686,11 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/src/durable.rs",
+      "note": "the runner's durable writer: appends and replacements with their syncs, and one decision's journal records as one explicit batch; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/tests/launch_config.rs",
       "note": "The runner launch Config tests.",
       "brief": "DIRECTORY-064"

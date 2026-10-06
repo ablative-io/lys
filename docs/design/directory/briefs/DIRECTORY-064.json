@@ -284,7 +284,8 @@
           "crates/lys-identity-server/src/runtime_state.rs",
           "crates/lys-identity-server/src/runtime_store.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
-          "crates/lys-identity-server/src/openapi_runner_types.rs"
+          "crates/lys-identity-server/src/openapi_runner_types.rs",
+          "crates/lys-runner/src/durable.rs"
         ],
         "delete": []
       },
@@ -586,6 +587,12 @@
       "by": "Archie",
       "subject": "Final checks: a boundary decision's journal records cost one journal sync, measured; a condition on BOX 20's final checks, not new scope",
       "ruling": "One boundary decision writes J = 1 + R + 2D operations-journal records: one decision, R refused-reminder records, and two preparation and arm records per dispatch. Brisket accounted their syncs at source level only, as ranging from 1 to J ordinary journal syncs plus one feed sync when events exist (Brisket c393aa8c). Under Tom's storage rule, a batch is one durable operation with one full flush, in the code, never leaf by leaf. Up to J syncs is the shape that rule forbids. The handback measures the journal syncs with lys-log-store's flush-counts feature, as for the audit store, for one boundary decision with R = 0 and D = 1, and for one with R = 5 and D = 1. If either takes more than one journal sync, plus the feed sync when events exist, those J records are written as one append batch with one sync in this box. The operations journal is BOX 20's already under amendment 17. If both measure one, the handback states the measured counts and this closes. A condition on BOX 20's final checks, not a new scope (Waffles 99cd53a7)."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R5: a boundary decision's journal records are one explicit writer batch with one sync, unconditionally; replaces amendment 39's measured condition; R5 gains lys-runner durable.rs",
+      "ruling": "operations.jsonl appends sync through lys-runner durable.rs (std::fs::File::sync_data at line 175, inside the per-path write loop), not lys-log-store, so lys-log-store's flush-counts cannot count them. The writer coalesces up to 32 queued commands opportunistically, with no transaction boundary, so scheduler timing can split one decision across syncs (Brisket 5bb22571). A measurement of one sync could therefore pass by luck, and a crash between the two halves of one decision would leave part of it on disk. Amendment 39's \"if either takes more than one\" is replaced: the explicit single-command batch is built now, whatever R = 0 and R = 5 measure, and the measurement is the proof of the batch (Waffles bfcbb001). R5 gains durable.rs, read on main at 181 lines (Waffles bfcbb001). It also gains lys-runner's Cargo.toml, only if the counter uses a feature. THE BATCH, as Brisket directed: one bounded writer batch slot is reserved on the first successfully validated journal record, before any metadata or controller mutation; that decision's journal bytes accumulate in operations/store.rs and are submitted once, as one durable operation with one sync. A failed or dropped non-empty batch names a writer failure and blocks pipe writes. A pre-enqueue offset or queue refusal keeps the existing red's unchanged authority and retry. There is no sync and no whole Table clone under the Table lock, and the feed stays with its existing owner. The touched files are durable.rs plus the already-owned operations/store.rs, operations.rs, harness_control/context.rs and the events.rs fixture. THE COUNTER: a per-writer, per-path sync count compiled only under cfg(test) or under a lys-runner feature named flush-counts, as lys-log-store names its own. No production code path changes for it. TESTS: one boundary decision with R = 0 and D = 1, and one with R = 5 and D = 1, each measures exactly one operations.jsonl sync; a decision interrupted inside its batch reopens with all of its records or none; two decisions queued together still produce two whole decisions, never a mixed record. The handback states both measured counts."
     }
   ]
 }
