@@ -827,6 +827,10 @@ fn the_original_request_digest_survives_a_changed_preparation_and_reopen()
     hash.update(b"lys-operation-request-json/v1\n");
     hash.update(canonical.as_bytes());
     let expected: [u8; 32] = hash.finalize().into();
+    assert_eq!(
+        crate::protocol::hex(&expected),
+        "535271fdca7ad0a677c9d622c318447ece4edf4bc1fa99cfdf18e7e4e5872d1f"
+    );
     assert_eq!(original.request.identity()?, expected);
     sessions.operate(original.clone())?;
     {
