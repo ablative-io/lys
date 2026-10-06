@@ -1239,6 +1239,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/durable.rs` | the runner's durable writer: appends and replacements with their syncs, and one decision's journal records as one explicit batch; DIRECTORY-064 R5 | DIRECTORY-064 |
 | `crates/lys-runner/tests/launch_config.rs` | The runner launch Config tests. | DIRECTORY-064 |
 | `crates/lys-runner/examples/qualify_adapter.rs` | Stage A of BOX 20's window: launches the machine's own claude or codex through the real adapter without the compiled QUALIFIED check, records the evidence a pin commit cites, and writes nothing to Lys; DIRECTORY-064 R6 | DIRECTORY-064 |
+| `crates/lys-runner/examples/qualify_adapter/owned.rs` | the qualifier's example-owned child: Cancellation, Message, Owned and child_entry, moved whole from qualify_adapter.rs; a private example module; DIRECTORY-064 R6 | DIRECTORY-064 |
+| `crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl` | fixture evidence: the qualifier stopping at its first unobserved step, marked fixture; never a pin's evidence; DIRECTORY-064 R6 | DIRECTORY-064 |
+| `crates/lys-runner/tests/fixtures/qualifier/fixture-pass.jsonl` | fixture evidence: every qualifier step observed against a fixture executable, marked fixture; never a pin's evidence; DIRECTORY-064 R6 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/grant_receipts_api.rs` | The grant receipt route: a grant leaf's receipt, the grant log's signed head and its inclusion proof. | DIRECTORY-058 |
 | `crates/lys-identity-server/tests/grant_receipts_signed.rs` | The grant receipt route's tests. | DIRECTORY-058 |
 | `crates/lys-identity/src/grants/receipt_answer.rs` | One function that verifies a grant receipt answer against a pinned key. | DIRECTORY-058 |

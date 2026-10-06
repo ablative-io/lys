@@ -5701,6 +5701,21 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/examples/qualify_adapter/owned.rs",
+      "note": "the qualifier's example-owned child: Cancellation, Message, Owned and child_entry, moved whole from qualify_adapter.rs; a private example module; DIRECTORY-064 R6",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl",
+      "note": "fixture evidence: the qualifier stopping at its first unobserved step, marked fixture; never a pin's evidence; DIRECTORY-064 R6",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/fixtures/qualifier/fixture-pass.jsonl",
+      "note": "fixture evidence: every qualifier step observed against a fixture executable, marked fixture; never a pin's evidence; DIRECTORY-064 R6",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-identity-server/src/grant_receipts_api.rs",
       "note": "The grant receipt route: a grant leaf's receipt, the grant log's signed head and its inclusion proof.",
       "brief": "DIRECTORY-058"
