@@ -601,3 +601,24 @@ fn threaded_notification_refusals_keep_method_and_keys_without_payload_values() 
     }
     Ok(())
 }
+
+#[test]
+fn malformed_notification_params_remain_protocol_faults_with_named_methods() -> Result {
+    let mut control = ready()?;
+    for frame in [
+        json!({"method":"warning"}),
+        json!({"method":"turn/started","params":null}),
+        json!({"method":"thread/started","params":["private fixture phrase"]}),
+    ] {
+        let error = control
+            .ingest(&binding(), &frame)
+            .err()
+            .ok_or("malformed params were accepted")?;
+        assert_eq!(error.name(), "control_protocol_unsupported");
+        let reason = error.to_string();
+        assert!(reason.contains(frame["method"].as_str().ok_or("fixture method missing")?));
+        assert!(reason.contains("params_keys=[]"));
+        assert!(!reason.contains("private fixture phrase"));
+    }
+    Ok(())
+}

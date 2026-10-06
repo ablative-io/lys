@@ -106,12 +106,6 @@ impl Compaction {
                     Some(Value::String(result)) if result == "failed" => Some(CompactResult::Failed),
                     _ => return Err("qualification_compaction_status_invalid: compact_result is not a closed SDK value".to_owned()),
                 };
-                if self.statuses.len() == 32 {
-                    return Err(
-                        "qualification_compaction_status_limit: more than 32 status frames"
-                            .to_owned(),
-                    );
-                }
                 self.statuses.push(StatusFrame {
                     status,
                     compact_result,

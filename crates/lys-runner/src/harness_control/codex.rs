@@ -135,7 +135,7 @@ pub(super) fn observe(
             method,
             &Value::Null,
             RunnerError::refused(
-                "control_correlation_unsupported",
+                "control_protocol_unsupported",
                 "notification has no params object",
             ),
         )
@@ -151,7 +151,7 @@ fn notification(
 ) -> Result<Observation, RunnerError> {
     if !params.is_object() {
         return Err(RunnerError::refused(
-            "control_correlation_unsupported",
+            "control_protocol_unsupported",
             "notification has no params object",
         ));
     }

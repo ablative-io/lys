@@ -729,7 +729,7 @@ mod tests {
     }
 
     #[test]
-    fn compaction_status_facts_refuse_unknown_values_and_overflow_without_text() -> Result<()> {
+    fn compaction_status_facts_refuse_unknown_values_without_text() -> Result<()> {
         let mut facts = Compaction::new("conversation", "uuid");
         for fields in [
             json!({}),
@@ -749,17 +749,6 @@ mod tests {
             assert!(error.starts_with("qualification_compaction_status_invalid"));
             assert!(!error.contains("private fixture phrase"));
         }
-        let status =
-            json!({"type":"system","subtype":"status", "session_id":"conversation", "status":null});
-        for _ in 0..32 {
-            facts.observe(&status)?;
-        }
-        let before = serde_json::to_value(&facts).map_err(io_failed)?;
-        assert_eq!(
-            facts.observe(&status).err().as_deref(),
-            Some("qualification_compaction_status_limit: more than 32 status frames")
-        );
-        assert_eq!(serde_json::to_value(&facts).map_err(io_failed)?, before);
         Ok(())
     }
 
@@ -858,6 +847,38 @@ mod tests {
         assert_eq!(value["result_seen"], true);
         assert_eq!(value["result_is_error"], Value::Null);
         assert!(!value.to_string().contains("private fixture phrase"));
+        Ok(())
+    }
+    #[test]
+    fn every_status_frame_in_the_current_compaction_is_retained() -> Result<()> {
+        let mut facts = Compaction::new("conversation", "uuid");
+        let statuses = [
+            json!({"status":"compacting","compact_result":"success"}),
+            json!({"status":"requesting","compact_result":"failed"}),
+            json!({"status":null}),
+        ];
+        let mut expected = Vec::new();
+        for index in 0..65 {
+            let mut frame = json!({"type":"system","subtype":"status","session_id":"conversation"});
+            let fields = &statuses[index % statuses.len()];
+            frame
+                .as_object_mut()
+                .ok_or("fixture shape invalid")?
+                .extend(fields.as_object().ok_or("fixture status invalid")?.clone());
+            facts.observe(&frame)?;
+            expected.push(
+                json!({"status":fields["status"],"compact_result":fields.get("compact_result")}),
+            );
+        }
+        assert_eq!(
+            serde_json::to_value(&facts).map_err(io_failed)?["statuses"],
+            json!(expected)
+        );
+        assert_eq!(
+            serde_json::to_value(Compaction::new("conversation", "next-uuid"))
+                .map_err(io_failed)?["statuses"],
+            json!([])
+        );
         Ok(())
     }
 }
