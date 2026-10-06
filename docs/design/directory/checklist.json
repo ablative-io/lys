@@ -2025,6 +2025,41 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Runner operation IDs carry their issue time (DIRECTORY-084)",
+      "items": [
+        {
+          "id": "C509",
+          "text": "Runner operation IDs have one dated form, `op-`, 12 hex digits of issue time, `-` and 32 hex digits, minted and read only in lys-runner operation_id.rs; every other form reads as undated (DIRECTORY-084 R1).",
+          "done": false
+        },
+        {
+          "id": "C510",
+          "text": "The runner refuses an undated, expired or future operation ID by name before any other judgment, live and after a reopen (DIRECTORY-084 R2).",
+          "done": false
+        },
+        {
+          "id": "C511",
+          "text": "The expiry pass prunes `seen` oldest first under a kept horizon, so the set holds at most two windows of IDs and a clock set back never readmits a pruned one (DIRECTORY-084 R2).",
+          "done": false
+        },
+        {
+          "id": "C512",
+          "text": "Goal reminders, budget crossings, the runner's managed input and peer restarts all mint dated IDs, and a resend after a restart carries the same ID (DIRECTORY-084 R3).",
+          "done": false
+        },
+        {
+          "id": "C513",
+          "text": "The named migration operations_undated_ids_retired runs once and removes every undated ID from `seen`, each refused by its form after (DIRECTORY-084 R4).",
+          "done": false
+        },
+        {
+          "id": "C514",
+          "text": "Tests show the set flat over ten windows, an expired ID refused after a reopen with nothing kept for it, and an old ID replayed after its window refused (DIRECTORY-084 R5).",
+          "done": false
+        }
+      ]
     }
   ]
 }

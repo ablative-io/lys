@@ -5691,6 +5691,11 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/src/operation_id.rs",
+      "note": "the runner's one operation ID form, `op-`, the issue time in milliseconds as 12 hex digits, `-` and 32 hex digits: minted and read here and nowhere else; DIRECTORY-084 R1",
+      "brief": "DIRECTORY-084"
+    },
+    {
       "path": "crates/lys-runner/tests/launch_config.rs",
       "note": "The runner launch Config tests.",
       "brief": "DIRECTORY-064"
@@ -5716,6 +5721,11 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/tests/as_caller.rs",
+      "note": "DIRECTORY-084: runner operation IDs carry their issue time",
+      "brief": "DIRECTORY-084"
+    },
+    {
       "path": "crates/lys-identity-server/src/grant_receipts_api.rs",
       "note": "The grant receipt route: a grant leaf's receipt, the grant log's signed head and its inclusion proof.",
       "brief": "DIRECTORY-058"
@@ -5724,6 +5734,11 @@
       "path": "crates/lys-identity-server/tests/grant_receipts_signed.rs",
       "note": "The grant receipt route's tests.",
       "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/budget_crossings.rs",
+      "note": "DIRECTORY-084: runner operation IDs carry their issue time",
+      "brief": "DIRECTORY-084"
     },
     {
       "path": "crates/lys-identity/src/grants/receipt_answer.rs",
@@ -5744,6 +5759,11 @@
       "path": "crates/lys/src/identity/stop.rs",
       "note": "`lys identity stop`: asks the service to stop everything, signed with the service key, then stops this computer's runner and services; DIRECTORY-083 R1 builds its request from console_stop.rs",
       "brief": "DIRECTORY-083"
+    },
+    {
+      "path": "crates/lys-runner/tests/injection/cases.rs",
+      "note": "DIRECTORY-084: runner operation IDs carry their issue time",
+      "brief": "DIRECTORY-084"
     }
   ],
   "inventory": [

@@ -534,3 +534,12 @@
 - [ ] **C506** — A console stop with no signature, another key's signature, a body changed after signing or a session cookie beside the signature is refused by name, and the cord is not pulled (DIRECTORY-083 R2, R3).
 - [ ] **C507** — A console stop sent again is answered as the same pull and stops nothing twice; sent after a release it is refused cord_reused (DIRECTORY-083 R2, R3).
 - [ ] **C508** — A console stop is admitted while an upgrade can still be put back, and every start after it is refused everything_stopped in words naming the console's person (DIRECTORY-083 R2, R3).
+
+## Runner operation IDs carry their issue time (DIRECTORY-084)
+
+- [ ] **C509** — Runner operation IDs have one dated form, `op-`, 12 hex digits of issue time, `-` and 32 hex digits, minted and read only in lys-runner operation_id.rs; every other form reads as undated (DIRECTORY-084 R1).
+- [ ] **C510** — The runner refuses an undated, expired or future operation ID by name before any other judgment, live and after a reopen (DIRECTORY-084 R2).
+- [ ] **C511** — The expiry pass prunes `seen` oldest first under a kept horizon, so the set holds at most two windows of IDs and a clock set back never readmits a pruned one (DIRECTORY-084 R2).
+- [ ] **C512** — Goal reminders, budget crossings, the runner's managed input and peer restarts all mint dated IDs, and a resend after a restart carries the same ID (DIRECTORY-084 R3).
+- [ ] **C513** — The named migration operations_undated_ids_retired runs once and removes every undated ID from `seen`, each refused by its form after (DIRECTORY-084 R4).
+- [ ] **C514** — Tests show the set flat over ten windows, an expired ID refused after a reopen with nothing kept for it, and an old ID replayed after its window refused (DIRECTORY-084 R5).

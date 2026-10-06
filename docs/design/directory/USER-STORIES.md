@@ -242,6 +242,8 @@
 
 **S267.** As the person who installed Lys, I want `lys identity stop` at this computer to stop every agent on every computer and to record who stopped them, when and why, even when nobody is signed in to the screens and while an upgrade can still be put back, so that one command at the machine is always enough to stop everything.
 
+**S268.** As the person who installed Lys, I want the runner's record of used operations to stay the same size however long it runs, while no operation is ever accepted twice, so that a runner that has run for a year starts and answers as fast as on its first day.
+
 ## Person setting up Lys for the first time — Installs Lys on their own machine with no terminal knowledge and signs in
 
 **S149.** As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
