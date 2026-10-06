@@ -106,15 +106,12 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/apps/registrars", post(registrar))
         .route("/apps/{app}", get(one))
         .route("/apps/{app}/approve", post(approve))
+        .route(
+            "/apps/{app}/connector",
+            post(crate::apps_connector_give::give),
+        )
         .route("/apps/{app}/sign_in", post(crate::apps_sign_in::set))
-        .route(
-            "/apps/{app}/credentials/issue",
-            post(crate::apps_client_credentials::issue),
-        )
-        .route(
-            "/apps/{app}/credentials/{credential}/revoke",
-            post(crate::apps_client_credentials::revoke),
-        )
+        .merge(crate::apps_client_credentials::routes())
         .route("/apps/{app}/decline", post(decline))
         .route("/apps/{app}/retire", post(retire))
 }
@@ -457,8 +454,10 @@ async fn approve(
             client_id: id.clone(),
             secret_sha256: digest,
         };
-        // The approval and its sign-in settings land as one durable act, or
-        // neither does: an approved app always has somewhere to send a person.
+        let connector = crate::apps_connector::made(&by, projection, &operation, &id, at)?;
+        // The approval, its sign-in settings and its connector land as one
+        // durable act, or none does: an approved app always has somewhere to
+        // send a person, and an identity to act as.
         apps.keep_approval(
             Approved {
                 operation: operation.clone(),
@@ -476,6 +475,7 @@ async fn approve(
                 by,
                 at,
             },
+            connector,
         )?;
         Ok(Approval {
             app: view(apps, &id)?,

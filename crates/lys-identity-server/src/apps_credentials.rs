@@ -72,7 +72,8 @@ pub(crate) fn pending(
     operation: &str,
 ) -> Result<bool, ServerError> {
     with_apps(state, |apps, projection| {
-        acting(state, apps.held(), headers, projection)?.administrator()?;
+        let who = acting(state, apps.held(), headers, projection)?;
+        who.administrator()?;
         if let Some(line) = apps.held().operation(operation) {
             return match line {
                 Line::Approved(approved) if approved.app == id => Ok(false),
@@ -82,6 +83,8 @@ pub(crate) fn pending(
                 .into()),
             };
         }
+        // Refused before any broker work: the connector needs a person.
+        crate::apps_connector::approver(&who.by(), projection)?;
         let app = apps
             .app(id)
             .ok_or_else(|| AppError::AppUnknown { app: id.to_owned() })?;

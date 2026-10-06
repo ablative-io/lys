@@ -10,7 +10,8 @@ use std::error::Error;
 use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
     Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
-    ClientCredentialsEnded, Decided, Line, LysRecorded, Placed, Proposed, Registered, SignInSet,
+    ClientCredentialsEnded, Connected, Decided, Line, LysRecorded, Placed, Proposed, Registered,
+    SignInSet,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -176,6 +177,7 @@ fn shape(line: &Line) -> &'static str {
         Line::ChangeDeclined(_) => "change_declined",
         Line::Placed(_) => "placed",
         Line::Registrar(_) => "registrar",
+        Line::Connector(_) => "connector",
         Line::ClientCredentialIssued(_) => "client_credential_issued",
         Line::ClientCredentialRevoked(_) => "client_credential_revoked",
         Line::ClientCredentialsEnded(_) => "client_credentials_ended",
@@ -239,9 +241,36 @@ fn every_client_credential_line_shape_keeps_its_bytes_and_reads_back() -> TestRe
         let read: Line = serde_json::from_slice(text.as_bytes())?;
         assert_eq!(&read, line, "{}: today's reader", shape(line));
     }
-    let shapes: std::collections::BTreeSet<_> =
-        lines().iter().chain(&credentials).map(shape).collect();
-    assert_eq!(shapes.len(), 14, "every shape of apps line is pinned");
+    let connector: Line = serde_json::from_str(CONNECTOR_FIXTURE.trim_end())?;
+    let shapes: std::collections::BTreeSet<_> = lines()
+        .iter()
+        .chain(&credentials)
+        .chain(std::iter::once(&connector))
+        .map(shape)
+        .collect();
+    assert_eq!(shapes.len(), 15, "every shape of apps line is pinned");
+    Ok(())
+}
+
+/// The connector line (box 12.1), written once by the code that added it and
+/// never regenerated, pinned beside the shapes written before it.
+const CONNECTOR_FIXTURE: &str = include_str!("fixtures/apps-line-connector.json");
+
+#[test]
+fn the_connector_line_keeps_its_bytes_and_reads_back() -> TestResult {
+    let line = Line::Connector(Connected {
+        operation: "op-0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e".to_owned(),
+        app: "notes".to_owned(),
+        connector: "connector-c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0".to_owned(),
+        approver: "person-d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1".to_owned(),
+        by: operator(),
+        at: 14,
+    });
+    let written = serde_json::to_string(&line)?;
+    assert_eq!(CONNECTOR_FIXTURE.trim_end(), written);
+    let read: Line = serde_json::from_str(CONNECTOR_FIXTURE.trim_end())?;
+    assert_eq!(read, line);
+    assert_eq!(shape(&read), "connector");
     Ok(())
 }
 

@@ -258,8 +258,14 @@ pub(crate) fn views<'a>(
 }
 
 /// Whether `asker` may see the sessions of `agent`: the administrator, the
-/// person responsible for it, or the agent itself.
-fn sees(directory: &Projection, administrator: bool, asker: IdentityId, agent: &str) -> bool {
+/// person responsible for it, or the agent itself. A service account or a
+/// connector is responsible for no agent, so it sees none.
+pub(crate) fn sees(
+    directory: &Projection,
+    administrator: bool,
+    asker: IdentityId,
+    agent: &str,
+) -> bool {
     if administrator {
         return true;
     }

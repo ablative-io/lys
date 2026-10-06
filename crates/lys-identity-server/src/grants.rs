@@ -210,7 +210,18 @@ fn with_directory_grants_model<A, T>(
     apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
-        let projection = crate::service_account_grants::projection(state, directory.projection()?)?;
+        // The apps are held first: their connectors are accounts the engine
+        // judges, beside the service accounts.
+        let mut apps =
+            state
+                .apps
+                .lock()
+                .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
+                    reason: format!("the apps lock is poisoned: {error}"),
+                })?;
+        apps.settle()?;
+        let projection =
+            crate::service_account_grants::projection(state, directory.projection()?, apps.held())?;
         let administrator =
             state
                 .admission
@@ -223,14 +234,6 @@ fn with_directory_grants_model<A, T>(
             .ok_or(ServerError::NotAdmitted {
                 reason: "the configured administrator's login is bound to no person, so there is no root authority to judge a grant under",
             })?;
-        let mut apps =
-            state
-                .apps
-                .lock()
-                .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
-                    reason: format!("the apps lock is poisoned: {error}"),
-                })?;
-        apps.settle()?;
         if require_model {
             state.grant_setup.require_model(apps.model_revision())?;
         }

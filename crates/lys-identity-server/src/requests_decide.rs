@@ -35,6 +35,9 @@ use crate::requests_views::RequestView;
 use crate::routes::AppState;
 use crate::session::now;
 
+/// The refusal of an approval naming no source for anyone but a person.
+const NAME_THE_SOURCE: &str = "only a person is given access from the root authority; an agent's, a service account's or a connector's access is lent from a grant a person holds: name the source";
+
 /// An approval. `source` is the grant the access is lent from, or null for
 /// the root authority to issue it to a person.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -163,10 +166,10 @@ pub(crate) async fn approve(
                     "a one-time answer lends from a grant the approver holds: name the source",
                 ));
             }
-            if source.is_none() && matches!(weighed.seeker, IdentityId::Agent(_)) {
-                return Err(malformed(
-                    "an agent's access is lent from a grant a person holds: name the source",
-                ));
+            // Only a person holds root authority; anyone else asking is lent
+            // from a grant, refused here before the intent is kept.
+            if source.is_none() && !matches!(weighed.seeker, IdentityId::Person(_)) {
+                return Err(malformed(NAME_THE_SOURCE));
             }
             store.intend(Intended {
                 id: asked.id.clone(),
@@ -215,9 +218,7 @@ pub(crate) async fn approve(
                     None,
                     IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_),
                 ) => {
-                    return Err(malformed(
-                        "an agent's access is lent from a grant a person holds: name the source",
-                    ));
+                    return Err(malformed(NAME_THE_SOURCE));
                 }
             };
             let recorded = match recorded {

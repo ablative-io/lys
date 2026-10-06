@@ -1,18 +1,21 @@
 //! The apps' sealed snapshot, lys-apps-state/v1, held to the bytes today's
 //! code writes before the connector line (DIRECTORY-080 R1, box 12.0). The
 //! record holds the app `lys` and an app of each standing: pending, approved
-//! with sign-in settings, declined and retired. The fixture was written once
-//! by the code at main 6e575de1 and is never regenerated: today's writer
-//! writes it, today's reader reads it back to the same record, and one
-//! changed byte is refused or read as another record.
+//! with sign-in settings, declined and retired. An app keeps its history as
+//! lines, so every kind of line and every kind of actor is a stored shape,
+//! and the record holds each. The fixture was written once by the code at
+//! main d759ef18 and is never regenerated: today's writer writes it, today's
+//! reader reads it back to the same record, and one changed byte is refused
+//! or read as another record.
 
+use std::collections::BTreeSet;
 use std::error::Error;
 
 use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
     Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
-    ClientCredentialsEnded, Decided, Held, Line, LysRecorded, Placed, Proposed, Registered,
-    SignInSet, Standing,
+    ClientCredentialsEnded, Connected, Decided, Held, Line, LysRecorded, Placed, Proposed,
+    Registered, SignInSet, Standing,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -166,7 +169,73 @@ fn lines() -> Vec<Line> {
         registered(12, "ledger", None),
         approved(13, "ledger", None),
         Line::Retired(decided(14, "ledger")),
+        Line::ChangeDeclined(decided(15, "notes")),
+        Line::Proposed(Proposed {
+            operation: op(16),
+            app: "notes".to_owned(),
+            replaces: 2,
+            schema: schema(),
+            by: By::ServiceAccount {
+                id: account.to_owned(),
+            },
+            at: 16,
+        }),
     ]
+}
+
+/// Which kind `line` is. Every kind is named here, so a kind added later is
+/// placed in words before it can be written.
+fn kind(line: &Line) -> &'static str {
+    match line {
+        Line::Lys(_) => "lys",
+        Line::Registered(_) => "registered",
+        Line::Approved(_) => "approved",
+        Line::SignInSet(_) => "sign_in_set",
+        Line::Declined(_) => "declined",
+        Line::Retired(_) => "retired",
+        Line::Proposed(_) => "proposed",
+        Line::Applied(_) => "applied",
+        Line::ChangeDeclined(_) => "change_declined",
+        Line::Placed(_) => "placed",
+        Line::Registrar(_) => "registrar",
+        Line::Connector(_) => "connector",
+        Line::ClientCredentialIssued(_) => "client_credential_issued",
+        Line::ClientCredentialRevoked(_) => "client_credential_revoked",
+        Line::ClientCredentialsEnded(_) => "client_credentials_ended",
+    }
+}
+
+/// Who `line` records as acting. The app `lys` is recorded as made by the
+/// service at start; a credentials-ended line records the broker's
+/// confirmation and names no actor.
+fn actor(line: &Line) -> Option<By> {
+    match line {
+        Line::Lys(_) => Some(By::Start),
+        Line::Registered(Registered { by, .. })
+        | Line::Approved(Approved { by, .. })
+        | Line::SignInSet(SignInSet { by, .. })
+        | Line::Declined(Decided { by, .. })
+        | Line::Retired(Decided { by, .. })
+        | Line::Proposed(Proposed { by, .. })
+        | Line::Applied(Applied { by, .. })
+        | Line::ChangeDeclined(Decided { by, .. })
+        | Line::Placed(Placed { by, .. })
+        | Line::Registrar(Registrar { by, .. })
+        | Line::Connector(Connected { by, .. })
+        | Line::ClientCredentialIssued(ClientCredentialIssued { by, .. })
+        | Line::ClientCredentialRevoked(ClientCredentialRevoked { by, .. }) => Some(by.clone()),
+        Line::ClientCredentialsEnded(_) => None,
+    }
+}
+
+/// Which kind of actor `by` is. Every kind is named here.
+fn actor_kind(by: &By) -> &'static str {
+    match by {
+        By::Person { .. } => "person",
+        By::Operator { .. } => "operator",
+        By::ServiceAccount { .. } => "service_account",
+        By::Start => "start",
+    }
 }
 
 fn held() -> Result<Held, Box<dyn Error>> {
@@ -183,6 +252,44 @@ fn standings(held: &Held) -> Vec<(String, Standing)> {
         .iter()
         .map(|app| (app.registered.app.clone(), app.standing()))
         .collect()
+}
+
+/// The connector line is the one kind no record here holds: it is pinned by
+/// its own fixture in `apps_lines.rs` (box 12.1).
+#[test]
+fn the_record_holds_every_kind_of_line_and_every_kind_of_actor() {
+    let lines: Vec<Line> = lines().into_iter().chain(credential_lines()).collect();
+    let kinds: BTreeSet<_> = lines.iter().map(kind).collect();
+    assert_eq!(
+        kinds,
+        BTreeSet::from([
+            "lys",
+            "registered",
+            "approved",
+            "sign_in_set",
+            "declined",
+            "retired",
+            "proposed",
+            "applied",
+            "change_declined",
+            "placed",
+            "registrar",
+            "client_credential_issued",
+            "client_credential_revoked",
+            "client_credentials_ended",
+        ]),
+        "every kind of line but the connector is in the fixtures"
+    );
+    let actors: BTreeSet<_> = lines
+        .iter()
+        .filter_map(actor)
+        .map(|by| actor_kind(&by))
+        .collect();
+    assert_eq!(
+        actors,
+        BTreeSet::from(["person", "operator", "service_account", "start"]),
+        "every kind of actor is in the fixture"
+    );
 }
 
 #[test]

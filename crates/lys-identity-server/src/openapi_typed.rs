@@ -14,6 +14,7 @@ use crate::openapi_table::{A, GET, POST, PUT, S};
 pub(crate) fn typed(api: &mut Api) {
     use crate::apps_api::{AppApprovalBody, DecideBody, RegisterBody, RegistrarBody};
     use crate::apps_bench::{AskBody, BENCH, BenchAnswer, OpenBody};
+    use crate::apps_connector_give::ConnectorBody;
     use crate::apps_schema_api::{ChangeBody, ChangeDecision, CheckBody, PlaceBody};
     use crate::apps_sign_in::AppSignInBody;
     use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued, SchemaChanged};
@@ -171,6 +172,7 @@ pub(crate) fn typed(api: &mut Api) {
                     "NoPerson",
                     "SecretsUnavailable",
                     "redirect_invalid",
+                    "connector_needs_a_person",
                 ],
             ],
         ),
@@ -190,6 +192,28 @@ pub(crate) fn typed(api: &mut Api) {
                     "app_not_approved",
                     "app_retired",
                     "redirect_invalid",
+                    "app_operation_reused",
+                ],
+            ],
+        ),
+        route(
+            (
+                POST,
+                "/apps/{app}/connector",
+                "Give an app approved before connectors its connector, answering to the administrator acting",
+            ),
+            S,
+            Some(api.schema::<ConnectorBody>()),
+            Some(app.clone()),
+            &[
+                ADMIN_BODY,
+                &[
+                    "app_unknown",
+                    "app_not_approved",
+                    "app_retired",
+                    "app_is_lys",
+                    "connector_exists",
+                    "connector_needs_a_person",
                     "app_operation_reused",
                 ],
             ],

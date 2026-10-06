@@ -129,6 +129,8 @@ pub(crate) fn for_judged(
         }
     }
     let mut possible = BTreeMap::<_, Vec<_>>::new();
+    // A service account or an app's connector is never named as one to ask:
+    // neither answers a request; the person each answers to is.
     for grant in candidates {
         if grant.holder() == caller
             || grant.holder() == root
@@ -139,7 +141,10 @@ pub(crate) fn for_judged(
                 .pass_on()
                 .actions()
                 .is_some_and(|actions| actions.contains(action))
-            || matches!(grant.holder(), IdentityId::ServiceAccount(_))
+            || matches!(
+                grant.holder(),
+                IdentityId::ServiceAccount(_) | IdentityId::Connector(_)
+            )
         {
             continue;
         }

@@ -2,7 +2,10 @@
 //! line does to its app once taken. `Held::hold` applies them in order, and
 //! a start replays them over the leaves after the snapshot.
 
-use super::{App, Applied, By, Held, Line, LysRecorded, Refused, Registered, Standing, Version};
+use super::{
+    App, Applied, By, Connected, Held, Line, LysRecorded, Refused, Registered, SignInSet, Standing,
+    Version,
+};
 
 /// The app `lys` as its one line records it: approved at the model's version.
 pub(super) fn lys_app(lys: LysRecorded) -> App {
@@ -26,6 +29,7 @@ pub(super) fn lys_app(lys: LysRecorded) -> App {
         },
         approved: None,
         sign_in: None,
+        connector: None,
         declined: None,
         retired: None,
         versions: vec![version],
@@ -34,15 +38,34 @@ pub(super) fn lys_app(lys: LysRecorded) -> App {
     }
 }
 
-/// Whether `line` is the sign-in settings kept beside `kept`, an approval of
-/// the same app under the same operation: the one case where an operation
-/// names two lines.
+/// Whether `line` is the sign-in settings or the connector kept beside
+/// `kept`, an approval of the same app under the same operation: the one case
+/// where an operation names more than one line.
 pub(super) fn beside_its_approval(kept: &Line, line: &Line) -> bool {
-    matches!(
-        (kept, line),
-        (Line::Approved(approved), Line::SignInSet(set))
-            if approved.app == set.app && approved.operation == set.operation
-    )
+    match (kept, line) {
+        (
+            Line::Approved(approved),
+            Line::SignInSet(SignInSet { app, operation, .. })
+            | Line::Connector(Connected { app, operation, .. }),
+        ) => approved.app == *app && approved.operation == *operation,
+        _ => false,
+    }
+}
+
+/// Refuse a connector line unless its connector and its approver read back
+/// as a connector's id and a person's id.
+pub(super) fn ids_read(connected: &Connected) -> Result<(), String> {
+    let named =
+        |error: lys_identity::IdentityError| format!("line `{}`: {error}", connected.operation);
+    connected
+        .connector
+        .parse::<lys_identity::ConnectorId>()
+        .map_err(named)?;
+    connected
+        .approver
+        .parse::<lys_identity::PersonId>()
+        .map_err(named)?;
+    Ok(())
 }
 
 /// Whether `line` may be kept on `app` as it stands.
@@ -65,19 +88,23 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
         {
             Err(Refused::Exists)
         }
-        Line::Retired(_) if app.registered.app == lys_identity::grants::LYS_APP => {
+        Line::Retired(_) | Line::Connector(_)
+            if app.registered.app == lys_identity::grants::LYS_APP =>
+        {
             Err(Refused::Lys)
         }
         Line::Retired(_)
         | Line::Proposed(_)
         | Line::Applied(_)
         | Line::Placed(_)
+        | Line::Connector(_)
         | Line::ClientCredentialIssued(_)
         | Line::ClientCredentialRevoked(_)
             if standing != Standing::Approved =>
         {
             Err(Refused::Standing(standing))
         }
+        Line::Connector(_) if app.connector.is_some() => Err(Refused::Exists),
         Line::Proposed(_) if app.pending.is_some() => Err(Refused::Pending),
         Line::Proposed(proposed) if proposed.replaces != current => Err(Refused::Moved(current)),
         Line::Applied(applied) if applied.version != current + 1 => Err(Refused::Moved(current)),
@@ -127,6 +154,7 @@ pub(super) fn apply(app: &mut App, line: &Line) {
             app.approved = Some(approved.clone());
         }
         Line::SignInSet(set) => app.sign_in = Some(set.clone()),
+        Line::Connector(connected) => app.connector = Some(connected.clone()),
         Line::Declined(declined) => app.declined = Some(declined.clone()),
         Line::Retired(retired) => app.retired = Some(retired.clone()),
         Line::Proposed(proposed) => app.pending = Some(proposed.clone()),

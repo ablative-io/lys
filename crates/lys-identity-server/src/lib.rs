@@ -25,6 +25,8 @@ pub mod apps_bench;
 pub mod apps_bench_scratch;
 pub mod apps_binding;
 mod apps_client_credentials;
+mod apps_connector;
+mod apps_connector_give;
 mod apps_credentials;
 pub mod apps_error;
 mod apps_refresh;
@@ -71,6 +73,8 @@ pub mod config;
 pub mod configuration_api;
 pub mod configuration_store;
 pub mod connections_api;
+#[cfg(test)]
+mod connector_arms_tests;
 pub mod cord_api;
 mod cord_pull;
 pub mod cord_store;

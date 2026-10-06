@@ -10,10 +10,12 @@
 //! retired app stays in the record, with its versions, and nothing it held
 //! is removed. The app `lys` is recorded once, from Lys's own model, and is
 //! never retired. Every operation id names one line only, except that an
-//! approval's sign-in settings are kept as a second line beside it under the
+//! approval's sign-in settings and its connector are kept beside it under the
 //! approval's operation, so that an approval is complete without a second
 //! act; an administrator's later change of those settings is a line of its
-//! own, and the latest is what the provider reads at each request.
+//! own, and the latest is what the provider reads at each request. An app
+//! holds one connector or none (DIRECTORY-080 R1), and a connector line
+//! written for an app approved before connectors has an operation of its own.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -35,9 +37,13 @@ pub use client_lines::{
 #[path = "apps_operation_tests.rs"]
 mod operation_tests;
 
+#[cfg(test)]
+#[path = "apps_connector_tests.rs"]
+mod connector_tests;
+
 use crate::apps_binding::{Binding, Registrar};
 use crate::read_views::Login;
-use fold::{allows_on, apply, beside_its_approval, lys_app};
+use fold::{allows_on, apply, beside_its_approval, ids_read, lys_app};
 
 /// The snapshot domain the apps' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/apps-state/v1";
@@ -217,6 +223,29 @@ pub struct Placed {
     pub at: u64,
 }
 
+/// An approved app's connector (DIRECTORY-080 R1): the identity the app gives
+/// and holds grants as, answering to the administrator who approved it, by
+/// that person's id as resolved from their login when the line was written.
+/// Kept beside the approval under the approval's operation when the approval
+/// writes it, and under an operation of its own when an administrator gives
+/// one to an app approved before connectors were.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Connected {
+    /// The operation id it was kept under.
+    pub operation: String,
+    /// The app.
+    pub app: String,
+    /// The connector's id: `connector-` and 32 hex digits.
+    pub connector: String,
+    /// The approving administrator's person id.
+    pub approver: String,
+    /// Who wrote it.
+    pub by: By,
+    /// When.
+    pub at: u64,
+}
+
 /// Lys's own model recorded as the schema of the app `lys`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -257,6 +286,8 @@ pub enum Line {
     Placed(Placed),
     /// A service account made a registrar.
     Registrar(Registrar),
+    /// An approved app's connector recorded.
+    Connector(Connected),
     /// A virtual client credential issued for an approved app.
     ClientCredentialIssued(ClientCredentialIssued),
     /// A client credential revoked.
@@ -280,6 +311,7 @@ impl Line {
             Self::Applied(line) => &line.operation,
             Self::Placed(line) => &line.operation,
             Self::Registrar(line) => &line.operation,
+            Self::Connector(line) => &line.operation,
             Self::ClientCredentialIssued(line) => &line.operation,
             Self::ClientCredentialRevoked(line) => &line.operation,
             Self::ClientCredentialsEnded(line) => &line.operation,
@@ -299,6 +331,7 @@ impl Line {
             Self::Proposed(line) => Some(&line.app),
             Self::Applied(line) => Some(&line.app),
             Self::Placed(line) => Some(&line.app),
+            Self::Connector(line) => Some(&line.app),
             Self::Registrar(_) => None,
             Self::ClientCredentialIssued(line) => Some(&line.app),
             Self::ClientCredentialRevoked(line) => Some(&line.app),
@@ -348,6 +381,11 @@ pub struct App {
     /// Its sign-in settings as last set: the addresses the provider admits and
     /// whether the app is given the person's name. Set with the approval.
     pub sign_in: Option<SignInSet>,
+    /// Its connector, once it has one. Absent from the sealed snapshot while
+    /// it has none, so a record of apps without connectors seals to the same
+    /// lys-apps-state/v1 bytes it always did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connector: Option<Connected>,
     /// Its registration declined, once it is.
     pub declined: Option<Decided>,
     /// Its retirement, once it has one.
@@ -531,6 +569,9 @@ impl Held {
         if line.app() == Some("") {
             return Err("this line names no app".to_owned());
         }
+        if let Line::Connector(connected) = &line {
+            ids_read(connected)?;
+        }
         if let Some(kept) = self.operation(line.operation())
             && !beside_its_approval(&kept, &line)
         {
@@ -557,6 +598,7 @@ impl Held {
                     registered,
                     approved: None,
                     sign_in: None,
+                    connector: None,
                     declined: None,
                     retired: None,
                     versions: Vec::new(),

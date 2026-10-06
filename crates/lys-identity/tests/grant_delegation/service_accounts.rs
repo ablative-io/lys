@@ -217,6 +217,74 @@ fn a_check_through_a_retired_service_accounts_grant_is_refused_and_another_grant
     Ok(())
 }
 
+/// An agent below a service account reads through the account's grant while
+/// the account stands; once the account is retired the agent's check is
+/// refused naming Retired, with nothing recorded.
+#[test]
+fn an_agent_below_a_service_account_is_refused_once_the_account_is_retired() -> Outcome {
+    let mut world = World::new()?;
+    let root = world.root(
+        world.dana,
+        "kite",
+        pass(
+            &["read", "write"],
+            &[RecipientKind::ServiceAccount, RecipientKind::Agent],
+        )?,
+        None,
+    )?;
+    let (active, service) = account(&mut world, false)?;
+    let held = world
+        .grants
+        .delegate(
+            &active,
+            &DelegateRequest {
+                operation: OperationId::from_bytes([71; 16]),
+                caller: IdentityId::Person(world.dana),
+                route: Route::Api,
+                source: root,
+                recipient: service,
+                responsible: world.dana,
+                resource: alpha()?,
+                relation: Relation::new("heron")?,
+                pass_on: pass(&["read"], &[RecipientKind::Agent])?,
+                window: Window::new(T0, None)?,
+            },
+            T0,
+        )?
+        .event
+        .grant();
+    let agent = IdentityId::Agent(world.tom_agent);
+    let mut below = world.request(service, held, agent, "tern", PassOn::UseOnly, None)?;
+    below.operation = OperationId::from_bytes([72; 16]);
+    let lent = world
+        .grants
+        .delegate(&active, &below, T0 + 1)?
+        .event
+        .grant();
+    let read = ExerciseRequest {
+        caller: agent,
+        route: Route::Tool,
+        resource: alpha()?,
+        action: Action::new("read")?,
+    };
+    let permit = world.grants.check(&active, &read, T0 + 2, None)?;
+    assert_eq!(permit.grant, lent, "the agent reads through the account");
+
+    let (retired, _) = account(&mut world, true)?;
+    let count = world.events();
+    let refused = world.grants.check(&retired, &read, T0 + 3, None);
+    assert!(
+        matches!(
+            &refused,
+            Err(GrantError::IdentityNotActive { identity, state: LifecycleState::Retired })
+                if *identity == service.to_string()
+        ),
+        "{refused:?}"
+    );
+    assert_eq!(world.events(), count, "a refused check records nothing");
+    Ok(())
+}
+
 #[test]
 fn a_service_account_cannot_mint_a_root_or_receive_a_person_only_grant() -> Outcome {
     let mut world = World::new()?;

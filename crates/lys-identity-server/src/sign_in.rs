@@ -79,8 +79,33 @@ fn failed(reason: impl Into<String>) -> ServerError {
 fn unreachable_issuer(error: reqwest::Error) -> ServerError {
     failed(format!(
         "the sign-in service could not be reached: {}",
-        error.without_url()
+        unreached(error)
     ))
+}
+
+/// What an HTTP call's failure says, without the address it was sent to,
+/// followed by every cause beneath it by name: reqwest's own words are only
+/// "error sending request", and the refused, reset or timed-out connection
+/// is in its sources.
+pub(crate) fn unreached(error: reqwest::Error) -> String {
+    let error = error.without_url();
+    let mut words = error.to_string();
+    let mut cause = std::error::Error::source(&error);
+    while let Some(next) = cause {
+        words.push_str(": ");
+        words.push_str(&next.to_string());
+        cause = next.source();
+    }
+    words
+}
+
+/// A client for the issuer that never sends a call on a connection left
+/// idle: the issuer closes an idle connection after its server's keep-alive
+/// (actix-web's default, five seconds, unset in its server), and a call
+/// written onto one it has just closed fails as "connection closed before
+/// message completed". Every call opens its own loopback connection.
+pub(crate) fn issuer_client() -> reqwest::ClientBuilder {
+    reqwest::ClientBuilder::new().pool_max_idle_per_host(0)
 }
 
 /// The issuer's sign-in API, over its loopback address, and the sign-ins
@@ -279,7 +304,7 @@ impl IssuerSignIn {
     pub fn new(api: String, callback: String) -> Result<Self, ServerError> {
         // The issuer refuses a sign-in that names no User-Agent; the service
         // names itself.
-        let http = reqwest::ClientBuilder::new()
+        let http = issuer_client()
             .redirect(reqwest::redirect::Policy::none())
             .user_agent(USER_AGENT)
             .build()

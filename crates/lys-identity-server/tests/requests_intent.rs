@@ -241,3 +241,54 @@ async fn settling_an_approval_the_grants_hold_nothing_for_leaves_the_request_wai
     assert_eq!(held["grants"], json!([]), "{held}");
     Ok(())
 }
+
+/// DIRECTORY-080 R1 (box 12.5): only a person is given access from the root
+/// authority. A connector's request approved with no source is refused by
+/// name before any intent is kept, and it still waits.
+#[tokio::test]
+async fn a_connectors_request_approved_with_no_source_is_refused_before_its_intent() -> TestResult {
+    let asking = operation()?;
+    let id = asking.clone();
+    let (service, _) = Service::start_with(move |config| {
+        let seeded = seed_configured(config, [ADMINISTRATOR, BEA])?;
+        let dir = config.requests_dir.as_deref().ok_or("no requests_dir")?;
+        let mut store =
+            RequestStore::open(dir, Arc::new(load_service_key(&config.event_key_file)?))?;
+        store.ask(Asked {
+            id,
+            asked_by: lys_identity::ConnectorId::generate()?.to_string(),
+            responsible: seeded.people[0].id.to_string(),
+            resource_kind: "doc".to_owned(),
+            resource_id: "1".to_owned(),
+            relation: "beta".to_owned(),
+            ends_at: Some(FAR),
+            why: "to read the quarter's figures".to_owned(),
+            asked_at: 5,
+        })?;
+        Ok(seeded)
+    })
+    .await?;
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let answer = service
+        .post(
+            &format!("/requests/{asking}/approve"),
+            Some(&ada),
+            &approval()?,
+        )
+        .await?;
+    refused(&answer, 400, "RequestMalformed");
+    assert!(
+        answer
+            .1
+            .to_string()
+            .contains("a connector's access is lent"),
+        "{}",
+        answer.1
+    );
+    let (_, seen) = service.get("/requests", Some(&ada)).await?;
+    assert_eq!(seen["requests"][0]["id"], asking.as_str(), "{seen}");
+    assert_eq!(seen["requests"][0]["state"], "waiting", "{seen}");
+    let (_, held) = service.get("/grants", Some(&ada)).await?;
+    assert_eq!(held["grants"], json!([]), "{held}");
+    Ok(())
+}

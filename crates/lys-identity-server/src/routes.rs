@@ -297,20 +297,22 @@ pub(crate) fn hex(bytes: &[u8]) -> String {
     text
 }
 
+/// The identity `text` names, read by its prefix; a prefix that names no
+/// kind of identity is refused by name (DIRECTORY-080 R1, box 12.5).
 pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
-    if text.starts_with("op-") {
-        return lys_identity::ServiceAccountId::from_str(text)
-            .map(IdentityId::ServiceAccount)
-            .map_err(ServerError::from);
-    }
-    if text.starts_with("agent-") {
-        return AgentId::from_str(text)
-            .map(IdentityId::Agent)
-            .map_err(ServerError::from);
-    }
-    PersonId::from_str(text)
-        .map(IdentityId::Person)
-        .map_err(ServerError::from)
+    let identity = match text.split_once('-').map(|(prefix, _)| prefix) {
+        Some("op") => {
+            lys_identity::ServiceAccountId::from_str(text).map(IdentityId::ServiceAccount)
+        }
+        Some("agent") => AgentId::from_str(text).map(IdentityId::Agent),
+        Some("connector") => lys_identity::ConnectorId::from_str(text).map(IdentityId::Connector),
+        Some("person") => PersonId::from_str(text).map(IdentityId::Person),
+        _ => Err(lys_identity::IdentityError::IdentifierMalformed {
+            kind: "person, agent, service account or connector",
+            text: text.to_owned(),
+        }),
+    };
+    identity.map_err(ServerError::from)
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]

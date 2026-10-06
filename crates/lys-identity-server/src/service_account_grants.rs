@@ -3,6 +3,7 @@
 //! retired account or inactive owner cannot exercise a grant.
 
 use std::str::FromStr;
+use std::sync::Arc;
 
 use axum::http::{HeaderMap, header};
 use lys_identity::projection::Projection;
@@ -74,13 +75,19 @@ pub(crate) fn admit(
     Ok(())
 }
 
-/// A request projection augmented from the accounts' current committed state.
+/// A request projection augmented from the accounts' current committed
+/// state and the connectors of the apps `apps` holds.
 pub(crate) fn projection(
     state: &AppState,
     directory: &Projection,
+    apps: &crate::apps_state::Held,
 ) -> Result<Projection, ServerError> {
     let Some(accounts) = &state.service_accounts else {
-        return Ok(directory.shared());
+        if apps.apps.iter().all(|app| app.connector.is_none()) {
+            return Ok(directory.shared());
+        }
+        let connectors = crate::apps_connector::with_connectors(Arc::default(), apps)?;
+        return Ok(directory.with_accounts(connectors));
     };
     let mut accounts =
         accounts
@@ -89,14 +96,16 @@ pub(crate) fn projection(
                 reason: format!("the service accounts lock is poisoned: {error}"),
             })?;
     accounts.settle()?;
-    expanded(directory, accounts.held())
+    expanded(directory, accounts.held(), apps)
 }
 
 fn expanded(
     directory: &Projection,
     accounts: &crate::service_accounts_state::Held,
+    apps: &crate::apps_state::Held,
 ) -> Result<Projection, ServerError> {
-    let projection = directory.with_accounts(accounts.grant_accounts()?);
+    let accounts = crate::apps_connector::with_connectors(accounts.grant_accounts()?, apps)?;
+    let projection = directory.with_accounts(accounts);
     #[cfg(test)]
     tests::copied(directory, &projection);
     Ok(projection)

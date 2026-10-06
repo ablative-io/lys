@@ -583,4 +583,28 @@ mod tests {
         }
         Ok(())
     }
+
+    /// DIRECTORY-080 R1 (box 12.5): a connector approves no MCP server,
+    /// administrator or not. The servers within remit are an agent's own
+    /// reviewed profile's, or the declared ones for the administrator as a
+    /// person; a connector has neither.
+    #[test]
+    fn a_connector_is_beyond_remit_for_every_mcp_server() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let mut profiles = ProvisioningStore::open(&dir.path().join("profiles.json"))?;
+        let asked = asked()?;
+        let intended = intent(&asked)?;
+        profiles.set(&asked.agent, 0, base(&intended)?)?;
+        profiles.set(&asked.agent, 1, intended.version)?;
+        let agent = IdentityId::Agent(AgentId::from_str(&asked.agent)?);
+        assert_eq!(declaration(false, &profiles, agent, &asked)?.name, "dot");
+        let connector = IdentityId::Connector(lys_identity::ConnectorId::generate()?);
+        for administrator in [false, true] {
+            assert!(matches!(
+                declaration(administrator, &profiles, connector, &asked),
+                Err(ServerError::McpBeyondRemit { .. })
+            ));
+        }
+        Ok(())
+    }
 }

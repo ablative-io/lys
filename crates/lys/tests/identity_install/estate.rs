@@ -49,6 +49,62 @@ fn stop_service(pid_file: &Path) -> TestResult {
 }
 
 impl Estate {
+    /// The install's own compose project, as its teardown and its logs name it.
+    fn compose(&self) -> Command {
+        let mut compose = Command::new("docker");
+        compose
+            .arg("compose")
+            .arg("-f")
+            .arg(self.root.path().join("deploy/compose.yaml"))
+            .arg("--env-file")
+            .arg(self.root.path().join("state/compose.env"))
+            .args(["-p", &self.project, "--profile", "bundled-db"]);
+        compose
+    }
+
+    /// Put every log the estate's services and containers wrote into the
+    /// test's output, before teardown removes them with the scratch root, so
+    /// a red can be read after it.
+    fn testify(&self) {
+        let logs = self.root.path().join("logs");
+        match std::fs::read_dir(&logs) {
+            Ok(entries) => {
+                let mut paths: Vec<_> = entries
+                    .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+                    .collect();
+                paths.sort();
+                for path in paths {
+                    match std::fs::read(&path) {
+                        Ok(bytes) => eprintln!(
+                            "===== {} =====\n{}",
+                            path.display(),
+                            String::from_utf8_lossy(&bytes)
+                        ),
+                        Err(error) => eprintln!("===== {} unread: {error}", path.display()),
+                    }
+                }
+            }
+            Err(error) => eprintln!("===== {} unread: {error}", logs.display()),
+        }
+        if !self.root.path().join("state/compose.env").exists() {
+            eprintln!("===== no compose project was written; no container logs");
+            return;
+        }
+        match self
+            .compose()
+            .args(["logs", "--no-color", "--timestamps"])
+            .output()
+        {
+            Ok(output) => eprintln!(
+                "===== docker compose logs ({}) =====\n{}{}",
+                output.status,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+            Err(error) => eprintln!("===== docker compose logs could not run: {error}"),
+        }
+    }
+
     fn cleanup(&self) -> TestResult {
         let mut failures = Vec::new();
         for name in ["runner.pid", "identity.pid", "secrets.pid"] {
@@ -58,13 +114,8 @@ impl Estate {
             }
         }
         if self.root.path().join("state/compose.env").exists() {
-            let down = Command::new("docker")
-                .arg("compose")
-                .arg("-f")
-                .arg(self.root.path().join("deploy/compose.yaml"))
-                .arg("--env-file")
-                .arg(self.root.path().join("state/compose.env"))
-                .args(["-p", &self.project, "--profile", "bundled-db"])
+            let down = self
+                .compose()
                 .args(["down", "-v", "--remove-orphans"])
                 .output();
             match down {
@@ -93,6 +144,8 @@ impl Estate {
 impl Drop for Estate {
     fn drop(&mut self) {
         if !self.cleaned {
+            // Not closed: the test failed an assertion or returned an error.
+            self.testify();
             if let Err(error) = self.cleanup() {
                 eprintln!("install failure cleanup: {error}");
             }

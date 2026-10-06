@@ -73,7 +73,8 @@ pub enum PassOnWire {
     To {
         /// The actions that may be passed on.
         actions: Vec<String>,
-        /// The kinds of recipient, `person` or `agent`.
+        /// The kinds of recipient: `person`, `agent`, `service_account` or
+        /// `connector`.
         recipients: Vec<String>,
     },
 }
@@ -83,9 +84,10 @@ fn recipient_kind(text: &str) -> Result<RecipientKind, ServerError> {
         "person" => Ok(RecipientKind::Person),
         "agent" => Ok(RecipientKind::Agent),
         "service_account" => Ok(RecipientKind::ServiceAccount),
+        "connector" => Ok(RecipientKind::Connector),
         other => Err(ServerError::RequestMalformed {
             reason: format!(
-                "{other} is not a recipient kind, which is person, agent or service_account"
+                "{other} is not a recipient kind, which is person, agent, service_account or connector"
             ),
         }),
     }

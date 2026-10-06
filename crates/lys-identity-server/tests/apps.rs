@@ -638,5 +638,388 @@ async fn a_schema_fault_is_refused_at_its_pointer_and_a_bad_redirect_by_name() -
     Ok(())
 }
 
+/// DIRECTORY-080 R1 (box 12.2): approving an app writes its connector line
+/// in the approval's own batch, answering to the person who holds the
+/// approving administrator's login.
+#[tokio::test]
+async fn an_approval_writes_its_connector_answering_to_the_approving_person() -> TestResult {
+    let (service, seeded) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let person = seeded
+        .people
+        .iter()
+        .find(|person| person.subject == ADMINISTRATOR)
+        .ok_or("the administrator is a seeded person")?
+        .id;
+    register(&service, &admin, NOTES).await?;
+    approve(&service, &admin, NOTES).await?;
+    let dir = service.dir.path();
+    assert!(held_anywhere(dir, br#""line":"connector""#)?);
+    assert!(held_anywhere(dir, br#""connector":"connector-"#)?);
+    assert!(held_anywhere(
+        dir,
+        format!(r#""approver":"{person}""#).as_bytes()
+    )?);
+    Ok(())
+}
+
+/// DIRECTORY-080 R1 (box 12.2): an approving login no person holds is
+/// refused `connector_needs_a_person`, and the app stays pending with nothing
+/// written for it.
+#[tokio::test]
+async fn an_approver_whose_login_no_person_holds_is_refused_and_nothing_is_approved() -> TestResult
+{
+    let broker = identity_contract::app_custody::start().await?;
+    let (service, _) = identity_contract::harness::Service::start_adjusted(
+        identity_contract::harness::GRANT_MODEL,
+        None,
+        None,
+        None,
+        move |config| {
+            config.secrets = Some(lys_identity_server::secrets_api::SecretsSettings {
+                broker,
+                service: "identity".to_owned(),
+                service_key_file: config.event_key_file.clone(),
+            });
+        },
+        // Registering through the service judges a grant under the
+        // administrator's person, which this administrator has not; the app
+        // is registered in the store, as one registered before it was.
+        |config| {
+            use lys_identity_server::apps_state::{By, Line, Registered};
+            let seeded =
+                lys_identity_server::dev_seed::seed_configured(config, [BEA, "cara-subject"])?;
+            let key = std::sync::Arc::new(lys_core::Ed25519Identity::load(&config.event_key_file)?);
+            let mut apps =
+                lys_identity_server::apps_store::AppStore::open(&config.apps_dir(), key)?;
+            apps.keep(Line::Registered(Registered {
+                operation: op()?,
+                app: NOTES.to_owned(),
+                name: "notes".to_owned(),
+                redirects: vec!["https://notes.example.test/signed-in".to_owned()],
+                schema: workspace_schema(NOTES),
+                service_account: None,
+                by: By::Operator {
+                    login: lys_identity_server::read_views::Login {
+                        provider: config.issuer.clone(),
+                        subject: ADMINISTRATOR.to_owned(),
+                    },
+                },
+                at: 1,
+            }))?;
+            Ok(seeded)
+        },
+    )
+    .await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let body = json!({"operation": op()?, "redirects": ["https://notes.example.test/signed-in"], "profile": false});
+    let answer = post(
+        &service,
+        &format!("/apps/{NOTES}/approve"),
+        Auth::Cookie(&admin),
+        &body,
+    )
+    .await?;
+    refused(&answer, 403, "connector_needs_a_person")?;
+    let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(app["state"], "pending", "{app}");
+    let dir = service.dir.path();
+    assert!(!held_anywhere(dir, br#""line":"approved""#)?);
+    assert!(!held_anywhere(dir, br#""line":"connector""#)?);
+    Ok(())
+}
+
+/// A service whose apps log holds `NOTES` approved by the line an approval
+/// wrote before connectors, with no connector line, and the seeded people.
+async fn approved_before_connectors() -> Result<
+    (
+        identity_contract::harness::Service,
+        lys_identity_server::dev_seed::Seeded,
+    ),
+    Box<dyn Error>,
+> {
+    use lys_identity_server::apps_state::{Approved, By, Client, Line, Registered};
+    identity_contract::harness::Service::start_adjusted(
+        identity_contract::harness::GRANT_MODEL,
+        None,
+        None,
+        None,
+        |_| {},
+        |config| {
+            let seeded =
+                lys_identity_server::dev_seed::seed_configured(config, [ADMINISTRATOR, BEA])?;
+            let key = std::sync::Arc::new(lys_core::Ed25519Identity::load(&config.event_key_file)?);
+            let mut apps =
+                lys_identity_server::apps_store::AppStore::open(&config.apps_dir(), key)?;
+            let by = By::Operator {
+                login: lys_identity_server::read_views::Login {
+                    provider: config.issuer.clone(),
+                    subject: ADMINISTRATOR.to_owned(),
+                },
+            };
+            apps.keep(Line::Registered(Registered {
+                operation: op()?,
+                app: NOTES.to_owned(),
+                name: "notes approved before connectors".to_owned(),
+                redirects: vec!["https://notes.example.test/signed-in".to_owned()],
+                schema: workspace_schema(NOTES),
+                service_account: None,
+                by: by.clone(),
+                at: 1,
+            }))?;
+            apps.keep(Line::Approved(Approved {
+                operation: op()?,
+                app: NOTES.to_owned(),
+                client: Client {
+                    client_id: NOTES.to_owned(),
+                    secret_sha256: "cd".repeat(32),
+                },
+                binding: None,
+                by,
+                at: 2,
+            }))?;
+            Ok(seeded)
+        },
+    )
+    .await
+}
+
+/// DIRECTORY-080 R1 (box 12.3): an app approved before connectors holds
+/// none until the administrator gives it one, answering to the person who
+/// holds the administrator's login; the same act sent again answers the
+/// same, and a second connector is refused by name.
+#[tokio::test]
+async fn an_app_approved_before_connectors_is_given_one_connector_by_the_administrator()
+-> TestResult {
+    let (service, seeded) = approved_before_connectors().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let person = seeded
+        .people
+        .iter()
+        .find(|person| person.subject == ADMINISTRATOR)
+        .ok_or("the administrator is a seeded person")?
+        .id
+        .to_string();
+    let path = format!("/apps/{NOTES}/connector");
+    let before = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(before["state"], "approved", "{before}");
+    assert_eq!(before["connector"], Value::Null, "{before}");
+
+    let bea = service.sign_in(login(BEA)).await?;
+    let body = json!({"operation": op()?});
+    refused(
+        &post(&service, &path, Auth::Cookie(&bea), &body).await?,
+        403,
+        "NotAdmitted",
+    )?;
+    let given = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
+    let connector = &given["connector"];
+    let id = connector["id"]
+        .as_str()
+        .ok_or("the view names its connector")?;
+    let hex = id.strip_prefix("connector-").ok_or("a connector id")?;
+    assert!(
+        hex.len() == 32 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "{id}"
+    );
+    assert_eq!(connector["approver"], person.as_str(), "{given}");
+    assert_eq!(connector["operation"], body["operation"], "{given}");
+
+    let again = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
+    assert_eq!(
+        again["connector"], given["connector"],
+        "the same act answers the same"
+    );
+    refused(
+        &post(
+            &service,
+            &path,
+            Auth::Cookie(&admin),
+            &json!({"operation": op()?}),
+        )
+        .await?,
+        409,
+        "connector_exists",
+    )?;
+    let after = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(after["connector"], given["connector"], "{after}");
+    let lines = br#""line":"connector""#;
+    let dir = service.dir.path();
+    assert!(held_anywhere(dir, lines)?);
+    Ok(())
+}
+
+/// DIRECTORY-080 R1 (box 12.3): a connector is given only to an approved
+/// app that is not Lys and holds none, each refusal by its name; an
+/// operation that names another act is refused, and nothing is written.
+#[tokio::test]
+async fn a_connector_is_given_only_to_an_approved_app_without_one() -> TestResult {
+    let (service, _) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let give = |app: &str| format!("/apps/{app}/connector");
+    let mut refusals = 0;
+    for (app, status, name) in [
+        ("fixture_unknown", 404, "app_unknown"),
+        ("lys", 403, "app_is_lys"),
+    ] {
+        let body = json!({"operation": op()?});
+        refused(
+            &post(&service, &give(app), Auth::Cookie(&admin), &body).await?,
+            status,
+            name,
+        )?;
+        refusals += 1;
+    }
+    register(&service, &admin, NOTES).await?;
+    let body = json!({"operation": op()?});
+    refused(
+        &post(&service, &give(NOTES), Auth::Cookie(&admin), &body).await?,
+        403,
+        "app_not_approved",
+    )?;
+    refusals += 1;
+    let approval = json!({"operation": op()?, "redirects": ["https://notes.example.test/signed-in"], "profile": false});
+    ok(post(
+        &service,
+        &format!("/apps/{NOTES}/approve"),
+        Auth::Cookie(&admin),
+        &approval,
+    )
+    .await?)?;
+    let approved = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert!(approved["connector"]["id"].is_string(), "{approved}");
+    // The give act under the approval's operation: one operation is one act.
+    let reused = json!({"operation": approval["operation"]});
+    refused(
+        &post(&service, &give(NOTES), Auth::Cookie(&admin), &reused).await?,
+        409,
+        "app_operation_reused",
+    )?;
+    refusals += 1;
+    let body = json!({"operation": op()?});
+    refused(
+        &post(&service, &give(NOTES), Auth::Cookie(&admin), &body).await?,
+        409,
+        "connector_exists",
+    )?;
+    refusals += 1;
+    let retire = json!({"operation": op()?, "reason": "done"});
+    ok(post(
+        &service,
+        &format!("/apps/{NOTES}/retire"),
+        Auth::Cookie(&admin),
+        &retire,
+    )
+    .await?)?;
+    let body = json!({"operation": op()?});
+    refused(
+        &post(&service, &give(NOTES), Auth::Cookie(&admin), &body).await?,
+        403,
+        "app_retired",
+    )?;
+    refusals += 1;
+    assert_eq!(refusals, 6);
+    let after = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(after["connector"], approved["connector"], "{after}");
+    Ok(())
+}
+
+/// DIRECTORY-080 R1 (box 12.5): an approved app acts in the engine as its
+/// connector. Holding nothing it may do nothing; lent `read` by the person
+/// who approved it, it may read and no more, and the grant answers to that
+/// person: one naming anyone else as responsible is refused by name.
+#[tokio::test]
+async fn an_approved_apps_connector_is_checked_on_what_its_approver_lent_it() -> TestResult {
+    let (service, seeded) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let person = seeded
+        .people
+        .iter()
+        .find(|person| person.subject == ADMINISTRATOR)
+        .ok_or("the administrator is a seeded person")?
+        .id
+        .to_string();
+    let bea = seeded.people[1].id.to_string();
+    registered(&service, &admin, NOTES).await?;
+    let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    let connector = app["connector"]["id"]
+        .as_str()
+        .ok_or("an approved app holds its connector")?
+        .to_owned();
+    assert_eq!(app["connector"]["approver"], person.as_str(), "{app}");
+    let doc = format!("{NOTES}.doc");
+    let checks = json!({"checks": [
+        check(&connector, &doc, "1", "read"),
+        check(&connector, &doc, "1", "write"),
+    ]});
+    let checked = |answer: &Value, index: usize| answer["results"][index]["allowed"].clone();
+    let before = ok(post(
+        &service,
+        "/grants/check/batch",
+        Auth::Cookie(&admin),
+        &checks,
+    )
+    .await?)?;
+    assert_eq!(checked(&before, 0), false, "nothing granted: {before}");
+    assert_eq!(before["results"][0]["refusal"], "NotHeld", "{before}");
+
+    let lending = json!({
+        "operation": op()?, "route": "api", "holder": person,
+        "resource": {"kind": doc, "id": "1"}, "relation": "reader",
+        "pass_on": {"kind": "to", "actions": ["read"], "recipients": ["connector"]},
+        "window": {"starts_at": 0, "ends_at": null},
+    });
+    let lending = ok(post(&service, "/grants/roots", Auth::Cookie(&admin), &lending).await?)?;
+    let lent = |responsible: &str| -> Result<Value, Box<dyn Error>> {
+        Ok(json!({
+            "operation": op()?, "route": "api", "source": lending["grant"],
+            "recipient": connector, "responsible": responsible,
+            "resource": {"kind": doc, "id": "1"}, "relation": "reader",
+            "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null},
+        }))
+    };
+    refused(
+        &post(&service, "/grants", Auth::Cookie(&admin), &lent(&bea)?).await?,
+        403,
+        "ResponsibleMismatch",
+    )?;
+    ok(post(&service, "/grants", Auth::Cookie(&admin), &lent(&person)?).await?)?;
+    let after = ok(post(
+        &service,
+        "/grants/check/batch",
+        Auth::Cookie(&admin),
+        &checks,
+    )
+    .await?)?;
+    assert_eq!(checked(&after, 0), true, "lent read: {after}");
+    assert_eq!(checked(&after, 1), false, "lent no write: {after}");
+    Ok(())
+}
+
+/// DIRECTORY-080 R1 (box 12.5): an identity is read by its prefix, and a
+/// prefix that names no kind of identity is refused by name.
+#[tokio::test]
+async fn an_identity_of_no_known_kind_is_refused_by_name() -> TestResult {
+    let (service, _) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let unknown = format!("robot-{}", "ab".repeat(16));
+    let answer = get(
+        &service,
+        &format!("/identities/{unknown}"),
+        Auth::Cookie(&admin),
+    )
+    .await?;
+    refused(&answer, 400, "IdentifierMalformed")?;
+    assert!(
+        answer
+            .1
+            .to_string()
+            .contains("person, agent, service account or connector"),
+        "{}",
+        answer.1
+    );
+    Ok(())
+}
+
 #[path = "shared/app_registration.rs"]
 mod app_registration;

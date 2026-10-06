@@ -1214,6 +1214,18 @@ fn app_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "app_operation_reused",
         ),
         (
+            ServerError::App(AppError::ConnectorNeedsAPerson {
+                login: detail.to_owned(),
+            }),
+            "connector_needs_a_person",
+        ),
+        (
+            ServerError::App(AppError::ConnectorExists {
+                app: detail.to_owned(),
+            }),
+            "connector_exists",
+        ),
+        (
             ServerError::App(AppError::KindNotRegistered {
                 kind: detail.to_owned(),
             }),

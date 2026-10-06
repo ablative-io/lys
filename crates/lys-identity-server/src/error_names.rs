@@ -249,6 +249,8 @@ fn app(error: &AppError) -> &str {
         AppError::AppIsLys { .. } => "app_is_lys",
         AppError::AppDecided { .. } => "app_decided",
         AppError::AppOperationReused { .. } => "app_operation_reused",
+        AppError::ConnectorNeedsAPerson { .. } => "connector_needs_a_person",
+        AppError::ConnectorExists { .. } => "connector_exists",
         AppError::KindNotRegistered { .. } => "kind_not_registered",
         AppError::ActionNotDeclared { .. } => "action_not_declared",
         AppError::NotYourApp { .. } => "not_your_app",

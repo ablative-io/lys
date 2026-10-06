@@ -264,6 +264,33 @@ async fn only_the_administrator_sets_providers_and_bad_credentials_are_refused()
     Ok(())
 }
 
+/// An issuer API nobody listens at is refused with the connection's own
+/// cause, never reqwest's bare "error sending request", and without its
+/// address.
+#[tokio::test]
+async fn an_issuer_api_that_refuses_the_connection_is_named_with_its_cause() -> TestResult {
+    let rauthy = FakeRauthy::start().await?;
+    let closed = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let address = closed.local_addr()?;
+    drop(closed);
+    let settings = SignInProvidersSettings {
+        api: format!("http://{address}"),
+        api_key_file: rauthy.api_key_file(),
+    };
+    let (service, ()) =
+        Service::start_setting(GRANT_MODEL, None, None, Some(settings), |_| Ok(())).await?;
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let answer = service.get("/sign-in-providers", Some(&ada)).await?;
+    refused(&answer, 503, "SignInProvidersUnavailable");
+    let reason = answer.1["reason"].as_str().unwrap_or_default();
+    assert!(
+        reason.contains("error sending request: ") && reason.contains("Connection refused"),
+        "{reason}"
+    );
+    assert!(!reason.contains(&address.to_string()), "{reason}");
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_service_without_the_issuer_api_says_so() -> TestResult {
     let service = Service::start().await?;

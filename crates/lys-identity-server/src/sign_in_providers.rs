@@ -32,6 +32,7 @@ use serde_json::{Value, json};
 
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in};
+use crate::sign_in::{issuer_client, unreached};
 
 #[path = "accounts_changes.rs"]
 mod account_changes;
@@ -217,7 +218,11 @@ impl SignInProviders {
         Ok(Self {
             api: settings.api.trim_end_matches('/').to_owned(),
             authorization: format!("API-Key {key}"),
-            client: reqwest::Client::new(),
+            client: issuer_client()
+                .build()
+                .map_err(|error| ServerError::ConfigInvalid {
+                    reason: format!("the issuer's API client could not be made: {error}"),
+                })?,
             origins: origins.unwrap_or_default(),
             probe,
             changes: account_changes::Changes::default(),
@@ -280,7 +285,7 @@ impl SignInProviders {
                 .map_err(|error| ServerError::SignInProvidersUnavailable {
                     reason: format!(
                         "the issuer's API could not be reached: {}",
-                        error.without_url()
+                        unreached(error)
                     ),
                 })?;
         let status = answer.status().as_u16();
@@ -291,7 +296,7 @@ impl SignInProviders {
                 .map_err(|error| ServerError::SignInProvidersUnavailable {
                     reason: format!(
                         "the issuer's answer could not be read: {}",
-                        error.without_url()
+                        unreached(error)
                     ),
                 })?;
         if !(200..300).contains(&status) {
@@ -357,7 +362,7 @@ impl SignInProviders {
                 reason: format!(
                     "{} could not be reached to check the client id: {}",
                     provider.name(),
-                    error.without_url()
+                    unreached(error)
                 ),
             }
         })?;

@@ -109,6 +109,23 @@ pub enum AppError {
         /// The operation id.
         operation: String,
     },
+    /// The approving administrator's login is held by no person, so the app's
+    /// connector would answer to no one (DIRECTORY-080 R1).
+    #[error(
+        "connector_needs_a_person: the login `{login}` is held by no person in the directory, so the app's connector would answer to no one; approve as an administrator whose login a person holds"
+    )]
+    ConnectorNeedsAPerson {
+        /// The approving login, as issuer and subject.
+        login: String,
+    },
+    /// The app already holds its connector; an app holds one or none.
+    #[error(
+        "connector_exists: the app `{app}` already has its connector, and an app holds one; its grants are given and held by that connector"
+    )]
+    ConnectorExists {
+        /// The app.
+        app: String,
+    },
     /// No approved app declares the kind.
     #[error("kind_not_registered: no approved app declares the kind `{kind}`")]
     KindNotRegistered {
@@ -234,11 +251,13 @@ impl AppError {
             Self::AppNotApproved { .. }
             | Self::AppRetired { .. }
             | Self::AppIsLys { .. }
+            | Self::ConnectorNeedsAPerson { .. }
             | Self::KindNotRegistered { .. }
             | Self::NotYourApp { .. } => StatusCode::FORBIDDEN,
             Self::CredentialRefused { .. } => StatusCode::UNAUTHORIZED,
             Self::AppExists { .. }
             | Self::AppDecided { .. }
+            | Self::ConnectorExists { .. }
             | Self::AppOperationReused { .. }
             | Self::SchemaVersionMoved { .. }
             | Self::SchemaChangeStrandsGrants { .. }

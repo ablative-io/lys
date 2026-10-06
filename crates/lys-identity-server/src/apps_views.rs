@@ -13,7 +13,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::apps_error::Strand;
-use crate::apps_state::{App, By, Proposed, SignInSet, Standing};
+use crate::apps_state::{App, By, Connected, Proposed, SignInSet, Standing};
 
 /// A schema change waiting for an administrator.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -73,6 +73,30 @@ impl From<&SignInSet> for SignInView {
     }
 }
 
+/// An app's connector as the routes answer it (DIRECTORY-080 R1).
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct ConnectorView {
+    /// The connector's id: `connector-` and 32 hex digits.
+    pub id: String,
+    /// The person it answers to: the administrator who approved the app.
+    pub approver: String,
+    /// The operation it was recorded under.
+    pub operation: String,
+    /// When.
+    pub at: u64,
+}
+
+impl From<&Connected> for ConnectorView {
+    fn from(line: &Connected) -> Self {
+        Self {
+            id: line.connector.clone(),
+            approver: line.approver.clone(),
+            operation: line.operation.clone(),
+            at: line.at,
+        }
+    }
+}
+
 /// An app as the routes answer it.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct AppView {
@@ -101,6 +125,9 @@ pub struct AppView {
     pub client_id: Option<String>,
     /// The service account it acts as, once bound.
     pub service_account: Option<String>,
+    /// Its connector, the identity it gives and holds grants as; null for an
+    /// app approved before connectors until an administrator gives it one.
+    pub connector: Option<ConnectorView>,
     /// Every client credential issued for it, in the order issued.
     pub client_credentials: Vec<ClientCredentialView>,
     /// Who registered it.
@@ -134,6 +161,7 @@ impl From<&App> for AppView {
                 .as_ref()
                 .map(|approved| approved.client.client_id.clone()),
             service_account: bound.or_else(|| registered.service_account.clone()),
+            connector: app.connector.as_ref().map(ConnectorView::from),
             client_credentials: app
                 .client_credentials()
                 .into_iter()

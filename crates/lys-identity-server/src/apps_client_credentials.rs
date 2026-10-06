@@ -22,11 +22,12 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::Json;
 use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path as UrlPath, State};
 use axum::http::{HeaderMap, Method};
+use axum::routing::post;
+use axum::{Json, Router};
 use lys_identity::OperationId;
 use serde::Deserialize;
 use serde_json::json;
@@ -45,6 +46,14 @@ use crate::session::now;
 
 /// The prefix every virtual client credential carries.
 const APP_CLIENT_PREFIX: &str = "lys-client.";
+
+/// The routes that issue and revoke an app's client credentials, merged
+/// into the app routes.
+pub(crate) fn routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/apps/{app}/credentials/issue", post(issue))
+        .route("/apps/{app}/credentials/{credential}/revoke", post(revoke))
+}
 
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

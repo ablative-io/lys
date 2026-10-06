@@ -31,7 +31,9 @@ use lys_log_store::{
 };
 
 use crate::apps_error::AppError;
-use crate::apps_state::{App, Approved, DOMAIN, Held, Line, Refused, SignInSet, Standing};
+use crate::apps_state::{
+    App, Approved, Connected, DOMAIN, Held, Line, Refused, SignInSet, Standing,
+};
 use crate::error::ServerError;
 
 /// How the leaf store is opened again after an append whose outcome is not known.
@@ -283,9 +285,10 @@ impl<S: LeafStore> AppStore<S> {
         Ok(line)
     }
 
-    /// Keep an approval with its sign-in settings as one durable act: the two
-    /// leaves are handed to the leaf store with one flush, so an app is never
-    /// approved without the addresses its client may send a person back to.
+    /// Keep an approval with its sign-in settings and its connector as one
+    /// durable act: the three leaves are handed to the leaf store with one
+    /// flush, so an app is never approved without the addresses its client may
+    /// send a person back to, nor without the connector it acts as.
     /// Sent again under the same operation in the same words it is kept once;
     /// the same operation in other words is refused, and so is an approval the
     /// app as it stands does not take.
@@ -293,6 +296,7 @@ impl<S: LeafStore> AppStore<S> {
         &mut self,
         approved: Approved,
         settings: SignInSet,
+        connector: Connected,
     ) -> Result<(), ServerError> {
         self.settle()?;
         let line = Line::Approved(approved);
@@ -308,7 +312,11 @@ impl<S: LeafStore> AppStore<S> {
         self.held
             .allows(&line)
             .map_err(|refused| refusal(&line, refused))?;
-        self.append_lines(vec![line, Line::SignInSet(settings)])
+        self.append_lines(vec![
+            line,
+            Line::SignInSet(settings),
+            Line::Connector(connector),
+        ])
     }
 
     /// The current schema of the approved, unretired app `app`.
@@ -435,9 +443,14 @@ fn same_act(kept: &Line, sent: &Line) -> bool {
 /// The refusal a line the apps do not take is answered with.
 fn refusal(line: &Line, refused: Refused) -> ServerError {
     let app = line.app().unwrap_or_default().to_owned();
+    let connector = matches!(line, Line::Connector(_));
     let error = match refused {
+        Refused::Exists if connector => AppError::ConnectorExists { app },
         Refused::Exists => AppError::AppExists { app },
         Refused::Unknown => AppError::AppUnknown { app },
+        Refused::Lys if connector => AppError::AppIsLys {
+            reason: "the app lys is Lys itself and acts as no connector",
+        },
         Refused::Lys => AppError::AppIsLys {
             reason: "the app lys is Lys itself and is never retired",
         },

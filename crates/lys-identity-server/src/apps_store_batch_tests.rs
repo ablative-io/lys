@@ -1,6 +1,6 @@
-//! An approval and its sign-in settings are one durable act: both leaves land
-//! with one flush or neither does, so no app is ever approved without an
-//! address to send a person back to. A store that refuses the write leaves
+//! An approval, its sign-in settings and its connector are one durable act:
+//! the three leaves land with one flush or none does, so no app is ever
+//! approved without an address to send a person back to or a connector. A store that refuses the write leaves
 //! the app pending, and the same approval asked again lands whole.
 
 use std::error::Error;
@@ -13,7 +13,7 @@ use serde_json::json;
 
 use super::{AppStore, ORIGIN};
 use crate::apps_bench_scratch::memory::{Kept, MemoryStore};
-use crate::apps_state::{Approved, By, Client, Line, Registered, SignInSet, Standing};
+use crate::apps_state::{Approved, By, Client, Connected, Line, Registered, SignInSet, Standing};
 
 const APP: &str = "fixture_notes";
 const BACK: &str = "https://app.example.test/signed-in";
@@ -81,7 +81,7 @@ fn open(
     )?)
 }
 
-fn approval() -> (Approved, SignInSet) {
+fn approval() -> (Approved, SignInSet, Connected) {
     (
         Approved {
             operation: "approve".to_owned(),
@@ -99,6 +99,14 @@ fn approval() -> (Approved, SignInSet) {
             app: APP.to_owned(),
             redirects: vec![BACK.to_owned()],
             profile: false,
+            by: By::Start,
+            at: 2,
+        },
+        Connected {
+            operation: "approve".to_owned(),
+            app: APP.to_owned(),
+            connector: "connector-c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0".to_owned(),
+            approver: "person-d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1".to_owned(),
             by: By::Start,
             at: 2,
         },
@@ -125,8 +133,8 @@ fn an_approval_refused_by_the_store_leaves_the_app_pending_and_lands_whole_when_
 
     // The store refuses the write: neither leaf lands, the app stays pending.
     refusing.store(true, Ordering::SeqCst);
-    let (approved, settings) = approval();
-    let refused = store.keep_approval(approved, settings);
+    let (approved, settings, connector) = approval();
+    let refused = store.keep_approval(approved, settings, connector);
     assert!(
         refused.is_err(),
         "the refused write is not answered as kept"
@@ -136,6 +144,7 @@ fn an_approval_refused_by_the_store_leaves_the_app_pending_and_lands_whole_when_
     assert_eq!(app.standing(), Standing::Pending);
     assert!(app.approved.is_none());
     assert!(app.sign_in.is_none());
+    assert!(app.connector.is_none());
     assert!(
         store.held().operation("approve").is_none(),
         "the operation names nothing"
@@ -143,9 +152,17 @@ fn an_approval_refused_by_the_store_leaves_the_app_pending_and_lands_whole_when_
 
     // Asked again once the store writes: both leaves land as one act.
     refusing.store(false, Ordering::SeqCst);
-    let (approved, settings) = approval();
-    store.keep_approval(approved, settings)?;
-    assert_eq!(store.len(), 3, "the approval and its settings, one act");
+    let (approved, settings, connector) = approval();
+    store.keep_approval(approved, settings, connector.clone())?;
+    assert_eq!(
+        store.len(),
+        4,
+        "the approval, its settings and its connector, one act"
+    );
+    assert_eq!(
+        store.app(APP).ok_or("no app")?.connector.as_ref(),
+        Some(&connector)
+    );
     let app = store.app(APP).ok_or("no app")?;
     assert_eq!(app.standing(), Standing::Approved);
     assert_eq!(
@@ -160,14 +177,15 @@ fn an_approval_refused_by_the_store_leaves_the_app_pending_and_lands_whole_when_
     ));
 
     // The same approval again answers the same and keeps nothing new.
-    let (approved, settings) = approval();
-    store.keep_approval(approved, settings)?;
-    assert_eq!(store.len(), 3);
+    let (approved, settings, connector) = approval();
+    store.keep_approval(approved, settings, connector.clone())?;
+    assert_eq!(store.len(), 4);
 
     // What landed reads back whole from the leaves, in order.
     let reopened = open(&kept, &refusing)?;
     let app = reopened.app(APP).ok_or("no app after reopen")?;
     assert_eq!(app.standing(), Standing::Approved);
     assert!(app.sign_in.is_some());
+    assert_eq!(app.connector.as_ref(), Some(&connector));
     Ok(())
 }
