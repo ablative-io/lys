@@ -35,3 +35,9 @@
 .usage-table textarea.usage-grow { field-sizing: content; min-height: 0; resize: none; font: inherit; }
 .usage-reason { margin: 0 0 4px; color: var(--text-secondary); }
 .usage-table caption.usage-caption { caption-side: top; text-align: left; padding: 0 0 6px; color: var(--text-secondary); }
+
+.managed-controls { margin-block: 1.5rem; }
+.current-control { border-inline-start: 3px solid currentColor; padding-inline-start: .75rem; }
+.control-operations > ul { list-style: none; padding: 0; }
+.control-operations article { border-block-start: 1px solid var(--line, #bbb); padding-block: .75rem; overflow-wrap: anywhere; }
+.control-actions { display: flex; flex-wrap: wrap; gap: .5rem; }

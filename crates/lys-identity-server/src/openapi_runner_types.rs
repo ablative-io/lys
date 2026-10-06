@@ -53,6 +53,12 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<lys_runner::operations::ControlReceipt>()),
         ),
         (
+            GET,
+            "/goals/{goal}/resends/{prior}",
+            None,
+            Some(api.schema::<crate::goals_api::ResendLookup>()),
+        ),
+        (
             POST,
             "/goals/{goal}/resend",
             Some(api.schema::<crate::goals_api::ResendBody>()),

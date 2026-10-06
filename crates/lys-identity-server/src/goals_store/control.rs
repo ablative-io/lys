@@ -104,6 +104,34 @@ impl<S: LeafStore> GoalStore<S> {
         self.held.resent_occurrence(prior)
     }
 
+    /// Read a kept occurrence only for an uncertain delivery of this aim.
+    ///
+    /// # Errors
+    /// Names an unknown prior, a different aim or a delivery that is not uncertain.
+    pub fn resend_lookup(&self, goal: &str, prior: &str) -> Result<Option<&Fired>, ServerError> {
+        let previous = self
+            .held
+            .delivery(prior)
+            .map_err(unavailable)?
+            .ok_or_else(|| ServerError::Runner {
+                refusal: "goal_prior_unknown".to_owned(),
+                words: "the prior delivery is not held for this goal".to_owned(),
+            })?;
+        if previous.item.goal.id != goal {
+            return Err(ServerError::Runner {
+                refusal: "goal_prior_unknown".to_owned(),
+                words: "the prior delivery is not held for this goal".to_owned(),
+            });
+        }
+        if previous.sent.state != crate::goals_state::Delivery::Uncertain {
+            return Err(ServerError::Runner {
+                refusal: "control_not_uncertain".to_owned(),
+                words: "the prior delivery is not uncertain".to_owned(),
+            });
+        }
+        Ok(self.held.resent_firing(prior))
+    }
+
     fn refuse_second_resend(&self, prior: &str, asked: &str) -> Result<(), ServerError> {
         if let Some(kept) = self.held.resent_occurrence(prior)
             && kept != asked

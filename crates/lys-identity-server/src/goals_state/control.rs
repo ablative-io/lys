@@ -60,12 +60,14 @@ impl Held {
 
     /// The first distinct occurrence already kept for an uncertain prior.
     pub fn resent_occurrence(&self, prior: &str) -> Option<&str> {
-        let (item, firing) = self.index.prior_resends.get(prior)?;
-        self.items
-            .get(*item)?
-            .fired
-            .get(*firing)
+        self.resent_firing(prior)
             .map(|fired| fired.operation.as_str())
+    }
+
+    /// Borrow the first kept resend through its derived location.
+    pub(crate) fn resent_firing(&self, prior: &str) -> Option<&Fired> {
+        let (item, firing) = self.index.prior_resends.get(prior)?;
+        self.items.get(*item)?.fired.get(*firing)
     }
 
     /// The firing under one stable identity, without walking goal history.

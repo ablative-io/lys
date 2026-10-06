@@ -407,3 +407,72 @@ pub(super) async fn resend(
         reconciliation: decision,
     }))
 }
+
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[schema(as = GoalResendOccurrence)]
+pub(crate) struct ResendOccurrence {
+    operation: String,
+    session: String,
+}
+
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[schema(as = GoalResendLookup)]
+pub(crate) struct ResendLookup {
+    goal: String,
+    prior: String,
+    occurrence: Option<ResendOccurrence>,
+}
+
+pub(super) async fn resend_lookup(
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    axum::extract::Path((goal, prior)): axum::extract::Path<(String, String)>,
+) -> Result<axum::Json<ResendLookup>, ServerError> {
+    let actor = super::signed_in(&state, &headers)?;
+    let person = with_directory(&state, |directory| {
+        super::own_person(directory.projection()?, &actor)
+    })?
+    .to_string();
+    let goals = goals(&state)?;
+    let holder = goals.with(|store| {
+        let item = store.item(&goal).ok_or(GoalError::Unknown)?;
+        if item.goal.responsible != person {
+            return Err(GoalError::Unknown.into());
+        }
+        Ok(item.goal.holder.clone())
+    })?;
+    let admitted = match holder.kind {
+        HolderKind::Agent => control_recipient(&state, &holder, &person, &holder.id, false)?,
+        HolderKind::Team => crate::teams_api::with_teams(&state, |store| {
+            let team = store.team(&holder.id).ok_or(TeamError::Unknown)?;
+            Ok(team.retired.is_none() && team.created.owner == person)
+        })?,
+    };
+    if !admitted {
+        return Err(GoalError::Unknown.into());
+    }
+    let occurrence = goals.with(|store| {
+        let item = store.item(&goal).ok_or(GoalError::Unknown)?;
+        if item.goal.responsible != person {
+            return Err(GoalError::Unknown.into());
+        }
+        store
+            .resend_lookup(&goal, &prior)?
+            .map(|fired| {
+                let sent = fired.sent.first().ok_or_else(|| ServerError::Runner {
+                    refusal: "goal_resend_invalid".to_owned(),
+                    words: "the kept occurrence has no intended delivery".to_owned(),
+                })?;
+                Ok(ResendOccurrence {
+                    operation: fired.operation.clone(),
+                    session: sent.session.clone(),
+                })
+            })
+            .transpose()
+    })?;
+    Ok(axum::Json(ResendLookup {
+        goal,
+        prior,
+        occurrence,
+    }))
+}

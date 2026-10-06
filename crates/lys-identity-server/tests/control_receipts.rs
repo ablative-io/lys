@@ -545,6 +545,21 @@ async fn a_foreign_person_cannot_read_control_evidence_or_resend_saved_goal_word
     assert_eq!(status, 404, "{answer}");
     assert_eq!(answer["refusal"], "goal_unknown");
     assert!(!answer.to_string().contains("private saved goal words"));
+    for prior in ["delivery", "missing-delivery"] {
+        let actual = service
+            .get(&format!("/goals/{goal}/resends/{prior}"), Some(&foreign))
+            .await?;
+        let absent = service
+            .get(
+                &format!("/goals/missing-goal/resends/{prior}"),
+                Some(&foreign),
+            )
+            .await?;
+        assert_eq!(actual, absent);
+        assert_eq!(actual.0, 404, "{actual:?}");
+        assert_eq!(actual.1["refusal"], "goal_unknown");
+        assert!(!actual.1.to_string().contains("delivery"));
+    }
     Ok(())
 }
 
@@ -835,6 +850,14 @@ fn refuse_second_resend(goals: &lys_identity_server::goals_store::GoalStore) -> 
 fn a_new_resend_id_after_a_failed_decision_write_is_refused_with_one_pending_delivery() -> TestResult
 {
     let fixture = failed_resend_decision()?;
+    let kept = fixture
+        .goals
+        .resend_lookup("goal", "delivery")?
+        .ok_or("kept occurrence absent")?;
+    assert_eq!(
+        (&*kept.operation, &*kept.sent[0].session),
+        ("kept-resend", "new-session")
+    );
     refuse_second_resend(&fixture.goals)
 }
 
@@ -845,6 +868,13 @@ fn a_new_resend_id_after_a_failed_decision_write_is_refused_after_reopen() -> Te
     let key = std::sync::Arc::clone(&fixture.key);
     drop(fixture.goals);
     let reopened = lys_identity_server::goals_store::GoalStore::open(&path, key)?;
+    let kept = reopened
+        .resend_lookup("goal", "delivery")?
+        .ok_or("kept occurrence absent after reopen")?;
+    assert_eq!(
+        (&*kept.operation, &*kept.sent[0].session),
+        ("kept-resend", "new-session")
+    );
     refuse_second_resend(&reopened)
 }
 
@@ -938,5 +968,169 @@ fn control_decision_audit_measures_ordinary_and_checkpoint_sync_counts() -> Test
     );
     assert_eq!(costs.get(&3), Some(&1));
     assert_eq!(costs.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_seeded_control_audit_keeps_all_leaves_and_snapshots_at_the_existing_count() -> TestResult {
+    use lys_identity_server::runner_acts::{ActStore, RunnerAct};
+    use lys_log_store::{FileLeafStore, FrontierLog, Start};
+    let dir = tempfile::tempdir()?;
+    let key = std::sync::Arc::new(lys_core::Ed25519Identity::load_or_generate(
+        &dir.path().join("key"),
+    )?);
+    let path = dir.path().join("audit");
+    let act = |at| RunnerAct {
+        act: "reconcile_control".to_owned(),
+        caller: "person".to_owned(),
+        session: "session".to_owned(),
+        agent: "agent".to_owned(),
+        machine: "machine".to_owned(),
+        at,
+        text: None,
+        keys: Vec::new(),
+        outcome: "control_receipt".to_owned(),
+    };
+    let mut audit = ActStore::open(&path, std::sync::Arc::clone(&key))?;
+    let before = lys_log_store::flush_count();
+    audit.keep(act(0))?;
+    assert_eq!(lys_log_store::flush_count() - before, 1);
+    drop(audit);
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    let count = lys_identity::SNAPSHOT_EVERY.get();
+    let leaves: Vec<_> = (1..count - 1)
+        .map(|number| serde_json::to_vec(&act(number)))
+        .collect::<Result<_, _>>()?;
+    let borrowed: Vec<_> = leaves.iter().map(Vec::as_slice).collect();
+    let before = lys_log_store::flush_count();
+    log.append_batch(&borrowed)?;
+    assert_eq!(lys_log_store::flush_count() - before, 1);
+    assert_eq!(log.len(), count - 1);
+    drop(log);
+    let mut audit = ActStore::open(&path, std::sync::Arc::clone(&key))?;
+    assert!(
+        matches!(audit.start(),Start::Resumed {size:0,replayed} if *replayed == count-1),
+        "{:?}",
+        audit.start()
+    );
+    let before = lys_log_store::flush_count();
+    audit.keep(act(count - 1))?;
+    assert_eq!(lys_log_store::flush_count() - before, 3);
+    assert_eq!(audit.len(), count);
+    drop(audit);
+    let audit = ActStore::open(&path, key)?;
+    assert_eq!(audit.len(), count);
+    assert!(
+        matches!(audit.start(),Start::Resumed {size,replayed:0} if *size==count),
+        "{:?}",
+        audit.start()
+    );
+    for number in 0..count {
+        assert_eq!(
+            audit.receipt(number)?.ok_or("audit leaf absent")?.act,
+            act(number)
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn resend_lookup_names_the_kept_occurrence_and_refuses_unknown_or_certain_priors()
+-> TestResult {
+    use identity_contract::{fake_issuer::Login, harness::Service};
+    use lys_identity_server::{dev_seed::seed_configured, goals_store::GoalStore};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    use std::sync::Arc;
+    let service = Service::start_with(|config| {
+        let seeded = seed_configured(
+            config,
+            [identity_contract::harness::ADMINISTRATOR, "second-subject"],
+        )?;
+        let key = Arc::new(lys_identity::signer::load_service_key(
+            &config.event_key_file,
+        )?);
+        let path = config.goals_dir.as_deref().ok_or("goals dir absent")?;
+        drop(GoalStore::open(path, Arc::clone(&key))?);
+        let mut original = uncertain()?.items.remove(0);
+        original.goal.holder.id = seeded.people[0].agents[0].id.to_string();
+        original.goal.responsible = seeded.people[0].id.to_string();
+        original.goal.set_by = original.goal.responsible.clone();
+        original.goal.reminders = vec![Remind::On {
+            event: lys_identity_server::goals_state::Event::Compaction,
+        }];
+        let mut certain = original.fired[0].clone();
+        certain.operation = "certain-occurrence".to_owned();
+        certain.sent[0].operation = "certain-delivery".to_owned();
+        certain.sent[0].state = Delivery::Delivered;
+        let mut no_resend = original.fired[0].clone();
+        no_resend.operation = "unresent-occurrence".to_owned();
+        no_resend.sent[0].operation = "unresent-delivery".to_owned();
+        let leaves = [
+            Line::Set(original.goal),
+            Line::Fired(original.fired.remove(0)),
+            Line::Fired(certain),
+            Line::Fired(no_resend),
+        ];
+        let (mut log, _) = FrontierLog::open(FileLeafStore::open(path)?)?;
+        let bytes = leaves
+            .iter()
+            .map(serde_json::to_vec)
+            .collect::<Result<Vec<_>, _>>()?;
+        log.append_batch(&bytes.iter().map(Vec::as_slice).collect::<Vec<_>>())?;
+        drop(log);
+        let store = GoalStore::open(path, Arc::clone(&key))?;
+        assert!(store.resend_lookup("goal", "unresent-delivery")?.is_none());
+        drop(store);
+        let mut store = GoalStore::open(path, Arc::clone(&key))?;
+        assert!(store.resend_lookup("goal", "unresent-delivery")?.is_none());
+        let (mut resend, _) = store.prepare_resend(
+            "goal",
+            "delivery",
+            "kept-resend",
+            "new-session",
+            &seeded.people[0].id.to_string(),
+            30,
+        )?;
+        resend.fired.sent[0].state = Delivery::Pending;
+        store.resend(resend)?;
+        drop(store);
+        drop(GoalStore::open(path, key)?);
+        Ok(())
+    })
+    .await?
+    .0;
+    let person = service
+        .sign_in(Login {
+            subject: identity_contract::harness::ADMINISTRATOR.to_owned(),
+            email: "owner@example.test".to_owned(),
+        })
+        .await?;
+    for (prior, occurrence) in [
+        (
+            "delivery",
+            serde_json::json!({"operation":"kept-resend", "session":"new-session"}),
+        ),
+        ("unresent-delivery", serde_json::Value::Null),
+    ] {
+        let (status, answer) = service
+            .get(&format!("/goals/goal/resends/{prior}"), Some(&person))
+            .await?;
+        assert_eq!(status, 200, "{answer}");
+        assert_eq!(
+            answer,
+            serde_json::json!({"goal":"goal", "prior":prior, "occurrence":occurrence})
+        );
+    }
+    for (prior, refusal) in [
+        ("missing-delivery", "goal_prior_unknown"),
+        ("certain-delivery", "control_not_uncertain"),
+    ] {
+        let (status, answer) = service
+            .get(&format!("/goals/goal/resends/{prior}"), Some(&person))
+            .await?;
+        assert_eq!(status, 409, "{answer}");
+        assert_eq!(answer["refusal"], refusal);
+        assert!(answer.get("occurrence").is_none());
+    }
     Ok(())
 }

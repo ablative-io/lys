@@ -182,3 +182,143 @@ export function useLoad<T>(read: () => Promise<T>, key: string): Load<T> {
   }, [key]);
   return state;
 }
+
+export type ControlPhase = 'unknown' | 'idle' | 'reserved' | 'active' | 'closed';
+export type ControlReason = 'measurement_unavailable' | 'measurement_future' | 'post_measurement_missing' | 'stop_pending' | 'delivery_uncertain' | 'above_limit' | 'authority_unavailable' | 'reason_unrecognised';
+export type AppliedContext = { state: 'released' } | { state: 'compact'; crossing: string } | { state: 'held'; crossing: string | null; reason: ControlReason } | { state: 'unavailable'; reason: ControlReason };
+export type ReminderReference = { goal: string; occurrence: string; version: string; prior: string | null };
+export type CurrentControl = { generation: number; phase: ControlPhase; active: string | null; context: AppliedContext | null; boundary: string | null; crossing: string | null; queued: { operation: string; reference: ReminderReference }[] };
+export type PersonDecision = { operation: string; by: string; at: number; decision: { choice: 'seen' | 'not_seen' } | { choice: 'resent'; occurrence: string } };
+export type PublicControlReceipt = {
+  operation: string; session: string; request: string; state: 'accepted' | 'delivering' | 'delivered' | 'confirmed' | 'uncertain' | 'refused'; at: number;
+  text: { length: number; sha256: string } | null; prepared: boolean; certainty: 'safely_unsent' | 'possibly_sent' | 'observed' | null;
+  generation: number | null; uuid: string | null; reference: ReminderReference | null; admitted: boolean; reconciled: PersonDecision | null;
+};
+export type ResendOccurrence = { operation: string; session: string };
+export type ResendLookup = { goal: string; prior: string; occurrence: ResendOccurrence | null };
+export type ControlSessionsPage = { agent: string; sessions: string[]; after: string | null };
+export type ControlReceiptsPage = { session: string; receipts: PublicControlReceipt[]; after: string | null };
+
+function controlUnreadable(name: string, reason: string): never { throw new Refused(0, { refusal: name, reason }); }
+function controlObject(value: unknown, name: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) controlUnreadable(name, 'The control answer is not an object.');
+  return value as Record<string, unknown>;
+}
+function controlId(value: unknown, name: string): string {
+  if (typeof value !== 'string' || !value.trim()) controlUnreadable(name, 'A control identity is absent.');
+  return value;
+}
+function controlOptionalId(value: unknown, name: string): string | null { return value === null ? null : controlId(value, name); }
+function controlNumber(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) controlUnreadable(name, 'A control count or instant is invalid.');
+  return value;
+}
+function controlBoolean(value: unknown, name: string): boolean {
+  if (typeof value !== 'boolean') controlUnreadable(name, 'A control evidence flag is absent.');
+  return value;
+}
+function controlChoice<T extends string>(value: unknown, choices: readonly T[], name: string): T {
+  if (typeof value !== 'string' || !choices.includes(value as T)) controlUnreadable(name, 'An unknown control phase, outcome or reason was answered; its state is not assumed idle or complete.');
+  return value as T;
+}
+function controlReference(value: unknown, name: string): ReminderReference {
+  const row = controlObject(value, name);
+  return { goal: controlId(row.goal, name), occurrence: controlId(row.occurrence, name), version: controlId(row.version, name), prior: controlOptionalId(row.prior, name) };
+}
+function appliedContext(value: unknown, name: string): AppliedContext | null {
+  if (value === null) return null;
+  const row = controlObject(value, name);
+  const state = controlChoice(row.state, ['released', 'compact', 'held', 'unavailable'] as const, name);
+  if (state === 'released') return { state };
+  if (state === 'compact') return { state, crossing: controlId(row.crossing, name) };
+  const reason = controlChoice(row.reason, ['measurement_unavailable', 'measurement_future', 'post_measurement_missing', 'stop_pending', 'delivery_uncertain', 'above_limit', 'authority_unavailable', 'reason_unrecognised'] as const, name);
+  return state === 'held' ? { state, crossing: controlOptionalId(row.crossing, name), reason } : { state, reason };
+}
+function publicControlReceipt(value: unknown, session: string): PublicControlReceipt {
+  const name = 'ControlReceiptUnreadable';
+  const row = controlObject(value, name);
+  if (row.session !== session) controlUnreadable(name, 'The receipt belongs to another session.');
+  let text: PublicControlReceipt['text'] = null;
+  if (row.text !== null) {
+    const digest = controlObject(row.text, name);
+    const sha256 = controlId(digest.sha256, name);
+    if (!/^[0-9a-f]{64}$/.test(sha256)) controlUnreadable(name, 'The payload digest is invalid.');
+    text = { length: controlNumber(digest.length, name), sha256 };
+  }
+  let reconciled: PersonDecision | null = null;
+  if (row.reconciled !== null) {
+    const kept = controlObject(row.reconciled, name);
+    const decision = controlObject(kept.decision, name);
+    const choice = controlChoice(decision.choice, ['seen', 'not_seen', 'resent'] as const, name);
+    reconciled = { operation: controlId(kept.operation, name), by: controlId(kept.by, name), at: controlNumber(kept.at, name), decision: choice === 'resent' ? { choice, occurrence: controlId(decision.occurrence, name) } : { choice } };
+  }
+  return {
+    operation: controlId(row.operation, name), session, request: controlId(row.request, name),
+    state: controlChoice(row.state, ['accepted', 'delivering', 'delivered', 'confirmed', 'uncertain', 'refused'] as const, name), at: controlNumber(row.at, name), text,
+    prepared: controlBoolean(row.prepared, name), certainty: row.certainty === null ? null : controlChoice(row.certainty, ['safely_unsent', 'possibly_sent', 'observed'] as const, name),
+    generation: row.generation === null ? null : controlNumber(row.generation, name), uuid: controlOptionalId(row.uuid, name),
+    reference: row.reference === null ? null : controlReference(row.reference, name), admitted: controlBoolean(row.admitted, name), reconciled,
+  };
+}
+function controlCursor(value: unknown, last: string | undefined, name: string): string | null {
+  const after = controlOptionalId(value, name);
+  if (after !== null && after !== last) controlUnreadable(name, 'The continuation does not name the last entry in this bounded page.');
+  return after;
+}
+
+export const controls = {
+  async resendLookup(receipt: PublicControlReceipt): Promise<ResendLookup> {
+    const name = 'GoalResendLookupUnreadable';
+    if (!receipt.reference) controlUnreadable(name, 'The uncertain receipt names no goal.');
+    const goal = receipt.reference.goal;
+    const row = controlObject(await request<unknown>('/goals/' + encodeURIComponent(goal) + '/resends/' + encodeURIComponent(receipt.operation)), name);
+    if (row.goal !== goal || row.prior !== receipt.operation) controlUnreadable(name, 'The resend lookup names another aim or prior.');
+    const occurrence = row.occurrence === null ? null : controlObject(row.occurrence, name);
+    return { goal, prior: receipt.operation, occurrence: occurrence === null ? null : { operation: controlId(occurrence.operation, name), session: controlId(occurrence.session, name) } };
+  },
+  async resend(receipt: PublicControlReceipt, occurrence: ResendOccurrence): Promise<PublicControlReceipt> {
+    const name = 'GoalResendUnreadable';
+    if (!receipt.reference) controlUnreadable(name, 'The uncertain receipt names no goal.');
+    const goal = receipt.reference.goal;
+    const row = controlObject(await request<unknown>('/goals/' + encodeURIComponent(goal) + '/resend', { operation: occurrence.operation, prior: receipt.operation, session: occurrence.session }), name);
+    const answer = publicControlReceipt(row.reconciliation, receipt.session);
+    const decision = answer.reconciled?.decision;
+    if (row.goal !== goal || row.prior !== receipt.operation || row.occurrence !== occurrence.operation || row.session !== occurrence.session || typeof row.operation !== 'string' || !row.operation || row.operation === receipt.operation || answer.operation !== receipt.operation || answer.state !== receipt.state || answer.admitted !== receipt.admitted || answer.reconciled?.operation !== occurrence.operation || decision?.choice !== 'resent' || decision.occurrence !== occurrence.operation) controlUnreadable(name, 'The answer did not confirm the kept occurrence and its separate personal decision; retry under the same identity.');
+    return answer;
+  },
+  async sessions(agent: string, after: string | null = null): Promise<ControlSessionsPage> {
+    const name = 'ControlSessionsUnreadable';
+    const row = controlObject(await request<unknown>('/agents/' + encodeURIComponent(agent) + '/control-sessions' + (after ? '?after=' + encodeURIComponent(after) : '')), name);
+    if (row.agent !== agent || !Array.isArray(row.sessions) || row.sessions.length > 256) controlUnreadable(name, 'The session page is unbounded or names another agent.');
+    const sessions = row.sessions.map((value) => controlId(value, name));
+    if (new Set(sessions).size !== sessions.length || sessions.includes(after ?? '')) controlUnreadable(name, 'The session page repeats an identity or its cursor.');
+    return { agent, sessions, after: controlCursor(row.after, sessions.at(-1), name) };
+  },
+  async status(session: string): Promise<CurrentControl | null> {
+    const name = 'ControlStatusUnreadable';
+    const answer = controlObject(await request<unknown>('/runtime/sessions/' + encodeURIComponent(session) + '/controls'), name);
+    if (answer.session !== session) controlUnreadable(name, 'The current control belongs to another session.');
+    if (answer.control === null) return null;
+    const row = controlObject(answer.control, name);
+    if (!Array.isArray(row.queued)) controlUnreadable(name, 'Queued occurrence identities are absent.');
+    return {
+      generation: controlNumber(row.generation, name), phase: controlChoice(row.phase, ['unknown', 'idle', 'reserved', 'active', 'closed'] as const, name),
+      active: controlOptionalId(row.active, name), context: appliedContext(row.context, name), boundary: controlOptionalId(row.boundary, name), crossing: controlOptionalId(row.crossing, name),
+      queued: row.queued.map((value) => { const entry = controlObject(value, name); return { operation: controlId(entry.operation, name), reference: controlReference(entry.reference, name) }; }),
+    };
+  },
+  async receipts(session: string, after: string | null = null): Promise<ControlReceiptsPage> {
+    const name = 'ControlReceiptsUnreadable';
+    const row = controlObject(await request<unknown>('/runtime/sessions/' + encodeURIComponent(session) + '/control-receipts' + (after ? '?after=' + encodeURIComponent(after) : '')), name);
+    if (row.session !== session || !Array.isArray(row.receipts) || row.receipts.length > 256) controlUnreadable(name, 'The receipt page is unbounded or names another session.');
+    const receipts = row.receipts.map((value) => publicControlReceipt(value, session));
+    const ids = receipts.map((receipt) => receipt.operation);
+    if (new Set(ids).size !== ids.length || ids.includes(after ?? '')) controlUnreadable(name, 'The receipt page repeats an operation or its cursor.');
+    return { session, receipts, after: controlCursor(row.after, ids.at(-1), name) };
+  },
+  async decide(receipt: PublicControlReceipt, operation: string, choice: 'seen' | 'not_seen'): Promise<PublicControlReceipt> {
+    const answer = publicControlReceipt(await request<unknown>('/runtime/sessions/' + encodeURIComponent(receipt.session) + '/control-receipts/' + encodeURIComponent(receipt.operation) + '/reconcile', { operation, decision: choice }), receipt.session);
+    if (answer.operation !== receipt.operation || answer.state !== receipt.state || answer.admitted !== receipt.admitted || answer.reconciled?.operation !== operation || answer.reconciled.decision.choice !== choice) controlUnreadable('ControlDecisionUnreadable', 'The answer did not confirm this personal decision separately from unchanged harness evidence; keep the same request when retrying.');
+    return answer;
+  },
+};
