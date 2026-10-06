@@ -253,7 +253,10 @@
           "crates/lys-identity-server/src/receipts_api.rs",
           "crates/lys-identity-server/src/runner_api.rs",
           "crates/lys-runner/src/session.rs",
-          "crates/lys-runner/src/protocol.rs"
+          "crates/lys-runner/src/protocol.rs",
+          "crates/lys-identity-server/src/goals_state.rs",
+          "crates/lys-identity-server/src/goals_index.rs",
+          "crates/lys-identity-server/src/goals_store.rs"
         ],
         "delete": []
       },
@@ -410,6 +413,12 @@
       "by": "Archie",
       "subject": "R3 and R4 name budgets_act/control.rs, a child module of budgets_act.rs",
       "ruling": "The service boundary review that amendments 12 to 14 rule on (the runner's current control identifiers, the current context and goal decisions, the raw server-only reply and the refusal of held words when the feed ends) moves into a new child module, budgets_act/control.rs, declared from budgets_act.rs, which re-exports only its review, start and feed-end helpers, so neither file passes the length limit. Every decision stays with the existing budget and goal owners. It adds no store, cursor, scheduler, poller or history scan (Brisket b4d3df9c; Waffles 653d97e3)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R5's explicit resend is a Line::Resent folded by the goals owner, and the goals snapshot kind moves to lys-goals-state/v2",
+      "ruling": "goals_state.rs fire() advances the reminder's timer for every Fired (lines 550 to 570), so a resend cannot be a Fired. A responsible person's decision to send again appends a new Line::Resent carrying the new Fired and the prior operation id. The existing goals owner folds it: the new occurrence is distinct, under its own operation id, keeps the prior identity so the possible-prior-delivery label survives a snapshot recovery, leaves that timer's next_due unchanged, and records no compaction event. A resend passes the same boundary and authority checks as any send, and one refused at the boundary records nothing. Narrowing resend to existing operation identities is refused: R5 requires a distinct authorised occurrence. An old install's goals log holds no Resent line, so its leaves read unchanged and need no forward migration. The folded snapshot's shape changes, so FORMAT in goals_state.rs moves from lys-goals-state/v1 to lys-goals-state/v2, and the existing refusal of another kind rebuilds the fold from the leaves, as the budgets log did in tonight's proof. Rollback is DIRECTORY-082's: the put-back restores data.previous, so an old build never reads a Resent line. Tests: an old-kind goals snapshot is refused by kind and rebuilt with every goal and timer kept; a Resent survives a reopen with its label; next_due is unchanged by a Resent; a Resent refused at the boundary records nothing. The upgrade proof writes one Resent in the window. The Operations owner's permanent used-id guard stays whole; its checkpoint cost is measured and posted with the implementation chosen (Brisket e85b2b03; Waffles 6ca66f07)."
     }
   ]
 }

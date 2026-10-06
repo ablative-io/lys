@@ -235,6 +235,9 @@ Behavioural. WHEN delivery starts, THE SYSTEM SHALL persist the existing 051 ope
 - modify: crates/lys-identity-server/src/runner_api.rs
 - modify: crates/lys-runner/src/session.rs
 - modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-identity-server/src/goals_state.rs
+- modify: crates/lys-identity-server/src/goals_index.rs
+- modify: crates/lys-identity-server/src/goals_store.rs
 
 **Checklist:**
 - C437 — Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).
