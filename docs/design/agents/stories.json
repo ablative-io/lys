@@ -1,0 +1,43 @@
+{
+  "cluster": "agents",
+  "personas": [
+    {
+      "name": "Tom",
+      "role": "owner",
+      "stories": [
+        {
+          "id": "S401",
+          "text": "As the owner, I want every seat started, seen, stopped and warned from Lys, so that herdr and Argus can be switched off."
+        },
+        {
+          "id": "S402",
+          "text": "As the owner, I want to set a seat's words, variables, countdowns and schedules in one place and see what was actually delivered, so that overnight work runs without a second system."
+        }
+      ]
+    },
+    {
+      "name": "Archie",
+      "role": "an agent",
+      "stories": [
+        {
+          "id": "S403",
+          "text": "As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind."
+        },
+        {
+          "id": "S404",
+          "text": "As an agent, I want a reminder to carry the goal's words and the time left, so that I can plan the hour."
+        }
+      ]
+    },
+    {
+      "name": "An operator",
+      "role": "a person running the estate",
+      "stories": [
+        {
+          "id": "S405",
+          "text": "As an operator, I want to attach to a seat's terminal from Lys when I need to look, so that I do not need a terminal workspace program to own the seats."
+        }
+      ]
+    }
+  ]
+}

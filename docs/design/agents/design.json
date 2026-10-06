@@ -1,0 +1,179 @@
+{
+  "cluster": "agents",
+  "title": "Lys runs and watches its agents: what Argus and herdr do today, done in Lys",
+  "intention": "Every seat is started by Lys through its own runner and proxy, watched by Lys's own hooks and status line, warned, compacted, reminded and scheduled by Lys through the harness's control channel, with its words, variables, countdowns and schedules held in Lys beside its goals, so Argus and herdr can be switched off one seat at a time and nothing a seat needs is typed into a terminal.",
+  "problem": "On 6 October 2026 every seat is started through herdr (a third-party terminal workspace binary with a socket API) and watched by Argus: Claude Code hooks and the status line forward every event to Argus (tools/argus/plugin/hooks/hooks.json, scripts/argus-statusline.sh); the context warning, the preparation note and /compact are typed into the pane as user turns (scripts/context-text-inject.sh via `herdr agent prompt`), which herdr cannot receipt (docs/herdr-compaction-permission-20260925.md); Argus holds the five prompt messages in four layers with templates, the agent variables ({{vars.key | fallback}}), the goals placeholder and the scheduled messages (docs/agent-prompts.md, docs/scheduled-messages-20260907.md). Lys already starts agents (DIRECTORY-050), tracks them through its own hooks, status line and proxy usage file, and holds budgets and goals with reminders (DIRECTORY-051); DIRECTORY-064 moves delivery from the terminal to the harness's control channel and has no commits. What has no owner in Lys: the prompt words and their layers, the variables with their substitutions and countdowns, the schedules, the seat registry with liveness, attaching to a seat's terminal, and the move itself.",
+  "solution": "Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt words in four layers with templates, variables per agent and session with revision and expiry, countdown and goal substitutions rendered at delivery with the contributing revisions captured, and schedules with interval and occurrence bounds, all delivered through 064's dispatcher and shown on the Usage screen; the agent reads and sets its own variables through lys and the Lys MCP server. AGENTS-002: a seat is a Lys record launched by the runner through the proxy with the profile HOME-037 carries, a registry with liveness (online, not seen, seen but unregistered), start, stop and restart as deliberate acts under Lys rights, an attach command that shows a seat's terminal, and the move of a seat off herdr and Argus one at a time, proved by the first warning arriving from Lys. ADR-137 settles where the data lives: in Lys beside goals, rendered at delivery; no shared library (Lodestone is a read-only query engine; haematite is already the store under Lys); alarms, rules and launches go to liminal services and aion per ADR-136 section 3.",
+  "structure": [
+    {
+      "path": "docs/design/agents/",
+      "note": "this cluster",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "docs/design/ARGUS-TO-LYS-2026-10-06.md",
+      "note": "the map from Argus and herdr to Lys",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "docs/design/decisions.json",
+      "note": "ADR-137",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "docs/design/roadmap.json",
+      "note": "RM-108",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "crates/lys-identity-server/src/",
+      "note": "words, variables, schedules and seats: API, state, store",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/",
+      "note": "their tests",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "crates/lys-runner/src/",
+      "note": "rendering at delivery; the runner's liveness and attach",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "crates/lys-runner/tests/",
+      "note": "the runner's tests",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "crates/lys/src/cli.rs",
+      "note": "the lys command line",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "crates/lys/src/commands/",
+      "note": "lys variables, lys attach",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "crates/lys/tests/",
+      "note": "command tests",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "surface/identity/src/features/usage/",
+      "note": "the Usage screen's words, variables and schedules",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "surface/identity/src/features/sessions/",
+      "note": "the Sessions screen's seat registry",
+      "brief": "AGENTS-002"
+    },
+    {
+      "path": "surface/identity/src/api.ts",
+      "note": "the surface's API client",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "surface/identity/tests/",
+      "note": "surface tests",
+      "brief": "AGENTS-001"
+    },
+    {
+      "path": "docs/ops/",
+      "note": "the move of a seat from herdr and Argus to Lys",
+      "brief": "AGENTS-002"
+    }
+  ],
+  "principles": [
+    {
+      "id": "P1",
+      "text": "Nothing a seat needs is typed into a terminal: warnings, compaction, reminders and stops go through the harness's control channel and the runner (ADR-130)."
+    },
+    {
+      "id": "P2",
+      "text": "The data lives in Lys beside goals, rendered at the moment of delivery, with every contributing revision in the receipt; no shared library (ADR-137)."
+    },
+    {
+      "id": "P3",
+      "text": "A seat's state comes from the runner's own knowledge and the proxy, never from a terminal program's listing."
+    },
+    {
+      "id": "P4",
+      "text": "Seat acts are deliberate acts under Lys rights and are receipted (ADR-136)."
+    }
+  ],
+  "decisions": [
+    "ADR-118",
+    "ADR-130",
+    "ADR-135",
+    "ADR-136",
+    "ADR-137"
+  ],
+  "goals": [
+    "Words in four layers with templates and a sending-nothing preview.",
+    "Variables per agent and session with revision, author and expiry, set by the agent itself through lys and the Lys MCP server.",
+    "Rendering at delivery of variables, goals, time left and context numbers, captured with its revisions.",
+    "Schedules with interval and occurrence bounds that coalesce and stop on uncertainty.",
+    "A seat as a Lys record launched through the proxy, seen with liveness, started and stopped by right, attached from lys, and moved off herdr and Argus one at a time."
+  ],
+  "non_goals": [
+    {
+      "text": "Alarms, rules, launches and the queue.",
+      "reason": "ADR-136 section 3 puts them in liminal services and aion."
+    },
+    {
+      "text": "A dashboard with graphs.",
+      "reason": "DIRECTORY-051 R5 keeps per-turn analytics out of the Usage screen."
+    },
+    {
+      "text": "herdr, screen or manifold as a transport.",
+      "reason": "The runner's pseudo-terminal and the control channel are the only ways in."
+    }
+  ],
+  "inventory": [
+    {
+      "path": "tools/argus:plugin/hooks/hooks.json",
+      "note": "every Claude Code hook event forwarded to Argus. Read, never changed."
+    },
+    {
+      "path": "tools/argus:plugin/scripts/argus-statusline.sh",
+      "note": "the status line that forwards the status payload. Read, never changed."
+    },
+    {
+      "path": "tools/argus:plugin/scripts/context-text-inject.sh",
+      "note": "how a warning or /compact is typed into a herdr pane today. Read, never changed."
+    },
+    {
+      "path": "tools/argus:docs/agent-prompts.md",
+      "note": "the five messages, four layers, templates and variables. Read, never changed."
+    },
+    {
+      "path": "tools/argus:docs/scheduled-messages-20260907.md",
+      "note": "the schedule contract. Read, never changed."
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-064.json",
+      "note": "the control-channel delivery this cluster sends through. Read, never changed."
+    },
+    {
+      "path": "crates/lys-runner/src/tracking_proxy.rs",
+      "note": "the proxy's usage file the follower reads. Read."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "Every delivery is a DIRECTORY-064 operation with its receipt; nothing here writes to a terminal."
+    },
+    {
+      "id": "CN2",
+      "text": "Every brief here is executed under the standing rules: written whole before one battery and one install; commits by pathspec on main; the design gate judged by parsed failures; every handback carries the hospital sentence."
+    },
+    {
+      "id": "CN3",
+      "text": "Nothing written is unreadable or rewritten: new record kinds take versions; old bytes stay valid (ADR-126)."
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "cluster": "agents",
+  "sections": [
+    {
+      "name": "Words, variables and schedules",
+      "items": [
+        {
+          "id": "C701",
+          "text": "The five message slots (context warning, preparation, compaction, wake-up, scheduled reminder) resolve built-in, then workspace, then agent, then session, with named templates; an empty layer inherits (AGENTS-001 R1).",
+          "done": false
+        },
+        {
+          "id": "C702",
+          "text": "An agent's and a session's variables are JSON values with a revision, an author and an optional expiry; a stale revision is refused by name; the agent reads and sets its own through lys and the Lys MCP server (AGENTS-001 R2).",
+          "done": false
+        },
+        {
+          "id": "C703",
+          "text": "Delivery renders {{vars.key | fallback}}, {{goals}} and {{time_left}} at the moment of delivery and captures the rendered text with every contributing revision in the operation's receipt (AGENTS-001 R3).",
+          "done": false
+        },
+        {
+          "id": "C704",
+          "text": "A schedule has at, until, interval, max occurrences and recipients; missed intervals coalesce to one send; an uncertain delivery stops it for inspection; every state survives restart (AGENTS-001 R4).",
+          "done": false
+        },
+        {
+          "id": "C705",
+          "text": "The Usage screen shows and sets words, variables and schedules with named refusals (AGENTS-001 R5).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Seats",
+      "items": [
+        {
+          "id": "C706",
+          "text": "A seat is a Lys record (name, harness, profile, home, machine) launched by the runner with the proxy and Lys's hooks and status line in its provisioned home (AGENTS-002 R1).",
+          "done": false
+        },
+        {
+          "id": "C707",
+          "text": "The Sessions screen shows every seat online, offline, not seen by the runner, or seen but unregistered, from the runner's own liveness, never from a terminal program (AGENTS-002 R2).",
+          "done": false
+        },
+        {
+          "id": "C708",
+          "text": "Start, stop and restart are deliberate acts under Lys rights; stop goes through the harness's control channel and the runner, never typed keys (AGENTS-002 R3).",
+          "done": false
+        },
+        {
+          "id": "C709",
+          "text": "lys attach shows a seat's live terminal to its responsible person or an administrator and nobody else (AGENTS-002 R4).",
+          "done": false
+        },
+        {
+          "id": "C710",
+          "text": "A seat moves off herdr and Argus one at a time with the same profile, proved by the first context warning arriving from Lys and Argus's delivery for that seat off (AGENTS-002 R5).",
+          "done": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-29",
+  "updated": "2026-10-06",
   "items": [
     {
       "id": "RM-001",
@@ -2664,6 +2664,36 @@
       },
       "depends_on": [],
       "notes": "Handwritten.051,062 and064 implementation seams required at integration. Gypsy reviews."
+    },
+    {
+      "id": "RM-108",
+      "title": "Lys replaces Argus and herdr for its seats: words, variables, schedules, the seat registry, attach and the move",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "AGENTS-001 holds the words, variables, countdowns and schedules in Lys and renders them at delivery through DIRECTORY-064; AGENTS-002 makes a seat a Lys record launched through the proxy, seen from the runner's liveness, stopped as a deliberate act, attached from lys, and moved off herdr and Argus one at a time.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-10-06T15:20:00+11:00",
+        "quote": "every seat is started through Herder, which Argus watches and runs through the hooks as well... have a look at how that's actually done and how we could actually do it in Lys, given that we're going to be starting them and we're going to be running them through the proxy... hooks and mods and status line... manage the variables... countdowns, do all that kind of stuff, do the scheduling.",
+        "context": "By voice to Waffles after the question of how far Lys is from replacing Argus's warnings; map at docs/design/ARGUS-TO-LYS-2026-10-06.md."
+      },
+      "links": {
+        "cluster": "agents",
+        "decisions": [
+          "ADR-137"
+        ],
+        "briefs": [
+          "AGENTS-001",
+          "AGENTS-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-087",
+        "RM-088",
+        "RM-105"
+      ],
+      "notes": "Written by hand on main from a clean clone on 6 October 2026."
     }
   ]
 }

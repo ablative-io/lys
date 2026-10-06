@@ -2033,6 +2033,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-137",
+      "title": "Argus's remaining functions move into Lys as data beside goals, and a seat is a Lys record launched by the runner through the proxy; no shared library",
+      "status": "proposed",
+      "scope": "agents",
+      "date": "2026-10-06",
+      "decided_by": "Tom, by voice to Waffles at about 15:2x Melbourne on 6 October 2026 (look at how herdr and Argus do it and do it in Lys; variables, countdowns and scheduling; maybe a shared library, maybe none); the shape proposed by Waffles in docs/design/ARGUS-TO-LYS-2026-10-06.md, for Tom to confirm.",
+      "context": "Every seat is started through herdr and watched by Argus through hooks, the status line and typed prompts; Argus holds the words, variables, goals placeholder and schedules. Lys has the runner (DIRECTORY-050), tracking with its own hooks, status line and proxy usage (DIRECTORY-051) and the control-channel delivery brief (DIRECTORY-064), and nothing for words, variables, schedules, the seat registry, attach or the move.",
+      "decision": "Words (five slots, four layers, templates), variables (per agent and session, revision, author, expiry), schedules and seats are identity-server records in Lys's log, rendered and acted on at delivery through DIRECTORY-064's dispatcher with the contributing revisions in the receipt. No shared library: Lodestone is a read-only query engine over a store and holds nothing; haematite is the store under Lys already; a library would be a second place for the same data. Seat start, stop and restart are deliberate acts under Lys rights (ADR-136). Argus's alarms, rules, launches and queue are not moved into Lys: they become liminal services and aion work (ADR-136 section 3). A seat moves off herdr and Argus one at a time, Waffles's first.",
+      "consequences": [
+        "Two briefs (AGENTS-001, AGENTS-002) after DIRECTORY-064.",
+        "herdr becomes a viewer at most and then nothing; Argus is switched off per seat as each moves.",
+        "The Lys MCP server gains the agent's own variables.",
+        "Every delivered word is receipted with what produced it."
+      ],
+      "quote": "every seat is started through Herder, which Argus watches and runs through the hooks as well... have a look at how that's actually done and how we could actually do it in Lys, given that we're going to be starting them and we're going to be running them through the proxy... hooks and mods and status line... manage the variables... countdowns... do the scheduling... maybe it belongs in haematite or Lodestone for the shared code, or maybe we don't need it at all",
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

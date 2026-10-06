@@ -1,0 +1,179 @@
+{
+  "id": "AGENTS-002",
+  "cluster": "agents",
+  "title": "A seat is a Lys record launched through the proxy, seen, stopped and attached from Lys, and moved off herdr and Argus one at a time",
+  "depends_on": [
+    "DIRECTORY-050",
+    "DIRECTORY-051",
+    "HOME-037",
+    "DIRECTORY-064"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C706",
+    "C707",
+    "C708",
+    "C709",
+    "C710"
+  ],
+  "stories": [
+    "S401",
+    "S405"
+  ],
+  "design_anchor": [
+    "ADR-118",
+    "ADR-130",
+    "ADR-135",
+    "ADR-137"
+  ],
+  "purpose": "Today a seat is a pane in a herdr workspace, started by Argus's seat_start (a tab, then a wait for the pane), stopped by typing /exit, seen through `herdr agent list` with the registry reconciled against it (online, not seen by herdr, seen but unregistered), and prompted through `herdr agent prompt` (tools/argus/lib/argus/mcp.ex; plugin/scripts/context-text-inject.sh). Lys's runner starts an agent in its own pseudo-terminal (050 R1), carries the profile (HOME-037), installs its hooks and status line (051 R1), counts through the proxy's usage file (tracking_proxy.rs) and will deliver through the control channel (064). Tom, 6 October 15:2x: look at how it is done and do it in Lys, since Lys starts them and runs them through the proxy.",
+  "task": "Add the seat record and its launch through the proxy, the registry with liveness from the runner, start/stop/restart as deliberate acts under rights, lys attach, and the written move of one seat at a time with its proof.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "A seat is a Lys record launched through the proxy",
+      "spec": "Behavioural. THE SYSTEM SHALL hold a seat as an identity-server record: name, the agent identity it runs as, harness (Claude Code or Codex), profile (HOME-037), home, machine (the runner's), account, and working folder; `lys seat start <name>` SHALL ask the runner to start it (050 R3) with the harness's model base URL pointed at the Lys proxy under the session's run key, Lys's hooks and status line in the provisioned home (051 R1) and no Argus hook or status line, and SHALL record the session id the harness reports; a seat whose profile names a harness or model the machine lacks is refused by name.",
+      "acceptance": [
+        "Start a seat; its first model call appears in the proxy's usage file under its run key; the harness's SessionStart hook reaches the runner's collector and nothing reaches Argus; a profile naming an absent binary is refused by name."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/seats_api.rs",
+          "crates/lys-identity-server/src/seats_state.rs",
+          "crates/lys-identity-server/src/seats_store.rs",
+          "crates/lys-identity-server/tests/seats.rs",
+          "crates/lys/src/commands/seat.rs",
+          "crates/lys/tests/seat.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/commands/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C706"
+      ],
+      "stories": [
+        "S401"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The registry with liveness",
+      "spec": "Behavioural. THE SYSTEM SHALL show on the Sessions screen every seat with its state from the runner's own knowledge (the process it holds, the harness session bound at SessionStart, the last hook or status line seen): online with working or idle, offline, not seen (a registered seat with no live session), and seen but unregistered (a session the runner holds for no seat), with the time of the last signal; when the runner cannot be read the states are unknown and named so, never zero; no terminal workspace program is consulted.",
+      "acceptance": [
+        "Start two seats, stop one: online, offline; kill the runner's child outside Lys: not seen within the follower's next read; a session started by the runner's protocol without a seat: seen but unregistered; runner down: unknown, named."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/sessions/Seats.tsx",
+          "surface/identity/tests/seats.test.tsx",
+          "crates/lys-runner/src/liveness.rs",
+          "crates/lys-runner/tests/liveness.rs"
+        ],
+        "modify": [
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/session.rs",
+          "surface/identity/src/api.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C707"
+      ],
+      "stories": [
+        "S401"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Start, stop and restart as deliberate acts",
+      "spec": "Behavioural. THE SYSTEM SHALL treat seat start, stop and restart as deliberate acts on the seat resource (actions seat.start, seat.stop, seat.restart in Lys's own app schema), asked of the grant engine live with the caller's identity and recorded as grant receipts (ADR-136 D2, D11); stop SHALL go through 064's control channel (the harness's own end-session request) and then the runner (050 R6), never typed keys, refusing by name while the harness reports a turn in progress unless force is named; restart is stop then start with the same profile and a new session; a seat with no responsible person cannot be started.",
+      "acceptance": [
+        "Without the right, stop is refused naming seat.stop and the request URL; with it, a stop mid-turn is refused by name, a stop between turns ends the session and the receipt names the grant; restart yields a new session id under the same seat."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/seats_acts.rs",
+          "crates/lys-identity-server/tests/seat_acts.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/seats_api.rs",
+          "crates/lys-runner/src/session.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C708"
+      ],
+      "stories": [
+        "S401"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Attach to a seat's terminal",
+      "spec": "Behavioural. `lys attach <seat>` SHALL show the seat's live terminal (the runner's pseudo-terminal, 050 R1) in the caller's terminal, read-only by default and typing only with a named flag, admitted for the seat's responsible person or an administrator through the runner's presentation (060) and refused by name for anyone else; detaching never ends the session; every attach and every typed byte is a log record naming who.",
+      "acceptance": [
+        "Attach as the responsible person: the seat's screen appears and updates; as another person: refused by name; detach: the seat runs on; the log names the attach."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/commands/attach.rs",
+          "crates/lys-runner/src/attach.rs",
+          "crates/lys-runner/tests/attach.rs",
+          "crates/lys/tests/attach.rs"
+        ],
+        "modify": [
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/commands/mod.rs",
+          "crates/lys-runner/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C709"
+      ],
+      "stories": [
+        "S405"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "The move, one seat at a time",
+      "spec": "Behavioural. docs/ops/MOVE-A-SEAT.md SHALL state the move of one seat: record its profile as a Lys seat (R1), stop the herdr pane, turn Argus's delivery for that seat off (its transport set to none), start the seat from Lys, and prove it by the first [Lys context watch] warning delivered through 064 and recorded in Lys's delivery log with no Argus delivery for that seat after the move; THE SYSTEM SHALL refuse to start a seat whose name is still online in Argus's registry if Argus is reachable, naming it, so no seat is watched twice; the first seat moved is Waffles's own.",
+      "acceptance": [
+        "Move one seat by the document; the proof lines are present; a second start of the same name while Argus still lists it online is refused by name."
+      ],
+      "files": {
+        "create": [
+          "docs/ops/MOVE-A-SEAT.md"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/seats_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C710"
+      ],
+      "stories": [
+        "S401"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No herdr, screen or manifold transport in Lys: the runner's pseudo-terminal and the harness's control channel are the only ways in.",
+    "Argus's alarms, rules, launches and queue are not moved here (ADR-136 section 3: liminal services and aion).",
+    "Nothing is typed into a terminal to warn, compact, remind or stop (ADR-130).",
+    "Agents started outside Lys stay out of scope (ADR-135): the move brings a seat inside."
+  ],
+  "verification": [
+    "This handwritten brief passes scripts/design/gate.sh, judged by its parsed failures, never by its exit code.",
+    "Written whole, read whole by the lead; the whole gate at the sha; the one battery and install on Tom's Mac; the lead walks the Sessions screen and attaches to a seat, with pictures; the first moved seat's warning is read in its session.",
+    "Four-heading handback with the hospital sentence; no test proves less; cargo nextest only; clippy pedantic -D warnings; file length 500."
+  ]
+}
