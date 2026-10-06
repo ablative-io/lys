@@ -362,6 +362,8 @@ pub struct SessionView {
     /// carried one; none for a session a restarted runner reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy: Option<JudgedUnder>,
+    /// Current managed boundary and occurrence identifiers, without saved words.
+    pub control: Option<crate::harness_control::ControlStatus>,
 }
 
 /// What a runner is and holds.

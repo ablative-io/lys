@@ -153,6 +153,11 @@ impl Session {
         let output = self.output.lock()?;
         Ok(SessionView {
             session: id.to_owned(),
+            control: self
+                .live
+                .as_ref()
+                .and_then(|live| live.control.as_ref())
+                .map(|control| control.controller.control_status()),
             pid: self.pid,
             started_at: self.started_at,
             columns: self.columns,

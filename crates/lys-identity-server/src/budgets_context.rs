@@ -130,6 +130,13 @@ pub struct Availability {
 }
 
 impl Availability {
+    pub(crate) fn reading(&self, agent: &str, session: &str) -> Option<(i64, Option<u64>)> {
+        self.agents
+            .get(agent)
+            .and_then(|agent| agent.sessions.get(session))
+            .map(|reading| (reading.at_ms, reading.figure))
+    }
+
     /// Update the current reading when a usage leaf is folded.
     pub(crate) fn keep(&mut self, usage: &Usage) -> Result<(), String> {
         self.agents

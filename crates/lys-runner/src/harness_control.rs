@@ -11,6 +11,10 @@ use crate::protocol::Launch;
 pub use crate::tracking_store::managed::{Binding, Executable, ManagedEvent};
 
 mod approval;
+mod context;
+mod reminders;
+pub use context::{BoundaryReply, ContextDecision, ControlStatus};
+pub use reminders::{QueuedReminder, ReminderDecision, ReminderReference};
 pub mod claude;
 pub mod codex;
 pub mod events;
@@ -70,6 +74,8 @@ pub struct Pending {
     pub kind: Kind,
     /// The admitted text.
     pub text: String,
+    pub(crate) reminder: Option<ReminderReference>,
+    pub(crate) authorised: Option<String>,
 }
 
 impl Pending {
@@ -90,6 +96,8 @@ impl Pending {
             uuid,
             kind,
             text,
+            reminder: None,
+            authorised: None,
         }
     }
 }
@@ -163,6 +171,7 @@ pub struct Controller {
     initialized: bool,
     closed: bool,
     pending_ids: BTreeSet<String>,
+    authority: context::Authority,
 }
 
 impl Controller {
@@ -195,6 +204,7 @@ impl Controller {
             initialized: false,
             closed: false,
             pending_ids: BTreeSet::new(),
+            authority: context::Authority::default(),
         })
     }
 
@@ -223,7 +233,7 @@ impl Controller {
     /// Whether authoritative state currently permits a new turn.
     #[must_use]
     pub fn idle(&self) -> bool {
-        self.boundary == Boundary::Idle
+        self.boundary == Boundary::Idle && (!self.authority.required || self.authority.normal)
     }
 
     /// Whether the channel has been bound by harness evidence.
@@ -299,14 +309,26 @@ impl Controller {
             ));
         }
         self.pending_ids.insert(pending.id.clone());
-        self.pending.push_back(pending);
+        if pending.kind == Kind::Compact {
+            let before_input = self
+                .pending
+                .iter()
+                .position(|held| held.kind != Kind::Compact)
+                .unwrap_or(self.pending.len());
+            self.pending.insert(before_input, pending);
+        } else {
+            self.pending.push_back(pending);
+        }
         let mut update = Update::default();
+        if self.boundary == Boundary::Idle {
+            self.request_boundary(&mut update)?;
+        }
         self.dispatch(&mut update)?;
         Ok(update)
     }
 
     fn dispatch(&mut self, update: &mut Update) -> Result<(), RunnerError> {
-        if !self.idle() {
+        if self.boundary != Boundary::Idle || !self.permitted() {
             return Ok(());
         }
         let Some(pending) = self.pending.pop_front() else {
@@ -314,6 +336,8 @@ impl Controller {
         };
         self.pending_ids.remove(&pending.id);
         self.boundary = Boundary::Reserved;
+        self.authority.waiting = None;
+        self.authority.answered = false;
         self.compacted = None;
         self.admitted = false;
         self.turn = None;
@@ -419,6 +443,7 @@ impl Controller {
                 self.compact = compact;
                 self.boundary = Boundary::Idle;
                 update.events.push(self.event("control_bound", None, None));
+                self.request_boundary(&mut update)?;
             }
             Observation::Started { turn } => {
                 if self.boundary == Boundary::Reserved || self.boundary == Boundary::Idle {
@@ -502,6 +527,7 @@ impl Controller {
                 }
                 self.boundary = Boundary::Idle;
                 self.turn = None;
+                self.request_boundary(&mut update)?;
                 self.dispatch(&mut update)?;
             }
             Observation::Refused => {

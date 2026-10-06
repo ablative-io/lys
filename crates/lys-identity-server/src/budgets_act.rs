@@ -12,6 +12,9 @@
 
 use std::sync::Arc;
 
+mod control;
+pub(crate) use control::{feed_end, review, start};
+
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
@@ -192,6 +195,9 @@ pub(crate) async fn settle_crossings(
     for crossing in unsettled {
         if let Some(acted) = act(state, &crossing).await {
             with_budgets_mut(state, |store| store.acted(acted))?;
+            if let Some(session) = crossing.session.as_deref() {
+                review(state, session, &crossing.operation).await?;
+            }
         }
     }
     Ok(())
@@ -206,6 +212,11 @@ pub fn settle_at_start(state: &Arc<AppState>) {
     tokio::spawn(async move {
         if let Err(error) = settle(&state).await {
             (state.say)(&format!("budgets: settling at start failed: {error}"));
+        }
+        if let Err(error) = start(&state).await {
+            (state.say)(&format!(
+                "controls: boundary recovery at start failed: {error}"
+            ));
         }
     });
 }
@@ -249,6 +260,22 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
     {
         return Some(kept(Stands::Refused, error.to_string()));
     }
+    let requires_controls = if crossing.act == Act::Compact
+        && crossing.measure == crate::budgets_state::Measure::ContextPercent
+    {
+        match crate::runner_api::session_settings(state, &crossing.agent) {
+            Ok(settings) => settings.is_some_and(|settings| settings.requires_controls),
+            Err(error) => {
+                (state.say)(&format!(
+                    "budget crossing {} awaits its control profile: {error}",
+                    crossing.operation
+                ));
+                return None;
+            }
+        }
+    } else {
+        false
+    };
     let request = match (crossing.act, crossing.text.clone()) {
         (Act::Tell, _) => {
             return Some(kept(
@@ -260,6 +287,10 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
             ));
         }
         (Act::Stop, _) => OperationRequest::Stop,
+        (Act::Compact, Some(text)) if requires_controls => OperationRequest::ContextCompact {
+            text,
+            crossing: crossing.operation.clone(),
+        },
         (Act::Compact, Some(text)) => OperationRequest::Compact { text },
         (Act::Notice, Some(text)) => OperationRequest::Notice { text },
         (Act::Compact, None) => {
@@ -290,7 +321,13 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
         request,
     };
     match operate(state, operation).await {
-        Ok(outcome) => Some(Acted::from_runner(&outcome, at_ms())),
+        Ok(outcome) => match i64::try_from(outcome.at) {
+            Ok(observed) => Some(Acted::from_runner(&outcome, observed)),
+            Err(error) => Some(kept(
+                Stands::Refused,
+                format!("runner outcome instant: {error}"),
+            )),
+        },
         Err(Undelivered::Refused(words)) => Some(kept(Stands::Refused, words)),
         Err(Undelivered::Unknown(error)) => {
             (state.say)(&format!(

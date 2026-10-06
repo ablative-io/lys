@@ -141,9 +141,24 @@ pub(super) fn perform(
             status: sessions.status(session.as_deref())?,
         }),
         Act::Operate { operation } => {
+            if matches!(
+                operation.request,
+                crate::operations::OperationRequest::BoundaryReply { .. }
+            ) {
+                if context.is_some() {
+                    return Err(RunnerError::refused(
+                        "control_boundary_service_required",
+                        "a person or agent cannot decide an owned context boundary",
+                    ));
+                }
+                return sessions
+                    .apply_boundary_reply(operation)
+                    .map(|outcome| Answer::Operation { outcome });
+            }
             let outcome = if matches!(
                 operation.request,
                 crate::operations::OperationRequest::Compact { .. }
+                    | crate::operations::OperationRequest::ContextCompact { .. }
             ) {
                 crate::legacy_input::compact(sessions, server, operation, context)?
             } else {

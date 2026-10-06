@@ -32,8 +32,10 @@ pub(crate) fn live(
         session: binding.session.clone(),
         generation: binding.generation,
     };
+    let mut controller = Controller::new(binding, transport)?;
+    controller.require_boundary_authority()?;
     let runtime = Runtime {
-        controller: Controller::new(binding, transport)?,
+        controller,
         pipe: Input::new(writer),
         admissions: BTreeMap::new(),
         left: Arc::new(AtomicBool::new(false)),
@@ -143,19 +145,33 @@ pub(crate) fn enqueue_operation(
         .get(id)
         .ok_or_else(|| RunnerError::refused("session_unknown", "session is not held"))?
         .generation;
-    let kind = if matches!(request, OperationRequest::Compact { .. }) {
+    let kind = if matches!(
+        request,
+        OperationRequest::Compact { .. } | OperationRequest::ContextCompact { .. }
+    ) {
         Kind::Compact
     } else {
         Kind::Reminder
     };
-    let pending = Pending::new(
-        operation.to_owned(),
-        kind,
-        crate::operations::managed_take(table, id, operation)?,
-    );
-    let update = runtime(table, id, generation)?
-        .controller
-        .enqueue(pending)?;
+    let text = crate::operations::managed_take(table, id, operation)?;
+    let pending = match request {
+        OperationRequest::GoalReminder { reference, .. } => {
+            Pending::for_goal(operation.to_owned(), text, reference.clone())
+        }
+        _ => Pending::new(operation.to_owned(), kind, text),
+    };
+    let control = &mut runtime(table, id, generation)?.controller;
+    let update = if let OperationRequest::ContextCompact { crossing, .. } = request {
+        if crossing != operation {
+            return Err(RunnerError::refused(
+                "control_crossing_changed",
+                "the crossing does not name its operation",
+            ));
+        }
+        control.context_compact(pending)?
+    } else {
+        control.enqueue(pending)?
+    };
     match apply(table, id, generation, update) {
         Ok(()) => Ok(()),
         Err(error) => {
@@ -288,6 +304,73 @@ pub(super) fn apply(
 }
 
 impl Sessions {
+    pub(crate) fn apply_boundary_reply(
+        &self,
+        operation: crate::operations::Operation,
+    ) -> Result<crate::operations::OperationOutcome, RunnerError> {
+        let OperationRequest::BoundaryReply { reply } = &operation.request else {
+            return Err(RunnerError::refused(
+                "control_boundary_invalid",
+                "the request is not a boundary reply",
+            ));
+        };
+        let encoded = serde_json::to_string(reply)
+            .map_err(|error| RunnerError::refused("control_boundary_invalid", error.to_string()))?;
+        let digest = crate::operations::TextDigest::of(&encoded);
+        let mut table = self.lock()?;
+        if let Some(held) = table.operations.get(&operation.operation) {
+            if held.session != operation.session
+                || held.request != "boundary_reply"
+                || held.text.as_ref() != Some(&digest)
+            {
+                return Err(RunnerError::refused(
+                    "operation_reused",
+                    "the boundary reply already names another decision",
+                ));
+            }
+            let outcome = held.clone();
+            drop(table);
+            self.writer.barrier()?;
+            return Ok(outcome);
+        }
+        table
+            .operations
+            .check_control_identity(&operation.operation)?;
+        let applied = runtime(&mut table, &operation.session, reply.generation)?
+            .controller
+            .boundary_reply(reply);
+        let (state, words, update) = match applied {
+            Ok(update) => (
+                OperationState::Confirmed,
+                "boundary_authority_applied".to_owned(),
+                update,
+            ),
+            Err(error) => {
+                let words = error.to_string();
+                let update = runtime(&mut table, &operation.session, reply.generation)?
+                    .controller
+                    .refuse_held(&words);
+                (OperationState::Refused, words, update)
+            }
+        };
+        let outcome = crate::operations::OperationOutcome {
+            operation: operation.operation,
+            session: operation.session.clone(),
+            request: "boundary_reply".to_owned(),
+            state,
+            at: now_ms(),
+            words,
+            text: Some(digest),
+            ended: None,
+        };
+        table.operations.keep_control(outcome.clone())?;
+        apply(&mut table, &operation.session, reply.generation, update)?;
+        drop(table);
+        self.writer.barrier()?;
+        self.wake();
+        Ok(outcome)
+    }
+
     fn managed_input(&self, id: &str, generation: u64, bytes: &[u8]) -> Result<(), RunnerError> {
         let text = std::str::from_utf8(bytes).map_err(|error| {
             RunnerError::refused(
@@ -547,6 +630,77 @@ mod tests {
         sessions.wake();
         Ok(())
     }
+
+    struct Service {
+        sessions: Arc<Sessions>,
+        ended: Arc<std::sync::atomic::AtomicBool>,
+        worker: Option<std::thread::JoinHandle<std::result::Result<(), crate::error::RunnerError>>>,
+    }
+
+    impl Service {
+        fn start(sessions: &Arc<Sessions>, source: &Binding) -> Result<Self> {
+            let ended = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let done = Arc::clone(&ended);
+            let owner = Arc::clone(sessions);
+            let source = source.clone();
+            let worker = std::thread::Builder::new()
+                .name("fixture-boundary-service".to_owned())
+                .spawn(move || {
+                    let mut answered = None;
+                    loop {
+                        let boundary = match owner.until_any(&done, |table| {
+                            table
+                                .sessions
+                                .get(&source.session)
+                                .and_then(|session| session.live.as_ref())
+                                .and_then(|live| live.control.as_ref())
+                                .and_then(|control| control.controller.control_status().boundary)
+                                .filter(|boundary| answered.as_ref() != Some(boundary))
+                        }) {
+                            Ok(boundary) => boundary,
+                            Err(error)
+                                if error.name() == "caller_left" && done.load(Ordering::SeqCst) =>
+                            {
+                                return Ok(());
+                            }
+                            Err(error) => return Err(error),
+                        };
+                        owner.apply_boundary_reply(Operation {
+                            operation: format!("fixture-{boundary}"),
+                            session: source.session.clone(),
+                            request: OperationRequest::BoundaryReply {
+                                reply: crate::harness_control::BoundaryReply {
+                                    generation: source.generation,
+                                    boundary: Some(boundary.clone()),
+                                    context: crate::harness_control::ContextDecision::Released,
+                                    reminders: Vec::new(),
+                                },
+                            },
+                        })?;
+                        answered = Some(boundary);
+                    }
+                })?;
+            Ok(Self {
+                sessions: Arc::clone(sessions),
+                ended,
+                worker: Some(worker),
+            })
+        }
+    }
+
+    impl Drop for Service {
+        fn drop(&mut self) {
+            self.ended.store(true, Ordering::SeqCst);
+            self.sessions.wake();
+            if let Some(worker) = self.worker.take() {
+                match worker.join() {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => panic!("fixture boundary service failed: {error}"),
+                    Err(reason) => panic!("fixture boundary service panicked: {reason:?}"),
+                }
+            }
+        }
+    }
     fn fixture(
         transport: Transport,
         human: bool,
@@ -643,7 +797,9 @@ mod tests {
             }
             Transport::Pty => return Err("fixture requires a managed adapter".into()),
         }
+        let service = Service::start(&sessions, &binding)?;
         let result = test(&sessions, &binding, &frames, &terminal);
+        drop(service);
         drop(cleanup);
         drop(terminal_input);
         result

@@ -94,11 +94,14 @@ pub fn compact(
     operation: Operation,
     context: Option<&InputContext<'_>>,
 ) -> Result<OperationOutcome, RunnerError> {
-    let OperationRequest::Compact { text } = &operation.request else {
-        return Err(RunnerError::refused(
-            "SessionInputInvalid",
-            "the operation is not a compaction",
-        ));
+    let text = match &operation.request {
+        OperationRequest::Compact { text } | OperationRequest::ContextCompact { text, .. } => text,
+        _ => {
+            return Err(RunnerError::refused(
+                "SessionInputInvalid",
+                "the operation is not a compaction",
+            ));
+        }
     };
     let sender = sender(sessions, &operation.session, server, context)?;
     let mut bytes = text.as_bytes().to_vec();

@@ -65,6 +65,11 @@ pub fn ensure(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
         let ended = follow(&state, &machine, runner).await;
         let again = matches!(&ended, ServerError::Runner { refusal, .. } if lost(refusal));
         state.runners.links().ended(Link::Feed, &machine, again);
+        if let Err(error) = crate::budgets_act::feed_end(&state, &machine, &ended).await {
+            (state.say)(&format!(
+                "controls: held words on machine {machine} could not receive the feed refusal: {error}"
+            ));
+        }
         (state.say)(&format!(
             "refusals: the feed of machine {machine}'s runner is no longer followed: {ended}{}",
             if again { AGAIN } else { "" }

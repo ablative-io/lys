@@ -19,8 +19,7 @@
 //! never the text itself.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 
 use serde::{Deserialize, Serialize};
@@ -29,6 +28,11 @@ use sha2::{Digest, Sha256};
 use crate::error::RunnerError;
 use crate::protocol::Ended;
 use crate::session::{Sessions, now_ms};
+
+mod control;
+mod store;
+pub use control::{Certainty, ControlReceipt, Reconciled, Reconciliation};
+use control::Control;
 
 mod delivery;
 pub(crate) use delivery::{accept, compacting, deliver, ended};
@@ -54,6 +58,25 @@ pub enum OperationRequest {
         /// The command.
         text: String,
     },
+    /// Compact one context crossing while keeping normal input held.
+    ContextCompact {
+        /// The configured compaction command.
+        text: String,
+        /// The existing crossing identity.
+        crossing: String,
+    },
+    /// Queue a stable goal occurrence for current boundary authority.
+    GoalReminder {
+        /// The initial reminder words.
+        text: String,
+        /// The saved goal revision and occurrence.
+        reference: crate::harness_control::ReminderReference,
+    },
+    /// Apply the service's current decision to one owned boundary.
+    BoundaryReply {
+        /// The exact generation and boundary decision.
+        reply: crate::harness_control::BoundaryReply,
+    },
     /// Type a notice to the session at the next turn boundary.
     Notice {
         /// The notice.
@@ -73,6 +96,9 @@ impl OperationRequest {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Compact { .. } => "compact",
+            Self::ContextCompact { .. } => "context_compact",
+            Self::GoalReminder { .. } => "goal_reminder",
+            Self::BoundaryReply { .. } => "boundary_reply",
             Self::Notice { .. } => "notice",
             Self::Reminder { .. } => "reminder",
             Self::Stop => "stop",
@@ -81,8 +107,12 @@ impl OperationRequest {
 
     fn text(&self) -> Option<&str> {
         match self {
-            Self::Compact { text } | Self::Notice { text } | Self::Reminder { text } => Some(text),
-            Self::Stop => None,
+            Self::Compact { text }
+            | Self::ContextCompact { text, .. }
+            | Self::GoalReminder { text, .. }
+            | Self::Notice { text }
+            | Self::Reminder { text } => Some(text),
+            Self::Stop | Self::BoundaryReply { .. } => None,
         }
     }
 }
@@ -170,6 +200,12 @@ struct Kept {
 /// in memory only.
 pub(crate) struct Operations {
     path: PathBuf,
+    checkpoint: PathBuf,
+    journal_offset: u64,
+    checkpoint_offset: u64,
+    checkpoint_bytes: u64,
+    controls: HashMap<String, Control>,
+    by_session: BTreeMap<String, BTreeSet<String>>,
     held: HashMap<String, OperationOutcome>,
     seen: HashSet<String>,
     expires: BTreeSet<(u64, String)>,
@@ -189,118 +225,12 @@ fn unavailable(what: impl std::fmt::Display) -> RunnerError {
 fn terminal(outcome: &OperationOutcome) -> bool {
     match outcome.state {
         OperationState::Accepted | OperationState::Delivering => false,
-        OperationState::Delivered => !matches!(outcome.request.as_str(), "stop" | "compact"),
+        OperationState::Delivered => !matches!(outcome.request.as_str(), "stop" | "compact" | "context_compact"),
         OperationState::Confirmed | OperationState::Uncertain | OperationState::Refused => true,
     }
 }
 
 impl Operations {
-    /// The operations recorded in `dir`. One a stopped runner left being
-    /// typed is uncertain; one it left waiting is refused, its session gone.
-    pub(crate) fn open(dir: &Path) -> Result<Self, RunnerError> {
-        Self::open_at(dir, now_ms())
-    }
-
-    fn open_at(dir: &Path, now: u64) -> Result<Self, RunnerError> {
-        let path = dir.join("operations.jsonl");
-        let old = dir.join("operations.json");
-        if !path.exists() {
-            let outcomes = match std::fs::read(&old) {
-                Ok(bytes) => {
-                    let kept: Kept = serde_json::from_slice(&bytes).map_err(unavailable)?;
-                    if kept.format != FORMAT {
-                        return Err(unavailable(format!("in format {}", kept.format)));
-                    }
-                    kept.operations
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-                Err(error) => return Err(unavailable(error)),
-            };
-            let mut bytes = Vec::new();
-            for outcome in outcomes {
-                serde_json::to_writer(&mut bytes, &outcome).map_err(unavailable)?;
-                bytes.push(b'\n');
-            }
-            crate::state::replace(&path, &bytes).map_err(unavailable)?;
-        }
-        let mut operations = Self {
-            path,
-            held: HashMap::new(),
-            seen: HashSet::new(),
-            expires: BTreeSet::new(),
-            accepted: BTreeMap::new(),
-            active: BTreeMap::new(),
-            texts: BTreeMap::new(),
-            compacting: BTreeSet::new(),
-            writer: None,
-        };
-        let file = std::fs::File::open(&operations.path).map_err(unavailable)?;
-        let length = file.metadata().map_err(unavailable)?.len();
-        let mut reader = BufReader::new(file);
-        let mut committed = 0;
-        loop {
-            let mut line = Vec::new();
-            let read = reader.read_until(b'\n', &mut line).map_err(unavailable)?;
-            if read == 0 {
-                break;
-            }
-            if line.last() != Some(&b'\n') {
-                break;
-            }
-            let outcome: OperationOutcome = serde_json::from_slice(&line).map_err(unavailable)?;
-            operations.fold(outcome, now);
-            committed += read as u64;
-        }
-        if committed < length {
-            let file = std::fs::OpenOptions::new()
-                .write(true)
-                .open(&operations.path)
-                .map_err(unavailable)?;
-            file.set_len(committed)
-                .and_then(|()| file.sync_all())
-                .map_err(unavailable)?;
-            crate::error::said(
-                "operations_tail_incomplete: the uncommitted last record was removed",
-            );
-        }
-        match std::fs::remove_file(&old) {
-            Ok(()) => std::fs::File::open(dir)
-                .and_then(|file| file.sync_all())
-                .map_err(unavailable)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(unavailable(error)),
-        }
-        let interrupted = operations
-            .held
-            .values()
-            .filter(|outcome| {
-                matches!(
-                    outcome.state,
-                    OperationState::Accepted | OperationState::Delivering
-                )
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        for mut outcome in interrupted {
-            let (state, words) = match outcome.state {
-                OperationState::Delivering => (
-                    OperationState::Uncertain,
-                    "the runner stopped while typing it: whether it reached the session cannot be known, and it is not typed again",
-                ),
-                OperationState::Accepted => (
-                    OperationState::Refused,
-                    "session_ended: the runner stopped before its boundary came",
-                ),
-                _ => continue,
-            };
-            outcome.state = state;
-            outcome.at = now_ms();
-            words.clone_into(&mut outcome.words);
-            operations.record(outcome)?;
-        }
-        Ok(operations)
-    }
-
     pub(crate) fn writer(&mut self, writer: crate::durable::Writer) {
         self.writer = Some(writer);
     }
@@ -308,6 +238,7 @@ impl Operations {
     fn fold(&mut self, outcome: OperationOutcome, now: u64) {
         let id = outcome.operation.clone();
         self.seen.insert(id.clone());
+        self.by_session.entry(outcome.session.clone()).or_default().insert(id.clone());
         if let Some(previous) = self.held.get(&id).filter(|held| terminal(held)) {
             self.expires
                 .remove(&(previous.at.saturating_add(RETAIN_MS), id.clone()));
@@ -321,6 +252,8 @@ impl Operations {
                 .or_default()
                 .push_back(id.clone());
         }
+        let unresolved = outcome.state == OperationState::Uncertain
+            && self.controls.get(&id).is_some_and(|control| control.decision.is_none());
         if terminal(&outcome) {
             if let Some(active) = self.active.get_mut(&outcome.session) {
                 active.remove(&id);
@@ -328,8 +261,9 @@ impl Operations {
                     self.active.remove(&outcome.session);
                 }
             }
-            self.expires
-                .insert((outcome.at.saturating_add(RETAIN_MS), id.clone()));
+            if !unresolved {
+                self.expires.insert((outcome.at.saturating_add(RETAIN_MS), id.clone()));
+            }
         } else {
             self.active
                 .entry(outcome.session.clone())
@@ -345,7 +279,12 @@ impl Operations {
             let Some((_, id)) = self.expires.pop_first() else {
                 break;
             };
-            self.held.remove(&id);
+            if let Some(outcome) = self.held.remove(&id)
+                && let Some(operations) = self.by_session.get_mut(&outcome.session) {
+                operations.remove(&id);
+                if operations.is_empty() { self.by_session.remove(&outcome.session); }
+            }
+            self.controls.remove(&id);
             self.texts.remove(&id);
             self.compacting.remove(&id);
         }
@@ -361,22 +300,13 @@ impl Operations {
         Ok(())
     }
 
-    fn record(&mut self, outcome: OperationOutcome) -> Result<(), RunnerError> {
-        let mut bytes = serde_json::to_vec(&outcome).map_err(unavailable)?;
-        bytes.push(b'\n');
-        if let Some(writer) = &self.writer {
-            writer.append(&self.path, bytes)?;
-        } else {
-            let mut file = std::fs::OpenOptions::new()
-                .append(true)
-                .open(&self.path)
-                .map_err(unavailable)?;
-            file.write_all(&bytes)
-                .and_then(|()| file.sync_data())
-                .map_err(unavailable)?;
-        }
-        self.fold(outcome, now_ms());
-        Ok(())
+    pub(crate) fn keep_control(&mut self, outcome: OperationOutcome) -> Result<(), RunnerError> {
+        self.repeated(&outcome.operation)?;
+        self.record(outcome)
+    }
+
+    pub(crate) fn check_control_identity(&self, operation: &str) -> Result<(), RunnerError> {
+        self.repeated(operation)
     }
 
     /// The outcome of `operation`.
@@ -405,8 +335,16 @@ impl Operations {
 impl Sessions {
     /// Accept `operation` under its stable id, answering how it stands.
     pub fn operate(&self, operation: Operation) -> Result<OperationOutcome, RunnerError> {
-        if matches!(operation.request, OperationRequest::Compact { .. })
-            && self.lock()?.responsible.contains_key(&operation.session)
+        if matches!(operation.request, OperationRequest::BoundaryReply { .. }) {
+            return Err(RunnerError::refused(
+                "control_boundary_service_required",
+                "only a verified service request may decide a boundary",
+            ));
+        }
+        if matches!(
+            operation.request,
+            OperationRequest::Compact { .. } | OperationRequest::ContextCompact { .. }
+        ) && self.lock()?.responsible.contains_key(&operation.session)
         {
             return Err(RunnerError::refused(
                 "SessionInputContextMissing",

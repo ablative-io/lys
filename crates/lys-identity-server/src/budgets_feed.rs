@@ -56,14 +56,59 @@ pub async fn keep_page(
                     convert(machine, &agent, &record, store.held(), &windows)
                 })?;
                 crate::budgets_enforce::keep(state, usage).await?;
+                crate::budgets_act::review(state, &record.session, &format!("feed-{}", entry.seq))
+                    .await?;
                 kept = true;
             }
             Body::Refusal(record) => refusals.push(record),
-            Body::Coverage(_)
-            | Body::Boundary(_)
-            | Body::Operation(_)
-            | Body::Injection(_)
-            | Body::Managed(_) => {}
+            Body::Operation(outcome) => {
+                if outcome.session != entry.session {
+                    return Err(refused(
+                        "runner feed operation and entry name different sessions",
+                    ));
+                }
+                let crossing = with_budgets(state, |store| {
+                    Ok(store.held().crossings.holds(&outcome.operation))
+                })?;
+                if crossing {
+                    let observed = i64::try_from(outcome.at)
+                        .map_err(|error| refused(format!("runner outcome instant: {error}")))?;
+                    with_budgets_mut(state, |store| {
+                        let acted = crate::budgets_crossing::Acted::from_runner(&outcome, observed);
+                        if store
+                            .held()
+                            .crossings
+                            .acted
+                            .get(&outcome.operation)
+                            .is_none_or(|prior| {
+                                prior.at_ms < observed
+                                    || (prior.at_ms == observed && prior != &acted)
+                            })
+                        {
+                            store.acted(acted)?;
+                        }
+                        Ok(())
+                    })?;
+                }
+                if let Some(goals) = &state.goals {
+                    goals.with(|store| {
+                        store.answer(crate::goals_state::Answered::from_runner(
+                            &outcome,
+                            crate::session::now(),
+                        ))
+                    })?;
+                }
+            }
+            Body::Managed(record) if record.event == "control_boundary" => {
+                if record.binding.session != entry.session {
+                    return Err(refused(
+                        "managed boundary and feed entry name different sessions",
+                    ));
+                }
+                crate::budgets_act::review(state, &entry.session, &format!("feed-{}", entry.seq))
+                    .await?;
+            }
+            Body::Coverage(_) | Body::Boundary(_) | Body::Injection(_) | Body::Managed(_) => {}
             Body::Commit(_) => {
                 return Err(refused("a runner feed page unexpectedly contains a commit"));
             }

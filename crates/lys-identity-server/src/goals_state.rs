@@ -27,7 +27,7 @@ mod operation_tests;
 /// The snapshot domain the goals' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/goals-state/v1";
 
-const FORMAT: &str = "lys-goals-state/v1";
+const FORMAT: &str = "lys-goals-state/v2";
 
 pub use crate::goals_types::{
     Change, Changed, Event, EvidenceKind, GoalError, Holder, HolderKind, Kind, Remind, Standing,
@@ -237,10 +237,24 @@ pub enum Line {
     Changed(Changed),
     /// A reminder fired.
     Fired(Fired),
+    /// A responsible person authorises a separate occurrence after uncertain delivery.
+    Resent(Resent),
     /// A runner's answer to a delivery.
     Answered(Answered),
     /// An event kept.
     Evented(Evented),
+}
+
+/// A distinct occurrence that leaves the regular reminder timer unchanged.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Resent {
+    /// The new occurrence and its intended session deliveries.
+    pub fired: Fired,
+    /// The original session operation whose delivery remains uncertain.
+    pub prior: String,
+    /// The responsible person authorising possible prior delivery.
+    pub by: String,
 }
 
 /// A reminder's timer.
@@ -343,6 +357,8 @@ pub struct Held {
     pub items: Vec<Item>,
     /// The operation ids of the events kept.
     pub events: Vec<String>,
+    /// Prior delivery identities retained by explicitly resent occurrences.
+    pub resends: std::collections::BTreeMap<String, String>,
     #[serde(skip)]
     index: Arc<index::Index>,
 }
@@ -352,6 +368,7 @@ pub struct Held {
 struct Records {
     items: Vec<Item>,
     events: Vec<String>,
+    resends: std::collections::BTreeMap<String, String>,
 }
 
 impl From<Records> for Held {
@@ -360,6 +377,7 @@ impl From<Records> for Held {
         Self {
             items: records.items,
             events: records.events,
+            resends: records.resends,
             index,
         }
     }
@@ -515,10 +533,19 @@ impl Held {
                 }
                 let change = item.changes.len();
                 let position = self.position(&changed.goal)?;
-                Arc::make_mut(&mut self.index).change(position, change, &changed.operation);
+                Arc::make_mut(&mut self.index).change(position, change, &changed);
                 self.items[position].changes.push(changed);
             }
             Line::Fired(fired) => self.fire(fired)?,
+            Line::Resent(resent) => {
+                self.check_resent(&resent)?;
+                let position = self.position(&resent.fired.goal)?;
+                let firing = self.items[position].fired.len();
+                Arc::make_mut(&mut self.index).fire(position, firing, &resent.fired);
+                self.resends
+                    .insert(resent.fired.operation.clone(), resent.prior);
+                self.items[position].fired.push(resent.fired);
+            }
             Line::Answered(answered) => self.answer(&answered)?,
             Line::Evented(evented) => {
                 if self.kept(&evented.operation) {
@@ -569,6 +596,58 @@ impl Held {
         Ok(())
     }
 
+    /// Validate every resend input before a leaf or folded state is changed.
+    pub fn check_resent(&self, resent: &Resent) -> Result<(), String> {
+        let location = self
+            .index
+            .sent
+            .get(&resent.prior)
+            .ok_or("resent prior operation is unknown")?;
+        let prior = self.pending_at(*location)?;
+        if prior.sent.state != Delivery::Uncertain {
+            return Err("resent prior delivery is not uncertain".to_owned());
+        }
+        if resent.by != prior.item.goal.responsible {
+            return Err("resent caller is not the responsible person".to_owned());
+        }
+        if prior.item.standing != Standing::Open || !prior.active {
+            return Err("resent goal is closed or inactive".to_owned());
+        }
+        if resent.fired.goal != prior.item.goal.id
+            || resent.fired.reminder != prior.fired.reminder
+            || resent.fired.due != prior.fired.due
+            || resent.fired.fired < prior.sent.at
+        {
+            return Err(
+                "resent occurrence does not preserve its prior goal and due instant".to_owned(),
+            );
+        }
+        if self.kept(&resent.fired.operation)
+            || self.index.firings.contains_key(&resent.fired.operation)
+        {
+            return Err("resent occurrence identity was already used".to_owned());
+        }
+        if resent.fired.sent.len() != 1 || resent.fired.refused.is_some() {
+            return Err("resent occurrence names exactly one intended delivery".to_owned());
+        }
+        let sent = &resent.fired.sent[0];
+        if sent.session.is_empty()
+            || sent.operation.is_empty()
+            || sent.state != Delivery::Pending
+            || self.index.sent.contains_key(&sent.operation)
+            || sent.operation == resent.prior
+        {
+            return Err("resent delivery has an invalid or reused identity".to_owned());
+        }
+        Ok(())
+    }
+
+    /// The firing under one stable identity, without walking goal history.
+    pub fn firing(&self, operation: &str) -> Option<&Fired> {
+        let (item, firing) = self.index.firings.get(operation)?;
+        self.items.get(*item)?.fired.get(*firing)
+    }
+
     fn answer(&mut self, answered: &Answered) -> Result<(), String> {
         let (item, firing, delivery) = self
             .index
@@ -585,6 +664,7 @@ impl Held {
         sent.state = answered.state;
         sent.words.clone_from(&answered.words);
         sent.at = answered.at;
+        Arc::make_mut(&mut self.index).answer((item, firing, delivery), sent);
         Ok(())
     }
 
@@ -600,19 +680,126 @@ impl Held {
     }
 
     /// Every delivery still asked of a runner, with the text it types.
-    pub fn unsettled(&self) -> Vec<(Sent, String)> {
-        self.items
-            .iter()
-            .filter(|item| item.active())
-            .flat_map(|item| &item.fired)
-            .flat_map(|fired| {
-                fired
-                    .sent
-                    .iter()
-                    .filter(|sent| sent.state.unsettled())
-                    .map(|sent| (sent.clone(), fired.text.clone()))
-            })
+    pub fn unsettled(&self) -> Result<Vec<(Sent, String)>, String> {
+        let mut unsettled = Vec::with_capacity(self.index.pending.len());
+        for location in self.index.pending.keys() {
+            let pending = self.pending_at(*location)?;
+            if pending.active && pending.item.standing == Standing::Open {
+                unsettled.push((
+                    pending.sent.clone(),
+                    crate::goals_store::text_with_words(
+                        pending.item,
+                        pending.words,
+                        pending.fired.fired,
+                    ),
+                ));
+            }
+        }
+        Ok(unsettled)
+    }
+
+    /// Pending occurrences in record order, without visiting settled history.
+    pub fn pending(&self) -> Result<Vec<PendingReminder<'_>>, String> {
+        self.index
+            .pending
+            .keys()
+            .map(|location| self.pending_at(*location))
             .collect()
+    }
+
+    /// Pending deliveries for one session, borrowing their current aim and words.
+    pub fn pending_for_session(&self, session: &str) -> Result<Vec<PendingReminder<'_>>, String> {
+        self.index
+            .pending_by_session
+            .get(session)
+            .into_iter()
+            .flat_map(|locations| locations.iter())
+            .map(|location| self.pending_at(*location))
+            .collect()
+    }
+
+    /// Pending deliveries for one aim, including those awaiting a named refusal.
+    pub fn pending_for_goal(&self, goal: &str) -> Result<Vec<PendingReminder<'_>>, String> {
+        self.index
+            .items
+            .get(goal)
+            .and_then(|position| self.index.pending_by_goal.get(position))
+            .into_iter()
+            .flat_map(|locations| locations.iter())
+            .map(|location| self.pending_at(*location))
+            .collect()
+    }
+
+    /// The current queued delivery under one stable operation identity.
+    pub fn pending_operation(
+        &self,
+        operation: &str,
+    ) -> Result<Option<PendingReminder<'_>>, String> {
+        self.index
+            .sent
+            .get(operation)
+            .filter(|location| self.index.pending.contains_key(location))
+            .map(|location| self.pending_at(*location))
+            .transpose()
+    }
+
+    fn pending_at(&self, location: index::Location) -> Result<PendingReminder<'_>, String> {
+        let (position, firing, delivery) = location;
+        let item = self
+            .items
+            .get(position)
+            .ok_or_else(|| format!("pending reminder item {position} is absent"))?;
+        let fired = item.fired.get(firing).ok_or_else(|| {
+            format!(
+                "pending reminder occurrence {firing} is absent from goal `{}`",
+                item.goal.id
+            )
+        })?;
+        let sent = fired.sent.get(delivery).ok_or_else(|| {
+            format!(
+                "pending reminder delivery {delivery} is absent from occurrence `{}`",
+                fired.operation
+            )
+        })?;
+        let words = match self.index.current_words.get(&position) {
+            Some(change) => match &item
+                .changes
+                .get(*change)
+                .ok_or_else(|| {
+                    format!(
+                        "current words revision {change} is absent from goal `{}`",
+                        item.goal.id
+                    )
+                })?
+                .change
+            {
+                Change::Words { words } => words.as_str(),
+                Change::Active { .. } => {
+                    return Err(format!(
+                        "current words revision {change} of goal `{}` changes activity instead",
+                        item.goal.id
+                    ));
+                }
+            },
+            None => item.goal.words.as_str(),
+        };
+        Ok(PendingReminder {
+            item,
+            fired,
+            sent,
+            prior: self.resends.get(&fired.operation).map(String::as_str),
+            words,
+            active: self
+                .index
+                .current_active
+                .get(&position)
+                .copied()
+                .unwrap_or(item.goal.active),
+            version: item
+                .changes
+                .last()
+                .map_or(item.goal.id.as_str(), |change| change.operation.as_str()),
+        })
     }
 
     /// Fold every leaf of `tail`, in order.
@@ -638,14 +825,35 @@ impl Held {
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
-        let sealed: Sealed =
+        let value: serde_json::Value =
             serde_json::from_slice(bytes).map_err(|error| format!("goals state: {error}"))?;
-        if sealed.format != FORMAT {
-            return Err(format!(
-                "goals state is in format {}, not {FORMAT}",
-                sealed.format
-            ));
+        let format = value
+            .get("format")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("goals state has no format")?;
+        if format != FORMAT {
+            return Err(format!("goals state is in format {format}, not {FORMAT}",));
         }
+        let sealed: Sealed =
+            serde_json::from_value(value).map_err(|error| format!("goals state: {error}"))?;
         Ok(sealed.held)
     }
+}
+
+/// One pending occurrence with borrowed current authority facts.
+pub struct PendingReminder<'a> {
+    /// The aim and its current standing.
+    pub item: &'a Item,
+    /// The stable occurrence and original due instant.
+    pub fired: &'a Fired,
+    /// This session's delivery receipt.
+    pub sent: &'a Sent,
+    /// A possible earlier delivery, for an explicitly authorised resend.
+    pub prior: Option<&'a str>,
+    /// The currently saved words, without copying edit history.
+    pub words: &'a str,
+    /// Whether the currently saved policy permits reminders.
+    pub active: bool,
+    /// The operation that names the current saved revision.
+    pub version: &'a str,
 }

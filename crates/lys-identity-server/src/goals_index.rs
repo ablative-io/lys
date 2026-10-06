@@ -1,8 +1,10 @@
 //! Derived locations preserve the fold's first item and nested record order.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use super::{Fired, Item};
+use super::{Change, Changed, Fired, Item, Sent};
+
+pub(super) type Location = (usize, usize, usize);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct Index {
@@ -11,6 +13,12 @@ pub(super) struct Index {
     pub(super) changed: HashMap<String, (usize, usize)>,
     pub(super) kept: HashSet<String>,
     pub(super) sent: HashMap<String, (usize, usize, usize)>,
+    pub(super) firings: HashMap<String, (usize, usize)>,
+    pub(super) pending: BTreeMap<Location, String>,
+    pub(super) pending_by_session: HashMap<String, BTreeSet<Location>>,
+    pub(super) pending_by_goal: HashMap<usize, BTreeSet<Location>>,
+    pub(super) current_words: HashMap<usize, usize>,
+    pub(super) current_active: HashMap<usize, bool>,
 }
 
 fn first<T: Copy + Ord>(map: &mut HashMap<String, T>, operation: &str, location: T) {
@@ -33,7 +41,7 @@ impl Index {
                 first(&mut index.marked, &marked.operation, position);
             }
             for (change, changed) in item.changes.iter().enumerate() {
-                index.change(position, change, &changed.operation);
+                index.change(position, change, changed);
             }
             for (firing, fired) in item.fired.iter().enumerate() {
                 index.fire(position, firing, fired);
@@ -46,19 +54,66 @@ impl Index {
         first(&mut self.marked, operation, position);
     }
 
-    pub(super) fn change(&mut self, position: usize, change: usize, operation: &str) {
-        first(&mut self.changed, operation, (position, change));
-        self.kept.insert(operation.to_owned());
+    pub(super) fn change(&mut self, position: usize, change: usize, changed: &Changed) {
+        first(&mut self.changed, &changed.operation, (position, change));
+        self.kept.insert(changed.operation.clone());
+        match &changed.change {
+            Change::Words { .. } => {
+                self.current_words.insert(position, change);
+            }
+            Change::Active { active } => {
+                self.current_active.insert(position, *active);
+            }
+        }
     }
 
     pub(super) fn fire(&mut self, position: usize, firing: usize, fired: &Fired) {
+        first(&mut self.firings, &fired.operation, (position, firing));
         self.kept.insert(fired.operation.clone());
         for (delivery, sent) in fired.sent.iter().enumerate() {
-            first(
-                &mut self.sent,
-                &sent.operation,
-                (position, firing, delivery),
-            );
+            let location = (position, firing, delivery);
+            let previous = self.sent.get(&sent.operation).copied();
+            first(&mut self.sent, &sent.operation, location);
+            if self.sent.get(&sent.operation) == Some(&location) {
+                if let Some(previous) = previous.filter(|previous| *previous != location) {
+                    self.finish(previous);
+                }
+                self.answer(location, sent);
+            }
+        }
+    }
+
+    pub(super) fn answer(&mut self, location: Location, sent: &Sent) {
+        if sent.state.unsettled() {
+            self.pending.insert(location, sent.session.clone());
+            self.pending_by_session
+                .entry(sent.session.clone())
+                .or_default()
+                .insert(location);
+            self.pending_by_goal
+                .entry(location.0)
+                .or_default()
+                .insert(location);
+        } else {
+            self.finish(location);
+        }
+    }
+
+    fn finish(&mut self, location: Location) {
+        let Some(session) = self.pending.remove(&location) else {
+            return;
+        };
+        if let Some(held) = self.pending_by_session.get_mut(&session) {
+            held.remove(&location);
+            if held.is_empty() {
+                self.pending_by_session.remove(&session);
+            }
+        }
+        if let Some(held) = self.pending_by_goal.get_mut(&location.0) {
+            held.remove(&location);
+            if held.is_empty() {
+                self.pending_by_goal.remove(&location.0);
+            }
         }
     }
 }
