@@ -160,7 +160,12 @@
           "crates/lys-runner/src/harness_control.rs",
           "crates/lys-runner/src/operations.rs",
           "crates/lys-identity-server/src/budgets_act.rs",
-          "crates/lys-identity-server/src/budgets_state.rs"
+          "crates/lys-identity-server/src/budgets_state.rs",
+          "crates/lys-identity-server/src/budgets_feed.rs",
+          "crates/lys-runner/src/socket/acts.rs",
+          "crates/lys-runner/src/session.rs",
+          "crates/lys-runner/src/legacy_input.rs",
+          "crates/lys-identity-server/src/refusals_follow.rs"
         ],
         "delete": []
       },
@@ -199,7 +204,11 @@
           "crates/lys-identity-server/src/goals_store.rs",
           "crates/lys-identity-server/src/goals_api.rs",
           "crates/lys-runner/src/operations.rs",
-          "crates/lys-runner/src/harness_control.rs"
+          "crates/lys-runner/src/harness_control.rs",
+          "crates/lys-identity-server/src/budgets_feed.rs",
+          "crates/lys-identity-server/src/goals_index.rs",
+          "crates/lys-identity-server/tests/goals_edits.rs",
+          "crates/lys-identity-server/src/refusals_follow.rs"
         ],
         "delete": []
       },
@@ -236,7 +245,8 @@
           "crates/lys-runner/src/state.rs",
           "crates/lys-runner/src/harness_control/events.rs",
           "crates/lys-identity-server/src/receipts_api.rs",
-          "crates/lys-identity-server/src/runner_api.rs"
+          "crates/lys-identity-server/src/runner_api.rs",
+          "crates/lys-runner/src/session.rs"
         ],
         "delete": []
       },
@@ -369,6 +379,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1 and R2 file lists set to what BOX 18 (10bb5597) built, after the install of d5e6d6cd",
       "ruling": "R1 creates crates/lys-runner/src/collector/stop.rs and crates/lys-runner/src/tracking_store/managed.rs (splits under the 500-line gate) and modifies crates/lys-identity-server/src/runner_start_pass_tests.rs and crates/lys-runner/tests/lifecycle/cases.rs. Nine files R1 listed were not touched and leave it: state.rs, socket.rs, runner_acts.rs, lys-home claude_code/launch.rs and codex/mod.rs, budgets_members.rs, goals_store.rs, provisioning_api.rs, docs/design/home/launch-template.schema.json; goals_store.rs and state.rs stay where R3 to R6 list them. The launch flags live in the runner's harness_control/claude.rs and codex.rs, so R2 no longer names lys-home's launch files. A file list is what the tree shows, verified by git ls-tree, never a guess."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R3 and R4 name the supporting files BOX 20 needs: crates/lys-identity-server/src/budgets_feed.rs, crates/lys-identity-server/src/goals_index.rs, crates/lys-identity-server/src/refusals_follow.rs, crates/lys-identity-server/tests/goals_edits.rs, crates/lys-runner/src/legacy_input.rs, crates/lys-runner/src/session.rs, crates/lys-runner/src/socket/acts.rs",
+      "ruling": "budgets_feed.rs keep_page drops Body::Boundary and Body::Managed in one empty arm, and refusals_follow.rs follow() is the one loop that feeds it; R3 and R4 hand that evidence to the budget and goal owners on the same page, cursor and signal task, with no poller, no second scheduler, no transcript read and no new feed record kind. goals_state.rs unsettled() walks every active item's fired history and clones its text, so R4 extends the existing goals_index.rs with pending deliveries by session and goal instead of a parallel owner; its pending lookups answer a Result, so Held::unsettled names an invalid location instead of filtering it out, and tests/goals_edits.rs propagates that Result (Brisket ce377f2e). Held input ends by name: when the feed follow ends or the boundary reply is refused, the held words are refused in the session's operation receipt, never by a timer. The operation carries typed crossing, occurrence and goal id and version fields; the threshold never crosses the runner socket, because the server's 051 measurement judges the crossing (Archie 3ba2c724, 394681b6, 70dcf869; Waffles 5e198af1). socket/acts.rs selects the caller-judged compaction path by request variant and legacy_input.rs compact() accepts only Compact, so a context compaction carrying its crossing id takes that same attribution path, and the boundary reply that releases held input is admitted from the server key alone and refused by name from an agent or person, with no permission widened (Brisket 35c0b3e4). refusals_follow.rs's Link::Feed end tells the same operations owner to refuse held words by name. A held boundary can sit before the saved feed cursor after a service restart, so no second cursor is stored: session.rs's status answer for a session names its current managed boundary by identifiers only (generation, waiting boundary, held crossing, queued occurrence and goal id and version, never words or a threshold), read from the runner's live controller, and the service reads it at start and at Link::Feed end to reconcile or refuse the exact held input. Status only reports the hold; only the server's reply for that boundary releases it (Brisket c4a4a28e)."
     }
   ]
 }

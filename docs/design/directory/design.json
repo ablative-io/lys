@@ -2756,6 +2756,16 @@
       "brief": "DIRECTORY-051"
     },
     {
+      "path": "crates/lys-identity-server/src/budgets_feed.rs",
+      "note": "the runner feed's page keeper; DIRECTORY-064 R3 and R4 hand its boundary and managed records to the budget and goal owners on the same page and cursor",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/src/refusals_follow.rs",
+      "note": "the signal task that follows a runner's feed into budgets_feed; DIRECTORY-064 R3 and R4 connect the same follow to the boundary reply",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-identity-server/src/goals_api.rs",
       "note": "DIRECTORY-051 R4: Goals with deadlines and reminders",
       "brief": "DIRECTORY-051"
@@ -2764,6 +2774,16 @@
       "path": "crates/lys-identity-server/src/goals_state.rs",
       "note": "DIRECTORY-051 R4: Goals with deadlines and reminders",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/goals_index.rs",
+      "note": "the goals fold's derived locations; DIRECTORY-064 R4 adds pending deliveries by session and goal, so a boundary reads only the affected occurrences",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/goals_edits.rs",
+      "note": "the goal edit fixtures; DIRECTORY-064 R4 makes Held::unsettled answer a Result, so an invalid pending location is refused by name, and these calls propagate it",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "crates/lys-identity-server/tests/goals.rs",
@@ -5493,6 +5513,11 @@
     {
       "path": "crates/lys-runner/src/socket/acts.rs",
       "note": "The signed Act dispatch of the runner socket, exhaustive over every act.",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/legacy_input.rs",
+      "note": "the caller-judged compaction path; DIRECTORY-064 R3 routes a context compaction carrying its crossing id through the same attribution, and refuses a boundary reply from anyone but the server",
       "brief": "DIRECTORY-064"
     },
     {

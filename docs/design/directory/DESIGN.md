@@ -650,8 +650,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/budgets_state.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
 | `crates/lys-identity-server/tests/budgets.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
 | `crates/lys-identity-server/src/budgets_act.rs` | DIRECTORY-051 R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_feed.rs` | the runner feed's page keeper; DIRECTORY-064 R3 and R4 hand its boundary and managed records to the budget and goal owners on the same page and cursor | DIRECTORY-064 |
+| `crates/lys-identity-server/src/refusals_follow.rs` | the signal task that follows a runner's feed into budgets_feed; DIRECTORY-064 R3 and R4 connect the same follow to the boundary reply | DIRECTORY-064 |
 | `crates/lys-identity-server/src/goals_api.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
 | `crates/lys-identity-server/src/goals_state.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_index.rs` | the goals fold's derived locations; DIRECTORY-064 R4 adds pending deliveries by session and goal, so a boundary reads only the affected occurrences | DIRECTORY-064 |
+| `crates/lys-identity-server/tests/goals_edits.rs` | the goal edit fixtures; DIRECTORY-064 R4 makes Held::unsettled answer a Result, so an invalid pending location is refused by name, and these calls propagate it | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/goals.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
 | `surface/identity/src/features/usage/Usage.tsx` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
 | `surface/identity/src/features/usage/usage.css` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
@@ -1198,6 +1202,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/collector.rs` | The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session. | DIRECTORY-064 |
 | `crates/lys-runner/src/collector/stop.rs` | the collector's stop path, split out of collector.rs under the 500-line gate by DIRECTORY-064 R1 (BOX 18, 10bb5597); ends a managed process group and confirms by actual exit | DIRECTORY-064 |
 | `crates/lys-runner/src/socket/acts.rs` | The signed Act dispatch of the runner socket, exhaustive over every act. | DIRECTORY-064 |
+| `crates/lys-runner/src/legacy_input.rs` | the caller-judged compaction path; DIRECTORY-064 R3 routes a context compaction carrying its crossing id through the same attribution, and refuses a boundary reply from anyone but the server | DIRECTORY-064 |
 | `crates/lys-runner/src/session/control.rs` | Manual input and resize of a live session. | DIRECTORY-064 |
 | `crates/lys-runner/src/harness_control/approval.rs` | The policy response to a harness approval request on a managed channel: never fabricated. | DIRECTORY-064 |
 | `crates/lys-runner/src/session/lifecycle/managed.rs` | The managed spawn branch of a session's lifecycle: the child entry started and proved. | DIRECTORY-064 |
