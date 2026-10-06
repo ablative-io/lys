@@ -1,0 +1,179 @@
+{
+  "cluster": "access",
+  "title": "Access across the stack: one authority, one pass, one way to ask",
+  "intention": "Lys decides who may do what in every product (Cambium, aion, haematite, liminal) with one grant model, one signed pass products verify by themselves, one way to hand an act to a draft, and one client library, so a new product or a new action is data in Lys and never a Lys release, and a person can read who can do what on one screen.",
+  "problem": "Today a grant names one resource and carries no mode; Lys answers questions but issues nothing a product can verify offline; no product enforces Lys grants (Cambium: any signed-in caller invites and a new person sees every channel; aion: namespaces; haematite: a Studio; liminal: wire passes cambium-door mints; Argus: \"registration grants no authority\"). Four products implementing permissions four ways is the nightmare Tom named on 6 October 2026.",
+  "solution": "The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decisions D1 to D11): one authority; every product route classified hot (decided from the pass offline) or deliberate (asked of Lys live, never falling back); the pass is the access token with a rights claim for its audience; a grant carries its mode (outright, by_draft, by_two); draft execution is pull; resources are hierarchical placements, never patterns; roles are named bundles in the product schema; a machine is the fifth identity; one client library lys-pass with conformance fixtures; availability stated on each product's screen; every deliberate act receipted in Lys.",
+  "principles": [
+    {
+      "id": "P1",
+      "text": "One authority: no product keeps a role table that is not derived from Lys grants; a product permission model is data in its app schema (ADR-116)."
+    },
+    {
+      "id": "P2",
+      "text": "A route is classified once, in a committed matrix, as hot or deliberate; a deliberate route never falls back to the pass when Lys cannot be asked."
+    },
+    {
+      "id": "P3",
+      "text": "A grant says its own mode; \"whatever your grant allows without a draft first\" (Tom to Hermes, 6 October 2026) is a grant whose mode is outright."
+    },
+    {
+      "id": "P4",
+      "text": "Lys calls no product (ADR-116): drafts are executed by the product reading Lys, never by Lys pushing."
+    },
+    {
+      "id": "P5",
+      "text": "No wildcard enters the permission engine: reach is by placement under a parent, and a restricted child is reached only by an explicit grant."
+    },
+    {
+      "id": "P6",
+      "text": "One library carries the hard parts and the conformance fixtures every product gate runs; a refusal has one shape and names the grant and the Lys page that requests it."
+    },
+    {
+      "id": "P7",
+      "text": "Nothing is derived at a product start from local files; a product with no Lys says so on its screen and refuses by name when the pass lifetime has passed."
+    }
+  ],
+  "decisions": [
+    "ADR-116",
+    "ADR-126",
+    "ADR-135",
+    "ADR-136"
+  ],
+  "goals": [
+    "A grant carries outright, by_draft or by_two, and Lys refuses a by_draft or by_two grant on an action its schema marks hot.",
+    "The access token for an app carries the holder's rights for that app, signed with the key Lys publishes, short-lived and refreshed.",
+    "lys-pass verifies a pass offline, evaluates reach through placements, asks Lys for deliberate routes, hands by_draft acts to Lys drafts, runs approved drafts, and ships the conformance fixtures.",
+    "An app schema names roles as action bundles and marks placements restricted; a widening of a role waits for the administrator.",
+    "A machine is a grant holder answering to the administrator who issued its join code."
+  ],
+  "non_goals": [
+    {
+      "text": "The products' own briefs (Cambium, aion, haematite, liminal).",
+      "reason": "Each lives in its repository and consumes this cluster; the design page names what each must do."
+    },
+    {
+      "text": "Agents started outside Lys obtaining a pass.",
+      "reason": "ADR-135 leaves them out of scope; whether Cambium's key-enrolled seats become Lys agents is Tom's to say (design page section 7)."
+    },
+    {
+      "text": "A pattern or wildcard resource.",
+      "reason": "Reach is by placement (P5); liminal subjects are placed under their parents."
+    }
+  ],
+  "structure": [
+    {
+      "path": "docs/design/access/",
+      "note": "this cluster",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md",
+      "note": "the design page the cluster hangs off",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/",
+      "note": "grant types, codec, admission, events: mode and role",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "crates/lys-identity/src/draft_event.rs",
+      "note": "draft records: the held act and its approvals",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "crates/lys-identity/src/",
+      "note": "identity kinds: the machine",
+      "brief": "ACCESS-005"
+    },
+    {
+      "path": "crates/lys-identity/tests/",
+      "note": "compatibility and codec pins",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "crates/lys-identity-server/src/",
+      "note": "grant, draft, schema, provider and machine routes",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/",
+      "note": "route and provider tests",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "crates/lys-pass/",
+      "note": "the client library every product consumes, with its conformance fixtures",
+      "brief": "ACCESS-003"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "workspace members",
+      "brief": "ACCESS-003"
+    },
+    {
+      "path": "crates/lys/src/identity/install/",
+      "note": "install settings: the pass lifetime",
+      "brief": "ACCESS-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_install/",
+      "note": "the real-install tests",
+      "brief": "ACCESS-002"
+    },
+    {
+      "path": "surface/identity/src/features/access/",
+      "note": "Access screens: mode, roles, drafts, machines",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "surface/identity/src/features/apps/",
+      "note": "Apps screen: schema roles and restricted placements",
+      "brief": "ACCESS-004"
+    },
+    {
+      "path": "surface/identity/src/features/network/",
+      "note": "Network screen: machines as holders",
+      "brief": "ACCESS-005"
+    },
+    {
+      "path": "surface/identity/tests/",
+      "note": "screen tests",
+      "brief": "ACCESS-001"
+    },
+    {
+      "path": "docs/design/directory/",
+      "note": "the directory cluster whose grant model this extends; read, not changed here",
+      "brief": "ACCESS-001"
+    }
+  ],
+  "inventory": [
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-081.json",
+      "note": "the virtual client credential; the sign-in this cluster's pass rides on. Read, never changed."
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-080.json",
+      "note": "the app connector identity. Read, never changed."
+    },
+    {
+      "path": "apps/cambium:docs/design/PERMISSIONS-PROPOSAL-2026-10-05.md",
+      "note": "Cambium's proposed roles and actions, the first product schema. Read."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "Nothing written is unreadable or rewritten: grant bodies, events and snapshots gain versions; old bytes stay valid (ADR-126)."
+    },
+    {
+      "id": "CN2",
+      "text": "Every brief here is executed under the standing rules: written whole before one battery and one install; commits by pathspec on main; the design gate judged by parsed failures; every handback carries the hospital sentence."
+    },
+    {
+      "id": "CN3",
+      "text": "Lys never calls a product, waits on one, or reads its store (ADR-116)."
+    }
+  ]
+}

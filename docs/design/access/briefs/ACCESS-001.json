@@ -1,0 +1,154 @@
+{
+  "id": "ACCESS-001",
+  "cluster": "access",
+  "title": "A grant carries its mode; a held act is a draft the product executes after approval",
+  "depends_on": [
+    "DIRECTORY-081"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C601",
+    "C602",
+    "C603",
+    "C604"
+  ],
+  "stories": [
+    "S301",
+    "S306",
+    "S307"
+  ],
+  "design_anchor": [
+    "ADR-116",
+    "ADR-126",
+    "ADR-135",
+    "ADR-136"
+  ],
+  "purpose": "Tom, 6 October 2026, to Hermes and relayed to Waffles: an agent may do \"whatever your grant allows without it having to be a draft first\", with the grant saying what needs a draft or two approvals. Today a grant (lys-identity grants/types.rs:300-324) carries no such word, drafts (drafts_api.rs) are made by hand, and nothing marks which actions could ever be held. This brief puts the mode on the grant and makes the draft the product's hand-off, with Lys never calling the product (ADR-116).",
+  "task": "Add mode to the grant and to the schema's actions; refuse a held mode on a hot action; make a draft record a product's held act; let the product read approved drafts and record their execution; show it all on the Access screens.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "A grant carries one mode",
+      "spec": "Behavioural. WHEN a grant is issued, THE SYSTEM SHALL carry one of outright, by_draft or by_two on it, defaulting to outright for every grant written before this brief; the grant body codec, the grant event envelope and the directory snapshot SHALL gain a version for it with the earlier versions still read and pinned by fixture; the Grant type, its admission and its refusal records SHALL carry the mode; /grants/which and /grants/check/batch SHALL answer the mode beside each right. Refusal texts SHALL say what is true about versions (no stale \"1 or 2\").",
+      "acceptance": [
+        "An old grant fixture reads as outright and its signature still verifies.",
+        "A by_two grant issued, read back, snapshotted and reopened keeps by_two.",
+        "check/batch on a by_draft right answers allowed=false, mode=by_draft, grant id, so a product holds rather than refuses."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/tests/grant_mode_compatibility.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/grants/types.rs",
+          "crates/lys-identity/src/grants/codec.rs",
+          "crates/lys-identity/src/grants/events.rs",
+          "crates/lys-identity/src/grants/admission.rs",
+          "crates/lys-identity/src/grants/refusal_codec.rs",
+          "crates/lys-identity/src/state_value.rs",
+          "crates/lys-identity-server/src/grants/handlers.rs",
+          "crates/lys-identity-server/src/grants_batch.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C601"
+      ],
+      "stories": [
+        "S301"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "A schema action is hot or deliberate, and a held mode is refused on a hot action",
+      "spec": "Behavioural. WHEN an app schema version names an action, THE SYSTEM SHALL take a class for it, hot or deliberate, defaulting every existing action to deliberate; WHEN a grant with mode by_draft or by_two names an action whose class is hot, THE SYSTEM SHALL refuse it as grant_mode_on_hot_action naming the app, action and class, and write nothing; a schema change that moves an action from deliberate to hot while a standing by_draft or by_two grant names it SHALL be refused as schema_change_strands_grants as a stranding is today.",
+      "acceptance": [
+        "PUT /apps/{app}/schema with an action class round-trips at every version.",
+        "Issuing a by_draft grant on a hot action is refused by name with nothing written.",
+        "Moving an action to hot with a standing by_draft grant is refused naming the grant count."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/apps_schema_api.rs",
+          "crates/lys-identity-server/src/apps_schema.rs",
+          "crates/lys-identity-server/src/grants/handlers.rs",
+          "crates/lys-identity-server/src/openapi_typed.rs",
+          "crates/lys-identity-server/tests/apps_schema.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C602"
+      ],
+      "stories": [
+        "S301"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "A product holds an act as a draft and executes it after approval",
+      "spec": "Behavioural. WHEN a product presents a pass (or its connector) and a by_draft or by_two right for a target {kind, id, action} and the digest and words of the request, THE SYSTEM SHALL record a draft naming the grant, the holder, the responsible person, the target and the digest, and answer the draft id; approval by one reviewer who may grant that action (walking up the chain as ADR-135 says) SHALL make a by_draft draft approved, and by two distinct such reviewers a by_two draft; the holder and the responsible person SHALL NOT be the approvers of their own draft; GET /drafts?app={app}&state=approved SHALL answer the approved drafts of that app's kinds to that app's connector and to nobody else; POST /drafts/{id}/executed with the product's receipt digest SHALL close it, and POST /drafts/{id}/refused-on-execution with the product's refusal SHALL close it as such; a draft left approved and unexecuted SHALL stay visible on the dashboard's drafts count. Refused calls are not drafts (ADR-135): only a right whose mode is held makes one.",
+      "acceptance": [
+        "A by_two draft with one approval is not answered as approved; with two distinct approvers it is; the holder approving is refused by name.",
+        "Another app's connector asking for approved drafts gets none and is refused by name.",
+        "Executed and refused-on-execution close the draft and the dashboard count falls."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/drafts_products.rs",
+          "crates/lys-identity-server/tests/drafts_products.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/drafts_api.rs",
+          "crates/lys-identity/src/draft_event.rs",
+          "crates/lys-identity-server/src/openapi_typed.rs",
+          "crates/lys-identity-server/src/openapi_refusals.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C603"
+      ],
+      "stories": [
+        "S307",
+        "S306"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "The Access screens show mode and held drafts",
+      "spec": "Behavioural. WHEN a grant is shown anywhere on the Access screens, THE SYSTEM SHALL show its mode in words (outright, by draft, by two approvals) and let an issuer choose the mode when issuing; the drafts screen SHALL list drafts held for each product with the target, the holder, the responsible person, who approved and when, and executed or refused-on-execution; nothing is derived on the screen.",
+      "acceptance": [
+        "Issuing a grant with \"by draft\" shows it on the who and reach views with that word.",
+        "A product's held draft appears with its approvals and closes when executed.",
+        "Screens walked with pictures on the install."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/access/Issue.tsx",
+          "surface/identity/src/features/access/Drafts.tsx",
+          "surface/identity/tests/access-drafts.test.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C604"
+      ],
+      "stories": [
+        "S301"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT call a product, wait on one, or read its store: execution is the product reading Lys (ADR-116).",
+    "SHALL NOT turn a refusal into a draft; only a held-mode right makes one (ADR-135).",
+    "SHALL NOT rewrite or drop any grant, event or snapshot written before this brief; versions only."
+  ],
+  "verification": [
+    "This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; the rendered markdown matches what render-cluster.py writes.",
+    "Written whole, read whole by the lead, then one battery on the Mac (every leg green) and the whole gate on Dean through aion at the same sha; then one install and a browser walk with pictures of every screen the brief touches.",
+    "Every handback has four headings (BLOCKED ON, CHANGED, FOUND, NOT CONFIRMED) and the hospital sentence; no test proves less than before; file-length gate 500 code lines; clippy --workspace --all-targets -- -D warnings; only cargo nextest."
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "id": "ACCESS-005",
+  "cluster": "access",
+  "title": "A machine is the fifth identity and a grant holder",
+  "depends_on": [
+    "ACCESS-001"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C613",
+    "C614"
+  ],
+  "stories": [
+    "S305"
+  ],
+  "design_anchor": [
+    "ADR-116",
+    "ADR-126",
+    "ADR-135",
+    "ADR-136"
+  ],
+  "purpose": "A computer with a runner joins with a one-use code and its own key (network_join.rs) but is not an identity and holds no grant; a liminal node or a federation link has nowhere to hold export and import rights (Hermes, 6 October). ADR-126 settled how a kind is added: a new code, versions, old bytes untouched.",
+  "task": "Add IdentityId::Machine (code 5), made at join from the recorded key, answering to the administrator who issued the code; grants with a machine holder; the Network screen shows machines and their grants.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The machine identity",
+      "spec": "Behavioural. WHEN POST /runner/join admits a computer, THE SYSTEM SHALL make a machine identity (word machine- and hex from the secure random source, made once and stored) with its public key, its responsible person the administrator who asked for the code, in the join's own batch; the codec, state value, grant events (a version), SpiceDB definition and the three readers that take an unknown prefix for another kind SHALL take the machine by name; a machine SHALL be refused as an issuer and as an approver and SHALL never hold a kept responsibility.",
+      "acceptance": [
+        "Join; the machine appears as an identity with its key and responsible person; an old join record still reads.",
+        "A grant to the machine on a liminal link kind is issued, read back and in its pass."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/tests/machine_compatibility.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/id.rs",
+          "crates/lys-identity/src/grants/codec.rs",
+          "crates/lys-identity/src/grants/types.rs",
+          "crates/lys-identity/src/grants/events.rs",
+          "crates/lys-identity/src/grants/admission.rs",
+          "crates/lys-identity/src/state_value.rs",
+          "crates/lys-identity/src/grants/permission.rs",
+          "crates/lys-identity-server/src/network_join.rs",
+          "crates/lys-identity-server/src/spicedb.rs",
+          "crates/lys-identity-server/src/routes.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C613"
+      ],
+      "stories": [
+        "S305"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Machines on the Network screen",
+      "spec": "Behavioural. THE SYSTEM SHALL show each machine on the Network screen with its key id, responsible person, the grants it holds and the links they are on, and let an administrator issue a grant to it from there.",
+      "acceptance": [
+        "Walked with pictures on the install: a machine with one link grant."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/network/Network.tsx",
+          "surface/identity/tests/network-machines.test.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C614"
+      ],
+      "stories": [
+        "S305"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT coerce an existing runner record into a machine without the join's key.",
+    "SHALL NOT let a machine issue, approve, or hold a kept responsibility."
+  ],
+  "verification": [
+    "This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; the rendered markdown matches what render-cluster.py writes.",
+    "Written whole, read whole by the lead, then one battery on the Mac (every leg green) and the whole gate on Dean through aion at the same sha; then one install and a browser walk with pictures of every screen the brief touches.",
+    "Every handback has four headings (BLOCKED ON, CHANGED, FOUND, NOT CONFIRMED) and the hospital sentence; no test proves less than before; file-length gate 500 code lines; clippy --workspace --all-targets -- -D warnings; only cargo nextest."
+  ]
+}

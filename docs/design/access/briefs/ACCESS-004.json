@@ -1,0 +1,90 @@
+{
+  "id": "ACCESS-004",
+  "cluster": "access",
+  "title": "Roles are named bundles in the app schema; a placement may be restricted",
+  "depends_on": [
+    "ACCESS-001"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C611",
+    "C612"
+  ],
+  "stories": [
+    "S302",
+    "S303",
+    "S308"
+  ],
+  "design_anchor": [
+    "ADR-116",
+    "ADR-126",
+    "ADR-135",
+    "ADR-136"
+  ],
+  "purpose": "People think in roles (administrator, member, observer); code checks actions. Without roles in the schema, every grant is thirty actions assembled by hand and the Access screen is unreadable. Without a restricted placement, a parent's relations reach every child and a new person sees every channel (Cambium today).",
+  "task": "Let an app schema name roles as action bundles; let a grant name a role; expand roles at pass issue; make a role widening by an app wait for the administrator; add restricted to placements.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Roles in the schema and in grants",
+      "spec": "Behavioural. WHEN an app schema version names roles, THE SYSTEM SHALL take each as a name and a set of that app's actions on one kind; a grant MAY name a role instead of actions and SHALL be judged as its actions at the version current when judged; WHEN an app (not the administrator) submits a schema version that widens a role, the change SHALL wait for the administrator on the Apps screen as app-made changes do today, and the screen SHALL show the widening by name; a role narrowed SHALL be refused while standing grants name it unless the narrowing strands nothing.",
+      "acceptance": [
+        "A grant naming cambium.workspace.administrator expands in the pass to the role's actions.",
+        "An app widening a role waits; the administrator sees \"adds seat_retire to administrator\" and approves or refuses."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/apps_schema_api.rs",
+          "crates/lys-identity-server/src/apps_schema.rs",
+          "crates/lys-identity/src/grants/types.rs",
+          "crates/lys-identity-server/src/grants_reach.rs",
+          "surface/identity/src/features/apps/Apps.tsx",
+          "surface/identity/src/features/access/Issue.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C611"
+      ],
+      "stories": [
+        "S302",
+        "S303"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "A restricted placement",
+      "spec": "Behavioural. WHEN a placement is recorded with restricted true, THE SYSTEM SHALL NOT flow the parent's relations to that child; only a grant naming the child reaches it; the reach views and the pass SHALL reflect it; an unrestricted placement is as today.",
+      "acceptance": [
+        "A member of the workspace does not reach a restricted place; a grant on the place does.",
+        "The reach view shows the restricted place apart."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/apps_schema_api.rs",
+          "crates/lys-identity-server/src/grants_reach.rs",
+          "crates/lys-identity-server/tests/apps_schema.rs",
+          "surface/identity/src/features/access/Reach.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C612"
+      ],
+      "stories": [
+        "S308"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT let a role widening by an app take effect before the administrator approves it.",
+    "SHALL NOT add a wildcard or pattern resource."
+  ],
+  "verification": [
+    "This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; the rendered markdown matches what render-cluster.py writes.",
+    "Written whole, read whole by the lead, then one battery on the Mac (every leg green) and the whole gate on Dean through aion at the same sha; then one install and a browser walk with pictures of every screen the brief touches.",
+    "Every handback has four headings (BLOCKED ON, CHANGED, FOUND, NOT CONFIRMED) and the hospital sentence; no test proves less than before; file-length gate 500 code lines; clippy --workspace --all-targets -- -D warnings; only cargo nextest."
+  ]
+}

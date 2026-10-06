@@ -1,0 +1,117 @@
+{
+  "id": "ACCESS-003",
+  "cluster": "access",
+  "title": "lys-pass: the one client library and its conformance fixtures",
+  "depends_on": [
+    "ACCESS-002"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C608",
+    "C609",
+    "C610"
+  ],
+  "stories": [
+    "S304",
+    "S306",
+    "S307"
+  ],
+  "design_anchor": [
+    "ADR-116",
+    "ADR-126",
+    "ADR-135",
+    "ADR-136"
+  ],
+  "purpose": "Four products implementing verification, reach, the deliberate check, the draft hand-off and the refusal four ways is where drift and the operating nightmare come from. One crate in this repository, consumed by pinned commit, carries them once, with fixtures every product gate runs (design page D9, section 5).",
+  "task": "Create crates/lys-pass with offline verification, right evaluation, the deliberate-route check, the draft hand-off and runner, the one refusal shape, and the conformance fixtures; a product depends on it by git commit.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Offline verification and right evaluation",
+      "spec": "Behavioural. THE SYSTEM SHALL verify a pass with the published key set (fetched and cached by key id), the audience and the time, and SHALL answer allowed, held (mode by_draft or by_two) or refused for (resource kind, id, action) from the pass's rights, following the placement reach the token already applied; a pass with another audience, an expired pass, or a signature by an unpublished key SHALL be refused by name and never partially trusted.",
+      "acceptance": [
+        "Each refusal case has a fixture and a test.",
+        "A right on a parent reaches the placed child in the pass; the restricted child is refused."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-pass/Cargo.toml",
+          "crates/lys-pass/src/lib.rs",
+          "crates/lys-pass/src/verify.rs",
+          "crates/lys-pass/src/rights.rs",
+          "crates/lys-pass/tests/verify.rs",
+          "crates/lys-pass/fixtures/passes/"
+        ],
+        "modify": [
+          "Cargo.toml"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C608"
+      ],
+      "stories": [
+        "S304"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The deliberate check, the draft hand-off and the draft runner",
+      "spec": "Behavioural. WHEN a product asks for a deliberate route, THE SYSTEM SHALL ask Lys /grants/check/batch with the pass as the caller and answer what Lys answers; WHEN Lys cannot be reached or answers outside its contract, THE SYSTEM SHALL answer \"Lys could not be asked\" as a refusal and never consult the pass instead; WHEN a right is held, THE SYSTEM SHALL write the draft (ACCESS-001 R3) with the target, digest and words and answer the draft id; the runner SHALL read approved drafts of the product's kinds with the connector's pass, call the product's executor once per draft, and record executed or refused-on-execution; a draft is never executed twice (the receipt digest is checked before executing).",
+      "acceptance": [
+        "Lys down: a deliberate route is refused with the words; a hot route still answers from the pass.",
+        "A held act becomes a draft and the runner executes it exactly once after approval."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-pass/src/deliberate.rs",
+          "crates/lys-pass/src/drafts.rs",
+          "crates/lys-pass/tests/deliberate.rs",
+          "crates/lys-pass/tests/drafts.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C609"
+      ],
+      "stories": [
+        "S307"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "The one refusal shape and the conformance fixtures",
+      "spec": "Behavioural. THE SYSTEM SHALL give one refusal value {refused: {resource, action, needed, request}} where needed names the grant (app, kind, id, action) and request is the Lys URL that asks for it; the crate SHALL ship a fixture set (wrong audience, expired, unpublished key, parent reaches child, restricted child, held mode on a hot route refused, the refusal bytes, deliberate route with Lys unreachable) and a test harness a product gate runs against its own routes; a product whose gate does not run the harness is not conformant and its brief says so.",
+      "acceptance": [
+        "The fixtures run green in this crate; the Cambium brief runs them first."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-pass/src/refusal.rs",
+          "crates/lys-pass/src/conformance.rs",
+          "crates/lys-pass/fixtures/refusals/",
+          "crates/lys-pass/tests/conformance.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C610"
+      ],
+      "stories": [
+        "S306"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT hold any authority of its own: a key, a token or a credential.",
+    "SHALL NOT fall back from a deliberate check to the pass.",
+    "SHALL NOT be published to crates.io; products depend by git commit."
+  ],
+  "verification": [
+    "This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; the rendered markdown matches what render-cluster.py writes.",
+    "Written whole, read whole by the lead, then one battery on the Mac (every leg green) and the whole gate on Dean through aion at the same sha; then one install and a browser walk with pictures of every screen the brief touches.",
+    "Every handback has four headings (BLOCKED ON, CHANGED, FOUND, NOT CONFIRMED) and the hospital sentence; no test proves less than before; file-length gate 500 code lines; clippy --workspace --all-targets -- -D warnings; only cargo nextest."
+  ]
+}

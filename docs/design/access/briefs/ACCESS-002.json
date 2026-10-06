@@ -1,0 +1,114 @@
+{
+  "id": "ACCESS-002",
+  "cluster": "access",
+  "title": "The pass: the access token carries the holder's rights for its audience, signed with the key Lys publishes",
+  "depends_on": [
+    "ACCESS-001",
+    "DIRECTORY-081"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C605",
+    "C606",
+    "C607"
+  ],
+  "stories": [
+    "S304",
+    "S306"
+  ],
+  "design_anchor": [
+    "ADR-116",
+    "ADR-126",
+    "ADR-135",
+    "ADR-136"
+  ],
+  "purpose": "Lys answers questions about grants but issues nothing a product can verify by itself (provider/endpoints.rs:480-500 carries no rights). A product on a hot path (a bus message, a chat read) cannot ask Lys per request. The pass is the access token with a rights claim for that audience, short-lived, signed with Lys's published key, so a product decides hot routes offline and asks Lys only for deliberate ones (design page D2, D3).",
+  "task": "Put a rights claim in the access token for its audience, expanded from live grants and roles; make its lifetime a setting with refresh; publish and rotate the signing key with a key id.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The access token carries the rights for its audience",
+      "spec": "Behavioural. WHEN the token endpoint issues an access token for client (audience) app A, THE SYSTEM SHALL carry a rights claim: the holder id and kind, the responsible person (for a non-person holder), and for app A's kinds only, one entry per effective right: resource kind, resource id, the actions, the mode and the grant id, with roles (ACCESS-004) expanded to their actions and placement reach already applied so a product never recomputes reach it cannot see; rights of other apps SHALL be absent; a token for app A SHALL be refused by a product as audience B's (lys-pass). The claim SHALL be bounded: WHEN it would exceed the configured size, THE SYSTEM SHALL answer the token with rights_truncated naming the app, so the product asks Lys instead of guessing.",
+      "acceptance": [
+        "A person with grants on two apps gets a token for A naming A's rights only.",
+        "A connector's token names its responsible person.",
+        "A right held on a parent appears for the placed child; a restricted child does not."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/provider/rights_claim.rs",
+          "crates/lys-identity-server/tests/provider_rights.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/provider/endpoints.rs",
+          "crates/lys-identity-server/src/provider.rs",
+          "crates/lys-identity-server/src/grants_reach.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C605"
+      ],
+      "stories": [
+        "S304"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The pass lifetime is a setting and refresh re-reads live grants",
+      "spec": "Behavioural. THE SYSTEM SHALL take identity.pass_lifetime as an install setting with a default of ten minutes (Tom to confirm, design page section 7), recorded in build.json; WHEN a refresh token is exchanged, THE SYSTEM SHALL issue a new access token from the grants live at that moment, so a revoked grant is absent from it; WHEN the holder's session has ended or the holder is retired, the refresh SHALL be refused by name.",
+      "acceptance": [
+        "Revoke a grant, refresh: the right is gone.",
+        "Retire the agent, refresh: refused by name.",
+        "The default and a chosen lifetime both read back from build.json."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys/src/identity/install/settings.rs",
+          "crates/lys-identity-server/src/provider/endpoints.rs",
+          "crates/lys/tests/identity_install/product.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C606"
+      ],
+      "stories": [
+        "S306"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "The signing key is published with an id and rotates safely",
+      "spec": "Behavioural. THE SYSTEM SHALL publish the pass-signing public key at the provider's keys route with a key id in every token header; WHEN the administrator rotates the key, THE SYSTEM SHALL publish both keys until every token signed by the old one has expired (the lifetime) and no longer; a product SHALL be able to verify any unexpired token with the published set alone.",
+      "acceptance": [
+        "Rotate; a token from before rotation verifies until its expiry and not after; the old key leaves the set after one lifetime."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/provider/keys.rs",
+          "crates/lys-identity-server/tests/provider.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C607"
+      ],
+      "stories": [
+        "S304"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT put rights of another audience in a token.",
+    "SHALL NOT let a product derive reach from a token: reach is applied at issue.",
+    "SHALL NOT issue a pass without an expiry."
+  ],
+  "verification": [
+    "This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; the rendered markdown matches what render-cluster.py writes.",
+    "Written whole, read whole by the lead, then one battery on the Mac (every leg green) and the whole gate on Dean through aion at the same sha; then one install and a browser walk with pictures of every screen the brief touches.",
+    "Every handback has four headings (BLOCKED ON, CHANGED, FOUND, NOT CONFIRMED) and the hospital sentence; no test proves less than before; file-length gate 500 code lines; clippy --workspace --all-targets -- -D warnings; only cargo nextest."
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-29",
+  "updated": "2026-10-06",
   "decisions": [
     {
       "id": "ADR-001",
@@ -2011,6 +2011,25 @@
         "Refused calls are not drafts.",
         "Agents started outside Lys are out of scope.",
         "The kept set is data Tom confirms."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-136",
+      "title": "Permissions across the stack: Lys is the one authority; products decide hot routes from a signed pass and ask Lys for deliberate ones; a grant carries its mode",
+      "status": "proposed",
+      "scope": "access",
+      "date": "2026-10-06",
+      "decided_by": "Tom, by text to Waffles at about 11:38 Melbourne on 6 October 2026; the shape proposed by Waffles in docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md, for Tom to confirm.",
+      "context": "No product enforces Lys grants; Cambium lets any signed-in caller invite and shows every channel to a new person; aion, haematite and liminal each have their own tenancy or passes; Argus has no authority model and liminal replaces it. Tom asked for permissions across aion, cambium, haematite and liminal, designed for maintenance and growth, operable.",
+      "decision": "Lys holds every identity and grant; a product permission model is data in its app schema (ADR-116). Every product route is classified once as hot (decided offline from the pass) or deliberate (asked of Lys live, never falling back). The pass is the access token with a rights claim for its audience, short-lived, signed with the key Lys publishes. A grant carries one mode: outright, by_draft or by_two; a held act is a Lys draft the product executes after approval by reading Lys. Reach is by placement, never a pattern; a placement may be restricted. Roles are named bundles in the product schema; a widening by an app waits for the administrator. A machine is the fifth identity. One client library, lys-pass, with conformance fixtures every product gate runs. Availability is stated on each product screen; every deliberate act is receipted in Lys.",
+      "quote": "implement permissions across the stack (aion, cambium, haematite, and liminal which will essentially replace argus++) ... think really carefully about how that's designed including how we best support its maintenance and growth in the short and long term ... something that wasn't a complete nightmare to operate",
+      "consequences": [
+        "Adding a product or an action is a schema version in that product, never a Lys release.",
+        "A product with no Lys is a product with nobody signed in past the pass lifetime, said on its screen.",
+        "Argus's functions become liminal services whose subjects are Lys-granted like any other.",
+        "Four products share one library and one refusal shape."
       ],
       "supersedes": [],
       "superseded_by": ""
