@@ -202,6 +202,7 @@ pub(crate) struct Operations {
     path: PathBuf,
     checkpoint: PathBuf,
     journal_offset: u64,
+    batch: Option<control::JournalBatch>,
     checkpoint_offset: u64,
     checkpoint_bytes: u64,
     controls: HashMap<String, Control>,
@@ -460,4 +461,24 @@ pub(crate) fn managed_state(
     let outcome = table.operations.set(operation, state, reason)?;
     feed(table, &outcome);
     Ok(outcome)
+}
+
+impl Operations {
+    pub(crate) fn begin_journal_batch(&mut self) -> Result<(), RunnerError> {
+        if self.batch.is_some() {
+            return Err(unavailable("a journal decision batch is already active"));
+        }
+        self.batch = Some(control::JournalBatch::default());
+        Ok(())
+    }
+    pub(crate) fn finish_journal_batch(&mut self) -> Result<(), RunnerError> {
+        self.batch
+            .take()
+            .ok_or_else(|| unavailable("no journal decision batch is active"))?
+            .finish()?;
+        self.checkpoint_if_due()
+    }
+    pub(crate) fn cancel_journal_batch(&mut self) {
+        drop(self.batch.take());
+    }
 }

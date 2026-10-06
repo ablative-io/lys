@@ -20,6 +20,18 @@ struct Record {
     control: Option<Control>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Bundle {
+    batch: Vec<Record>,
+}
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Row {
+    One(Box<Record>),
+    Batch(Bundle),
+}
+
 #[derive(Serialize)]
 struct Writing<'a> {
     outcome: &'a OperationOutcome,
@@ -55,6 +67,7 @@ impl Operations {
             path: dir.join("operations.v2.journal"),
             checkpoint: dir.join("operations.v2.snapshot"),
             journal_offset: 0,
+            batch: None,
             checkpoint_offset: 0,
             checkpoint_bytes: 0,
             controls: HashMap::new(),
@@ -183,21 +196,38 @@ impl Operations {
             if read == 0 || line.last() != Some(&b'\n') {
                 break;
             }
-            let record: Record = serde_json::from_slice(&line).map_err(unavailable)?;
-            if let Some(control) = record.control {
-                control.validate(&record.outcome)?;
-                self.controls
-                    .insert(record.outcome.operation.clone(), control);
-            } else if self.controls.contains_key(&record.outcome.operation) {
-                return Err(unavailable(
-                    "a journal record drops its original preparation",
-                ));
+            let records = match serde_json::from_slice::<Row>(&line).map_err(unavailable)? {
+                Row::One(record) => vec![*record],
+                Row::Batch(bundle) => bundle.batch,
+            };
+            if records.is_empty() {
+                return Err(unavailable("a journal decision batch is empty"));
             }
-            self.fold(record.outcome, now);
-            self.journal_offset = self
+            let mut prepared = BTreeSet::new();
+            for record in &records {
+                if let Some(control) = &record.control {
+                    control.validate(&record.outcome)?;
+                    prepared.insert(record.outcome.operation.as_str());
+                } else if self.controls.contains_key(&record.outcome.operation)
+                    || prepared.contains(record.outcome.operation.as_str())
+                {
+                    return Err(unavailable(
+                        "a journal record drops its original preparation",
+                    ));
+                }
+            }
+            let offset = self
                 .journal_offset
                 .checked_add(u64::try_from(read).map_err(unavailable)?)
                 .ok_or_else(|| unavailable("journal offset overflows"))?;
+            for record in records {
+                if let Some(control) = record.control {
+                    self.controls
+                        .insert(record.outcome.operation.clone(), control);
+                }
+                self.fold(record.outcome, now);
+            }
+            self.journal_offset = offset;
         }
         if self.journal_offset < length {
             let file = std::fs::OpenOptions::new()
@@ -338,13 +368,19 @@ impl Operations {
                 .or_else(|| self.controls.get(&outcome.operation)),
         })
         .map_err(unavailable)?;
-        bytes.push(b'\n');
-        let length = u64::try_from(bytes.len()).map_err(unavailable)?;
+        let length = if let Some(batch) = &self.batch {
+            batch.increment(bytes.len())?
+        } else {
+            bytes.push(b'\n');
+            u64::try_from(bytes.len()).map_err(unavailable)?
+        };
         let offset = self
             .journal_offset
             .checked_add(length)
             .ok_or_else(|| unavailable("journal offset overflows"))?;
-        if let Some(writer) = &self.writer {
+        if let Some(batch) = &mut self.batch {
+            batch.append(self.writer.as_ref(), &self.path, &bytes)?;
+        } else if let Some(writer) = &self.writer {
             writer.append(&self.path, bytes)?;
         } else {
             let mut file = std::fs::OpenOptions::new()
@@ -360,6 +396,13 @@ impl Operations {
             self.controls.insert(outcome.operation.clone(), control);
         }
         self.fold(outcome, now);
+        if self.batch.is_none() {
+            self.checkpoint_if_due()?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn checkpoint_if_due(&mut self) -> Result<(), RunnerError> {
         if self.checkpoint_bytes > 0
             && self.journal_offset - self.checkpoint_offset >= self.checkpoint_bytes
         {
@@ -392,7 +435,57 @@ impl Operations {
 
 #[cfg(test)]
 impl Operations {
+    pub(crate) fn test_journal_path(&self) -> &Path {
+        &self.path
+    }
+
     pub(crate) fn test_journal_offset(&mut self, offset: u64) -> u64 {
         std::mem::replace(&mut self.journal_offset, offset)
+    }
+}
+
+#[cfg(test)]
+mod batch_validation_tests {
+    use super::{Control, Operations, Writing};
+    use crate::operations::{Certainty, OperationOutcome, OperationState};
+    #[test]
+    fn every_batch_member_is_validated_before_any_member_folds()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let mut operations = Operations::open_at(dir.path(), 1)?;
+        let outcome = |id: &str| OperationOutcome {
+            operation: id.to_owned(),
+            session: "session".to_owned(),
+            request: "notice".to_owned(),
+            state: OperationState::Delivered,
+            at: 1,
+            words: "observed".to_owned(),
+            text: None,
+            ended: None,
+        };
+        let first = outcome("first");
+        let second = outcome("second");
+        let invalid = Control {
+            prepared: None,
+            original_text: None,
+            certainty: Certainty::Observed,
+            admitted: None,
+            decision: None,
+        };
+        let mut bytes = serde_json::to_vec(&serde_json::json!({"batch":[
+            serde_json::to_value(Writing {outcome:&first,control:None})?,
+            serde_json::to_value(Writing {outcome:&second,control:Some(&invalid)})?,
+        ]}))?;
+        bytes.push(b'\n');
+        std::fs::write(&operations.path, bytes)?;
+        let error = operations
+            .read_tail(1)
+            .err()
+            .ok_or("invalid batch member was accepted")?;
+        assert!(error.to_string().contains("control_record_invalid"));
+        assert!(operations.get("first").is_none());
+        assert!(operations.get("second").is_none());
+        assert_eq!(operations.journal_offset, 0);
+        Ok(())
     }
 }

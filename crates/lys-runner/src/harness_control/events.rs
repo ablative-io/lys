@@ -655,6 +655,15 @@ mod tests {
         automatic: bool,
         test: impl FnOnce(&Arc<Sessions>, &Binding, &mpsc::Receiver<Vec<u8>>, &AtomicUsize) -> Result,
     ) -> Result {
+        gated_fixture(transport, human, automatic, None, test)
+    }
+    fn gated_fixture(
+        transport: Transport,
+        human: bool,
+        automatic: bool,
+        gate: Option<mpsc::Receiver<()>>,
+        test: impl FnOnce(&Arc<Sessions>, &Binding, &mpsc::Receiver<Vec<u8>>, &AtomicUsize) -> Result,
+    ) -> Result {
         let directory = tempfile::tempdir()?;
         let sessions = Sessions::open(directory.path(), 4096)?;
         let cleanup = Cleanup(Arc::clone(&sessions));
@@ -697,7 +706,13 @@ mod tests {
         let (runtime, bridge) = super::live(
             binding.clone(),
             transport,
-            Box::new(Pipe(sender)),
+            match gate {
+                Some(release) => Box::new(PausedPipe {
+                    frames: sender,
+                    release,
+                }),
+                None => Box::new(Pipe(sender)),
+            },
             Arc::downgrade(&sessions),
         )?;
         let terminal_input = {
@@ -763,6 +778,117 @@ mod tests {
             session: "fixture".to_owned(),
             request,
         }
+    }
+
+    struct PausedPipe {
+        frames: mpsc::Sender<Vec<u8>>,
+        release: mpsc::Receiver<()>,
+    }
+    impl Write for PausedPipe {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.frames
+                .send(bytes.to_vec())
+                .map_err(std::io::Error::other)?;
+            self.release.recv().map_err(std::io::Error::other)?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    struct Release(mpsc::Sender<()>);
+    impl Drop for Release {
+        fn drop(&mut self) {
+            if let Err(error) = self.0.send(()) {
+                crate::error::said(&format!("fixture_release_failed: {error}"));
+            }
+        }
+    }
+    fn boundary_syncs(refused: usize) -> Result {
+        let (release, gate) = mpsc::channel();
+        gated_fixture(
+            Transport::Claude,
+            false,
+            false,
+            Some(gate),
+            move |sessions, source, frames, terminal| {
+                let release = Release(release);
+                for number in 0..=refused {
+                    sessions.operate(operation(
+                        &format!("delivery-{number}"),
+                        OperationRequest::GoalReminder {
+                            text: "saved words".to_owned(),
+                            reference: crate::harness_control::ReminderReference {
+                                goal: format!("goal-{number}"),
+                                occurrence: format!("occurrence-{number}"),
+                                version: "version".to_owned(),
+                                prior: None,
+                            },
+                        },
+                    ))?;
+                }
+                sessions.writer.barrier()?;
+                let (status, path) = {
+                    let mut table = sessions.lock()?;
+                    (
+                        super::runtime(&mut table, "fixture", source.generation)?
+                            .controller
+                            .control_status(),
+                        table.operations.test_journal_path().to_owned(),
+                    )
+                };
+                let reminders = status
+                    .queued
+                    .iter()
+                    .enumerate()
+                    .map(|(number, queued)| {
+                        if number < refused {
+                            crate::harness_control::ReminderDecision::Refuse {
+                                operation: queued.operation.clone(),
+                                reference: queued.reference.clone(),
+                                reason: "current goal withdrawn".to_owned(),
+                            }
+                        } else {
+                            crate::harness_control::ReminderDecision::Deliver {
+                                operation: queued.operation.clone(),
+                                reference: queued.reference.clone(),
+                                text: "current words".to_owned(),
+                            }
+                        }
+                    })
+                    .collect();
+                sessions.writer.serial_appends();
+                let before = sessions.writer.sync_count(&path)?;
+                let answer = sessions.apply_boundary_reply(operation(
+                    "decision",
+                    OperationRequest::BoundaryReply {
+                        reply: crate::harness_control::BoundaryReply {
+                            generation: source.generation,
+                            boundary: status.boundary,
+                            context: crate::harness_control::ContextDecision::Released,
+                            reminders,
+                        },
+                    },
+                ))?;
+                let syncs = sessions.writer.sync_count(&path)? - before;
+                let frame = frames.recv()?;
+                drop(release);
+                assert_eq!(answer.state, OperationState::Confirmed);
+                assert!(!frame.is_empty());
+                assert_eq!(terminal.load(Ordering::SeqCst), 0);
+                println!("boundary_batch refused={refused} dispatched=1 journal_syncs={syncs}");
+                assert_eq!(syncs, 1);
+                Ok(())
+            },
+        )
+    }
+    #[test]
+    fn one_boundary_dispatch_is_one_explicit_journal_sync() -> Result {
+        boundary_syncs(0)
+    }
+    #[test]
+    fn five_refusals_and_a_boundary_dispatch_are_one_explicit_journal_sync() -> Result {
+        boundary_syncs(5)
     }
 
     #[test]

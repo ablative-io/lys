@@ -407,3 +407,51 @@ impl Sessions {
         Ok(receipt)
     }
 }
+
+#[derive(Default)]
+pub(super) struct JournalBatch {
+    bytes: Vec<u8>,
+    reservation: Option<crate::durable::Reservation>,
+}
+impl JournalBatch {
+    pub(super) fn increment(&self, length: usize) -> Result<u64, RunnerError> {
+        let framing = if self.bytes.is_empty() {
+            b"{\"batch\":[".len() + b"]}\n".len()
+        } else {
+            1
+        };
+        u64::try_from(
+            length
+                .checked_add(framing)
+                .ok_or_else(|| super::unavailable("journal batch length overflows"))?,
+        )
+        .map_err(super::unavailable)
+    }
+    pub(super) fn append(
+        &mut self,
+        writer: Option<&crate::durable::Writer>,
+        path: &std::path::Path,
+        bytes: &[u8],
+    ) -> Result<(), RunnerError> {
+        if self.bytes.is_empty() {
+            let writer = writer
+                .ok_or_else(|| super::unavailable("a journal batch requires its durable writer"))?;
+            self.reservation = Some(writer.reserve(path)?);
+            self.bytes.extend_from_slice(b"{\"batch\":[");
+        } else {
+            self.bytes.push(b',');
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+    pub(super) fn finish(mut self) -> Result<(), RunnerError> {
+        if self.bytes.is_empty() {
+            return Ok(());
+        }
+        self.bytes.extend_from_slice(b"]}\n");
+        self.reservation
+            .take()
+            .ok_or_else(|| super::unavailable("journal batch has no reserved writer slot"))?
+            .commit(std::mem::take(&mut self.bytes))
+    }
+}

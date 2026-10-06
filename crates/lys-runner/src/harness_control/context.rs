@@ -381,13 +381,22 @@ impl crate::session::Sessions {
             text: Some(digest),
             ended: None,
         };
-        table.operations.keep_control(outcome.clone())?;
-        let controller = &mut runtime(&mut table, &operation.session, reply.generation)?.controller;
-        let update = match plan {
-            Ok(plan) => controller.apply_boundary_plan(plan),
-            Err(_) => controller.refuse_held(&outcome.words),
-        };
-        apply(&mut table, &operation.session, reply.generation, update)?;
+        table.operations.begin_journal_batch()?;
+        let applied = (|| {
+            table.operations.keep_control(outcome.clone())?;
+            let controller =
+                &mut runtime(&mut table, &operation.session, reply.generation)?.controller;
+            let update = match plan {
+                Ok(plan) => controller.apply_boundary_plan(plan),
+                Err(_) => controller.refuse_held(&outcome.words),
+            };
+            apply(&mut table, &operation.session, reply.generation, update)
+        })();
+        if let Err(error) = applied {
+            table.operations.cancel_journal_batch();
+            return Err(error);
+        }
+        table.operations.finish_journal_batch()?;
         drop(table);
         self.writer.barrier()?;
         self.wake();

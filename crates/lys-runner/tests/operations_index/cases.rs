@@ -555,3 +555,116 @@ fn an_accepted_control_record_survives_a_failed_checkpoint_replace() -> Result<(
     );
     Ok(())
 }
+
+#[test]
+fn a_torn_decision_batch_reopens_with_all_members_or_none() -> Result<(), Box<dyn Error>> {
+    for truncated in [None, Some(2), Some(1)] {
+        let dir = tempfile::tempdir()?;
+        let writer = crate::durable::Writer::new()?;
+        let mut operations = Operations::open_at(dir.path(), 1)?;
+        operations.writer(writer.clone());
+        operations.checkpoint_bytes = u64::MAX;
+        operations.begin_journal_batch()?;
+        for number in 0..4 {
+            operations.record(outcome(format!("member-{number}")))?;
+        }
+        operations.finish_journal_batch()?;
+        writer.barrier()?;
+        let path = operations.path.clone();
+        let bytes = std::fs::read(&path)?;
+        drop(operations);
+        if let Some(divisor) = truncated {
+            let length = if divisor == 1 {
+                bytes.len() - 1
+            } else {
+                bytes.len() / divisor
+            };
+            let file = std::fs::OpenOptions::new().write(true).open(&path)?;
+            file.set_len(u64::try_from(length)?)?;
+            file.sync_data()?;
+        }
+        let operations = Operations::open_at(dir.path(), 1)?;
+        for number in 0..4 {
+            assert_eq!(
+                operations.get(&format!("member-{number}")).is_some(),
+                truncated.is_none()
+            );
+        }
+        if truncated.is_some() {
+            assert_eq!(std::fs::metadata(path)?.len(), 0);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn two_queued_decisions_remain_two_whole_journal_batches() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let writer = crate::durable::Writer::new()?;
+    let mut operations = Operations::open_at(dir.path(), 1)?;
+    operations.writer(writer.clone());
+    operations.checkpoint_bytes = u64::MAX;
+    for (decision, count) in [("first", 2), ("second", 3)] {
+        operations.begin_journal_batch()?;
+        for number in 0..count {
+            operations.record(outcome(format!("{decision}-{number}")))?;
+        }
+        operations.finish_journal_batch()?;
+    }
+    writer.barrier()?;
+    let bytes = std::fs::read_to_string(&operations.path)?;
+    let batches = bytes
+        .lines()
+        .map(serde_json::from_str::<serde_json::Value>)
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(batches.len(), 2);
+    assert_eq!(
+        batches[0]["batch"]
+            .as_array()
+            .ok_or("first batch absent")?
+            .len(),
+        2
+    );
+    assert_eq!(
+        batches[1]["batch"]
+            .as_array()
+            .ok_or("second batch absent")?
+            .len(),
+        3
+    );
+    drop(operations);
+    let operations = Operations::open_at(dir.path(), 1)?;
+    for (decision, count) in [("first", 2), ("second", 3)] {
+        for number in 0..count {
+            let id = format!("{decision}-{number}");
+            assert_eq!(operations.get(&id), Some(&outcome(id.clone())));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_dropped_nonempty_decision_batch_faults_the_writer_without_a_prefix()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let writer = crate::durable::Writer::new()?;
+    let mut operations = Operations::open_at(dir.path(), 1)?;
+    operations.writer(writer.clone());
+    operations.begin_journal_batch()?;
+    operations.record(outcome("decision".to_owned()))?;
+    operations.cancel_journal_batch();
+    let error = writer
+        .barrier()
+        .err()
+        .ok_or("dropped decision did not fault the writer")?;
+    assert!(error.to_string().contains("journal_batch_dropped"));
+    let path = operations.path.clone();
+    drop(operations);
+    assert_eq!(std::fs::metadata(path)?.len(), 0);
+    assert!(
+        Operations::open_at(dir.path(), 1)?
+            .get("decision")
+            .is_none()
+    );
+    Ok(())
+}
