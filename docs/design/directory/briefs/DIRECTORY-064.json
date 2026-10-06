@@ -632,6 +632,12 @@
       "by": "Archie",
       "subject": "R5: amendment 44's cost corrected (a retry hashes its own request), and the managed request kinds named",
       "ruling": "Amendment 44 said a retry costs one 32-byte comparison. That was wrong. A same-ID retry hashes its own incoming typed request once and then compares 32 bytes with the retained identity, and first acceptance hashes once too (Brisket 8f221c46). The fixed typed encoding is streamed straight into SHA-256, with no whole-request buffer, no state clone, no history scan and no added sync. A digest supplied by the caller is never taken as proof. The managed request kinds this box adds are goal_reminder, context_compact and boundary_reply, and amendment 45's v1 migration test names all three."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R5: apply_boundary_reply's persistence call carries amendment 44's complete-request identity",
+      "ruling": "harness_control/context.rs apply_boundary_reply bypasses delivery::accept and persists through Operations::keep_control(outcome). It already compares a digest of the typed reply and refuses changed fields, but it cannot attach amendment 44's named complete-request identity unless the request reaches keep_control (Brisket 76eda9e8). context.rs is already this box's file (R3). Only that persistence and check call changes: keep_control receives the typed request, and the identity is computed with the same named encoding and stored as for goal_reminder and context_compact. A boundary_reply retry is judged exactly as amendments 44 to 46 rule. The existing public text digest, the pure plan, the batch ordering of amendments 40 and 41, and the existing refusal of changed fields are unchanged. The red includes a boundary_reply retried with one changed field, refused live and after a reopen."
     }
   ]
 }
