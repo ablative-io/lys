@@ -131,7 +131,7 @@ pub struct Operation {
 }
 
 /// Where an operation stands.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OperationState {
     /// Accepted, waiting for its boundary.
@@ -149,7 +149,7 @@ pub enum OperationState {
 }
 
 /// Text as the record keeps it: its length and digest.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TextDigest {
     /// Its length in bytes.

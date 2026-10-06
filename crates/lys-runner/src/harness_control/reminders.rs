@@ -8,7 +8,7 @@ use crate::error::RunnerError;
 use crate::operations::OperationState;
 
 /// The goal revision and stable occurrence behind a queued delivery.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReminderReference {
     /// The saved aim.
@@ -22,7 +22,7 @@ pub struct ReminderReference {
 }
 
 /// One queued delivery's identities for service recovery and current authority.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct QueuedReminder {
     /// This session's delivery identity.

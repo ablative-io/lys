@@ -14,6 +14,7 @@ pub(super) struct Index {
     pub(super) kept: HashSet<String>,
     pub(super) sent: HashMap<String, (usize, usize, usize)>,
     pub(super) firings: HashMap<String, (usize, usize)>,
+    pub(super) prior_resends: HashMap<String, (usize, usize)>,
     pub(super) pending: BTreeMap<Location, String>,
     pub(super) pending_by_session: HashMap<String, BTreeSet<Location>>,
     pub(super) pending_by_goal: HashMap<usize, BTreeSet<Location>>,
@@ -32,7 +33,11 @@ fn first<T: Copy + Ord>(map: &mut HashMap<String, T>, operation: &str, location:
 }
 
 impl Index {
-    pub(super) fn of(items: &[Item], events: &[String]) -> Self {
+    pub(super) fn of(
+        items: &[Item],
+        events: &[String],
+        resends: &BTreeMap<String, String>,
+    ) -> Self {
         let mut index = Self::default();
         index.kept.extend(events.iter().cloned());
         for (position, item) in items.iter().enumerate() {
@@ -45,6 +50,12 @@ impl Index {
             }
             for (firing, fired) in item.fired.iter().enumerate() {
                 index.fire(position, firing, fired);
+                if let Some(prior) = resends.get(&fired.operation) {
+                    index
+                        .prior_resends
+                        .entry(prior.clone())
+                        .or_insert((position, firing));
+                }
             }
         }
         index

@@ -39,6 +39,7 @@ impl<S: LeafStore> GoalStore<S> {
             }
             return Ok(resent.fired);
         }
+        self.refuse_second_resend(&resent.prior, &resent.fired.operation)?;
         self.held.check_resent(&resent).map_err(unavailable)?;
         let fired = resent.fired.clone();
         self.append(Line::Resent(resent))?;
@@ -98,6 +99,25 @@ pub(crate) fn occurrence_text(
 }
 
 impl<S: LeafStore> GoalStore<S> {
+    /// The already kept resend, borrowing its identity from the derived index.
+    pub fn resent_occurrence(&self, prior: &str) -> Option<&str> {
+        self.held.resent_occurrence(prior)
+    }
+
+    fn refuse_second_resend(&self, prior: &str, asked: &str) -> Result<(), ServerError> {
+        if let Some(kept) = self.held.resent_occurrence(prior)
+            && kept != asked
+        {
+            return Err(ServerError::Runner {
+                refusal: "goal_prior_already_resent".to_owned(),
+                words: format!(
+                    "prior `{prior}` already has occurrence `{kept}`; finish its recorded decision instead of creating another delivery"
+                ),
+            });
+        }
+        Ok(())
+    }
+
     /// Prepare a distinct occurrence from one prior receipt without changing a timer.
     ///
     /// # Errors
@@ -119,12 +139,8 @@ impl<S: LeafStore> GoalStore<S> {
         if previous.item.goal.id != goal || previous.item.goal.responsible != by {
             return Err(GoalError::Unknown.into());
         }
-        if previous.item.standing != crate::goals_state::Standing::Open || !previous.active {
-            return Err(unavailable(
-                "goal_closed_or_inactive: the prior goal cannot send another occurrence",
-            ));
-        }
         let source = previous.sent.session.clone();
+        self.refuse_second_resend(prior, operation)?;
         let fired = if let Some(kept) = self.held.firing(operation) {
             if self.held.resends.get(operation).map(String::as_str) != Some(prior)
                 || kept.goal != goal
@@ -138,6 +154,11 @@ impl<S: LeafStore> GoalStore<S> {
             }
             kept.clone()
         } else {
+            if previous.item.standing != crate::goals_state::Standing::Open || !previous.active {
+                return Err(unavailable(
+                    "goal_closed_or_inactive: the prior goal cannot send another occurrence",
+                ));
+            }
             crate::goals_state::Fired {
                 operation: operation.to_owned(),
                 goal: goal.to_owned(),

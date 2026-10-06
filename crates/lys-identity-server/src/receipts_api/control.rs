@@ -19,40 +19,75 @@ use crate::routes::{AppState, signed_in, with_directory};
 use crate::runner_sessions::{Driven, machine_runner, operator};
 use crate::runtime_api::with_runtime;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct PageQuery {
+#[schema(as = ControlPageQuery)]
+pub(crate) struct PageQuery {
     after: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
-enum Choice {
+#[schema(as = ControlDecisionChoice)]
+pub(crate) enum Choice {
     Seen,
     NotSeen,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct DecisionBody {
+#[schema(as = ControlDecisionBody)]
+pub(crate) struct DecisionBody {
     operation: String,
     decision: Choice,
 }
 
-#[derive(Serialize)]
-struct Status {
+#[derive(Serialize, utoipa::ToSchema)]
+#[schema(as = ControlStatusView)]
+pub(crate) struct Status {
     session: String,
     control: Option<ControlStatus>,
 }
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/agents/{id}/control-sessions", get(agent_sessions))
         .route("/runtime/sessions/{session}/controls", get(status))
         .route("/runtime/sessions/{session}/control-receipts", get(page))
         .route(
             "/runtime/sessions/{session}/control-receipts/{operation}/reconcile",
             post(decide),
         )
+}
+
+async fn agent_sessions(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    query: Result<Query<PageQuery>, QueryRejection>,
+) -> Result<Json<crate::runtime_state::control::ControlSessions>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    let Ok(agent) = AgentId::from_str(&id) else {
+        return Err(ServerError::AgentNotVisible);
+    };
+    let agent = with_directory(&state, |directory| {
+        let projection = directory.projection()?;
+        let asker = crate::grants::caller(&state, &headers, projection)?;
+        let administrator = state.admission.is_administrator(projection, &actor)?;
+        if projection.record(IdentityId::Agent(agent)).is_none()
+            || !crate::runtime_api::sees(projection, administrator, asker, &agent.to_string())
+        {
+            return Err(ServerError::AgentNotVisible);
+        }
+        Ok(agent.to_string())
+    })?;
+    let Query(query) = query.map_err(|error| ServerError::RequestMalformed {
+        reason: error.body_text(),
+    })?;
+    with_runtime(&state, |store| {
+        store.control_sessions(&agent, query.after.as_deref())
+    })
+    .map(Json)
 }
 
 fn refused(name: &str, reason: impl Into<String>) -> ServerError {
@@ -285,7 +320,7 @@ async fn decide(
     .map(Json)
 }
 
-fn responsible(
+pub(crate) fn responsible(
     state: &AppState,
     driven: &Driven,
     receipt: &ControlReceipt,

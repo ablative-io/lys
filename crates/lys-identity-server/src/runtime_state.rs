@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+pub mod control;
+
 #[cfg(test)]
 #[path = "runtime_operation_tests.rs"]
 mod operation_tests;
@@ -146,6 +148,7 @@ pub struct Held {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct Index {
     positions: BTreeMap<String, usize>,
+    by_agent: BTreeMap<String, BTreeSet<usize>>,
     live: BTreeMap<(String, usize), usize>,
     operations: HashMap<String, (usize, usize)>,
     machine_reports: BTreeMap<String, BTreeSet<(u64, usize)>>,
@@ -181,6 +184,13 @@ impl From<Records> for Held {
                 .positions
                 .entry(tracked.session.clone())
                 .or_insert(position);
+            if let Some(agent) = &tracked.agent {
+                index
+                    .by_agent
+                    .entry(agent.clone())
+                    .or_default()
+                    .insert(position);
+            }
             if let Some(report) = tracked.latest() {
                 index.report(&tracked.machine, position, None, report.at);
             }
@@ -303,7 +313,12 @@ impl Held {
         index
             .positions
             .insert(report.session.clone(), self.sessions.len());
-        if report.agent.is_some() {
+        if let Some(agent) = &report.agent {
+            index
+                .by_agent
+                .entry(agent.clone())
+                .or_default()
+                .insert(self.sessions.len());
             index.live.insert(
                 (report.session.clone(), self.sessions.len()),
                 self.sessions.len(),

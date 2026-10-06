@@ -32,6 +32,12 @@ impl Held {
                 "resent occurrence does not preserve its prior goal and due instant".to_owned(),
             );
         }
+        if let Some(kept) = self.resent_occurrence(&resent.prior) {
+            return Err(format!(
+                "goal_prior_already_resent: prior `{}` already has occurrence `{kept}`",
+                resent.prior
+            ));
+        }
         if self.kept(&resent.fired.operation)
             || self.index.firings.contains_key(&resent.fired.operation)
         {
@@ -50,6 +56,16 @@ impl Held {
             return Err("resent delivery has an invalid or reused identity".to_owned());
         }
         Ok(())
+    }
+
+    /// The first distinct occurrence already kept for an uncertain prior.
+    pub fn resent_occurrence(&self, prior: &str) -> Option<&str> {
+        let (item, firing) = self.index.prior_resends.get(prior)?;
+        self.items
+            .get(*item)?
+            .fired
+            .get(*firing)
+            .map(|fired| fired.operation.as_str())
     }
 
     /// The firing under one stable identity, without walking goal history.

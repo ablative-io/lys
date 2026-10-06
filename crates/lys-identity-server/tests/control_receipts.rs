@@ -657,16 +657,286 @@ async fn control_session_pages_keep_stopped_ids_and_refuse_foreign_visibility_an
         assert!(!page.to_string().contains("private report words"));
     }
     assert_eq!(received, expected);
-    for cursor in [
-        foreign_session,
-        OperationId::generate()?.to_string(),
-        String::new(),
+    for (cursor, reason) in [
+        (foreign_session, "control_sessions_cursor_foreign"),
+        (
+            OperationId::generate()?.to_string(),
+            "control_sessions_cursor_unknown",
+        ),
+        (String::new(), "control_sessions_cursor_unknown"),
     ] {
         let (status, answer) = service
             .get(&format!("{path}?after={cursor}"), Some(&owner))
             .await?;
         assert_eq!(status, 400, "{answer}");
-        assert_eq!(answer["refusal"], "control_sessions_cursor_unknown");
+        assert_eq!(answer["refusal"], "RequestMalformed");
+        assert!(
+            answer["reason"]
+                .as_str()
+                .ok_or("cursor reason absent")?
+                .contains(reason),
+            "{answer}"
+        );
     }
+    Ok(())
+}
+
+#[test]
+fn existing_runtime_session_answers_keep_their_wire_bytes() -> TestResult {
+    use lys_identity_server::runtime_api::{SessionView, SessionsView, StopView};
+    let answer = SessionsView {
+        sessions: vec![SessionView {
+            session: "session".to_owned(),
+            agent: Some("agent".to_owned()),
+            machine: "machine".to_owned(),
+            machine_name: None,
+            runtime: None,
+            shown: "stopped",
+            last_reported: "stopped",
+            first_report_at: 1,
+            last_report_at: 2,
+            what: "reported words".to_owned(),
+            stopped: Some(StopView {
+                at: 2,
+                confirmation: "exit".to_owned(),
+            }),
+            stop_asked_at: Some(1),
+            reported_by: "person".to_owned(),
+        }],
+    };
+    assert_eq!(serde_json::to_vec(&answer)?, br#"{"sessions":[{"session":"session","agent":"agent","machine":"machine","machine_name":null,"runtime":null,"shown":"stopped","last_reported":"stopped","first_report_at":1,"last_report_at":2,"what":"reported words","stopped":{"at":2,"confirmation":"exit"},"stop_asked_at":1,"reported_by":"person"}]}"#);
+    Ok(())
+}
+
+struct FailedResendDecision {
+    dir: tempfile::TempDir,
+    key: std::sync::Arc<lys_core::Ed25519Identity>,
+    goals: lys_identity_server::goals_store::GoalStore,
+    runner: std::sync::Arc<lys_runner::Sessions>,
+}
+
+fn decision_answer(
+    runner: &std::sync::Arc<lys_runner::Sessions>,
+    key: &lys_core::Ed25519Identity,
+) -> Result<lys_runner::Answer, Box<dyn Error>> {
+    let greeting = lys_runner::protocol::Greeting::fresh("21");
+    let act = lys_runner::Act::ReconcileControl {
+        operation: "delivery".to_owned(),
+        decision: lys_runner::operations::Reconciled {
+            operation: "kept-resend".to_owned(),
+            by: "person".to_owned(),
+            at: u64::try_from(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_millis(),
+            )?,
+            decision: lys_runner::operations::Reconciliation::Resent {
+                occurrence: "kept-resend".to_owned(),
+            },
+        },
+    };
+    let line = lys_runner::protocol::sign_request(key, &greeting, &act)?;
+    Ok(lys_runner::socket::dispatch(
+        runner,
+        &key.public_key_bytes(),
+        &greeting,
+        &line,
+        &std::sync::atomic::AtomicBool::new(false),
+    ))
+}
+
+fn failed_resend_decision() -> Result<FailedResendDecision, Box<dyn Error>> {
+    use lys_identity_server::goals_store::{GoalStore, ORIGIN};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    let dir = tempfile::tempdir()?;
+    let key = std::sync::Arc::new(lys_core::Ed25519Identity::load_or_generate(
+        &dir.path().join("key"),
+    )?);
+    let path = dir.path().join("goals");
+    FileLeafStore::create(&path, ORIGIN)?;
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    let held = uncertain()?;
+    for line in [
+        Line::Set(held.items[0].goal.clone()),
+        Line::Fired(held.items[0].fired[0].clone()),
+    ] {
+        log.append(&serde_json::to_vec(&line)?)?;
+    }
+    drop(log);
+    let mut goals = GoalStore::open(&path, std::sync::Arc::clone(&key))?;
+    let (resent, _) = goals.prepare_resend(
+        "goal",
+        "delivery",
+        "kept-resend",
+        "new-session",
+        "person",
+        30,
+    )?;
+    goals.resend(resent)?;
+    let runner_path = dir.path().join("runner");
+    std::fs::create_dir(&runner_path)?;
+    let legacy = serde_json::json!({"operation":"delivery","session":"session","request":"reminder","state":"uncertain","at":0,"words":"possible prior delivery","text":null,"ended":null});
+    let mut bytes = serde_json::to_vec(&legacy)?;
+    bytes.push(b'\n');
+    std::fs::write(runner_path.join("operations.jsonl"), bytes)?;
+    let runner = lys_runner::Sessions::open(&runner_path, 4096)?;
+    let journal = runner_path.join("operations.v2.journal");
+    let saved = runner_path.join("saved-journal");
+    std::fs::rename(&journal, &saved)?;
+    std::fs::create_dir(&journal)?;
+    let answer = decision_answer(&runner, &key)?;
+    assert!(
+        matches!(answer, lys_runner::Answer::Refused { .. }),
+        "{answer:?}"
+    );
+    drop(runner);
+    std::fs::remove_dir(&journal)?;
+    std::fs::rename(saved, journal)?;
+    let runner = lys_runner::Sessions::open(&runner_path, 4096)?;
+    assert!(runner.control_receipt("delivery")?.reconciled.is_none());
+    Ok(FailedResendDecision {
+        dir,
+        key,
+        goals,
+        runner,
+    })
+}
+
+fn refuse_second_resend(goals: &lys_identity_server::goals_store::GoalStore) -> TestResult {
+    let error = goals
+        .prepare_resend(
+            "goal",
+            "delivery",
+            "second-resend",
+            "new-session",
+            "person",
+            31,
+        )
+        .err()
+        .ok_or("a second occurrence was admitted for the same uncertain prior")?;
+    assert!(
+        matches!(&error, lys_identity_server::error::ServerError::Runner {refusal,..} if refusal == "goal_prior_already_resent"),
+        "{error}"
+    );
+    assert!(error.to_string().contains("kept-resend"), "{error}");
+    let item = goals.item("goal").ok_or("goal absent")?;
+    assert_eq!(
+        item.fired
+            .iter()
+            .flat_map(|fired| &fired.sent)
+            .filter(|sent| sent.state == Delivery::Pending)
+            .count(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn a_new_resend_id_after_a_failed_decision_write_is_refused_with_one_pending_delivery() -> TestResult
+{
+    let fixture = failed_resend_decision()?;
+    refuse_second_resend(&fixture.goals)
+}
+
+#[test]
+fn a_new_resend_id_after_a_failed_decision_write_is_refused_after_reopen() -> TestResult {
+    let fixture = failed_resend_decision()?;
+    let path = fixture.dir.path().join("goals");
+    let key = std::sync::Arc::clone(&fixture.key);
+    drop(fixture.goals);
+    let reopened = lys_identity_server::goals_store::GoalStore::open(&path, key)?;
+    refuse_second_resend(&reopened)
+}
+
+#[test]
+fn the_same_resend_id_repairs_the_missing_decision_without_another_delivery() -> TestResult {
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    let mut fixture = failed_resend_decision()?;
+    let path = fixture.dir.path().join("goals");
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    let before = log.len();
+    drop(log);
+    let (retry, _) = fixture.goals.prepare_resend(
+        "goal",
+        "delivery",
+        "kept-resend",
+        "new-session",
+        "person",
+        99,
+    )?;
+    let fired = fixture.goals.resend(retry)?;
+    assert_eq!(fired.operation, "kept-resend");
+    assert_eq!(fired.sent[0].state, Delivery::Pending);
+    let answer = decision_answer(&fixture.runner, &fixture.key)?;
+    assert!(
+        matches!(answer, lys_runner::Answer::ControlReceipt { .. }),
+        "{answer:?}"
+    );
+    let receipt = fixture.runner.control_receipt("delivery")?;
+    let reconciled = receipt.reconciled.ok_or("person decision absent")?;
+    assert_eq!(reconciled.operation, "kept-resend");
+    assert_eq!(
+        reconciled.decision,
+        lys_runner::operations::Reconciliation::Resent {
+            occurrence: "kept-resend".to_owned()
+        }
+    );
+    assert_eq!(
+        receipt.state,
+        lys_runner::operations::OperationState::Uncertain
+    );
+    assert!(!receipt.admitted);
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    assert_eq!(log.len(), before);
+    assert_eq!(
+        fixture
+            .goals
+            .item("goal")
+            .ok_or("goal absent")?
+            .fired
+            .iter()
+            .flat_map(|fired| &fired.sent)
+            .filter(|sent| sent.state == Delivery::Pending)
+            .count(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn control_decision_audit_measures_ordinary_and_checkpoint_sync_counts() -> TestResult {
+    use lys_identity_server::runner_acts::{ActStore, RunnerAct};
+    let dir = tempfile::tempdir()?;
+    let key = std::sync::Arc::new(lys_core::Ed25519Identity::load_or_generate(
+        &dir.path().join("key"),
+    )?);
+    let mut audit = ActStore::open(&dir.path().join("audit"), key)?;
+    let mut costs = std::collections::BTreeMap::new();
+    for number in 0..lys_identity::SNAPSHOT_EVERY.get() {
+        let before = lys_log_store::flush_count();
+        audit.keep(RunnerAct {
+            act: "reconcile_control".to_owned(),
+            caller: "person".to_owned(),
+            session: "session".to_owned(),
+            agent: "agent".to_owned(),
+            machine: "machine".to_owned(),
+            at: number,
+            text: None,
+            keys: Vec::new(),
+            outcome: "control_receipt".to_owned(),
+        })?;
+        let count = lys_log_store::flush_count() - before;
+        *costs.entry(count).or_insert(0_usize) += 1;
+    }
+    println!(
+        "control decision audit real sync counts: {costs:?}; interval {}",
+        lys_identity::SNAPSHOT_EVERY
+    );
+    assert_eq!(
+        costs.get(&1),
+        Some(&(usize::try_from(lys_identity::SNAPSHOT_EVERY.get())? - 1))
+    );
+    assert_eq!(costs.get(&3), Some(&1));
+    assert_eq!(costs.len(), 2);
     Ok(())
 }

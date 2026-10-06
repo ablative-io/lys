@@ -32,6 +32,7 @@ use lys_runner::operations::Operation;
 use serde::Deserialize;
 
 mod control;
+pub(crate) use control::{ResendBody, ResendView};
 pub(crate) use control::{boundary_reminders, control_recipient};
 
 use crate::agent_signature::signed_agent;

@@ -9,7 +9,7 @@ use crate::harness_control::{Binding, ReminderReference};
 use crate::session::{Sessions, now_ms};
 
 /// What durable evidence says about an attempted pipe delivery.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Certainty {
     /// The request was prepared without arming a pipe write.
@@ -21,7 +21,7 @@ pub enum Certainty {
 }
 
 /// A responsible person's explicit reconciliation choice.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "choice", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Reconciliation {
     /// Record the person's decision that delivery was seen.
@@ -36,7 +36,7 @@ pub enum Reconciliation {
 }
 
 /// Reconciliation is a person's recorded decision, separate from harness evidence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Reconciled {
     /// The stable identity of this decision.
@@ -50,7 +50,7 @@ pub struct Reconciled {
 }
 
 /// Operational readback carries no prepared frame or saved goal words.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ControlReceipt {
     /// The original operation.
@@ -82,7 +82,7 @@ pub struct ControlReceipt {
 }
 
 /// A bounded page of current operation evidence for one explicit session.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ControlPage {
     /// The requested session, including an empty page's owner.

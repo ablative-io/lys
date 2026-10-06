@@ -294,6 +294,26 @@ impl<S: LeafStore> RuntimeStore<S> {
         self.held.live_ordered(after)
     }
 
+    /// A bounded identifier page from the derived set, without cloning report history.
+    pub fn control_sessions(
+        &self,
+        agent: &str,
+        after: Option<&str>,
+    ) -> Result<crate::runtime_state::control::ControlSessions, ServerError> {
+        let mut selected = self.held.control_sessions(agent, after)?;
+        let sessions: Vec<String> = selected
+            .by_ref()
+            .take(lys_runner::tracking_store::PAGE_MAX)
+            .map(str::to_owned)
+            .collect();
+        let after = selected.next().and_then(|_| sessions.last().cloned());
+        Ok(crate::runtime_state::control::ControlSessions {
+            agent: agent.to_owned(),
+            sessions,
+            after,
+        })
+    }
+
     /// The maintained number of live agent sessions.
     pub fn live_count(&self) -> usize {
         self.held.live_count()

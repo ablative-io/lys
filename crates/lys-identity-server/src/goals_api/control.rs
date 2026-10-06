@@ -250,12 +250,24 @@ pub(crate) fn control_recipient(
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-pub(super) struct ResendBody {
+#[schema(as = GoalResendBody)]
+pub(crate) struct ResendBody {
     operation: String,
     prior: String,
     session: String,
+}
+
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[schema(as = GoalResendView)]
+pub(crate) struct ResendView {
+    goal: String,
+    occurrence: String,
+    operation: String,
+    session: String,
+    prior: String,
+    reconciliation: lys_runner::operations::ControlReceipt,
 }
 
 pub(super) async fn resend(
@@ -263,7 +275,7 @@ pub(super) async fn resend(
     headers: axum::http::HeaderMap,
     axum::extract::Path(goal): axum::extract::Path<String>,
     body: Result<axum::Json<ResendBody>, axum::extract::rejection::JsonRejection>,
-) -> Result<axum::Json<serde_json::Value>, ServerError> {
+) -> Result<axum::Json<ResendView>, ServerError> {
     use crate::receipts_api::control::{
         managed_status, read_receipt, record_decision, service_target,
     };
@@ -286,7 +298,7 @@ pub(super) async fn resend(
         ));
     }
     let goals = goals(&state)?;
-    let (resent, source, holder) = goals.with(|store| {
+    let (resent, source, holder, kept) = goals.with(|store| {
         let item = store.item(&goal).ok_or(GoalError::Unknown)?;
         if item.goal.responsible != person {
             return Err(GoalError::Unknown.into());
@@ -300,29 +312,9 @@ pub(super) async fn resend(
             &person,
             now(),
         )?;
-        Ok((resent, source, holder))
+        let kept = store.resent_occurrence(&body.prior).is_some();
+        Ok((resent, source, holder, kept))
     })?;
-    let agent = with_runtime(&state, |store| {
-        let tracked = store
-            .session(&body.session)
-            .ok_or(ServerError::RuntimeSessionUnknown)?;
-        if tracked.stopped() {
-            return Err(ServerError::RuntimeSessionUnknown);
-        }
-        tracked
-            .agent
-            .clone()
-            .ok_or(ServerError::RuntimeSessionUnknown)
-    })?;
-    if !control_recipient(&state, &holder, &person, &agent, true)? {
-        return Err(refused(
-            "goal_authority_revoked",
-            "the intended session is no longer an admitted recipient",
-        ));
-    }
-    let driven = service_target(&state, &body.session)?;
-    let status = managed_status(&state, &driven).await?;
-    crate::budgets_act::resend_allowed(&state, &agent, &body.session, &status)?;
     let original = service_target(&state, &source)?;
     let prior = read_receipt(&state, &original, &body.prior).await?;
     if prior.state != OperationState::Uncertain
@@ -347,14 +339,40 @@ pub(super) async fn resend(
             "a different person decision is already recorded",
         ));
     }
-    // Authority is re-read after runner IO, and the dispatcher judges it again before any write.
-    if !control_recipient(&state, &holder, &person, &agent, true)? {
-        return Err(refused(
-            "goal_authority_revoked",
-            "the intended recipient changed before the occurrence was recorded",
-        ));
-    }
-    let fired = goals.with(|store| store.resend(resent))?;
+    let fired = if kept {
+        crate::receipts_api::control::responsible(&state, &original, &prior, &person)?;
+        resent.fired
+    } else {
+        let agent = with_runtime(&state, |store| {
+            let tracked = store
+                .session(&body.session)
+                .ok_or(ServerError::RuntimeSessionUnknown)?;
+            if tracked.stopped() {
+                return Err(ServerError::RuntimeSessionUnknown);
+            }
+            tracked
+                .agent
+                .clone()
+                .ok_or(ServerError::RuntimeSessionUnknown)
+        })?;
+        if !control_recipient(&state, &holder, &person, &agent, true)? {
+            return Err(refused(
+                "goal_authority_revoked",
+                "the intended session is no longer an admitted recipient",
+            ));
+        }
+        let driven = service_target(&state, &body.session)?;
+        let status = managed_status(&state, &driven).await?;
+        crate::budgets_act::resend_allowed(&state, &agent, &body.session, &status)?;
+        // Authority is re-read after runner IO, and the dispatcher judges it again before any write.
+        if !control_recipient(&state, &holder, &person, &agent, true)? {
+            return Err(refused(
+                "goal_authority_revoked",
+                "the intended recipient changed before the occurrence was recorded",
+            ));
+        }
+        goals.with(|store| store.resend(resent))?
+    };
     let decision = record_decision(
         &state,
         &original,
@@ -380,7 +398,12 @@ pub(super) async fn resend(
             "the saved resend has no intended delivery",
         )
     })?;
-    Ok(axum::Json(
-        serde_json::json!({"goal":goal,"occurrence":fired.operation,"operation":sent.operation,"session":sent.session,"prior":prior.operation,"reconciliation":decision}),
-    ))
+    Ok(axum::Json(ResendView {
+        goal,
+        occurrence: fired.operation,
+        operation: sent.operation.clone(),
+        session: sent.session.clone(),
+        prior: prior.operation,
+        reconciliation: decision,
+    }))
 }

@@ -374,7 +374,11 @@ struct Records {
 
 impl From<Records> for Held {
     fn from(records: Records) -> Self {
-        let index = Arc::new(index::Index::of(&records.items, &records.events));
+        let index = Arc::new(index::Index::of(
+            &records.items,
+            &records.events,
+            &records.resends,
+        ));
         Self {
             items: records.items,
             events: records.events,
@@ -501,6 +505,9 @@ impl Held {
                 let position = self.position(&resent.fired.goal)?;
                 let firing = self.items[position].fired.len();
                 Arc::make_mut(&mut self.index).fire(position, firing, &resent.fired);
+                Arc::make_mut(&mut self.index)
+                    .prior_resends
+                    .insert(resent.prior.clone(), (position, firing));
                 self.resends
                     .insert(resent.fired.operation.clone(), resent.prior);
                 self.items[position].fired.push(resent.fired);

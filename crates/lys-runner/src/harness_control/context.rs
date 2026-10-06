@@ -48,7 +48,7 @@ pub struct BoundaryReply {
 }
 
 /// Only the bound reader or dispatcher can establish the current phase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ControlPhase {
     /// No authoritative boundary has been observed.
@@ -64,7 +64,7 @@ pub enum ControlPhase {
 }
 
 /// Public reason codes never carry the service's detailed refusal text.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ContextReason {
     /// No current measurement exists.
@@ -86,7 +86,7 @@ pub enum ContextReason {
 }
 
 /// The last applied decision, with identifiers and closed reason codes only.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AppliedContext {
     /// Normal input was permitted by this decision.
@@ -148,7 +148,7 @@ impl AppliedContext {
 }
 
 /// Current control identifiers, read directly from the owned live controller.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ControlStatus {
     /// The current process generation.
