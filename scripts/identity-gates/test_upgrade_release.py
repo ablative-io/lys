@@ -69,8 +69,8 @@ class ReleaseShapeTests(unittest.TestCase):
 
     def test_each_baseline_is_read_from_its_own_tree(self):
         root = Path(__file__).resolve().parents[2]
-        leg = (root / "scripts/identity-gates/upgrade_proof_leg.sh").read_text()
-        baselines = leg.split('baselines="', 1)[1].split('"', 1)[0].split()
+        named = (root / "scripts/identity-gates/upgrade_proof_baselines.sh").read_text()
+        baselines = named.split('baselines="', 1)[1].split('"', 1)[0].split()
         self.assertEqual(len(baselines), 4)
         found = {}
         for commit in baselines:

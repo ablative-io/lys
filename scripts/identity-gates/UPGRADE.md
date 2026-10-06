@@ -18,11 +18,20 @@ its build stamp must match the candidate. Coordinate ports 8490 and
 binary stamps and a surface manifest naming a different commit. Install and
 upgrade themselves verify the surface files against that manifest.
 
+The proof has two halves. `upgrade_proof_build.sh <artifacts> <clones>` runs on
+the build machine: it builds this clean tree's candidate and each old release in
+`upgrade_proof_baselines.sh`, each old release in its own clone under `<clones>`
+(never a worktree of a checkout), and copies only the release programs and the
+packaged screens into `<artifacts>`. `upgrade_proof_run.sh <artifacts>` compiles
+nothing: on a machine with Docker and the two ports free, it runs the command
+below for every old release. Both sources are read from this repository at their
+commits with `git show`, so the run end needs the commits, not a tree of each.
+`upgrade_proof_leg.sh` runs both halves on one machine.
+
 ```
 python3 scripts/identity-gates/upgrade_live.py \
-  --old-source /path/to/clean-old-checkout \
   --old-commit FULL_OLD_COMMIT \
-  --old-bin /path/to/clean-old-checkout/target/release \
+  --old-bin /path/to/artifacts/old-FULL_OLD_COMMIT/bin \
   --old-surface /path/to/old-surface-package \
   --candidate-bin /path/to/candidate/target/release \
   --candidate-surface /path/to/candidate-surface-package \

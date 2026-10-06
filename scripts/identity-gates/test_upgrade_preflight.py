@@ -14,7 +14,7 @@ class PreflightTests(unittest.TestCase):
     def test_prepare_only_never_installs_or_claims_a_pass(self):
         args = ["upgrade_live.py", "--old-commit", "a" * 40, "--candidate-commit", "b" * 40,
                 "--prepare-only"]
-        for name in ("old-source", "old-bin", "candidate-bin", "old-surface", "candidate-surface", "work"):
+        for name in ("old-bin", "candidate-bin", "old-surface", "candidate-surface", "work"):
             args.extend(["--" + name, "/fixture/" + name])
         with patch("sys.argv", args), patch("upgrade_live.prepare", return_value={"prepared": True}), \
                 patch("upgrade_live.exercise") as exercise, patch("builtins.print") as output:

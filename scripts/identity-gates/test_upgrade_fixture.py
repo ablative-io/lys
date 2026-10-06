@@ -181,7 +181,10 @@ class UpgradeProofTests(unittest.TestCase):
             with patch("upgrade_live.require_free"), patch("upgrade_live.port", return_value=12345), \
                     patch("upgrade_live.subprocess.check_output", side_effect=[
                         "host none occupied", json.dumps(networks)]):
-                self.assertEqual(installation(root, source, "fixture"), 8490)
+                def read(path):
+                    return (source / path).read_text()
+
+                self.assertEqual(installation(root, read, "fixture"), 8490)
             self.assertEqual((root / "deployment.toml").read_text(),
                              'project = "fixture"\nsubnet = "172.29.49.0/24"\n')
 

@@ -347,8 +347,20 @@ def network_subnets(networks):
     return used
 
 
-def installation(root, old_source, project):
-    layout = (old_source / "crates/lys/src/identity/install/layout.rs").read_text()
+def source_at(commit):
+    """Read one path of this repository as it is at `commit`, never from a checked-out tree."""
+    repository = Path(__file__).resolve().parents[2]
+
+    def read(path):
+        return subprocess.check_output(
+            ["git", "-C", str(repository), "show", commit + ":" + path], text=True
+        )
+
+    return read
+
+
+def installation(root, old_text, project):
+    layout = old_text("crates/lys/src/identity/install/layout.rs")
     ports = {}
     for name in ["SERVICE_PORT", "BROKER_PORT"]:
         match = re.search(rf"pub const {name}: u16 = (\d+);", layout)
@@ -375,7 +387,7 @@ def installation(root, old_source, project):
     )
     if network is None:
         raise RuntimeError("no unused fixture network in the identity test range")
-    text = (old_source / "crates/lys/src/identity/install/deployment.template.toml").read_text()
+    text = old_text("crates/lys/src/identity/install/deployment.template.toml")
     text = text.replace("{{admin_email_line}}", "")
     text = text.replace("{{service_port}}", str(ports["SERVICE_PORT"]))
     text = text.replace("{{rauthy_port}}", str(port()))
@@ -437,28 +449,13 @@ def prepare(args):
     """Validate copied artifacts and kernel paths without using service ports."""
     if args.work.exists():
         raise RuntimeError(f"fixture work directory already exists: {args.work}")
-    old_head = subprocess.check_output(
-        ["git", "-C", str(args.old_source), "rev-parse", "HEAD"], text=True
-    ).strip()
-    if old_head != args.old_commit:
-        raise RuntimeError(f"old source is {old_head}, expected {args.old_commit}")
-    dirty = subprocess.check_output(
-        ["git", "-C", str(args.old_source), "status", "--porcelain"], text=True
-    )
-    if dirty:
-        raise RuntimeError("old source must be clean, including its deployment template")
-
-    def old_text(path):
-        return (args.old_source / path).read_text()
+    # The old release's source is read from this repository at its commit,
+    # so no old tree has to sit beside the binaries that were built from it.
+    old_text = source_at(args.old_commit)
 
     layouts = {"old": inventory(old_text, args.old_commit)}
     release = old_release(old_text)
-    repository = Path(__file__).resolve().parents[2]
-
-    def candidate_source(path):
-        return subprocess.check_output(
-            ["git", "-C", str(repository), "show", args.candidate_commit + ":" + path], text=True
-        )
+    candidate_source = source_at(args.candidate_commit)
 
     layouts["candidate"] = inventory(candidate_source, args.candidate_commit, candidate=True)
     installed_binaries = layouts["old"]["installed_binaries"]
@@ -528,7 +525,7 @@ def exercise(args):
     driver = args.candidate_bin / "examples/upgrade_window"
     installed_stamp = partial(stamp, programs=args.prepared["layouts"]["old"]["installed_binaries"])
     project = "lys-upgrade-proof-" + str(os.getpid())
-    browser = Browser(installation(root, args.old_source, project))
+    browser = Browser(installation(root, source_at(args.old_commit), project))
     # Every real program here starts with this named login, never the
     # proof's own environment.
     env = login(args.work)
@@ -812,7 +809,6 @@ def exercise(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in [
-        "old-source",
         "old-bin",
         "candidate-bin",
         "old-surface",
