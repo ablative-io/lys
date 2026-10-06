@@ -294,14 +294,33 @@ pub fn sign_in_client<'a>(
     secret: &str,
     redirect: &str,
 ) -> Result<&'a App, AppError> {
+    let app = sign_in_secret(held, client_id, secret)?;
+    listed(app, redirect)?;
+    Ok(app)
+}
+
+/// The approved app whose sign-in client is `client_id` and holds `secret`,
+/// judged before any return address is read: the token exchange's client
+/// authentication. The refusals are `sign_in_client`'s, without the address's.
+pub fn sign_in_secret<'a>(
+    held: &'a Held,
+    client_id: &str,
+    secret: &str,
+) -> Result<&'a App, AppError> {
     let (app, approved) = approved_client(held, client_id)?;
     if !same(&approved.client.secret_sha256, &sha256_hex(secret)) {
         return Err(AppError::CredentialRefused {
             reason: "no client by that id holds that secret",
         });
     }
-    listed(app, redirect)?;
     Ok(app)
+}
+
+/// The approved app whose sign-in client is `client_id`, judged before any
+/// secret or address is read: where the token exchange starts on a virtual
+/// client credential, which only the secrets broker can confirm.
+pub fn sign_in_app<'a>(held: &'a Held, client_id: &str) -> Result<&'a App, AppError> {
+    approved_client(held, client_id).map(|(app, _approved)| app)
 }
 
 /// The app whose sign-in client is `client_id`, when `redirect` is an address

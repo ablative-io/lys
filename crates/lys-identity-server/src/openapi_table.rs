@@ -251,7 +251,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]] scope("agent", "agent.policy.set", ["id"]);
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
     GET "/oauth/authorize" "Begin an authorization" P [&["RequestMalformed", "RedirectUnregistered", "ScopeUnknown", "ScopeNotGranted", "NoPerson", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["credential_refused", "app_not_approved", "app_retired", "redirect_invalid", "apps_unavailable"]];
-    POST "/oauth/token" "Exchange a code for tokens" P [&["RequestMalformed", "ClientUnknown", "CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["credential_refused", "app_not_approved", "app_retired", "redirect_invalid", "apps_unavailable"]];
+    POST "/oauth/token" "Exchange a code for tokens" P [&["RequestMalformed", "ClientUnknown", "CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["credential_refused", "app_not_approved", "app_retired", "redirect_invalid", "apps_unavailable", "SecretsUnavailable"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
     GET "/.well-known/oauth-protected-resource" "Where the MCP door's authorization is found" P [];
     GET "/.well-known/oauth-protected-resource/mcp" "Where the MCP door's authorization is found, by its address" P [];

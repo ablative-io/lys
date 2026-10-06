@@ -40,6 +40,33 @@ class WindowProofTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "reversible"):
                 refuse_operator(reader, root, config)
 
+    def test_a_service_install_proves_it_holds_no_token_and_a_presented_one_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            log = root / "log"
+            leaves = log / "leaves"
+            leaves.mkdir(parents=True)
+            (leaves / "000").write_bytes(b"old signed record")
+            config = {"operator_token_file": None, "log_dir": str(log)}
+            presented = []
+            class Reader:
+                def ask(inner, method, path, body, **options):
+                    self.assertEqual((method, path), ("POST", "/agents"))
+                    self.assertEqual(options["expected_status"], 401)
+                    presented.append(options["operator"])
+                    return {"refusal": "OperatorRefused", "reason": "the upgrade is still reversible"}
+            self.assertIsNone(refuse_operator(Reader(), root, config))
+            self.assertEqual(len(presented[0]), 64)
+            # A token file anywhere under a service install is refused, and so is a missing key.
+            (root / "state").mkdir()
+            (root / "state" / "operator-token").write_text("left behind")
+            with self.assertRaisesRegex(RuntimeError, "holds an operator token file"):
+                refuse_operator(Reader(), root, config)
+            (root / "state" / "operator-token").unlink()
+            with self.assertRaisesRegex(RuntimeError, "operator_token_file as null"):
+                refuse_operator(Reader(), root, {"log_dir": str(log)})
+            self.assertEqual(len(presented), 1)
+
     def test_all_five_mutations_use_real_record_ids_and_stored_versions(self):
         legacy = {"team": "kept-team", "foreign": ["kept-member"], "person": "kept-person",
                   "release": {"budgets": "per_measure", "teams": "unguarded"},

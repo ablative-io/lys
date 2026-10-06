@@ -24,6 +24,7 @@ pub mod apps_api;
 pub mod apps_bench;
 pub mod apps_bench_scratch;
 pub mod apps_binding;
+mod apps_client_credentials;
 mod apps_credentials;
 pub mod apps_error;
 mod apps_refresh;

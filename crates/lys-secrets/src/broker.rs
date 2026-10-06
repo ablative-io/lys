@@ -28,6 +28,8 @@ mod checked;
 pub use checked::{Ask, Checked};
 mod ending;
 pub use ending::{EndAct, EndWay, Ended, HandleEnded, LeaseEnd, SystemBehind};
+mod app_client;
+pub use app_client::{APP_CLIENT_PREFIX, IssuedAppClient};
 mod folded;
 mod handles;
 #[cfg(test)]

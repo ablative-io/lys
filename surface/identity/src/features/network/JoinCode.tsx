@@ -31,7 +31,8 @@ export async function askJoinCode(machine: string): Promise<JoinCode> {
 /** Why a code was not given, in the words the add row and the panel both show. */
 export const joinFailure = (error: unknown): string => error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error);
 
-function Copy({ text, what }: { text: string; what: string }) {
+/** Copy `text` for the person, saying whether it was copied; when the browser refuses, they are told to copy it themselves. */
+export function Copy({ text, what }: { text: string; what: string }) {
   const [said, setSaid] = useState('');
   const copy = async () => {
     try {

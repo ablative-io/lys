@@ -775,11 +775,11 @@ const LEAK: &str = "LYS_TEST_HARNESS_CONFIG_DIR";
 /// What /bin/sh sets for itself, beside what it is given.
 const SHELL_OWN: &[&str] = &["PATH", "PWD", "OLDPWD", "SHLVL", "_"];
 
-/// This process's variables with the leak added.
-fn process_with_leak() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
-    let mut process: Vec<(std::ffi::OsString, std::ffi::OsString)> = std::env::vars_os().collect();
+/// The test login's variables with the leak added; never this process's.
+fn process_with_leak() -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, Box<dyn Error>> {
+    let mut process = super::login::fixture::variables()?;
     process.push((LEAK.into(), "/leaked".into()));
-    process
+    Ok(process)
 }
 
 #[test]
@@ -796,7 +796,7 @@ fn a_detached_service_starts_with_the_given_environment_only() -> Result<(), Box
         !foreign.is_empty(),
         "the test process carries nothing but the login"
     );
-    let environment = super::login::login_from(process_with_leak())?;
+    let environment = super::login::login_from(process_with_leak()?)?;
     let dir = tempfile::TempDir::new()?;
     let names = dir.path().join("names");
     let pid = dir.path().join("scratch.pid");

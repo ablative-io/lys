@@ -73,7 +73,7 @@ afterEach(() => { for (const root of roots.splice(0)) act(() => root.unmount());
 
 describe('the permission template builder', () => {
   it('names an operator registration as the install operator, never a sign-in or service start', async () => {
-    const app = { id: APP, name: 'Notes', state: 'pending', redirects: [], schema: documents, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'operator', login: { provider: 'https://issuer.test', subject: 'administrator' } }, registered_at: 1 };
+    const app = { id: APP, name: 'Notes', state: 'pending', redirects: [], schema: documents, version: 0, versions: [], pending: null, client_id: null, service_account: null, client_credentials: [], registered_by: { kind: 'operator', login: { provider: 'https://issuer.test', subject: 'administrator' } }, registered_at: 1 };
     stub({ 'GET /apps': () => ok({ apps: [app] }) });
     await render(<Apps />);
     expect(text()).toContain('Registered by the install operator for administrator');
@@ -164,7 +164,7 @@ describe('the permission template builder', () => {
 
 describe('the Apps screen', () => {
   it('shows a pending app in words before approval and never its secret after', async () => {
-    const pending = { id: APP, name: 'Notes fixture', state: 'pending', redirects: ['https://app.example.test/signed-in'], sign_in: null, schema: uploadedWorkspace, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'service_account', id: 'op-1' }, registered_at: 1 };
+    const pending = { id: APP, name: 'Notes fixture', state: 'pending', redirects: ['https://app.example.test/signed-in'], sign_in: null, schema: uploadedWorkspace, version: 0, versions: [], pending: null, client_id: null, service_account: null, client_credentials: [], registered_by: { kind: 'service_account', id: 'op-1' }, registered_at: 1 };
     // Approval keeps the registration's address as the sign-in settings, the name withheld.
     const signIn = { redirects: ['https://app.example.test/signed-in'], profile: false, operation: 'op-approve', by: { kind: 'start' }, at: 2 };
     let approved = false;
@@ -183,7 +183,8 @@ describe('the Apps screen', () => {
     await click(button('Approve Notes fixture'));
     // The approval sends the sign-in settings it offered: the registration's address, the name withheld.
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ operation: expect.stringMatching(/^op-/), redirects: ['https://app.example.test/signed-in'], profile: false });
-    expect(labelled('Save app credentials')).not.toBeNull();
+    // Credentials are issued below; nothing is offered to save.
+    expect(labelled('Client credentials of ' + APP)).not.toBeNull();
     expect(document.body.innerHTML).not.toContain('f'.repeat(64));
     expect(text()).toContain('approved');
     expect(sessionStorage.getItem('lys.schema-draft.' + APP)).toBeNull();

@@ -59,6 +59,7 @@ pub fn refused(error: &SecretsError) -> (StatusCode, String) {
         | SecretsError::OAuth(_)
         | SecretsError::Revocation(_)
         | SecretsError::Service(_)
+        | SecretsError::AppClient(_)
         | SecretsError::PermissionDenied { .. }
         | SecretsError::NoRelation { .. }
         | SecretsError::RelationRemoved { .. }

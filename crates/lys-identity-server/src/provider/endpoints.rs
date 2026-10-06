@@ -5,10 +5,11 @@
 //! never the other way round (`exchange.rs`). The apps store
 //! (`admitted_client`, `name_granted`), the directory (`display_name`, the
 //! person at authorize) and the sessions are each taken and released on their
-//! own, and never under a provider guard.
+//! own, and never under a provider guard. No lock is held while the token
+//! exchange waits on the secrets broker (`client_auth`).
 
 use super::{Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, random, unavailable};
-use crate::apps_binding::{sign_in_client, sign_in_redirect};
+use crate::apps_binding::sign_in_redirect;
 use crate::apps_error::AppError;
 use crate::error::ServerError;
 use crate::error_provider::ProviderError;
@@ -83,25 +84,20 @@ struct Admitted {
 }
 
 /// The approved app `client_id` names, judged from the apps' record as it
-/// stands at this request: its approval, its secret when the token exchange
-/// presents one, `redirect` against the addresses its sign-in settings list,
-/// and whether those settings give it the name. Nothing is kept between
-/// requests, so an approval, a retirement or a changed setting is in force at
-/// the next one. The apps lock is taken and released here, before any
-/// provider lock.
+/// stands at this request: its approval, `redirect` against the addresses its
+/// sign-in settings list, and whether those settings give it the name. The
+/// token exchange's client is authenticated before this (`client_auth`).
+/// Nothing is kept between requests, so an approval, a retirement or a
+/// changed setting is in force at the next one. The apps lock is taken and
+/// released here, before any provider lock.
 fn admitted_client(
     state: &AppState,
     client_id: &str,
-    secret: Option<&str>,
     redirect: &str,
 ) -> Result<Admitted, ServerError> {
     let mut apps = apps(state)?;
     apps.settle()?;
-    let held = apps.held();
-    let app = match secret {
-        Some(secret) => sign_in_client(held, client_id, secret, redirect)?,
-        None => sign_in_redirect(held, client_id, redirect)?,
-    };
+    let app = sign_in_redirect(apps.held(), client_id, redirect)?;
     Ok(Admitted {
         app: app.registered.app.clone(),
         profile: app
@@ -111,7 +107,7 @@ fn admitted_client(
     })
 }
 
-fn apps(
+pub(super) fn apps(
     state: &AppState,
 ) -> Result<std::sync::MutexGuard<'_, crate::apps_store::AppStore>, ServerError> {
     state.apps.lock().map_err(|error| {
@@ -185,7 +181,7 @@ pub(super) async fn authorize(
     let Query(asked) = asked.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    let admitted = admitted_client(&state, &asked.client_id, None, &asked.redirect_uri)?;
+    let admitted = admitted_client(&state, &asked.client_id, &asked.redirect_uri)?;
     if asked.response_type != "code" {
         return Err(malformed("a product asks for a code"));
     }
@@ -248,12 +244,17 @@ pub(super) async fn authorize(
     Ok((StatusCode::SEE_OTHER, [(header::LOCATION, back)]).into_response())
 }
 
-/// A product's token request.
+/// A product's token request. Only the grant type is required to read it:
+/// the client is authenticated before the grant is judged, so a request for
+/// any grant with a refused credential is refused as that.
 #[derive(Deserialize)]
 pub(super) struct Exchange {
     pub(super) grant_type: String,
+    #[serde(default)]
     pub(super) code: String,
+    #[serde(default)]
     pub(super) redirect_uri: String,
+    #[serde(default)]
     pub(super) code_verifier: String,
     pub(super) client_id: Option<String>,
     pub(super) client_secret: Option<String>,
@@ -432,7 +433,16 @@ pub(super) async fn token(
     headers: HeaderMap,
     form: Result<Form<Exchange>, FormRejection>,
 ) -> Response {
-    match exchange(&state, &headers, form) {
+    let answer = match form {
+        Ok(Form(form)) => match super::client_auth::authenticated(&state, &headers, &form).await {
+            Ok(client) => exchange(&state, &form, &client),
+            Err(error) => Err(error),
+        },
+        Err(refused) => Err(ServerError::RequestMalformed {
+            reason: refused.body_text(),
+        }),
+    };
+    match answer {
         Ok(answer) => (
             StatusCode::OK,
             [(header::CACHE_CONTROL, "no-store")],
@@ -443,21 +453,16 @@ pub(super) async fn token(
     }
 }
 
-pub(super) fn exchange(
-    state: &AppState,
-    headers: &HeaderMap,
-    form: Result<Form<Exchange>, FormRejection>,
-) -> Result<Value, ServerError> {
+/// The exchange of a code for a token by the app `client`, whose client
+/// authentication was judged first (`client_auth`), so a request with a
+/// refused credential is refused as that whatever grant it asks for. The
+/// app and its return address are judged again here, at this request.
+fn exchange(state: &AppState, form: &Exchange, client: &str) -> Result<Value, ServerError> {
     let provider = provider(state)?;
-    let Form(form) = form.map_err(|refused| ServerError::RequestMalformed {
-        reason: refused.body_text(),
-    })?;
     if form.grant_type != "authorization_code" {
         return Err(malformed("a product exchanges an authorization code"));
     }
-    let (client_id, secret) =
-        presented(headers, &form).ok_or(ServerError::Provider(ProviderError::ClientUnknown))?;
-    let admitted = admitted_client(state, &client_id, Some(&secret), &form.redirect_uri)?;
+    let admitted = admitted_client(state, client, &form.redirect_uri)?;
     let client_id = admitted.app;
     let at = now();
     // The first act on the provider's state: the code verified and marked used.

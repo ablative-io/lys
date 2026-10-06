@@ -68,7 +68,12 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
         Line::Retired(_) if app.registered.app == lys_identity::grants::LYS_APP => {
             Err(Refused::Lys)
         }
-        Line::Retired(_) | Line::Proposed(_) | Line::Applied(_) | Line::Placed(_)
+        Line::Retired(_)
+        | Line::Proposed(_)
+        | Line::Applied(_)
+        | Line::Placed(_)
+        | Line::ClientCredentialIssued(_)
+        | Line::ClientCredentialRevoked(_)
             if standing != Standing::Approved =>
         {
             Err(Refused::Standing(standing))
@@ -88,6 +93,21 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
         Line::ChangeDeclined(_) if app.pending.is_none() => Err(Refused::NothingPending),
         Line::Placed(placed) if held.parent(&placed.child_kind, &placed.child_id).is_some() => {
             Err(Refused::Placed)
+        }
+        Line::ClientCredentialIssued(issued)
+            if app
+                .client_credentials()
+                .iter()
+                .any(|held| held.issued.credential_id == issued.credential_id) =>
+        {
+            Err(Refused::Exists)
+        }
+        Line::ClientCredentialRevoked(revoked)
+            if !app
+                .live_client_credentials()
+                .contains(&revoked.credential_id) =>
+        {
+            Err(Refused::Credential)
         }
         _ => Ok(()),
     }
@@ -121,6 +141,14 @@ pub(super) fn apply(app: &mut App, line: &Line) {
                 at: applied.at,
             });
         }
-        Line::Lys(_) | Line::Registered(_) | Line::Placed(_) | Line::Registrar(_) => {}
+        // A credential's lines are read from the app's history, where every
+        // line after its registration is kept (`App::client_credentials`).
+        Line::Lys(_)
+        | Line::Registered(_)
+        | Line::Placed(_)
+        | Line::Registrar(_)
+        | Line::ClientCredentialIssued(_)
+        | Line::ClientCredentialRevoked(_)
+        | Line::ClientCredentialsEnded(_) => {}
     }
 }

@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 mod accounts;
+mod app_client;
 mod bounds;
 mod lease;
 mod lending;
@@ -14,6 +15,7 @@ mod revocation;
 mod service;
 
 pub use accounts::AccountsRefusal;
+pub use app_client::AppClientRefusal;
 pub use bounds::BoundsRefusal;
 pub use lease::{LeaseRefusal, ListRefusal};
 pub use lending::LendingRefusal;
@@ -402,6 +404,9 @@ pub enum SecretsError {
     /// A screen service's request on a person's behalf refused.
     #[error(transparent)]
     Service(#[from] ServiceRefusal),
+    /// An app's virtual client credential refused.
+    #[error(transparent)]
+    AppClient(#[from] AppClientRefusal),
     /// An owner change refused for its operation id.
     #[error(transparent)]
     OwnerChange(#[from] OwnerChangeRefusal),

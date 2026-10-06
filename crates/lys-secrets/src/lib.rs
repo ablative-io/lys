@@ -34,15 +34,15 @@ pub mod teams;
 pub use access::{Asker, AskerKind};
 pub use audit::{AuditKind, AuditLine, AuditLog, Opened, RecordedLine, STATE_DOMAIN};
 pub use broker::{
-    Admitted, Ask, Broker, BrokerPaths, Checked, Clock, Discovery, EndAct, EndWay, Ended,
-    HandleEnded, HandleRecord as Lease, HeldHandle, LeaseEnd, LeaseView, ListScope, OwnerChanged,
-    PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome, SNAPSHOT_EVERY, SecretSettings, Settled,
-    Signature, SigningRefusal, SnapshotReport, SystemBehind, Ticket, UpstreamRevocation, UseError,
-    Used,
+    APP_CLIENT_PREFIX, Admitted, Ask, Broker, BrokerPaths, Checked, Clock, Discovery, EndAct,
+    EndWay, Ended, HandleEnded, HandleRecord as Lease, HeldHandle, IssuedAppClient, LeaseEnd,
+    LeaseView, ListScope, OwnerChanged, PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome,
+    SNAPSHOT_EVERY, SecretSettings, Settled, Signature, SigningRefusal, SnapshotReport,
+    SystemBehind, Ticket, UpstreamRevocation, UseError, Used,
 };
 pub use error::{
-    AccountsRefusal, BoundsRefusal, LeaseRefusal, ListRefusal, OAuthRefusal, OwnerChangeRefusal,
-    RevocationRefusal, SecretsError, ServiceRefusal,
+    AccountsRefusal, AppClientRefusal, BoundsRefusal, LeaseRefusal, ListRefusal, OAuthRefusal,
+    OwnerChangeRefusal, RevocationRefusal, SecretsError, ServiceRefusal,
 };
 pub use handle::{
     HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id, request_digest,

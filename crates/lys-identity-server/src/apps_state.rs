@@ -25,6 +25,12 @@ mod index;
 #[path = "apps_fold.rs"]
 mod fold;
 
+#[path = "apps_client_lines.rs"]
+mod client_lines;
+pub use client_lines::{
+    ClientCredential, ClientCredentialIssued, ClientCredentialRevoked, ClientCredentialsEnded,
+};
+
 #[cfg(test)]
 #[path = "apps_operation_tests.rs"]
 mod operation_tests;
@@ -251,6 +257,12 @@ pub enum Line {
     Placed(Placed),
     /// A service account made a registrar.
     Registrar(Registrar),
+    /// A virtual client credential issued for an approved app.
+    ClientCredentialIssued(ClientCredentialIssued),
+    /// A client credential revoked.
+    ClientCredentialRevoked(ClientCredentialRevoked),
+    /// The broker's confirmation that it ended an app's credentials.
+    ClientCredentialsEnded(ClientCredentialsEnded),
 }
 
 impl Line {
@@ -268,6 +280,9 @@ impl Line {
             Self::Applied(line) => &line.operation,
             Self::Placed(line) => &line.operation,
             Self::Registrar(line) => &line.operation,
+            Self::ClientCredentialIssued(line) => &line.operation,
+            Self::ClientCredentialRevoked(line) => &line.operation,
+            Self::ClientCredentialsEnded(line) => &line.operation,
         }
     }
 
@@ -285,6 +300,9 @@ impl Line {
             Self::Applied(line) => Some(&line.app),
             Self::Placed(line) => Some(&line.app),
             Self::Registrar(_) => None,
+            Self::ClientCredentialIssued(line) => Some(&line.app),
+            Self::ClientCredentialRevoked(line) => Some(&line.app),
+            Self::ClientCredentialsEnded(line) => Some(&line.app),
         }
     }
 }
@@ -391,6 +409,8 @@ pub enum Refused {
     Placed,
     /// The app is `lys`, which is never retired.
     Lys,
+    /// No live client credential of the app has that id.
+    Credential,
 }
 
 /// The apps as their log folds them, in the order registered.

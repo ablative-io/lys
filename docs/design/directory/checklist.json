@@ -1946,7 +1946,7 @@
         },
         {
           "id": "C495",
-          "text": "An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them in the same batch as the retirement; the apps snapshot pins the two new lines (DIRECTORY-081 R2).",
+          "text": "An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them by its one line, never waiting on the broker; the apps snapshot pins the three new lines (DIRECTORY-081 R2).",
           "done": false
         },
         {

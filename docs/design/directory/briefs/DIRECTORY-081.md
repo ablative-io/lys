@@ -13,7 +13,7 @@ title: A product signs people in with a virtual client credential an administrat
 > - ADR-116 — Every app registers with Lys through one published API; Lys depends on no app — An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.
 > **Checklist:**
 > - C494 — The token exchange authenticates a lys-client. credential by asking the broker, never falls back to the digest path, and refuses a revoked credential whatever its grant (DIRECTORY-081 R1).
-> - C495 — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them in the same batch as the retirement; the apps snapshot pins the two new lines (DIRECTORY-081 R2).
+> - C495 — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them by its one line, never waiting on the broker; the apps snapshot pins the three new lines (DIRECTORY-081 R2).
 > - C496 — The Apps screen issues a credential shown once with a copy control, lists who issued and revoked each, and revokes with confirmation (DIRECTORY-081 R3).
 > **Stories:**
 > - S179 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
@@ -31,7 +31,7 @@ Give an administrator one act that issues a product a virtual client credential 
 
 ### R1: The token exchange authenticates a virtual client credential through the broker
 
-Behavioural. WHEN a token request presents a client id and a secret that begins lys-client., THE SYSTEM SHALL judge the app with sign_in_redirect's refusals first (app_not_approved, app_retired, credential_refused for an id no approved app holds, redirect_invalid), and then ask the broker at a new route POST /_lys/apps/client, signed by the service as prepare and save are (save_app.rs:41-46), with {app, presented}. The broker SHALL answer {app, credential_id} only when the presented value's digest is a credential issued for that app's client entry and not revoked or ended, and the app's sealed client secret's SHA-256 equals Approved.client.secret_sha256; otherwise it refuses by name, and the provider answers credential_refused naming no secret. A secret without the lys-client. prefix is judged by digest as today; nothing issues such a secret, so it is refused credential_refused. A broker that cannot be reached, or answers anything but a confirmation, is refused SecretsUnavailable by name at the token endpoint and the exchange never falls back to the digest path for a lys-client. value. Client authentication is judged before the grant type, so a request with a revoked credential is refused credential_refused whatever grant it asks for, a refresh_token grant included; a request with a good credential and a grant other than authorization_code is refused as today. The exchange awaits the broker and holds no apps or provider lock across that wait (the rule at apps_api.rs:411-412). Codes and tokens issued before a credential is revoked stand until their own expiry. Every exchange writes one broker audit line: client authenticated for {app} with {credential_id}, or refused {reason} for {app}; never a value.
+Behavioural. WHEN a token request presents a client id and a secret that begins lys-client., THE SYSTEM SHALL judge the app first (app_not_approved, app_retired, credential_refused for an id no approved app holds, or for an app holding no live credential), and then ask the broker at a new route POST /_lys/apps/client, signed by the service on behalf of the owner of the app's sealed client entry as prepare is, with {app, presented, live, secret_sha256}: the ids the apps' record holds live and the approved digest. The return address is judged after the client, with the grant (redirect_invalid). The broker SHALL answer {app, credential_id} only when the presented value's digest is a credential issued for that app's client entry, not ended, and among the live ids sent (one that is not, it refuses and ends), and the app's sealed client secret's SHA-256 equals Approved.client.secret_sha256; otherwise it refuses by name, and the provider answers credential_refused naming no secret. A secret without the lys-client. prefix is judged by digest as today; nothing issues such a secret, so it is refused credential_refused. A broker that cannot be reached, or answers anything but a confirmation, is refused SecretsUnavailable by name at the token endpoint and the exchange never falls back to the digest path for a lys-client. value. Client authentication is judged before the grant type, so a request with a revoked credential is refused credential_refused whatever grant it asks for, a refresh_token grant included; a request with a good credential and a grant other than authorization_code is refused as today. The exchange awaits the broker and holds no apps or provider lock across that wait (the rule at apps_api.rs:411-412). Codes and tokens issued before a credential is revoked stand until their own expiry. Every exchange writes one broker audit line: client authenticated for {app} with {credential_id}, or refused {reason} for {app}; never a value.
 
 **Acceptance:**
 - On a real install the product exchanges its code with an issued virtual credential sent as the form's client_secret, and as HTTP Basic, and receives an ID token whose issuer is Lys's origin and whose audience is the app; userinfo answers the same subject; the keys answer.
@@ -47,10 +47,12 @@ Behavioural. WHEN a token request presents a client id and a secret that begins 
 - create: crates/lys-secrets/src/bin/lys-secrets/app_client.rs
 - create: crates/lys-secrets/src/bin/lys-secrets/app_client_tests.rs
 - create: crates/lys-secrets/src/broker/app_client.rs
+- create: crates/lys-identity-server/src/provider/client_auth.rs
+- create: crates/lys-identity-server/tests/shared/provider_client_credentials.rs
 - modify: crates/lys-secrets/src/bin/lys-secrets/router.rs
+- modify: crates/lys-identity-server/src/provider.rs
 - modify: crates/lys-identity-server/src/provider/endpoints.rs
 - modify: crates/lys-identity-server/src/apps_binding.rs
-- modify: crates/lys-identity-server/src/apps_credentials.rs
 - modify: crates/lys-identity-server/tests/provider.rs
 - modify: tests/identity_contract/src/app_custody.rs
 - modify: crates/lys/tests/identity_install/product.rs
@@ -63,38 +65,62 @@ Behavioural. WHEN a token request presents a client id and a secret that begins 
 
 ### R2: An administrator issues, lists and revokes an app's client credentials; retirement ends them
 
-Behavioural. WHEN an administrator posts POST /apps/{app}/credentials/issue with an operation id for an approved app whose custody is confirmed, THE SYSTEM SHALL have the broker make a credential lys-client.{app}.{64 hex digits from the secure random source}, keep only its digest bound to the app's sealed client entry and its owner, and answer the value once in that response with its credential id; the service keeps the value nowhere. The act is judged by its own named permission, issue_app_client_credential, held today only through the administrator, by the same authority as approval (apps_api.rs:389 administrator); register_app does not hold it. An app may hold any number of credentials. WHEN an administrator posts POST /apps/{app}/credentials/{id}/revoke, THE SYSTEM SHALL end that credential in the broker and refuse it from the next exchange. The apps log gains two line kinds, ClientCredentialIssued {operation, app, credential_id, by, at} and ClientCredentialRevoked {operation, app, credential_id, reason, by, at}, written only after the broker confirms, and GET /apps/{app} lists the app's credentials with who issued each and when, and who revoked it and when, never a value. WHEN an app is retired, THE SYSTEM SHALL end every credential it holds in the broker and write their revocations in the same durable batch as Line::Retired; a retirement whose credential endings the broker does not confirm is refused SecretsUnavailable and nothing is written. An operation id already used answers the same result and keeps nothing new; one used for another app is refused app_operation_reused. A pending, declined or retired app is refused by its standing's name; a caller without the permission is refused as the other Apps decisions refuse. The apps snapshot pin (crates/lys-identity-server/tests/apps_snapshot.rs and fixtures/apps-state-v1.json) grows with both line kinds in the same piece, and a log written before this brief, without them, opens and folds to the same apps.
+Behavioural. WHEN an administrator posts POST /apps/{app}/credentials/issue with an operation id for an approved app whose custody is confirmed, THE SYSTEM SHALL have the broker make a credential lys-client.{app}.{64 hex digits from the secure random source}, keep only its digest bound to the app's sealed client entry and its owner, and answer the value once in that response with its credential id; the service keeps the value nowhere. The act is judged by its own named permission, issue_app_client_credential, held today only through the administrator, by the same authority as approval (apps_api.rs:389 administrator); register_app does not hold it. An app may hold any number of credentials. WHEN an administrator posts POST /apps/{app}/credentials/{id}/revoke, THE SYSTEM SHALL end that credential in the broker and refuse it from the next exchange. The apps log gains line kinds, among them ClientCredentialIssued {operation, app, credential_id, by, at} and ClientCredentialRevoked {operation, app, credential_id, reason, by, at}, the issue written only after the broker confirms it, and GET /apps/{app} lists the app's credentials with who issued each and when, and who revoked it and when, never a value. WHEN an app is retired, THE SYSTEM SHALL end every credential it holds by the one Line::Retired, one durable batch, and the apps' record no longer holds any of them live (amendment 1, Waffles 5579d02c: retirement is never refused because the broker is down; retirement under DIRECTORY-079 never waited on the broker either, apps_api.rs decided and retire never touch it). The provider refuses a retired app's credential app_retired before the broker is asked, and every confirmation the provider asks carries the ids the apps' record holds live, so the broker refuses and ends any other. The broker is then asked to end the retired app's credentials; when it cannot answer, the endings are asked again by the next administrator act on any app's credentials or standing, which asks them before anything else, and each confirmed ending is kept as a third line kind, ClientCredentialsEnded {operation, app, credential_ids, at}. A revocation is kept the same way, first and never waiting on the broker, which is then asked to end the credential. ClientCredentialIssued also names the owner of the app's sealed client entry, on whose behalf the provider asks the broker to confirm. An operation id already used answers the same result and keeps nothing new; one used for another app is refused app_operation_reused. A pending, declined or retired app is refused by its standing's name; a caller without the permission is refused as the other Apps decisions refuse. The apps snapshot pin (crates/lys-identity-server/tests/apps_snapshot.rs) grows with the three line kinds in the same piece: fixtures/apps-state-v1.json stays as the record before this brief, a second fixture, fixtures/apps-state-081.json, holds the same record with credential lines kept on it, and the record read from the first takes those lines and writes the second byte for byte; tests/apps_lines.rs pins each new line's bytes in fixtures/apps-lines-081.jsonl. Amendment 2 (Waffles 5579d02c): POST /apps/{app}/credentials/save goes, with its OpenAPI row and its tests, and so does the broker's /_lys/apps/save; no caller outside Lys's own code and tests uses either.
 
 **Acceptance:**
 - An administrator issues a credential for an approved app; the answer holds the value once; GET /apps/{app} lists it with the issuer and time and no value; no file, log line, audit line or later answer holds the value.
 - A second credential for the same app is issued and both exchange; revoking the first leaves the second working.
 - A person holding register_app on the app, who is not the administrator, is refused issuing and revoking, and nothing is kept.
 - Issuing for a pending, declined or retired app is refused by that standing's name.
-- Retiring the app ends every credential it holds in one batch with Line::Retired; each is listed as ended by the retirement; a broker that does not confirm leaves the app approved and refused SecretsUnavailable.
+- Retiring the app ends every credential it holds by its one Line::Retired; each is listed as ended by the retirement; with the broker down the retirement is still kept, and a credential of the app retired while the broker was down never authenticates after the broker returns (amendment 1).
+- The broker ends a retired app's or a revoked credential when it next answers an administrator's act, and the app lists the ending as confirmed (ClientCredentialsEnded).
+- POST /apps/{app}/credentials/save and the broker's /_lys/apps/save are gone, with their OpenAPI row and their tests (amendment 2).
 - A repeated operation id answers the same credential id with no value and issues nothing new.
-- The snapshot fixture holds both new line kinds and today's writer writes it byte for byte; an apps log without them opens and folds to the same apps.
+- The second snapshot fixture holds the three new line kinds and today's writer writes it byte for byte; the record read from the fixture written before this brief takes the same lines and writes the second fixture byte for byte; each new line keeps its bytes in apps-lines-081.jsonl.
 - The OpenAPI document describes both routes with their requests, responses and refusals, and the route test that walks every route passes.
 
 **Files:**
+- create: crates/lys-identity-server/src/apps_client_credentials.rs
+- create: crates/lys-identity-server/src/apps_client_lines.rs
+- create: crates/lys-identity-server/tests/fixtures/apps-lines-081.jsonl
+- create: crates/lys-identity-server/tests/fixtures/apps-state-081.json
+- create: crates/lys-secrets/src/error/app_client.rs
 - modify: crates/lys-identity-server/src/apps_api.rs
 - modify: crates/lys-identity-server/src/apps_credentials.rs
+- modify: crates/lys-identity-server/src/apps_fold.rs
 - modify: crates/lys-identity-server/src/apps_state.rs
+- modify: crates/lys-identity-server/src/apps_store.rs
 - modify: crates/lys-identity-server/src/apps_views.rs
-- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/apps_views_tests.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/src/openapi_typed.rs
+- modify: crates/lys-identity-server/src/secrets_api.rs
+- modify: crates/lys-identity-server/tests/apps_lines.rs
 - modify: crates/lys-identity-server/tests/apps_snapshot.rs
-- modify: crates/lys-identity-server/tests/fixtures/apps-state-v1.json
+- modify: crates/lys-identity-server/tests/secrets_api.rs
+- modify: crates/lys-identity-server/tests/shared/secrets_custody.rs
 - modify: crates/lys-secrets/src/bin/lys-secrets/app_client.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/callers.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/main.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/save_app.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/save_app_tests.rs
+- modify: crates/lys-secrets/src/broker.rs
 - modify: crates/lys-secrets/src/broker/app_client.rs
+- modify: crates/lys-secrets/src/broker/seal_once.rs
+- modify: crates/lys-secrets/src/error.rs
+- modify: crates/lys-secrets/src/error/name.rs
+- modify: crates/lys-secrets/src/lib.rs
 
 **Checklist:**
-- C495 — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them in the same batch as the retirement; the apps snapshot pins the two new lines (DIRECTORY-081 R2).
+- C495 — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them by its one line, never waiting on the broker; the apps snapshot pins the three new lines (DIRECTORY-081 R2).
 
 **Stories:**
 - S266 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator, I want to issue, list and revoke the credential a product signs people in with, with nobody ever seeing the app's secret, so that I can arm a product and disarm it in one place.
 
 ### R3: The Apps screen issues, lists and revokes an app's client credentials
 
-Behavioural. WHEN an administrator views an approved app on the Apps screen (surface/identity/src/features/apps/Apps.tsx), THE SYSTEM SHALL show its client credentials with who issued each and when, and an act to issue one. Issuing shows the value once, as the connection code is shown once (features/network/JoinCode.tsx), with a copy control and words saying it is shown only now and goes when the page is left; the value is held in that view's state only and is gone on leaving. Revoking asks for confirmation on the page and then lists the credential as revoked with who and when. Every refusal is shown in its words. SaveCredentials.tsx and the approval's "two secrets held on this page" words are removed, since approval hands the administrator no secret; the approval shows that custody is confirmed.
+Behavioural. WHEN an administrator views an approved app on the Apps screen (surface/identity/src/features/apps/Apps.tsx), THE SYSTEM SHALL show its client credentials with who issued each and when, and an act to issue one. Issuing shows the value once, as the connection code is shown once (features/network/JoinCode.tsx), with a copy control and words saying it is shown only now and goes when the page is left; the value is held in that view's state only and is gone on leaving. Revoking asks for confirmation on the page and then lists the credential as revoked with who and when. Every refusal is shown in its words. SaveCredentials.tsx and the approval's "two secrets held on this page" words are removed, since approval hands the administrator no secret; the approval shows that custody is confirmed. A retired app lists the credentials its retirement ended, with no act. With this piece (Waffles 5579d02c), the Dashboard's budget card keeps an agent's name whole in its narrow column instead of breaking it mid-word.
 
 **Acceptance:**
 - Vitest: an approved app lists its credentials with issuer and time, and offers issue; a pending, declined or retired app offers no issue.
@@ -108,7 +134,15 @@ Behavioural. WHEN an administrator views an approved app on the Apps screen (sur
 - create: surface/identity/src/features/apps/ClientCredentials.tsx
 - create: surface/identity/tests/app-client-credentials.test.tsx
 - modify: surface/identity/src/features/apps/Apps.tsx
+- modify: surface/identity/src/features/network/JoinCode.tsx
+- modify: surface/identity/src/features/dashboard/Widgets.tsx
+- modify: surface/identity/src/features/dashboard/dashboard.css
 - modify: surface/identity/tests/app-credentials.test.tsx
+- modify: surface/identity/tests/apps-sign-in.test.tsx
+- modify: surface/identity/tests/graph.test.tsx
+- modify: surface/identity/tests/human-words.test.tsx
+- modify: surface/identity/tests/schema-builder.test.tsx
+- modify: surface/identity/tests/shell-places.test.tsx
 - delete: surface/identity/src/features/apps/SaveCredentials.tsx
 
 **Checklist:**
@@ -125,7 +159,7 @@ Behavioural. WHEN an administrator views an approved app on the Apps screen (sur
 - SHALL NOT name a broker address, or any address but Lys's own, in discovery or to a product; the product calls Lys's token endpoint.
 - SHALL NOT let register_app, or anything but the issue permission held through the administrator, issue or revoke a credential.
 - SHALL NOT name, call, wait on or read any product from Lys; nothing in the code, the tests' names or the configuration names a product (ADR-116).
-- SHALL NOT change the bytes or the meaning of any apps line already written; the two new line kinds are added so old logs read unchanged.
+- SHALL NOT change the bytes or the meaning of any apps line already written; the three new line kinds are added so old logs read unchanged.
 - SHALL NOT hold an apps or provider lock across a wait on the broker.
 - SHALL NOT add a timeout, deadline, watchdog, poll, cap, unsafe, ignored test, allow attribute, underscore rename or discarded result.
 

@@ -56,9 +56,8 @@ fn login_with(
         format!("#!/bin/sh\necho 'noise from a profile'\n{profile}\n/bin/sh \"$@\"\necho 'bye'\n"),
     )?;
     std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700))?;
-    let mut process: Vec<(std::ffi::OsString, std::ffi::OsString)> = std::env::vars_os()
-        .filter(|(name, _)| name != "SHELL" && name != "ANTHROPIC_BASE_URL")
-        .collect();
+    let mut process = crate::identity::install::login::fixture::variables()?;
+    process.retain(|(name, _)| name != "SHELL");
     process.push(("SHELL".into(), shell.into()));
     process.push((
         "ANTHROPIC_BASE_URL".into(),

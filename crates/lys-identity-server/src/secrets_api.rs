@@ -111,6 +111,19 @@ pub(crate) async fn ask(
     body: Bytes,
 ) -> Result<Value, ServerError> {
     let person = person(state, headers)?;
+    ask_as(state, &person, method, path, body).await
+}
+
+/// Asks the broker `path` on behalf of `person`, with `body`: the service's
+/// own word for an act no session makes, such as the token exchange asking
+/// for an app's client credential under its custody owner.
+pub(crate) async fn ask_as(
+    state: &AppState,
+    person: &str,
+    method: Method,
+    path: &str,
+    body: Bytes,
+) -> Result<Value, ServerError> {
     let broker = state
         .secrets
         .as_ref()
@@ -120,7 +133,7 @@ pub(crate) async fn ask(
     let [service, on_behalf_of, operation, signed_at, signature] = crate::secrets_sign::headers(
         &crate::secrets_sign::Asked {
             service: &broker.service,
-            person: &person,
+            person,
             method: method.as_str(),
             path,
             body: &body,

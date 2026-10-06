@@ -9,8 +9,8 @@ use std::error::Error;
 
 use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
-    Applied, Approved, By, Client, Decided, Line, LysRecorded, Placed, Proposed, Registered,
-    SignInSet,
+    Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
+    ClientCredentialsEnded, Decided, Line, LysRecorded, Placed, Proposed, Registered, SignInSet,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -18,6 +18,7 @@ use serde_json::json;
 type TestResult = Result<(), Box<dyn Error>>;
 
 const FIXTURE: &str = include_str!("fixtures/apps-lines-5215ed6c.jsonl");
+const CREDENTIAL_FIXTURE: &str = include_str!("fixtures/apps-lines-081.jsonl");
 
 fn person() -> By {
     By::Person {
@@ -175,7 +176,73 @@ fn shape(line: &Line) -> &'static str {
         Line::ChangeDeclined(_) => "change_declined",
         Line::Placed(_) => "placed",
         Line::Registrar(_) => "registrar",
+        Line::ClientCredentialIssued(_) => "client_credential_issued",
+        Line::ClientCredentialRevoked(_) => "client_credential_revoked",
+        Line::ClientCredentialsEnded(_) => "client_credentials_ended",
     }
+}
+
+/// One line of each shape an app's client credentials write
+/// (DIRECTORY-081), held to `apps-lines-081.jsonl`, written once with them
+/// and never regenerated.
+fn credential_lines() -> Vec<Line> {
+    let first = "0a1b2c3d4e5f6a7b";
+    vec![
+        Line::ClientCredentialIssued(ClientCredentialIssued {
+            operation: "op-0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f".to_owned(),
+            app: "notes".to_owned(),
+            credential_id: first.to_owned(),
+            owner: "person-custody".to_owned(),
+            by: operator(),
+            at: 15,
+        }),
+        Line::ClientCredentialIssued(ClientCredentialIssued {
+            operation: "op-10101010101010101010101010101010".to_owned(),
+            app: "notes".to_owned(),
+            credential_id: "1b2c3d4e5f6a7b8c".to_owned(),
+            owner: "person-custody".to_owned(),
+            by: operator(),
+            at: 16,
+        }),
+        Line::ClientCredentialRevoked(ClientCredentialRevoked {
+            operation: "op-11111111111111111111111111111111".to_owned(),
+            app: "notes".to_owned(),
+            credential_id: first.to_owned(),
+            reason: "rotated".to_owned(),
+            by: person(),
+            at: 17,
+        }),
+        Line::ClientCredentialsEnded(ClientCredentialsEnded {
+            operation: "op-12121212121212121212121212121212".to_owned(),
+            app: "notes".to_owned(),
+            credential_ids: vec![first.to_owned()],
+            at: 18,
+        }),
+    ]
+}
+
+#[test]
+fn every_client_credential_line_shape_keeps_its_bytes_and_reads_back() -> TestResult {
+    let credentials = credential_lines();
+    let written = credentials
+        .iter()
+        .map(serde_json::to_string)
+        .collect::<Result<Vec<_>, _>>()?;
+    let fixture: Vec<&str> = CREDENTIAL_FIXTURE.lines().collect();
+    assert_eq!(
+        fixture,
+        written,
+        "today's writer no longer writes the fixture's lines; it writes:\n{}",
+        written.join("\n")
+    );
+    for (text, line) in fixture.iter().zip(&credentials) {
+        let read: Line = serde_json::from_slice(text.as_bytes())?;
+        assert_eq!(&read, line, "{}: today's reader", shape(line));
+    }
+    let shapes: std::collections::BTreeSet<_> =
+        lines().iter().chain(&credentials).map(shape).collect();
+    assert_eq!(shapes.len(), 14, "every shape of apps line is pinned");
+    Ok(())
 }
 
 #[test]

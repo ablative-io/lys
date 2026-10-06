@@ -1,11 +1,13 @@
-//! Store app credentials as the authenticated person, never under a supplied owner.
+//! Prepare an approved app's credentials as the authenticated person, never
+//! under a supplied owner. The broker makes the client secret itself and
+//! seals it; no route takes or answers it (DIRECTORY-081).
 use std::sync::Arc;
 
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
-use lys_secrets::{EntryClass, Secret, SecretsError};
+use lys_secrets::SecretsError;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -15,20 +17,18 @@ use crate::serve::{MAX_BODY, Shared, on_broker};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Save {
+struct Prepare {
     app: String,
-    #[serde(default)]
-    client_secret: Option<String>,
     upstream: String,
 }
 
 type Answer = Result<Json<Value>, (StatusCode, String)>;
 
-/// Save is available only through a trusted screen service for a person.
-/// Values travel in the signed body and are never returned or logged.
-pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
+/// Prepare is available only through a trusted screen service for a person.
+/// The values it seals are never returned or logged; the answer carries
+/// their references and the client secret's SHA-256.
+pub async fn prepare(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (parts, body) = request.into_parts();
-    let preparing = parts.uri.path() == "/_lys/apps/prepare";
     // Guarded: read before the caller is known, as the caller's signature covers it.
     let body: Bytes = axum::body::to_bytes(body, MAX_BODY)
         .await
@@ -45,24 +45,16 @@ pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer
             "NotAdmitted: a trusted screen service is required".to_owned(),
         ));
     }
-    let asked: Save = serde_json::from_slice(&body).map_err(|_error| {
+    let asked: Prepare = serde_json::from_slice(&body).map_err(|_error| {
         (
             StatusCode::BAD_REQUEST,
-            "RequestMalformed: invalid app credential save".to_owned(),
+            "RequestMalformed: invalid app credential preparation".to_owned(),
         )
     })?;
-    if !valid_app(&asked.app)
-        || if preparing {
-            asked.client_secret.is_some()
-        } else {
-            asked.client_secret.as_ref().is_none_or(|secret| {
-                secret.len() != 64 || !secret.bytes().all(|b| b.is_ascii_hexdigit())
-            })
-        }
-    {
+    if !valid_app(&asked.app) {
         return Err((
             StatusCode::BAD_REQUEST,
-            "RequestMalformed: invalid app credential save".to_owned(),
+            "RequestMalformed: invalid app credential preparation".to_owned(),
         ));
     }
     let url = reqwest::Url::parse(&asked.upstream).map_err(|_error| {
@@ -88,21 +80,7 @@ pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer
         let prefix = format!("lys-app-{}-{}", who.identity, asked.app);
         let client = format!("{prefix}-client");
         let api = format!("{prefix}-api");
-        let digest = if preparing {
-            Some(broker.prepare_app(&asked.app, &who.identity)?)
-        } else {
-            let secret = asked.client_secret.as_deref().unwrap_or_default();
-            broker.seal_once(
-                &client,
-                EntryClass::Key,
-                &who.identity,
-                &Secret::from_slice(secret.as_bytes()),
-            )?;
-            let credential =
-                Secret::from_slice(format!("lys-app.{}.{secret}", asked.app).as_bytes());
-            broker.seal_once(&api, EntryClass::Credential, &who.identity, &credential)?;
-            None
-        };
+        let digest = broker.prepare_app(&asked.app, &who.identity)?;
         layout.add_route(
             &api,
             Route {
@@ -112,12 +90,12 @@ pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer
                 spend_header: None,
             },
         )?;
-        let mut answer =
-            json!({"app": asked.app, "client_secret_ref": client, "api_credential_ref": api});
-        if let Some(digest) = digest {
-            answer["client_secret_sha256"] = json!(digest);
-        }
-        Ok::<_, SecretsError>(Json(answer))
+        Ok::<_, SecretsError>(Json(json!({
+            "app": asked.app,
+            "client_secret_ref": client,
+            "api_credential_ref": api,
+            "client_secret_sha256": digest,
+        })))
     })
     .await
     .map_err(|error| refused(&error))?

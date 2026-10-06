@@ -1,10 +1,12 @@
 //! The apps as the routes answer them. Each view derives its schema for the
 //! `OpenAPI` document from its own fields.
 //!
-//! No view carries a secret or a digest of one. The one answer that carries
-//! a client secret is an approval's, [`ClientIssued`], made once for the
-//! approving administrator; a registrar's credential is answered the same
-//! way, once, to the administrator who made it.
+//! No view carries a secret or a digest of one, and no answer carries an
+//! app's client secret, which never leaves the secrets broker. The one
+//! answer that carries an app's virtual client credential is its issue's,
+//! [`ClientCredentialGiven`], made once for the administrator who issued it
+//! (DIRECTORY-081); a registrar's credential is answered the same way, once,
+//! to the administrator who made it.
 
 use lys_identity::grants::{Named, SchemaDiff};
 use serde::Serialize;
@@ -99,6 +101,8 @@ pub struct AppView {
     pub client_id: Option<String>,
     /// The service account it acts as, once bound.
     pub service_account: Option<String>,
+    /// Every client credential issued for it, in the order issued.
+    pub client_credentials: Vec<ClientCredentialView>,
     /// Who registered it.
     #[schema(value_type = Object)]
     pub registered_by: By,
@@ -130,6 +134,27 @@ impl From<&App> for AppView {
                 .as_ref()
                 .map(|approved| approved.client.client_id.clone()),
             service_account: bound.or_else(|| registered.service_account.clone()),
+            client_credentials: app
+                .client_credentials()
+                .into_iter()
+                .map(|credential| ClientCredentialView {
+                    live: credential.live_on(app),
+                    ended_at_broker: credential.ended_at_broker,
+                    ended_by_retirement: credential.revoked.is_none() && app.retired.is_some(),
+                    credential_id: credential.issued.credential_id,
+                    issued_by: credential.issued.by,
+                    issued_at: credential.issued.at,
+                    revoked_by: credential
+                        .revoked
+                        .as_ref()
+                        .map(|revoked| revoked.by.clone()),
+                    revoked_at: credential.revoked.as_ref().map(|revoked| revoked.at),
+                    revoked_reason: credential
+                        .revoked
+                        .as_ref()
+                        .map(|revoked| revoked.reason.clone()),
+                })
+                .collect(),
             registered_by: registered.by.clone(),
             registered_at: registered.at,
         }
@@ -143,38 +168,64 @@ pub struct AppsView {
     pub apps: Vec<AppView>,
 }
 
-/// A client created at approval, answered once to the approving
-/// administrator. Its `Debug` names the client and never the secret or the
-/// credential.
+/// A virtual client credential issued for an app, answered once to the
+/// administrator who issued it and kept nowhere: the broker holds only its
+/// SHA-256. A repeated issue answers no value. Its `Debug` names the
+/// credential's id and never its value.
 #[derive(Clone, Serialize, utoipa::ToSchema)]
-pub struct ClientIssued {
-    /// The client id.
-    pub client_id: String,
-    /// The client secret. It is shown here once and kept nowhere: Lys holds
-    /// only its SHA-256.
-    pub client_secret: String,
-    /// The bearer credential the app calls Lys's API with.
-    pub credential: String,
+pub struct ClientCredentialGiven {
+    /// The app.
+    pub app: String,
+    /// The credential's id.
+    pub credential_id: String,
+    /// The value the product presents as its client secret, shown here once.
+    pub credential: Option<String>,
 }
 
-/// The answer of an approval.
+impl std::fmt::Debug for ClientCredentialGiven {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientCredentialGiven")
+            .field("app", &self.app)
+            .field("credential_id", &self.credential_id)
+            .field("credential_given", &self.credential.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+/// One of an app's client credentials, as the Apps screen lists it. No
+/// value.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct ClientCredentialView {
+    /// The credential's id.
+    pub credential_id: String,
+    /// Who issued it.
+    #[schema(value_type = Object)]
+    pub issued_by: By,
+    /// When.
+    pub issued_at: u64,
+    /// Who revoked it, once revoked.
+    #[schema(value_type = Option<Object>)]
+    pub revoked_by: Option<By>,
+    /// When, once revoked.
+    pub revoked_at: Option<u64>,
+    /// Why it was revoked, in the administrator's words, once revoked.
+    pub revoked_reason: Option<String>,
+    /// Ended by the app's retirement, when it was not revoked first.
+    pub ended_by_retirement: bool,
+    /// Whether a product may sign people in with it now.
+    pub live: bool,
+    /// Whether the broker has confirmed ending it, once it is not live.
+    pub ended_at_broker: bool,
+}
+
+/// The answer of an approval. No client secret: the broker made it, sealed
+/// it, and shows it to nobody.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct Approval {
     /// The app as it now stands.
     pub app: AppView,
-    /// Retained wire field; approval now keeps credentials in the broker
-    /// and returns no plaintext client secret.
-    pub client: Option<ClientIssued>,
-    /// Durable broker references, when approval saved the credentials.
+    /// Durable broker references, when approval prepared the credentials.
     pub credentials: Option<crate::apps_credentials::Saved>,
-}
-
-impl std::fmt::Debug for ClientIssued {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ClientIssued")
-            .field("client_id", &self.client_id)
-            .finish_non_exhaustive()
-    }
 }
 
 /// A registrar's credential, answered once to the administrator who made

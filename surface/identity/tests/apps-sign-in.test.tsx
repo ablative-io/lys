@@ -20,7 +20,7 @@ const APP = 'fixture_notes';
 const BACK = 'https://notes.example.test/signed-in';
 const MOVED = 'https://notes.example.test/moved-here';
 const signIn = { redirects: [BACK], profile: true, operation: 'op-approve', by: { kind: 'start' }, at: 2 };
-const approved = { id: APP, name: 'Notes fixture', state: 'approved', redirects: [BACK], sign_in: signIn, schema: { kinds: {} }, version: 1, versions: [1], pending: null, client_id: APP, service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+const approved = { id: APP, name: 'Notes fixture', state: 'approved', redirects: [BACK], sign_in: signIn, schema: { kinds: {} }, version: 1, versions: [1], pending: null, client_id: APP, service_account: null, client_credentials: [], registered_by: { kind: 'start' }, registered_at: 1 };
 const ada = { kind: 'person', login: { issuer: 'https://issuer.example.test', subject: 'ada' } };
 
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;

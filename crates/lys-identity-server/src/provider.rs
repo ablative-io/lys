@@ -45,6 +45,7 @@ use crate::session::now;
 mod token_store;
 use token_store::Tokens;
 
+mod client_auth;
 mod endpoints;
 mod exchange;
 pub use endpoints::routes;

@@ -29,6 +29,8 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 const ADA: &str = "ada-subject";
 const BEA: &str = "bea-subject";
+/// The id the stand-in names every client credential it issues.
+const CREDENTIAL_ID: &str = "0123456789abcdef";
 
 /// One request as the stand-in broker received it.
 #[derive(Clone, Debug)]
@@ -74,26 +76,34 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
             .collect(),
         body: body.to_vec(),
     });
-    if path == "/_lys/apps/save" || path == "/_lys/apps/prepare" {
-        let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
-        let owner = parts
-            .headers
-            .get("lys-on-behalf-of")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("missing");
-        let app = asked["app"].as_str().unwrap_or("missing");
-        let prefix = format!("lys-app-{owner}-{app}");
-        let mut answer = json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")});
-        if path == "/_lys/apps/prepare" {
+    let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+    let owner = parts
+        .headers
+        .get("lys-on-behalf-of")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("missing");
+    let app = asked["app"].as_str().unwrap_or("missing");
+    match path.as_str() {
+        "/_lys/apps/prepare" => {
+            let prefix = format!("lys-app-{owner}-{app}");
+            let mut answer = json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")});
             answer["client_secret_sha256"] =
                 json!(format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())));
+            if app == "fixture_bad_custody" {
+                answer["client_secret_ref"] = json!("another-app");
+            }
+            axum::Json(answer).into_response()
         }
-        if app == "fixture_bad_custody" {
-            answer["client_secret_ref"] = json!("another-app");
+        "/_lys/apps/client/issue" => axum::Json(json!({
+            "app": app, "credential_id": CREDENTIAL_ID, "owner": owner,
+            "value": format!("lys-client.{app}.{}", "cd".repeat(32)),
+        }))
+        .into_response(),
+        "/_lys/apps/client/end" => {
+            axum::Json(json!({"app": app, "ended": asked["credential_ids"]})).into_response()
         }
-        return axum::Json(answer).into_response();
+        _ => answer(&path, &body),
     }
-    answer(&path, &body)
 }
 
 fn answer(path: &str, body: &Bytes) -> Response {

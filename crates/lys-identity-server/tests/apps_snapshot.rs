@@ -10,7 +10,8 @@ use std::error::Error;
 
 use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
-    Applied, Approved, By, Client, Decided, Held, Line, LysRecorded, Placed, Proposed, Registered,
+    Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
+    ClientCredentialsEnded, Decided, Held, Line, LysRecorded, Placed, Proposed, Registered,
     SignInSet, Standing,
 };
 use lys_identity_server::read_views::Login;
@@ -19,6 +20,9 @@ use serde_json::json;
 type TestResult = Result<(), Box<dyn Error>>;
 
 const FIXTURE: &str = include_str!("fixtures/apps-state-v1.json");
+/// The same record with client credentials kept on it (DIRECTORY-081),
+/// written once with them and never regenerated.
+const CREDENTIAL_FIXTURE: &str = include_str!("fixtures/apps-state-081.json");
 
 fn login(subject: &str) -> Login {
     Login {
@@ -210,6 +214,77 @@ fn todays_reader_reads_the_fixture_as_the_same_record_of_each_standing() -> Test
     assert_eq!(notes.versions.len(), 2);
     assert!(notes.pending.is_some());
     assert_eq!(read.encode()?, FIXTURE.trim_end().as_bytes());
+    Ok(())
+}
+
+/// The client credential lines kept on `notes` after the 12.0 record
+/// (DIRECTORY-081): two issued, the first revoked and its ending confirmed.
+fn credential_lines() -> Vec<Line> {
+    let first = "0a1b2c3d4e5f6a7b";
+    let issued = |operation: u8, credential_id: &str| {
+        Line::ClientCredentialIssued(ClientCredentialIssued {
+            operation: op(operation),
+            app: "notes".to_owned(),
+            credential_id: credential_id.to_owned(),
+            owner: "person-custody".to_owned(),
+            by: operator(),
+            at: u64::from(operation),
+        })
+    };
+    // Operations 17 to 20, after every operation the record above holds or
+    // will hold (15 and 16 are box 12.0b's), so each stays one line's.
+    vec![
+        issued(17, first),
+        issued(18, "1b2c3d4e5f6a7b8c"),
+        Line::ClientCredentialRevoked(ClientCredentialRevoked {
+            operation: op(19),
+            app: "notes".to_owned(),
+            credential_id: first.to_owned(),
+            reason: "rotated".to_owned(),
+            by: person(),
+            at: 19,
+        }),
+        Line::ClientCredentialsEnded(ClientCredentialsEnded {
+            operation: op(20),
+            app: "notes".to_owned(),
+            credential_ids: vec![first.to_owned()],
+            at: 20,
+        }),
+    ]
+}
+
+fn held_with_credentials() -> Result<Held, Box<dyn Error>> {
+    let mut held = held()?;
+    for line in credential_lines() {
+        held.hold(line)?;
+    }
+    Ok(held)
+}
+
+#[test]
+fn todays_writer_and_reader_keep_the_snapshot_with_client_credentials() -> TestResult {
+    let held = held_with_credentials()?;
+    assert_eq!(
+        String::from_utf8(held.encode()?)?,
+        CREDENTIAL_FIXTURE.trim_end()
+    );
+    let read = Held::decode(CREDENTIAL_FIXTURE.trim_end().as_bytes())?;
+    assert_eq!(read.apps, held.apps);
+    let notes = read.app("notes").ok_or("notes is not held")?;
+    assert_eq!(notes.live_client_credentials(), ["1b2c3d4e5f6a7b8c"]);
+    assert!(notes.client_credentials_to_end().is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_record_written_before_client_credentials_takes_them_and_folds_to_the_same_apps() -> TestResult
+{
+    let mut upgraded = Held::decode(FIXTURE.trim_end().as_bytes())?;
+    for line in credential_lines() {
+        upgraded.hold(line)?;
+    }
+    assert_eq!(upgraded.apps, held_with_credentials()?.apps);
+    assert_eq!(upgraded.encode()?, CREDENTIAL_FIXTURE.trim_end().as_bytes());
     Ok(())
 }
 

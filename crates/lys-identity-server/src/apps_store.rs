@@ -454,6 +454,9 @@ fn refusal(line: &Line, refused: Refused) -> ServerError {
         Refused::Placed => AppError::PlacementInvalid {
             reason: "the resource is already placed in a parent".to_owned(),
         },
+        Refused::Credential => AppError::CredentialRefused {
+            reason: "no live client credential of this app has that id",
+        },
         Refused::Standing(standing) => match (line, standing) {
             (Line::Approved(_) | Line::Declined(_), _) => AppError::AppDecided { app },
             (_, Standing::Retired) => AppError::AppRetired { app },

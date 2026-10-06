@@ -24,6 +24,8 @@ mod cleanup_tests;
 mod estate;
 use estate::Estate;
 pub mod identity_support;
+#[path = "identity_install/login.rs"]
+mod login;
 #[path = "identity_install/policy.rs"]
 mod policy;
 #[path = "identity_install/product.rs"]
@@ -126,20 +128,6 @@ fn collect(base: &Path, dir: &Path, files: &mut Vec<(String, Vec<u8>)>) -> TestR
 fn hex(bytes: &[u8]) -> String {
     let digits: Vec<String> = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
     digits.concat()
-}
-
-/// A PATH whose `open` and `xdg-open` find no browser, so the install
-/// hands the setup code over as a headless one does.
-fn headless_path(at: &Path) -> TestResult<String> {
-    let bin = at.join("no-browser");
-    std::fs::create_dir(&bin)?;
-    for name in ["open", "xdg-open"] {
-        let script = bin.join(name);
-        std::fs::write(&script, "#!/bin/sh\nexit 1\n")?;
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))?;
-    }
-    let inherited = std::env::var("PATH")?;
-    Ok(format!("{}:{inherited}", bin.display()))
 }
 
 /// The estate's deployment configuration: the shipped template on free
@@ -296,7 +284,7 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
     let bin = binaries()?;
     let work = tempfile::TempDir::new()?;
     let package = screens(work.path())?;
-    let path = headless_path(work.path())?;
+    let login = login::login(work.path())?;
     let listeners = [
         TcpListener::bind("127.0.0.1:0")?,
         TcpListener::bind("127.0.0.1:0")?,
@@ -330,7 +318,8 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         .arg(proxy_port.to_string())
         .arg("--surface")
         .arg(&package)
-        .env("PATH", &path)
+        .env_clear()
+        .envs(login.iter().map(|(name, value)| (name, value)))
         .output()?;
     succeeded(&installed, "lys identity install")?;
     let recorded: serde_json::Value =
@@ -467,7 +456,7 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
             broker_port: estate.broker_port,
             lys: &bin.join("lys"),
             package: &package,
-            path: &path,
+            login: &login,
         },
         &mut read,
     )?;

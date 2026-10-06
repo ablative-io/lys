@@ -8,24 +8,26 @@
 //! still handed a code. Every answer is kept for the scan, and every address
 //! the browser is sent to is Lys's or the product's.
 //!
-//! The token, userinfo and keys steps are not here until BOX 16: no answer
-//! hands a product its client secret, and the broker does not yet present
-//! the app's client authentication for it. Until then the in-process tests
-//! in lys-identity-server's tests/provider.rs prove them through the custody
-//! fixture, among them
-//! `a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys`
-//! and `an_app_is_a_client_from_its_approval_to_its_retirement_with_no_restart`.
+//! The administrator issues the product a client credential (DIRECTORY-081),
+//! answered once, and the product exchanges each code with it, in its Basic
+//! header before the restart and in its form after, the real broker
+//! confirming it: the ID token verifies against the key Lys publishes, and
+//! userinfo answers the same subject. A revoked credential is then refused
+//! `credential_refused`, and once the app is retired its other credential is
+//! refused `app_retired`.
 
+use std::fmt::Write as _;
 use std::path::Path;
 use std::process::Command;
 
 use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use lys_core::Ed25519Identity;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::identity_support::fixtures::{TestResult, succeeded};
-use super::{EMAIL, Heard, PASSWORD, ask, operation};
+use super::{EMAIL, Heard, PASSWORD, Seen, ask, operation, send};
 
 /// The fixture product's client id, an app id.
 const PRODUCT: &str = "fixture_product";
@@ -45,8 +47,8 @@ pub struct Installed<'a> {
     pub lys: &'a Path,
     /// The screens package the install was given.
     pub package: &'a Path,
-    /// The `PATH` with no browser on it.
-    pub path: &'a str,
+    /// The login the install is run with (`login`).
+    pub login: &'a [(std::ffi::OsString, std::ffi::OsString)],
 }
 
 /// The value `name` has in the query of `address`.
@@ -133,7 +135,10 @@ fn register(installed: &Installed<'_>, read: &mut Heard, cookie: &str) -> TestRe
     read.answer("the product's approval", &approved);
     assert!(!holds_a_secret(&approved.body), "{}", approved.body);
     let answer: Value = serde_json::from_str(&approved.body)?;
-    assert_eq!(answer["client"], Value::Null, "no secret is issued");
+    assert!(
+        answer.get("client").is_none(),
+        "no secret is issued: {answer}"
+    );
     assert_eq!(answer["credentials"]["app"], PRODUCT);
     for reference in ["client_secret_ref", "api_credential_ref"] {
         let named = answer["credentials"][reference].as_str().ok_or(reference)?;
@@ -160,7 +165,8 @@ fn install_again(installed: &Installed<'_>, read: &mut Heard) -> TestResult {
         .arg(installed.broker_port.to_string())
         .arg("--surface")
         .arg(installed.package)
-        .env("PATH", installed.path)
+        .env_clear()
+        .envs(installed.login.iter().map(|(name, value)| (name, value)))
         .output()?;
     succeeded(&again, "lys identity install, run again")?;
     read.install(&again);
@@ -204,8 +210,159 @@ fn handed_a_code(
     Ok(query_value(&back, "code").ok_or("a code")?)
 }
 
-/// A fixture product registered and approved on a real install is handed a
-/// code for a signed-in person, before and after the install runs again.
+/// Posts `body` to the app route `rest` of the fixture product as the
+/// administrator, answering what was seen.
+fn admin_act(
+    installed: &Installed<'_>,
+    cookie: &str,
+    rest: &str,
+    body: &Value,
+) -> TestResult<Seen> {
+    ask(
+        installed.service_port,
+        "POST",
+        &format!("/api/apps/{PRODUCT}{rest}"),
+        Some(cookie),
+        Some(&body.to_string()),
+    )
+}
+
+/// Issues the fixture product a client credential, answering its id and its
+/// value, given this once.
+fn issue(
+    installed: &Installed<'_>,
+    read: &mut Heard,
+    cookie: &str,
+) -> TestResult<(String, String)> {
+    let issued = admin_act(
+        installed,
+        cookie,
+        "/credentials/issue",
+        &json!({ "operation": operation() }),
+    )?;
+    assert_eq!(issued.status, 200, "{}", issued.body);
+    read.answer("the product's client credential, issued", &issued);
+    let answer: Value = serde_json::from_str(&issued.body)?;
+    let value = answer["credential"]
+        .as_str()
+        .ok_or("an issue answers its value")?;
+    assert!(
+        value.starts_with(&format!("lys-client.{PRODUCT}.")),
+        "{value}"
+    );
+    let id = answer["credential_id"].as_str().ok_or("an id")?;
+    Ok((id.to_owned(), value.to_owned()))
+}
+
+/// The product exchanges `code` with `credential`, in its Basic header or in
+/// its form, answering what was seen.
+fn exchange(
+    installed: &Installed<'_>,
+    code: &str,
+    credential: &str,
+    basic: bool,
+) -> TestResult<Seen> {
+    let mut form = format!(
+        "grant_type=authorization_code&code={code}&redirect_uri=https%3A%2F%2Fproduct.example.test%2Fauth%2Fcallback&code_verifier={VERIFIER}"
+    );
+    let mut headers = Vec::new();
+    if basic {
+        let pair = STANDARD.encode(format!("{PRODUCT}:{credential}"));
+        headers.push(format!("Authorization: Basic {pair}"));
+    } else {
+        write!(form, "&client_id={PRODUCT}&client_secret={credential}")?;
+    }
+    send(
+        installed.service_port,
+        "POST",
+        "/oauth/token",
+        &headers,
+        Some(("application/x-www-form-urlencoded", &form)),
+    )
+}
+
+/// The product signs the person in with `code`: the exchange answers an ID
+/// token that verifies against the key Lys publishes, names Lys's origin and
+/// the product, and userinfo answers the same subject for its access token.
+fn signed_in(
+    installed: &Installed<'_>,
+    read: &mut Heard,
+    code: &str,
+    credential: &str,
+    basic: bool,
+    when: &str,
+) -> TestResult {
+    let origin = format!("http://localhost:{}", installed.service_port);
+    let token = exchange(installed, code, credential, basic)?;
+    assert_eq!(token.status, 200, "{}", token.body);
+    let answer: Value = serde_json::from_str(&token.body)?;
+    assert!(!token.body.contains(credential));
+    read.answer(&format!("the product's token, {when}"), &token);
+    let id_token = answer["id_token"].as_str().ok_or("an ID token")?;
+    let parts: Vec<&str> = id_token.split('.').collect();
+    let [header, claims, signature] = parts.as_slice() else {
+        return Err(format!("an ID token has three parts: {id_token}").into());
+    };
+    let header: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(header)?)?;
+    let claims: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(claims)?)?;
+    let keys = ask(installed.service_port, "GET", "/oauth/jwks", None, None)?;
+    assert_eq!(keys.status, 200, "{}", keys.body);
+    read.answer(&format!("Lys's keys, {when}"), &keys);
+    let keys: Value = serde_json::from_str(&keys.body)?;
+    let key = keys["keys"]
+        .as_array()
+        .and_then(|keys| keys.iter().find(|key| key["kid"] == header["kid"]))
+        .ok_or("the token's key is published")?;
+    assert_eq!(header["alg"], "EdDSA");
+    let public: [u8; 32] = URL_SAFE_NO_PAD
+        .decode(key["x"].as_str().ok_or("a public key")?)?
+        .try_into()
+        .map_err(|_unsized| "an Ed25519 key is 32 bytes")?;
+    let signed = format!("{}.{}", parts[0], parts[1]);
+    Ed25519Identity::verify(
+        &public,
+        signed.as_bytes(),
+        &URL_SAFE_NO_PAD.decode(signature)?,
+    )?;
+    assert_eq!(claims["iss"], origin);
+    assert_eq!(claims["aud"], PRODUCT);
+    assert_eq!(claims["nonce"], "product-nonce");
+    let access = answer["access_token"].as_str().ok_or("an access token")?;
+    let info = send(
+        installed.service_port,
+        "GET",
+        "/oauth/userinfo",
+        &[format!("Authorization: Bearer {access}")],
+        None,
+    )?;
+    assert_eq!(info.status, 200, "{}", info.body);
+    read.answer(&format!("the product's userinfo, {when}"), &info);
+    let info: Value = serde_json::from_str(&info.body)?;
+    assert_eq!(info["sub"], claims["sub"]);
+    Ok(())
+}
+
+/// The product's exchange of `code` with `credential` is refused `refusal`
+/// with `status`.
+fn refused(
+    installed: &Installed<'_>,
+    read: &mut Heard,
+    code: &str,
+    credential: &str,
+    (status, refusal): (u16, &str),
+) -> TestResult {
+    let token = exchange(installed, code, credential, true)?;
+    read.answer(&format!("the product's token, refused {refusal}"), &token);
+    assert_eq!(token.status, status, "{}", token.body);
+    let answer: Value = serde_json::from_str(&token.body)?;
+    assert_eq!(answer["refusal"], refusal, "{answer}");
+    assert!(!token.body.contains(credential));
+    Ok(())
+}
+
+/// A fixture product registered and approved on a real install signs a
+/// person in with its client credential, before and after the install runs
+/// again; revoked, the credential is refused, and retired, the app is.
 pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> TestResult {
     let origin = format!("http://localhost:{}", installed.service_port);
     let cookie = sign_in(installed, read, "the administrator's sign-in")?;
@@ -231,7 +388,9 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
         let address = discovery[endpoint].as_str().ok_or(endpoint)?;
         assert!(address.starts_with(&origin), "{endpoint} is {address}");
     }
+    let (credential_id, credential) = issue(installed, read, &cookie)?;
     let first = handed_a_code(installed, read, &cookie, "at approval")?;
+    signed_in(installed, read, &first, &credential, true, "at approval")?;
 
     install_again(installed, read)?;
     let cookie = sign_in(installed, read, "a sign-in after the restart")?;
@@ -248,7 +407,53 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
     let kept: Value = serde_json::from_str(&kept.body)?;
     assert_eq!(kept["state"], "approved", "{kept}");
     assert_eq!(kept["sign_in"], sign_in_settings);
+    assert_eq!(kept["client_credentials"][0]["live"], true, "{kept}");
     let second = handed_a_code(installed, read, &cookie, "after the restart")?;
     assert_ne!(first, second, "each authorize hands a fresh code");
+    signed_in(
+        installed,
+        read,
+        &second,
+        &credential,
+        false,
+        "after the restart",
+    )?;
+
+    let third = handed_a_code(installed, read, &cookie, "before the revocation")?;
+    let revoked = admin_act(
+        installed,
+        &cookie,
+        &format!("/credentials/{credential_id}/revoke"),
+        &json!({ "operation": operation(), "reason": "rotated" }),
+    )?;
+    assert_eq!(revoked.status, 200, "{}", revoked.body);
+    read.answer("the product's credential, revoked", &revoked);
+    let revoked: Value = serde_json::from_str(&revoked.body)?;
+    assert_eq!(revoked["client_credentials"][0]["live"], false);
+    assert_eq!(revoked["client_credentials"][0]["ended_at_broker"], true);
+    refused(
+        installed,
+        read,
+        &third,
+        &credential,
+        (401, "credential_refused"),
+    )?;
+
+    let (other_id, other) = issue(installed, read, &cookie)?;
+    let fourth = handed_a_code(installed, read, &cookie, "before the retirement")?;
+    let retired = admin_act(
+        installed,
+        &cookie,
+        "/retire",
+        &json!({ "operation": operation(), "reason": "done" }),
+    )?;
+    assert_eq!(retired.status, 200, "{}", retired.body);
+    read.answer("the product, retired", &retired);
+    let retired: Value = serde_json::from_str(&retired.body)?;
+    let ended = &retired["client_credentials"][1];
+    assert_eq!(ended["credential_id"], other_id.as_str(), "{retired}");
+    assert_eq!(ended["live"], false);
+    assert_eq!(ended["ended_by_retirement"], true);
+    refused(installed, read, &fourth, &other, (403, "app_retired"))?;
     Ok(())
 }

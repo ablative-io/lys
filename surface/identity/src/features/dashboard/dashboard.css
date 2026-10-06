@@ -18,6 +18,8 @@
 .you-tree thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-default); padding: 6px 10px; text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .dash-table { width: 100%; }
 .dash-table td { padding: 7px 10px; }
+/* A name keeps its words whole: the column is never narrower than its longest word, which breaks only when it alone is wider than the card. */
+.dash-table .dash-name { overflow-wrap: break-word; }
 .dash-table .dash-num { width: 1%; min-width: 3ch; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .dash-table a { color: var(--text-primary); }
 .dash-table .you-act { text-align: right; white-space: nowrap; }

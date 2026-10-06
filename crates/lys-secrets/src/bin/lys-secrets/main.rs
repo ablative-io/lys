@@ -5,6 +5,8 @@
 
 #![warn(clippy::await_holding_lock)]
 
+mod app_client;
+mod app_client_tests;
 mod args;
 mod callers;
 mod cli;

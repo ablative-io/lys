@@ -47,7 +47,7 @@ describe('Identity graph', () => {
     expect($('.node-card a[href^="#/access/who/"]')).toBeNull();
   });
   it('draws the connections the install records when no grant is recorded', async () => {
-    const app = { id: 'notes', name: 'Notes', state: 'approved', redirects: [], schema: null, version: 1, versions: [1], pending: null, client_id: 'c1', service_account: null, registered_by: { kind: 'lys' }, registered_at: 1 };
+    const app = { id: 'notes', name: 'Notes', state: 'approved', redirects: [], schema: null, version: 1, versions: [1], pending: null, client_id: 'c1', service_account: null, client_credentials: [], registered_by: { kind: 'lys' }, registered_at: 1 };
     await mount('#/graph', { ...SERVICE, '/grants': ok({ grants: [], revision: 7 }), '/apps': ok({ apps: [app] }) });
     expect(titles('grant')).toHaveLength(0);
     const installed = titles('installed');

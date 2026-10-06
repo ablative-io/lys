@@ -5,8 +5,8 @@ use lys_openapi::Api;
 
 use crate::openapi::route;
 use crate::openapi_refusals::{
-    ADMIN_BODY, APP_READ, APP_SELF, BATCH, CHANGE, CHANGE_DECIDE, CHECK, DECIDE, PLACE, REGISTER,
-    RETIRE, VERSION, WHICH,
+    ADMIN_BODY, APP_READ, APP_SELF, BATCH, CHANGE, CHANGE_DECIDE, CHECK, CREDENTIAL, DECIDE, PLACE,
+    REGISTER, RETIRE, VERSION, WHICH,
 };
 use crate::openapi_table::{A, GET, POST, PUT, S};
 
@@ -60,16 +60,28 @@ pub(crate) fn typed(api: &mut Api) {
         route(
             (
                 POST,
-                "/apps/{app}/credentials/save",
-                "Save app credentials in Lys secrets",
+                "/apps/{app}/credentials/issue",
+                "Issue an approved app a client credential, answered once",
             ),
             S,
-            Some(api.schema::<crate::apps_credentials::SaveBody>()),
-            Some(api.schema::<crate::apps_credentials::Saved>()),
+            Some(api.schema::<crate::apps_client_credentials::ClientCredentialIssueBody>()),
+            Some(api.schema::<crate::apps_views::ClientCredentialGiven>()),
             &[
                 ADMIN_BODY,
-                &["credential_refused", "app_retired", "SecretsUnavailable"],
+                CREDENTIAL,
+                &["NoPerson", "SecretsUnavailable", "AppClientNoCustody"],
             ],
+        ),
+        route(
+            (
+                POST,
+                "/apps/{app}/credentials/{credential}/revoke",
+                "Revoke one of an app's client credentials",
+            ),
+            S,
+            Some(api.schema::<crate::apps_client_credentials::ClientCredentialRevokeBody>()),
+            Some(app.clone()),
+            &[ADMIN_BODY, CREDENTIAL, &["credential_refused"]],
         ),
         route(
             (

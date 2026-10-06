@@ -12,7 +12,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Listing } from '../src/shell/Listing';
 
 const settings = { source: 'startup_configuration', mutable_in_browser: false, sign_in: { provider_origin: 'https://login.test', session_seconds: 3600, secure_cookie: true }, directory: { roles_configured: true }, permissions: { model_version: 8, projection: 'local' }, secrets: { configured: true }, runtimes: { machines_configured: true, provisioning_configured: true }, storage: { directory_format: 'signed_leaf_log', grant_format: 'signed_leaf_log', requests_configured: true } };
-const lys = { id: 'lys', name: 'Lys', state: 'approved', redirects: [], schema: { relations: MODEL.relations }, version: 2, versions: [2], pending: null, client_id: null, service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+const lys = { id: 'lys', name: 'Lys', state: 'approved', redirects: [], schema: { relations: MODEL.relations }, version: 2, versions: [2], pending: null, client_id: null, service_account: null, client_credentials: [], registered_by: { kind: 'start' }, registered_at: 1 };
 const resources = (list: { kind: string; id: string; standing: number; ended: number; holders: number }[]) => ok({ kinds: [...new Set(list.map((entry) => entry.kind))], revision: 1, judged_at: 1790540000, resources: list });
 const ROUTES = {
   ...SERVICE,

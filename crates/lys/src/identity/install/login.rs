@@ -96,11 +96,17 @@ static LOGIN: OnceLock<Environment> = OnceLock::new();
 /// started as a login shell with only those variables) answers it. Refused
 /// when there is no `SHELL`, when the shell does not run, when it does not
 /// answer, or when it answers an empty `PATH`.
+///
+/// A test build reads the test login of `login_fixture.rs` instead, never the
+/// variables of whoever runs the tests nor their shell.
 pub fn login() -> IdentityResult<&'static Environment> {
     if let Some(environment) = LOGIN.get() {
         return Ok(environment);
     }
+    #[cfg(not(test))]
     let environment = login_from(std::env::vars_os())?;
+    #[cfg(test)]
+    let environment = login_from(fixture::variables()?)?;
     Ok(LOGIN.get_or_init(|| environment))
 }
 
@@ -214,6 +220,10 @@ pub fn login_from(
         anthropic_base: (!anthropic_base.is_empty()).then(|| anthropic_base.to_owned()),
     })
 }
+
+#[cfg(test)]
+#[path = "login_fixture.rs"]
+pub mod fixture;
 
 #[cfg(test)]
 #[path = "login_tests.rs"]

@@ -5424,6 +5424,46 @@
       "path": "crates/lys/tests/identity_install/product.rs",
       "note": "the real-install product test; regains its token, userinfo and keys steps through an issued credential",
       "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/error/app_client.rs",
+      "note": "the broker's refusals of an app's virtual client credential, each by its own name",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/save_app.rs",
+      "note": "the broker route that prepares an app's sealed credentials at approval; its save route is gone",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/save_app_tests.rs",
+      "note": "the prepare route's tests",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/broker.rs",
+      "note": "the broker; names its app client credentials module",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/broker/seal_once.rs",
+      "note": "sealing a broker-made value once; prepare's app id check moves beside the app client credentials",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/error.rs",
+      "note": "the broker's errors; gains the app client credential refusals",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/error/name.rs",
+      "note": "each broker error's name",
+      "brief": "DIRECTORY-081"
+    },
+    {
+      "path": "crates/lys-secrets/src/lib.rs",
+      "note": "the broker crate's exports",
+      "brief": "DIRECTORY-081"
     }
   ],
   "inventory": [

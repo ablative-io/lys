@@ -56,6 +56,7 @@ impl SecretsError {
             Self::Lease(refusal) => refusal.name(),
             Self::OAuth(refusal) => refusal.name(),
             Self::Service(refusal) => refusal.name(),
+            Self::AppClient(refusal) => refusal.name(),
             Self::OwnerChange(refusal) => refusal.name(),
             Self::MemoryNotUsable { .. } => "MemoryNotUsable",
             Self::ReservationMissing { .. } => "ReservationMissing",

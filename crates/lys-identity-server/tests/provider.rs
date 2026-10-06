@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use identity_contract::app_custody::Custody;
 use identity_contract::apps::{
     Auth, approve, approve_with, ok, post, registration, workspace_schema,
 };
@@ -54,7 +55,19 @@ fn secret() -> String {
 /// approved by the administrator, answering the service, the administrator's
 /// cookie and their person id.
 async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn Error>> {
-    let broker = identity_contract::app_custody::start().await?;
+    // The stand-in serves on with its handle let go: only these tests reach in.
+    let (service, cookie, person, custody) = table_kept(code_seconds).await?;
+    drop(custody);
+    Ok((service, cookie, person))
+}
+
+/// `table`, with the custody stand-in the service asks, to take down and
+/// bring back and to read what it ended.
+async fn table_kept(
+    code_seconds: u64,
+) -> Result<(Service, String, String, Custody), Box<dyn Error>> {
+    let custody = identity_contract::app_custody::serve().await?;
+    let broker = custody.base.clone();
     let (service, ()) = Service::start_adjusted(
         GRANT_MODEL,
         None,
@@ -126,7 +139,7 @@ async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn E
     body["redirects"] = json!([CALLBACK]);
     ok(post(&service, "/apps", Auth::Cookie(&cookie), &body).await?)?;
     approve(&service, &cookie, PRODUCT).await?;
-    Ok((service, cookie, person))
+    Ok((service, cookie, person, custody))
 }
 
 fn browser() -> Result<reqwest::Client, Box<dyn Error>> {
@@ -1009,3 +1022,6 @@ async fn a_renamed_person_is_named_anew_at_the_next_issue_and_request() -> TestR
     );
     Ok(())
 }
+
+#[path = "shared/provider_client_credentials.rs"]
+mod client_credentials;

@@ -1,0 +1,4 @@
+{"line":"client_credential_issued","operation":"op-0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f","app":"notes","credential_id":"0a1b2c3d4e5f6a7b","owner":"person-custody","by":{"kind":"operator","login":{"provider":"https://issuer.test","subject":"owner"}},"at":15}
+{"line":"client_credential_issued","operation":"op-10101010101010101010101010101010","app":"notes","credential_id":"1b2c3d4e5f6a7b8c","owner":"person-custody","by":{"kind":"operator","login":{"provider":"https://issuer.test","subject":"owner"}},"at":16}
+{"line":"client_credential_revoked","operation":"op-11111111111111111111111111111111","app":"notes","credential_id":"0a1b2c3d4e5f6a7b","reason":"rotated","by":{"kind":"person","login":{"provider":"https://issuer.test","subject":"ada"}},"at":17}
+{"line":"client_credentials_ended","operation":"op-12121212121212121212121212121212","app":"notes","credential_ids":["0a1b2c3d4e5f6a7b"],"at":18}

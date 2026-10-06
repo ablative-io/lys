@@ -1,5 +1,5 @@
 #![cfg(test)]
-//! The signed broker route seals both values, never returns them, and refuses tampering.
+//! The signed broker route makes and seals both values, never returns them, and refuses tampering.
 use crate::{
     files::{FileGrants, Layout, now_ms},
     serve::Shared,
@@ -15,10 +15,11 @@ use lys_secrets::{
     request_digest, to_hex,
 };
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::sync::{Arc, Mutex};
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
-const PATH: &str = "/_lys/apps/save";
+const PATH: &str = "/_lys/apps/prepare";
 fn signed(key: &Ed25519Identity, body: &[u8]) -> Result<Request, Box<dyn std::error::Error>> {
     signed_path(key, body, PATH)
 }
@@ -47,7 +48,8 @@ fn signed_path(
         .body(Body::from(body.to_vec()))?)
 }
 #[tokio::test]
-async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
+async fn signed_prepare_is_private_repeatable_bound_to_body_and_its_route_presents_the_credential()
+-> Outcome {
     let dir = tempfile::tempdir()?;
     let layout = Layout::new(&dir.path().join("broker"), &dir.path().join("keys"));
     layout.prepare()?;
@@ -65,15 +67,29 @@ async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
         window: Mutex::new(ServiceWindow::new()),
         permissions: Arc::new(grants),
     });
-    let secret = "ab".repeat(32);
-    let expected = format!("Bearer lys-app.fixture_app.{secret}");
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let upstream = format!("http://{}/api", listener.local_addr()?);
+    let body = serde_json::to_vec(&json!({"app":"fixture_app","upstream":upstream}))?;
+    let answer = crate::save_app::prepare(State(Arc::clone(&shared)), signed(&key, &body)?)
+        .await
+        .map_err(|e| format!("{} {}", e.0, e.1))?
+        .0;
+    assert!(answer.get("client_secret").is_none());
+    let digest = answer["client_secret_sha256"]
+        .as_str()
+        .ok_or("no digest")?
+        .to_owned();
+    // The upstream sees the credential the broker made, and only the
+    // broker's digest of its secret tells the test it is the right one.
     let target = axum::Router::new().route(
         "/api/apps/me",
         axum::routing::get(move |headers: axum::http::HeaderMap| async move {
-            if headers.get("authorization").and_then(|h| h.to_str().ok()) == Some(expected.as_str())
-            {
+            let presented = headers
+                .get("authorization")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|h| h.strip_prefix("Bearer lys-app.fixture_app."))
+                .map(|secret| to_hex(&Sha256::digest(secret.as_bytes())));
+            if presented.as_deref() == Some(digest.as_str()) {
                 "authorised fixture"
             } else {
                 "wrong credential"
@@ -81,15 +97,7 @@ async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
         }),
     );
     let serving = tokio::spawn(async move { axum::serve(listener, target).await });
-    let body = serde_json::to_vec(
-        &json!({"app":"fixture_app","client_secret":secret,"upstream":upstream}),
-    )?;
-    let answer = crate::save_app::save(State(Arc::clone(&shared)), signed(&key, &body)?)
-        .await
-        .map_err(|e| format!("{} {}", e.0, e.1))?
-        .0;
-    assert!(!answer.to_string().contains(&secret));
-    let again = crate::save_app::save(State(Arc::clone(&shared)), signed(&key, &body)?)
+    let again = crate::save_app::prepare(State(Arc::clone(&shared)), signed(&key, &body)?)
         .await
         .map_err(|e| format!("{} {}", e.0, e.1))?
         .0;
@@ -105,15 +113,14 @@ async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
     let mut forged = signed(&key, &body)?;
     *forged.body_mut() = Body::from("{}");
     assert!(
-        crate::save_app::save(State(Arc::clone(&shared)), forged)
+        crate::save_app::prepare(State(Arc::clone(&shared)), forged)
             .await
             .is_err()
     );
-    let remote = serde_json::to_vec(
-        &json!({"app":"fixture_app","client_secret":secret,"upstream":"https://outside.example"}),
-    )?;
+    let remote =
+        serde_json::to_vec(&json!({"app":"fixture_app","upstream":"https://outside.example"}))?;
     assert!(
-        crate::save_app::save(State(Arc::clone(&shared)), signed(&key, &remote)?)
+        crate::save_app::prepare(State(Arc::clone(&shared)), signed(&key, &remote)?)
             .await
             .is_err()
     );
@@ -201,10 +208,11 @@ async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcom
     let path = "/_lys/apps/prepare";
     let body =
         serde_json::to_vec(&json!({"app":"prepared_app","upstream":"http://127.0.0.1:8491/api"}))?;
-    let first = crate::save_app::save(State(Arc::clone(&shared)), signed_path(&key, &body, path)?)
-        .await
-        .map_err(|e| format!("{} {}", e.0, e.1))?
-        .0;
+    let first =
+        crate::save_app::prepare(State(Arc::clone(&shared)), signed_path(&key, &body, path)?)
+            .await
+            .map_err(|e| format!("{} {}", e.0, e.1))?
+            .0;
     assert_eq!(first.as_object().ok_or("not object")?.len(), 4);
     assert!(first.get("client_secret").is_none());
     assert!(first.get("credential").is_none());
@@ -224,10 +232,11 @@ async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcom
         window: Mutex::new(ServiceWindow::new()),
         permissions: Arc::new(grants),
     });
-    let again = crate::save_app::save(State(Arc::clone(&shared)), signed_path(&key, &body, path)?)
-        .await
-        .map_err(|e| format!("{} {}", e.0, e.1))?
-        .0;
+    let again =
+        crate::save_app::prepare(State(Arc::clone(&shared)), signed_path(&key, &body, path)?)
+            .await
+            .map_err(|e| format!("{} {}", e.0, e.1))?
+            .0;
     assert_eq!(first, again);
     assert_eq!(
         shared
@@ -249,7 +258,7 @@ async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcom
         &json!({"app":"prepared_app","upstream":"http://127.0.0.1:8491/api","client_secret":"ab".repeat(32)}),
     )?;
     assert!(
-        crate::save_app::save(State(shared), signed_path(&key, &forged, path)?)
+        crate::save_app::prepare(State(shared), signed_path(&key, &forged, path)?)
             .await
             .is_err()
     );

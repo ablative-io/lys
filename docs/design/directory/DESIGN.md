@@ -1184,6 +1184,14 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-secrets/src/broker/app_client.rs` | the broker's virtual client credentials: digest bound to the app's sealed client entry, issue, check, revoke, end | DIRECTORY-081 |
 | `crates/lys-secrets/src/bin/lys-secrets/router.rs` | the broker's routes; gains POST /_lys/apps/client | DIRECTORY-081 |
 | `crates/lys/tests/identity_install/product.rs` | the real-install product test; regains its token, userinfo and keys steps through an issued credential | DIRECTORY-081 |
+| `crates/lys-secrets/src/error/app_client.rs` | the broker's refusals of an app's virtual client credential, each by its own name | DIRECTORY-081 |
+| `crates/lys-secrets/src/bin/lys-secrets/save_app.rs` | the broker route that prepares an app's sealed credentials at approval; its save route is gone | DIRECTORY-081 |
+| `crates/lys-secrets/src/bin/lys-secrets/save_app_tests.rs` | the prepare route's tests | DIRECTORY-081 |
+| `crates/lys-secrets/src/broker.rs` | the broker; names its app client credentials module | DIRECTORY-081 |
+| `crates/lys-secrets/src/broker/seal_once.rs` | sealing a broker-made value once; prepare's app id check moves beside the app client credentials | DIRECTORY-081 |
+| `crates/lys-secrets/src/error.rs` | the broker's errors; gains the app client credential refusals | DIRECTORY-081 |
+| `crates/lys-secrets/src/error/name.rs` | each broker error's name | DIRECTORY-081 |
+| `crates/lys-secrets/src/lib.rs` | the broker crate's exports | DIRECTORY-081 |
 
 ## Inventory
 

@@ -1,9 +1,19 @@
 //! A named custody stand-in for app contract tests. Real broker sealing and
 //! signed requests are covered by the broker and secrets API test suites.
+//!
+//! The stand-in also holds apps' virtual client credentials (DIRECTORY-081)
+//! as the broker does: it issues each once, keeps only its digest, confirms
+//! one only while the apps' record sends it as live, ends one the record no
+//! longer holds live when it meets it, and can be taken down and brought
+//! back, refusing every request while down.
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::{Json, http::HeaderMap};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::error::Error;
+use std::sync::{Arc, Mutex};
 
 /// Fixed fixture bytes, never used by a production service.
 pub fn secret() -> String {
@@ -13,27 +23,225 @@ pub fn secret() -> String {
 pub fn credential(app: &str) -> String {
     format!("lys-app.{app}.{}", secret())
 }
+
+/// One client credential the stand-in issued.
+#[derive(Clone, Debug)]
+struct Held {
+    app: String,
+    credential_id: String,
+    digest: String,
+    ended: bool,
+}
+
+#[derive(Default)]
+struct Kept {
+    down: bool,
+    /// Apps whose sealed client secret the stand-in no longer holds.
+    lost: Vec<String>,
+    issued: Vec<Held>,
+}
+
+/// A running stand-in: its address, and its credentials as it holds them.
+#[derive(Clone)]
+pub struct Custody {
+    /// The address the service is configured with.
+    pub base: String,
+    kept: Arc<Mutex<Kept>>,
+}
+
+impl Custody {
+    fn kept(&self) -> std::sync::MutexGuard<'_, Kept> {
+        self.kept
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Take the stand-in down: every request is refused until `up`.
+    pub fn down(&self) {
+        self.kept().down = true;
+    }
+
+    /// Bring the stand-in back.
+    pub fn up(&self) {
+        self.kept().down = false;
+    }
+
+    /// The stand-in no longer holds `app`'s sealed client secret, as a
+    /// broker whose store was lost: issuing to it is refused in the broker's
+    /// words.
+    pub fn lose(&self, app: &str) {
+        self.kept().lost.push(app.to_owned());
+    }
+
+    /// The ids of `app`'s credentials the stand-in has ended.
+    #[must_use]
+    pub fn ended(&self, app: &str) -> Vec<String> {
+        self.kept()
+            .issued
+            .iter()
+            .filter(|held| held.app == app && held.ended)
+            .map(|held| held.credential_id.clone())
+            .collect()
+    }
+}
+
 /// Start this test's isolated broker endpoint.
 ///
 /// # Errors
 /// Returns listener binding errors.
 pub async fn start() -> Result<String, Box<dyn Error>> {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-    let base = format!("http://{}", listener.local_addr()?);
-    let router = axum::Router::new().route("/_lys/apps/prepare", axum::routing::post(prepare));
-    tokio::spawn(async move { axum::serve(listener, router).await });
-    Ok(base)
+    Ok(serve().await?.base)
 }
-async fn prepare(headers: HeaderMap, Json(body): Json<Value>) -> Json<Value> {
-    let owner = headers
+
+/// Start this test's isolated broker endpoint, answering its handle.
+///
+/// # Errors
+/// Returns listener binding errors.
+pub async fn serve() -> Result<Custody, Box<dyn Error>> {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let custody = Custody {
+        base: format!("http://{}", listener.local_addr()?),
+        kept: Arc::default(),
+    };
+    let router = axum::Router::new()
+        .route("/_lys/apps/prepare", axum::routing::post(prepare))
+        .route("/_lys/apps/client", axum::routing::post(authenticate))
+        .route("/_lys/apps/client/issue", axum::routing::post(issue))
+        .route("/_lys/apps/client/end", axum::routing::post(end))
+        .with_state(custody.clone());
+    tokio::spawn(async move { axum::serve(listener, router).await });
+    Ok(custody)
+}
+
+fn digest(text: &str) -> String {
+    format!("{:x}", Sha256::digest(text.as_bytes()))
+}
+
+fn owner(headers: &HeaderMap) -> String {
+    headers
         .get("lys-on-behalf-of")
         .and_then(|value| value.to_str().ok())
-        .unwrap_or("missing");
+        .unwrap_or("missing")
+        .to_owned()
+}
+
+fn refused(status: StatusCode, words: &str) -> Response {
+    (status, format!("{words}\n")).into_response()
+}
+
+fn down() -> Response {
+    refused(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Unavailable: the custody stand-in is down",
+    )
+}
+
+async fn prepare(
+    State(custody): State<Custody>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Response {
+    if custody.kept().down {
+        return down();
+    }
+    let owner = owner(&headers);
     let app = body["app"].as_str().unwrap_or("missing");
     let prefix = format!("lys-app-{owner}-{app}");
     Json(
         json!({"app": app, "client_secret_ref": format!("{prefix}-client"),
         "api_credential_ref": format!("{prefix}-api"),
-        "client_secret_sha256": format!("{:x}", Sha256::digest(secret().as_bytes()))}),
+        "client_secret_sha256": digest(&secret())}),
     )
+    .into_response()
+}
+
+async fn issue(
+    State(custody): State<Custody>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Response {
+    let mut kept = custody.kept();
+    if kept.down {
+        return down();
+    }
+    let app = body["app"].as_str().unwrap_or("missing").to_owned();
+    if kept.lost.contains(&app) {
+        return refused(
+            StatusCode::FORBIDDEN,
+            &format!(
+                "AppClientNoCustody: no client secret is sealed for the app {app} (act: approve the app, which seals its client secret, before issuing it a credential)"
+            ),
+        );
+    }
+    let credential_id = format!("{:016x}", kept.issued.len() + 1);
+    let value = format!(
+        "lys-client.{app}.{}",
+        digest(&format!("{app}/{credential_id}"))
+    );
+    kept.issued.push(Held {
+        app: app.clone(),
+        credential_id: credential_id.clone(),
+        digest: digest(&value),
+        ended: false,
+    });
+    Json(json!({"app": app, "credential_id": credential_id,
+        "owner": owner(&headers), "value": value}))
+    .into_response()
+}
+
+async fn authenticate(State(custody): State<Custody>, Json(body): Json<Value>) -> Response {
+    let mut kept = custody.kept();
+    if kept.down {
+        return down();
+    }
+    if body["secret_sha256"].as_str() != Some(digest(&secret()).as_str()) {
+        return refused(
+            StatusCode::FORBIDDEN,
+            "AppClientCustodyMismatch: the sealed client secret is not the approved one",
+        );
+    }
+    let app = body["app"].as_str().unwrap_or("missing");
+    let presented = digest(body["presented"].as_str().unwrap_or_default());
+    let live: Vec<&str> = body["live"]
+        .as_array()
+        .map(|live| live.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    let credential_refused = || {
+        refused(
+            StatusCode::FORBIDDEN,
+            "AppClientCredentialRefused: no live client credential of this app holds that value",
+        )
+    };
+    let Some(held) = kept
+        .issued
+        .iter_mut()
+        .find(|held| held.app == app && held.digest == presented && !held.ended)
+    else {
+        return credential_refused();
+    };
+    if !live.contains(&held.credential_id.as_str()) {
+        held.ended = true;
+        return credential_refused();
+    }
+    Json(json!({"app": app, "credential_id": held.credential_id})).into_response()
+}
+
+async fn end(State(custody): State<Custody>, Json(body): Json<Value>) -> Response {
+    let mut kept = custody.kept();
+    if kept.down {
+        return down();
+    }
+    let app = body["app"].as_str().unwrap_or("missing").to_owned();
+    let asked: Vec<&str> = body["credential_ids"]
+        .as_array()
+        .map(|ids| ids.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    let mut ended = Vec::new();
+    for held in &mut kept.issued {
+        if held.app == app && !held.ended && asked.contains(&held.credential_id.as_str()) {
+            held.ended = true;
+            ended.push(held.credential_id.clone());
+        }
+    }
+    Json(json!({"app": app, "ended": ended})).into_response()
 }

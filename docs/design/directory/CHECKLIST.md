@@ -514,5 +514,5 @@
 ## A product signs people in with a virtual client credential an administrator issues, authenticated by the broker (DIRECTORY-081)
 
 - [ ] **C494** — The token exchange authenticates a lys-client. credential by asking the broker, never falls back to the digest path, and refuses a revoked credential whatever its grant (DIRECTORY-081 R1).
-- [ ] **C495** — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them in the same batch as the retirement; the apps snapshot pins the two new lines (DIRECTORY-081 R2).
+- [ ] **C495** — An administrator alone issues, lists and revokes an app's client credentials, shown once and kept as a digest; retirement ends them by its one line, never waiting on the broker; the apps snapshot pins the three new lines (DIRECTORY-081 R2).
 - [ ] **C496** — The Apps screen issues a credential shown once with a copy control, lists who issued and revoked each, and revokes with confirmation (DIRECTORY-081 R3).

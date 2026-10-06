@@ -8,7 +8,7 @@ use super::*;
 const BACK: &str = "https://notes.example.test/signed-in";
 
 #[tokio::test]
-async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_signed_body()
+async fn only_administrator_issues_and_revokes_a_client_credential_and_the_broker_gets_signed_bodies()
 -> TestResult {
     use identity_contract::apps::{Auth, ok, op, post, registration, workspace_schema};
     use identity_contract::harness::ADMINISTRATOR;
@@ -31,10 +31,10 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         &json!({"operation":approval_operation, "redirects": [BACK], "profile": false}),
     )
     .await?)?;
-    assert!(approved["client"].is_null());
+    assert!(approved.get("client").is_none(), "{approved}");
     assert_eq!(approved["credentials"]["app"], app);
     // The stand-in has custody of this fixed fixture value; it was not returned
-    // by approval. Manual save remains available for already-issued credentials.
+    // by approval, and no route takes or answers it.
     let fixture = "ab".repeat(32);
     let secret = fixture.as_str();
     let prepared = received(&setup.log);
@@ -50,58 +50,71 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         &json!({"operation":approval_operation, "redirects": [BACK], "profile": false}),
     )
     .await?)?;
-    assert!(replay["client"].is_null());
+    assert!(replay.get("client").is_none(), "{replay}");
     assert!(!replay.to_string().contains(secret));
     assert!(
         received(&setup.log).is_empty(),
         "replay must not prepare again"
     );
-    let path = format!("/apps/{app}/credentials/save");
-    let body = json!({"client_secret":secret});
+    let path = format!("/apps/{app}/credentials/issue");
+    let body = json!({"operation": op()?});
     assert_eq!(
         post(&setup.service, &path, Auth::Cookie(&bea), &body)
             .await?
             .0,
         403
     );
-    assert_ne!(
-        post(
-            &setup.service,
-            &path,
-            Auth::Cookie(&admin),
-            &json!({"client_secret":"wrong"})
-        )
-        .await?
-        .0,
-        200
-    );
     let malformed = post(
         &setup.service,
         &path,
         Auth::Cookie(&admin),
-        &json!({"client_secret": secret, "owner":"person-other"}),
+        &json!({"operation": op()?, "owner":"person-other"}),
     )
     .await?;
     assert_eq!(malformed.0, 400);
     assert_eq!(malformed.1["refusal"], "RequestMalformed");
-    assert!(!malformed.1.to_string().contains(secret));
     assert!(
         received(&setup.log).is_empty(),
         "refusals never reached the broker"
     );
     let answer = ok(post(&setup.service, &path, Auth::Cookie(&admin), &body).await?)?;
+    assert_eq!(answer["credential_id"], CREDENTIAL_ID);
+    assert!(
+        answer["credential"]
+            .as_str()
+            .is_some_and(|value| value.starts_with(&format!("lys-client.{app}."))),
+        "{answer}"
+    );
     assert!(!answer.to_string().contains(secret));
     let calls = received(&setup.log);
     assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].path, "/_lys/apps/save");
+    assert_eq!(calls[0].path, "/_lys/apps/client/issue");
     signed_as_received(&calls[0], &setup.key)?;
-    let saved: Value = serde_json::from_slice(&calls[0].body)?;
-    assert_eq!(saved["app"], app);
-    assert_eq!(saved["client_secret"], secret);
-    assert!(
-        saved.get("owner").is_none(),
-        "browser cannot supply an owner"
+    let issued: Value = serde_json::from_slice(&calls[0].body)?;
+    assert_eq!(
+        issued,
+        json!({"app": app}),
+        "the browser cannot supply an owner"
     );
+    setup.log.lock().expect("fixture lock poisoned").clear();
+    let revoke = format!("/apps/{app}/credentials/{CREDENTIAL_ID}/revoke");
+    let revoked = json!({"operation": op()?, "reason": "rotated"});
+    assert_eq!(
+        post(&setup.service, &revoke, Auth::Cookie(&bea), &revoked)
+            .await?
+            .0,
+        403
+    );
+    assert!(received(&setup.log).is_empty());
+    let view = ok(post(&setup.service, &revoke, Auth::Cookie(&admin), &revoked).await?)?;
+    assert_eq!(view["client_credentials"][0]["live"], false);
+    assert_eq!(view["client_credentials"][0]["ended_at_broker"], true);
+    let calls = received(&setup.log);
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].path, "/_lys/apps/client/end");
+    signed_as_received(&calls[0], &setup.key)?;
+    let ended: Value = serde_json::from_slice(&calls[0].body)?;
+    assert_eq!(ended["credential_ids"], json!([CREDENTIAL_ID]));
     Ok(())
 }
 

@@ -13,16 +13,18 @@
 //! it (`apps_sign_in`); it binds the service
 //! account the registration names, makes the registered schema version 1
 //! and gives its kinds to the grants. A declined app never takes effect. A
-//! retired app's client credential is refused and every check on its kinds
-//! is refused `app_retired`; its grants stay in the log, readable. The app
-//! `lys` is never retired.
+//! retired app's client credentials are ended by its retirement's one line,
+//! which never waits on the secrets broker, and every check on its kinds is
+//! refused `app_retired`; its grants stay in the log, readable. The app `lys`
+//! is never retired. An approved app's client credentials are issued and
+//! revoked by the administrator (`apps_client_credentials`).
 //!
 //! Lys calls no app: a redirect address is kept to be sent back to, never
 //! fetched, and nothing here waits on or reads anything an app holds.
 //!
 //! Each act is sent under an operation id; the same act sent again in the
-//! same words answers what it did and writes nothing, except that an
-//! approval's secret is answered only the first time.
+//! same words answers what it did and writes nothing, except that a client
+//! credential's or a registrar's value is answered only the first time.
 
 use std::path::Path;
 use std::str::FromStr;
@@ -106,8 +108,12 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/apps/{app}/approve", post(approve))
         .route("/apps/{app}/sign_in", post(crate::apps_sign_in::set))
         .route(
-            "/apps/{app}/credentials/save",
-            post(crate::apps_credentials::save),
+            "/apps/{app}/credentials/issue",
+            post(crate::apps_client_credentials::issue),
+        )
+        .route(
+            "/apps/{app}/credentials/{credential}/revoke",
+            post(crate::apps_client_credentials::revoke),
         )
         .route("/apps/{app}/decline", post(decline))
         .route("/apps/{app}/retire", post(retire))
@@ -424,7 +430,6 @@ async fn approve(
             }
             return Ok(Approval {
                 app: view(apps, &id)?,
-                client: None,
                 credentials: None,
             });
         }
@@ -474,7 +479,6 @@ async fn approve(
         )?;
         Ok(Approval {
             app: view(apps, &id)?,
-            client: None,
             credentials: Some(credentials),
         })
     })?;
@@ -534,7 +538,11 @@ async fn retire(
         }
         .into());
     }
-    decided(&state, &headers, &id, &body, Line::Retired).map(Json)
+    // The retirement is kept first and ends every client credential the app
+    // holds by its one line; the broker's ending follows and is never waited on.
+    let answer = decided(&state, &headers, &id, &body, Line::Retired)?;
+    crate::apps_client_credentials::ended_after(&state, &headers, &id).await;
+    Ok(Json(answer))
 }
 
 /// Make a service account a registrar, answering its credential once.

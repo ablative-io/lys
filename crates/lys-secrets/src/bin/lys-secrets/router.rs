@@ -14,8 +14,10 @@ use crate::serve::Shared;
 /// The broker's routes over `shared`.
 pub fn routes(shared: Arc<Shared>) -> Router {
     Router::new()
-        .route("/_lys/apps/prepare", post(crate::save_app::save))
-        .route("/_lys/apps/save", post(crate::save_app::save))
+        .route("/_lys/apps/prepare", post(crate::save_app::prepare))
+        .route("/_lys/apps/client", post(crate::app_client::authenticate))
+        .route("/_lys/apps/client/issue", post(crate::app_client::issue))
+        .route("/_lys/apps/client/end", post(crate::app_client::end))
         .route("/_lys/secrets", get(crate::view::secrets))
         .route("/_lys/audit", get(crate::view::audit))
         .route("/_lys/grants", get(crate::view::grants))

@@ -3,23 +3,23 @@
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 
-use super::{KEPT, login_from};
+use super::{KEPT, fixture, login, login_from};
 
 /// A variable the invoking shell could carry and no service may: the
 /// shape of a harness's config folder.
 const LEAK: &str = "LYS_TEST_HARNESS_CONFIG_DIR";
 
-/// This process's variables with the leak added.
-fn process_with_leak() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
-    let mut process: Vec<(std::ffi::OsString, std::ffi::OsString)> = std::env::vars_os().collect();
+/// The test login's variables with the leak added; never this process's.
+fn process_with_leak() -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, Box<dyn Error>> {
+    let mut process = fixture::variables()?;
     process.push((LEAK.into(), "/leaked".into()));
-    process
+    Ok(process)
 }
 
 #[test]
 fn the_login_environment_keeps_the_login_and_nothing_of_the_invoking_process()
 -> Result<(), Box<dyn Error>> {
-    let environment = login_from(process_with_leak())?;
+    let environment = login_from(process_with_leak()?)?;
     let variables: Vec<(&str, &str)> = environment.variables().collect();
     assert!(
         !variables.iter().any(|(name, _)| *name == LEAK),
@@ -31,9 +31,9 @@ fn the_login_environment_keeps_the_login_and_nothing_of_the_invoking_process()
             "{name} is not a login variable"
         );
     }
-    let home = std::env::var("HOME")?;
+    let home = fixture::home();
     assert!(
-        variables.contains(&("HOME", home.as_str())),
+        variables.contains(&("HOME", home.to_str().ok_or("a home in text")?)),
         "HOME is the login's"
     );
     let (_, path) = variables
@@ -59,7 +59,7 @@ fn a_login_profile_that_prints_does_not_become_part_of_path() -> Result<(), Box<
         "#!/bin/sh\necho 'Last login: noise from a profile'\n/bin/sh \"$@\"\necho 'bye from a logout file'\n",
     )?;
     std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700))?;
-    let mut process = process_with_leak();
+    let mut process = process_with_leak()?;
     process.retain(|(name, _)| name != "SHELL");
     process.push(("SHELL".into(), shell.into()));
     let environment = login_from(process)?;
@@ -83,7 +83,7 @@ fn a_login_profile_that_prints_does_not_become_part_of_path() -> Result<(), Box<
     let mute = dir.path().join("mute-shell");
     std::fs::write(&mute, "#!/bin/sh\necho 'nothing'\n")?;
     std::fs::set_permissions(&mute, std::fs::Permissions::from_mode(0o700))?;
-    let mut process = process_with_leak();
+    let mut process = process_with_leak()?;
     process.retain(|(name, _)| name != "SHELL");
     process.push(("SHELL".into(), mute.into()));
     let refusal = login_from(process)
@@ -98,7 +98,7 @@ fn a_login_profile_that_prints_does_not_become_part_of_path() -> Result<(), Box<
     let open = dir.path().join("open-shell");
     std::fs::write(&open, "#!/bin/sh\nprintf 'LYS_LOGIN_PATH:/bin'\n")?;
     std::fs::set_permissions(&open, std::fs::Permissions::from_mode(0o700))?;
-    let mut process = process_with_leak();
+    let mut process = process_with_leak()?;
     process.retain(|(name, _)| name != "SHELL");
     process.push(("SHELL".into(), open.into()));
     let refusal = login_from(process)
@@ -119,7 +119,7 @@ fn a_login_profile_that_prints_does_not_become_part_of_path() -> Result<(), Box<
         "#!/bin/sh\nprintf 'LYS_LOGIN_PATH:/bin:LYS_LOGIN_PATH_END'\n",
     )?;
     std::fs::set_permissions(&half, std::fs::Permissions::from_mode(0o700))?;
-    let mut process = process_with_leak();
+    let mut process = process_with_leak()?;
     process.retain(|(name, _)| name != "SHELL");
     process.push(("SHELL".into(), half.into()));
     let refusal = login_from(process)
@@ -131,5 +131,47 @@ fn a_login_profile_that_prints_does_not_become_part_of_path() -> Result<(), Box<
             .contains("did not answer its ANTHROPIC_BASE_URL"),
         "{refusal}"
     );
+    Ok(())
+}
+
+#[test]
+fn a_login_without_a_shell_is_refused_in_the_product_s_words() -> Result<(), Box<dyn Error>> {
+    let mut process = process_with_leak()?;
+    process.retain(|(name, _)| name != "SHELL");
+    let refusal = login_from(process)
+        .err()
+        .ok_or("a login without SHELL must be refused")?;
+    assert_eq!(refusal.kind(), super::ErrorKind::Unready, "{refusal}");
+    assert!(
+        refusal
+            .to_string()
+            .contains("SHELL is not set; start the install from a login"),
+        "{refusal}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_test_build_starts_the_test_login_s_shell_and_never_the_runner_s() -> Result<(), Box<dyn Error>>
+{
+    let environment = login()?;
+    let variables: Vec<(&str, &str)> = environment.variables().collect();
+    let shell = fixture::shell();
+    assert!(
+        variables.contains(&("SHELL", shell.to_str().ok_or("a shell in text")?)),
+        "{variables:?}"
+    );
+    let home = fixture::home();
+    assert!(
+        variables.contains(&("HOME", home.to_str().ok_or("a home in text")?)),
+        "{variables:?}"
+    );
+    // Only the test login's shell answers this PATH: the runner's own login
+    // shell would answer the runner's.
+    assert!(
+        variables.contains(&("PATH", fixture::PATH)),
+        "{variables:?}"
+    );
+    assert_eq!(environment.anthropic_base(), None);
     Ok(())
 }

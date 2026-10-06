@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import socket
 import subprocess
 import sys
@@ -17,7 +18,9 @@ from upgrade_fixture import (
     Browser, admitted_after_upgrade, observe, populate, restored_records, same_records,
 )
 from upgrade_legacy import seed as seed_legacy, verify as verify_legacy
-from upgrade_window import MARKER, legacy_files, pending, profile_file, unchanged
+from upgrade_window import (
+    MARKER, legacy_files, no_operator_token, pending, profile_file, unchanged,
+)
 from upgrade_negative import exercise as exercise_negative, put_back as release_put_back
 from upgrade_restart import settle as settle_restart
 from upgrade_provenance import seed as seed_provenance, verify as verify_provenance
@@ -25,6 +28,7 @@ from upgrade_provenance import seed as seed_provenance, verify as verify_provena
 from upgrade_preflight import socket_paths
 from upgrade_teardown import terminate_fixture
 from upgrade_layout import inventory, executables, harness_inventory, harness_paths
+from upgrade_login import login
 from upgrade_release import old_release
 
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
@@ -525,17 +529,9 @@ def exercise(args):
     installed_stamp = partial(stamp, programs=args.prepared["layouts"]["old"]["installed_binaries"])
     project = "lys-upgrade-proof-" + str(os.getpid())
     browser = Browser(installation(root, args.old_source, project))
-    headless = args.work / "headless"
-    headless.mkdir()
-    for name in ["open", "xdg-open"]:
-        executable = headless / name
-        executable.write_text("#!/bin/sh\nexit 1\n")
-        executable.chmod(0o700)
-    env = dict(
-        os.environ,
-        PATH=str(headless) + os.pathsep + os.environ["PATH"],
-        PYTHONDONTWRITEBYTECODE="1",
-    )
+    # Every real program here starts with this named login, never the
+    # proof's own environment.
+    env = login(args.work)
     installed = [
         str(args.old_bin / "lys"),
         "identity",
@@ -725,20 +721,33 @@ def exercise(args):
             )
             verify_provenance(browser, provenance)
             operator_config = json.loads(config_file.read_text())
-            operator_path = Path(operator_config["operator_token_file"]).resolve()
-            if not operator_path.is_relative_to(root):
-                raise RuntimeError("operator token leaves fixture after commit")
             held_proof = json.loads((evidence / "window.json").read_text())
-            if (
-                hashlib.sha256(operator_path.read_bytes()).hexdigest()
-                != held_proof["operator_token_sha256"]
-            ):
-                raise RuntimeError("operator token changed between refusal and post-clear control")
-            operator_people = browser.ask(
-                "GET", "/directory/people", operator=operator_path.read_text().strip()
-            )
-            if operator_people != browser.ask("GET", "/directory/people"):
-                raise RuntimeError("valid post-clear operator read differs from administrator read")
+            if held_proof["operator_token_sha256"] is None:
+                # A service install keeps no operator token after the window either, and a
+                # presented one is refused as a token the service does not hold.
+                no_operator_token(root, operator_config)
+                refused = browser.ask(
+                    "GET", "/directory/people", expected_status=401, operator=secrets.token_hex(32)
+                )
+                if (
+                    refused.get("refusal") != "OperatorRefused"
+                    or "holds no operator token" not in refused.get("reason", "")
+                ):
+                    raise RuntimeError("post-clear operator read was not refused as no token held")
+            else:
+                operator_path = Path(operator_config["operator_token_file"]).resolve()
+                if not operator_path.is_relative_to(root):
+                    raise RuntimeError("operator token leaves fixture after commit")
+                if (
+                    hashlib.sha256(operator_path.read_bytes()).hexdigest()
+                    != held_proof["operator_token_sha256"]
+                ):
+                    raise RuntimeError("operator token changed between refusal and post-clear control")
+                operator_people = browser.ask(
+                    "GET", "/directory/people", operator=operator_path.read_text().strip()
+                )
+                if operator_people != browser.ask("GET", "/directory/people"):
+                    raise RuntimeError("valid post-clear operator read differs from administrator read")
             after = observe(browser, ids)
             (evidence / "after.json").write_text(json.dumps(after, indent=2))
             same_records(before, after)

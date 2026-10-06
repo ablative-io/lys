@@ -87,6 +87,13 @@ pub(crate) const DECIDE: &[&str] = &[
     "app_decided",
     "app_operation_reused",
 ];
+/// An issue or a revocation of an app's client credential.
+pub(crate) const CREDENTIAL: &[&str] = &[
+    "app_unknown",
+    "app_not_approved",
+    "app_retired",
+    "app_operation_reused",
+];
 /// A retirement.
 pub(crate) const RETIRE: &[&str] = &["NotAdmitted", "app_unknown", "app_is_lys", "app_retired"];
 /// A schema change.

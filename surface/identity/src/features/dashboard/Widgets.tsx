@@ -73,7 +73,7 @@ export function budgetPart({ rows }: { rows: DashboardAgent[] }) {
   return part("Budget", reached ? reached + ' at limit' : known.length + ' limited', "#/people", <>
     <table className="dash-table"><tbody>
       {limited.map(({ row, near, line }) => <tr key={row.agent.id} data-budget={row.agent.id}>
-        <td>{row.agent.display_name}</td>
+        <td className="dash-name">{row.agent.display_name}</td>
         <td className="sec">{line.refused ? <small className="refusal-name why-not">{line.words}</small> : <>
           <span className="dash-bar" role="img" aria-label={near < 0 ? 'Nothing reported yet' : Math.round(near * 100) + '% of the nearest limit'}>
             <span className={near >= 1 ? 'full' : ''} style={{ width: Math.max(0, Math.min(1, near)) * 100 + '%' }} /></span>

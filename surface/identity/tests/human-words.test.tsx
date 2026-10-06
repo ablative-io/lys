@@ -137,7 +137,7 @@ async function clickNamed(view: HTMLElement, name: string) {
 it('shows app approval from its response without relying on another list read', async () => {
   const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: ['https://notes.example.test/back'], sign_in: null,
     schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null,
-    service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+    service_account: null, client_credentials: [], registered_by: { kind: 'start' }, registered_at: 1 };
   const signIn = { redirects: ['https://notes.example.test/back'], profile: false, operation: 'op-approve', by: { kind: 'start' }, at: 2 };
   let reads = 0;
   const sent: unknown[] = [];
@@ -201,7 +201,7 @@ it('shows the kept review and its person from the confirmed answer without rerea
 
 
 it('refuses an approval answer for a different app without displaying success or reading again', async () => {
-  const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: ['https://notes.example.test/back'], sign_in: null, schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+  const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: ['https://notes.example.test/back'], sign_in: null, schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null, service_account: null, client_credentials: [], registered_by: { kind: 'start' }, registered_at: 1 };
   const signIn = { redirects: ['https://notes.example.test/back'], profile: false, operation: 'op-approve', by: { kind: 'start' }, at: 2 };
   let reads = 0;
   vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
@@ -219,7 +219,7 @@ it('refuses an approval answer for a different app without displaying success or
 });
 
 it('does not let the saved approval hide a later retirement answer', async () => {
-  const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: ['https://notes.example.test/back'], sign_in: null, schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+  const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: ['https://notes.example.test/back'], sign_in: null, schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null, service_account: null, client_credentials: [], registered_by: { kind: 'start' }, registered_at: 1 };
   const approved = { ...pending, state: 'approved', version: 1, versions: [1], sign_in: { redirects: ['https://notes.example.test/back'], profile: false, operation: 'op-approve', by: { kind: 'start' }, at: 2 } };
   let retired = false;
   let reads = 0;

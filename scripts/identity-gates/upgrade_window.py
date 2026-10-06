@@ -4,12 +4,15 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import secrets
 
 from upgrade_fixture import Browser, operation
 from upgrade_provenance import verify as verify_provenance
 from upgrade_legacy import verify
 
 MARKER = "lys-disposable-upgrade-proof/v1"
+# The name a development install's operator token file has under state/.
+OPERATOR_TOKEN_NAME = "operator-token"
 
 
 def family_files(root, config):
@@ -85,11 +88,33 @@ def refused_writes(fixture, provisioning):
 
 
 
+def no_operator_token(root, config):
+    """A service install keeps no standing operator token: its configuration names none, and
+    no operator token file exists anywhere under the install."""
+    if "operator_token_file" not in config or config["operator_token_file"] is not None:
+        raise RuntimeError("the installed configuration must name operator_token_file as null")
+    held = [str(path) for path in root.rglob(OPERATOR_TOKEN_NAME)]
+    if held:
+        raise RuntimeError(f"a service install holds an operator token file: {held}")
+
+
 def refuse_operator(browser, root, config):
-    """A valid install operator cannot emit a v1 record while old-reader rollback is possible."""
-    token = Path(config["operator_token_file"]).resolve()
+    """A presented operator token cannot emit a v1 record while old-reader rollback is possible.
+    With a token file the install's own token is presented; a service install names none, so its
+    absence is proved and a token of the same shape is presented instead. Answers the token
+    file's digest, or None when the install keeps none."""
+    named = config.get("operator_token_file")
+    if named is None:
+        no_operator_token(root, config)
+        token = None
+        presented = secrets.token_hex(32)
+    else:
+        token = Path(named).resolve()
+        if not token.is_relative_to(root):
+            raise RuntimeError("operator proof paths leave the disposable root")
+        presented = token.read_text().strip()
     directory = Path(config["log_dir"]).resolve()
-    if not token.is_relative_to(root) or not directory.is_relative_to(root):
+    if not directory.is_relative_to(root):
         raise RuntimeError("operator proof paths leave the disposable root")
     def leaves():
         return {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
@@ -99,11 +124,11 @@ def refuse_operator(browser, root, config):
         raise RuntimeError("operator proof requires a nonempty identity log")
     answer = browser.ask("POST", "/agents", {
         "operation": operation(), "display_name": "Must not be admitted during rollback",
-    }, expected_status=401, operator=token.read_text().strip())
+    }, expected_status=401, operator=presented)
     if answer.get("refusal") != "OperatorRefused" or "reversible" not in answer.get("reason", ""):
         raise RuntimeError("operator write did not name the reversible upgrade refusal")
     unchanged(before, leaves())
-    return hashlib.sha256(token.read_bytes()).hexdigest()
+    return None if token is None else hashlib.sha256(token.read_bytes()).hexdigest()
 
 
 def check(root):
