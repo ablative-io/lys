@@ -356,7 +356,7 @@
 - [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed at open, at each committed append and at each settle that adopts leaves, under the log's own origin (DIRECTORY-058 R1).
 - [ ] **C404** — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).
 - [ ] **C497** — Every grant change's receipt is read back from GET /grant-receipts/{index} with the grant log's signed head and an inclusion proof, and one function verifies it against a pinned key (DIRECTORY-058 R3).
-- [ ] **C498** — Every sign-in Lys admits and every sign-in it refuses for a known identity is a change in the directory log with a receipt, carrying no credential (DIRECTORY-058 R4).
+- [ ] **C498** — Every sign-in Lys admits and every sign-in it refuses, for a registered identity or an unregistered issuer-subject claim, is a change in the directory log with a receipt, carrying no credential (DIRECTORY-058 R4).
 
 ## Installed audit sender
 

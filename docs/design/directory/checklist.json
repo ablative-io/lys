@@ -1396,7 +1396,7 @@
         },
         {
           "id": "C498",
-          "text": "Every sign-in Lys admits and every sign-in it refuses for a known identity is a change in the directory log with a receipt, carrying no credential (DIRECTORY-058 R4).",
+          "text": "Every sign-in Lys admits and every sign-in it refuses, for a registered identity or an unregistered issuer-subject claim, is a change in the directory log with a receipt, carrying no credential (DIRECTORY-058 R4).",
           "done": false
         }
       ]
