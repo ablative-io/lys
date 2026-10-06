@@ -626,6 +626,12 @@
       "by": "Archie",
       "subject": "R5: amendment 44 completed; the request digest's canonical encoding is named in the code, and a v1 record of each managed kind is proved impossible or refused",
       "ruling": "Amendment 44 was written as Waffles ruled at the same moment (0bb275ae). His ruling adds three conditions, and they bind with amendment 44. 1. The digest is taken over one canonical encoding of the typed request: field order and integer forms fixed, no display text. That encoding is named in the code as one function the digest alone uses. 2. A test shows that the same request yields the same digest after a reopen, beside amendment 44's known-digest test. 3. The v1 migration's absent identity is correct only because v1 cannot hold these managed variants. So a test proves, for each managed request kind (GoalReminder, ContextCompact and every other variant this box adds to the operation request), that a v1 record of that kind cannot be constructed or is refused by name at migration. This replaces amendment 44's narrower test that a migrated v1 retry with the same text is answered as before; that test may stay as well. The reds, the v2 change in place under amendment 41, the pruning and permanent spent-ID refusal, and the six R5 files are as amendment 44 records them (Waffles 0bb275ae)."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R5: amendment 44's cost corrected (a retry hashes its own request), and the managed request kinds named",
+      "ruling": "Amendment 44 said a retry costs one 32-byte comparison. That was wrong. A same-ID retry hashes its own incoming typed request once and then compares 32 bytes with the retained identity, and first acceptance hashes once too (Brisket 8f221c46). The fixed typed encoding is streamed straight into SHA-256, with no whole-request buffer, no state clone, no history scan and no added sync. A digest supplied by the caller is never taken as proof. The managed request kinds this box adds are goal_reminder, context_compact and boundary_reply, and amendment 45's v1 migration test names all three."
     }
   ]
 }
