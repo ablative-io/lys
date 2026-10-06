@@ -74,7 +74,13 @@ impl Sessions {
     pub fn resize(&self, id: &str, columns: u16, rows: u16) -> Result<(), RunnerError> {
         let mut table = self.lock()?;
         let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-        crate::pty::resize(&*session.live(id)?.master, columns, rows)?;
+        let master = session.live(id)?.master.as_ref().ok_or_else(|| {
+            RunnerError::refused(
+                "control_transport_unsupported",
+                "managed pipes have no terminal to resize",
+            )
+        })?;
+        crate::pty::resize(&**master, columns, rows)?;
         session.columns = columns;
         session.rows = rows;
         Ok(())

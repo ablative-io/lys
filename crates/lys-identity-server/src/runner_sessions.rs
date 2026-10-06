@@ -6,6 +6,9 @@
 //! and stopped only once its runner said the process ended: each is kept as
 //! the runtime report the runner's answer confirms, never inferred.
 
+mod controls;
+use controls::select_transport;
+
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -338,7 +341,11 @@ pub async fn run_on_runner(
             seat,
         )?
     };
-    let missing_config = matches!(&act, Act::Start { lys_mcp: None, .. });
+    let act = select_transport(act);
+    let missing_config = matches!(
+        &act,
+        Act::Start { lys_mcp: None, .. } | Act::StartManaged { lys_mcp: None, .. }
+    );
     let act = owned_start(state, agent, act)?;
     let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
     let answer = match asked {
@@ -530,7 +537,7 @@ impl Launcher for DirectoryLauncher {
 /// A start owned by the agent's responsible person, so the runner admits
 /// input to it only for a verified caller; any other act is sent as it is.
 fn owned_start(state: &AppState, agent: &str, act: Act) -> Result<Act, ServerError> {
-    if !matches!(act, Act::Start { .. }) {
+    if !matches!(act, Act::Start { .. } | Act::StartManaged { .. }) {
         return Ok(act);
     }
     let agent = AgentId::from_str(agent)?;

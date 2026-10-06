@@ -462,3 +462,37 @@ impl Sessions {
         Ok(outcome)
     }
 }
+
+pub(crate) fn managed_take(
+    table: &mut crate::session::Table,
+    session: &str,
+    operation: &str,
+) -> Result<String, RunnerError> {
+    let queue = table
+        .operations
+        .accepted
+        .get_mut(session)
+        .ok_or_else(|| unavailable("managed operation has no accepted queue"))?;
+    if queue.back().map(String::as_str) != Some(operation) {
+        return Err(unavailable(
+            "managed operation is not the newly accepted input",
+        ));
+    }
+    queue.pop_back();
+    table
+        .operations
+        .texts
+        .remove(operation)
+        .ok_or_else(|| unavailable("managed operation has no held text"))
+}
+
+pub(crate) fn managed_state(
+    table: &mut crate::session::Table,
+    operation: &str,
+    state: OperationState,
+    reason: String,
+) -> Result<OperationOutcome, RunnerError> {
+    let outcome = table.operations.set(operation, state, reason)?;
+    feed(table, &outcome);
+    Ok(outcome)
+}

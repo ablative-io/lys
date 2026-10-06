@@ -18,6 +18,9 @@ pub use lys_home::harness::rendering_launch::File;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Whether this exact reviewed setup requires managed controls.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub requires_controls: bool,
     /// All files supplied by the renderer.
     pub files: Vec<File>,
     /// Argument positions bound to the named files.

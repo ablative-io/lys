@@ -1562,12 +1562,12 @@
         {
           "id": "C433",
           "text": "One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).",
-          "done": false
+          "done": true
         },
         {
           "id": "C434",
           "text": "Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).",
-          "done": false
+          "done": true
         },
         {
           "id": "C435",

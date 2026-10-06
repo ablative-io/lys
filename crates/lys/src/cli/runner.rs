@@ -8,6 +8,9 @@ pub const SCROLLBACK: usize = 1 << 20;
 /// `lys runner` subcommands.
 #[derive(Debug, clap::Subcommand)]
 pub enum RunnerCommand {
+    /// Enter an isolated managed process session using a startup frame on stdin.
+    #[command(hide = true)]
+    ManagedEntry,
     /// Hold each agent the server starts in its own background
     /// pseudo-terminal.
     ///

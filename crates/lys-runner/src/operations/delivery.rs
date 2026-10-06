@@ -61,6 +61,13 @@ pub(crate) fn accept(
             format!("no session {} is held", operation.session),
         )
     })?;
+    if session.ended.is_none() {
+        crate::harness_control::events::accepts(table, &operation.session, &operation.request)?;
+    }
+    let session = table
+        .sessions
+        .get(&operation.session)
+        .ok_or_else(|| RunnerError::refused("session_unknown", "session is not held"))?;
     let (state, words) = if session.ended.is_some() {
         (
             OperationState::Refused,
@@ -91,6 +98,32 @@ pub(crate) fn accept(
             .insert(operation.operation.clone(), text.to_owned());
     }
     let id = operation.session;
+    if table
+        .sessions
+        .get(&id)
+        .is_some_and(|session| session.managed.is_some())
+        && operation.request != OperationRequest::Stop
+    {
+        if let Err(error) = crate::harness_control::events::enqueue_operation(
+            table,
+            &id,
+            &operation.operation,
+            &operation.request,
+        ) {
+            let refused = table.operations.set(
+                &operation.operation,
+                OperationState::Refused,
+                error.to_string(),
+            )?;
+            feed(table, &refused);
+            return Ok(refused);
+        }
+        return table
+            .operations
+            .get(&operation.operation)
+            .cloned()
+            .ok_or_else(|| unavailable("managed operation record disappeared"));
+    }
     if operation.request == OperationRequest::Stop {
         return Ok(outcome);
     }

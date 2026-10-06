@@ -25,7 +25,7 @@ rand.workspace = true
 # `wait` takes a regular expression only when the caller names one.
 regex-lite.workspace = true
 # Ending a session's whole process group, through a safe interface.
-rustix = { workspace = true, features = ["net"] }
+rustix = { workspace = true, features = ["net", "process"] }
 # The dial bridge's TLS: rustls with ring and the Mozilla roots, each pinned
 # at the version already in the lock, as lys-home pins them.
 rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }

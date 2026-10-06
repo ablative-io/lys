@@ -197,6 +197,9 @@ pub struct Settings {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SessionSettings {
+    /// Whether starts require a qualified managed control adapter.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub requires_controls: bool,
     /// The harness's compaction command, typed as one line; none when the
     /// harness has none, and then a compaction is refused by name.
     #[serde(default, skip_serializing_if = "Option::is_none")]

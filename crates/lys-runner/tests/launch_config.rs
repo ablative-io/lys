@@ -28,6 +28,7 @@ fn launch() -> Launch {
         rotation: None,
         policy: None,
         config: Some(Config {
+            requires_controls: false,
             files: vec![File {
                 path: "settings.json".to_owned(),
                 text: "exact settings".to_owned(),
@@ -330,6 +331,7 @@ fn mcp_launch(codex: bool) -> Launch {
         ("mcp.json", r#"{"mcpServers":{}}"#)
     };
     launch.config = Some(Config {
+        requires_controls: false,
         files: vec![File {
             path: path.to_owned(),
             text: text.to_owned(),
@@ -590,5 +592,19 @@ fn signed_start_without_pass_leaves_both_native_configs_unchanged() -> TestResul
         )?;
         assert_eq!(Redacted(text), Redacted(file.text));
     }
+    Ok(())
+}
+
+#[test]
+fn old_config_stays_manual_and_control_requirement_is_typed() -> TestResult {
+    let old = serde_json::json!({"files":[],"argument_files":{},"environment_paths":{},"working_directory":false});
+    let config: Config = serde_json::from_value(old.clone())?;
+    assert_eq!(serde_json::to_value(config)?, old);
+    let mut required = old;
+    required["requires_controls"] = serde_json::json!(true);
+    let config: Config = serde_json::from_value(required.clone())?;
+    assert_eq!(serde_json::to_value(config)?, required);
+    required["requires_controls"] = serde_json::json!("true");
+    assert!(serde_json::from_value::<Config>(required).is_err());
     Ok(())
 }

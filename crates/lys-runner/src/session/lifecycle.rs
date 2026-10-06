@@ -29,6 +29,7 @@ pub use crate::peer::Collected;
 
 mod drain;
 mod launch;
+mod managed;
 mod stream;
 mod terminal;
 
@@ -82,6 +83,9 @@ pub(super) struct SpawnPlan {
     environment: std::collections::BTreeMap<String, String>,
     columns: u16,
     rows: u16,
+    session: String,
+    generation: u64,
+    managed: Option<crate::harness_control::Settings>,
 }
 
 pub(super) fn plan(session: &Session, resumed: bool) -> Result<SpawnPlan, RunnerError> {
@@ -106,11 +110,28 @@ pub(super) fn plan(session: &Session, resumed: bool) -> Result<SpawnPlan, Runner
         environment,
         columns: session.columns,
         rows: session.rows,
+        session: launch.session.clone(),
+        generation: session.generation.checked_add(1).ok_or_else(|| {
+            RunnerError::refused(
+                "control_generation_invalid",
+                "session generation overflowed",
+            )
+        })?,
+        managed: session.managed.clone(),
     })
 }
 
+struct Spawned {
+    reader: Box<dyn Read + Send>,
+    writer: crate::input::Input,
+    master: Option<Box<dyn portable_pty::MasterPty + Send>>,
+    child: Box<dyn Child + Send + Sync>,
+    pid: u32,
+    control: Option<crate::harness_control::events::Runtime>,
+}
+
 pub(super) struct Prepared {
-    spawned: Option<crate::pty::Spawned>,
+    spawned: Option<Spawned>,
     leader: Leader,
 }
 
@@ -169,6 +190,9 @@ impl Sessions {
         {
             probe();
         }
+        if let Some(managed) = &plan.managed {
+            return self.run_managed(plan, managed);
+        }
         let mut spawned = crate::pty::spawn(&crate::pty::Spawn {
             program: &plan.program,
             arguments: &plan.arguments,
@@ -192,7 +216,14 @@ impl Sessions {
             start,
         };
         Ok(Prepared {
-            spawned: Some(spawned),
+            spawned: Some(Spawned {
+                reader: spawned.reader,
+                writer: crate::input::Input::new(spawned.writer),
+                master: Some(spawned.master),
+                child: spawned.child,
+                pid: spawned.pid,
+                control: None,
+            }),
             leader,
         })
     }
@@ -222,8 +253,9 @@ impl Sessions {
         session.guard.leader = Some(prepared.leader.clone());
         session.leader_start = Some(prepared.leader.clone());
         session.live = Some(Live {
-            writer: crate::input::Input::new(spawned.writer),
+            writer: spawned.writer,
             master: spawned.master,
+            control: spawned.control,
             pid: spawned.pid,
             leader: Some(prepared.leader.clone()),
         });
@@ -249,13 +281,38 @@ impl Sessions {
             child,
             output,
         } = pending;
+        let managed = self
+            .lock()?
+            .sessions
+            .get(id)
+            .is_some_and(|session| session.managed.is_some());
+        if managed {
+            if let Err(error) = self.managed_bootstrap(id, generation) {
+                return self.activation_failed(
+                    id,
+                    generation,
+                    &output,
+                    FailedActivation {
+                        pid,
+                        child,
+                        pump: None,
+                        failure: error,
+                    },
+                );
+            }
+        }
         let pumped = Arc::clone(self);
         let owned = id.to_owned();
         let pumped_output = Arc::clone(&output);
         let pump = match std::thread::Builder::new()
             .name("runner-output".to_owned())
-            .spawn(move || pumped.pump(&owned, generation, &pumped_output, reader))
-        {
+            .spawn(move || {
+                if managed {
+                    pumped.managed_read(&owned, generation, reader);
+                } else {
+                    pumped.pump(&owned, generation, &pumped_output, reader);
+                }
+            }) {
             Ok(pump) => pump,
             Err(error) => {
                 let failure =

@@ -77,6 +77,7 @@ pub(crate) fn build(
         directory: record.working_directory.clone(),
         environment: native.environment,
         config: Some(lys_runner::launch_config::Config {
+            requires_controls: crate::launch_template::requires_controls(version),
             files: native.files,
             argument_files: native.argument_files,
             environment_paths: native.environment_paths,

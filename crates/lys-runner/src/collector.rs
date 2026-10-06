@@ -15,6 +15,7 @@ use crate::tracking::{Harness, Reading};
 use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 
 pub(crate) mod status;
+mod stop;
 
 #[cfg(test)]
 #[path = "../tests/collector_binding/cases.rs"]
@@ -90,25 +91,13 @@ impl Sessions {
             "Stop" if input.get("stop_hook_active").and_then(Value::as_bool) == Some(true) => Ok(
                 "stop_hook_active: the harness is already continuing from a stop hook, so this is no boundary".to_owned(),
             ),
-            "Stop" | "SessionEnd" => {
-                self.read_source(id, None);
-                let name = if event == "Stop" { "turn_end" } else { "session_end" };
-                let mut table = self.lock()?;
-                flushed(&mut table, self.runner(), id, name)?;
-                if event == "Stop" {
-                    if let Some(session) = table.sessions.get_mut(id) {
-                        session.guard.idle = true;
-                    }
-                    crate::operations::deliver(&mut table, id);
-                }
-                drop(table);
-                self.wake();
-                Ok(format!("{name} kept"))
-            }
+            "Stop" | "SessionEnd" => self.hook_stop(id, event),
             "PreCompact" => {
                 let mut table = self.lock()?;
                 append(&mut table, id, vec![boundary("compacting", None)], None)?;
-                crate::operations::compacting(&mut table, id);
+                if table.sessions.get(id).is_none_or(|session| session.managed.is_none()) {
+                    crate::operations::compacting(&mut table, id);
+                }
                 drop(table);
                 self.wake();
                 Ok("compacting kept".to_owned())
@@ -339,10 +328,16 @@ impl Sessions {
         self.read_source(id, None);
         let mut table = self.lock()?;
         flushed_at(&mut table, self.runner(), id, "turn_end", turn)?;
-        if let Some(session) = table.sessions.get_mut(id) {
-            session.guard.idle = true;
+        if table
+            .sessions
+            .get(id)
+            .is_none_or(|session| session.managed.is_none())
+        {
+            if let Some(session) = table.sessions.get_mut(id) {
+                session.guard.idle = true;
+            }
+            crate::operations::deliver(&mut table, id);
         }
-        crate::operations::deliver(&mut table, id);
         drop(table);
         self.wake();
         Ok("the turn's end kept".to_owned())

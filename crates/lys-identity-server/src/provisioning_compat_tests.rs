@@ -56,3 +56,71 @@ fn an_old_profile_rewritten_without_edits_keeps_its_exact_bytes()
     assert_eq!(reopened.profiles(), store.profiles());
     Ok(())
 }
+
+#[test]
+fn an_old_session_profile_stays_manual_and_retains_its_exact_bytes()
+-> Result<(), Box<dyn std::error::Error>> {
+    let original = br#"{
+  "profiles": [
+    {
+      "agent": "ordinary-agent",
+      "versions": [
+        {
+          "number": 1,
+          "operation": "recorded-operation",
+          "settings": {
+            "model_access": [],
+            "tools": [],
+            "skills": [],
+            "mcp_servers": [],
+            "instructions": "",
+            "note": "",
+            "session": {
+              "message_prefix": "legacy prefix",
+              "sensitive": false
+            }
+          },
+          "set_by": "ordinary-person",
+          "set_at": 1
+        }
+      ]
+    }
+  ]
+}"#;
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("provisioning.json");
+    std::fs::write(&path, original)?;
+    let mut store = ProvisioningStore::open(&path)?;
+    let version = &store
+        .profile("ordinary-agent")
+        .ok_or("old profile missing")?
+        .versions[0];
+    assert_eq!(
+        serde_json::to_value(&version.settings.session)?["requires_controls"],
+        serde_json::Value::Null
+    );
+    store.write(read(&path)?)?;
+    assert_eq!(std::fs::read(&path)?, original);
+    let mut explicit = version_fixture()?;
+    explicit["settings"]["session"]["requires_controls"] = serde_json::json!(true);
+    let version: super::Version = serde_json::from_value(explicit)?;
+    store.set("ordinary-agent", 1, version)?;
+    let reopened = ProvisioningStore::open(&path)?;
+    let current = reopened
+        .profile("ordinary-agent")
+        .ok_or("updated profile missing")?
+        .versions
+        .last()
+        .ok_or("updated version missing")?;
+    assert_eq!(
+        serde_json::to_value(&current.settings.session)?["requires_controls"],
+        true
+    );
+    Ok(())
+}
+
+fn version_fixture() -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    Ok(serde_json::from_str(
+        r#"{"number":2,"operation":"required-controls","settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"","session":{"message_prefix":"","sensitive":false}},"set_by":"ordinary-person","set_at":2}"#,
+    )?)
+}

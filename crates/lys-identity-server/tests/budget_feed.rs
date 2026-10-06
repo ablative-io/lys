@@ -181,6 +181,44 @@ fn page(session: &str, agent: &str, at: u64, kept: &str) -> TestResult<FeedPage>
             words: "denied".to_owned(),
         }),
     });
+    let binding = lys_runner::tracking_store::managed::Binding {
+        session: session.to_owned(),
+        generation: 1,
+        leader: lys_runner::peer::Leader {
+            pid: 42,
+            start: lys_runner::peer::StartIdentity("fixture-start".to_owned()),
+        },
+        conversation: "fixture-thread".to_owned(),
+        entry: lys_runner::tracking_store::managed::Executable {
+            path: "fixture-entry".to_owned(),
+            sha256: "fixture-entry-digest".to_owned(),
+        },
+        harness: lys_runner::tracking_store::managed::Executable {
+            path: "fixture-harness".to_owned(),
+            sha256: "fixture-harness-digest".to_owned(),
+        },
+        harness_version: "fixture-version".to_owned(),
+        adapter: "fixture-adapter/1".to_owned(),
+    };
+    for event in [
+        "turn_start",
+        "turn_end",
+        "turn_end",
+        "harness_compacted",
+        "harness_compacted",
+    ] {
+        entries.push(FeedEntry {
+            seq: u64::try_from(entries.len())?,
+            at,
+            session: session.to_owned(),
+            body: Body::Managed(lys_runner::tracking_store::managed::ManagedEvent {
+                binding: binding.clone(),
+                event: event.to_owned(),
+                turn: Some("fixture-turn".to_owned()),
+                operation: Some("fixture-operation".to_owned()),
+            }),
+        });
+    }
     Ok(FeedPage {
         format: FEED_FORMAT.to_owned(),
         entries,

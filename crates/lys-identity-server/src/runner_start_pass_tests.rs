@@ -17,6 +17,7 @@ fn launch(configured: bool) -> Launch {
         directory: "/".to_owned(),
         environment: BTreeMap::new(),
         config: configured.then(|| lys_runner::launch_config::Config {
+            requires_controls: false,
             files: Vec::new(),
             argument_files: BTreeMap::new(),
             environment_paths: BTreeMap::new(),

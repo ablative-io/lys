@@ -89,6 +89,17 @@ pub struct Launch {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "act", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Act {
+    /// Start an explicitly selected, versioned managed harness channel.
+    StartManaged {
+        /// Existing launch inputs and the requested channel.
+        managed: Box<crate::harness_control::ManagedLaunch>,
+        /// The same admitted Lys MCP credential configuration as a manual start.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lys_mcp: Option<LysMcp>,
+        /// Existing authoritative proxy tracking, when configured.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proxy: Option<crate::tracking_proxy::ProxyTracking>,
+    },
     /// Read the exact PTY bytes without UTF-8 replacement or boundary trimming.
     ReadBytes {
         /// The session.

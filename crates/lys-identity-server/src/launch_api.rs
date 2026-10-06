@@ -478,6 +478,7 @@ pub fn kept_launch(
         directory: text("directory")?.to_owned(),
         environment: native.environment,
         config: Some(lys_runner::launch_config::Config {
+            requires_controls: crate::launch_template::requires_controls(version),
             files,
             argument_files: native.argument_files,
             environment_paths: native.environment_paths,

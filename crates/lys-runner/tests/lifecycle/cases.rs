@@ -244,6 +244,7 @@ fn a_claude_code_launch_records_its_folder_as_trusted_before_the_spawn_and_only_
     // As the server starts a run: no tracking, the harness named on the
     // launch's config, and the configuration directory the profile chose.
     let config = crate::launch_config::Config {
+        requires_controls: false,
         files: Vec::new(),
         argument_files: BTreeMap::new(),
         environment_paths: BTreeMap::new(),
@@ -324,6 +325,7 @@ fn a_trust_dialog_the_harness_still_shows_is_answered_for_the_named_folder_only(
     )?;
     std::fs::set_permissions(&harness, std::fs::Permissions::from_mode(0o755))?;
     let config = crate::launch_config::Config {
+        requires_controls: false,
         files: Vec::new(),
         argument_files: BTreeMap::new(),
         environment_paths: BTreeMap::new(),

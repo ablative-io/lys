@@ -58,6 +58,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [tools, setTools] = useState(profile?.tools ?? []);
   const [skills, setSkills] = useState(profile?.skills ?? []);
   const [servers, setServers] = useState(profile?.mcp_servers ?? []);
+  const [requiresControls, setRequiresControls] = useState(profile?.session?.requires_controls ?? false);
   const builds = program?.builds ?? [];
   const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
   const heldListed = heldBuild && builds.some((entry) => entry.program === heldBuild.program && entry.package === heldBuild.package);
@@ -85,7 +86,9 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
     ...(runsOn ? { runs_on: runsOn } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
     ...(folder ? { working_folder: folder } : {}),
-    ...(profile?.session ? { session: profile.session } : {}),
+    session: requiresControls
+      ? { sensitive: false, ...profile?.session, requires_controls: true }
+      : profile?.session ? Object.fromEntries(Object.entries(profile.session).filter(([name]) => name !== 'requires_controls')) : profile?.session ?? null,
   };
   const where = <div className="wide">
     {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun && !folderFirst ? ' Choose one now, or when you start this agent.' : ''}</p>}
@@ -116,6 +119,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {firstRun && profile && !program?.modes.some((entry) => entry.id === mode) ? <p>The saved program settings are kept for this request.</p> : null}
     <Permissions key={programName} agent={agent} program={program} value={permissions} change={setPermissions} tools={tools} computers={machines} computer={preferred} />
     <div className="wide"><ModeWords program={program} mode={mode} sentencesOnly /></div>
+    <label className="field"><span>Require automatic context and reminder controls</span><input type="checkbox" name="requires_controls" checked={requiresControls} disabled={!canChoose} onChange={(event) => setRequiresControls(event.target.checked)} /><span className="hint">Starts are refused until this program’s managed adapter is qualified.</span></label>
     <ToolsNamed value={tools} change={setTools} />
     <McpServers key={'servers:' + programName} program={program?.name ?? ''} transports={program?.description?.mcp?.transports} value={servers} change={setServers} />
     <Skills program={program?.name ?? ''} kept={choices.skills} value={skills} change={setSkills} />

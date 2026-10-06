@@ -403,8 +403,8 @@
 
 ## Managed context and goal delivery (DIRECTORY-064)
 
-- [ ] **C433** — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).
-- [ ] **C434** — Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).
+- [x] **C433** — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).
+- [x] **C434** — Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).
 - [ ] **C435** — Enforce context thresholds at the owned boundary (DIRECTORY-064 R3).
 - [ ] **C436** — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).
 - [ ] **C437** — Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).

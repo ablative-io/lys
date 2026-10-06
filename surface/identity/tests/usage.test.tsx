@@ -289,3 +289,25 @@ describe('Usage', () => {
     expect(document.querySelectorAll('section.usage button.act svg').length).toBeGreaterThan(0);
   });
 });
+
+describe('The saved control transport', () => {
+  it('names an unavailable setup without hiding budgets or claiming a terminal transport', async () => {
+    await mount(file, { ...keeping(), ['/agents/' + SCRIBE + '/provisioning']: refused(503, 'ProvisioningUnavailable', 'profile store is unavailable') });
+    expect(text()).toContain('Control setup unavailable: ProvisioningUnavailable');
+    expect($('section[aria-label="Budgets"]')).not.toBeNull();
+    expect(text()).not.toContain('Notices use the terminal');
+  });
+
+  it('shows terminal notices for an old setup and names the unqualified managed refusal after an explicit choice', async () => {
+    for (const required of [false, true]) {
+      const routes = { ...keeping(), ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE,
+        profile: { session: required ? { requires_controls: true } : null } }) };
+      const { posted } = await mount(file, routes);
+      expect(text()).toContain(required ? 'Managed controls are required' : 'Notices use the terminal');
+      expect(text()).toContain('No managed adapter is qualified');
+      if (required) expect(text()).toContain('control_adapter_unqualified');
+      expect(posted).toEqual([]);
+      unmountAll(); document.body.innerHTML = '';
+    }
+  });
+});

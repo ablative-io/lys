@@ -52,6 +52,7 @@ pub mod dial;
 mod durable;
 pub mod error;
 pub mod folders;
+pub mod harness_control;
 pub mod injection;
 mod input;
 pub mod judge;

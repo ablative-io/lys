@@ -6,6 +6,7 @@ import { Gate } from '../signin/Gate';
 import { UsageBudgets } from './UsageBudgets';
 import { UsageGoals } from './UsageGoals';
 import { tracking } from './contract';
+import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { BudgetsView, GoalsView, UsageView } from './contract';
 import './usage.css';
 
@@ -23,6 +24,7 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
   return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals }) => {
     const tracked = tracking(usage);
     return <>
+      <ControlSetup agent={agent} />
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
@@ -44,4 +46,15 @@ export function TeamUsage({ team, name }: { team: string; name?: string }) {
     <UsageBudgets budgets={budgets} receipts={[]} changed={changed} name={name} />
     <UsageGoals agent={team} kind="team" goals={goals.goals} changed={changed} />
   </>} /></div>;
+}
+
+/** The saved setup chooses the next start; a running session is never moved by a read. */
+function ControlSetup({ agent }: { agent: string }) {
+  const load = useLoad(async () => {
+    const answer = await request<ProvisioningAnswer>('/agents/' + encodeURIComponent(agent) + '/provisioning');
+    const required = answer.profile?.session?.requires_controls;
+    if (answer.agent !== agent || (required !== undefined && typeof required !== 'boolean')) throw new Error('ControlSetupUnreadable: the saved setup did not name this agent and its control requirement.');
+    return required === true;
+  }, 'control-setup:' + agent);
+  return <Gate load={load} title="Control setup" renderError={(failure) => <p role="status">Control setup unavailable: {failure.refusal.refusal}: {failure.message}</p>} ok={(required) => <p role="status">{required ? 'Managed controls are required by the saved setup. No managed adapter is qualified; starts are refused (control_adapter_unqualified).' : 'Notices use the terminal. No managed adapter is qualified.'}</p>} />;
 }

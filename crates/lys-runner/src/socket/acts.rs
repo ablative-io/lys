@@ -53,6 +53,22 @@ pub(super) fn perform(
             crate::legacy_input::write(sessions, server, &session, &data, context)
                 .map(|()| Answer::Delivered { session })
         }
+        Act::StartManaged {
+            mut managed,
+            lys_mcp,
+            proxy,
+        } => {
+            if let Some(entry) = lys_mcp {
+                crate::launch_config::add_lys_mcp(&mut managed.launch, &entry)?;
+            }
+            let session = managed.launch.session.clone();
+            let (pid, started_at) = sessions.start_managed(*managed, proxy, None)?;
+            Ok(Answer::Started {
+                session,
+                pid,
+                started_at,
+            })
+        }
         Act::Start {
             mut launch,
             lys_mcp,
@@ -186,6 +202,23 @@ fn as_caller(
     left: &AtomicBool,
 ) -> Result<Answer, RunnerError> {
     match act {
+        Act::StartManaged {
+            mut managed,
+            lys_mcp,
+            proxy,
+        } => {
+            if let Some(entry) = lys_mcp {
+                crate::launch_config::add_lys_mcp(&mut managed.launch, &entry)?;
+            }
+            let session = managed.launch.session.clone();
+            let (pid, started_at) =
+                sessions.start_managed(*managed, proxy, Some(caller.to_owned()))?;
+            Ok(Answer::Started {
+                session,
+                pid,
+                started_at,
+            })
+        }
         Act::Start {
             mut launch,
             lys_mcp,

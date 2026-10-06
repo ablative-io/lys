@@ -214,3 +214,13 @@ pub(crate) fn runner_harness(
         _ => None,
     }
 }
+
+/// Whether the exact reviewed version requires a managed control adapter.
+#[must_use]
+pub(crate) fn requires_controls(version: &Version) -> bool {
+    version
+        .settings
+        .session
+        .as_ref()
+        .is_some_and(|session| session.requires_controls)
+}

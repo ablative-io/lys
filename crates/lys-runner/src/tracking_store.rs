@@ -31,6 +31,7 @@ use serde_json::Value;
 use crate::tracking::{Figures, Unavailable, UsageRecord, count, note};
 
 mod cursor;
+pub mod managed;
 
 /// The feed's format.
 pub const FEED_FORMAT: &str = "lys-runner-feed/v1";
@@ -246,6 +247,8 @@ pub struct Boundary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "entry", rename_all = "snake_case")]
 pub enum Body {
+    /// A managed channel observation, containing identifiers and states only.
+    Managed(managed::ManagedEvent),
     /// One admitted injection, durable before its terminal delivery.
     Injection(crate::injection::InjectionRecord),
     /// A record of figures.

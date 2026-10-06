@@ -17,6 +17,9 @@ use crate::commands::error::CliResult;
 /// Runs `lys runner`.
 pub fn run(command: RunnerCommand) -> CliResult<()> {
     match command {
+        RunnerCommand::ManagedEntry => {
+            lys_runner::harness_control::process::entry().map_err(Into::into)
+        }
         RunnerCommand::Serve {
             socket,
             state,

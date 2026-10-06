@@ -205,3 +205,71 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
     serving.stop()?;
     tested
 }
+
+#[test]
+fn both_launch_owners_carry_controls_from_the_exact_reviewed_version() -> Result<(), Box<dyn Error>>
+{
+    let directory = tempfile::tempdir()?;
+    for required in [false, true] {
+        let version: Version = serde_json::from_value(json!({
+            "number":1,"operation":"profile-original","settings":{
+                "model_access":["fixture-model"],"tools":[],"skills":[],"mcp_servers":[],
+                "instructions":"","note":"","harness":harness_description::declared(),
+                "permissions":{"default_mode":"plan"},
+                "session":{"message_prefix":"","sensitive":false,"requires_controls":required}
+            },"set_by":"person","set_at":1,
+            "reviewed":{"operation":"review-original","by":"person","at":1}
+        }))?;
+        let rendered = render(
+            &Start {
+                agent: "agent",
+                session: "session",
+                machine: "machine",
+                runtime: "sh",
+                version: &version,
+                skills: &[],
+                policy: None,
+                model_proxy: None,
+            },
+            &[],
+        )?;
+        let native = from_template(&version, &rendered.template, &rendered.template_sha256)?;
+        let record = LaunchRecord {
+            id: "launch".to_owned(),
+            agent: "agent".to_owned(),
+            machine: "machine".to_owned(),
+            executable: native.program,
+            arguments: native.arguments,
+            working_directory: "/".to_owned(),
+            profile_version: version.operation.clone(),
+            credential_ids: Vec::new(),
+            given_by: "person".to_owned(),
+            given_at: 1,
+            copied_from: None,
+        };
+        let mut store =
+            ProvisioningStore::open(&directory.path().join(format!("profiles-{required}.json")))?;
+        let mut later = version.clone();
+        later.number = 2;
+        later.operation = "profile-later".to_owned();
+        later.settings.session = serde_json::from_value(
+            json!({"message_prefix":"","sensitive":false,"requires_controls":!required}),
+        )?;
+        store.set("agent", 0, version)?;
+        store.set("agent", 1, later)?;
+        let launch = build(&store, &record, "session".to_owned(), "sh", None, None)?;
+        let view = json!({"agent":"agent","session":"session","directory":"/","provisioning_version":1,
+            "template":rendered.template,"template_sha256":rendered.template_sha256,"handles":[]});
+        let kept = crate::launch_api::kept_launch(&store, &view)?;
+        for launch in [launch, kept] {
+            assert_eq!(
+                serde_json::to_value(&launch)?["config"]["requires_controls"]
+                    .as_bool()
+                    .unwrap_or(false),
+                required
+            );
+            assert!(!launch.environment.contains_key("LYS_MANAGED_CONTROLS"));
+        }
+    }
+    Ok(())
+}

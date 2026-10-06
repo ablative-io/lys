@@ -92,7 +92,8 @@ pub fn now_ms() -> u64 {
 /// The live ends of a running process.
 pub(crate) struct Live {
     pub(crate) writer: Input,
-    master: Box<dyn MasterPty + Send>,
+    master: Option<Box<dyn MasterPty + Send>>,
+    pub(crate) control: Option<crate::harness_control::events::Runtime>,
     pid: u32,
     leader: Option<Leader>,
 }
@@ -138,6 +139,7 @@ pub(crate) struct Session {
     pub(crate) live: Option<Live>,
     pub(crate) generation: u64,
     pub(crate) launch: Option<Launch>,
+    pub(crate) managed: Option<crate::harness_control::Settings>,
     pub(crate) rotation: Option<RotationState>,
     pub(crate) ending: bool,
     pub(crate) guard: Guard,
@@ -305,6 +307,7 @@ impl Sessions {
                     live: None,
                     generation: 0,
                     launch: None,
+                    managed: None,
                     rotation: None,
                     ending: false,
                     guard: Guard::default(),
@@ -436,13 +439,14 @@ impl Sessions {
         self.begin_owned(launch, policy, tracking, None, None)
     }
 
-    fn begin_owned(
+    pub(crate) fn begin_transport(
         self: &Arc<Self>,
         mut launch: Launch,
         policy: Option<Policy>,
         tracking: Option<Tracking>,
         proxy: Option<crate::tracking_proxy::ProxyTracking>,
         responsible: Option<String>,
+        managed: Option<crate::harness_control::Settings>,
     ) -> Result<(u32, u64), RunnerError> {
         if let Some(tracking) = &tracking {
             tracking.checked()?;
@@ -512,6 +516,7 @@ impl Sessions {
             live: None,
             generation: 0,
             launch: Some(launch),
+            managed,
             rotation,
             ending: false,
             guard: Guard {
@@ -576,7 +581,13 @@ impl Sessions {
         // start; another harness starting in between can lose it. The run's
         // first screen is watched for the dialog, which is answered for the
         // named folder only and said in the feed.
-        if let Some(trust) = trusted {
+        if let Some(trust) = trusted
+            && self
+                .lock()?
+                .sessions
+                .get(&id)
+                .is_some_and(|session| session.managed.is_none())
+        {
             self.watch_trust_dialog(&id, trust.directory)?;
         }
         self.writer.barrier()?;
