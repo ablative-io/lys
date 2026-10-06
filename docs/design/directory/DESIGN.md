@@ -966,11 +966,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/file/tabs.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
 | `crates/lys-runner/src/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
 | `crates/lys-runner/src/tracking_store.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/tracking_store/managed.rs` | the tracking store's managed-session records, split out of tracking_store.rs under the 500-line gate by DIRECTORY-064 R1 (BOX 18, 10bb5597) | DIRECTORY-064 |
 | `crates/lys-runner/tests/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
 | `crates/lys-home/src/harness/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
 | `crates/lys-home/src/harness/tracking_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
 | `crates/lys-identity-server/src/tracking_export.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
 | `crates/lys-runner/src/session/lifecycle.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/tests/lifecycle/cases.rs` | the lifecycle case table; DIRECTORY-064 R1 adds the managed-transport cases (Act::Start to Act::StartManaged under requires_controls) | DIRECTORY-064 |
 | `crates/lys-home/src/harness/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
 | `crates/lys-home/src/harness/claude_code/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
 | `crates/lys-home/src/harness/claude_code/launch.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
@@ -1194,6 +1196,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-secrets/src/lib.rs` | the broker crate's exports | DIRECTORY-081 |
 | `crates/lys-runner/src/operations/delivery.rs` | The operations log's delivery: what an admitted act does to the harness and how its receipt is recorded. | DIRECTORY-064 |
 | `crates/lys-runner/src/collector.rs` | The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session. | DIRECTORY-064 |
+| `crates/lys-runner/src/collector/stop.rs` | the collector's stop path, split out of collector.rs under the 500-line gate by DIRECTORY-064 R1 (BOX 18, 10bb5597); ends a managed process group and confirms by actual exit | DIRECTORY-064 |
 | `crates/lys-runner/src/socket/acts.rs` | The signed Act dispatch of the runner socket, exhaustive over every act. | DIRECTORY-064 |
 | `crates/lys-runner/src/session/control.rs` | Manual input and resize of a live session. | DIRECTORY-064 |
 | `crates/lys-runner/src/harness_control/approval.rs` | The policy response to a harness approval request on a managed channel: never fabricated. | DIRECTORY-064 |

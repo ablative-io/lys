@@ -4336,6 +4336,11 @@
       "brief": "DIRECTORY-051"
     },
     {
+      "path": "crates/lys-runner/src/tracking_store/managed.rs",
+      "note": "the tracking store's managed-session records, split out of tracking_store.rs under the 500-line gate by DIRECTORY-064 R1 (BOX 18, 10bb5597)",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/tests/tracking.rs",
       "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
       "brief": "DIRECTORY-051"
@@ -4359,6 +4364,11 @@
       "path": "crates/lys-runner/src/session/lifecycle.rs",
       "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/lifecycle/cases.rs",
+      "note": "the lifecycle case table; DIRECTORY-064 R1 adds the managed-transport cases (Act::Start to Act::StartManaged under requires_controls)",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "crates/lys-home/src/harness/mod.rs",
@@ -5473,6 +5483,11 @@
     {
       "path": "crates/lys-runner/src/collector.rs",
       "note": "The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session.",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/collector/stop.rs",
+      "note": "the collector's stop path, split out of collector.rs under the 500-line gate by DIRECTORY-064 R1 (BOX 18, 10bb5597); ends a managed process group and confirms by actual exit",
       "brief": "DIRECTORY-064"
     },
     {
