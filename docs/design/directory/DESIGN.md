@@ -661,6 +661,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/goals_api.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
 | `crates/lys-identity-server/src/goals_api/control.rs` | the goals routes' control under goals_api: the boundary reminder judgement and the explicit reconciliation and resend route; DIRECTORY-064 R4 and R5 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/goals_state.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_state/fold.rs` | the goal fold's whole hold() method and the derived indexes it keeps, under goals_state; DIRECTORY-064 R4 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/goals_state/control.rs` | the goals fold's control reads under goals_state: current-control and index reads, and Resent validation before any append; DIRECTORY-064 R4 and R5 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/goals_index.rs` | the goals fold's derived locations; DIRECTORY-064 R4 adds pending deliveries by session and goal, so a boundary reads only the affected occurrences | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/goals_edits.rs` | the goal edit fixtures; DIRECTORY-064 R4 makes Held::unsettled answer a Result, so an invalid pending location is refused by name, and these calls propagate it | DIRECTORY-064 |

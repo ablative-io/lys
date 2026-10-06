@@ -197,6 +197,8 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - create: crates/lys-identity-server/src/goals_state/control.rs
 - create: crates/lys-identity-server/src/goals_api/control.rs
 - create: crates/lys-runner/src/protocol/acts.rs
+- create: crates/lys-identity-server/src/goals_state/fold.rs
+- create: crates/lys-identity-server/src/goals_store/control.rs
 - modify: crates/lys-identity-server/src/goals_state.rs
 - modify: crates/lys-identity-server/src/goals_store.rs
 - modify: crates/lys-identity-server/src/goals_api.rs

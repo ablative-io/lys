@@ -2811,6 +2811,11 @@
       "brief": "DIRECTORY-051"
     },
     {
+      "path": "crates/lys-identity-server/src/goals_state/fold.rs",
+      "note": "the goal fold's whole hold() method and the derived indexes it keeps, under goals_state; DIRECTORY-064 R4",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-identity-server/src/goals_state/control.rs",
       "note": "the goals fold's control reads under goals_state: current-control and index reads, and Resent validation before any append; DIRECTORY-064 R4 and R5",
       "brief": "DIRECTORY-064"
