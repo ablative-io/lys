@@ -258,7 +258,8 @@
           "crates/lys-identity-server/src/goals_store/control.rs",
           "crates/lys-identity-server/src/goals_api/control.rs",
           "crates/lys-identity-server/src/receipts_api/control.rs",
-          "crates/lys-runner/src/protocol/acts.rs"
+          "crates/lys-runner/src/protocol/acts.rs",
+          "crates/lys-identity-server/src/runtime_state/control.rs"
         ],
         "modify": [
           "crates/lys-runner/src/operations.rs",
@@ -277,7 +278,11 @@
           "crates/lys-identity-server/src/runner_sessions.rs",
           "crates/lys-runner/src/operations/delivery.rs",
           "crates/lys-runner/src/socket/connection.rs",
-          "crates/lys-runner/src/dial.rs"
+          "crates/lys-runner/src/dial.rs",
+          "crates/lys-identity-server/src/runtime_state.rs",
+          "crates/lys-identity-server/src/runtime_store.rs",
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/openapi_runner_types.rs"
         ],
         "delete": []
       },
@@ -500,6 +505,12 @@
       "by": "Archie",
       "subject": "R5: the control readers ask Act::ControlStatus, a direct query that reads no history and keeps Status's reserved control slot",
       "ruling": "The control readers in budgets_act/control.rs, goals_api/control.rs and receipts_api/control.rs asked Act::Status, whose SessionView clones and serializes the session's whole account-move history to answer a question about current control. Act::ControlStatus {session} and Answer::ControlStatus {session, control} are added in protocol/acts.rs; Sessions::control_status in harness_control/context.rs answers them and takes no history and no output lock; socket/acts.rs dispatches the act directly; runner_sessions.rs kind() gains one arm for the answer, and driven() stays untouched. Those three readers switch to it. Act::Status and SessionView stay exactly as they are for every other caller, and nothing is removed from them. Act::Status today takes the reserved control slot, in socket/connection.rs Command::control (line 117) and in dial.rs control_request (line 177), so it is not queued behind ordinary acts. Act::ControlStatus is recognised in both places the same way, so moving a reader off Status does not take that slot from it; R5 therefore modifies socket/connection.rs and dial.rs. Tests: the control answer carries the same control fields SessionView carries for the same session, read side by side; an unknown session is refused by name; reading control_status for a session with a long account-move history does not touch that history, shown with a counter or an allocation bound, never a time; and Act::ControlStatus is classified as a control act in both connection.rs and dial.rs (Brisket ca25e7ba; Waffles 95f19c8b; the slot, Archie)."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R5 pages an agent's control sessions from a derived agent-to-session set in the Runtime index, never from a scan of every session",
+      "ruling": "GET /agents/{id}/runtime/sessions filters every held session to find one agent's (runtime_api.rs agent_sessions, lines 386 to 393), so reusing it for the control view would scan every agent's history on each reload. Instead, GET /agents/{id}/control-sessions?after answers at most tracking_store::PAGE_MAX (256) session ids with the cursor to resume from, stopped sessions included so that old uncertainty stays reachable. The endpoint lives in receipts_api/control.rs. It reads an agent-to-ordered-session-position set held in the Runtime Index (runtime_state.rs), through a borrowed selector in the new runtime_state/control.rs: no Tracked or report is cloned, nothing scans all history, and no IO happens under the guard. The set is derived, never stored: it is built in the existing From<Records> pass at open beside positions and live, kept current on the same paths that already change the Index, and adds no stored shape, no format change, no second fold and no extra pass over the log. The route admits exactly as /agents/{id}/runtime/sessions does: a signed caller who sees the agent, refused AgentNotVisible otherwise. Its OpenAPI entry and types go in openapi_table.rs and openapi_runner_types.rs, which every HTTP route amendment 19 gave receipts_api/control.rs also needs (tests/openapi.rs every_declared_route_has_an_entry_and_every_entry_a_route and every_route_names_the_types_it_takes_and_answers); R5 therefore modifies both. Tests: more than 256 sessions are read whole across pages with no gap and no repeat; an unknown cursor and another agent's cursor are refused by name; the number of sessions read is bounded by the page size against a large unrelated history; after a reopen the set equals the one built live, stopped sessions included; a caller who does not see the agent is refused AgentNotVisible; the existing runtime routes answer byte for byte as before, with a check added if none exists. The handback names the set's memory cost: one position per session, and the figure at 10,000 and 100,000 sessions (Brisket 07f12b68; Waffles 7c8ff43b; the admission and OpenAPI files, Archie)."
     }
   ]
 }

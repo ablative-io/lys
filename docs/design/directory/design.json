@@ -2431,6 +2431,11 @@
       "brief": "DIRECTORY-043"
     },
     {
+      "path": "crates/lys-identity-server/src/runtime_state/control.rs",
+      "note": "the borrowed selector over the Runtime index's agent-to-session set, paging an agent's control sessions; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-identity-server/src/runtime_store.rs",
       "note": "touched by DIRECTORY-043 R1: Runtime state is indexed",
       "brief": "DIRECTORY-043"
@@ -5394,6 +5399,11 @@
       "path": "crates/lys-identity-server/src/openapi_table.rs",
       "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
       "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_runner_types.rs",
+      "note": "the OpenAPI types the runner and control routes take and answer; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "crates/lys-identity-server/src/lib.rs",

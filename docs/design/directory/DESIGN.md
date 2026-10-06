@@ -585,6 +585,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/spicedb.rs` | touched by DIRECTORY-042 R7: The SpiceDB schema is read when it can have changed, not before every call | DIRECTORY-042 |
 | `crates/lys-identity-server/src/spicedb_http.rs` | touched by DIRECTORY-042 R8: SpiceDB calls use a pooled async client, outside the directory lock, with no timeout | DIRECTORY-042 |
 | `crates/lys-identity-server/src/runtime_state.rs` | touched by DIRECTORY-043 R1: Runtime state is indexed | DIRECTORY-043 |
+| `crates/lys-identity-server/src/runtime_state/control.rs` | the borrowed selector over the Runtime index's agent-to-session set, paging an agent's control sessions; DIRECTORY-064 R5 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/runtime_store.rs` | touched by DIRECTORY-043 R1: Runtime state is indexed | DIRECTORY-043 |
 | `crates/lys-identity-server/src/requests_state.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
 | `crates/lys-identity-server/src/certificates_store.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
@@ -1178,6 +1179,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/error.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
 | `crates/lys-identity-server/src/error_status.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
 | `crates/lys-identity-server/src/openapi_table.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/openapi_runner_types.rs` | the OpenAPI types the runner and control routes take and answer; DIRECTORY-064 R5 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/lib.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
 | `crates/lys-identity-server/src/teams_nesting.rs` | Versioned nesting events and their admitted mutations (DIRECTORY-071). | DIRECTORY-071 |
 | `crates/lys-identity-server/src/tree_views.rs` | Typed summaries computed from held state for the tree read (DIRECTORY-071). | DIRECTORY-071 |
