@@ -9,6 +9,10 @@ use lys_runner::harness_control::{Binding, Controller, Kind, Pending, Transport,
 use lys_runner::operations::OperationState;
 use serde_json::{Value, json};
 
+#[path = "qualify_adapter/diagnostics.rs"]
+mod diagnostics;
+use diagnostics::{Compaction, check_compaction};
+
 #[path = "qualify_adapter/owned.rs"]
 mod owned;
 use owned::{Cancellation, Message, Owned, child_entry};
@@ -73,6 +77,7 @@ struct Evidence {
     next: usize,
     closed: bool,
     cleanup: String,
+    compaction: Option<Compaction>,
 }
 
 impl Evidence {
@@ -87,6 +92,7 @@ impl Evidence {
             next: 0,
             closed: false,
             cleanup: "not_started".to_owned(),
+            compaction: None,
         })
     }
     fn record(&mut self, step: &str, mut detail: Value) -> Result<()> {
@@ -111,10 +117,14 @@ impl Evidence {
             );
         }
         if let Some(step) = STEPS.get(self.next).copied() {
-            self.record(
-                step,
-                json!({"observed":false,"reason":reason,"cleanup":self.cleanup}),
-            )?;
+            let mut detail = json!({"observed":false,"reason":reason,"cleanup":self.cleanup});
+            if step == "compaction" {
+                if let Some(facts) = &self.compaction {
+                    detail["compaction"] = serde_json::to_value(facts)
+                        .map_err(|error| format!("qualification_evidence_failed:{error}"))?;
+                }
+            }
+            self.record(step, detail)?;
         }
         self.closed = true;
         self.file.sync_all().map_err(io_failed)
@@ -181,10 +191,14 @@ async fn ingest(
     cancel: &mut Cancellation,
     transport: Transport,
     proof: &mut Option<String>,
+    compaction: Option<&mut Compaction>,
 ) -> Result<Update> {
     let Message::Frame(frame) = owned.next(cancel).await? else {
         return Err("qualification_frame_invalid".to_owned());
     };
+    if let Some(facts) = compaction {
+        facts.observe(&frame)?;
+    }
     let update = controller
         .ingest(source, &frame)
         .map_err(|error| error.to_string())?;
@@ -243,6 +257,7 @@ async fn protocol(
             cancel,
             transport,
             &mut proof,
+            None,
         )
         .await?;
         if update
@@ -273,6 +288,7 @@ async fn protocol(
             cancel,
             transport,
             &mut proof,
+            None,
         )
         .await?;
         if update.receipts.iter().any(|receipt| {
@@ -300,6 +316,7 @@ async fn protocol(
             cancel,
             transport,
             &mut proof,
+            None,
         )
         .await?;
     }
@@ -308,6 +325,7 @@ async fn protocol(
         Kind::Compact,
         String::new(),
     );
+    evidence.compaction = Some(Compaction::new(&binding.conversation, &pending.uuid));
     owned.write(
         &controller
             .enqueue(pending)
@@ -321,19 +339,14 @@ async fn protocol(
             cancel,
             transport,
             &mut proof,
+            evidence.compaction.as_mut(),
         )
         .await?;
-        if let Some(receipt) = update
-            .receipts
-            .iter()
-            .find(|receipt| receipt.operation == "qualification-compaction")
-        {
-            if receipt.state != OperationState::Confirmed || receipt.reason != "harness_compacted" {
-                return Err("qualification_compaction_unconfirmed".to_owned());
-            }
+        if check_compaction(&update)? {
             break;
         }
     }
+
     evidence.record("compaction", json!({"evidence":if transport == Transport::Claude {"compact_boundary"} else {"ContextCompaction"},"turn_completed":true}))
 }
 
@@ -645,6 +658,206 @@ mod tests {
             assert!(evidence.failed(reason).is_err());
             assert!(std::fs::read(path)?.is_empty());
         }
+        Ok(())
+    }
+    #[test]
+    fn a_failed_compaction_keeps_the_typed_receipt_and_lys_reason() -> Result<()> {
+        for state in [OperationState::Refused, OperationState::Uncertain] {
+            let mut update = Update::default();
+            update.receipts.push(lys_runner::harness_control::Receipt {
+                operation: "qualification-compaction".to_owned(),
+                state,
+                reason: "not_compacted".to_owned(),
+            });
+            let reason = check_compaction(&update)
+                .err()
+                .ok_or("failed receipt accepted")?;
+            assert!(reason.contains(&format!("{state:?}")), "{reason}");
+            assert!(reason.contains("not_compacted"), "{reason}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn compaction_facts_keep_only_correlated_closed_values_and_frame_order() -> Result<()> {
+        let mut facts = Compaction::new("private-conversation", "private-uuid");
+        let boundary = json!({"type":"system","subtype":"compact_boundary", "session_id":"private-conversation", "compact_metadata":{"secret":"private fixture phrase"}});
+        let replay = json!({"type":"user","session_id":"private-conversation", "uuid":"private-uuid", "parent_tool_use_id":null, "message":{"role":"user","content":"private fixture phrase"}});
+        let status = json!({"type":"system","subtype":"status", "session_id":"private-conversation", "status":"compacting", "compact_result":"failed", "compact_error":"private fixture phrase"});
+        for frame in [
+            &boundary,
+            &replay,
+            &status,
+            &json!({"type":"result", "session_id":"private-conversation", "is_error":true}),
+        ] {
+            let mut foreign = frame.clone();
+            foreign["session_id"] = json!("other");
+            facts.observe(&foreign)?;
+        }
+        let empty = serde_json::to_value(&facts).map_err(io_failed)?;
+        facts.observe(&json!({"type":"user","session_id":"private-conversation", "uuid":"other", "parent_tool_use_id":null, "message":{"role":"user"}}))?;
+        assert_eq!(serde_json::to_value(&facts).map_err(io_failed)?, empty);
+        facts.observe(&replay)?;
+        facts.observe(&boundary)?;
+        facts.observe(&replay)?;
+        facts.observe(&status)?;
+        facts.observe(&json!({"type":"system","subtype":"status", "session_id":"private-conversation", "status":"requesting"}))?;
+        facts.observe(&json!({"type":"system","subtype":"status", "session_id":"private-conversation", "status":null, "compact_result":"success"}))?;
+        facts.observe(&json!({"type":"result", "session_id":"private-conversation", "is_error":true, "result":"private fixture phrase"}))?;
+        let value = serde_json::to_value(&facts).map_err(io_failed)?;
+        assert_eq!(
+            value,
+            json!({
+                "compact_boundary_seen":true,"matching_user_replay_seen":true,
+                "replay_before_boundary":true,"replay_after_boundary":true,
+                "result_seen":true,"result_is_error":true,
+                "statuses":[{"status":"compacting","compact_result":"failed"},
+                    {"status":"requesting","compact_result":null},{"status":null,"compact_result":"success"}]
+            })
+        );
+        let encoded = value.to_string();
+        for private in [
+            "private fixture phrase",
+            "private-conversation",
+            "private-uuid",
+            "compact_error",
+            "compact_metadata",
+        ] {
+            assert!(!encoded.contains(private));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn compaction_status_facts_refuse_unknown_values_and_overflow_without_text() -> Result<()> {
+        let mut facts = Compaction::new("conversation", "uuid");
+        for fields in [
+            json!({}),
+            json!({"status":"private fixture phrase"}),
+            json!({"status":null,"compact_result":"private fixture phrase"}),
+            json!({"status":null,"compact_result":null}),
+        ] {
+            let mut frame = json!({"type":"system","subtype":"status","session_id":"conversation"});
+            frame
+                .as_object_mut()
+                .ok_or("fixture shape invalid")?
+                .extend(fields.as_object().ok_or("fixture fields invalid")?.clone());
+            let error = facts
+                .observe(&frame)
+                .err()
+                .ok_or("invalid status was accepted")?;
+            assert!(error.starts_with("qualification_compaction_status_invalid"));
+            assert!(!error.contains("private fixture phrase"));
+        }
+        let status =
+            json!({"type":"system","subtype":"status", "session_id":"conversation", "status":null});
+        for _ in 0..32 {
+            facts.observe(&status)?;
+        }
+        let before = serde_json::to_value(&facts).map_err(io_failed)?;
+        assert_eq!(
+            facts.observe(&status).err().as_deref(),
+            Some("qualification_compaction_status_limit: more than 32 status frames")
+        );
+        assert_eq!(serde_json::to_value(&facts).map_err(io_failed)?, before);
+        Ok(())
+    }
+
+    #[test]
+    fn compaction_replay_order_distinguishes_boundary_first_and_missing_boundary() -> Result<()> {
+        let replay = json!({"type":"user","session_id":"conversation","uuid":"uuid", "parent_tool_use_id":null,"message":{"role":"user"}});
+        for boundary_first in [true, false] {
+            let mut facts = Compaction::new("conversation", "uuid");
+            if boundary_first {
+                facts.observe(&json!({"type":"system","subtype":"compact_boundary","session_id":"conversation"}))?;
+            }
+            facts.observe(&replay)?;
+            facts
+                .observe(&json!({"type":"result","session_id":"conversation","is_error":false}))?;
+            let value = serde_json::to_value(&facts).map_err(io_failed)?;
+            assert_eq!(value["compact_boundary_seen"], boundary_first);
+            assert_eq!(value["replay_after_boundary"], boundary_first);
+            assert_eq!(value["replay_before_boundary"], !boundary_first);
+            assert_eq!(value["result_is_error"], false);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn failed_compaction_evidence_contains_actual_receipt_facts_and_cleanup()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let folder = tempfile::tempdir()?;
+        let path = folder.path().join("evidence.jsonl");
+        let mut evidence = Evidence::create(&path)?;
+        for step in &STEPS[..5] {
+            evidence.record(step, json!({"fixture":true}))?;
+        }
+        evidence.cleanup = "ok".to_owned();
+        let mut facts = Compaction::new("conversation", "uuid");
+        facts.observe(&json!({"type":"result","session_id":"conversation","is_error":false, "result":"private fixture phrase"}))?;
+        evidence.compaction = Some(facts);
+        let mut update = Update::default();
+        update.receipts.push(lys_runner::harness_control::Receipt {
+            operation: "qualification-compaction".to_owned(),
+            state: OperationState::Refused,
+            reason: "not_compacted".to_owned(),
+        });
+        let error = check_compaction(&update)
+            .err()
+            .ok_or("failed compaction was accepted")?;
+        evidence.failed(&error)?;
+        let text = std::fs::read_to_string(path)?;
+        let records: Vec<Value> = text
+            .lines()
+            .map(serde_json::from_str)
+            .collect::<std::result::Result<_, _>>()?;
+        assert_eq!(records.len(), 6);
+        assert_eq!(records[5]["step"], "compaction");
+        assert_eq!(
+            records[5]["reason"],
+            "qualification_compaction_unconfirmed: state=Refused; reason=not_compacted"
+        );
+        assert_eq!(records[5]["cleanup"], "ok");
+        assert_eq!(records[5]["compaction"]["result_is_error"], false);
+        assert_eq!(records[5]["compaction"]["compact_boundary_seen"], false);
+        assert!(!text.contains("private fixture phrase"));
+        Ok(())
+    }
+
+    #[test]
+    fn compaction_receipts_require_both_confirmed_state_and_compacted_reason() -> Result<()> {
+        let mut update = Update::default();
+        assert!(!check_compaction(&update)?);
+        update.receipts.push(lys_runner::harness_control::Receipt {
+            operation: "other".to_owned(),
+            state: OperationState::Confirmed,
+            reason: "harness_compacted".to_owned(),
+        });
+        assert!(!check_compaction(&update)?);
+        update.receipts.push(lys_runner::harness_control::Receipt {
+            operation: "qualification-compaction".to_owned(),
+            state: OperationState::Confirmed,
+            reason: "harness_admitted".to_owned(),
+        });
+        assert!(check_compaction(&update).is_err());
+        update.receipts[1].reason = "harness_compacted".to_owned();
+        assert!(check_compaction(&update)?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_malformed_result_is_seen_without_retaining_its_outcome_text() -> Result<()> {
+        let mut facts = Compaction::new("conversation", "uuid");
+        let error = facts.observe(&json!({"type":"result","session_id":"conversation","is_error":"private fixture phrase"}))
+            .err().ok_or("malformed result was accepted")?;
+        assert_eq!(
+            error,
+            "qualification_compaction_result_invalid: is_error must be a boolean"
+        );
+        let value = serde_json::to_value(&facts).map_err(io_failed)?;
+        assert_eq!(value["result_seen"], true);
+        assert_eq!(value["result_is_error"], Value::Null);
+        assert!(!value.to_string().contains("private fixture phrase"));
         Ok(())
     }
 }

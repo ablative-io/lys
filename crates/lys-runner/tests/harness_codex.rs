@@ -394,3 +394,210 @@ fn the_codex_initialize_version_must_match_the_probed_version() -> Result {
     }
     Ok(())
 }
+
+const CONNECTION_METHODS: [&str; 21] = [
+    "skills/changed",
+    "project/changed",
+    "command/exec/outputDelta",
+    "process/outputDelta",
+    "process/exited",
+    "mcpServer/event/stream/notification",
+    "account/updated",
+    "account/gatewayOAuth/changed",
+    "account/rateLimits/updated",
+    "app/list/updated",
+    "remoteControl/status/changed",
+    "externalAgentConfig/import/progress",
+    "externalAgentConfig/import/completed",
+    "fs/changed",
+    "deprecationNotice",
+    "configWarning",
+    "fuzzyFileSearch/sessionUpdated",
+    "fuzzyFileSearch/sessionCompleted",
+    "windows/worldWritableWarning",
+    "windowsSandbox/setupCompleted",
+    "account/login/completed",
+];
+const OPTIONAL_THREAD_METHODS: [&str; 3] = [
+    "warning",
+    "mcpServer/oauthLogin/completed",
+    "mcpServer/startupStatus/updated",
+];
+
+fn unchanged(control: &mut Controller, frame: &Value) -> Result {
+    let before = control.control_status();
+    let identity = control.binding.clone();
+    let ready = control.ready();
+    let idle = control.idle();
+    let update = control.ingest(&binding(), frame)?;
+    assert!(update.events.is_empty(), "{frame}");
+    assert!(update.receipts.is_empty(), "{frame}");
+    assert!(update.dispatches.is_empty(), "{frame}");
+    assert_eq!(control.control_status(), before);
+    assert_eq!(control.binding, identity);
+    assert_eq!(control.ready(), ready);
+    assert_eq!(control.idle(), idle);
+    Ok(())
+}
+
+#[test]
+fn connection_notifications_leave_unbound_and_active_control_unchanged() -> Result {
+    let mut unbound = Controller::new(binding(), Transport::Codex)?;
+    let mut active = ready()?;
+    active.ingest(&binding(), &started("owned-turn"))?;
+    active.enqueue(pending("waiting", Kind::Reminder))?;
+    for method in CONNECTION_METHODS {
+        let frame = json!({"method":method,"params":{"payload":"private fixture value"}});
+        unchanged(&mut unbound, &frame)?;
+        unchanged(&mut active, &frame)?;
+    }
+    assert_eq!(
+        active
+            .ingest(&binding(), &completed("owned-turn"))?
+            .dispatches
+            .len(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn optional_thread_notifications_preserve_control_for_each_identity_shape() -> Result {
+    let mut control = ready()?;
+    control.ingest(&binding(), &started("owned-turn"))?;
+    control.enqueue(pending("waiting", Kind::Reminder))?;
+    let mut unbound = Controller::new(binding(), Transport::Codex)?;
+    for method in OPTIONAL_THREAD_METHODS {
+        for params in [json!({}), json!({"threadId":null})] {
+            unchanged(&mut unbound, &json!({"method":method,"params":params}))?;
+        }
+        for params in [
+            json!({"threadId":"conversation"}),
+            json!({"threadId":"other"}),
+            json!({}),
+            json!({"threadId":null}),
+        ] {
+            unchanged(&mut control, &json!({"method":method,"params":params}))?;
+        }
+        for thread in [json!(1), json!({"id":"conversation"}), json!("")] {
+            let error = control
+                .ingest(
+                    &binding(),
+                    &json!({"method":method,"params":{"threadId":thread}}),
+                )
+                .err()
+                .ok_or("malformed optional thread was accepted")?;
+            assert_eq!(error.name(), "control_correlation_unsupported");
+            assert!(error.to_string().contains(method));
+        }
+    }
+    assert_eq!(
+        control
+            .ingest(&binding(), &completed("owned-turn"))?
+            .dispatches
+            .len(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn thread_started_requires_its_nested_identity_without_binding_control() -> Result {
+    let mut control = Controller::new(binding(), Transport::Codex)?;
+    for id in ["conversation", "other"] {
+        unchanged(
+            &mut control,
+            &json!({"method":"thread/started","params":{"thread":{"id":id}}}),
+        )?;
+    }
+    for params in [
+        json!({}),
+        json!({"thread":{}}),
+        json!({"thread":{"id":1}}),
+        json!({"thread":{"id":""}}),
+    ] {
+        let error = control
+            .ingest(
+                &binding(),
+                &json!({"method":"thread/started","params":params}),
+            )
+            .err()
+            .ok_or("thread/started without typed identity was accepted")?;
+        assert_eq!(error.name(), "control_correlation_unsupported");
+        assert!(error.to_string().contains("thread/started"));
+        assert!(error.to_string().contains("params.thread.id"));
+    }
+    assert!(!control.ready());
+    Ok(())
+}
+
+#[test]
+fn unknown_notifications_name_method_and_parameter_keys_without_values() -> Result {
+    let mut control = ready()?;
+    for method in [
+        "unrecognised/event",
+        "account/unrecognised",
+        "warning/unrecognised",
+    ] {
+        let error = control
+            .ingest(
+                &binding(),
+                &json!({"method":method,"params":{
+                    "opaque":"private fixture phrase", "nested":{"secret":"private fixture phrase"}
+                }}),
+            )
+            .err()
+            .ok_or("unknown notification was accepted")?;
+        assert_eq!(error.name(), "control_correlation_unsupported");
+        let reason = error.to_string();
+        assert!(reason.contains(method), "{reason}");
+        assert!(reason.contains("opaque"), "{reason}");
+        assert!(reason.contains("nested"), "{reason}");
+        assert!(!reason.contains("private fixture phrase"));
+        assert!(!reason.contains("secret"));
+    }
+    Ok(())
+}
+
+#[test]
+fn connection_notifications_cannot_approve_a_server_request() -> Result {
+    let mut control = ready()?;
+    for method in CONNECTION_METHODS
+        .into_iter()
+        .chain(OPTIONAL_THREAD_METHODS)
+    {
+        let before = control.control_status();
+        let error = control
+            .ingest(
+                &binding(),
+                &json!({"id":"approval","method":method,"params":{}}),
+            )
+            .err()
+            .ok_or("server request was treated as a notification")?;
+        assert_eq!(error.name(), "control_approval_unsupported");
+        assert_eq!(control.control_status(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn threaded_notification_refusals_keep_method_and_keys_without_payload_values() -> Result {
+    let mut control = ready()?;
+    for frame in [
+        json!({"method":"unknown/threaded","params":{"threadId":"conversation","payload":"private fixture phrase"}}),
+        json!({"method":"turn/started","params":{"threadId":"conversation","payload":"private fixture phrase"}}),
+        json!({"method":"turn/completed","params":{"threadId":"conversation","turn":{"id":"owned","status":"private fixture phrase"},"payload":"private fixture phrase"}}),
+    ] {
+        let error = control
+            .ingest(&binding(), &frame)
+            .err()
+            .ok_or("malformed notification accepted")?;
+        let reason = error.to_string();
+        let method = frame["method"].as_str().ok_or("fixture method missing")?;
+        assert!(reason.contains(method), "{reason}");
+        assert!(reason.contains("threadId"), "{reason}");
+        assert!(reason.contains("payload"), "{reason}");
+        assert!(!reason.contains("private fixture phrase"));
+    }
+    Ok(())
+}

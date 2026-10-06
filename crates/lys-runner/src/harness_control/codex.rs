@@ -131,21 +131,84 @@ pub(super) fn observe(
         )
     })?;
     let params = value.get("params").ok_or_else(|| {
-        RunnerError::refused(
-            "control_protocol_unsupported",
-            "notification has no parameters",
+        notification_error(
+            method,
+            &Value::Null,
+            RunnerError::refused(
+                "control_correlation_unsupported",
+                "notification has no params object",
+            ),
         )
     })?;
+    notification(conversation, method, params)
+        .map_err(|error| notification_error(method, params, error))
+}
+
+fn notification(
+    conversation: &str,
+    method: &str,
+    params: &Value,
+) -> Result<Observation, RunnerError> {
+    if !params.is_object() {
+        return Err(RunnerError::refused(
+            "control_correlation_unsupported",
+            "notification has no params object",
+        ));
+    }
     if method == "thread/started" {
+        if params
+            .pointer("/thread/id")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            return Err(RunnerError::refused(
+                "control_correlation_unsupported",
+                "params.thread.id must be a nonempty string",
+            ));
+        }
+        return Ok(Observation::Other);
+    }
+    if matches!(
+        method,
+        "skills/changed"
+            | "project/changed"
+            | "command/exec/outputDelta"
+            | "process/outputDelta"
+            | "process/exited"
+            | "mcpServer/event/stream/notification"
+            | "account/updated"
+            | "account/gatewayOAuth/changed"
+            | "account/rateLimits/updated"
+            | "app/list/updated"
+            | "remoteControl/status/changed"
+            | "externalAgentConfig/import/progress"
+            | "externalAgentConfig/import/completed"
+            | "fs/changed"
+            | "deprecationNotice"
+            | "configWarning"
+            | "fuzzyFileSearch/sessionUpdated"
+            | "fuzzyFileSearch/sessionCompleted"
+            | "windows/worldWritableWarning"
+            | "windowsSandbox/setupCompleted"
+            | "account/login/completed"
+    ) {
+        return Ok(Observation::Other);
+    }
+    if matches!(
+        method,
+        "warning" | "mcpServer/oauthLogin/completed" | "mcpServer/startupStatus/updated"
+    ) && params.get("threadId").is_none_or(Value::is_null)
+    {
         return Ok(Observation::Other);
     }
     let thread = params
         .get("threadId")
         .and_then(Value::as_str)
+        .filter(|thread| !thread.is_empty())
         .ok_or_else(|| {
             RunnerError::refused(
                 "control_correlation_unsupported",
-                "notification has no thread identity",
+                "params.threadId must be a nonempty string",
             )
         })?;
     if thread != conversation {
@@ -218,12 +281,31 @@ pub(super) fn observe(
         | "item/mcpToolCall/progress"
         | "item/reasoning/summaryTextDelta"
         | "item/reasoning/summaryPartAdded"
-        | "item/reasoning/textDelta" => Ok(Observation::Other),
+        | "item/reasoning/textDelta"
+        | "warning"
+        | "mcpServer/oauthLogin/completed"
+        | "mcpServer/startupStatus/updated" => Ok(Observation::Other),
         _ => Err(RunnerError::refused(
             "control_protocol_unsupported",
             "notification method is unsupported",
         )),
     }
+}
+
+fn notification_error(method: &str, params: &Value, mut error: RunnerError) -> RunnerError {
+    if let RunnerError::Refused { words, .. } = &mut error {
+        let keys: Vec<&str> = params
+            .as_object()
+            .into_iter()
+            .flat_map(|params| params.keys().map(String::as_str))
+            .collect();
+        *words = format!(
+            "{words}; method={}; params_keys={}",
+            json!(method),
+            json!(keys)
+        );
+    }
+    error
 }
 
 fn required(value: &Value, path: &str) -> Result<String, RunnerError> {
