@@ -5494,6 +5494,11 @@
       "path": "crates/lys-runner/src/session/lifecycle/managed.rs",
       "note": "The managed spawn branch of a session's lifecycle: the child entry started and proved.",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "docs/design/home/launch-template.schema.json",
+      "note": "The launch template schema.",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

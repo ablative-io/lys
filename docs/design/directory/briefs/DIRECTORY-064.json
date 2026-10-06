@@ -73,7 +73,12 @@
           "crates/lys-runner/Cargo.toml",
           "crates/lys-identity-server/src/budgets_members.rs",
           "crates/lys-identity-server/src/goals_store.rs",
-          "crates/lys-identity-server/tests/budget_feed.rs"
+          "crates/lys-identity-server/tests/budget_feed.rs",
+          "crates/lys-identity-server/src/provisioning_store.rs",
+          "crates/lys-identity-server/src/provisioning_api.rs",
+          "crates/lys-identity-server/src/launch_template.rs",
+          "surface/identity/src/features/provisioning/Provisioning.tsx",
+          "docs/design/home/launch-template.schema.json"
         ],
         "delete": []
       },
@@ -337,6 +342,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1: three files created for the 500-line gate",
       "ruling": "At f6ec48f0 with BOX 18 applied, events.rs reaches 655 code lines, runner_sessions.rs 560, lifecycle.rs 523 and session.rs 501. R1 therefore creates crates/lys-runner/src/harness_control/approval.rs (the policy response to a harness approval request), crates/lys-identity-server/src/runner_sessions/controls.rs (the managed profile selection) and crates/lys-runner/src/session/lifecycle/managed.rs (the managed spawn branch only, the small launch wrapper moving there from session.rs). Ownership splits only: no new store and no new runtime behaviour. Found by Brisket (BOX 18, 17:13)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1: the managed transport is chosen by the agent's setup, never inferred; qualification pins adapter and reported version",
+      "ruling": "Archie's read of BOX 18 (17:44) found that selecting the managed transport from an agent's limits or reminders, with no adapter yet qualified, would stop every such agent starting after the install. Ruled: the managed transport is chosen by a field of the agent's setup that the responsible person sets (HOME-037's profile: provisioning_store.rs, provisioning_api.rs, launch_template.rs, the launch template schema and the Provisioning screen), moved one seat at a time as AGENTS-002 says, Waffles's seat first. An agent whose setup does not require controls starts on the terminal as today, whatever limits it holds, and the existing Usage page says in one line that its notices go through the terminal and no managed adapter is qualified. An agent whose setup requires controls is refused control_adapter_unqualified by name until an adapter is qualified. Qualification (R6's proof) pins the adapter and the version the harness reports of itself, checked at launch against the init frame (Claude's system/init, Codex's initialize answer), never the binary's sha256, which the launch record keeps as a fact. In the same read: frames from subagents and hooks are Observation::Other, refused only when they claim our correlation and fail it; every numeric limit is removed or tied to a source named in the code; the collector reads its table under one guard."
     }
   ]
 }

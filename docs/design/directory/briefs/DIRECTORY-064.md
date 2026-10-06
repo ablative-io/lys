@@ -79,6 +79,11 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - modify: crates/lys-identity-server/src/budgets_members.rs
 - modify: crates/lys-identity-server/src/goals_store.rs
 - modify: crates/lys-identity-server/tests/budget_feed.rs
+- modify: crates/lys-identity-server/src/provisioning_store.rs
+- modify: crates/lys-identity-server/src/provisioning_api.rs
+- modify: crates/lys-identity-server/src/launch_template.rs
+- modify: surface/identity/src/features/provisioning/Provisioning.tsx
+- modify: docs/design/home/launch-template.schema.json
 
 **Checklist:**
 - C433 — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).
