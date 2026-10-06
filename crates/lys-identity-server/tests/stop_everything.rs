@@ -27,7 +27,7 @@ use lys_core::Ed25519Identity;
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::secrets_api::SecretsSettings;
-use lys_runner::{Options, Runner, Serving};
+use lys_runner::{Options, Runner, Serving, console_stop};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -92,10 +92,15 @@ struct Table {
     serving: Option<Serving>,
     machine: String,
     drops: Drops,
+    console_base: String,
 }
 
 impl Table {
     async fn set() -> Result<Self, Box<dyn Error>> {
+        Self::set_surface(false).await
+    }
+
+    async fn set_surface(surface: bool) -> Result<Self, Box<dyn Error>> {
         let drops = Drops::default();
         let kept = Arc::clone(&drops);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -116,12 +121,20 @@ impl Table {
         let socket = dir.path().join("runner.sock");
         let state = dir.path().join("runner-state");
         let adjusted = socket.clone();
-        let (service, (seeded, serving)) = Service::start_adjusted(
+        let screens = dir.path().join("screens");
+        if surface {
+            std::fs::create_dir(&screens)?;
+            std::fs::write(screens.join("index.html"), "<html></html>")?;
+        }
+        let (mut service, (seeded, serving)) = Service::start_adjusted(
             GRANT_MODEL,
             None,
             Some(settings),
             None,
-            move |config| config.runner_socket = Some(adjusted),
+            move |config| {
+                config.runner_socket = Some(adjusted);
+                config.surface_dir = surface.then_some(screens);
+            },
             move |config| {
                 let seeded = seed_configured(config, [ADMINISTRATOR, BEA])?;
                 let key = Ed25519Identity::load(&config.event_key_file)?;
@@ -135,6 +148,10 @@ impl Table {
             },
         )
         .await?;
+        let console_base = service.base.clone();
+        if surface {
+            service.base.push_str("/api");
+        }
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
         let mut table = Self {
@@ -146,6 +163,7 @@ impl Table {
             serving: Some(serving),
             machine: String::new(),
             drops,
+            console_base,
         };
         table.machine = table
             .named_machine("Runner box", Some(json!({ "kind": "lys" })))
@@ -559,4 +577,51 @@ async fn a_dialled_computer_with_no_bridge_in_is_unreached_and_its_session_is_no
         "asked is never stopped: {kept}"
     );
     table.close()
+}
+
+async fn console_join(surface: bool) -> TestResult {
+    let table = Table::set_surface(surface).await?;
+    let agent = table.agent(0);
+    table.profile(&agent).await?;
+    let session = table.started(&agent).await?;
+    let body = console_stop::Body {
+        operation: operation()?,
+        by: "the operator at the console of this computer".to_owned(),
+        reason: "stop a runaway process".to_owned(),
+        kill: true,
+    };
+    let bytes = serde_json::to_vec(&body)?;
+    let key = Ed25519Identity::load(&table.service.dir.path().join("service.key"))?;
+    let signature = lys_runner::protocol::hex(&key.sign(&console_stop::signed_bytes(&bytes)));
+    let response = reqwest::Client::new()
+        .post(format!(
+            "{}{}",
+            table.console_base,
+            console_stop::route(surface)
+        ))
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .header(console_stop::SIGNATURE, signature)
+        .body(bytes)
+        .send()
+        .await?;
+    let status = response.status().as_u16();
+    let pulled: Value = response.json().await?;
+    assert_eq!(status, 200, "console stop answered {status}: {pulled}");
+    assert_eq!(pulled["pulled"]["by"], "console", "{pulled}");
+    assert_eq!(pulled["pulled"]["by_name"], body.by, "{pulled}");
+    assert_eq!(pulled["pulled"]["reason"], body.reason, "{pulled}");
+    assert_eq!(pulled["pulled"]["kill"], true, "{pulled}");
+    assert_eq!(pulled["stopped"][0]["session"], session, "{pulled}");
+    assert_eq!(table.session(&agent, &session).await?["shown"], "stopped");
+    table.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn console_stop_joins_the_bare_service_and_stops_a_running_session() -> TestResult {
+    console_join(false).await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn console_stop_joins_the_surface_service_and_stops_a_running_session() -> TestResult {
+    console_join(true).await
 }
