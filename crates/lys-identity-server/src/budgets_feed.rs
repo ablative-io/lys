@@ -320,10 +320,17 @@ fn later_control_outcome(
     prior: &crate::budgets_crossing::Acted,
     next: &crate::budgets_crossing::Acted,
 ) -> bool {
-    prior != next
-        && next.at_ms >= prior.at_ms
-        && (prior.stands != crate::budgets_crossing::Stands::Confirmed
-            || next.stands == crate::budgets_crossing::Stands::Confirmed)
+    use crate::budgets_crossing::Stands;
+    let advances = match prior.stands {
+        Stands::Confirmed => next.stands == Stands::Confirmed,
+        Stands::Uncertain | Stands::Refused => {
+            !matches!(next.stands, Stands::Accepted | Stands::Delivered)
+        }
+        Stands::Delivered => next.stands != Stands::Accepted,
+        Stands::Accepted => true,
+        Stands::Told => next.stands == Stands::Told,
+    };
+    prior != next && next.at_ms >= prior.at_ms && advances
 }
 
 #[cfg(test)]
@@ -466,6 +473,66 @@ mod control_tests {
         let accepted =
             crate::budgets_crossing::Acted::from_runner(&outcome(OperationState::Accepted, 20), 20);
         assert!(super::later_control_outcome(&accepted, &prior));
+    }
+
+    #[test]
+    fn a_started_control_cannot_return_to_a_provisional_receipt() {
+        use lys_runner::operations::{OperationOutcome, OperationState};
+        let acted = |state, at| {
+            crate::budgets_crossing::Acted::from_runner(
+                &OperationOutcome {
+                    operation: "crossing".to_owned(),
+                    session: "session".to_owned(),
+                    request: "context_compact".to_owned(),
+                    state,
+                    at,
+                    words: "observation".to_owned(),
+                    text: None,
+                    ended: None,
+                },
+                i64::try_from(at).unwrap(),
+            )
+        };
+        for state in [
+            OperationState::Delivered,
+            OperationState::Uncertain,
+            OperationState::Refused,
+        ] {
+            let prior = acted(state, 20);
+            for next in [OperationState::Accepted, OperationState::Delivering] {
+                for at in [20, 21] {
+                    assert!(
+                        !super::later_control_outcome(&prior, &acted(next, at)),
+                        "{state:?} was reopened by {next:?} at {at}"
+                    );
+                }
+            }
+        }
+        let uncertain = acted(OperationState::Uncertain, 20);
+        assert!(!super::later_control_outcome(
+            &uncertain,
+            &acted(OperationState::Delivered, 21)
+        ));
+        assert!(super::later_control_outcome(
+            &uncertain,
+            &acted(OperationState::Confirmed, 21)
+        ));
+        assert!(super::later_control_outcome(
+            &uncertain,
+            &acted(OperationState::Refused, 21)
+        ));
+        assert!(super::later_control_outcome(
+            &acted(OperationState::Delivered, 20),
+            &acted(OperationState::Uncertain, 21)
+        ));
+        assert!(super::later_control_outcome(
+            &acted(OperationState::Accepted, 20),
+            &acted(OperationState::Delivered, 21)
+        ));
+        assert!(!super::later_control_outcome(
+            &acted(OperationState::Accepted, 20),
+            &acted(OperationState::Confirmed, 19)
+        ));
     }
 
     use super::{select_holders, source_agent};
