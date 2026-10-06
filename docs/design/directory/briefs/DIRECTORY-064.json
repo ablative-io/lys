@@ -275,7 +275,9 @@
           "crates/lys-runner/tests/operations.rs",
           "crates/lys-identity-server/src/goals_api.rs",
           "crates/lys-identity-server/src/runner_sessions.rs",
-          "crates/lys-runner/src/operations/delivery.rs"
+          "crates/lys-runner/src/operations/delivery.rs",
+          "crates/lys-runner/src/socket/connection.rs",
+          "crates/lys-runner/src/dial.rs"
         ],
         "delete": []
       },
@@ -492,6 +494,12 @@
       "by": "Archie",
       "subject": "R5's proportional-checkpoint test stays as it is, a migration-seeded test is added beside it, and its 4.445 s is a named slow defect held for Tom",
       "ruling": "proportional_checkpoints_bound_rewrite_bytes_and_keep_every_spent_id in tests/operations_index/cases.rs took 4.445 s on Dean, spending it on about 80 real durability fences plus the checkpoint fences (Brisket 4ec8bc0a). Replacing it with migration-seeded ids, or shrinking its K, would take operations off the normal append path that amendment 17's \"after K operations\" claim names, and Tom's 23:10 rule says nothing is narrowed overnight. So: (1) the existing test stays exactly as it is, with 1,200 real appends, its fences and all its assertions; (2) a new test is added beside it, with the same 1,200 spent ids seeded by the real migration, then large record updates crossing several proportional boundaries, every guard checked and a final reopen, with the byte and tail invariants; (3) the 4.445 s goes in the handback as a named slow defect, HELD FOR TOM, with its cause and the proposal. A further real-path test with a small starting checkpoint, firing the trigger at least three times, may be added for a faster signal, but it replaces nothing. A fixed count stays refused (Archie 016f02d8; Waffles d98ad5fd withdrawn where it differed, 9d61c090)."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R5: the control readers ask Act::ControlStatus, a direct query that reads no history and keeps Status's reserved control slot",
+      "ruling": "The control readers in budgets_act/control.rs, goals_api/control.rs and receipts_api/control.rs asked Act::Status, whose SessionView clones and serializes the session's whole account-move history to answer a question about current control. Act::ControlStatus {session} and Answer::ControlStatus {session, control} are added in protocol/acts.rs; Sessions::control_status in harness_control/context.rs answers them and takes no history and no output lock; socket/acts.rs dispatches the act directly; runner_sessions.rs kind() gains one arm for the answer, and driven() stays untouched. Those three readers switch to it. Act::Status and SessionView stay exactly as they are for every other caller, and nothing is removed from them. Act::Status today takes the reserved control slot, in socket/connection.rs Command::control (line 117) and in dial.rs control_request (line 177), so it is not queued behind ordinary acts. Act::ControlStatus is recognised in both places the same way, so moving a reader off Status does not take that slot from it; R5 therefore modifies socket/connection.rs and dial.rs. Tests: the control answer carries the same control fields SessionView carries for the same session, read side by side; an unknown session is refused by name; reading control_status for a session with a long account-move history does not touch that history, shown with a counter or an allocation bound, never a time; and Act::ControlStatus is classified as a control act in both connection.rs and dial.rs (Brisket ca25e7ba; Waffles 95f19c8b; the slot, Archie)."
     }
   ]
 }

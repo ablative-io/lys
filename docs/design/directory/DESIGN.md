@@ -1225,6 +1225,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/collector.rs` | The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session. | DIRECTORY-064 |
 | `crates/lys-runner/src/collector/stop.rs` | the collector's stop path, split out of collector.rs under the 500-line gate by DIRECTORY-064 R1 (BOX 18, 10bb5597); ends a managed process group and confirms by actual exit | DIRECTORY-064 |
 | `crates/lys-runner/src/socket/acts.rs` | The signed Act dispatch of the runner socket, exhaustive over every act. | DIRECTORY-064 |
+| `crates/lys-runner/src/dial.rs` | the runner's outbound dial; a control request is recognised before dispatch; DIRECTORY-064 R5 | DIRECTORY-064 |
+| `crates/lys-runner/src/socket/connection.rs` | the runner socket's dispatch slots; a control act takes the reserved slot; DIRECTORY-064 R5 | DIRECTORY-064 |
 | `crates/lys-runner/src/legacy_input.rs` | the caller-judged compaction path; DIRECTORY-064 R3 routes a context compaction carrying its crossing id through the same attribution, and refuses a boundary reply from anyone but the server | DIRECTORY-064 |
 | `crates/lys-runner/src/session/control.rs` | Manual input and resize of a live session. | DIRECTORY-064 |
 | `crates/lys-runner/src/harness_control/approval.rs` | The policy response to a harness approval request on a managed channel: never fabricated. | DIRECTORY-064 |

@@ -5631,6 +5631,16 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/src/dial.rs",
+      "note": "the runner's outbound dial; a control request is recognised before dispatch; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/socket/connection.rs",
+      "note": "the runner socket's dispatch slots; a control act takes the reserved slot; DIRECTORY-064 R5",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/src/legacy_input.rs",
       "note": "the caller-judged compaction path; DIRECTORY-064 R3 routes a context compaction carrying its crossing id through the same attribution, and refuses a boundary reply from anyone but the server",
       "brief": "DIRECTORY-064"
