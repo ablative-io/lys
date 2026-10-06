@@ -6,6 +6,49 @@ use super::{
 };
 
 impl Held {
+    /// Only current compaction holders can be visited for one source agent.
+    pub fn compaction_holders(&self, agent: &str) -> Vec<super::Holder> {
+        let agent = self
+            .index
+            .compaction_agents
+            .get(agent)
+            .map(|_| super::Holder {
+                kind: super::HolderKind::Agent,
+                id: agent.to_owned(),
+            });
+        agent
+            .into_iter()
+            .chain(self.index.compaction_teams.keys().map(|id| super::Holder {
+                kind: super::HolderKind::Team,
+                id: id.clone(),
+            }))
+            .collect()
+    }
+
+    pub(crate) fn compaction_goals(
+        &self,
+        holder: &super::Holder,
+        responsible: &str,
+    ) -> Result<Vec<String>, String> {
+        let positions = match holder.kind {
+            super::HolderKind::Agent => &self.index.compaction_agents,
+            super::HolderKind::Team => &self.index.compaction_teams,
+        };
+        positions
+            .get(&holder.id)
+            .into_iter()
+            .flatten()
+            .filter_map(|position| {
+                #[cfg(test)]
+                compaction_probe::visit(*position);
+                let Some(item) = self.items.get(*position) else {
+                    return Some(Err("compaction index names a missing goal".to_owned()));
+                };
+                (item.goal.responsible == responsible).then(|| Ok(item.goal.id.clone()))
+            })
+            .collect()
+    }
+
     /// Validate every resend input before a leaf or folded state is changed.
     pub fn check_resent(&self, resent: &Resent) -> Result<(), String> {
         let location = self
@@ -249,5 +292,19 @@ impl Held {
     /// Whether `operation` names a firing, event or aim change already kept.
     pub fn kept(&self, operation: &str) -> bool {
         self.index.kept.contains(operation)
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod compaction_probe {
+    thread_local! {static VISITS: std::cell::RefCell<Vec<usize>>=const {std::cell::RefCell::new(Vec::new())};}
+    pub(crate) fn reset() {
+        VISITS.with(|visits| visits.borrow_mut().clear());
+    }
+    pub(crate) fn visit(position: usize) {
+        VISITS.with(|visits| visits.borrow_mut().push(position));
+    }
+    pub(crate) fn visits() -> Vec<usize> {
+        VISITS.with(|visits| visits.borrow().clone())
     }
 }

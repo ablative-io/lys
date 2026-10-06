@@ -35,7 +35,8 @@ use sha2::{Digest, Sha256};
 use tokio::sync::Notify;
 
 mod control;
-pub(crate) use control::{occurrence_text, text_with_words};
+pub use control::{CompactionHolder, ControlAnswer};
+pub(crate) use control::{actual_compaction, occurrence_text, text_with_words};
 
 use crate::config::Config;
 use crate::error::ServerError;

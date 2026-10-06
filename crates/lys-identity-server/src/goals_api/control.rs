@@ -220,12 +220,25 @@ pub(crate) fn control_recipient(
         let id = AgentId::from_str(agent).map_err(|error| GoalError::Unavailable {
             reason: error.to_string(),
         })?;
-        let record = directory
-            .projection()?
+        let projection = directory.projection()?;
+        let record = projection
             .record(IdentityId::Agent(id))
             .ok_or(ServerError::AgentNotVisible)?;
-        if require_active && record.state() != lys_identity::LifecycleState::Active {
-            return Ok(false);
+        if require_active {
+            let person = lys_identity::PersonId::from_str(responsible).map_err(|error| {
+                GoalError::Unavailable {
+                    reason: error.to_string(),
+                }
+            })?;
+            let authority = ControlLifecycle {
+                agent: record.state(),
+                person: projection
+                    .record(IdentityId::Person(person))
+                    .map(lys_identity::projection::Record::state),
+            };
+            if !live_control_authority(authority) {
+                return Ok(false);
+            }
         }
         Ok(match holder.kind {
             HolderKind::Agent => {
@@ -240,10 +253,7 @@ pub(crate) fn control_recipient(
     if admitted && holder.kind == HolderKind::Team {
         crate::teams_api::with_teams(state, |store| {
             let team = store.team(&holder.id).ok_or(TeamError::Unknown)?;
-            Ok(team.retired.is_none()
-                && team.created.owner == responsible
-                && team.members.iter().any(|member| member == agent)
-                && !team.held.iter().any(|held| held.member == agent))
+            Ok(team_control_recipient(team, responsible, agent))
         })
     } else {
         Ok(admitted)
@@ -475,4 +485,53 @@ pub(super) async fn resend_lookup(
         prior,
         occurrence,
     }))
+}
+
+pub(crate) fn team_control_recipient(
+    team: &crate::teams_state::Team,
+    responsible: &str,
+    agent: &str,
+) -> bool {
+    team.retired.is_none()
+        && team.created.owner == responsible
+        && team.members.iter().any(|member| member == agent)
+        && !team.held.iter().any(|held| held.member == agent)
+}
+
+#[derive(Clone, Copy)]
+struct ControlLifecycle {
+    agent: lys_identity::LifecycleState,
+    person: Option<lys_identity::LifecycleState>,
+}
+fn live_control_authority(authority: ControlLifecycle) -> bool {
+    authority.agent == lys_identity::LifecycleState::Active
+        && authority.person == Some(lys_identity::LifecycleState::Active)
+}
+
+#[cfg(test)]
+mod authority_tests {
+    use super::{ControlLifecycle, live_control_authority};
+    use lys_identity::LifecycleState;
+    #[test]
+    fn pending_words_are_refused_when_the_responsible_person_is_no_longer_active() {
+        assert!(live_control_authority(ControlLifecycle {
+            agent: LifecycleState::Active,
+            person: Some(LifecycleState::Active)
+        }));
+        for person in [
+            Some(LifecycleState::Suspended),
+            Some(LifecycleState::Retired),
+            Some(LifecycleState::Registered),
+            None,
+        ] {
+            assert!(!live_control_authority(ControlLifecycle {
+                agent: LifecycleState::Active,
+                person
+            }));
+        }
+        assert!(!live_control_authority(ControlLifecycle {
+            agent: LifecycleState::Suspended,
+            person: Some(LifecycleState::Active)
+        }));
+    }
 }

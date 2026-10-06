@@ -1134,3 +1134,423 @@ async fn resend_lookup_names_the_kept_occurrence_and_refuses_unknown_or_certain_
     }
     Ok(())
 }
+
+struct CompactionFixture {
+    dir: tempfile::TempDir,
+    key: std::sync::Arc<lys_core::Ed25519Identity>,
+    store: lys_identity_server::goals_store::GoalStore,
+    holders: Vec<lys_identity_server::goals_store::CompactionHolder>,
+}
+
+fn compaction_fixture(holders: usize, padding: usize) -> Result<CompactionFixture, Box<dyn Error>> {
+    use lys_identity_server::goals_store::{CompactionHolder, GoalStore};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    let dir = tempfile::tempdir()?;
+    let key = std::sync::Arc::new(lys_core::Ed25519Identity::load_or_generate(
+        &dir.path().join("key"),
+    )?);
+    let path = dir.path().join("goals");
+    drop(GoalStore::open(&path, std::sync::Arc::clone(&key))?);
+    let mut leaves = Vec::with_capacity(holders + padding);
+    let mut targets = Vec::with_capacity(holders);
+    for number in 0..holders + padding {
+        let mut goal = queued()?.items.remove(0).goal;
+        goal.id = format!("goal-{number}");
+        goal.holder.id = format!("team-{number}");
+        goal.holder.kind = HolderKind::Team;
+        goal.reminders = if number < holders {
+            vec![Remind::On {
+                event: lys_identity_server::goals_state::Event::Compaction,
+            }]
+        } else {
+            Vec::new()
+        };
+        if number < holders {
+            targets.push(CompactionHolder {
+                holder: goal.holder.clone(),
+                responsible: goal.responsible.clone(),
+            });
+        }
+        leaves.push(serde_json::to_vec(&Line::Set(goal))?);
+    }
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    log.append_batch(&leaves.iter().map(Vec::as_slice).collect::<Vec<_>>())?;
+    drop(log);
+    let store = GoalStore::open(&path, std::sync::Arc::clone(&key))?;
+    Ok(CompactionFixture {
+        dir,
+        key,
+        store,
+        holders: targets,
+    })
+}
+
+fn compact_outcome(
+    state: lys_runner::operations::OperationState,
+    request: &str,
+) -> lys_runner::operations::OperationOutcome {
+    lys_runner::operations::OperationOutcome {
+        operation: "compaction".to_owned(),
+        session: "session".to_owned(),
+        request: request.to_owned(),
+        state,
+        at: 2000,
+        words: "actual harness observation".to_owned(),
+        text: None,
+        ended: None,
+    }
+}
+
+#[test]
+fn confirmed_compaction_fires_each_holder_once_and_never_a_later_holder_on_repeat() -> TestResult {
+    use lys_identity_server::goals_store::{CompactionHolder, ControlAnswer, GoalStore};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    use lys_runner::operations::OperationState;
+    let CompactionFixture {
+        dir,
+        key,
+        mut store,
+        mut holders,
+    } = compaction_fixture(2, 1022)?;
+    let outcome = compact_outcome(OperationState::Confirmed, "context_compact");
+    let path = dir.path().join("goals");
+    let before = lys_log_store::flush_count();
+    assert!(store.control_answer(ControlAnswer {
+        outcome: &outcome,
+        holders: &holders,
+        at: 2
+    })?);
+    assert_eq!(lys_log_store::flush_count() - before, 1);
+    for number in 0..2 {
+        assert_eq!(
+            store
+                .item(&format!("goal-{number}"))
+                .ok_or("goal absent")?
+                .timers[0]
+                .next_due,
+            Some(2)
+        );
+    }
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    assert_eq!(log.len(), 1027);
+    drop(log);
+    let mut later = queued()?.items.remove(0).goal;
+    later.id = "later-goal".to_owned();
+    later.holder.id = "later-team".to_owned();
+    later.holder.kind = HolderKind::Team;
+    later.reminders = vec![Remind::On {
+        event: lys_identity_server::goals_state::Event::Compaction,
+    }];
+    holders.push(CompactionHolder {
+        holder: later.holder.clone(),
+        responsible: later.responsible.clone(),
+    });
+    store.set(later)?;
+    assert!(!store.control_answer(ControlAnswer {
+        outcome: &outcome,
+        holders: &holders,
+        at: 3
+    })?);
+    assert_eq!(
+        store.item("later-goal").ok_or("later goal absent")?.timers[0].next_due,
+        None
+    );
+    drop(store);
+    let mut store = GoalStore::open(&path, key)?;
+    assert!(!store.control_answer(ControlAnswer {
+        outcome: &outcome,
+        holders: &holders,
+        at: 4
+    })?);
+    assert_eq!(
+        store.item("later-goal").ok_or("later goal absent")?.timers[0].next_due,
+        None
+    );
+    Ok(())
+}
+
+#[test]
+fn accepted_uncertain_and_person_resent_outcomes_fire_no_compaction_reminder() -> TestResult {
+    use lys_identity_server::goals_store::ControlAnswer;
+    use lys_runner::operations::OperationState;
+    let fixture = compaction_fixture(1, 0)?;
+    let mut store = fixture.store;
+    let holders = fixture.holders;
+    for (state, request) in [
+        (OperationState::Accepted, "compact"),
+        (OperationState::Uncertain, "context_compact"),
+        (OperationState::Confirmed, "goal_reminder"),
+        (OperationState::Confirmed, "reconcile_control"),
+    ] {
+        let outcome = compact_outcome(state, request);
+        assert!(!store.control_answer(ControlAnswer {
+            outcome: &outcome,
+            holders: &holders,
+            at: 2
+        })?);
+        assert_eq!(
+            store.item("goal-0").ok_or("goal absent")?.timers[0].next_due,
+            None
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn compaction_holder_batches_measure_one_sync_at_ten_and_a_thousand_and_three_at_a_snapshot()
+-> TestResult {
+    use lys_identity_server::goals_store::{ControlAnswer, GoalStore};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    use lys_runner::operations::OperationState;
+    for (count, padding, expected_syncs) in [(10, 1014, 1), (1000, 24, 1), (10, 0, 3)] {
+        let CompactionFixture {
+            dir,
+            key,
+            mut store,
+            holders,
+        } = compaction_fixture(count, padding)?;
+        let path = dir.path().join("goals");
+        if expected_syncs == 3 {
+            drop(store);
+            let (mut log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+            let leaves: Vec<_> = (count..1023)
+                .map(|number| {
+                    serde_json::to_vec(&Line::Evented(lys_identity_server::goals_state::Evented {
+                        operation: format!("old-event-{number}"),
+                        event: lys_identity_server::goals_state::Event::Compaction,
+                        goals: Vec::new(),
+                        at: 1,
+                    }))
+                })
+                .collect::<Result<_, _>>()?;
+            log.append_batch(&leaves.iter().map(Vec::as_slice).collect::<Vec<_>>())?;
+            drop(log);
+            store = GoalStore::open(&path, std::sync::Arc::clone(&key))?;
+        }
+        let outcome = compact_outcome(OperationState::Confirmed, "compact");
+        let before = lys_log_store::flush_count();
+        assert!(store.control_answer(ControlAnswer {
+            outcome: &outcome,
+            holders: &holders,
+            at: 2
+        })?);
+        let syncs = lys_log_store::flush_count() - before;
+        assert_eq!(syncs, expected_syncs, "{count} holders");
+        println!(
+            "compaction_batch holders={count} leaves={} syncs={syncs} snapshot_boundary={}",
+            count + 1,
+            expected_syncs == 3
+        );
+        drop(store);
+        let store = GoalStore::open(&path, key)?;
+        for number in 0..count {
+            assert_eq!(
+                store
+                    .item(&format!("goal-{number}"))
+                    .ok_or("goal absent after reopen")?
+                    .timers[0]
+                    .next_due,
+                Some(2)
+            );
+        }
+    }
+    Ok(())
+}
+
+struct InterruptedCompactionStore {
+    inner: lys_log_store::FileLeafStore,
+    fault: std::sync::Arc<std::sync::atomic::AtomicU8>,
+}
+
+impl lys_log_store::LeafStore for InterruptedCompactionStore {
+    fn origin(&self) -> &str {
+        self.inner.origin()
+    }
+    fn extent(&self) -> u64 {
+        self.inner.extent()
+    }
+    fn leaf(&self, index: u64) -> lys_log_store::StoreResult<Option<Vec<u8>>> {
+        self.inner.leaf(index)
+    }
+    fn pinned(&self) -> lys_log_store::PinnedRoot {
+        self.inner.pinned()
+    }
+    fn pin(&mut self, pin: lys_log_store::PinnedRoot) -> lys_log_store::StoreResult<()> {
+        self.inner.pin(pin)
+    }
+    fn snapshot(&self) -> lys_log_store::StoreResult<Option<Vec<u8>>> {
+        self.inner.snapshot()
+    }
+    fn put_snapshot(&mut self, bytes: &[u8]) -> lys_log_store::StoreResult<()> {
+        self.inner.put_snapshot(bytes)
+    }
+    fn append(
+        &mut self,
+        index: u64,
+        leaves: &[&[u8]],
+        pin: lys_log_store::PinnedRoot,
+    ) -> lys_log_store::StoreResult<()> {
+        use std::sync::atomic::Ordering;
+        let fault = self.fault.swap(0, Ordering::SeqCst);
+        if fault == 0 {
+            return self.inner.append(index, leaves, pin);
+        }
+        let segment = self
+            .inner
+            .dir()
+            .join("leaves/segments/00000000000000000000");
+        let old = std::fs::metadata(&segment)
+            .map_err(|source| lys_log_store::StoreError::Io {
+                context: "fault segment metadata".to_owned(),
+                source,
+            })?
+            .len();
+        self.inner.append(index, leaves, pin)?;
+        if fault == 1 {
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .open(&segment)
+                .map_err(|source| lys_log_store::StoreError::Io {
+                    context: "fault segment open".to_owned(),
+                    source,
+                })?;
+            let end = file
+                .metadata()
+                .map_err(|source| lys_log_store::StoreError::Io {
+                    context: "fault segment metadata".to_owned(),
+                    source,
+                })?
+                .len();
+            file.set_len(old + (end - old) / 2).map_err(|source| {
+                lys_log_store::StoreError::Io {
+                    context: "mid-batch fault".to_owned(),
+                    source,
+                }
+            })?;
+        }
+        Err(lys_log_store::StoreError::Io {
+            context: "interrupted compaction batch".to_owned(),
+            source: std::io::Error::other("injected write/answer gap"),
+        })
+    }
+}
+
+#[test]
+fn interrupted_compaction_batches_reopen_all_or_none_and_retry_once_in_total() -> TestResult {
+    use lys_identity_server::goals_store::{ControlAnswer, GoalStore};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    use lys_runner::operations::OperationState;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU8, Ordering},
+    };
+    for mode in [1, 2] {
+        let CompactionFixture {
+            dir,
+            key,
+            store,
+            holders,
+        } = compaction_fixture(10, 1014)?;
+        drop(store);
+        let path = dir.path().join("goals");
+        let opened = path.clone();
+        let fault = Arc::new(AtomicU8::new(0));
+        let plan = Arc::clone(&fault);
+        let mut store = GoalStore::over(
+            Box::new(move || {
+                Ok(InterruptedCompactionStore {
+                    inner: FileLeafStore::open(&opened)?,
+                    fault: Arc::clone(&plan),
+                })
+            }),
+            Arc::clone(&key),
+        )?;
+        fault.store(mode, Ordering::SeqCst);
+        let outcome = compact_outcome(OperationState::Confirmed, "context_compact");
+        let answer = store.control_answer(ControlAnswer {
+            outcome: &outcome,
+            holders: &holders,
+            at: 2,
+        });
+        assert_eq!(answer.is_ok(), mode == 2, "{answer:?}");
+        drop(store);
+        let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+        assert_eq!(log.len(), if mode == 1 { 1024 } else { 1035 });
+        drop(log);
+        let mut store = GoalStore::open(&path, Arc::clone(&key))?;
+        for number in 0..10 {
+            assert_eq!(
+                store
+                    .item(&format!("goal-{number}"))
+                    .ok_or("goal absent")?
+                    .timers[0]
+                    .next_due,
+                if mode == 1 { None } else { Some(2) }
+            );
+        }
+        let fired = store.control_answer(ControlAnswer {
+            outcome: &outcome,
+            holders: &holders,
+            at: 3,
+        })?;
+        assert_eq!(fired, mode == 1);
+        assert!(!store.control_answer(ControlAnswer {
+            outcome: &outcome,
+            holders: &holders,
+            at: 4
+        })?);
+        drop(store);
+        let store = GoalStore::open(&path, key)?;
+        for number in 0..10 {
+            assert_eq!(
+                store
+                    .item(&format!("goal-{number}"))
+                    .ok_or("goal absent after retry")?
+                    .timers[0]
+                    .next_due,
+                Some(2)
+            );
+        }
+        let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+        assert_eq!(log.len(), 1035);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_repeated_compaction_holder_is_refused_before_any_batch_leaf_is_written() -> TestResult {
+    use lys_identity_server::goals_store::{CompactionHolder, ControlAnswer};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    let CompactionFixture {
+        dir,
+        key,
+        mut store,
+        mut holders,
+    } = compaction_fixture(1, 0)?;
+    holders.push(CompactionHolder {
+        holder: holders[0].holder.clone(),
+        responsible: holders[0].responsible.clone(),
+    });
+    let outcome = compact_outcome(lys_runner::operations::OperationState::Confirmed, "compact");
+    let error = store
+        .control_answer(ControlAnswer {
+            outcome: &outcome,
+            holders: &holders,
+            at: 2,
+        })
+        .err()
+        .ok_or("a repeated holder was accepted")?;
+    assert!(
+        matches!(error,lys_identity_server::error::ServerError::Runner {refusal,..} if refusal=="compaction_holder_repeated")
+    );
+    drop(store);
+    let path = dir.path().join("goals");
+    let store = lys_identity_server::goals_store::GoalStore::open(&path, key)?;
+    assert_eq!(
+        store.item("goal-0").ok_or("goal absent")?.timers[0].next_due,
+        None
+    );
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    assert_eq!(log.len(), 1);
+    Ok(())
+}

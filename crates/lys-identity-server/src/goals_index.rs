@@ -2,13 +2,15 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use super::{Change, Changed, Fired, Item, Sent};
+use super::{Change, Changed, Fired, HolderKind, Item, Remind, Sent, Standing};
 
 pub(super) type Location = (usize, usize, usize);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct Index {
     pub(super) items: HashMap<String, usize>,
+    pub(super) compaction_agents: BTreeMap<String, BTreeSet<usize>>,
+    pub(super) compaction_teams: BTreeMap<String, BTreeSet<usize>>,
     pub(super) marked: HashMap<String, usize>,
     pub(super) changed: HashMap<String, (usize, usize)>,
     pub(super) kept: HashSet<String>,
@@ -57,8 +59,41 @@ impl Index {
                         .or_insert((position, firing));
                 }
             }
+            index.compaction(position, item);
         }
         index
+    }
+
+    pub(super) fn compaction(&mut self, position: usize, item: &Item) {
+        let held = match item.goal.holder.kind {
+            HolderKind::Agent => &mut self.compaction_agents,
+            HolderKind::Team => &mut self.compaction_teams,
+        };
+        if let Some(positions) = held.get_mut(&item.goal.holder.id) {
+            positions.remove(&position);
+            if positions.is_empty() {
+                held.remove(&item.goal.holder.id);
+            }
+        }
+        if item.standing == Standing::Open
+            && self
+                .current_active
+                .get(&position)
+                .copied()
+                .unwrap_or(item.goal.active)
+            && item.goal.reminders.iter().any(|remind| {
+                matches!(
+                    remind,
+                    Remind::On {
+                        event: super::Event::Compaction
+                    }
+                )
+            })
+        {
+            held.entry(item.goal.holder.id.clone())
+                .or_default()
+                .insert(position);
+        }
     }
 
     pub(super) fn mark(&mut self, position: usize, operation: &str) {

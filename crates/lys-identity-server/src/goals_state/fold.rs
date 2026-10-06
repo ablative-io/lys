@@ -24,6 +24,7 @@ impl Held {
                 Arc::make_mut(&mut self.index)
                     .items
                     .insert(goal.id.clone(), self.items.len());
+                let position = self.items.len();
                 self.items.push(Item {
                     goal,
                     standing: Standing::Open,
@@ -32,6 +33,7 @@ impl Held {
                     fired: Vec::new(),
                     changes: Vec::new(),
                 });
+                Arc::make_mut(&mut self.index).compaction(position, &self.items[position]);
             }
             Line::Marked(marked) => {
                 let position = self.position(&marked.goal)?;
@@ -46,6 +48,7 @@ impl Held {
                     timer.next_due = None;
                 }
                 Arc::make_mut(&mut self.index).mark(position, &operation);
+                Arc::make_mut(&mut self.index).compaction(position, &self.items[position]);
             }
             Line::Changed(changed) => {
                 changed.change.check().map_err(|error| error.to_string())?;
@@ -63,6 +66,7 @@ impl Held {
                 let position = self.position(&changed.goal)?;
                 Arc::make_mut(&mut self.index).change(position, change, &changed);
                 self.items[position].changes.push(changed);
+                Arc::make_mut(&mut self.index).compaction(position, &self.items[position]);
             }
             Line::Fired(fired) => self.fire(fired)?,
             Line::Resent(resent) => {

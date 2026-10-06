@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 mod control;
+#[cfg(test)]
+pub(crate) use control::compaction_probe;
 mod fold;
 #[path = "goals_index.rs"]
 mod index;

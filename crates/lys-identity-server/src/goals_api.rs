@@ -33,7 +33,7 @@ use serde::Deserialize;
 
 mod control;
 pub(crate) use control::{ResendBody, ResendLookup, ResendView};
-pub(crate) use control::{boundary_reminders, control_recipient};
+pub(crate) use control::{boundary_reminders, control_recipient, team_control_recipient};
 
 use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
