@@ -1201,6 +1201,11 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `docs/design/home/launch-template.schema.json` | The launch template schema. | DIRECTORY-064 |
 | `crates/lys-runner/src/launch_config.rs` | The runner launch Config: the typed members a launch carries. | DIRECTORY-064 |
 | `crates/lys-runner/tests/launch_config.rs` | The runner launch Config tests. | DIRECTORY-064 |
+| `crates/lys-identity-server/src/grant_receipts_api.rs` | The grant receipt route: a grant leaf's receipt, the grant log's signed head and its inclusion proof. | DIRECTORY-058 |
+| `crates/lys-identity-server/tests/grant_receipts_signed.rs` | The grant receipt route's tests. | DIRECTORY-058 |
+| `crates/lys-identity/src/grants/receipt_answer.rs` | One function that verifies a grant receipt answer against a pinned key. | DIRECTORY-058 |
+| `crates/lys-identity/src/grants/receipt_answer_tests.rs` | The grant receipt answer verifier's tests. | DIRECTORY-058 |
+| `crates/lys-identity/src/directory_sign_in.rs` | The directory's sign-in and refused sign-in changes, committed on the one write path. | DIRECTORY-058 |
 
 ## Inventory
 

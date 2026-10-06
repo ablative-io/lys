@@ -8,7 +8,9 @@
   "blocked_by": [],
   "checklist": [
     "C403",
-    "C404"
+    "C404",
+    "C497",
+    "C498"
   ],
   "stories": [
     "S162"
@@ -99,6 +101,90 @@
       "stories": [
         "S162"
       ]
+    },
+    {
+      "id": "R3",
+      "title": "Every grant change answers a receipt the grant log proves, read back by route",
+      "spec": "Behavioural. A grant change's receipt is answered today only in the answer to the write that made it (GrantReceipt, crates/lys-identity/src/grants/receipt.rs line 21, answered at crates/lys-identity-server/src/grants/handlers.rs line 133), no route reads it back, and verify_grant_receipt (receipt.rs) takes an unsigned tree size and root, the gap R1 closes for the directory log. The grant events are leaves of their own log, appended at crates/lys-identity/src/grants/recovery.rs line 161 by GrantLedger over the same Ledger the directory uses (crates/lys-identity/src/restart.rs). GrantLedger gains origin(), answered by the Ledger::origin R1 adds, from its own store. Grants, which holds the service key today (crates/lys-identity/src/grants/authority.rs line 105), makes a signed head of the grant log with lys_core::checkpoint::sign_note under a note key whose name is the grant log's origin, at open for the head it opens at, at each committed append, and at each reconcile that adopts leaves, and at no read. It holds the signed head as one value with its tree size and root, answers it by signed_head(), and counts the heads it has made by heads_made(), as R1 does for the directory. A sign that fails after open marks the grants broken as a refused leaf does, and every later grant call is refused LogUnavailable until a restart. GET /grant-receipts/{index} answers the receipt of the grant leaf at index, the signed event, the signed head with tree_size and root beside it, and an inclusion proof against that head, from GrantLedger's entry() and inclusion_proof() (recovery.rs). The route admits a caller exactly as GET /grants/{id} admits a reader of the grant the leaf changed (crates/lys-identity-server/src/grants.rs line 163), and refuses any other caller by the same name, so it shows no grant the caller could not already read. The lys-identity crate gains verify_grant_receipt_answer(answer, service_key, origin), which reads the note with R2's note_origin and verify_checkpoint and answers R2's refusals for the note and the proof (checkpoint_unsigned, checkpoint_origin, checkpoint_signature, checkpoint_behind_receipt, inclusion_proof), and verify_grant_receipt's own checks for the receipt, each with its own named refusal. The function verify_grant_receipt keeps its signature. The grant log's origin is its store's, never a machine default and never the directory log's.",
+      "acceptance": [
+        "A delegation's receipt read from GET /grant-receipts/{index} has the same fields as the delegation's own answer.",
+        "A revocation's receipt read from GET /grant-receipts/{index} has the same fields as the revocation's own answer.",
+        "The answer's note verifies under the service's public key with lys_core::checkpoint::verify_checkpoint.",
+        "The note's key name is the grant log's origin.",
+        "The note's body equals the tree_size and root beside it in the answer.",
+        "After a grant change and before any request, the held signed head is of the grant log's new tree.",
+        "Ten grant receipt reads after a grant change leave heads_made() where the change left it.",
+        "A caller who cannot read the grant is refused by the name GET /grants/{id} answers it.",
+        "The refused answer names nothing of the grant.",
+        "The function verify_grant_receipt_answer accepts the true answer.",
+        "The forged tree around a genuine grant event is refused checkpoint_unsigned or checkpoint_signature.",
+        "A changed proof is refused inclusion_proof.",
+        "A note of a tree smaller than the receipt's index needs is refused checkpoint_behind_receipt.",
+        "A receipt that names another grant is refused by its own name."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/grant_receipts_api.rs",
+          "crates/lys-identity-server/tests/grant_receipts_signed.rs",
+          "crates/lys-identity/src/grants/receipt_answer.rs",
+          "crates/lys-identity/src/grants/receipt_answer_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/grants/recovery.rs",
+          "crates/lys-identity/src/grants/authority.rs",
+          "crates/lys-identity/src/grants/receipt.rs",
+          "crates/lys-identity/src/grants/mod.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/routes.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C497"
+      ],
+      "stories": [
+        "S162"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Every sign-in and every refused sign-in is a change in the directory log with a receipt",
+      "spec": "Behavioural. No sign-in is an act in any log today: the directory's changes (crates/lys-identity/src/event.rs, enum Change) are SetupPerson, RegisterPerson, RegisterAgent, ReportingRegistration, ReportsToChanged, ChangeProfile, BindLogin, Transition, LinkAudit and AgentCall. Change gains SignIn and SignInRefused, each naming the identity, the actor's provenance as the service attests it, and for SignInRefused the refusal's name, and the two join lys/identity-event/v1's change codes. Every session Lys begins starts at session_admission::begin (crates/lys-identity-server/src/session_admission.rs line 58), reached from sign_in_callback.rs line 24, sign_in_upstream.rs line 343, sign_in.rs line 500 and setup.rs line 405. WHEN begin admits a session for an identity, THE SYSTEM SHALL commit one SignIn change naming it, through the directory's one write path inside the same with_directory borrow in which bound_caller admitted it, before the session is begun, and the sign-in's answer SHALL carry the index of its leaf. WHEN begin refuses after the actor has resolved to an identity, at the disabled account (line 78), the account mismatch (line 83) or bound_caller's refusal such as IdentityNotActive, THE SYSTEM SHALL commit one SignInRefused change naming that identity and the refusal's name, whatever the name is. An actor that resolves to no identity is refused as today and commits nothing, because the log names no one the directory has not registered. A wrong email or password, which the issuer refuses before begin is reached, commits nothing here, as the issuer counts it. If the commit fails, the sign-in is refused LogUnavailable and no session begins, so no session is ever answered without its record. A read and an answered permission question commit nothing. The changes are signed by the service key as every change is, so R1's signed head and R2's verifier cover them, and their time is the clock the server injects. No change, answer or log line carries a password, token, cookie or authorization code.",
+      "acceptance": [
+        "A person's password sign-in leaves exactly one new SignIn leaf naming that person.",
+        "That leaf's receipt verifies with verify_receipt_answer under the service key.",
+        "The sign-in's answer carries the index of that leaf.",
+        "A sign-in through each of the callback, upstream, password and setup entry points leaves exactly one SignIn leaf.",
+        "A suspended person's sign-in is refused by name and leaves exactly one SignInRefused leaf whose reason is that refusal's name.",
+        "That suspended person's refused sign-in leaves no SignIn leaf.",
+        "A disabled account's sign-in leaves exactly one SignInRefused leaf naming the person, with reason SignInRefused.",
+        "A wrong password refused by the issuer leaves no leaf.",
+        "An actor bound to no identity is refused and leaves no leaf.",
+        "Three reads and three answered permission questions after a sign-in leave the leaf count unchanged.",
+        "A directory whose append fails refuses the sign-in LogUnavailable and begins no session.",
+        "No SignIn or SignInRefused leaf's bytes contain the password, the token, the cookie or the authorization code the test used."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/src/directory_sign_in.rs",
+          "crates/lys-identity-server/tests/sign_in_receipts.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/event.rs",
+          "crates/lys-identity/src/encoding.rs",
+          "crates/lys-identity/src/projection.rs",
+          "crates/lys-identity/src/lib.rs",
+          "crates/lys-identity-server/src/session_admission.rs",
+          "docs/design/WIRE-FORMATS.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C498"
+      ],
+      "stories": [
+        "S162"
+      ]
     }
   ],
   "boundaries": [
@@ -112,5 +198,13 @@
   "verification": [
     "The full Lys gate and ast-grep scan exit 0 at the card's head, measured by the card round.",
     "On a scratch install, read a receipt, verify it with verify_receipt_answer under the key read from /service-key, then present the forged tree and see it refused."
+  ],
+  "amendments": [
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R3 grant receipts read back and proved under a signed head; R4 every sign-in and refused sign-in is a change in the directory log",
+      "ruling": "DIRECTORY-007 is superseded (Waffles, 3b1e9e4c); what it held that must not be lost is that every sign-in and every permission change is an act in a log with a receipt. Neither 050 nor 058 named them: event.rs has no sign-in change, and a grant receipt is answered only in its write's answer with no route and no signed head (Archie, 6faa3c05). R3 and R4 carry them here, on R1's signed head and R2's verifier. Ruled by Waffles at 5e8e80b3."
+    }
   ]
 }
