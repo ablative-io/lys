@@ -159,6 +159,7 @@ Behavioural. WHEN 051's authoritative context measurement crosses its held thres
 - modify: crates/lys-runner/src/session.rs
 - modify: crates/lys-runner/src/legacy_input.rs
 - modify: crates/lys-identity-server/src/refusals_follow.rs
+- modify: crates/lys-runner/src/protocol.rs
 
 **Checklist:**
 - C435 — Enforce context thresholds at the owned boundary (DIRECTORY-064 R3).
@@ -196,6 +197,7 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - modify: crates/lys-identity-server/src/goals_index.rs
 - modify: crates/lys-identity-server/tests/goals_edits.rs
 - modify: crates/lys-identity-server/src/refusals_follow.rs
+- modify: crates/lys-runner/src/protocol.rs
 
 **Checklist:**
 - C436 — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).
@@ -228,6 +230,7 @@ Behavioural. WHEN delivery starts, THE SYSTEM SHALL persist the existing 051 ope
 - modify: crates/lys-identity-server/src/receipts_api.rs
 - modify: crates/lys-identity-server/src/runner_api.rs
 - modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/protocol.rs
 
 **Checklist:**
 - C437 — Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).
