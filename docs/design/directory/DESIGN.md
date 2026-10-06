@@ -810,6 +810,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-core/src/keys/identity.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-runner/src/peer.rs` | R6: socket peer credentials, ancestry and leader start identity; DIRECTORY-060 reuses this proof | DIRECTORY-051 |
+| `crates/lys-runner/src/peer_connection_tests.rs` | the peer connection's unit tests: an ended or restarted launch is refused; DIRECTORY-064 R5 reads the kept restart through the typed operations store | DIRECTORY-064 |
 | `crates/lys-runner/tests/present.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-runner/src/present_client.rs` | the runner's session holder key | DIRECTORY-060 |
 | `docs/design/directory/briefs/DIRECTORY-060.json` | the runner's session holder key brief | DIRECTORY-060 |

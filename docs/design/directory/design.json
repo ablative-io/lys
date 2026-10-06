@@ -3556,6 +3556,11 @@
       "brief": "DIRECTORY-051"
     },
     {
+      "path": "crates/lys-runner/src/peer_connection_tests.rs",
+      "note": "the peer connection's unit tests: an ended or restarted launch is refused; DIRECTORY-064 R5 reads the kept restart through the typed operations store",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/tests/present.rs",
       "note": "the runner's session holder key",
       "brief": "DIRECTORY-060"

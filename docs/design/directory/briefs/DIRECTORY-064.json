@@ -286,7 +286,9 @@
           "crates/lys-identity-server/src/runtime_store.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
           "crates/lys-identity-server/src/openapi_runner_types.rs",
-          "crates/lys-runner/src/durable.rs"
+          "crates/lys-runner/src/durable.rs",
+          "crates/lys-runner/src/peer_connection_tests.rs",
+          "crates/lys-runner/tests/peer_restart/cases.rs"
         ],
         "delete": []
       },
@@ -676,6 +678,12 @@
       "by": "Archie",
       "subject": "Amendment 50's fixture update also covers events.rs's shared cfg(test) gated_fixture Claude arm",
       "ruling": "At 555e985f the whole lys-runner run failed nine events.rs cfg(test) tests with control_source_unbound: init arrived before a bound turn (Brisket 1f429541, run 4af93177). They share gated_fixture's Claude arm, which injects system/init before any turn (e8d905bf lines 740 to 746, checked here). The nine tests are at lines 886, 890, 895, 1030, 1111, 1168, 1220, 1244 and 1254 (Brisket 8ece061d). This is amendment 51's case, in a file already this box's (R1, R2, R5). Granted for that shared setup only: the Claude arm supplies the correlated initialize success first, and init at the first turn, as the harness does. The nine tests' assertions and every other test are unchanged. If a test needs init before a turn to pass, post it as a finding and do not keep it. The two peer tests failing on operations.jsonl are not covered here. They are ruled separately, once the parent and base runs are quoted."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "R5 gains peer_connection_tests.rs and tests/peer_restart/cases.rs: they read the kept restart through the typed store, never the replaced operations.jsonl",
+      "ruling": "Two peer tests fail with ENOENT at 555e985f (Brisket 1f429541): a_connection_refuses_an_ended_or_restarted_launch reads operations.jsonl by name (peer_connection_tests.rs line 133 at e8d905bf), and a_replayed_operation_answers_the_kept_restart_once folds its lines (tests/peer_restart/cases.rs line 193). At the installed d310a9ea the runner wrote operations.jsonl (operations.rs line 205). This box replaced it with operations.v2.journal and operations.v2.snapshot (operations/store.rs lines 71 and 72, amendments 40 and 41), so the file is gone on every machine, the Mac included. This is the box's own break, not a venue difference and not a FOUND. It blocks the battery until fixed (Waffles c865c670). Granted for those two files: each reads the kept restart through the typed store, never by a file name. The unit test uses the crate's own operations reader. The integration test uses a public path that already exists (Sessions::outcome or the runner's outcome act), and the handback names which. No store internals are made public for a test. Each test keeps its claim. The first: the restart was kept under replace-proved, and a restarted launch is refused peer_unproved. The second: a replayed restart answers the one kept restart, and replay keeps no second operation. Each claim is now proved from typed records. No assertion is dropped or weakened, and no other peer code changes. The handback quotes both tests passing under nextest at the new head, and states whether they passed at d310a9ea in the same profile."
     }
   ]
 }
