@@ -14,11 +14,12 @@ mod owned;
 use owned::{Cancellation, Message, Owned, child_entry};
 
 type Result<T> = std::result::Result<T, String>;
-const STEPS: [&str; 7] = [
+const STEPS: [&str; 8] = [
     "launcher",
     "version_report",
-    "init",
+    "bound",
     "reminder_admitted",
+    "init",
     "compaction",
     "stop",
     "terminal_writes",
@@ -71,6 +72,7 @@ struct Evidence {
     file: File,
     next: usize,
     closed: bool,
+    cleanup: String,
 }
 
 impl Evidence {
@@ -84,6 +86,7 @@ impl Evidence {
                 .map_err(io_failed)?,
             next: 0,
             closed: false,
+            cleanup: "not_started".to_owned(),
         })
     }
     fn record(&mut self, step: &str, mut detail: Value) -> Result<()> {
@@ -101,17 +104,23 @@ impl Evidence {
         Ok(())
     }
     fn failed(&mut self, reason: &str) -> Result<()> {
+        if reason.trim().is_empty() || self.cleanup.trim().is_empty() {
+            return Err(
+                "qualification_evidence_failure_invalid: reason and cleanup must be named"
+                    .to_owned(),
+            );
+        }
         if let Some(step) = STEPS.get(self.next).copied() {
-            self.record(step, json!({"observed":false,"reason":code(reason)}))?;
+            self.record(
+                step,
+                json!({"observed":false,"reason":reason,"cleanup":self.cleanup}),
+            )?;
         }
         self.closed = true;
         self.file.sync_all().map_err(io_failed)
     }
 }
 
-fn code(reason: &str) -> &str {
-    reason.split_once(':').map_or(reason, |(name, _)| name)
-}
 fn io_failed(error: impl std::fmt::Display) -> String {
     format!("qualification_io_failed:{error}")
 }
@@ -170,13 +179,35 @@ async fn ingest(
     controller: &mut Controller,
     source: &Binding,
     cancel: &mut Cancellation,
+    transport: Transport,
+    proof: &mut Option<String>,
 ) -> Result<Update> {
     let Message::Frame(frame) = owned.next(cancel).await? else {
         return Err("qualification_frame_invalid".to_owned());
     };
     let update = controller
         .ingest(source, &frame)
-        .map_err(|error| error.name())?;
+        .map_err(|error| error.to_string())?;
+    if transport == Transport::Claude
+        && update
+            .events
+            .iter()
+            .any(|event| event.event == "control_initialized")
+    {
+        *proof = frame
+            .get("claude_code_version")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+    } else if transport == Transport::Codex
+        && frame.get("id").and_then(Value::as_str) == Some("lys-initialize")
+    {
+        *proof = frame
+            .pointer("/result/userAgent")
+            .and_then(Value::as_str)
+            .and_then(|agent| agent.split_whitespace().next())
+            .and_then(|product| product.split_once('/'))
+            .map(|(_, version)| version.to_owned());
+    }
     owned.write(&update)?;
     Ok(update)
 }
@@ -189,10 +220,31 @@ async fn protocol(
     cancel: &mut Cancellation,
 ) -> Result<()> {
     let mut controller =
-        Controller::new(binding.clone(), transport).map_err(|error| error.name())?;
-    owned.write(&controller.bootstrap())?;
+        Controller::new(binding.clone(), transport).map_err(|error| error.to_string())?;
+    let bootstrap = controller.bootstrap();
+    let frame = &bootstrap
+        .dispatches
+        .first()
+        .ok_or("qualification_initialize_missing")?
+        .frame;
+    let correlation = frame
+        .get("request_id")
+        .or_else(|| frame.get("id"))
+        .and_then(Value::as_str)
+        .ok_or("qualification_initialize_uncorrelated")?
+        .to_owned();
+    let mut proof = None;
+    owned.write(&bootstrap)?;
     loop {
-        let update = ingest(owned, &mut controller, &binding, cancel).await?;
+        let update = ingest(
+            owned,
+            &mut controller,
+            &binding,
+            cancel,
+            transport,
+            &mut proof,
+        )
+        .await?;
         if update
             .events
             .iter()
@@ -201,16 +253,28 @@ async fn protocol(
             break;
         }
     }
-    evidence.record("init", json!({"version":binding.harness_version}))?;
+    evidence.record("bound", json!({"correlation":correlation}))?;
     let pending = Pending::new(
         "qualification-reminder".to_owned(),
         Kind::Reminder,
         "Reply exactly ready.".to_owned(),
     );
     let correlation = pending.uuid.clone();
-    owned.write(&controller.enqueue(pending).map_err(|error| error.name())?)?;
+    owned.write(
+        &controller
+            .enqueue(pending)
+            .map_err(|error| error.to_string())?,
+    )?;
     loop {
-        let update = ingest(owned, &mut controller, &binding, cancel).await?;
+        let update = ingest(
+            owned,
+            &mut controller,
+            &binding,
+            cancel,
+            transport,
+            &mut proof,
+        )
+        .await?;
         if update.receipts.iter().any(|receipt| {
             receipt.operation == "qualification-reminder"
                 && receipt.state == OperationState::Confirmed
@@ -220,17 +284,45 @@ async fn protocol(
         }
     }
     evidence.record("reminder_admitted", json!({"correlation":correlation}))?;
+    let version = proof.as_deref().ok_or("qualification_init_unobserved")?;
+    if version != binding.harness_version {
+        return Err(
+            "qualification_version_mismatch: the serving harness differs from its version report"
+                .to_owned(),
+        );
+    }
+    evidence.record("init", json!({"version":version}))?;
     while !controller.idle() {
-        ingest(owned, &mut controller, &binding, cancel).await?;
+        ingest(
+            owned,
+            &mut controller,
+            &binding,
+            cancel,
+            transport,
+            &mut proof,
+        )
+        .await?;
     }
     let pending = Pending::new(
         "qualification-compaction".to_owned(),
         Kind::Compact,
         String::new(),
     );
-    owned.write(&controller.enqueue(pending).map_err(|error| error.name())?)?;
+    owned.write(
+        &controller
+            .enqueue(pending)
+            .map_err(|error| error.to_string())?,
+    )?;
     loop {
-        let update = ingest(owned, &mut controller, &binding, cancel).await?;
+        let update = ingest(
+            owned,
+            &mut controller,
+            &binding,
+            cancel,
+            transport,
+            &mut proof,
+        )
+        .await?;
         if let Some(receipt) = update
             .receipts
             .iter()
@@ -263,7 +355,7 @@ async fn observe(options: &Options, evidence: &mut Evidence) -> Result<()> {
         return Err("qualification_directory_not_empty".to_owned());
     }
     let selected =
-        process::executable(&selected(&options.adapter)?).map_err(|error| error.name())?;
+        process::executable(&selected(&options.adapter)?).map_err(|error| error.to_string())?;
     let mut probe = Owned::start(&selected, &directory, "probe", "", &mut cancel).await?;
     let Message::Version(bytes) = probe.next(&mut cancel).await? else {
         return Err("qualification_version_report_invalid".to_owned());
@@ -297,7 +389,7 @@ async fn observe(options: &Options, evidence: &mut Evidence) -> Result<()> {
         leader: owned.leader.clone().ok_or("qualification_child_unproved")?,
         conversation,
         entry: process::executable(&std::env::current_exe().map_err(io_failed)?)
-            .map_err(|error| error.name())?,
+            .map_err(|error| error.to_string())?,
         harness: selected,
         harness_version: version,
         adapter: if transport == Transport::Claude {
@@ -308,13 +400,11 @@ async fn observe(options: &Options, evidence: &mut Evidence) -> Result<()> {
         .to_owned(),
     };
     if let Err(error) = protocol(&mut owned, binding, transport, evidence, &mut cancel).await {
-        if let Err(cleanup) = owned.stop(true) {
-            return Err(format!(
-                "qualification_cleanup_failed:{};{}",
-                code(&error),
-                code(&cleanup)
-            ));
-        }
+        eprintln!("{error}");
+        evidence.cleanup = match owned.stop(true) {
+            Ok(_) => "ok".to_owned(),
+            Err(cleanup) => cleanup,
+        };
         return Err(error);
     }
     let status = owned.stop(true)?;
@@ -359,7 +449,7 @@ fn main() {
             .block_on(run(&args))
     })();
     if let Err(error) = result {
-        eprintln!("{}", code(&error));
+        eprintln!("{error}");
         std::process::exit(1);
     }
 }
@@ -389,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_step_ends_the_ordered_evidence_without_private_error_words()
+    fn a_missing_step_keeps_lys_words_and_discards_harness_text()
     -> std::result::Result<(), Box<dyn std::error::Error>> {
         let folder = tempfile::tempdir()?;
         let path = folder.path().join("evidence.jsonl");
@@ -398,25 +488,43 @@ mod tests {
             "launcher",
             json!({"kind":"example-owned","claims_spawn":false,"fixture":true}),
         )?;
-        evidence.failed("qualification_cancelled:private harness text")?;
-        let later = evidence.record("init", json!({"version":"0.1.2"}));
-        println!(
-            "QUALIFIER_FAIL_STOP_EVIDENCE_BEGIN\n{}QUALIFIER_EVIDENCE_END",
-            std::fs::read_to_string(&path)?
-        );
-        assert!(later.is_err());
-        drop(evidence);
-        let text = std::fs::read_to_string(path)?;
-        let records: Vec<Value> = text
+        let executable = Executable {
+            path: "fixture".to_owned(),
+            sha256: "fixture".to_owned(),
+        };
+        let binding = Binding {
+            session: "session".to_owned(),
+            generation: 1,
+            leader: lys_runner::peer::Leader {
+                pid: 2,
+                start: lys_runner::peer::StartIdentity("fixture".to_owned()),
+            },
+            conversation: String::new(),
+            entry: executable.clone(),
+            harness: executable,
+            harness_version: "0.1.2".to_owned(),
+            adapter: "codex-app-server/1".to_owned(),
+        };
+        let mut controller = Controller::new(binding.clone(), Transport::Codex)?;
+        let error = controller
+            .ingest(
+                &binding,
+                &json!({"id":"lys-initialize",
+            "error":{"message":"fixture private harness phrase"}}),
+            )
+            .err()
+            .ok_or("harness error was accepted")?;
+        evidence.failed(&error.to_string())?;
+        let records: Vec<Value> = std::fs::read_to_string(&path)?
             .lines()
             .map(serde_json::from_str)
             .collect::<std::result::Result<_, _>>()?;
-        assert_eq!(records.len(), 2);
         assert_eq!(
-            records[1],
-            json!({"step":"version_report","observed":false,"reason":"qualification_cancelled"})
+            records[1]["reason"],
+            "control_protocol_unsupported: initialize was refused"
         );
-        assert!(!text.contains("private harness text"));
+        assert_eq!(records[1]["cleanup"], "not_started");
+        assert!(!std::fs::read_to_string(path)?.contains("fixture private harness phrase"));
         Ok(())
     }
 
@@ -475,17 +583,18 @@ mod tests {
         assert_eq!(codex.control_status(), before);
         assert!(update.events.is_empty());
         assert!(update.receipts.is_empty());
-        assert!(
-            Controller::new(binding, Transport::Claude)?
-                .bootstrap()
-                .dispatches
-                .is_empty()
+        let claude = Controller::new(binding, Transport::Claude)?.bootstrap();
+        assert_eq!(claude.dispatches.len(), 1);
+        assert_eq!(
+            claude.dispatches[0].frame["request"]["subtype"],
+            "initialize"
         );
+        assert_eq!(claude.dispatches[0].frame["type"], "control_request");
         Ok(())
     }
 
     #[test]
-    fn a_fixture_pass_emits_the_seven_contract_records()
+    fn a_fixture_pass_emits_the_eight_contract_records()
     -> std::result::Result<(), Box<dyn std::error::Error>> {
         let folder = tempfile::tempdir()?;
         let path = folder.path().join("evidence.jsonl");
@@ -498,9 +607,10 @@ mod tests {
             "version_report",
             json!({"line":"codex-cli 0.1.2","version":"0.1.2"}),
         )?;
-        evidence.record("init", json!({"version":"0.1.2"}))?;
+        evidence.record("bound", json!({"correlation":"lys-initialize"}))?;
         let pending = Pending::new("fixture-reminder".to_owned(), Kind::Reminder, String::new());
         evidence.record("reminder_admitted", json!({"correlation":pending.uuid}))?;
+        evidence.record("init", json!({"version":"0.1.2"}))?;
         evidence.record(
             "compaction",
             json!({"evidence":"ContextCompaction","turn_completed":true}),
@@ -522,6 +632,19 @@ mod tests {
             assert_eq!(record.get("step"), Some(&json!(step)));
         }
         println!("QUALIFIER_FIXTURE_PASS_EVIDENCE_BEGIN\n{text}QUALIFIER_EVIDENCE_END");
+        Ok(())
+    }
+    #[test]
+    fn an_empty_reason_or_cleanup_is_refused_before_writing_evidence()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        for (reason, cleanup) in [("", "ok"), ("named failure", "")] {
+            let folder = tempfile::tempdir()?;
+            let path = folder.path().join("evidence.jsonl");
+            let mut evidence = Evidence::create(&path)?;
+            evidence.cleanup = cleanup.to_owned();
+            assert!(evidence.failed(reason).is_err());
+            assert!(std::fs::read(path)?.is_empty());
+        }
         Ok(())
     }
 }

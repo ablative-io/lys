@@ -1,6 +1,6 @@
 //! The example owns a child session and cleans up its pipes on every exit.
 
-use super::{Result, code, io_failed};
+use super::{Result, io_failed};
 use lys_runner::harness_control::{Executable, Update, claude, codex, process};
 use lys_runner::peer::{Leader, start_identity};
 use serde_json::{Value, json};
@@ -41,6 +41,7 @@ pub(super) struct Owned {
     writer: Option<ChildStdin>,
     frames: mpsc::Receiver<Result<Message>>,
     reader: Option<JoinHandle<()>>,
+    exits: Signal,
 }
 
 impl Owned {
@@ -51,6 +52,7 @@ impl Owned {
         conversation: &str,
         cancel: &mut Cancellation,
     ) -> Result<Self> {
+        let exits = signal(SignalKind::child()).map_err(io_failed)?;
         let executable = std::env::current_exe().map_err(io_failed)?;
         let mut child = Command::new(executable)
             .arg("--owned-child")
@@ -70,6 +72,7 @@ impl Owned {
             leader: None,
             frames,
             reader: None,
+            exits,
         };
         let stdout = owned
             .child
@@ -84,7 +87,7 @@ impl Owned {
                     let mut reader = BufReader::new(stdout);
                     let ready = process::frame(&mut reader)
                         .map(Message::Frame)
-                        .map_err(|error| error.name());
+                        .map_err(|error| error.to_string());
                     let failed = ready.is_err();
                     if send.blocking_send(ready).is_err() || failed {
                         return;
@@ -110,7 +113,7 @@ impl Owned {
                         loop {
                             let result = process::frame(&mut (&mut reader).take(1_048_576))
                                 .map(Message::Frame)
-                                .map_err(|error| error.name());
+                                .map_err(|error| error.to_string());
                             let failed = result.is_err();
                             if send.blocking_send(result).is_err() || failed {
                                 break;
@@ -140,7 +143,7 @@ impl Owned {
         }
         owned.leader = Some(Leader {
             pid,
-            start: start_identity(pid).map_err(|error| error.name())?,
+            start: start_identity(pid).map_err(|error| error.to_string())?,
         });
         owned
             .writer
@@ -151,7 +154,19 @@ impl Owned {
         Ok(owned)
     }
     pub(super) async fn next(&mut self, cancel: &mut Cancellation) -> Result<Message> {
-        tokio::select! { frame = self.frames.recv() => frame.ok_or_else(|| "qualification_pipe_ended".to_owned())?, () = cancel.received() => Err("qualification_cancelled".to_owned()) }
+        loop {
+            tokio::select! {
+                biased;
+                frame = self.frames.recv() => return frame.ok_or_else(|| "qualification_pipe_ended: the harness output ended before the awaited frame".to_owned())?,
+                () = cancel.received() => return Err("qualification_cancelled: the qualification was stopped".to_owned()),
+                ended = self.exits.recv() => {
+                    ended.ok_or("qualification_child_signal_ended")?;
+                    if let Some(status) = self.child.as_mut().ok_or("qualification_child_missing")?.try_wait().map_err(io_failed)? {
+                        return Err(format!("qualification_child_exited: the owned harness exited with {status} before the awaited frame"));
+                    }
+                }
+            }
+        }
     }
     pub(super) fn write(&mut self, update: &Update) -> Result<()> {
         let writer = self.writer.as_mut().ok_or("qualification_pipe_missing")?;
@@ -172,13 +187,16 @@ impl Owned {
         if child.try_wait().map_err(io_failed)?.is_none() {
             if let Some(leader) = &self.leader {
                 if force {
-                    if start_identity(leader.pid).map_err(|error| error.name())? == leader.start {
-                        lys_runner::pty::end_group(leader.pid).map_err(|error| error.name())?;
+                    if start_identity(leader.pid).map_err(|error| error.to_string())?
+                        == leader.start
+                    {
+                        lys_runner::pty::end_group(leader.pid)
+                            .map_err(|error| error.to_string())?;
                     } else {
                         return Err("qualification_child_start_changed".to_owned());
                     }
                 } else {
-                    lys_runner::pty::end(leader).map_err(|error| error.name())?;
+                    lys_runner::pty::end(leader).map_err(|error| error.to_string())?;
                 }
             } else {
                 child.kill().map_err(io_failed)?;
@@ -196,7 +214,7 @@ impl Owned {
             .wait()
             .map_err(io_failed)?;
         if let Some(leader) = &self.leader {
-            match lys_runner::pty::end_left_group(leader).map_err(|error| error.name())? {
+            match lys_runner::pty::end_left_group(leader).map_err(|error| error.to_string())? {
                 lys_runner::pty::Left::Gone | lys_runner::pty::Left::Ended { reason: None } => {}
                 lys_runner::pty::Left::Ended {
                     reason: Some(reason),
@@ -227,7 +245,7 @@ impl Drop for Owned {
         if self.child.is_some()
             && let Err(error) = self.stop(true)
         {
-            eprintln!("{}", code(&error));
+            eprintln!("{error}");
         }
     }
 }
@@ -244,13 +262,13 @@ pub(super) fn child_entry(args: &[String]) -> Result<()> {
     }
     let arguments = match mode.as_str() {
         "probe" => vec!["--version".to_owned()],
-        "claude-code" => claude::arguments(&[], conversation).map_err(|error| error.name())?,
-        "codex" => codex::arguments(&[]).map_err(|error| error.name())?,
+        "claude-code" => claude::arguments(&[], conversation).map_err(|error| error.to_string())?,
+        "codex" => codex::arguments(&[]).map_err(|error| error.to_string())?,
         _ => return Err("qualification_child_arguments_invalid".to_owned()),
     };
     rustix::process::setsid().map_err(io_failed_errno)?;
     let mut stdout = std::io::stdout();
-    serde_json::to_writer(&mut stdout, &json!({"qualification_child":std::process::id(),"executable":process::executable(Path::new(program)).map_err(|error| error.name())?})).map_err(|error| format!("qualification_child_ready_failed:{error}"))?;
+    serde_json::to_writer(&mut stdout, &json!({"qualification_child":std::process::id(),"executable":process::executable(Path::new(program)).map_err(|error| error.to_string())?})).map_err(|error| format!("qualification_child_ready_failed:{error}"))?;
     stdout
         .write_all(b"\n")
         .and_then(|()| stdout.flush())

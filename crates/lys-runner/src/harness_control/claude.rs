@@ -2,7 +2,7 @@
 
 use serde_json::{Value, json};
 
-use super::{Kind, Observation, Pending};
+use super::{Boundary, Controller, Kind, Observation, Pending, Update};
 use crate::error::RunnerError;
 
 /// Add the machine protocol flags without changing the existing settings.
@@ -133,7 +133,123 @@ pub(super) fn passive_frame(value: &Value) -> bool {
             value.get("subtype").and_then(Value::as_str),
             Some("init" | "compact_boundary")
         ),
-        Some("user" | "result" | "control_request") => false,
+        Some("user" | "result" | "control_request" | "control_response") => false,
         _ => true,
+    }
+}
+
+impl Controller {
+    pub(super) fn observe_claude(&mut self, value: &Value) -> Result<Observation, RunnerError> {
+        match observe(
+            &self.binding.conversation,
+            &self.binding.harness_version,
+            value,
+            self.current.as_ref(),
+        ) {
+            Ok(observation) => Ok(observation),
+            Err(error) => {
+                self.ready = false;
+                self.closed = true;
+                self.refusal = Some(error.to_string());
+                Err(error)
+            }
+        }
+    }
+
+    pub(super) fn defer_claude_admission(&mut self, uuid: &str) -> bool {
+        if self.initialized {
+            return false;
+        }
+        if self
+            .current
+            .as_ref()
+            .is_some_and(|current| current.uuid == uuid)
+        {
+            self.replayed = true;
+        }
+        true
+    }
+
+    pub(super) fn claude_unproved(&mut self) -> RunnerError {
+        let error = RunnerError::refused(
+            "control_adapter_unqualified",
+            "the turn ended before its serving version was proved",
+        );
+        self.ready = false;
+        self.closed = true;
+        self.refusal = Some(error.to_string());
+        error
+    }
+
+    pub(super) fn bind_claude(&mut self, frame: &Value) -> Result<Option<Update>, RunnerError> {
+        if frame.get("type").and_then(Value::as_str) != Some("control_response") {
+            return Ok(None);
+        }
+        let response = &frame["response"];
+        let refusal = if response.get("request_id").and_then(Value::as_str)
+            == Some(self.initialize.as_str())
+        {
+            match response.get("subtype").and_then(Value::as_str) {
+                Some("success") => None,
+                Some("error") => Some((
+                    "control_initialize_refused",
+                    "the harness refused initialization",
+                )),
+                _ => Some((
+                    "control_protocol_unsupported",
+                    "initialize response has no success or error outcome",
+                )),
+            }
+        } else {
+            Some((
+                "control_correlation_unsupported",
+                "initialize response has another request identity",
+            ))
+        };
+        if let Some((name, words)) = refusal {
+            self.ready = false;
+            self.closed = true;
+            let error = RunnerError::refused(name, words);
+            self.refusal = Some(error.to_string());
+            return Err(error);
+        }
+        if self.ready {
+            return Ok(Some(Update::default()));
+        }
+        self.ready = true;
+        self.boundary = Boundary::Idle;
+        let mut update = Update::default();
+        update.events.push(self.event("control_bound", None, None));
+        self.request_boundary(&mut update)?;
+        Ok(Some(update))
+    }
+
+    pub(super) fn claude_version(&mut self, compact: bool) -> Result<Update, RunnerError> {
+        if !self.ready || self.current.is_none() {
+            return Err(RunnerError::refused(
+                "control_source_unbound",
+                "init arrived before a bound turn",
+            ));
+        }
+        self.compact = compact;
+        let mut update = Update::default();
+        if !self.initialized {
+            self.initialized = true;
+            update
+                .events
+                .push(self.event("control_initialized", None, None));
+        }
+        if self.replayed {
+            let Some(uuid) = self.current.as_ref().map(|current| current.uuid.clone()) else {
+                return Err(self.claude_unproved());
+            };
+            let admitted = self.apply(Observation::Admitted { uuid, turn: None })?;
+            update.events.extend(admitted.events);
+            update.receipts.extend(admitted.receipts);
+            update.admissions.extend(admitted.admissions);
+            update.dispatches.extend(admitted.dispatches);
+            self.replayed = false;
+        }
+        Ok(update)
     }
 }

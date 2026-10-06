@@ -35,11 +35,7 @@ fn controlled() -> Result<(Binding, Controller), Box<dyn Error>> {
     };
     let mut controller = Controller::new(binding.clone(), Transport::Claude)?;
     controller.require_boundary_authority()?;
-    controller.ingest(
-        &binding,
-        &json!({"type":"system","subtype":"init",
-        "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
-    )?;
+    first_turn(&mut controller, &binding)?;
     Ok((binding, controller))
 }
 
@@ -305,5 +301,53 @@ fn lost_boundary_authority_refuses_queued_words_without_releasing_input() -> Tes
                 && receipt.reason == "runner_feed_ended")
     );
     assert!(!controller.idle());
+    Ok(())
+}
+
+fn first_turn(control: &mut Controller, source: &Binding) -> TestResult {
+    let bootstrap = control.bootstrap();
+    let correlation = bootstrap
+        .dispatches
+        .first()
+        .ok_or("initialize not written")?
+        .frame["request_id"]
+        .as_str()
+        .ok_or("initialize not correlated")?;
+    control.ingest(
+        source,
+        &json!({"type":"control_response","response":{
+        "subtype":"success","request_id":correlation,"response":{}}}),
+    )?;
+    let first = Pending::new(
+        "fixture-initialization".to_owned(),
+        Kind::Human,
+        "first turn".to_owned(),
+    );
+    let uuid = first.uuid.clone();
+    control.enqueue(first)?;
+    let status = control.control_status();
+    if status.boundary.is_some() {
+        control.boundary_reply(&BoundaryReply {
+            generation: status.generation,
+            boundary: status.boundary,
+            context: ContextDecision::Released,
+            reminders: Vec::new(),
+        })?;
+    }
+    control.ingest(
+        source,
+        &json!({"type":"system","subtype":"init","session_id":"conversation",
+        "claude_code_version":"9.8.7","slash_commands":["compact"]}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"user","session_id":"conversation","uuid":uuid,
+        "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"result","session_id":"conversation",
+        "uuid":"fixture-initialization-result","is_error":false}),
+    )?;
     Ok(())
 }

@@ -3,7 +3,7 @@
 use std::collections::{BTreeSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::error::RunnerError;
 use crate::protocol::Launch;
@@ -11,6 +11,7 @@ pub use crate::tracking_store::managed::{Binding, Executable, ManagedEvent};
 
 mod approval;
 mod context;
+mod initialize;
 mod reminders;
 pub use context::{
     AppliedContext, BoundaryReply, ContextDecision, ContextReason, ControlPhase, ControlStatus,
@@ -147,6 +148,9 @@ pub struct Controller {
     turn: Option<String>,
     last_result: Option<String>,
     initialized: bool,
+    initialize: String,
+    refusal: Option<String>,
+    replayed: bool,
     closed: bool,
     pending_ids: BTreeSet<String>,
     authority: context::Authority,
@@ -180,30 +184,13 @@ impl Controller {
             turn: None,
             last_result: None,
             initialized: false,
+            initialize: crate::protocol::hex(&rand::random::<[u8; 16]>()),
+            refusal: None,
+            replayed: false,
             closed: false,
             pending_ids: BTreeSet::new(),
             authority: context::Authority::default(),
         })
-    }
-
-    /// Handshake frames only; process launch and adapter qualification remain separate.
-    #[must_use]
-    pub fn bootstrap(&self) -> Update {
-        if self.transport != Transport::Codex {
-            return Update::default();
-        }
-        Update {
-            dispatches: vec![Dispatch {
-                operation: String::new(),
-                frame: json!({
-                    "id":"lys-initialize", "method":"initialize", "params":{
-                        "clientInfo":{"name":"lys","title":null,"version":env!("CARGO_PKG_VERSION")},
-                        "capabilities":{"experimentalApi":false}
-                    }
-                }),
-            }],
-            ..Update::default()
-        }
     }
 
     pub(crate) fn active_turn(&self) -> Option<&str> {
@@ -229,7 +216,13 @@ impl Controller {
         self.boundary = Boundary::Unknown;
         let mut update = Update::default();
         if let Some(current) = self.current.take() {
-            if current.kind == Kind::Compact || !self.admitted {
+            if let Some(reason) = &self.refusal {
+                update.receipts.push(receipt(
+                    &current.id,
+                    crate::operations::OperationState::Refused,
+                    reason,
+                ));
+            } else if current.kind == Kind::Compact || !self.admitted {
                 update.receipts.push(receipt(
                     &current.id,
                     crate::operations::OperationState::Uncertain,
@@ -362,6 +355,11 @@ impl Controller {
                 "event belongs to another source",
             ));
         }
+        if self.transport == Transport::Claude
+            && let Some(update) = self.bind_claude(value)?
+        {
+            return Ok(update);
+        }
         if self.transport == Transport::Codex
             && let Some(update) = self.bind_codex(value)?
         {
@@ -397,12 +395,7 @@ impl Controller {
             self.last_result = Some(id.to_owned());
         }
         let observation = match self.transport {
-            Transport::Claude => claude::observe(
-                &self.binding.conversation,
-                &self.binding.harness_version,
-                value,
-                self.current.as_ref(),
-            )?,
+            Transport::Claude => self.observe_claude(value)?,
             Transport::Codex => {
                 codex::observe(&self.binding.conversation, value, self.current.as_ref())?
             }
@@ -416,6 +409,9 @@ impl Controller {
         match observation {
             Observation::Other | Observation::Accepted => {}
             Observation::Ready { compact } => {
+                if self.transport == Transport::Claude {
+                    return self.claude_version(compact);
+                }
                 if self.ready {
                     return Ok(update);
                 }
@@ -435,6 +431,9 @@ impl Controller {
                 }
             }
             Observation::Admitted { uuid, turn } => {
+                if self.transport == Transport::Claude && self.defer_claude_admission(&uuid) {
+                    return Ok(update);
+                }
                 if let Some(current) = &self.current {
                     if current.uuid == uuid && !self.admitted {
                         update.admissions.push((
@@ -475,6 +474,9 @@ impl Controller {
                 }
             }
             Observation::Completed { turn, failed } => {
+                if self.transport == Transport::Claude && !self.initialized {
+                    return Err(self.claude_unproved());
+                }
                 let matches = if self.transport == Transport::Claude {
                     self.current.is_some() && self.boundary != Boundary::Unknown
                 } else {

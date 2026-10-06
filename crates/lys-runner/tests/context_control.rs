@@ -49,11 +49,7 @@ fn a_compact_crossing_sends_one_request_after_the_active_turn_before_queued_norm
 -> TestResult {
     let source = binding();
     let mut control = Controller::new(source.clone(), Transport::Claude)?;
-    control.ingest(
-        &source,
-        &json!({"type":"system","subtype":"init",
-        "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
-    )?;
+    first_turn(&mut control, &source)?;
     let active = Pending::new("active".to_owned(), Kind::Human, "first message".to_owned());
     let uuid = active.uuid.clone();
     control.enqueue(active)?;
@@ -100,11 +96,7 @@ fn controlled() -> Result<(Binding, Controller), Box<dyn Error>> {
     let source = binding();
     let mut controller = Controller::new(source.clone(), Transport::Claude)?;
     controller.require_boundary_authority()?;
-    controller.ingest(
-        &source,
-        &json!({"type":"system","subtype":"init",
-        "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
-    )?;
+    first_turn(&mut controller, &source)?;
     Ok((source, controller))
 }
 
@@ -276,5 +268,53 @@ fn the_judged_agent_cannot_remove_its_own_context_hold() -> TestResult {
             "{answer:?}"
         );
     }
+    Ok(())
+}
+
+fn first_turn(control: &mut Controller, source: &Binding) -> TestResult {
+    let bootstrap = control.bootstrap();
+    let correlation = bootstrap
+        .dispatches
+        .first()
+        .ok_or("initialize not written")?
+        .frame["request_id"]
+        .as_str()
+        .ok_or("initialize not correlated")?;
+    control.ingest(
+        source,
+        &json!({"type":"control_response","response":{
+        "subtype":"success","request_id":correlation,"response":{}}}),
+    )?;
+    let first = Pending::new(
+        "fixture-initialization".to_owned(),
+        Kind::Human,
+        "first turn".to_owned(),
+    );
+    let uuid = first.uuid.clone();
+    control.enqueue(first)?;
+    let status = control.control_status();
+    if status.boundary.is_some() {
+        control.boundary_reply(&BoundaryReply {
+            generation: status.generation,
+            boundary: status.boundary,
+            context: ContextDecision::Released,
+            reminders: Vec::new(),
+        })?;
+    }
+    control.ingest(
+        source,
+        &json!({"type":"system","subtype":"init","session_id":"conversation",
+        "claude_code_version":"9.8.7","slash_commands":["compact"]}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"user","session_id":"conversation","uuid":uuid,
+        "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"result","session_id":"conversation",
+        "uuid":"fixture-initialization-result","is_error":false}),
+    )?;
     Ok(())
 }

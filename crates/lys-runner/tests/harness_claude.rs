@@ -38,7 +38,7 @@ fn pending(id: &str, kind: Kind) -> Pending {
 }
 fn ready() -> Result<Controller> {
     let mut control = Controller::new(binding(), Transport::Claude)?;
-    control.ingest(&binding(), &json!({"type":"system","subtype":"init","session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}))?;
+    first_turn(&mut control, &binding())?;
     Ok(control)
 }
 fn replay(uuid: &str) -> Value {
@@ -220,11 +220,26 @@ fn a_replay_claiming_the_owned_uuid_must_prove_its_sdk_envelope() -> Result {
 fn the_claude_init_version_must_match_the_probed_version() -> Result {
     for version in [json!("9.8.6"), Value::Null] {
         let mut control = Controller::new(binding(), Transport::Claude)?;
+        let bootstrap = control.bootstrap();
+        let id = &bootstrap.dispatches[0].frame["request_id"];
+        control.ingest(
+            &binding(),
+            &json!({"type":"control_response","response":{
+            "subtype":"success","request_id":id,"response":{}}}),
+        )?;
+        control.enqueue(pending("unqualified-first-turn", Kind::Reminder))?;
         let error = control.ingest(&binding(), &json!({"type":"system","subtype":"init",
             "session_id":"conversation","claude_code_version":version,"slash_commands":["compact"]}))
             .err().ok_or("init bypassed the probed version")?;
         assert_eq!(error.name(), "control_adapter_unqualified");
         assert!(!control.ready());
+        let lost = control.disconnected();
+        assert_eq!(lost.receipts[0].state, OperationState::Refused);
+        assert!(
+            lost.receipts[0]
+                .reason
+                .contains("control_adapter_unqualified")
+        );
     }
     Ok(())
 }
@@ -249,5 +264,164 @@ fn all_admitted_inputs_and_their_whole_encoded_words_remain_queued() -> Result {
             .dispatches
             .is_empty()
     );
+    Ok(())
+}
+
+#[test]
+fn a_claude_that_emits_init_only_after_input_binds_without_sending_a_turn() -> Result {
+    let mut control = Controller::new(binding(), Transport::Claude)?;
+    let bootstrap = control.bootstrap();
+    assert_eq!(
+        bootstrap.dispatches.len(),
+        1,
+        "Claude must receive initialize before any turn"
+    );
+    let frame = &bootstrap.dispatches[0].frame;
+    let id = frame["request_id"]
+        .as_str()
+        .ok_or("no initialization correlation")?;
+    assert_eq!(
+        frame,
+        &json!({"type":"control_request","request_id":id,
+        "request":{"subtype":"initialize"}})
+    );
+    assert!(bootstrap.receipts.is_empty());
+    let response = json!({"type":"control_response","response":{
+        "subtype":"success","request_id":id,"response":{"account":"discarded"}}});
+    let bound = control.ingest(&binding(), &response)?;
+    assert!(
+        bound
+            .events
+            .iter()
+            .any(|event| event.event == "control_bound")
+    );
+    assert!(bound.receipts.is_empty());
+    assert!(
+        bound.dispatches.is_empty(),
+        "the handshake sends no user input"
+    );
+    let turn = control.enqueue(pending("first-reminder", Kind::Reminder))?;
+    assert_eq!(turn.dispatches.len(), 1);
+    assert_eq!(turn.dispatches[0].frame["type"], "user");
+    let init = json!({"type":"system","subtype":"init","session_id":"conversation",
+        "claude_code_version":"9.8.7","slash_commands":["compact"]});
+    control.ingest(&binding(), &init)?;
+    Ok(())
+}
+
+fn first_turn(control: &mut Controller, source: &Binding) -> Result {
+    let bootstrap = control.bootstrap();
+    let correlation = bootstrap
+        .dispatches
+        .first()
+        .ok_or("initialize not written")?
+        .frame["request_id"]
+        .as_str()
+        .ok_or("initialize not correlated")?;
+    control.ingest(
+        source,
+        &json!({"type":"control_response","response":{
+        "subtype":"success","request_id":correlation,"response":{}}}),
+    )?;
+    let first = Pending::new(
+        "fixture-initialization".to_owned(),
+        Kind::Human,
+        "first turn".to_owned(),
+    );
+    let uuid = first.uuid.clone();
+    control.enqueue(first)?;
+    control.ingest(
+        source,
+        &json!({"type":"system","subtype":"init","session_id":"conversation",
+        "claude_code_version":"9.8.7","slash_commands":["compact"]}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"user","session_id":"conversation","uuid":uuid,
+        "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"result","session_id":"conversation",
+        "uuid":"fixture-initialization-result","is_error":false}),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn initialize_errors_and_foreign_correlations_refuse_the_claude_binding() -> Result {
+    for (subtype, foreign, expected) in [
+        ("error", false, "control_initialize_refused"),
+        ("success", true, "control_correlation_unsupported"),
+    ] {
+        let mut control = Controller::new(binding(), Transport::Claude)?;
+        let bootstrap = control.bootstrap();
+        let id = if foreign {
+            json!("foreign")
+        } else {
+            bootstrap.dispatches[0].frame["request_id"].clone()
+        };
+        let error = control
+            .ingest(
+                &binding(),
+                &json!({"type":"control_response","response":{
+            "subtype":subtype,"request_id":id,"response":{"private":"discarded"}}}),
+            )
+            .err()
+            .ok_or("invalid initialize was admitted")?;
+        assert_eq!(error.name(), expected);
+        assert!(!control.ready());
+    }
+    Ok(())
+}
+
+#[test]
+fn separate_claude_controllers_have_fresh_initialize_correlations() -> Result {
+    let first = Controller::new(binding(), Transport::Claude)?.bootstrap();
+    let second = Controller::new(binding(), Transport::Claude)?.bootstrap();
+    assert_ne!(
+        first.dispatches[0].frame["request_id"],
+        second.dispatches[0].frame["request_id"]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_first_replay_is_not_confirmed_until_its_serving_version_is_proved() -> Result {
+    for matches in [true, false] {
+        let mut control = Controller::new(binding(), Transport::Claude)?;
+        let bootstrap = control.bootstrap();
+        control.ingest(&binding(), &json!({"type":"control_response","response":{
+            "subtype":"success","request_id":bootstrap.dispatches[0].frame["request_id"],"response":{}}}))?;
+        let input = pending("first-reminder", Kind::Reminder);
+        let uuid = input.uuid.clone();
+        control.enqueue(input)?;
+        assert!(
+            control
+                .ingest(&binding(), &replay(&uuid))?
+                .receipts
+                .is_empty()
+        );
+        let init = json!({"type":"system","subtype":"init","session_id":"conversation",
+            "claude_code_version":if matches { "9.8.7" } else { "9.8.6" },"slash_commands":["compact"]});
+        if matches {
+            let proved = control.ingest(&binding(), &init)?;
+            assert_eq!(proved.receipts[0].state, OperationState::Confirmed);
+            assert_eq!(proved.receipts[0].operation, "first-reminder");
+        } else {
+            assert_eq!(
+                control
+                    .ingest(&binding(), &init)
+                    .err()
+                    .ok_or("wrong version was accepted")?
+                    .name(),
+                "control_adapter_unqualified"
+            );
+            assert_eq!(
+                control.disconnected().receipts[0].state,
+                OperationState::Refused
+            );
+        }
+    }
     Ok(())
 }
