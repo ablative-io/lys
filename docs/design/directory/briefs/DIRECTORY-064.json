@@ -48,19 +48,16 @@
           "crates/lys-runner/tests/harness_control.rs",
           "crates/lys-runner/src/harness_control/approval.rs",
           "crates/lys-identity-server/src/runner_sessions/controls.rs",
-          "crates/lys-runner/src/session/lifecycle/managed.rs"
+          "crates/lys-runner/src/session/lifecycle/managed.rs",
+          "crates/lys-runner/src/collector/stop.rs",
+          "crates/lys-runner/src/tracking_store/managed.rs"
         ],
         "modify": [
           "crates/lys-runner/src/protocol.rs",
           "crates/lys-runner/src/session.rs",
           "crates/lys-runner/src/session/lifecycle.rs",
           "crates/lys-runner/src/lib.rs",
-          "crates/lys-runner/src/state.rs",
-          "crates/lys-runner/src/socket.rs",
-          "crates/lys-identity-server/src/runner_acts.rs",
           "crates/lys-identity-server/src/runner_sessions.rs",
-          "crates/lys-home/src/harness/claude_code/launch.rs",
-          "crates/lys-home/src/harness/codex/mod.rs",
           "crates/lys-runner/src/operations.rs",
           "crates/lys-runner/src/operations/delivery.rs",
           "crates/lys-runner/src/collector.rs",
@@ -71,14 +68,10 @@
           "crates/lys/src/commands/runner.rs",
           "crates/lys/src/cli/runner.rs",
           "crates/lys-runner/Cargo.toml",
-          "crates/lys-identity-server/src/budgets_members.rs",
-          "crates/lys-identity-server/src/goals_store.rs",
           "crates/lys-identity-server/tests/budget_feed.rs",
           "crates/lys-identity-server/src/provisioning_store.rs",
-          "crates/lys-identity-server/src/provisioning_api.rs",
           "crates/lys-identity-server/src/launch_template.rs",
           "surface/identity/src/features/provisioning/Provisioning.tsx",
-          "docs/design/home/launch-template.schema.json",
           "surface/identity/src/features/provisioning/ProfileEditor.tsx",
           "surface/identity/src/features/usage/Usage.tsx",
           "surface/identity/tests/agent-provisioning.test.tsx",
@@ -88,7 +81,9 @@
           "crates/lys-runner/src/launch_config.rs",
           "crates/lys-identity-server/src/launch_api.rs",
           "crates/lys-identity-server/src/launch_record_config.rs",
-          "crates/lys-runner/tests/launch_config.rs"
+          "crates/lys-runner/tests/launch_config.rs",
+          "crates/lys-identity-server/src/runner_start_pass_tests.rs",
+          "crates/lys-runner/tests/lifecycle/cases.rs"
         ],
         "delete": []
       },
@@ -127,9 +122,7 @@
         ],
         "modify": [
           "crates/lys-runner/src/harness_control.rs",
-          "crates/lys-runner/src/harness_control/events.rs",
-          "crates/lys-home/src/harness/claude_code/launch.rs",
-          "crates/lys-home/src/harness/codex/launch.rs"
+          "crates/lys-runner/src/harness_control/events.rs"
         ],
         "delete": []
       },
@@ -370,6 +363,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1: Config.requires_controls set by the two production constructors from the exact Version",
       "ruling": "Config lives in crates/lys-runner/src/launch_config.rs; its production constructors are launch_api.rs and launch_record_config.rs, each holding the exact reviewed Version; a launch_template helper taking that Version sets Config.requires_controls (absent false) for both, and the native template bytes (rendering_launch::Launch) stay unchanged, since only Lys needs the value. Those three files and crates/lys-runner/tests/launch_config.rs join R1. Any existing test that only gains the new member in a Config literal is a mechanical touch allowed by this amendment and listed by name in the handback. Found by Brisket (BOX 18, 17:49)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1 and R2 file lists set to what BOX 18 (10bb5597) built, after the install of d5e6d6cd",
+      "ruling": "R1 creates crates/lys-runner/src/collector/stop.rs and crates/lys-runner/src/tracking_store/managed.rs (splits under the 500-line gate) and modifies crates/lys-identity-server/src/runner_start_pass_tests.rs and crates/lys-runner/tests/lifecycle/cases.rs. Nine files R1 listed were not touched and leave it: state.rs, socket.rs, runner_acts.rs, lys-home claude_code/launch.rs and codex/mod.rs, budgets_members.rs, goals_store.rs, provisioning_api.rs, docs/design/home/launch-template.schema.json; goals_store.rs and state.rs stay where R3 to R6 list them. The launch flags live in the runner's harness_control/claude.rs and codex.rs, so R2 no longer names lys-home's launch files. A file list is what the tree shows, verified by git ls-tree, never a guess."
     }
   ]
 }

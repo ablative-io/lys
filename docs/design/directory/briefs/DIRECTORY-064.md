@@ -56,16 +56,13 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - create: crates/lys-runner/src/harness_control/approval.rs
 - create: crates/lys-identity-server/src/runner_sessions/controls.rs
 - create: crates/lys-runner/src/session/lifecycle/managed.rs
+- create: crates/lys-runner/src/collector/stop.rs
+- create: crates/lys-runner/src/tracking_store/managed.rs
 - modify: crates/lys-runner/src/protocol.rs
 - modify: crates/lys-runner/src/session.rs
 - modify: crates/lys-runner/src/session/lifecycle.rs
 - modify: crates/lys-runner/src/lib.rs
-- modify: crates/lys-runner/src/state.rs
-- modify: crates/lys-runner/src/socket.rs
-- modify: crates/lys-identity-server/src/runner_acts.rs
 - modify: crates/lys-identity-server/src/runner_sessions.rs
-- modify: crates/lys-home/src/harness/claude_code/launch.rs
-- modify: crates/lys-home/src/harness/codex/mod.rs
 - modify: crates/lys-runner/src/operations.rs
 - modify: crates/lys-runner/src/operations/delivery.rs
 - modify: crates/lys-runner/src/collector.rs
@@ -76,14 +73,10 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - modify: crates/lys/src/commands/runner.rs
 - modify: crates/lys/src/cli/runner.rs
 - modify: crates/lys-runner/Cargo.toml
-- modify: crates/lys-identity-server/src/budgets_members.rs
-- modify: crates/lys-identity-server/src/goals_store.rs
 - modify: crates/lys-identity-server/tests/budget_feed.rs
 - modify: crates/lys-identity-server/src/provisioning_store.rs
-- modify: crates/lys-identity-server/src/provisioning_api.rs
 - modify: crates/lys-identity-server/src/launch_template.rs
 - modify: surface/identity/src/features/provisioning/Provisioning.tsx
-- modify: docs/design/home/launch-template.schema.json
 - modify: surface/identity/src/features/provisioning/ProfileEditor.tsx
 - modify: surface/identity/src/features/usage/Usage.tsx
 - modify: surface/identity/tests/agent-provisioning.test.tsx
@@ -94,6 +87,8 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - modify: crates/lys-identity-server/src/launch_api.rs
 - modify: crates/lys-identity-server/src/launch_record_config.rs
 - modify: crates/lys-runner/tests/launch_config.rs
+- modify: crates/lys-identity-server/src/runner_start_pass_tests.rs
+- modify: crates/lys-runner/tests/lifecycle/cases.rs
 
 **Checklist:**
 - C433 — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).
@@ -127,8 +122,6 @@ Behavioural. WHEN the dispatcher delivers an act, THE SYSTEM SHALL use a machine
 - create: crates/lys-runner/tests/harness_codex.rs
 - modify: crates/lys-runner/src/harness_control.rs
 - modify: crates/lys-runner/src/harness_control/events.rs
-- modify: crates/lys-home/src/harness/claude_code/launch.rs
-- modify: crates/lys-home/src/harness/codex/launch.rs
 
 **Checklist:**
 - C434 — Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).
