@@ -45,7 +45,10 @@
           "crates/lys-runner/src/harness_control.rs",
           "crates/lys-runner/src/harness_control/events.rs",
           "crates/lys-runner/src/harness_control/process.rs",
-          "crates/lys-runner/tests/harness_control.rs"
+          "crates/lys-runner/tests/harness_control.rs",
+          "crates/lys-runner/src/harness_control/approval.rs",
+          "crates/lys-identity-server/src/runner_sessions/controls.rs",
+          "crates/lys-runner/src/session/lifecycle/managed.rs"
         ],
         "modify": [
           "crates/lys-runner/src/protocol.rs",
@@ -328,6 +331,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1: the no-second-charge proof extends the real feed fixture",
       "ruling": "R1's acceptance that repeated adapter events add no second usage charge in 051 is proved in the existing real feed fixture, crates/lys-identity-server/tests/budget_feed.rs, by repeated managed feed entries and the fixture's durable usage totals assertion; that file joins R1's modify list for that fixture only, with no owner rewrite and no change to the stop and restart test there (BOX 20). Found by Brisket (BOX 18, 16:59)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1: three files created for the 500-line gate",
+      "ruling": "At f6ec48f0 with BOX 18 applied, events.rs reaches 655 code lines, runner_sessions.rs 560, lifecycle.rs 523 and session.rs 501. R1 therefore creates crates/lys-runner/src/harness_control/approval.rs (the policy response to a harness approval request), crates/lys-identity-server/src/runner_sessions/controls.rs (the managed profile selection) and crates/lys-runner/src/session/lifecycle/managed.rs (the managed spawn branch only, the small launch wrapper moving there from session.rs). Ownership splits only: no new store and no new runtime behaviour. Found by Brisket (BOX 18, 17:13)."
     }
   ]
 }

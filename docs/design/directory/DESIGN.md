@@ -1196,6 +1196,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/collector.rs` | The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session. | DIRECTORY-064 |
 | `crates/lys-runner/src/socket/acts.rs` | The signed Act dispatch of the runner socket, exhaustive over every act. | DIRECTORY-064 |
 | `crates/lys-runner/src/session/control.rs` | Manual input and resize of a live session. | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/approval.rs` | The policy response to a harness approval request on a managed channel: never fabricated. | DIRECTORY-064 |
+| `crates/lys-runner/src/session/lifecycle/managed.rs` | The managed spawn branch of a session's lifecycle: the child entry started and proved. | DIRECTORY-064 |
 
 ## Inventory
 

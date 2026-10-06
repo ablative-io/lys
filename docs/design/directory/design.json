@@ -5484,6 +5484,16 @@
       "path": "crates/lys-runner/src/session/control.rs",
       "note": "Manual input and resize of a live session.",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/approval.rs",
+      "note": "The policy response to a harness approval request on a managed channel: never fabricated.",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/session/lifecycle/managed.rs",
+      "note": "The managed spawn branch of a session's lifecycle: the child entry started and proved.",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

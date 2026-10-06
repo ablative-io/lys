@@ -53,6 +53,9 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - create: crates/lys-runner/src/harness_control/events.rs
 - create: crates/lys-runner/src/harness_control/process.rs
 - create: crates/lys-runner/tests/harness_control.rs
+- create: crates/lys-runner/src/harness_control/approval.rs
+- create: crates/lys-identity-server/src/runner_sessions/controls.rs
+- create: crates/lys-runner/src/session/lifecycle/managed.rs
 - modify: crates/lys-runner/src/protocol.rs
 - modify: crates/lys-runner/src/session.rs
 - modify: crates/lys-runner/src/session/lifecycle.rs
