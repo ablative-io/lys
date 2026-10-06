@@ -417,3 +417,43 @@ fn an_uncertain_without_control_metadata_does_not_expire_before_a_person_decides
     assert_eq!(answer["receipt"]["admitted"], false);
     Ok(())
 }
+
+#[test]
+fn runner_answers_keep_their_existing_wire_bytes() -> TestResult {
+    use lys_runner::protocol::{Answer, Reply};
+    let delivered = Reply {
+        version: 1,
+        answer: Answer::Delivered {
+            session: "session".to_owned(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_string(&delivered)?,
+        r#"{"version":1,"answer":{"kind":"delivered","session":"session"}}"#
+    );
+    let refusal = Reply {
+        version: 1,
+        answer: Answer::Refused {
+            refusal: "session_unknown".to_owned(),
+            words: "the session is not held".to_owned(),
+            oldest: None,
+        },
+    };
+    assert_eq!(
+        serde_json::to_string(&refusal)?,
+        r#"{"version":1,"answer":{"kind":"refused","refusal":"session_unknown","words":"the session is not held"}}"#
+    );
+    let expired = Reply {
+        version: 1,
+        answer: Answer::Refused {
+            refusal: "cursor_expired".to_owned(),
+            words: "the requested output is no longer held".to_owned(),
+            oldest: Some(42),
+        },
+    };
+    assert_eq!(
+        serde_json::to_string(&expired)?,
+        r#"{"version":1,"answer":{"kind":"refused","refusal":"cursor_expired","words":"the requested output is no longer held","oldest":42}}"#
+    );
+    Ok(())
+}

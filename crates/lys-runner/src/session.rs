@@ -171,7 +171,14 @@ impl Session {
             moves: self
                 .rotation
                 .as_ref()
-                .map(|rotation| rotation.moves().to_vec())
+                .map(|rotation| {
+                    #[cfg(test)]
+                    {
+                        control_history::READS
+                            .with(|reads| reads.set(reads.get() + rotation.moves().len()));
+                    }
+                    rotation.moves().to_vec()
+                })
                 .unwrap_or_default(),
             ended: self.ended.clone(),
             policy: self
@@ -598,5 +605,12 @@ impl Sessions {
         self.writer.barrier()?;
         self.wake();
         Ok((pid, started_at))
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod control_history {
+    thread_local! {
+        pub(crate) static READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     }
 }

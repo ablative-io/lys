@@ -174,7 +174,11 @@ fn control_request(line: &str) -> bool {
         return false;
     };
     match serde_json::from_str::<crate::protocol::Act>(&request.act) {
-        Ok(crate::protocol::Act::Status { .. } | crate::protocol::Act::End { .. }) => true,
+        Ok(
+            crate::protocol::Act::Status { .. }
+            | crate::protocol::Act::ControlStatus { .. }
+            | crate::protocol::Act::End { .. },
+        ) => true,
         Ok(crate::protocol::Act::Operate { operation }) => {
             matches!(operation.request, crate::operations::OperationRequest::Stop)
         }
@@ -226,5 +230,16 @@ impl Signer {
             ],
             body,
         )
+    }
+}
+
+#[cfg(test)]
+mod control_status_tests {
+    #[test]
+    fn current_control_status_uses_the_reserved_dial_slot() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let request = serde_json::json!({"version":crate::protocol::Greeting::fresh("fixture").version,"runner":"fixture","challenge":"challenge", "act":"{\"act\":\"control_status\",\"session\":\"session\"}","signature":"signature"});
+        assert!(super::control_request(&serde_json::to_string(&request)?));
+        Ok(())
     }
 }

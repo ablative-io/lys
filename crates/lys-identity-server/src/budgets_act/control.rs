@@ -101,23 +101,16 @@ async fn review_with(
         state,
         &machine,
         runner.clone(),
-        Act::Status {
-            session: Some(session.to_owned()),
+        Act::ControlStatus {
+            session: session.to_owned(),
         },
     )
     .await?;
     let control = match answer {
-        Answer::Status { status } => {
-            let mut matching = status
-                .sessions
-                .into_iter()
-                .filter(|view| view.session == session);
-            let current = matching.next().ok_or(ServerError::RuntimeSessionUnknown)?;
-            if matching.next().is_some() {
-                return Err(refused("runner status repeats the controlled session"));
-            }
-            current.control
-        }
+        Answer::ControlStatus {
+            session: answered,
+            control,
+        } if answered == session => control,
         other => {
             return Err(refused(format!(
                 "runner answered {} to a control status read",
@@ -211,5 +204,34 @@ pub(crate) async fn feed_end(
         Ok(())
     } else {
         Err(refused(failures.join("; ")))
+    }
+}
+
+pub(crate) fn resend_allowed(
+    state: &AppState,
+    agent: &str,
+    session: &str,
+    status: &ControlStatus,
+) -> Result<(), ServerError> {
+    let standing = standing(state, agent)?;
+    let context = with_budgets(state, |store| {
+        store
+            .held()
+            .control_context(
+                &standing,
+                status,
+                session,
+                jiff::Timestamp::now().as_millisecond(),
+            )
+            .map_err(refused)
+    })?;
+    match context {
+        ContextDecision::Released => Ok(()),
+        ContextDecision::Compact { .. } => Err(refused(
+            "context_compaction_pending: the intended session must compact before another occurrence",
+        )),
+        ContextDecision::Held { reason, .. } | ContextDecision::Unavailable { reason } => {
+            Err(refused(reason))
+        }
     }
 }

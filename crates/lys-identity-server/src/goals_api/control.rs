@@ -85,38 +85,7 @@ pub(crate) fn boundary_reminders(
             ));
             continue;
         }
-        let authorised = with_directory(state, |directory| {
-            let id = AgentId::from_str(&agent).map_err(|reason| GoalError::Unavailable {
-                reason: reason.to_string(),
-            })?;
-            let record = directory
-                .projection()?
-                .record(IdentityId::Agent(id))
-                .ok_or(ServerError::AgentNotVisible)?;
-            if record.state() != lys_identity::LifecycleState::Active {
-                return Ok(false);
-            }
-            Ok(match holder.kind {
-                HolderKind::Agent => {
-                    holder.id == agent
-                        && record
-                            .responsible()
-                            .is_some_and(|person| person.to_string() == responsible)
-                }
-                HolderKind::Team => true,
-            })
-        })?;
-        let authorised = if authorised && holder.kind == HolderKind::Team {
-            crate::teams_api::with_teams(state, |store| {
-                let team = store.team(&holder.id).ok_or(TeamError::Unknown)?;
-                Ok(team.retired.is_none()
-                    && team.created.owner == responsible
-                    && team.members.contains(&agent)
-                    && !team.held.iter().any(|held| held.member == agent))
-            })?
-        } else {
-            authorised
-        };
+        let authorised = control_recipient(state, &holder, &responsible, &agent, true)?;
         if !authorised {
             decisions.push(refuse(
                 "goal_authority_revoked: the session is no longer an admitted recipient",
@@ -165,25 +134,16 @@ impl Deliver for Live<'_> {
                 self.0,
                 &driven.machine,
                 driven.runner.clone(),
-                Act::Status {
-                    session: Some(operation.session.clone()),
+                Act::ControlStatus {
+                    session: operation.session.clone(),
                 },
             )
             .await
             .map_err(|error| Undelivered::Unknown(error.to_string()))?;
             let managed = match status {
-                Answer::Status { status } => status
-                    .sessions
-                    .iter()
-                    .find(|view| view.session == operation.session)
-                    .ok_or_else(|| {
-                        Undelivered::Refused(
-                            "goal_session_unknown: the runner no longer holds the target"
-                                .to_owned(),
-                        )
-                    })?
-                    .control
-                    .is_some(),
+                Answer::ControlStatus { session, control } if session == operation.session => {
+                    control.is_some()
+                }
                 other => {
                     return Err(Undelivered::Unknown(format!(
                         "goal control status answered {}",
@@ -247,4 +207,180 @@ impl Deliver for Live<'_> {
             .await
         })
     }
+}
+
+pub(crate) fn control_recipient(
+    state: &AppState,
+    holder: &Holder,
+    responsible: &str,
+    agent: &str,
+    require_active: bool,
+) -> Result<bool, ServerError> {
+    let admitted = with_directory(state, |directory| {
+        let id = AgentId::from_str(agent).map_err(|error| GoalError::Unavailable {
+            reason: error.to_string(),
+        })?;
+        let record = directory
+            .projection()?
+            .record(IdentityId::Agent(id))
+            .ok_or(ServerError::AgentNotVisible)?;
+        if require_active && record.state() != lys_identity::LifecycleState::Active {
+            return Ok(false);
+        }
+        Ok(match holder.kind {
+            HolderKind::Agent => {
+                holder.id == agent
+                    && record
+                        .responsible()
+                        .is_some_and(|person| person.to_string() == responsible)
+            }
+            HolderKind::Team => true,
+        })
+    })?;
+    if admitted && holder.kind == HolderKind::Team {
+        crate::teams_api::with_teams(state, |store| {
+            let team = store.team(&holder.id).ok_or(TeamError::Unknown)?;
+            Ok(team.retired.is_none()
+                && team.created.owner == responsible
+                && team.members.iter().any(|member| member == agent)
+                && !team.held.iter().any(|held| held.member == agent))
+        })
+    } else {
+        Ok(admitted)
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ResendBody {
+    operation: String,
+    prior: String,
+    session: String,
+}
+
+pub(super) async fn resend(
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    axum::extract::Path(goal): axum::extract::Path<String>,
+    body: Result<axum::Json<ResendBody>, axum::extract::rejection::JsonRejection>,
+) -> Result<axum::Json<serde_json::Value>, ServerError> {
+    use crate::receipts_api::control::{
+        managed_status, read_receipt, record_decision, service_target,
+    };
+    use lys_runner::operations::{OperationState, Reconciled, Reconciliation};
+    let refused = |name: &str, words: &str| ServerError::Runner {
+        refusal: name.to_owned(),
+        words: words.to_owned(),
+    };
+    let actor = super::signed_in(&state, &headers)?;
+    let person = with_directory(&state, |directory| {
+        super::own_person(directory.projection()?, &actor)
+    })?
+    .to_string();
+    let axum::Json(body) = body.map_err(|error| super::malformed(error.body_text()))?;
+    lys_identity::OperationId::from_str(&body.operation)
+        .map_err(|error| super::malformed(error.to_string()))?;
+    if body.session.is_empty() || body.prior.is_empty() {
+        return Err(super::malformed(
+            "resend must name its prior operation and intended session",
+        ));
+    }
+    let goals = goals(&state)?;
+    let (resent, source, holder) = goals.with(|store| {
+        let item = store.item(&goal).ok_or(GoalError::Unknown)?;
+        if item.goal.responsible != person {
+            return Err(GoalError::Unknown.into());
+        }
+        let holder = item.goal.holder.clone();
+        let (resent, source) = store.prepare_resend(
+            &goal,
+            &body.prior,
+            &body.operation,
+            &body.session,
+            &person,
+            now(),
+        )?;
+        Ok((resent, source, holder))
+    })?;
+    let agent = with_runtime(&state, |store| {
+        let tracked = store
+            .session(&body.session)
+            .ok_or(ServerError::RuntimeSessionUnknown)?;
+        if tracked.stopped() {
+            return Err(ServerError::RuntimeSessionUnknown);
+        }
+        tracked
+            .agent
+            .clone()
+            .ok_or(ServerError::RuntimeSessionUnknown)
+    })?;
+    if !control_recipient(&state, &holder, &person, &agent, true)? {
+        return Err(refused(
+            "goal_authority_revoked",
+            "the intended session is no longer an admitted recipient",
+        ));
+    }
+    let driven = service_target(&state, &body.session)?;
+    let status = managed_status(&state, &driven).await?;
+    crate::budgets_act::resend_allowed(&state, &agent, &body.session, &status)?;
+    let original = service_target(&state, &source)?;
+    let prior = read_receipt(&state, &original, &body.prior).await?;
+    if prior.state != OperationState::Uncertain
+        || prior
+            .reference
+            .as_ref()
+            .is_some_and(|reference| reference.goal != goal)
+    {
+        return Err(refused(
+            "control_not_uncertain",
+            "the prior receipt does not name uncertain delivery of this goal",
+        ));
+    }
+    let choice = Reconciliation::Resent {
+        occurrence: body.operation.clone(),
+    };
+    if prior.reconciled.as_ref().is_some_and(|kept| {
+        kept.operation != body.operation || kept.by != person || kept.decision != choice
+    }) {
+        return Err(refused(
+            "control_already_reconciled",
+            "a different person decision is already recorded",
+        ));
+    }
+    // Authority is re-read after runner IO, and the dispatcher judges it again before any write.
+    if !control_recipient(&state, &holder, &person, &agent, true)? {
+        return Err(refused(
+            "goal_authority_revoked",
+            "the intended recipient changed before the occurrence was recorded",
+        ));
+    }
+    let fired = goals.with(|store| store.resend(resent))?;
+    let decision = record_decision(
+        &state,
+        &original,
+        &prior,
+        Reconciled {
+            operation: body.operation,
+            by: person,
+            at: u64::try_from(jiff::Timestamp::now().as_millisecond())
+                .map_err(|error| super::malformed(error.to_string()))?,
+            decision: choice,
+        },
+    )
+    .await;
+    goals.changed.notify_one();
+    state.changes.signal()?;
+    let decision = decision.map_err(|error| ServerError::Runner {
+        refusal: "goal_resend_kept_reconciliation_unavailable".to_owned(),
+        words: format!("occurrence {} is kept under its distinct delivery; the original receipt's personal decision is unconfirmed: {error}", fired.operation),
+    })?;
+    let sent = fired.sent.first().ok_or_else(|| {
+        refused(
+            "goal_resend_invalid",
+            "the saved resend has no intended delivery",
+        )
+    })?;
+    Ok(axum::Json(
+        serde_json::json!({"goal":goal,"occurrence":fired.operation,"operation":sent.operation,"session":sent.session,"prior":prior.operation,"reconciliation":decision}),
+    ))
 }

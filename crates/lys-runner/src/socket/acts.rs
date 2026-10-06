@@ -137,6 +137,10 @@ pub(super) fn perform(
             let ended = sessions.end(&session, left)?;
             Ok(Answer::Ended { session, ended })
         }
+        Act::ControlStatus { session } => {
+            let control = sessions.control_status(&session)?;
+            Ok(Answer::ControlStatus { session, control })
+        }
         Act::Status { session } => Ok(Answer::Status {
             status: sessions.status(session.as_deref())?,
         }),

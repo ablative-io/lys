@@ -32,7 +32,7 @@ use lys_runner::operations::Operation;
 use serde::Deserialize;
 
 mod control;
-pub(crate) use control::boundary_reminders;
+pub(crate) use control::{boundary_reminders, control_recipient};
 
 use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
@@ -85,6 +85,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/agents/{id}/goals", get(agent_goals).post(set_agent_goal))
         .route("/teams/{id}/goals", get(team_goals).post(set_team_goal))
         .route("/goals/{goal}/mark", post(mark))
+        .route("/goals/{goal}/resend", post(control::resend))
         .route("/goals/{goal}/active", post(crate::goals_edit::active))
         .route("/goals/{goal}/words", post(crate::goals_edit::words))
 }

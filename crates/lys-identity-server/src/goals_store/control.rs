@@ -96,3 +96,80 @@ pub(crate) fn occurrence_text(
         text_with_words(item, words, at)
     ))
 }
+
+impl<S: LeafStore> GoalStore<S> {
+    /// Prepare a distinct occurrence from one prior receipt without changing a timer.
+    ///
+    /// # Errors
+    /// Refuses an unavailable, closed, unauthorised or reused occurrence.
+    pub fn prepare_resend(
+        &self,
+        goal: &str,
+        prior: &str,
+        operation: &str,
+        session: &str,
+        by: &str,
+        at: u64,
+    ) -> Result<(crate::goals_state::Resent, String), ServerError> {
+        let previous = self
+            .held
+            .delivery(prior)
+            .map_err(unavailable)?
+            .ok_or(GoalError::Unknown)?;
+        if previous.item.goal.id != goal || previous.item.goal.responsible != by {
+            return Err(GoalError::Unknown.into());
+        }
+        if previous.item.standing != crate::goals_state::Standing::Open || !previous.active {
+            return Err(unavailable(
+                "goal_closed_or_inactive: the prior goal cannot send another occurrence",
+            ));
+        }
+        let source = previous.sent.session.clone();
+        let fired = if let Some(kept) = self.held.firing(operation) {
+            if self.held.resends.get(operation).map(String::as_str) != Some(prior)
+                || kept.goal != goal
+                || kept.sent.len() != 1
+                || kept.sent[0].session != session
+            {
+                return Err(GoalError::Reused {
+                    operation: operation.to_owned(),
+                }
+                .into());
+            }
+            kept.clone()
+        } else {
+            crate::goals_state::Fired {
+                operation: operation.to_owned(),
+                goal: goal.to_owned(),
+                reminder: previous.fired.reminder,
+                due: previous.fired.due,
+                fired: at,
+                late: at > previous.fired.due,
+                text: occurrence_text(
+                    previous.item,
+                    previous.words,
+                    previous.fired.due,
+                    at,
+                    Some(prior),
+                )?,
+                sent: vec![crate::goals_state::Sent {
+                    session: session.to_owned(),
+                    operation: super::op_id(&["resend-delivery", operation, session]),
+                    state: crate::goals_state::Delivery::Pending,
+                    words: String::new(),
+                    at,
+                }],
+                refused: None,
+            }
+        };
+        let resent = crate::goals_state::Resent {
+            fired,
+            prior: prior.to_owned(),
+            by: by.to_owned(),
+        };
+        if !self.held.kept(operation) {
+            self.held.check_resent(&resent).map_err(unavailable)?;
+        }
+        Ok((resent, source))
+    }
+}

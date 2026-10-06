@@ -13,6 +13,7 @@
 use std::sync::Arc;
 
 mod control;
+pub(crate) use control::resend_allowed;
 pub(crate) use control::{feed_end, review, start};
 
 use axum::extract::rejection::JsonRejection;

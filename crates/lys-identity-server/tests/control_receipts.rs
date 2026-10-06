@@ -303,3 +303,370 @@ fn an_old_version_goals_snapshot_is_rebuilt_without_losing_goals_or_timers() -> 
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn control_routes_require_a_person_before_resolving_a_session_or_goal() -> TestResult {
+    use identity_contract::harness::Service;
+    let service = Service::start().await?;
+    let client = reqwest::Client::new();
+    for path in [
+        "/runtime/sessions/unknown/controls",
+        "/runtime/sessions/unknown/control-receipts",
+    ] {
+        let response = client.get(format!("{}{path}", service.base)).send().await?;
+        assert_eq!(response.status(), 401, "{path}");
+        let answer: serde_json::Value = response.json().await?;
+        assert_eq!(answer["refusal"], "NotSignedIn");
+    }
+    for (path, body) in [
+        (
+            "/runtime/sessions/unknown/control-receipts/delivery/reconcile",
+            serde_json::json!({"operation":"decision","decision":"not_seen"}),
+        ),
+        (
+            "/goals/unknown/resend",
+            serde_json::json!({"operation":"occurrence","prior":"delivery","session":"unknown"}),
+        ),
+    ] {
+        let response = client
+            .post(format!("{}{path}", service.base))
+            .json(&body)
+            .send()
+            .await?;
+        assert_eq!(response.status(), 401, "{path}");
+        let answer: serde_json::Value = response.json().await?;
+        assert_eq!(answer["refusal"], "NotSignedIn");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_refused_resend_keeps_the_actual_leaf_count_and_next_timer() -> TestResult {
+    use lys_core::Ed25519Identity;
+    use lys_identity_server::goals_store::{GoalStore, ORIGIN};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    use std::sync::Arc;
+    let dir = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let path = dir.path().join("goals");
+    FileLeafStore::create(&path, ORIGIN)?;
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    let held = uncertain()?;
+    log.append(&serde_json::to_vec(&Line::Set(held.items[0].goal.clone()))?)?;
+    log.append(&serde_json::to_vec(&Line::Fired(
+        held.items[0].fired[0].clone(),
+    ))?)?;
+    drop(log);
+    let mut store = GoalStore::open(&path, key)?;
+    let next = store.next_due();
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    let before = log.len();
+    drop(log);
+    let mut line = serde_json::to_value(resend_line(&held)?)?;
+    line["by"] = serde_json::json!("unrelated-person");
+    let Line::Resent(resent) = serde_json::from_value(line)? else {
+        return Err("resend fixture has another shape".into());
+    };
+    assert!(store.resend(resent).is_err());
+    assert_eq!(store.next_due(), next);
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    assert_eq!(log.len(), before);
+    Ok(())
+}
+
+#[test]
+fn a_saved_resend_retry_keeps_its_occurrence_delivery_and_regular_timer() -> TestResult {
+    use lys_core::Ed25519Identity;
+    use lys_identity_server::goals_store::{GoalStore, ORIGIN};
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    use std::sync::Arc;
+    let dir = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let path = dir.path().join("goals");
+    FileLeafStore::create(&path, ORIGIN)?;
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    let held = uncertain()?;
+    log.append(&serde_json::to_vec(&Line::Set(held.items[0].goal.clone()))?)?;
+    log.append(&serde_json::to_vec(&Line::Fired(
+        held.items[0].fired[0].clone(),
+    ))?)?;
+    drop(log);
+    let mut store = GoalStore::open(&path, Arc::clone(&key))?;
+    let next = store.next_due();
+    let (asked, source) = store.prepare_resend(
+        "goal",
+        "delivery",
+        "explicit-occurrence",
+        "new-session",
+        "person",
+        30,
+    )?;
+    assert_eq!(source, "session");
+    assert_eq!(asked.fired.due, 2);
+    assert!(
+        asked
+            .fired
+            .text
+            .contains("Possible prior delivery of operation delivery")
+    );
+    assert!(asked.fired.text.contains("original words"));
+    assert_ne!(asked.fired.sent[0].operation, "delivery");
+    let fired = store.resend(asked)?;
+    assert_eq!(store.next_due(), next);
+    store.answer(lys_identity_server::goals_state::Answered {
+        operation: fired.sent[0].operation.clone(),
+        state: Delivery::Delivered,
+        words: "matching admission".to_owned(),
+        at: 31,
+    })?;
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    let before = log.len();
+    drop(log);
+    let (retry, _) = store.prepare_resend(
+        "goal",
+        "delivery",
+        "explicit-occurrence",
+        "new-session",
+        "person",
+        99,
+    )?;
+    assert_eq!(retry.fired.fired, 30);
+    assert_eq!(retry.fired.sent[0].operation, fired.sent[0].operation);
+    assert_eq!(store.resend(retry)?.sent[0].state, Delivery::Delivered);
+    assert_eq!(store.next_due(), next);
+    assert!(
+        store
+            .prepare_resend(
+                "goal",
+                "delivery",
+                "explicit-occurrence",
+                "another-session",
+                "person",
+                99
+            )
+            .is_err()
+    );
+    let (log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
+    assert_eq!(log.len(), before);
+    drop(log);
+    drop(store);
+    let store = GoalStore::open(&path, key)?;
+    let (reopened, _) = store.prepare_resend(
+        "goal",
+        "delivery",
+        "explicit-occurrence",
+        "new-session",
+        "person",
+        100,
+    )?;
+    assert_eq!(reopened.fired.sent[0].operation, fired.sent[0].operation);
+    assert_eq!(reopened.fired.sent[0].state, Delivery::Delivered);
+    assert_eq!(store.next_due(), next);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_foreign_person_cannot_read_control_evidence_or_resend_saved_goal_words() -> TestResult {
+    use identity_contract::fake_issuer::Login;
+    use identity_contract::harness::Service;
+    use lys_identity::OperationId;
+    use lys_identity_server::dev_seed::seed_configured;
+    use lys_identity_server::runtime_state::{Report, Reported};
+    use lys_identity_server::runtime_store::RuntimeStore;
+    use std::sync::Arc;
+    let session = OperationId::generate()?.to_string();
+    let kept_session = session.clone();
+    let (service, seeded) = Service::start_with(move |config| {
+        let seeded = seed_configured(
+            config,
+            [identity_contract::harness::ADMINISTRATOR, "foreign-subject"],
+        )?;
+        let key = Arc::new(lys_identity::signer::load_service_key(
+            &config.event_key_file,
+        )?);
+        let mut runtime = RuntimeStore::open(
+            config.runtime_dir.as_deref().ok_or("runtime dir absent")?,
+            key,
+        )?;
+        runtime.report(Report {
+            operation: OperationId::generate()?.to_string(),
+            session: kept_session,
+            agent: Some(seeded.people[0].agents[0].id.to_string()),
+            machine: "private-machine".to_owned(),
+            state: Reported::Starting,
+            what: String::new(),
+            confirmation: String::new(),
+            reported_by: seeded.people[0].id.to_string(),
+            at: 1,
+            launch: None,
+        })?;
+        Ok(seeded)
+    })
+    .await?;
+    let owner = service
+        .sign_in(Login {
+            subject: identity_contract::harness::ADMINISTRATOR.to_owned(),
+            email: "owner@example.test".to_owned(),
+        })
+        .await?;
+    let foreign = service
+        .sign_in(Login {
+            subject: "foreign-subject".to_owned(),
+            email: "foreign@example.test".to_owned(),
+        })
+        .await?;
+    let agent = seeded.people[0].agents[0].id.to_string();
+    let (status, item) = service.post(&format!("/agents/{agent}/goals"), Some(&owner), &serde_json::json!({"operation":OperationId::generate()?.to_string(),"kind":"goal","words":"private saved goal words","reminders":[]})).await?;
+    assert_eq!(status, 200, "{item}");
+    let goal = item["goal"]["id"].as_str().ok_or("goal id absent")?;
+    let unknown = OperationId::generate()?.to_string();
+    for suffix in ["controls", "control-receipts"] {
+        let actual = service
+            .get(
+                &format!("/runtime/sessions/{session}/{suffix}"),
+                Some(&foreign),
+            )
+            .await?;
+        let absent = service
+            .get(
+                &format!("/runtime/sessions/{unknown}/{suffix}"),
+                Some(&foreign),
+            )
+            .await?;
+        assert_eq!(actual, absent);
+        assert_eq!(actual.0, 404, "{actual:?}");
+        assert_eq!(actual.1["refusal"], "RuntimeSessionUnknown");
+        assert!(!actual.1.to_string().contains("private-machine"));
+    }
+    let body = serde_json::json!({"operation":OperationId::generate()?.to_string(),"prior":"delivery","session":session});
+    let (status, answer) = service
+        .post(&format!("/goals/{goal}/resend"), Some(&foreign), &body)
+        .await?;
+    assert_eq!(status, 404, "{answer}");
+    assert_eq!(answer["refusal"], "goal_unknown");
+    assert!(!answer.to_string().contains("private saved goal words"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn control_session_pages_keep_stopped_ids_and_refuse_foreign_visibility_and_cursors()
+-> TestResult {
+    use identity_contract::fake_issuer::Login;
+    use identity_contract::harness::Service;
+    use lys_identity::OperationId;
+    use lys_identity_server::dev_seed::seed_configured;
+    use lys_identity_server::runtime_state::{Report, Reported};
+    use lys_identity_server::runtime_store::RuntimeStore;
+    use std::sync::Arc;
+    let (service, (seeded, expected, foreign_session)) = Service::start_with(|config| {
+        let seeded = seed_configured(
+            config,
+            [identity_contract::harness::ADMINISTRATOR, "page-foreign"],
+        )?;
+        let key = Arc::new(lys_identity::signer::load_service_key(
+            &config.event_key_file,
+        )?);
+        let path = config.runtime_dir.as_deref().ok_or("runtime dir absent")?;
+        let mut runtime = RuntimeStore::open(path, Arc::clone(&key))?;
+        let ids: Vec<String> = (0..514)
+            .map(|_| OperationId::generate().map(|id| id.to_string()))
+            .collect::<Result<_, _>>()?;
+        let foreign = ids[0].clone();
+        let reports = ids
+            .iter()
+            .enumerate()
+            .map(|(number, session)| {
+                let person = &seeded.people[usize::from(number == 0)];
+                Report {
+                    operation: format!("start-{number}"),
+                    session: session.clone(),
+                    agent: Some(person.agents[0].id.to_string()),
+                    machine: "private-page-machine".to_owned(),
+                    state: Reported::Starting,
+                    what: "private report words".to_owned(),
+                    confirmation: String::new(),
+                    reported_by: person.id.to_string(),
+                    at: 1,
+                    launch: None,
+                }
+            })
+            .collect();
+        runtime.report_all(reports)?;
+        runtime.report(Report {
+            operation: "stop-first".to_owned(),
+            session: ids[1].clone(),
+            agent: Some(seeded.people[0].agents[0].id.to_string()),
+            machine: "private-page-machine".to_owned(),
+            state: Reported::Stopped,
+            what: String::new(),
+            confirmation: "exit".to_owned(),
+            reported_by: seeded.people[0].id.to_string(),
+            at: 2,
+            launch: None,
+        })?;
+        drop(runtime);
+        let reopened = RuntimeStore::open(path, key)?;
+        assert!(
+            reopened
+                .session(&ids[1])
+                .ok_or("stopped session absent")?
+                .stopped()
+        );
+        Ok((seeded, ids[1..].to_vec(), foreign))
+    })
+    .await?;
+    let owner = service
+        .sign_in(Login {
+            subject: identity_contract::harness::ADMINISTRATOR.to_owned(),
+            email: "page-owner@example.test".to_owned(),
+        })
+        .await?;
+    let foreign = service
+        .sign_in(Login {
+            subject: "page-foreign".to_owned(),
+            email: "page-foreign@example.test".to_owned(),
+        })
+        .await?;
+    let agent = seeded.people[0].agents[0].id.to_string();
+    let path = format!("/agents/{agent}/control-sessions");
+    let (status, denied) = service.get(&path, Some(&foreign)).await?;
+    assert_eq!(status, 404, "{denied}");
+    assert_eq!(denied["refusal"], "AgentNotVisible");
+    let mut received = Vec::new();
+    let mut after = None;
+    for count in [256, 256, 1] {
+        let url = after
+            .as_ref()
+            .map_or_else(|| path.clone(), |after| format!("{path}?after={after}"));
+        let (status, page) = service.get(&url, Some(&owner)).await?;
+        assert_eq!(status, 200, "{page}");
+        assert_eq!(page["agent"], agent);
+        let sessions = page["sessions"].as_array().ok_or("session ids absent")?;
+        assert_eq!(sessions.len(), count);
+        for session in sessions {
+            received.push(
+                session
+                    .as_str()
+                    .ok_or("session id is not a string")?
+                    .to_owned(),
+            );
+        }
+        after = page["after"].as_str().map(str::to_owned);
+        assert_eq!(after.is_some(), count == 256);
+        assert!(!page.to_string().contains("private-page-machine"));
+        assert!(!page.to_string().contains("private report words"));
+    }
+    assert_eq!(received, expected);
+    for cursor in [
+        foreign_session,
+        OperationId::generate()?.to_string(),
+        String::new(),
+    ] {
+        let (status, answer) = service
+            .get(&format!("{path}?after={cursor}"), Some(&owner))
+            .await?;
+        assert_eq!(status, 400, "{answer}");
+        assert_eq!(answer["refusal"], "control_sessions_cursor_unknown");
+    }
+    Ok(())
+}

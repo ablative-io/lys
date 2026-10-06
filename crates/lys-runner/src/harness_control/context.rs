@@ -499,3 +499,27 @@ impl Controller {
         ))
     }
 }
+
+impl crate::session::Sessions {
+    /// Read current controller state without taking output or account history.
+    ///
+    /// # Errors
+    /// Refuses an unknown session or an unavailable session table.
+    pub fn control_status(
+        &self,
+        session: &str,
+    ) -> Result<Option<ControlStatus>, crate::error::RunnerError> {
+        let table = self.lock()?;
+        let held = table.sessions.get(session).ok_or_else(|| {
+            crate::error::RunnerError::refused(
+                "session_unknown",
+                "the runner holds no session with this identity",
+            )
+        })?;
+        Ok(held
+            .live
+            .as_ref()
+            .and_then(|live| live.control.as_ref())
+            .map(|control| control.controller.control_status()))
+    }
+}

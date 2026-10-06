@@ -1,6 +1,7 @@
 //! Requests retain their exact tagged wire representation.
 
-use super::{Key, Launch, LysMcp};
+use super::{Ended, Key, Launch, LysMcp, Output, StatusView};
+use crate::error::RunnerError;
 use serde::{Deserialize, Serialize};
 
 /// One act a request asks for.
@@ -112,6 +113,11 @@ pub enum Act {
         /// The session.
         session: String,
     },
+    /// Read current controller state without output or account history.
+    ControlStatus {
+        /// The explicit session whose current control is read.
+        session: String,
+    },
     /// Say which protocol this runner speaks and what it holds.
     Status {
         /// One session only, when named.
@@ -214,4 +220,139 @@ pub enum Act {
         #[serde(default)]
         settling: bool,
     },
+}
+
+/// An answer to one act.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Answer {
+    /// Exact bytes from a terminal, with byte cursors and observed end evidence.
+    Bytes {
+        /// The byte window.
+        output: crate::terminal_bytes::ByteOutput,
+    },
+    /// The session's process is up.
+    Started {
+        /// The session.
+        session: String,
+        /// Its process id.
+        pid: u32,
+        /// When it started, in milliseconds since the Unix epoch.
+        started_at: u64,
+    },
+    /// The input, keys or resize were delivered.
+    Delivered {
+        /// The session.
+        session: String,
+    },
+    /// Output read.
+    Output {
+        /// What was read.
+        output: Output,
+    },
+    /// The pattern appeared.
+    Matched {
+        /// The session.
+        session: String,
+        /// The text that matched.
+        matched: String,
+        /// The cursor just after the match.
+        cursor: u64,
+    },
+    /// The session's process has ended.
+    Ended {
+        /// The session.
+        session: String,
+        /// Its end.
+        ended: Ended,
+    },
+    /// What the runner is and holds.
+    Status {
+        /// The status.
+        status: StatusView,
+    },
+    /// The judge's verdict on a tool call a harness asked about.
+    Judged {
+        /// The verdict.
+        verdict: crate::refusals::Verdict,
+    },
+    /// A hook, status line or notice from a harness was recorded.
+    Collected {
+        /// What was recorded, in words.
+        words: String,
+    },
+    /// How an operation stands.
+    Operation {
+        /// Its outcome.
+        outcome: crate::operations::OperationOutcome,
+    },
+    /// Public managed delivery evidence without its retained payload.
+    ControlReceipt {
+        /// The operation's original identities and evidence.
+        receipt: crate::operations::ControlReceipt,
+    },
+    /// Current managed control without output or account history.
+    ControlStatus {
+        /// The explicit session.
+        session: String,
+        /// Its current control; absent when this session has no managed channel.
+        control: Option<crate::harness_control::ControlStatus>,
+    },
+    /// A bounded page of public control evidence.
+    ControlReceipts {
+        /// Continue using its cursor until the owner returns the last page.
+        page: crate::operations::ControlPage,
+    },
+    /// A page of the tracking feed.
+    Feed {
+        /// The page.
+        page: crate::tracking_store::FeedPage,
+    },
+    /// The folders directly inside one folder.
+    Folders {
+        /// The folder looked in, absolute.
+        under: String,
+        /// The name of each folder in it, in order.
+        folders: Vec<String>,
+    },
+    /// The connection is held as the grant channel from here on.
+    GrantChannel,
+    /// A stop of everything: the sessions it ended, each recorded with who
+    /// and why, and those not ended when it answered.
+    StoppedEverything {
+        /// Every session this act ended.
+        sessions: Vec<String>,
+        /// Every session asked to end that had not when the act answered.
+        running: Vec<String>,
+    },
+    /// The act was refused, by name.
+    Refused {
+        /// The refusal's name.
+        refusal: String,
+        /// Why, in words.
+        words: String,
+        /// For `cursor_expired`, the oldest cursor held.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        oldest: Option<u64>,
+    },
+}
+
+impl Answer {
+    /// The answer for `error`, by its name.
+    pub fn refusal(error: &RunnerError) -> Self {
+        let oldest = match error {
+            RunnerError::Refused { oldest, .. } => *oldest,
+            _ => None,
+        };
+        let text = error.to_string();
+        let words = text
+            .split_once(": ")
+            .map_or(text.as_str(), |(_, words)| words)
+            .to_owned();
+        Self::Refused {
+            refusal: error.name(),
+            words,
+            oldest,
+        }
+    }
 }

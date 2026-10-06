@@ -109,6 +109,14 @@ impl Held {
             .collect()
     }
 
+    pub(crate) fn delivery(&self, operation: &str) -> Result<Option<PendingReminder<'_>>, String> {
+        self.index
+            .sent
+            .get(operation)
+            .map(|location| self.pending_at(*location))
+            .transpose()
+    }
+
     /// The current queued delivery under one stable operation identity.
     pub fn pending_operation(
         &self,

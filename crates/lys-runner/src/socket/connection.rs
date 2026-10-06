@@ -114,7 +114,10 @@ impl Command {
     pub(super) fn control(&self) -> bool {
         matches!(
             self,
-            Self::Server(Act::Status { .. } | Act::StopEverything { .. }, _)
+            Self::Server(
+                Act::Status { .. } | Act::ControlStatus { .. } | Act::StopEverything { .. },
+                _
+            )
         ) || matches!(self,
             Self::Server(Act::Operate { operation }, _) if operation.request == crate::operations::OperationRequest::Stop)
     }
@@ -402,5 +405,32 @@ pub(super) async fn connection(
         Ok(()) => Ok(()),
         Err(error) if error.kind() == io::ErrorKind::NotConnected => Ok(()),
         Err(error) => Err(socket_failed(error)),
+    }
+}
+
+#[cfg(test)]
+mod control_status_tests {
+    #[test]
+    fn current_control_status_uses_the_reserved_socket_slot()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let act = serde_json::from_value(
+            serde_json::json!({"act":"control_status","session":"session"}),
+        )?;
+        let control = super::Command::Server(act, [0; 32]).control();
+        assert!(control);
+        let slots = super::DispatchSlots::new();
+        let mut ordinary = Vec::new();
+        for _ in 0..super::DISPATCH_MAX - 1 {
+            ordinary.push(slots.acquire(false)?);
+        }
+        assert!(slots.acquire(false).is_err());
+        let permit = slots.acquire(control)?;
+        permit.finish();
+        drop(ordinary);
+        assert!(
+            super::Command::Server(crate::protocol::Act::Status { session: None }, [0; 32])
+                .control()
+        );
+        Ok(())
     }
 }
