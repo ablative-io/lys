@@ -4,8 +4,7 @@
 //! versions; a skill Lys does not keep is refused when the profile is
 //! recorded.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::error::Error;
 

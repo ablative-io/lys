@@ -8,10 +8,8 @@
 //! more; an act whose answer cannot be had stays unconfirmed and is asked
 //! again under its own id. Every wait ends on an answer, never a clock.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
-#[path = "support/stub_program.rs"]
-mod stub_program;
+use crate::support::harness_description;
+use crate::support::stub_program;
 
 use std::error::Error;
 use std::path::PathBuf;

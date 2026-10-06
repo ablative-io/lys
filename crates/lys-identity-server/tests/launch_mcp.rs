@@ -5,8 +5,7 @@
 //! Claude Code enables it by. What would carry a credential is refused when
 //! the profile is recorded, naming the server and where, never the value.
 
-#[path = "support/runner_start.rs"]
-pub mod support;
+use crate::support::runner_start as support;
 use support::{PLANTED, Table, operation};
 
 use std::error::Error;

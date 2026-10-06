@@ -3,8 +3,7 @@
 //! back as recorded; a start from a profile that declares none is refused
 //! by name before anything is rendered.
 
-#[path = "support/runner_start.rs"]
-pub mod support;
+use crate::support::runner_start as support;
 use support::{Table, operation};
 
 use std::error::Error;

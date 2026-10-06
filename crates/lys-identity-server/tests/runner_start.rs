@@ -10,8 +10,7 @@
 //! the runner holds that digest. Every wait ends on an
 //! answer, never a clock.
 
-#[path = "support/runner_start.rs"]
-mod support;
+use crate::support::runner_start as support;
 use support::{Table, operation};
 
 use std::collections::BTreeMap;

@@ -1,8 +1,7 @@
 #![cfg(test)]
 //! A declared fixture program reads its config before signalling readiness.
 
-#[path = "harness_description.rs"]
-mod harness_description;
+use super::harness_description;
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;

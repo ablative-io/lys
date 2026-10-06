@@ -1,7 +1,6 @@
 //! Refused starts leave a counted runner untouched; the counter first receives a signed control.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::error::Error;
 use std::path::Path;

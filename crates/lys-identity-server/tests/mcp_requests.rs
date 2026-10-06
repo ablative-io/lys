@@ -1,8 +1,7 @@
 #![cfg(test)]
 //! MCP requests refuse servers absent from the reviewed profile.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::error::Error;
 

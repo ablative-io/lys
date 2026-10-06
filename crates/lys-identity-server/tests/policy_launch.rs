@@ -2,8 +2,7 @@
 //! agent is given a default-deny policy, so a launch finds none only on a
 //! service that keeps no policies.
 
-#[path = "support/runner_start.rs"]
-mod support;
+use crate::support::runner_start as support;
 
 use std::error::Error;
 use std::sync::Arc;

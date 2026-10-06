@@ -1,8 +1,7 @@
 #![cfg(test)]
 //! Approval copies a reviewed server only within the caller's reach and remit.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 #[path = "support/mcp_approvals.rs"]
 mod support;
 

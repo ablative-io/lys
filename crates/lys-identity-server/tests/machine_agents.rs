@@ -1,7 +1,6 @@
 //! A computer's agent allowance changes once while retaining its creation and other permissions.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::collections::BTreeMap;
 use std::error::Error;

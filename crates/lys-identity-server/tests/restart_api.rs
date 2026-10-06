@@ -1,8 +1,7 @@
 #![cfg(test)]
 //! A restart waits on the old session's exit and keeps the reviewed launch it starts.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::collections::BTreeMap;
 use std::error::Error;

@@ -30,10 +30,10 @@ use lys_log_store::{
     FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, open_with_snapshot,
 };
 
-use crate::config::Config;
-use crate::error::ServerError;
-use crate::routes::Say;
-use crate::teams_state::{DOMAIN, Held, Line, Refused, Team};
+use super::config::Config;
+use super::error::ServerError;
+use super::routes::Say;
+use super::teams_state::{DOMAIN, Held, Line, Refused, Team};
 
 /// How the leaf store is opened again after an append whose outcome is not known.
 pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;

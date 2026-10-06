@@ -1,8 +1,7 @@
 #![cfg(test)]
 //! Reviewed native process inputs carry every profile member and replay by version.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::error::Error;
 

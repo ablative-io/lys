@@ -3,8 +3,7 @@
 //! order; a model the declared harness cannot carry is refused when the
 //! profile is recorded, and nothing is reported left out.
 
-#[path = "support/runner_start.rs"]
-pub mod support;
+use crate::support::runner_start as support;
 use support::{Table, operation};
 
 use std::error::Error;

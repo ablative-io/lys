@@ -8,6 +8,7 @@ repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 publish = false
+autotests = false
 
 [dependencies]
 zeroize.workspace = true
@@ -45,6 +46,10 @@ toml.workspace = true
 
 # The target that needs a running permission database runs only when it is
 # named, never under `cargo test --workspace --all-features`.
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
 [[test]]
 name = "identity_spicedb"
 path = "tests/identity_spicedb.rs"

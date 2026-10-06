@@ -7,8 +7,7 @@ use identity_contract::harness::ADMINISTRATOR;
 use lys_runner::judge::Policy;
 use serde_json::json;
 
-#[path = "support/agent_policy.rs"]
-mod support;
+use crate::support::agent_policy as support;
 use support::table;
 
 type TestResult = Result<(), Box<dyn Error>>;

@@ -3,8 +3,7 @@ use identity_contract::apps::{Auth, get, login, post};
 use identity_contract::harness::ADMINISTRATOR;
 use serde_json::json;
 use std::error::Error;
-#[path = "support/agent_policy.rs"]
-mod support;
+use crate::support::agent_policy as support;
 
 #[tokio::test]
 async fn an_ended_session_cannot_read_change_signals() -> Result<(), Box<dyn Error>> {

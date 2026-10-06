@@ -5,8 +5,7 @@
 //! rule the settings file cannot express is refused by name: a profile's
 //! when it is recorded, a policy's by its id when the start is rendered.
 
-#[path = "support/runner_start.rs"]
-pub mod support;
+use crate::support::runner_start as support;
 use support::{Table, operation};
 
 use std::error::Error;

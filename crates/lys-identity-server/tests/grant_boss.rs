@@ -1,7 +1,6 @@
 //! Boss delegation names both authorities and waits for the rollback boundary.
 
-#[path = "support/agent_policy.rs"]
-mod support;
+use crate::support::agent_policy as support;
 
 use identity_contract::apps::{Auth, get, login, op, post};
 use identity_contract::harness::ADMINISTRATOR;

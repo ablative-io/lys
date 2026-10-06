@@ -20,7 +20,7 @@ pub const SOURCE_COMMIT: &str = "088351303e6b6d04ac3200ddb5bf86e243d91ddb";
 
 use serde::{Deserialize, Serialize};
 
-use crate::read_views::Login;
+use super::read_views::Login;
 
 /// The snapshot domain the teams' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/teams-state/v1";

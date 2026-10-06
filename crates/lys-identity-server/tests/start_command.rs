@@ -4,8 +4,7 @@
 //! kept profile for a chosen machine, names the agent and its handle ids and
 //! never a credential's value, runs on its runner, and each refusal is by name.
 
-#[path = "support/runner_start.rs"]
-pub mod support;
+use crate::support::runner_start as support;
 use support::{PLANTED, Table, operation};
 
 use std::error::Error;

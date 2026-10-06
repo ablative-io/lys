@@ -1,8 +1,7 @@
 #![cfg(test)]
 //! Budget prompts and due goal reminders are delivered before any viewer opens.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;

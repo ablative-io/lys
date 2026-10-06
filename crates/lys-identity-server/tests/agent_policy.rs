@@ -15,8 +15,7 @@ use lys_identity_server::agent_policy_store::{PolicyStore, digest};
 use lys_runner::judge::{Authority, Policy, Rule, RuleKind};
 use serde_json::{Value, json};
 
-#[path = "support/agent_policy.rs"]
-mod support;
+use crate::support::agent_policy as support;
 
 type TestResult = Result<(), Box<dyn Error>>;
 

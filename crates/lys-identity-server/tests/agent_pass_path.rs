@@ -4,8 +4,7 @@
 //! route inside its grant, is refused outside it, and once stopped its pass
 //! is refused.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+use crate::support::harness_description;
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
