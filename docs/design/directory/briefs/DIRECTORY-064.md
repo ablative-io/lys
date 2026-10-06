@@ -58,6 +58,7 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - create: crates/lys-runner/src/session/lifecycle/managed.rs
 - create: crates/lys-runner/src/collector/stop.rs
 - create: crates/lys-runner/src/tracking_store/managed.rs
+- create: crates/lys-runner/src/protocol/acts.rs
 - modify: crates/lys-runner/src/protocol.rs
 - modify: crates/lys-runner/src/session.rs
 - modify: crates/lys-runner/src/session/lifecycle.rs
@@ -151,6 +152,8 @@ Behavioural. WHEN 051's authoritative context measurement crosses its held thres
 - create: crates/lys-runner/src/harness_control/context.rs
 - create: crates/lys-runner/tests/context_control.rs
 - create: crates/lys-identity-server/src/budgets_act/control.rs
+- create: crates/lys-identity-server/src/budgets_state/control.rs
+- create: crates/lys-runner/src/protocol/acts.rs
 - modify: crates/lys-runner/src/harness_control.rs
 - modify: crates/lys-runner/src/operations.rs
 - modify: crates/lys-identity-server/src/budgets_act.rs
@@ -193,6 +196,7 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - create: crates/lys-identity-server/src/budgets_act/control.rs
 - create: crates/lys-identity-server/src/goals_state/control.rs
 - create: crates/lys-identity-server/src/goals_api/control.rs
+- create: crates/lys-runner/src/protocol/acts.rs
 - modify: crates/lys-identity-server/src/goals_state.rs
 - modify: crates/lys-identity-server/src/goals_store.rs
 - modify: crates/lys-identity-server/src/goals_api.rs
@@ -236,6 +240,7 @@ Behavioural. WHEN delivery starts, THE SYSTEM SHALL persist the existing 051 ope
 - create: crates/lys-identity-server/src/goals_store/control.rs
 - create: crates/lys-identity-server/src/goals_api/control.rs
 - create: crates/lys-identity-server/src/receipts_api/control.rs
+- create: crates/lys-runner/src/protocol/acts.rs
 - modify: crates/lys-runner/src/operations.rs
 - modify: crates/lys-runner/src/state.rs
 - modify: crates/lys-runner/src/harness_control/events.rs

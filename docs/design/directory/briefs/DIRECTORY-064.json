@@ -50,7 +50,8 @@
           "crates/lys-identity-server/src/runner_sessions/controls.rs",
           "crates/lys-runner/src/session/lifecycle/managed.rs",
           "crates/lys-runner/src/collector/stop.rs",
-          "crates/lys-runner/src/tracking_store/managed.rs"
+          "crates/lys-runner/src/tracking_store/managed.rs",
+          "crates/lys-runner/src/protocol/acts.rs"
         ],
         "modify": [
           "crates/lys-runner/src/protocol.rs",
@@ -155,7 +156,9 @@
         "create": [
           "crates/lys-runner/src/harness_control/context.rs",
           "crates/lys-runner/tests/context_control.rs",
-          "crates/lys-identity-server/src/budgets_act/control.rs"
+          "crates/lys-identity-server/src/budgets_act/control.rs",
+          "crates/lys-identity-server/src/budgets_state/control.rs",
+          "crates/lys-runner/src/protocol/acts.rs"
         ],
         "modify": [
           "crates/lys-runner/src/harness_control.rs",
@@ -203,7 +206,8 @@
           "crates/lys-runner/tests/reminder_delivery.rs",
           "crates/lys-identity-server/src/budgets_act/control.rs",
           "crates/lys-identity-server/src/goals_state/control.rs",
-          "crates/lys-identity-server/src/goals_api/control.rs"
+          "crates/lys-identity-server/src/goals_api/control.rs",
+          "crates/lys-runner/src/protocol/acts.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/goals_state.rs",
@@ -252,7 +256,8 @@
           "crates/lys-identity-server/src/goals_state/control.rs",
           "crates/lys-identity-server/src/goals_store/control.rs",
           "crates/lys-identity-server/src/goals_api/control.rs",
-          "crates/lys-identity-server/src/receipts_api/control.rs"
+          "crates/lys-identity-server/src/receipts_api/control.rs",
+          "crates/lys-runner/src/protocol/acts.rs"
         ],
         "modify": [
           "crates/lys-runner/src/operations.rs",
@@ -455,6 +460,12 @@
       "by": "Archie",
       "subject": "R5's migration carries every interrupted v1 Accepted or Delivering operation over as Uncertain, and the restart assertion at tests/operations.rs line 259 reads Uncertain instead of Refused",
       "ruling": "harness_control/events.rs managed_written (lines 343 to 371) sets a Delivering operation to Accepted only after its pipe write succeeded, so an installed v1 Accepted may already have been sent. Reading it as Refused tells the person it never happened, and that invites a second delivery. So the migration carries every interrupted v1 Accepted or Delivering operation over as Uncertain, with a private control record whose preparation is named absent and whose certainty is possibly_sent. No request id, frame or admission is invented, and nothing is replayed. The assertion at tests/operations.rs line 259 that expected the v1 Accepted operation Refused now expects it Uncertain, with that named lack-of-preparation evidence. This is a stronger check, not a narrowed one. Three cases are added beside it: a migrated legacy Uncertain is never resent on its own and offers the responsible person's decision; that decision passes the same boundary and authority checks as any resend; a newly prepared SafelyUnsent operation still reads Refused and is kept (Brisket d81030d7; Waffles bfb64be0)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "budgets_state/control.rs and protocol/acts.rs are whole-item children for the length limit, and the other moved methods go into files R3 to R5 already name",
+      "ruling": "By the repository's count_rust scanner, before fmt, budgets_state.rs reaches 590 code lines with the current control_context method, protocol.rs 502, harness_control/events.rs 557, harness_control.rs 518 and goals_api.rs 524. Each is brought under the limit by moving whole items to a child of the same owner, never by splitting a function, and nothing is reworded on the way. budgets_state/control.rs holds the whole current_control_context method (R3). protocol/acts.rs holds the whole existing Act enum, re-exported from protocol.rs. Moving the enum changes no wire byte: an existing round-trip or golden test of Act's encoding passes unchanged, and if none exists, one is added before the move. Sessions::apply_boundary_reply moves whole into harness_control/context.rs (R3), Pending::new into harness_control/reminders.rs (R4), the goals_state index reads into goals_state/control.rs and the whole Live Deliver implementation into goals_api/control.rs (amendment 19). No owner, scheduler, watcher or history scan is added (Brisket 39a02750; Waffles acb5ea15)."
     }
   ]
 }

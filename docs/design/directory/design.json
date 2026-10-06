@@ -2676,6 +2676,11 @@
       "brief": "DIRECTORY-050"
     },
     {
+      "path": "crates/lys-runner/src/protocol/acts.rs",
+      "note": "the runner socket's whole Act enum, re-exported from protocol.rs with no wire change; DIRECTORY-064",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/src/console_stop.rs",
       "note": "the console stop's one shape, shared by the CLI and the service: its route, signing domain, signature header, body and the signed bytes; DIRECTORY-083 R1",
       "brief": "DIRECTORY-083"
@@ -2749,6 +2754,11 @@
       "path": "crates/lys-identity-server/src/budgets_state.rs",
       "note": "DIRECTORY-051 R2: Budgets on agents, teams and people",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/budgets_state/control.rs",
+      "note": "the budget fold's current_control_context method, whole, under budgets_state; DIRECTORY-064 R3",
+      "brief": "DIRECTORY-064"
     },
     {
       "path": "crates/lys-identity-server/tests/budgets.rs",
