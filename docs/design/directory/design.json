@@ -5474,6 +5474,16 @@
       "path": "crates/lys-runner/src/collector.rs",
       "note": "The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session.",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/socket/acts.rs",
+      "note": "The signed Act dispatch of the runner socket, exhaustive over every act.",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/session/control.rs",
+      "note": "Manual input and resize of a live session.",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

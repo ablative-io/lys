@@ -60,7 +60,11 @@
           "crates/lys-home/src/harness/codex/mod.rs",
           "crates/lys-runner/src/operations.rs",
           "crates/lys-runner/src/operations/delivery.rs",
-          "crates/lys-runner/src/collector.rs"
+          "crates/lys-runner/src/collector.rs",
+          "crates/lys-runner/src/socket/acts.rs",
+          "crates/lys-runner/src/session/control.rs",
+          "crates/lys-runner/src/tracking_store.rs",
+          "crates/lys-identity-server/src/budgets_feed.rs"
         ],
         "delete": []
       },
@@ -294,6 +298,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1 modifies the three existing 051 owners of delivery and turn boundaries",
       "ruling": "R1 says keep 051's hooks, collector and operations log and never make a second one, but listed none of them. Brisket (BOX 18, 15:48) found that operations.rs record and set are private, operations/delivery.rs enqueue types the held text through the terminal writer and finish records Delivered on a byte write or Confirmed on a harness saying it is compacting, and collector.rs marks idle and delivers on the Stop hook and confirms on PreCompact. R1 therefore modifies crates/lys-runner/src/operations.rs, crates/lys-runner/src/operations/delivery.rs and crates/lys-runner/src/collector.rs: a receipt transition the managed channel can use (accepted on a pipe write, confirmed only on the adapter's evidence, uncertain otherwise), delivery.rs taking the managed channel in place of the terminal writer for a managed session, and the collector's Stop and PreCompact marks deferring to the managed channel's boundaries on such a session. No second operations log."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1 modifies the four seams the managed channel passes through",
+      "ruling": "Brisket (BOX 18, 15:53) read the launch, input and feed seams: socket/acts.rs holds the exhaustive signed Act dispatch (socket.rs only re-exports it); session/control.rs owns manual input and resize and assumes a PTY master; tracking_store.rs owns the durable Feed Body and Commit records; budgets_feed.rs consumes every Body variant exhaustively. R1 therefore modifies those four files too. Direction: a typed managed start wrapped around the existing Launch so its constructors keep their shape; the signed dispatch selects managed or PTY; manual messages enter the one dispatcher; a managed resize is refused by name; the Feed gains the managed event record and the budget reader never charges it again. No transport encoded in an environment or argument value."
     }
   ]
 }

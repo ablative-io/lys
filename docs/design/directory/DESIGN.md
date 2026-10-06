@@ -1194,6 +1194,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-secrets/src/lib.rs` | the broker crate's exports | DIRECTORY-081 |
 | `crates/lys-runner/src/operations/delivery.rs` | The operations log's delivery: what an admitted act does to the harness and how its receipt is recorded. | DIRECTORY-064 |
 | `crates/lys-runner/src/collector.rs` | The runner's hook collector: SessionStart, Stop and PreCompact events bound to the session. | DIRECTORY-064 |
+| `crates/lys-runner/src/socket/acts.rs` | The signed Act dispatch of the runner socket, exhaustive over every act. | DIRECTORY-064 |
+| `crates/lys-runner/src/session/control.rs` | Manual input and resize of a live session. | DIRECTORY-064 |
 
 ## Inventory
 
