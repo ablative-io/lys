@@ -80,10 +80,7 @@ pub async fn keep_page(
                             .crossings
                             .acted
                             .get(&outcome.operation)
-                            .is_none_or(|prior| {
-                                prior.at_ms < observed
-                                    || (prior.at_ms == observed && prior != &acted)
-                            })
+                            .is_none_or(|prior| later_control_outcome(prior, &acted))
                         {
                             store.acted(acted)?;
                         }
@@ -319,6 +316,16 @@ fn tokens(record: &UsageRecord, unavailable: &mut Vec<Unavailable>) -> Result<u6
     Ok(total)
 }
 
+fn later_control_outcome(
+    prior: &crate::budgets_crossing::Acted,
+    next: &crate::budgets_crossing::Acted,
+) -> bool {
+    prior != next
+        && next.at_ms >= prior.at_ms
+        && (prior.stands != crate::budgets_crossing::Stands::Confirmed
+            || next.stands == crate::budgets_crossing::Stands::Confirmed)
+}
+
 #[cfg(test)]
 #[path = "budgets_feed_tests.rs"]
 mod tests;
@@ -421,6 +428,46 @@ fn select_holders<'a>(
 
 #[cfg(test)]
 mod control_tests {
+    #[test]
+    fn a_confirmed_control_cannot_be_downgraded_by_an_equal_or_later_feed_receipt() {
+        use lys_runner::operations::{OperationOutcome, OperationState};
+        let outcome = |state, at| OperationOutcome {
+            operation: "crossing".to_owned(),
+            session: "session".to_owned(),
+            request: "context_compact".to_owned(),
+            state,
+            at,
+            words: "observation".to_owned(),
+            text: None,
+            ended: None,
+        };
+        let prior = crate::budgets_crossing::Acted::from_runner(
+            &outcome(OperationState::Confirmed, 20),
+            20,
+        );
+        for state in [
+            OperationState::Accepted,
+            OperationState::Delivering,
+            OperationState::Delivered,
+            OperationState::Uncertain,
+            OperationState::Refused,
+        ] {
+            for at in [20, 21] {
+                let next = crate::budgets_crossing::Acted::from_runner(
+                    &outcome(state, at),
+                    i64::try_from(at).unwrap(),
+                );
+                assert!(
+                    !super::later_control_outcome(&prior, &next),
+                    "{state:?} at {at} discarded confirmed evidence"
+                );
+            }
+        }
+        let accepted =
+            crate::budgets_crossing::Acted::from_runner(&outcome(OperationState::Accepted, 20), 20);
+        assert!(super::later_control_outcome(&accepted, &prior));
+    }
+
     use super::{select_holders, source_agent};
     use crate::goals_state::{Event, Goal, Held, Holder, HolderKind, Kind, Line, Remind};
     use crate::teams_state::Team;
