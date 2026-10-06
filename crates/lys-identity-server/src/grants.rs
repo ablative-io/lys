@@ -210,8 +210,10 @@ fn with_directory_grants_model<A, T>(
     apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
-        // The apps are held first: their connectors are accounts the engine
-        // judges, beside the service accounts.
+        // The apps are taken under the directory and before the grants, the
+        // order `with_grants` names, and before the projection is made: their
+        // connectors are accounts the engine judges, beside the service
+        // accounts.
         let mut apps =
             state
                 .apps
