@@ -67,7 +67,9 @@
           "crates/lys-identity-server/src/budgets_feed.rs",
           "crates/lys/src/commands/runner.rs",
           "crates/lys/src/cli/runner.rs",
-          "crates/lys-runner/Cargo.toml"
+          "crates/lys-runner/Cargo.toml",
+          "crates/lys-identity-server/src/budgets_members.rs",
+          "crates/lys-identity-server/src/goals_store.rs"
         ],
         "delete": []
       },
@@ -313,6 +315,12 @@
       "by": "Waffles the Terrible",
       "subject": "R1: the managed child is made a session leader by a lys runner child-entry subcommand",
       "ruling": "A PTY child is a session leader through portable-pty; a pipe child of std::process::Command is not, and pty.rs end_member and the stop cleanup prove the leader by getsid and getpgid. Safe setsid is not on the pinned toolchain's CommandExt and pre_exec is unsafe, which the brief forbids. The runner's containment entry binary is used by tests only and nothing installs it, so a new binary would be install work. R1 therefore adds a typed child-entry subcommand to the lys runner family (crates/lys/src/cli/runner.rs, crates/lys/src/commands/runner.rs) that calls harness_control/process.rs: the child calls safe rustix::process::setsid, then executes the selected harness without a shell; the runner starts it as its own executable (current_exe, whose identity the managed launch records as R1 requires) and proves the leader's start, session and group before accepting any control; the stop and restart cleanup guards are unchanged. crates/lys-runner/Cargo.toml gains rustix's process feature, which the workspace already declares. Found by Brisket (BOX 18, 16:01); the direction is his."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Waffles the Terrible",
+      "subject": "R1: two borrowed read-only getters select the managed profile without cloning the estate",
+      "ruling": "Selecting a managed launch only for an agent, person or team that holds a compact or notice limit or a live goal reminder needs one agent's standing and one holder's requirement; the getters that exist (budgets_members::standings, GoalStore::of_holder) build every agent, clone every team and clone each item with its fired history, which a launch must never do (one durable operation, no whole-state clones on a hot path). R1 therefore modifies crates/lys-identity-server/src/budgets_members.rs (standing_for: one agent, borrowed current team membership) and crates/lys-identity-server/src/goals_store.rs (requires_controls: borrowed holder items, no fired-history clone), both read-only, and runner_sessions.rs selects the profile with them. No second budget or goal owner. Found by Brisket (BOX 18, 16:38)."
     }
   ]
 }
