@@ -422,3 +422,31 @@ describe('resend recovery readback', () => {
     }
   });
 });
+
+describe('running session control readback', () => {
+  it('reads only the session explicitly opened, without asking a history route', async () => {
+    const { createRoot } = await import('react-dom/client');
+    const { MemoryRouter } = await import('react-router');
+    const { RunningList } = await import('../src/features/runtime/Sessions');
+    const { serve } = await import('./harness');
+    const requests = serve({ ...keeping(),
+      '/runtime/live': ok({ sessions: [{ session: 'session-old', agent: SCRIBE, machine: 'machine', machine_name: 'Computer', shown: 'running', first_report_at: 1, last_reported: 'running' }], unanswered: [] }),
+      '/runtime/sessions/session-old/controls': ok({ session: 'session-old', control: currentControl }),
+      '/runtime/sessions/session-old/control-receipts': ok({ session: 'session-old', receipts: [uncertainControl], after: null }),
+    });
+    const container = document.createElement('div'); document.body.appendChild(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => { root.render(<MemoryRouter><RunningList /></MemoryRouter>); });
+      expect(requests).not.toContain('/runtime/sessions/session-old/controls');
+      const button = container.querySelector<HTMLButtonElement>('button[aria-label="Read controls for Scribe"]');
+      expect(button).not.toBeNull();
+      await act(async () => { button?.click(); });
+      expect(container.textContent).toContain('Active turn');
+      expect(container.textContent).toContain('Held: above limit');
+      expect(requests).toContain('/runtime/sessions/session-old/controls');
+      expect(requests).toContain('/runtime/sessions/session-old/control-receipts');
+      expect(requests.some((path) => path.endsWith('/runtime/sessions'))).toBe(false);
+    } finally { await act(async () => root.unmount()); container.remove(); }
+  });
+});
