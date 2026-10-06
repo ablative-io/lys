@@ -1243,6 +1243,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/launch_config.rs` | The runner launch Config tests. | DIRECTORY-064 |
 | `crates/lys-runner/examples/qualify_adapter.rs` | Stage A of BOX 20's window: launches the machine's own claude or codex through the real adapter without the compiled QUALIFIED check, records the evidence a pin commit cites, and writes nothing to Lys; DIRECTORY-064 R6 | DIRECTORY-064 |
 | `crates/lys-runner/examples/qualify_adapter/owned.rs` | the qualifier's example-owned child: Cancellation, Message, Owned and child_entry, moved whole from qualify_adapter.rs; a private example module; DIRECTORY-064 R6 | DIRECTORY-064 |
+| `crates/lys-runner/examples/qualify_adapter/diagnostics.rs` | the qualifier's closed failure facts: a compaction receipt's typed state and Lys reason and the correlated frame facts; DIRECTORY-064 R6, amendments 55 and 56 | DIRECTORY-064 |
 | `crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl` | fixture evidence: the qualifier stopping at its first unobserved step, marked fixture; never a pin's evidence; DIRECTORY-064 R6 | DIRECTORY-064 |
 | `crates/lys-runner/tests/fixtures/qualifier/fixture-pass.jsonl` | fixture evidence: every qualifier step observed against a fixture executable, marked fixture; never a pin's evidence; DIRECTORY-064 R6 | DIRECTORY-064 |
 | `crates/lys-runner/tests/as_caller.rs` | DIRECTORY-084: runner operation IDs carry their issue time | DIRECTORY-084 |

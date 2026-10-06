@@ -302,6 +302,7 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - create: crates/lys-runner/examples/qualify_adapter/owned.rs
 - create: crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl
 - create: crates/lys-runner/tests/fixtures/qualifier/fixture-pass.jsonl
+- create: crates/lys-runner/examples/qualify_adapter/diagnostics.rs
 - modify: surface/identity/src/features/usage/Usage.tsx
 - modify: surface/identity/src/features/usage/usage.css
 - modify: surface/identity/tests/usage.test.tsx

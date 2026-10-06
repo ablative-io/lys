@@ -5721,6 +5721,11 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/examples/qualify_adapter/diagnostics.rs",
+      "note": "the qualifier's closed failure facts: a compaction receipt's typed state and Lys reason and the correlated frame facts; DIRECTORY-064 R6, amendments 55 and 56",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl",
       "note": "fixture evidence: the qualifier stopping at its first unobserved step, marked fixture; never a pin's evidence; DIRECTORY-064 R6",
       "brief": "DIRECTORY-064"
