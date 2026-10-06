@@ -160,6 +160,7 @@ Behavioural. WHEN 051's authoritative context measurement crosses its held thres
 - modify: crates/lys-runner/src/legacy_input.rs
 - modify: crates/lys-identity-server/src/refusals_follow.rs
 - modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-identity-server/src/budgets_context.rs
 
 **Checklist:**
 - C435 — Enforce context thresholds at the owned boundary (DIRECTORY-064 R3).

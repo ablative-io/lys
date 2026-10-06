@@ -166,7 +166,8 @@
           "crates/lys-runner/src/session.rs",
           "crates/lys-runner/src/legacy_input.rs",
           "crates/lys-identity-server/src/refusals_follow.rs",
-          "crates/lys-runner/src/protocol.rs"
+          "crates/lys-runner/src/protocol.rs",
+          "crates/lys-identity-server/src/budgets_context.rs"
         ],
         "delete": []
       },
@@ -394,6 +395,12 @@
       "by": "Archie",
       "subject": "R3, R4 and R5 name protocol.rs, where the runner socket's typed control fields live",
       "ruling": "The typed fields amendment 12 rules on cross the runner socket in protocol.rs: the context compaction act with its crossing id, the boundary reply admitted from the server key alone, and the status view's current-boundary identifiers (generation, waiting boundary, held crossing, queued occurrence and goal id and version). Identifiers only: no saved words beyond those already delivered, and never a threshold. Runner and server are installed together, so there is no old-shape arm (Archie 394681b6, 17b4bbbe; Brisket 49af0f5f)."
+    },
+    {
+      "date": "2026-10-06",
+      "by": "Archie",
+      "subject": "R3 names budgets_context.rs, where the boundary judge reads the current measurement",
+      "ruling": "budgets_context.rs Availability already folds exactly one reading per agent and session, with its instant and an optional figure, a named missing measurement included; its Reading is private. R3's boundary judge reads it through one derived accessor that answers only the instant and the optional figure, so a missing report after a crossing is not mistaken for the last valid figure, and no use history is scanned. No stored shape changes and no limit crosses the runner socket (Brisket ef00ec1a)."
     }
   ]
 }

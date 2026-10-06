@@ -2761,6 +2761,11 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-identity-server/src/budgets_context.rs",
+      "note": "the context availability fold, one reading per agent and session; DIRECTORY-064 R3 reads the current reading at a boundary, a missing measurement included",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-identity-server/src/refusals_follow.rs",
       "note": "the signal task that follows a runner's feed into budgets_feed; DIRECTORY-064 R3 and R4 connect the same follow to the boundary reply",
       "brief": "DIRECTORY-064"
