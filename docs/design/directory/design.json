@@ -5696,8 +5696,18 @@
       "brief": "DIRECTORY-064"
     },
     {
+      "path": "crates/lys-runner/src/session/lifecycle/terminal.rs",
+      "note": "takes a proved Ended, with or without cleanup diagnostics, as ended; DIRECTORY-064 R6, amendment 65",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/src/session/stop.rs",
       "note": "stopping every session: marks sessions ending and signals under the table lock, then waits on the exit events after the lock is released; DIRECTORY-064 R6, amendment 62",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/session/adopt.rs",
+      "note": "takes a proved Ended, with or without cleanup diagnostics, as ended; DIRECTORY-064 R6, amendment 65",
       "brief": "DIRECTORY-064"
     },
     {

@@ -314,6 +314,8 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - modify: crates/lys-runner/src/pty.rs
 - modify: crates/lys-runner/tests/pty_stop.rs
 - modify: crates/lys-runner/src/session/stop.rs
+- modify: crates/lys-runner/src/session/adopt.rs
+- modify: crates/lys-runner/src/session/lifecycle/terminal.rs
 
 **Checklist:**
 - C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6).
