@@ -1289,6 +1289,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/control_recovery.rs` | start-up boundary recovery continues past a session whose control read fails; DIRECTORY-064 amendment 69 | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/context_stop.rs` | context limits stop or compact live sessions, and the usage report answers what it kept | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/budget_feed.rs` | native budget figures and refusals through the runner feed | DIRECTORY-064 |
+| `crates/lys-runner/tests/restart_group.rs` | a runner restart ends only its own recorded process groups and names why it ends or keeps each member | DIRECTORY-064 |
 
 ## Inventory
 

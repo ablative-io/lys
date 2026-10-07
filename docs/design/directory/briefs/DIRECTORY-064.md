@@ -336,6 +336,7 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - modify: crates/lys-identity-server/src/provider/endpoints.rs
 - modify: crates/lys-identity-server/src/provider_tests.rs
 - modify: crates/lys-identity-server/tests/sign_in_proxy.rs
+- modify: crates/lys-runner/tests/restart_group.rs
 
 **Checklist:**
 - C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6).

@@ -5949,6 +5949,11 @@
       "path": "crates/lys-identity-server/tests/budget_feed.rs",
       "note": "native budget figures and refusals through the runner feed",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/restart_group.rs",
+      "note": "a runner restart ends only its own recorded process groups and names why it ends or keeps each member",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [
