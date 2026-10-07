@@ -189,6 +189,11 @@ fn leading_zero_bits(hash: &[u8]) -> u32 {
 /// `version:difficulty:expires:salt:challenge:`, version 1 and the
 /// difficulty two digits.
 pub fn solve(challenge: &str) -> Result<String, ServerError> {
+    let counter = solve_counter(challenge)?;
+    Ok(format!("{challenge}{counter}"))
+}
+
+fn solve_counter(challenge: &str) -> Result<u64, ServerError> {
     if !challenge.starts_with("1:") || !challenge.ends_with(':') {
         return Err(failed(
             "the sign-in service's challenge is not one this service answers",
@@ -203,7 +208,7 @@ pub fn solve(challenge: &str) -> Result<String, ServerError> {
     loop {
         let answer = format!("{challenge}{counter}");
         if leading_zero_bits(&Sha256::digest(answer.as_bytes())) >= difficulty {
-            return Ok(answer);
+            return Ok(counter);
         }
         counter = counter
             .checked_add(1)

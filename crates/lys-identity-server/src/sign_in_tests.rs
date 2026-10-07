@@ -106,3 +106,28 @@ fn the_connection_peer_is_the_address_and_no_peer_is_refused() -> Result<(), Box
     );
     Ok(())
 }
+
+#[test]
+fn a_difficulty_nineteen_counter_search_allocates_nothing() -> Result<(), Box<dyn Error>> {
+    let challenge = "1:19:4102444800:salt:challenge:";
+    let mut answer = None;
+    let allocations = allocation_counter::measure(|| {
+        answer = Some(super::solve_counter(challenge));
+    });
+    let counter = answer.ok_or("the search ran")??;
+    let hash = Sha256::digest(format!("{challenge}{counter}").as_bytes());
+    assert!(leading_zero_bits(&hash) >= 19);
+    assert_eq!(allocations.count_total, 0, "{allocations:?}");
+    Ok(())
+}
+
+#[test]
+fn a_forbidden_answer_at_the_challenge_expiry_names_the_expiry() -> Result<(), Box<dyn Error>> {
+    let answer = reqwest::Response::from(axum::http::Response::builder().status(403).body(
+        reqwest::Body::from(r#"{"error":"Forbidden","message":"private-sentinel"}"#),
+    )?);
+    let refusal = super::accepted(&answer).err().ok_or("the issuer refused")?;
+    assert_eq!(refusal.name(), "IssuerChallengeExpired");
+    assert!(!refusal.to_string().contains("private-sentinel"));
+    Ok(())
+}
