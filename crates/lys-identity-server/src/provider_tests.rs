@@ -291,3 +291,22 @@ fn a_code_replayed_after_its_exchange_revokes_the_token_it_issued() -> Result<()
     ));
     Ok(())
 }
+
+#[tokio::test]
+async fn issuer_challenge_and_refusal_are_oauth_server_errors() -> Result<(), Box<dyn Error>> {
+    use crate::error::ServerError;
+    for refusal in [
+        ServerError::IssuerChallengeExpired,
+        ServerError::IssuerRefused {
+            status: 403,
+            error: "Forbidden".to_owned(),
+        },
+    ] {
+        let response = super::endpoints::oauth_refusal(&refusal);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
+        let body: serde_json::Value = serde_json::from_slice(&body)?;
+        assert_eq!(body["error"], "server_error");
+        assert_eq!(body["refusal"], refusal.name());
+    }
+    Ok(())
+}

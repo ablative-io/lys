@@ -133,7 +133,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
     GET "/health" "That this service is serving, with its name and build" P [];
     GET "/login" "Redirect to the sign-in screen" P [];
-    GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown", "SignInFailed", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
+    GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown", "SignInFailed", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]] scope("person", "person.create", []);
     POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]] scope("agent", "agent.create", []);
@@ -268,12 +268,13 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/oauth/mcp/consent" "The person connects an app or refuses it" P [&["RequestMalformed", "RedirectUnregistered", "CodeUnknown", "NotSignedIn"]];
     POST "/oauth/mcp/token" "Exchange a connected app's code or refresh token for tokens" P [];
     GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["apps_unavailable"]];
-    POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
+    POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
-    GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
+    GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [&["IssuerChallengeExpired", "IssuerRefused"]];
+    GET "/auth/v1/providers/callback" "Finish a sign-in through a provider" P [&["IssuerChallengeExpired", "IssuerRefused"]];
     POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused", "DirectoryUnavailable"]];
-    POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
-    POST "/setup/password" "Set the first administrator's password" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
+    POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
+    POST "/setup/password" "Set the first administrator's password" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
     GET "/me/account" "The caller's sign-in account" C [SIGNED, &["AccountRefused"]];
     POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY, &["AccountRefused"]];
     POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
