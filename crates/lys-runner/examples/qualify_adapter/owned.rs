@@ -47,8 +47,13 @@ pub(super) struct Owned {
     exited: Option<ExitStatus>,
 }
 
-enum ExitEvents {
+pub(super) enum ExitEvents {
     Child(Signal),
+    #[cfg(test)]
+    Probing {
+        signal: Signal,
+        waiting: Option<tokio::sync::oneshot::Sender<()>>,
+    },
     #[cfg(test)]
     Queued {
         events: mpsc::Receiver<()>,
@@ -62,6 +67,18 @@ impl ExitEvents {
                 .recv()
                 .await
                 .ok_or_else(|| "qualification_child_signal_ended".to_owned()),
+            #[cfg(test)]
+            Self::Probing { signal, waiting } => {
+                if let Some(waiting) = waiting.take() {
+                    waiting
+                        .send(())
+                        .map_err(|()| "qualification_fixture_wait_observer_ended")?;
+                }
+                signal
+                    .recv()
+                    .await
+                    .ok_or_else(|| "qualification_child_signal_ended".to_owned())
+            }
             #[cfg(test)]
             Self::Queued { events, observed } => {
                 events
@@ -238,6 +255,25 @@ impl Owned {
                 .map_err(io_failed)?;
         }
         Ok(())
+    }
+    pub(super) async fn wait_exit(&mut self, cancel: &mut Cancellation) -> Result<ExitStatus> {
+        loop {
+            if self.exited.is_none() {
+                self.exited = self
+                    .child
+                    .as_mut()
+                    .ok_or("qualification_child_missing")?
+                    .try_wait()
+                    .map_err(io_failed)?;
+            }
+            if self.exited.is_some() {
+                return self.stop(cancel).await;
+            }
+            tokio::select! {
+                ended = self.exits.recv() => ended?,
+                () = cancel.received() => return Err("qualification_cancelled: the owned child exit is still awaited".to_owned()),
+            }
+        }
     }
     pub(super) async fn stop(&mut self, cancel: &mut Cancellation) -> Result<ExitStatus> {
         self.frames.close();
@@ -420,7 +456,7 @@ pub(super) fn child_entry(args: &[String]) -> Result<()> {
     ))
 }
 
-fn permission(input: &mut impl Read) -> Result<()> {
+pub(super) fn permission(input: &mut impl Read) -> Result<()> {
     // Buffered startup input can consume the next process's first protocol frame.
     let mut bytes = [0; 8];
     input.read_exact(&mut bytes).map_err(io_failed)?;
@@ -431,63 +467,23 @@ fn permission(input: &mut impl Read) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn launch_permission_leaves_the_first_protocol_frame_in_the_pipe()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let (mut reader, mut writer) = std::io::pipe()?;
-        writer.write_all(b"execute\n{\"id\":\"next-frame\"}\n")?;
-        drop(writer);
-        permission(&mut reader)?;
-        let mut remaining = String::new();
-        reader.read_to_string(&mut remaining)?;
-        assert_eq!(remaining, "{\"id\":\"next-frame\"}\n");
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-pub(super) struct ExitFixture {
-    pub(super) owned: Owned,
-    pub(super) sender: mpsc::Sender<Result<Message>>,
-    pub(super) observed: tokio::sync::oneshot::Receiver<()>,
-}
-
-#[cfg(test)]
 impl Owned {
-    pub(super) fn queued_exit() -> Result<ExitFixture> {
-        let mut child = Command::new("/usr/bin/true")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(io_failed)?;
-        if !child.wait().map_err(io_failed)?.success() {
-            return Err("qualification_fixture_child_failed".to_owned());
+    pub(super) fn fixture(
+        child: Child,
+        leader: Option<Leader>,
+        frames: mpsc::Receiver<Result<Message>>,
+        exits: ExitEvents,
+    ) -> Self {
+        Self {
+            child: Some(child),
+            leader,
+            writer: None,
+            frames,
+            reader: None,
+            reader_done: None,
+            cleanup: String::new(),
+            exits,
+            exited: None,
         }
-        let (notice, events) = mpsc::channel(1);
-        notice.try_send(()).map_err(io_failed)?;
-        drop(notice);
-        let (observed, notification) = tokio::sync::oneshot::channel();
-        let (sender, frames) = mpsc::channel(1);
-        Ok(ExitFixture {
-            owned: Self {
-                child: Some(child),
-                leader: None,
-                writer: None,
-                frames,
-                reader: None,
-                reader_done: None,
-                cleanup: String::new(),
-                exits: ExitEvents::Queued {
-                    events,
-                    observed: Some(observed),
-                },
-                exited: None,
-            },
-            sender,
-            observed: notification,
-        })
     }
 }

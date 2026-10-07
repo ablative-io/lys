@@ -128,7 +128,7 @@ fn cancellation_refuses_an_unconfirmed_exit_without_a_clock() -> TestResult {
     use std::os::fd::AsFd;
     let mut harness = Harness::start()?;
     let leader = harness.leader()?;
-    let (cancel, sender) = std::io::pipe()?;
+    let (cancel, sender) = std::os::unix::net::UnixStream::pair()?;
     let ending = pty::prepare_left_group(&leader)?;
     drop(sender);
     let pty::Left::Unended { reason } = ending.wait(Some(cancel.as_fd())) else {

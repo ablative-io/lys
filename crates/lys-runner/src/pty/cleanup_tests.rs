@@ -73,6 +73,7 @@ mod cycle_tests {
         actions: Vec<String>,
         unproved: Option<u32>,
         unregistered: Option<u32>,
+        gone_on_registration: Option<u32>,
         unsignalled: Option<u32>,
         unreadable: bool,
         cancelled: bool,
@@ -111,7 +112,7 @@ mod cycle_tests {
                     "registration EPERM errno 1",
                 ));
             }
-            Ok(true)
+            Ok(self.gone_on_registration != Some(pid))
         }
         fn signal(&mut self, pid: u32) -> Result<(), RunnerError> {
             self.actions.push(format!("signal:{pid}"));
@@ -138,7 +139,10 @@ mod cycle_tests {
         }
     }
     fn plan(listings: Vec<Vec<u32>>) -> Plan<Kernel> {
-        let kernel = Kernel {
+        with_kernel(listings, |_| {})
+    }
+    fn with_kernel(listings: Vec<Vec<u32>>, configure: impl FnOnce(&mut Kernel)) -> Plan<Kernel> {
+        let mut kernel = Kernel {
             listings: listings.into(),
             current: [(10, "leader"), (11, "first"), (12, "late")]
                 .into_iter()
@@ -146,6 +150,7 @@ mod cycle_tests {
                 .collect(),
             ..Kernel::default()
         };
+        configure(&mut kernel);
         Plan::prepare(
             Leader {
                 pid: 10,
@@ -155,6 +160,20 @@ mod cycle_tests {
             Err(rustix::io::Errno::PERM),
         )
     }
+    #[test]
+    fn registration_esrch_ends_an_unreaped_member_after_one_listing() {
+        let mut ending = with_kernel(vec![vec![11]], |kernel| {
+            kernel.gone_on_registration = Some(11);
+        });
+        let result = ending.wait(None);
+        assert!(matches!(result, Left::Ended { .. }), "{result:?}");
+        assert_eq!(ending.operations.actions, ["prove:11", "register:11"]);
+        assert_eq!(
+            ending.receipts.get(&11),
+            Some(&StartIdentity("first".to_owned()))
+        );
+    }
+
     #[test]
     fn exit_registration_precedes_signalling_and_success_waits_on_receipts() {
         let mut ending = plan(vec![vec![11], vec![]]);

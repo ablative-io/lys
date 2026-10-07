@@ -350,6 +350,13 @@ async fn protocol(
     evidence.record("compaction", json!({"evidence":if transport == Transport::Claude {"compact_boundary"} else {"ContextCompaction"},"turn_completed":true}))
 }
 
+async fn probe_exit(
+    probe: &mut Owned,
+    cancel: &mut Cancellation,
+) -> Result<std::process::ExitStatus> {
+    probe.wait_exit(cancel).await
+}
+
 async fn observe(options: &Options, evidence: &mut Evidence) -> Result<()> {
     evidence.record(
         "launcher",
@@ -374,7 +381,7 @@ async fn observe(options: &Options, evidence: &mut Evidence) -> Result<()> {
         return Err("qualification_version_report_invalid".to_owned());
     };
     let (line, version) = version(&bytes, &options.adapter)?;
-    if !probe.stop(&mut cancel).await?.success() {
+    if !probe_exit(&mut probe, &mut cancel).await?.success() {
         return Err("qualification_version_probe_failed".to_owned());
     }
     evidence.record("version_report", json!({"line":line,"version":version}))?;
@@ -469,6 +476,175 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read, Write};
+    use std::process::{Child, ChildStdin, Command, Stdio};
+    use tokio::signal::unix::{SignalKind, signal};
+    use tokio::sync::{mpsc, oneshot};
+
+    struct HeldChild(Option<Child>);
+    impl Drop for HeldChild {
+        fn drop(&mut self) {
+            if let Some(child) = &mut self.0 {
+                match child.try_wait() {
+                    Ok(Some(_)) => return,
+                    Ok(None) => {}
+                    Err(error) => eprintln!("qualification_fixture_status_failed:{error}"),
+                }
+                if let Err(error) = child.kill() {
+                    eprintln!("qualification_fixture_signal_failed:{error}");
+                }
+                if let Err(error) = child.wait() {
+                    eprintln!("qualification_fixture_reap_failed:{error}");
+                }
+            }
+        }
+    }
+    struct ExitFixture {
+        owned: Owned,
+        sender: mpsc::Sender<Result<Message>>,
+        observed: oneshot::Receiver<()>,
+    }
+    fn queued_exit() -> Result<ExitFixture> {
+        let mut child = Command::new("/usr/bin/true")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(io_failed)?;
+        if !child.wait().map_err(io_failed)?.success() {
+            return Err("qualification_fixture_child_failed".to_owned());
+        }
+        let (notice, events) = mpsc::channel(1);
+        notice.try_send(()).map_err(io_failed)?;
+        drop(notice);
+        let (observed, notification) = oneshot::channel();
+        let (sender, frames) = mpsc::channel(1);
+        Ok(ExitFixture {
+            owned: Owned::fixture(
+                child,
+                None,
+                frames,
+                owned::ExitEvents::Queued {
+                    events,
+                    observed: Some(observed),
+                },
+            ),
+            sender,
+            observed: notification,
+        })
+    }
+    fn live_probe() -> Result<(Owned, ChildStdin, oneshot::Receiver<()>)> {
+        let signal = signal(SignalKind::child()).map_err(io_failed)?;
+        let mut held = HeldChild(Some(Command::new("/usr/bin/python3")
+            .args(["-c", "import os,sys\nos.setsid()\nprint('codex-cli 0.159.2', flush=True)\nos.close(1)\nsys.stdin.buffer.read()"])
+            .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
+            .spawn().map_err(io_failed)?));
+        let child = held
+            .0
+            .as_mut()
+            .ok_or("qualification_fixture_child_missing")?;
+        let release = child
+            .stdin
+            .take()
+            .ok_or("qualification_fixture_stdin_missing")?;
+        let mut bytes = Vec::new();
+        child
+            .stdout
+            .take()
+            .ok_or("qualification_fixture_stdout_missing")?
+            .read_to_end(&mut bytes)
+            .map_err(io_failed)?;
+        assert_eq!(bytes, b"codex-cli 0.159.2\n");
+        let leader = lys_runner::peer::Leader {
+            pid: child.id(),
+            start: lys_runner::peer::start_identity(child.id())
+                .map_err(|error| error.to_string())?,
+        };
+        assert!(child.try_wait().map_err(io_failed)?.is_none());
+        let (waiting, ready) = oneshot::channel();
+        let (sender, frames) = mpsc::channel(1);
+        drop(sender);
+        Ok((
+            Owned::fixture(
+                held.0.take().ok_or("qualification_fixture_child_missing")?,
+                Some(leader),
+                frames,
+                owned::ExitEvents::Probing {
+                    signal,
+                    waiting: Some(waiting),
+                },
+            ),
+            release,
+            ready,
+        ))
+    }
+
+    #[tokio::test]
+    async fn version_probe_waits_for_its_own_exit_after_stdout_eof() -> Result<()> {
+        let (mut probe, release, waiting) = live_probe()?;
+        let mut cancel = Cancellation::new()?;
+        let mut finish = Box::pin(probe_exit(&mut probe, &mut cancel));
+        let status = tokio::select! {
+            result = &mut finish => { drop(release); result? },
+            ready = waiting => { ready.map_err(io_failed)?; drop(release); finish.await? },
+        };
+        assert!(
+            status.success(),
+            "version probe was signalled before its own exit: {status}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn launch_permission_leaves_the_first_protocol_frame_in_the_pipe()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let (mut reader, mut writer) = std::os::unix::net::UnixStream::pair()?;
+        writer.write_all(b"execute\n{\"id\":\"next-frame\"}\n")?;
+        drop(writer);
+        owned::permission(&mut reader)?;
+        let mut remaining = String::new();
+        reader.read_to_string(&mut remaining)?;
+        assert_eq!(remaining, "{\"id\":\"next-frame\"}\n");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn version_probe_exit_wait_is_cancelled_by_a_signal() -> Result<()> {
+        let (mut probe, release, waiting) = live_probe()?;
+        let mut cancel = Cancellation::new()?;
+        let (finished, completion) = oneshot::channel();
+        let (result, released) = tokio::join!(
+            async {
+                let result = probe_exit(&mut probe, &mut cancel).await;
+                finished
+                    .send(())
+                    .map_err(|()| "qualification_fixture_completion_ended")?;
+                Ok::<_, String>(result)
+            },
+            async {
+                waiting.await.map_err(io_failed)?;
+                rustix::process::kill_process(
+                    rustix::process::getpid(),
+                    rustix::process::Signal::INT,
+                )
+                .map_err(io_failed)?;
+                completion.await.map_err(io_failed)?;
+                drop(release);
+                Ok::<(), String>(())
+            }
+        );
+        released?;
+        let error = result?
+            .err()
+            .ok_or("qualification_fixture_cancellation_accepted")?;
+        assert_eq!(
+            error,
+            "qualification_cancelled: the owned child exit is still awaited"
+        );
+        probe.stop(&mut cancel).await?;
+        Ok(())
+    }
+
     use super::*;
     use lys_runner::harness_control::Executable;
 
@@ -883,11 +1059,11 @@ mod tests {
     }
     #[tokio::test]
     async fn an_already_observed_owned_exit_finishes_cleanup() -> Result<()> {
-        let owned::ExitFixture {
+        let ExitFixture {
             mut owned,
             sender,
             observed,
-        } = Owned::queued_exit()?;
+        } = queued_exit()?;
         drop(sender);
         drop(observed);
         let mut cancel = Cancellation::new()?;
@@ -898,11 +1074,11 @@ mod tests {
     async fn after_queued_exit(
         message: Option<Message>,
     ) -> Result<std::result::Result<Message, String>> {
-        let owned::ExitFixture {
+        let ExitFixture {
             mut owned,
             sender,
             observed,
-        } = Owned::queued_exit()?;
+        } = queued_exit()?;
         let mut cancel = Cancellation::new()?;
         let (received, delivered) = tokio::join!(owned.next(&mut cancel), async {
             observed.await.map_err(io_failed)?;
@@ -989,11 +1165,11 @@ mod tests {
 
     #[tokio::test]
     async fn cancellation_still_stops_a_reader_after_an_observed_exit() -> Result<()> {
-        let owned::ExitFixture {
+        let ExitFixture {
             mut owned,
             sender,
             observed,
-        } = Owned::queued_exit()?;
+        } = queued_exit()?;
         let mut cancel = Cancellation::new()?;
         let (finished, completion) = tokio::sync::oneshot::channel();
         let (received, cancelled) = tokio::join!(

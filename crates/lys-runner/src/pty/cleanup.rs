@@ -88,7 +88,6 @@ impl<O: Operations> Plan<O> {
                 return;
             }
         };
-        let mut unreceipted = false;
         for pid in members {
             let start = match self.operations.start(pid) {
                 Ok(Some(start)) => start,
@@ -101,7 +100,6 @@ impl<O: Operations> Plan<O> {
             if self.receipts.get(&pid) == Some(&start) {
                 continue;
             }
-            unreceipted = true;
             let basename = match self.operations.basename(pid) {
                 Ok(basename) => basename,
                 Err(error) => {
@@ -115,6 +113,15 @@ impl<O: Operations> Plan<O> {
                 .and_then(|()| self.operations.register(pid));
             match checked {
                 Ok(false) => {
+                    match self.operations.start(pid) {
+                        Ok(current) if current.as_ref().is_none_or(|current| current == &start) => {
+                            self.receipts.insert(pid, start);
+                        }
+                        Ok(_) => self.fail(format!(
+                            "process {pid} ({basename}): identity changed after registration ESRCH"
+                        )),
+                        Err(error) => self.fail(format!("process {pid} ({basename}): {error}")),
+                    }
                     self.words.push(format!(
                         "process {pid} ({basename}): registration ESRCH (errno 3)"
                     ));
@@ -154,7 +161,7 @@ impl<O: Operations> Plan<O> {
                 Err(error) => self.fail(format!("process {pid} ({basename}): {error}")),
             }
         }
-        if !unreceipted && !self.failed {
+        if self.pending.is_empty() && !self.failed {
             self.result = Some(if self.signalled || !self.words.is_empty() {
                 Left::Ended {
                     reason: Some(self.words.join("; ")),
