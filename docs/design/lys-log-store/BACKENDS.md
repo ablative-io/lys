@@ -133,7 +133,9 @@ Read again at `haematite@af5e18a` on 7 October:
 
 The move is scheduled haematite work, not a waiting list (Waffles, 7 October). It waits on
 four conditions, each a named haematite brief: per-append durability, meaning an
-acknowledgement only after the flush (a STOR brief Apollo writes for it); prune and online
+acknowledgement only after the flush (met: STOR-012's `LeafLog::append` flushes before it
+returns, `api/leaf_log.rs:177-178` at `v0.15.0`; #58 holds only for ordinary stores, and the
+move is onto `LeafLog`, never an ordinary store); prune and online
 reclaim installed and measured (STOR-013, STOR-014); a start-up that reads no history
 (STOR-015); and a green bound test (STOR-014). When all four are green at a named haematite
 commit, the move gets its own Lys brief and goes into the next Lys piece.
