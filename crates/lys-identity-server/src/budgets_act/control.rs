@@ -182,7 +182,11 @@ fn live(state: &AppState, machine: Option<&str>) -> Result<Vec<String>, ServerEr
 /// Current live sessions are recovered once; no dead pipe is resumed.
 pub(crate) async fn start(state: &Arc<AppState>) -> Result<(), ServerError> {
     for session in live(state, None)? {
-        review(state, &session, "service-start").await?;
+        if let Err(error) = review(state, &session, "service-start").await {
+            (state.say)(&format!(
+                "controls: boundary recovery for session {session} at start failed: {error}"
+            ));
+        }
     }
     Ok(())
 }

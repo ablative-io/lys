@@ -510,7 +510,7 @@ pub async fn remind(goals: &Goals, deliver: &dyn Deliver, at: u64) -> Result<(),
         let pending = store.held.pending().map_err(unavailable)?.into_iter()
             .map(|pending| (pending.sent.clone(), pending.item.goal.holder.clone(),
                 pending.active && pending.item.standing == Standing::Open,
-                text_with_words(pending.item, pending.words, at)))
+                text_with_words(pending.item, pending.words, pending.fired.fired)))
             .collect::<Vec<_>>();
         for (sent, holder, permitted, text) in pending {
             if !permitted {

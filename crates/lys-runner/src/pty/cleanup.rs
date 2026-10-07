@@ -328,7 +328,8 @@ impl Operations for Kernel {
         if rustix::process::getsid(Some(member)).map_err(refused)? != recorded
             || rustix::process::getpgid(Some(member)).map_err(refused)? != recorded
         {
-            return Err(refused(
+            return Err(RunnerError::refused(
+                "process_session_mismatch",
                 "member no longer belongs to the recorded session and group",
             ));
         }

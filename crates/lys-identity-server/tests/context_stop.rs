@@ -41,6 +41,7 @@ impl Runner {
         let read_count = Arc::clone(&control_reads);
         let task = tokio::spawn(async move {
             let mut operations = Vec::new();
+            let mut channels = Vec::new();
             loop {
                 let socket = tokio::select! {
                     _ = &mut stopped => return Ok(operations),
@@ -52,15 +53,16 @@ impl Runner {
                     .write_all(format!("{}\n", greeting.line()).as_bytes())
                     .await
                     .map_err(|error| error.to_string())?;
-                let line = BufReader::new(read)
-                    .lines()
+                let mut lines = BufReader::new(read).lines();
+                let line = lines
                     .next_line()
                     .await
                     .map_err(|error| error.to_string())?
                     .ok_or("runner request ended before its line")?;
-                let answer = match verify_request(&line, &key, &greeting)
-                    .map_err(|error| error.to_string())?
-                {
+                let act =
+                    verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
+                let channel = matches!(act, RunnerAct::GrantChannel);
+                let answer = match act {
                     RunnerAct::AsCaller { done, .. } => match *done {
                         RunnerAct::Operate { operation } => {
                             operations.push(operation);
@@ -89,6 +91,12 @@ impl Runner {
                             }
                         }
                     }
+                    RunnerAct::GrantChannel => Answer::GrantChannel,
+                    RunnerAct::Feed { .. } => Answer::Refused {
+                        refusal: "feed_not_kept".to_owned(),
+                        words: "this fixture keeps no feed".to_owned(),
+                        oldest: None,
+                    },
                     other => return Err(format!("unexpected runner act: {other:?}")),
                 };
                 let reply = Reply {
@@ -100,6 +108,9 @@ impl Runner {
                     .write_all(format!("{line}\n").as_bytes())
                     .await
                     .map_err(|error| error.to_string())?;
+                if channel {
+                    channels.push((lines, write));
+                }
             }
         });
         Self {

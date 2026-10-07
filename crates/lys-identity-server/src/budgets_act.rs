@@ -196,8 +196,12 @@ pub(crate) async fn settle_crossings(
     for crossing in unsettled {
         if let Some(acted) = act(state, &crossing).await {
             with_budgets_mut(state, |store| store.acted(acted))?;
-            if let Some(session) = crossing.session.as_deref() {
-                review(state, session, &crossing.operation).await?;
+            if let Some(session) = crossing.session.as_deref()
+                && let Err(error) = review(state, session, &crossing.operation).await
+            {
+                (state.say)(&format!(
+                    "controls: boundary review after kept crossing for session {session} failed: {error}"
+                ));
             }
         }
     }
