@@ -15,6 +15,7 @@ mod harness_description;
 mod stub_program;
 
 use std::error::Error;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::Router;
@@ -45,7 +46,6 @@ type BrokerCalls = Arc<Mutex<Vec<(String, String)>>>;
 struct Setting {
     under_api: bool,
     upgrade: bool,
-    refuse_handles: bool,
     previous: Option<console_stop::Request>,
 }
 
@@ -55,7 +55,7 @@ async fn broker(
     request: Request,
     drops: &Drops,
     calls: &BrokerCalls,
-    refuse_handles: bool,
+    refuse_handles: &AtomicBool,
 ) -> Response {
     let path = request.uri().path().to_owned();
     let query = request.uri().query().unwrap_or_default().to_owned();
@@ -69,7 +69,7 @@ async fn broker(
         .lock()
         .expect("fixture lock poisoned")
         .push((path.clone(), person));
-    if path == "/_lys/handles" && refuse_handles {
+    if path == "/_lys/handles" && refuse_handles.load(Ordering::Acquire) {
         return (
             axum::http::StatusCode::FORBIDDEN,
             "fixture_handles_refused: the broker refuses ending these handles",
@@ -127,6 +127,7 @@ struct Table {
     machine: String,
     drops: Drops,
     broker_calls: BrokerCalls,
+    refuse_handles: Arc<AtomicBool>,
     under_api: bool,
 }
 
@@ -167,11 +168,12 @@ impl Table {
         let Setting {
             under_api,
             upgrade,
-            refuse_handles,
             previous,
         } = setting;
         let drops = Drops::default();
         let broker_calls = BrokerCalls::default();
+        let refuse_handles = Arc::new(AtomicBool::new(false));
+        let refusing = Arc::clone(&refuse_handles);
         let called = Arc::clone(&broker_calls);
         let kept = Arc::clone(&drops);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -179,7 +181,8 @@ impl Table {
         let stand_in = Router::new().fallback(move |request: Request| {
             let drops = Arc::clone(&kept);
             let calls = Arc::clone(&called);
-            async move { broker(request, &drops, &calls, refuse_handles).await }
+            let refused = Arc::clone(&refusing);
+            async move { broker(request, &drops, &calls, &refused).await }
         });
         tokio::spawn(async move { axum::serve(listener, stand_in).await });
         let dir = tempfile::tempdir()?;
@@ -240,6 +243,7 @@ impl Table {
             machine: String::new(),
             drops,
             broker_calls,
+            refuse_handles,
             under_api,
         };
         table.machine = table
@@ -762,6 +766,9 @@ async fn console_join(under_api: bool) -> TestResult {
     let agent = table.agent(0);
     table.profile(&agent).await?;
     let session = table.started(&agent).await?;
+    let prior_calls = table.called_handles();
+    let mut expected_drops = table.dropped();
+    expected_drops.push(format!("h-{agent}"));
     let request = console_request()?;
     let body = serde_json::to_vec(&request)?;
     let signature = table.signed(&body)?;
@@ -785,16 +792,17 @@ async fn console_join(under_api: bool) -> TestResult {
     assert_eq!(pulled["still_running"], json!([]));
     assert_eq!(pulled["unreached"], json!([]));
     assert_eq!(pulled["handles_refused"], json!([]), "{pulled}");
-    assert_eq!(table.dropped(), vec![format!("h-{agent}")]);
+    assert_eq!(table.dropped(), expected_drops);
     let calls = table.called_handles();
     let owner = table.seeded.people[0].id.to_string();
     assert_eq!(
-        calls,
-        vec![
+        &calls[prior_calls.len()..],
+        &[
             ("/_lys/handles".to_owned(), owner.clone()),
             ("/_lys/drop".to_owned(), owner),
         ]
     );
+    assert_eq!(&calls[..prior_calls.len()], &prior_calls);
     let kept = table.session(&agent, &session).await?;
     assert_eq!(kept["shown"], "stopped", "{kept}");
     assert_eq!(kept["last_reported"], "stopped", "{kept}");
@@ -802,7 +810,7 @@ async fn console_join(under_api: bool) -> TestResult {
     assert_eq!(status, 200, "{again}");
     assert_eq!(again, pulled, "the same signed stop keeps its answer");
     assert_eq!(table.session(&agent, &session).await?, kept);
-    assert_eq!(table.dropped(), vec![format!("h-{agent}")]);
+    assert_eq!(table.dropped(), expected_drops);
     assert_eq!(table.called_handles(), calls);
     table.close()
 }
@@ -937,14 +945,12 @@ async fn every_start_after_a_console_stop_names_the_console_claim_and_reason() -
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_console_pull_names_the_broker_refusal_instead_of_skipping_handles() -> TestResult {
-    let table = Table::set_with(Setting {
-        refuse_handles: true,
-        ..Setting::default()
-    })
-    .await?;
+    let table = Table::set().await?;
     let agent = table.agent(0);
     table.profile(&agent).await?;
     table.started(&agent).await?;
+    let before = table.dropped();
+    table.refuse_handles.store(true, Ordering::Release);
     let body = serde_json::to_vec(&console_request()?)?;
     let signature = table.signed(&body)?;
     let (status, answer) = table.console(&body, Some(&signature), None).await?;
@@ -960,7 +966,7 @@ async fn a_console_pull_names_the_broker_refusal_instead_of_skipping_handles() -
             .is_some_and(|words| words.contains("fixture_handles_refused")),
         "{answer}"
     );
-    assert!(table.dropped().is_empty());
+    assert_eq!(table.dropped(), before);
     table.close()
 }
 
