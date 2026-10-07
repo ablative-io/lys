@@ -5919,6 +5919,16 @@
       "path": "crates/lys-identity-server/src/error_names_tests.rs",
       "note": "refusal names and route declarations; DIRECTORY-064 amendment 67",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider/endpoints.rs",
+      "note": "the provider's routes and its OAuth error answers",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider_tests.rs",
+      "note": "the provider's unit tests, among them the OAuth answer of each refusal",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [
