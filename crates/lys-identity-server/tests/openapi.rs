@@ -44,7 +44,16 @@ fn declared_in(text: &str) -> Declared {
             }
         }
         let body = &call[..end];
-        if let Some(path) = body.split('"').nth(1) {
+        let argument = body
+            .trim_start_matches('(')
+            .split(',')
+            .next()
+            .map(str::trim);
+        let path = match argument {
+            Some("console_stop::PATH") => Some(lys_runner::console_stop::PATH),
+            _ => body.split('"').nth(1),
+        };
+        if let Some(path) = path {
             for method in ["get", "post", "put", "delete", "patch"] {
                 let mut from = 0;
                 while let Some(at) = body[from..].find(&format!("{method}(")) {
@@ -177,6 +186,19 @@ fn a_route_added_without_an_entry_fails_naming_the_route() {
     );
     assert_eq!(wrapped.len(), 1, "a route across lines is read");
     assert!(missing(&wrapped, &documented()).is_empty());
+}
+
+#[test]
+fn a_shared_console_route_is_read_from_its_wire_definition() {
+    for source in [
+        "Router::new().route(console_stop::PATH, post(console))",
+        "Router::new().route(\n    console_stop::PATH,\n    post(console),\n)",
+    ] {
+        assert_eq!(
+            declared_in(source),
+            BTreeSet::from([("post".to_owned(), lys_runner::console_stop::PATH.to_owned())]),
+        );
+    }
 }
 
 #[tokio::test]

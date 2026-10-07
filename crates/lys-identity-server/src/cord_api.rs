@@ -17,12 +17,14 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
+use axum::body::Bytes;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, header};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::OperationId;
+use lys_runner::console_stop;
 use serde::{Deserialize, Serialize};
 
 use crate::cord_store::{CordStore, Kept, Pull, PullResult, Release};
@@ -73,6 +75,7 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/runtime/stop-everything", get(stands).post(pull))
         .route("/runtime/stop-everything/release", post(release))
+        .route(console_stop::PATH, post(console))
 }
 
 /// The cord's routes' schemas.
@@ -93,11 +96,96 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<crate::openapi_types::Ent
         ),
         (
             crate::openapi_table::POST,
+            console_stop::PATH,
+            Some(api.schema::<console_stop::Request>()),
+            Some(api.schema::<PullResult>()),
+        ),
+        (
+            crate::openapi_table::POST,
             "/runtime/stop-everything/release",
             Some(api.schema::<ReleaseBody>()),
             Some(view),
         ),
     ]
+}
+
+fn console_refused(reason: impl Into<String>) -> ServerError {
+    CordError::ConsoleSignatureRefused {
+        reason: reason.into(),
+    }
+    .into()
+}
+
+/// The console credential is only present here; its signature still needs the bounded body.
+pub(crate) fn console_signature(headers: &HeaderMap) -> Result<&str, ServerError> {
+    if headers.contains_key(header::COOKIE) {
+        return Err(console_refused(
+            "a console signature cannot carry a session cookie",
+        ));
+    }
+    let mut signatures = headers.get_all(console_stop::SIGNATURE_HEADER).iter();
+    let signature = signatures.next().ok_or(ServerError::NotSignedIn)?;
+    if signatures.next().is_some() {
+        return Err(console_refused(
+            "a console request carries exactly one signature",
+        ));
+    }
+    let signature = signature.to_str().map_err(|error| {
+        console_refused(format!(
+            "the console signature is not hexadecimal text: {error}"
+        ))
+    })?;
+    if signature.len() != 128 {
+        return Err(console_refused(
+            "the console signature must encode exactly 64 bytes",
+        ));
+    }
+    Ok(signature)
+}
+
+async fn console(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    bytes: Bytes,
+) -> Result<Json<PullResult>, ServerError> {
+    let signature = lys_runner::protocol::unhex(console_signature(&headers)?)
+        .ok_or_else(|| console_refused("the console signature is not hexadecimal text"))?;
+    if lys_core::Ed25519Identity::verify(
+        &state.runners.public_key(),
+        &console_stop::signed_bytes(&bytes),
+        &signature,
+    )
+    .is_err()
+    {
+        return Err(console_refused(
+            "the signature does not verify this body under this service's key",
+        ));
+    }
+    let given: console_stop::Request =
+        serde_json::from_slice(&bytes).map_err(|error| ServerError::RequestMalformed {
+            reason: error.to_string(),
+        })?;
+    let operation = OperationId::from_str(&given.operation)?.to_string();
+    if given.by.trim().is_empty() || given.reason.trim().is_empty() {
+        return Err(ServerError::RequestMalformed {
+            reason:
+                "the console claim and the reason must both name who stopped everything and why"
+                    .to_owned(),
+        });
+    }
+    crate::cord_pull::console(
+        &state,
+        Pull {
+            operation,
+            by: "console".to_owned(),
+            by_name: Some(given.by),
+            reason: given.reason,
+            kill: given.kill,
+            at: now(),
+        },
+    )
+    .await
+    .map(Json)
 }
 
 /// Run `act` on the cord, one caller at a time.

@@ -145,6 +145,12 @@ async fn check(
 /// live session; otherwise the session's own refusal. `true` when the
 /// caller is judged in full here, before its body is read.
 fn admitted(state: &AppState, auth: &[Auth], headers: &HeaderMap) -> Result<bool, ServerError> {
+    if auth
+        .iter()
+        .any(|door| matches!(door, Auth::ConsoleSignature { .. }))
+    {
+        return crate::cord_api::console_signature(headers).map(|_| false);
+    }
     if headers.contains_key(header::COOKIE) && headers.contains_key(crate::agent_signature::HEADER)
     {
         return Err(ServerError::AgentSignatureRefused {

@@ -7,6 +7,12 @@ use axum::http::StatusCode;
 /// A refusal of the master off switch, or of a start it holds back.
 #[derive(Debug, thiserror::Error)]
 pub enum CordError {
+    /// The console request is not signed by this service alone.
+    #[error("console_signature_refused: {reason}")]
+    ConsoleSignatureRefused {
+        /// Why the signature cannot admit this request.
+        reason: String,
+    },
     /// Everything is stopped, so no agent may start: the words say who
     /// stopped it, when and why.
     #[error("everything_stopped: {words}")]
@@ -36,6 +42,7 @@ pub enum CordError {
 impl CordError {
     pub(crate) const fn name(&self) -> &'static str {
         match self {
+            Self::ConsoleSignatureRefused { .. } => "console_signature_refused",
             Self::EverythingStopped { .. } => "everything_stopped",
             Self::Reused { .. } => "cord_reused",
             Self::NotPulled => "cord_not_pulled",
@@ -45,6 +52,7 @@ impl CordError {
 
     pub(crate) const fn status(&self) -> StatusCode {
         match self {
+            Self::ConsoleSignatureRefused { .. } => StatusCode::UNAUTHORIZED,
             Self::EverythingStopped { .. } | Self::Reused { .. } | Self::NotPulled => {
                 StatusCode::CONFLICT
             }

@@ -44,6 +44,12 @@ struct Open {
 /// still running, or why it could not be asked.
 type Asked = Result<(Vec<String>, Vec<String>), (String, String)>;
 
+#[derive(Clone, Copy)]
+enum Caller<'a> {
+    Session(&'a HeaderMap),
+    Console,
+}
+
 /// An operation id for one part of the pull, the same each time the same
 /// pull is sent, so each part is kept once.
 fn part(operation: &str, kind: &str, key: &str) -> String {
@@ -57,7 +63,23 @@ pub(crate) async fn pull(
     headers: &HeaderMap,
     pull: Pull,
 ) -> Result<PullResult, ServerError> {
-    let pull = match with_cord(state, |store| store.pull(pull))? {
+    pulling(state, Caller::Session(headers), pull).await
+}
+
+/// Pull from the console, ending each agent's handles for its responsible person.
+pub(crate) async fn console(state: &Arc<AppState>, pull: Pull) -> Result<PullResult, ServerError> {
+    pulling(state, Caller::Console, pull).await
+}
+
+async fn pulling(
+    state: &Arc<AppState>,
+    caller: Caller<'_>,
+    pull: Pull,
+) -> Result<PullResult, ServerError> {
+    let pull = match with_cord(state, |store| match caller {
+        Caller::Session(_) => store.pull(pull),
+        Caller::Console => store.console_pull(pull),
+    })? {
         Pulling::Answered(result) => return Ok(*result),
         Pulling::Go(pull) => pull,
     };
@@ -78,7 +100,7 @@ pub(crate) async fn pull(
     // The runners are already being asked; each agent's credentials end now,
     // not after the slowest runner has answered.
     let agents: BTreeSet<String> = open.iter().filter_map(|open| open.agent.clone()).collect();
-    let (handles_ended, handles_refused) = end_handles(state, headers, &pull, &agents).await;
+    let (handles_ended, handles_refused) = end_handles(state, caller, &pull, &agents).await;
     let mut ended: Vec<(String, String)> = Vec::new();
     let mut running: Vec<(String, String)> = Vec::new();
     let mut unreached: Vec<(String, String, String)> = Vec::new();
@@ -391,13 +413,21 @@ fn record_stopped(
 /// agent whose handles the broker did not confirm ended.
 async fn end_handles(
     state: &AppState,
-    headers: &HeaderMap,
+    caller: Caller<'_>,
     pull: &Pull,
     agents: &BTreeSet<String>,
 ) -> (Vec<String>, Vec<HandlesRefused>) {
     let (mut ended, mut refused) = (Vec::new(), Vec::new());
     for agent in agents {
-        match crate::stop_api::end_handles(state, headers, agent, &pull.operation).await {
+        let answer = match caller {
+            Caller::Session(headers) => {
+                crate::stop_api::end_handles(state, headers, agent, &pull.operation).await
+            }
+            Caller::Console => {
+                crate::stop_api::end_handles_as_owner(state, agent, &pull.operation).await
+            }
+        };
+        match answer {
             Ok(handles) => ended.extend(handles),
             Err(error) => refused.push(HandlesRefused {
                 agent: agent.clone(),

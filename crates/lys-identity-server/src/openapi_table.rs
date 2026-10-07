@@ -4,6 +4,7 @@
 //! anything else.
 
 use lys_openapi::{Auth, Method};
+use lys_runner::console_stop::PATH as CONSOLE_PATH;
 
 use crate::openapi_refusals::{
     ADMIN, ADMIN_BODY, AGENT, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE, GRANT_READ,
@@ -29,6 +30,10 @@ pub(crate) const G: &[Auth] = &[Auth::AgentSignature, Auth::Session, Auth::Opera
 pub(crate) const B: &[Auth] = &[Auth::Bearer];
 /// An agent's signed request alone.
 pub(crate) const AGENT_ONLY: &[Auth] = &[Auth::AgentSignature];
+/// The service's own signature over the console request.
+pub(crate) const CONSOLE_ONLY: &[Auth] = &[Auth::ConsoleSignature {
+    header: lys_runner::console_stop::SIGNATURE_HEADER,
+}];
 
 /// One untyped entry: method, path, words, authentication and the refusal
 /// sets it answers with.
@@ -50,7 +55,7 @@ pub(crate) struct Scope {
 }
 
 macro_rules! entries {
-    ($($method:ident $path:literal $words:literal $auth:ident [$($set:expr),*] $(scope($kind:literal, $action:literal, [$($parameter:literal),*]))?;)*) => {
+    ($($method:ident $path:tt $words:literal $auth:ident [$($set:expr),*] $(scope($kind:literal, $action:literal, [$($parameter:literal),*]))?;)*) => {
         &[$(E($method, $path, $words, $auth, &[$($set),*], entries!(@scope $($kind, $action, [$($parameter),*])?)),)*]
     };
     (@scope) => { None };
@@ -222,6 +227,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     GET "/runtime/stop-everything" "Whether everything is stopped, by whom, when and why" S [SIGNED, &["cord_unavailable"]] scope("runtime-session", "read", []);
     POST "/runtime/stop-everything" "Stop every session on every computer and refuse every start" S [ADMIN_BODY, &["IdentifierMalformed", "cord_reused", "cord_unavailable", "RuntimeUnavailable"]] scope("runtime-session", "runtime.stop-everything", []);
+    POST CONSOLE_PATH "Stop every session under the service's own console signature" CONSOLE_ONLY [SIGNED_BODY, &["console_signature_refused", "IdentifierMalformed", "cord_reused", "cord_unavailable", "RuntimeUnavailable"]];
     POST "/runtime/stop-everything/release" "Let agents start again" S [ADMIN_BODY, &["IdentifierMalformed", "cord_not_pulled", "cord_reused", "cord_unavailable"]] scope("runtime-session", "runtime.stop-everything", []);
     POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
     GET "/budgets/{kind}/{id}" "A holder's limits and measured usage" S [SIGNED, BUDGET_READ] scope("budget", "read", ["kind", "id"]);

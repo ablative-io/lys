@@ -519,8 +519,61 @@ pub(crate) async fn end_handles(
     agent: &str,
     operation: &str,
 ) -> Result<Vec<String>, ServerError> {
+    end_handles_by(state, HandleCaller::Session(headers), agent, operation).await
+}
+
+/// A console stop speaks to the broker for the agent's recorded responsible person.
+pub(crate) async fn end_handles_as_owner(
+    state: &AppState,
+    agent: &str,
+    operation: &str,
+) -> Result<Vec<String>, ServerError> {
+    let id = AgentId::from_str(agent)?;
+    let person = with_directory(state, |directory| {
+        directory
+            .projection()?
+            .record(IdentityId::Agent(id))
+            .ok_or(ServerError::AgentNotVisible)?
+            .responsible()
+            .map(|person| person.to_string())
+            .ok_or(ServerError::NoPerson)
+    })?;
+    end_handles_by(state, HandleCaller::Owner(&person), agent, operation).await
+}
+
+#[derive(Clone, Copy)]
+enum HandleCaller<'a> {
+    Session(&'a HeaderMap),
+    Owner(&'a str),
+}
+
+impl HandleCaller<'_> {
+    async fn ask(
+        self,
+        state: &AppState,
+        method: Method,
+        path: &str,
+        body: Bytes,
+    ) -> Result<Value, ServerError> {
+        match self {
+            Self::Session(headers) => {
+                crate::secrets_api::ask(state, headers, method, path, body).await
+            }
+            Self::Owner(person) => {
+                crate::secrets_api::ask_as(state, person, method, path, body).await
+            }
+        }
+    }
+}
+
+async fn end_handles_by(
+    state: &AppState,
+    caller: HandleCaller<'_>,
+    agent: &str,
+    operation: &str,
+) -> Result<Vec<String>, ServerError> {
     let path = format!("/_lys/handles?holder={agent}");
-    let held = crate::secrets_api::ask(state, headers, Method::GET, &path, Bytes::new()).await?;
+    let held = caller.ask(state, Method::GET, &path, Bytes::new()).await?;
     let handles = held["handles"]
         .as_array()
         .ok_or_else(|| ServerError::SecretsUnavailable {
@@ -534,14 +587,14 @@ pub(crate) async fn end_handles(
             });
         };
         let body = json!({ "handle": id, "operation": part(operation, "handle", id) });
-        let answer: Value = crate::secrets_api::ask(
-            state,
-            headers,
-            Method::POST,
-            "/_lys/drop",
-            Bytes::from(body.to_string()),
-        )
-        .await?;
+        let answer: Value = caller
+            .ask(
+                state,
+                Method::POST,
+                "/_lys/drop",
+                Bytes::from(body.to_string()),
+            )
+            .await?;
         if answer["handle"].as_str() != Some(id) {
             return Err(ServerError::SecretsUnavailable {
                 reason: format!("the broker did not confirm ending handle {id}"),

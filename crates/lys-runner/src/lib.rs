@@ -41,6 +41,7 @@ pub mod codex_policy_contract;
 pub mod codex_policy_readback;
 pub mod codex_refusals;
 pub mod collector;
+pub mod console_stop;
 pub mod containment_descriptors;
 pub mod containment_entry;
 pub mod containment_inputs;
