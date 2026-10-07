@@ -412,6 +412,8 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::NotPermitted { .. }
         | ServerError::NoLiveSession { .. }
         | ServerError::RunnerAbsent { .. }
+        | ServerError::IssuerChallengeExpired
+        | ServerError::IssuerRefused { .. }
         | ServerError::Runner { .. } => "server_error",
     };
     let body = json!({

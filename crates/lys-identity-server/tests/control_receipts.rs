@@ -1554,3 +1554,509 @@ fn a_repeated_compaction_holder_is_refused_before_any_batch_leaf_is_written() ->
     assert_eq!(log.len(), 1);
     Ok(())
 }
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReceiptCase {
+    Mismatched,
+    MissingRunner,
+    Reconciled,
+    ForeignResponsible,
+    RevokedRecipient,
+    KeptResend,
+    EmptyResend,
+}
+
+struct ReceiptRunner {
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    task: Option<tokio::task::JoinHandle<Result<Vec<&'static str>, String>>>,
+}
+
+impl ReceiptRunner {
+    fn start(
+        listener: tokio::net::UnixListener,
+        key: [u8; 32],
+        receipt: lys_runner::operations::ControlReceipt,
+    ) -> Self {
+        let (stop, mut stopped) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+            let mut requests = Vec::new();
+            loop {
+                let socket = tokio::select! {
+                    _ = &mut stopped => return Ok(requests),
+                    accepted = listener.accept() => accepted.map_err(|error| error.to_string())?.0,
+                };
+                let (read, mut write) = socket.into_split();
+                let greeting =
+                    lys_runner::protocol::Greeting::fresh("0123456789abcdef0123456789abcdef");
+                write
+                    .write_all(format!("{}\n", greeting.line()).as_bytes())
+                    .await
+                    .map_err(|error| error.to_string())?;
+                let line = BufReader::new(read)
+                    .lines()
+                    .next_line()
+                    .await
+                    .map_err(|error| error.to_string())?
+                    .ok_or("runner request ended before its line")?;
+                let act = lys_runner::protocol::verify_request(&line, &key, &greeting)
+                    .map_err(|error| error.to_string())?;
+                let (request, answer) = receipt_answer(act, &receipt)?;
+                requests.push(request);
+                let reply = lys_runner::protocol::Reply {
+                    version: lys_runner::protocol::PROTOCOL_VERSION,
+                    answer,
+                };
+                let line = serde_json::to_string(&reply).map_err(|error| error.to_string())?;
+                write
+                    .write_all(format!("{line}\n").as_bytes())
+                    .await
+                    .map_err(|error| error.to_string())?;
+            }
+        });
+        Self {
+            stop: Some(stop),
+            task: Some(task),
+        }
+    }
+
+    async fn finish(mut self) -> Result<Vec<&'static str>, Box<dyn Error>> {
+        let stopped = self
+            .stop
+            .take()
+            .ok_or("missing runner stop signal")?
+            .send(());
+        let requests = self
+            .task
+            .take()
+            .ok_or("missing runner task")?
+            .await?
+            .map_err(std::io::Error::other)?;
+        stopped.map_err(|()| "runner ended before its stop signal")?;
+        Ok(requests)
+    }
+}
+
+impl Drop for ReceiptRunner {
+    fn drop(&mut self) {
+        if let Some(task) = self.task.take() {
+            task.abort();
+        }
+    }
+}
+
+fn receipt_answer(
+    act: lys_runner::Act,
+    receipt: &lys_runner::operations::ControlReceipt,
+) -> Result<(&'static str, lys_runner::Answer), String> {
+    use lys_runner::{Act, Answer};
+    match act {
+        Act::Feed { .. } | Act::GrantChannel => Ok((
+            if matches!(act, Act::GrantChannel) {
+                "grants"
+            } else {
+                "feed"
+            },
+            Answer::Refused {
+                refusal: "fixture_standing_link_refused".to_owned(),
+                words: "the control fixture serves no standing feed or grant channel".to_owned(),
+                oldest: None,
+            },
+        )),
+        Act::ControlStatus { session } if session == "session" => Ok((
+            "status",
+            Answer::ControlStatus {
+                session: "different-session".to_owned(),
+                control: None,
+            },
+        )),
+        Act::ControlReceipts { session, after } if session == "session" && after.is_none() => Ok((
+            "page",
+            Answer::ControlReceipts {
+                page: lys_runner::operations::ControlPage {
+                    session: "different-session".to_owned(),
+                    receipts: Vec::new(),
+                    after: None,
+                },
+            },
+        )),
+        Act::ControlReceipt { operation } if operation == receipt.operation => Ok((
+            "receipt",
+            Answer::ControlReceipt {
+                receipt: receipt.clone(),
+            },
+        )),
+        Act::ReconcileControl {
+            operation,
+            decision,
+        } if operation == receipt.operation
+            && matches!(
+                decision.decision,
+                lys_runner::operations::Reconciliation::Resent { .. }
+            ) =>
+        {
+            Ok((
+                "reconcile",
+                Answer::Refused {
+                    refusal: "fixture_reconciliation_unavailable".to_owned(),
+                    words: "the fixture cannot keep this decision".to_owned(),
+                    oldest: None,
+                },
+            ))
+        }
+        other => Err(format!("unexpected control fixture request: {other:?}")),
+    }
+}
+
+struct ReceiptTable {
+    service: identity_contract::harness::Service,
+    cookie: String,
+    operation: String,
+    runner: Option<ReceiptRunner>,
+}
+
+impl ReceiptTable {
+    async fn start(case: ReceiptCase) -> Result<Self, Box<dyn Error>> {
+        use identity_contract::{
+            fake_issuer::Login,
+            harness::{ADMINISTRATOR, Service},
+        };
+        let operation = lys_identity::OperationId::generate()?.to_string();
+        let (service, runner) = Service::start_adjusted(
+            identity_contract::harness::GRANT_MODEL,
+            None,
+            None,
+            None,
+            |config| config.budgets_dir = None,
+            |config| prepare_receipt_table(config, case, &operation),
+        )
+        .await?;
+        let cookie = service
+            .sign_in(Login {
+                subject: ADMINISTRATOR.to_owned(),
+                email: "control-owner@example.test".to_owned(),
+            })
+            .await?;
+        Ok(Self {
+            service,
+            cookie,
+            operation,
+            runner,
+        })
+    }
+
+    async fn finish(self, expected: &[&str]) -> TestResult {
+        let requests = match self.runner {
+            Some(runner) => runner.finish().await?,
+            None => Vec::new(),
+        };
+        let controls = requests
+            .into_iter()
+            .filter(|request| !matches!(*request, "feed" | "grants"))
+            .collect::<Vec<_>>();
+        assert_eq!(controls, expected);
+        Ok(())
+    }
+}
+
+fn prepare_receipt_table(
+    config: &lys_identity_server::Config,
+    case: ReceiptCase,
+    operation: &str,
+) -> Result<Option<ReceiptRunner>, Box<dyn Error>> {
+    use lys_identity_server::dev_seed::seed_configured;
+    use lys_identity_server::network_store::{Machine, NetworkStore};
+    use lys_identity_server::runner_client::RunnerRecord;
+    let seeded = seed_configured(
+        config,
+        [identity_contract::harness::ADMINISTRATOR, "control-other"],
+    )?;
+    let person = seeded.people[0].id.to_string();
+    let agent = seeded.people[0].agents[0].id.to_string();
+    let other = seeded.people[1].id.to_string();
+    let key = std::sync::Arc::new(lys_identity::signer::load_service_key(
+        &config.event_key_file,
+    )?);
+    let machine = lys_identity::OperationId::generate()?.to_string();
+    let socket = config
+        .network_file
+        .as_deref()
+        .ok_or("network file absent")?
+        .with_file_name("control-proof.sock");
+    let mut network = NetworkStore::open(
+        config
+            .network_file
+            .as_deref()
+            .ok_or("network file absent")?,
+    )?;
+    network.name(Machine {
+        id: machine.clone(),
+        name: "Control fixture".to_owned(),
+        kind: "laptop".to_owned(),
+        runtime: Some("sh".to_owned()),
+        slots: 2,
+        may_run: vec![agent.clone(), seeded.people[1].agents[0].id.to_string()],
+        may_run_roles: Vec::new(),
+        may_reach: Vec::new(),
+        named_by: person.clone(),
+        named_at: 1,
+        retired: None,
+        team: None,
+        creation_team: None,
+    })?;
+    track_receipt_sessions(config, std::sync::Arc::clone(&key), &seeded, &machine)?;
+    let responsible = if case == ReceiptCase::ForeignResponsible {
+        &other
+    } else {
+        &person
+    };
+    keep_receipt_goal(config, &key, &agent, responsible, operation, case)?;
+    if case == ReceiptCase::MissingRunner || case == ReceiptCase::EmptyResend {
+        return Ok(None);
+    }
+    network.name_runner(
+        &machine,
+        Some(RunnerRecord::Socket {
+            path: socket.to_str().ok_or("socket path is not text")?.to_owned(),
+        }),
+    )?;
+    let mut receipt = lys_runner::operations::ControlReceipt {
+        operation: "delivery".to_owned(),
+        session: "session".to_owned(),
+        request: "input".to_owned(),
+        state: lys_runner::operations::OperationState::Uncertain,
+        at: 2,
+        text: None,
+        prepared: true,
+        certainty: Some(lys_runner::operations::Certainty::PossiblySent),
+        generation: Some(1),
+        uuid: None,
+        reference: Some(lys_runner::harness_control::ReminderReference {
+            goal: "goal".to_owned(),
+            occurrence: "occurrence".to_owned(),
+            version: "goal".to_owned(),
+            prior: None,
+        }),
+        admitted: false,
+        reconciled: None,
+    };
+    if case == ReceiptCase::Reconciled {
+        receipt.reconciled = Some(lys_runner::operations::Reconciled {
+            operation: lys_identity::OperationId::generate()?.to_string(),
+            by: person,
+            at: 3,
+            decision: lys_runner::operations::Reconciliation::Seen,
+        });
+    }
+    Ok(Some(ReceiptRunner::start(
+        tokio::net::UnixListener::bind(socket)?,
+        key.public_key_bytes(),
+        receipt,
+    )))
+}
+
+fn track_receipt_sessions(
+    config: &lys_identity_server::Config,
+    key: std::sync::Arc<lys_core::Ed25519Identity>,
+    seeded: &lys_identity_server::dev_seed::Seeded,
+    machine: &str,
+) -> TestResult {
+    use lys_identity_server::runtime_state::{Report, Reported};
+    let mut runtime = lys_identity_server::runtime_store::RuntimeStore::open(
+        config.runtime_dir.as_deref().ok_or("runtime dir absent")?,
+        key,
+    )?;
+    for (session, person) in [
+        ("session", &seeded.people[0]),
+        ("new-session", &seeded.people[1]),
+    ] {
+        runtime.report(Report {
+            operation: lys_identity::OperationId::generate()?.to_string(),
+            session: session.to_owned(),
+            agent: Some(person.agents[0].id.to_string()),
+            machine: machine.to_owned(),
+            state: Reported::Starting,
+            what: "tracked control fixture".to_owned(),
+            confirmation: String::new(),
+            reported_by: person.id.to_string(),
+            at: 1,
+            launch: None,
+        })?;
+    }
+    Ok(())
+}
+
+fn keep_receipt_goal(
+    config: &lys_identity_server::Config,
+    key: &std::sync::Arc<lys_core::Ed25519Identity>,
+    agent: &str,
+    person: &str,
+    operation: &str,
+    case: ReceiptCase,
+) -> TestResult {
+    use lys_identity_server::goals_store::GoalStore;
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    let path = config.goals_dir.as_deref().ok_or("goals dir absent")?;
+    drop(GoalStore::open(path, std::sync::Arc::clone(key))?);
+    let mut original = uncertain()?.items.remove(0);
+    original.goal.holder.id = agent.to_owned();
+    original.goal.responsible = person.to_owned();
+    original.goal.set_by = person.to_owned();
+    original.goal.reminders = vec![Remind::On {
+        event: lys_identity_server::goals_state::Event::Compaction,
+    }];
+    let mut held = Held::default();
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(path)?)?;
+    for line in [
+        Line::Set(original.goal),
+        Line::Fired(original.fired.remove(0)),
+    ] {
+        log.append(&serde_json::to_vec(&line)?)?;
+        held.hold(line)?;
+    }
+    drop(log);
+    if matches!(case, ReceiptCase::KeptResend | ReceiptCase::EmptyResend) {
+        let mut store = GoalStore::open(path, std::sync::Arc::clone(key))?;
+        let (resent, _) =
+            store.prepare_resend("goal", "delivery", operation, "new-session", person, 30)?;
+        let answered = lys_identity_server::goals_state::Answered {
+            operation: resent.fired.sent[0].operation.clone(),
+            state: Delivery::Uncertain,
+            words: "delivery remains uncertain".to_owned(),
+            at: 31,
+        };
+        held.hold(Line::Resent(resent.clone()))?;
+        held.hold(Line::Answered(answered.clone()))?;
+        store.resend(resent)?;
+        store.answer(answered)?;
+        drop(store);
+        if case == ReceiptCase::EmptyResend {
+            let mut sealed: serde_json::Value = serde_json::from_slice(&held.encode()?)?;
+            sealed["held"]["items"][0]["fired"][1]["sent"] = serde_json::json!([]);
+            let (mut log, _) = FrontierLog::open(FileLeafStore::open(path)?)?;
+            log.write_snapshot(
+                lys_identity_server::goals_state::DOMAIN,
+                &serde_json::to_vec(&sealed)?,
+                key,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn control_routes_refuse_status_and_pages_from_a_different_session() -> TestResult {
+    let table = ReceiptTable::start(ReceiptCase::Mismatched).await?;
+    for (route, refusal) in [
+        ("controls", "control_status_mismatch"),
+        ("control-receipts", "control_page_mismatch"),
+    ] {
+        let (status, answer) = table
+            .service
+            .get(
+                &format!("/runtime/sessions/session/{route}"),
+                Some(&table.cookie),
+            )
+            .await?;
+        assert_eq!(status, 409, "{answer}");
+        assert_eq!(answer["refusal"], refusal);
+    }
+    table.finish(&["status", "page"]).await
+}
+
+#[tokio::test]
+async fn both_control_read_routes_name_an_absent_runner() -> TestResult {
+    let table = ReceiptTable::start(ReceiptCase::MissingRunner).await?;
+    for route in ["controls", "control-receipts"] {
+        let (status, answer) = table
+            .service
+            .get(
+                &format!("/runtime/sessions/session/{route}"),
+                Some(&table.cookie),
+            )
+            .await?;
+        assert_eq!(status, 409, "{answer}");
+        assert_eq!(answer["refusal"], "runner_absent");
+    }
+    table.finish(&[]).await
+}
+
+#[tokio::test]
+async fn reconciliation_refuses_to_replace_a_kept_person_decision() -> TestResult {
+    let table = ReceiptTable::start(ReceiptCase::Reconciled).await?;
+    let (status, answer) = table
+        .service
+        .post(
+            "/runtime/sessions/session/control-receipts/delivery/reconcile",
+            Some(&table.cookie),
+            &serde_json::json!({"operation":table.operation, "decision":"not_seen"}),
+        )
+        .await?;
+    table.finish(&["receipt"]).await?;
+    assert_eq!(status, 409, "{answer}");
+    assert_eq!(answer["refusal"], "control_already_reconciled");
+    Ok(())
+}
+
+#[tokio::test]
+async fn reconciliation_refuses_a_person_who_does_not_own_the_goal() -> TestResult {
+    let table = ReceiptTable::start(ReceiptCase::ForeignResponsible).await?;
+    let (status, answer) = table
+        .service
+        .post(
+            "/runtime/sessions/session/control-receipts/delivery/reconcile",
+            Some(&table.cookie),
+            &serde_json::json!({"operation":table.operation, "decision":"seen"}),
+        )
+        .await?;
+    table.finish(&["receipt"]).await?;
+    assert_eq!(status, 403, "{answer}");
+    assert_eq!(answer["refusal"], "not_permitted");
+    Ok(())
+}
+
+#[tokio::test]
+async fn resend_refuses_an_intended_session_outside_the_goal_authority() -> TestResult {
+    let table = ReceiptTable::start(ReceiptCase::RevokedRecipient).await?;
+    let (status, answer) = table.service.post(
+        "/goals/goal/resend", Some(&table.cookie),
+        &serde_json::json!({"operation":table.operation, "prior":"delivery", "session":"new-session"}),
+    ).await?;
+    table.finish(&["receipt"]).await?;
+    assert_eq!(status, 409, "{answer}");
+    assert_eq!(answer["refusal"], "goal_authority_revoked");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_kept_resend_names_a_runner_that_cannot_record_its_reconciliation() -> TestResult {
+    let table = ReceiptTable::start(ReceiptCase::KeptResend).await?;
+    let (status, answer) = table.service.post(
+        "/goals/goal/resend", Some(&table.cookie),
+        &serde_json::json!({"operation":table.operation, "prior":"delivery", "session":"new-session"}),
+    ).await?;
+    assert_eq!(status, 409, "{answer}");
+    assert_eq!(
+        answer["refusal"],
+        "goal_resend_kept_reconciliation_unavailable"
+    );
+    let (status, lookup) = table
+        .service
+        .get("/goals/goal/resends/delivery", Some(&table.cookie))
+        .await?;
+    assert_eq!(status, 200, "{lookup}");
+    assert_eq!(lookup["occurrence"]["operation"], table.operation);
+    table.finish(&["receipt", "reconcile"]).await
+}
+
+#[tokio::test]
+async fn resend_lookup_names_a_signed_snapshot_occurrence_without_a_delivery() -> TestResult {
+    let table = ReceiptTable::start(ReceiptCase::EmptyResend).await?;
+    let (status, answer) = table
+        .service
+        .get("/goals/goal/resends/delivery", Some(&table.cookie))
+        .await?;
+    assert_eq!(status, 409, "{answer}");
+    assert_eq!(answer["refusal"], "goal_resend_invalid");
+    table.finish(&[]).await
+}
