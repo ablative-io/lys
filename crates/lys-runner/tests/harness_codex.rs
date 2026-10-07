@@ -622,3 +622,283 @@ fn malformed_notification_params_remain_protocol_faults_with_named_methods() -> 
     }
     Ok(())
 }
+
+const NOTIFICATIONS: [(&str, &str, u32, bool); 85] = [
+    ("error", "v2-notification.rs", 62, true),
+    ("thread/started", "v2-thread.rs", 1972, false),
+    ("thread/status/changed", "v2-thread.rs", 1979, true),
+    ("thread/archived", "v2-thread.rs", 1987, true),
+    ("thread/deleted", "v2-thread.rs", 1994, true),
+    ("thread/unarchived", "v2-thread.rs", 2001, true),
+    ("thread/closed", "v2-thread.rs", 2008, true),
+    ("thread/reverted", "v2-thread.rs", 2015, true),
+    ("skills/changed", "v2-plugin.rs", 1057, false),
+    ("thread/name/updated", "v2-thread.rs", 2021, true),
+    (
+        "thread/attachment/updated",
+        "v2-thread_attachment.rs",
+        101,
+        true,
+    ),
+    ("thread/goal/updated", "v2-thread.rs", 2031, true),
+    ("thread/goal/cleared", "v2-thread.rs", 2040, true),
+    ("thread/queue/changed", "v2-thread.rs", 2047, true),
+    ("project/changed", "v2-project.rs", 180, false),
+    ("thread/project/updated", "v2-project.rs", 188, true),
+    (
+        "thread/environment/connected",
+        "v2-environment.rs",
+        60,
+        true,
+    ),
+    (
+        "thread/environment/disconnected",
+        "v2-environment.rs",
+        60,
+        true,
+    ),
+    ("thread/settings/updated", "v2-thread.rs", 330, true),
+    ("thread/tokenUsage/updated", "v2-thread.rs", 1878, true),
+    ("turn/started", "v2-turn.rs", 532, true),
+    ("hook/started", "v2-hook.rs", 145, true),
+    ("turn/completed", "v2-turn.rs", 549, true),
+    ("hook/completed", "v2-hook.rs", 154, true),
+    ("turn/diff/updated", "v2-turn.rs", 559, true),
+    ("turn/plan/updated", "v2-turn.rs", 568, true),
+    ("item/started", "v2-item.rs", 1337, true),
+    ("item/autoApprovalReview/started", "v2-item.rs", 1351, true),
+    (
+        "item/autoApprovalReview/completed",
+        "v2-item.rs",
+        1382,
+        true,
+    ),
+    (
+        "autoApprovalReview/strictReviewRequired",
+        "v2-notification.rs",
+        51,
+        true,
+    ),
+    ("item/completed", "v2-item.rs", 1415, true),
+    ("rawResponseItem/completed", "v2-item.rs", 1427, true),
+    ("rawResponse/completed", "v2-thread.rs", 1889, true),
+    ("item/agentMessage/delta", "v2-item.rs", 1437, true),
+    ("item/plan/delta", "v2-item.rs", 1449, true),
+    ("command/exec/outputDelta", "v2-command_exec.rs", 202, false),
+    ("process/outputDelta", "v2-process.rs", 165, false),
+    ("process/exited", "v2-process.rs", 181, false),
+    (
+        "item/commandExecution/outputDelta",
+        "v2-item.rs",
+        1506,
+        true,
+    ),
+    (
+        "item/commandExecution/terminalInteraction",
+        "v2-item.rs",
+        1494,
+        true,
+    ),
+    ("item/fileChange/outputDelta", "v2-item.rs", 1518, true),
+    ("item/fileChange/patchUpdated", "v2-item.rs", 1528, true),
+    ("serverRequest/resolved", "v2-notification.rs", 74, true),
+    ("item/mcpToolCall/progress", "v2-mcp.rs", 328, true),
+    ("mcpServer/oauthLogin/completed", "v2-mcp.rs", 338, false),
+    ("mcpServer/startupStatus/updated", "v2-mcp.rs", 360, false),
+    (
+        "mcpServer/event/stream/notification",
+        "v2-mcp.rs",
+        193,
+        false,
+    ),
+    ("account/updated", "v2-account.rs", 588, false),
+    ("account/gatewayOAuth/changed", "v2-account.rs", 606, false),
+    ("account/rateLimits/updated", "v2-account.rs", 657, false),
+    ("app/list/updated", "v2-apps.rs", 269, false),
+    (
+        "remoteControl/status/changed",
+        "v2-remote_control.rs",
+        30,
+        false,
+    ),
+    (
+        "externalAgentConfig/import/progress",
+        "v2-config.rs",
+        1056,
+        false,
+    ),
+    (
+        "externalAgentConfig/import/completed",
+        "v2-config.rs",
+        1064,
+        false,
+    ),
+    ("fs/changed", "v2-fs.rs", 199, false),
+    ("item/reasoning/summaryTextDelta", "v2-item.rs", 1459, true),
+    ("item/reasoning/summaryPartAdded", "v2-item.rs", 1471, true),
+    ("item/reasoning/textDelta", "v2-item.rs", 1482, true),
+    ("thread/compacted", "v2-thread.rs", 2055, true),
+    ("model/rerouted", "v2-model.rs", 188, true),
+    ("model/verification", "v2-model.rs", 199, true),
+    (
+        "modelProvider/authRecoveryStarted",
+        "v2-notification.rs",
+        11,
+        true,
+    ),
+    (
+        "modelProvider/authRecoveryCompleted",
+        "v2-notification.rs",
+        11,
+        true,
+    ),
+    ("turn/moderationMetadata", "v2-model.rs", 208, true),
+    ("model/safetyBuffering/updated", "v2-model.rs", 217, true),
+    ("warning", "v2-notification.rs", 31, false),
+    ("guardianWarning", "v2-notification.rs", 41, true),
+    ("deprecationNotice", "v2-notification.rs", 21, false),
+    ("configWarning", "v2-config.rs", 1130, false),
+    ("fuzzyFileSearch/sessionUpdated", "common.rs", 1903, false),
+    ("fuzzyFileSearch/sessionCompleted", "common.rs", 1912, false),
+    ("thread/realtime/started", "v2-realtime.rs", 382, true),
+    ("thread/realtime/itemAdded", "v2-realtime.rs", 392, true),
+    ("thread/realtime/item/started", "v2-realtime.rs", 401, true),
+    (
+        "thread/realtime/item/transcript/delta",
+        "v2-realtime.rs",
+        410,
+        true,
+    ),
+    (
+        "thread/realtime/item/completed",
+        "v2-realtime.rs",
+        420,
+        true,
+    ),
+    (
+        "thread/realtime/transcript/delta",
+        "v2-realtime.rs",
+        430,
+        true,
+    ),
+    (
+        "thread/realtime/transcript/done",
+        "v2-realtime.rs",
+        442,
+        true,
+    ),
+    (
+        "thread/realtime/outputAudio/delta",
+        "v2-realtime.rs",
+        453,
+        true,
+    ),
+    ("thread/realtime/sdp", "v2-realtime.rs", 462, true),
+    ("thread/realtime/error", "v2-realtime.rs", 471, true),
+    ("thread/realtime/closed", "v2-realtime.rs", 480, true),
+    (
+        "windows/worldWritableWarning",
+        "v2-windows_sandbox.rs",
+        10,
+        false,
+    ),
+    (
+        "windowsSandbox/setupCompleted",
+        "v2-windows_sandbox.rs",
+        68,
+        false,
+    ),
+    ("account/login/completed", "v2-account.rs", 814, false),
+];
+
+fn notification_case(method: &str, thread: &str) -> Result {
+    let mut control = ready()?;
+    control.ingest(&binding(), &started("active"))?;
+    control.enqueue(pending("waiting", Kind::Reminder))?;
+    let frame = json!({"method":method,"params":{
+        "threadId":thread,"thread":{"id":thread},"turnId":"active",
+        "turn":{"id":"active","status":"completed"},"item":{"type":"agentMessage"},
+        "run":{},"private":"never retained"}});
+    if thread == "conversation"
+        && matches!(
+            method,
+            "thread/closed" | "thread/archived" | "thread/deleted" | "thread/reverted"
+        )
+    {
+        let error = control
+            .ingest(&binding(), &frame)
+            .err()
+            .ok_or("ended thread was accepted")?;
+        if error.name() != "control_thread_ended" || !error.to_string().contains(method) {
+            return Err(format!("ended thread has the wrong refusal: {error}").into());
+        }
+        if error.to_string().contains("never retained") {
+            return Err("ended-thread refusal retains payload".into());
+        }
+    } else if thread == "conversation" && method == "turn/completed" {
+        let update = control.ingest(&binding(), &frame)?;
+        if update.dispatches.len() != 1 || update.dispatches[0].operation != "waiting" {
+            return Err("matching turn did not release the queued request".into());
+        }
+    } else {
+        unchanged(&mut control, &frame)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn every_documented_notification_has_an_exact_bound_and_foreign_thread_answer() {
+    let mut failures = Vec::new();
+    for (method, file, line, _) in NOTIFICATIONS {
+        for thread in ["conversation", "other"] {
+            if let Err(error) = notification_case(method, thread) {
+                failures.push(format!("{method} {file}:{line} thread={thread}: {error}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn every_required_thread_notification_refuses_a_malformed_correlation() -> Result {
+    let mut failures = Vec::new();
+    for (method, file, line, required) in NOTIFICATIONS {
+        if !required {
+            continue;
+        }
+        for params in [
+            json!({}),
+            json!({"threadId":null}),
+            json!({"threadId":1}),
+            json!({"threadId":""}),
+        ] {
+            let mut control = ready()?;
+            let answer = control.ingest(&binding(), &json!({"method":method,"params":params}));
+            if !answer.is_err_and(|error| error.name() == "control_correlation_unsupported") {
+                failures.push(format!(
+                    "{method} {file}:{line} accepted malformed threadId"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+    Ok(())
+}
+
+#[test]
+fn an_unknown_foreign_notification_is_refused_without_retaining_its_payload() -> Result {
+    let mut control = ready()?;
+    let error = control
+        .ingest(
+            &binding(),
+            &json!({"method":"hook/future","params":{
+        "threadId":"other","private":"never retained"}}),
+        )
+        .err()
+        .ok_or("unknown foreign method was admitted")?;
+    assert_eq!(error.name(), "control_protocol_unsupported");
+    let words = error.to_string();
+    assert!(words.contains("hook/future") && words.contains("private"));
+    assert!(!words.contains("never retained"));
+    Ok(())
+}

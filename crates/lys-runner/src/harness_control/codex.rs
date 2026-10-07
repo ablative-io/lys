@@ -144,6 +144,14 @@ pub(super) fn observe(
         .map_err(|error| notification_error(method, params, error))
 }
 
+enum NotificationKind {
+    Started,
+    Completed,
+    Item,
+    Other,
+    Ended,
+}
+
 fn notification(
     conversation: &str,
     method: &str,
@@ -211,14 +219,83 @@ fn notification(
                 "params.threadId must be a nonempty string",
             )
         })?;
+    let notification = match method {
+        "turn/started" => NotificationKind::Started,
+        "turn/completed" => NotificationKind::Completed,
+        "item/started" | "item/completed" => NotificationKind::Item,
+        "thread/closed" | "thread/archived" | "thread/deleted" | "thread/reverted" => {
+            NotificationKind::Ended
+        }
+        "error"
+        | "thread/status/changed"
+        | "thread/unarchived"
+        | "thread/name/updated"
+        | "thread/attachment/updated"
+        | "thread/goal/updated"
+        | "thread/goal/cleared"
+        | "thread/queue/changed"
+        | "thread/project/updated"
+        | "thread/environment/connected"
+        | "thread/environment/disconnected"
+        | "thread/settings/updated"
+        | "thread/tokenUsage/updated"
+        | "hook/started"
+        | "hook/completed"
+        | "turn/diff/updated"
+        | "turn/plan/updated"
+        | "item/autoApprovalReview/started"
+        | "item/autoApprovalReview/completed"
+        | "autoApprovalReview/strictReviewRequired"
+        | "rawResponseItem/completed"
+        | "rawResponse/completed"
+        | "item/agentMessage/delta"
+        | "item/plan/delta"
+        | "item/commandExecution/outputDelta"
+        | "item/commandExecution/terminalInteraction"
+        | "item/fileChange/outputDelta"
+        | "item/fileChange/patchUpdated"
+        | "serverRequest/resolved"
+        | "item/mcpToolCall/progress"
+        | "mcpServer/oauthLogin/completed"
+        | "mcpServer/startupStatus/updated"
+        | "item/reasoning/summaryTextDelta"
+        | "item/reasoning/summaryPartAdded"
+        | "item/reasoning/textDelta"
+        | "thread/compacted"
+        | "model/rerouted"
+        | "model/verification"
+        | "modelProvider/authRecoveryStarted"
+        | "modelProvider/authRecoveryCompleted"
+        | "turn/moderationMetadata"
+        | "model/safetyBuffering/updated"
+        | "warning"
+        | "guardianWarning"
+        | "thread/realtime/started"
+        | "thread/realtime/itemAdded"
+        | "thread/realtime/item/started"
+        | "thread/realtime/item/transcript/delta"
+        | "thread/realtime/item/completed"
+        | "thread/realtime/transcript/delta"
+        | "thread/realtime/transcript/done"
+        | "thread/realtime/outputAudio/delta"
+        | "thread/realtime/sdp"
+        | "thread/realtime/error"
+        | "thread/realtime/closed" => NotificationKind::Other,
+        _ => {
+            return Err(RunnerError::refused(
+                "control_protocol_unsupported",
+                "notification method is unsupported",
+            ));
+        }
+    };
     if thread != conversation {
         return Ok(Observation::Other);
     }
-    match method {
-        "turn/started" => Ok(Observation::Started {
+    match notification {
+        NotificationKind::Started => Ok(Observation::Started {
             turn: required(params, "/turn/id")?,
         }),
-        "turn/completed" => {
+        NotificationKind::Completed => {
             let status = required(params, "/turn/status")?;
             if !matches!(status.as_str(), "completed" | "failed" | "interrupted") {
                 return Err(RunnerError::refused(
@@ -231,7 +308,7 @@ fn notification(
                 failed: status != "completed",
             })
         }
-        "item/completed" | "item/started" => {
+        NotificationKind::Item => {
             let kind = required(params, "/item/type")?;
             if kind == "contextCompaction" && method == "item/completed" {
                 Ok(Observation::Compacted {
@@ -267,27 +344,10 @@ fn notification(
                 ))
             }
         }
-        "thread/status/changed"
-        | "thread/name/updated"
-        | "thread/tokenUsage/updated"
-        | "thread/compacted"
-        | "turn/diff/updated"
-        | "turn/plan/updated"
-        | "item/agentMessage/delta"
-        | "item/plan/delta"
-        | "item/commandExecution/outputDelta"
-        | "item/fileChange/outputDelta"
-        | "item/fileChange/patchUpdated"
-        | "item/mcpToolCall/progress"
-        | "item/reasoning/summaryTextDelta"
-        | "item/reasoning/summaryPartAdded"
-        | "item/reasoning/textDelta"
-        | "warning"
-        | "mcpServer/oauthLogin/completed"
-        | "mcpServer/startupStatus/updated" => Ok(Observation::Other),
-        _ => Err(RunnerError::refused(
-            "control_protocol_unsupported",
-            "notification method is unsupported",
+        NotificationKind::Other => Ok(Observation::Other),
+        NotificationKind::Ended => Err(RunnerError::refused(
+            "control_thread_ended",
+            format!("the bound conversation ended or was rewritten by {method}"),
         )),
     }
 }
