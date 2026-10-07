@@ -131,6 +131,9 @@ Read again at `haematite@af5e18a` on 7 October:
   longer written to, and a reopen cuts it and flushes before the first append. Not checked
   in code for this section.
 
-The log moves onto haematite when, read at a named haematite commit: a durable-per-append
-path is in its contract; its prune and online reclaim are installed and measured; its
-startup reads no history; and its bound test is green.
+The move is scheduled haematite work, not a waiting list (Waffles, 7 October). It waits on
+four conditions, each a named haematite brief: per-append durability, meaning an
+acknowledgement only after the flush (a STOR brief Apollo writes for it); prune and online
+reclaim installed and measured (STOR-013, STOR-014); a start-up that reads no history
+(STOR-015); and a green bound test (STOR-014). When all four are green at a named haematite
+commit, the move gets its own Lys brief and goes into the next Lys piece.
