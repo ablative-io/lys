@@ -11,7 +11,7 @@ pub enum CordError {
     #[error("console_signature_refused: {reason}")]
     ConsoleSignatureRefused {
         /// Why the signature cannot admit this request.
-        reason: &'static str,
+        reason: String,
     },
     /// Everything is stopped, so no agent may start: the words say who
     /// stopped it, when and why.

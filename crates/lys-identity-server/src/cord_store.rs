@@ -198,7 +198,7 @@ struct Records {
 
 impl From<Records> for Held {
     fn from(records: Records) -> Self {
-        let released: HashSet<&str> = records
+        let cleared_operations: HashSet<&str> = records
             .releases
             .iter()
             .map(|release| release.pull.as_str())
@@ -209,7 +209,10 @@ impl From<Records> for Held {
             .map(|(at, kept)| {
                 (
                     kept.pull.operation.clone(),
-                    Spent::Pull(at, released.contains(kept.pull.operation.as_str())),
+                    Spent::Pull(
+                        at,
+                        cleared_operations.contains(kept.pull.operation.as_str()),
+                    ),
                 )
             })
             .chain(releases.map(|(at, release)| (release.operation.clone(), Spent::Release(at))))

@@ -528,7 +528,7 @@ pub(crate) async fn end_handles_as_owner(
     agent: &str,
     operation: &str,
 ) -> Result<Vec<String>, ServerError> {
-    let id = AgentId::from_str(agent).map_err(|_| ServerError::AgentNotVisible)?;
+    let id = AgentId::from_str(agent)?;
     let person = with_directory(state, |directory| {
         directory
             .projection()?

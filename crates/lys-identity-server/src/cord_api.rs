@@ -109,8 +109,11 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<crate::openapi_types::Ent
     ]
 }
 
-fn console_refused(reason: &'static str) -> ServerError {
-    CordError::ConsoleSignatureRefused { reason }.into()
+fn console_refused(reason: impl Into<String>) -> ServerError {
+    CordError::ConsoleSignatureRefused {
+        reason: reason.into(),
+    }
+    .into()
 }
 
 /// The console credential is only present here; its signature still needs the bounded body.
@@ -127,9 +130,11 @@ pub(crate) fn console_signature(headers: &HeaderMap) -> Result<&str, ServerError
             "a console request carries exactly one signature",
         ));
     }
-    let signature = signature
-        .to_str()
-        .map_err(|_| console_refused("the console signature is not hexadecimal text"))?;
+    let signature = signature.to_str().map_err(|error| {
+        console_refused(format!(
+            "the console signature is not hexadecimal text: {error}"
+        ))
+    })?;
     if signature.len() != 128 {
         return Err(console_refused(
             "the console signature must encode exactly 64 bytes",
