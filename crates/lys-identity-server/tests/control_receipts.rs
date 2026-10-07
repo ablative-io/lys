@@ -1722,8 +1722,15 @@ impl ReceiptTable {
             harness::{ADMINISTRATOR, Service},
         };
         let operation = lys_identity::OperationId::generate()?.to_string();
-        let (service, runner) =
-            Service::start_with(|config| prepare_receipt_table(config, case, &operation)).await?;
+        let (service, runner) = Service::start_adjusted(
+            identity_contract::harness::GRANT_MODEL,
+            None,
+            None,
+            None,
+            |config| config.budgets_dir = None,
+            |config| prepare_receipt_table(config, case, &operation),
+        )
+        .await?;
         let cookie = service
             .sign_in(Login {
                 subject: ADMINISTRATOR.to_owned(),
@@ -1772,9 +1779,9 @@ fn prepare_receipt_table(
     )?);
     let machine = lys_identity::OperationId::generate()?.to_string();
     let socket = config
-        .budgets_dir
+        .network_file
         .as_deref()
-        .ok_or("budgets dir absent")?
+        .ok_or("network file absent")?
         .with_file_name("control-proof.sock");
     let mut network = NetworkStore::open(
         config
