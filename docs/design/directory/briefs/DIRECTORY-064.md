@@ -305,6 +305,7 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - create: crates/lys-runner/examples/qualify_adapter/diagnostics.rs
 - create: crates/lys-runner/src/pty/cleanup.rs
 - create: crates/lys-runner/src/pty/cleanup_tests.rs
+- create: crates/lys-identity-server/tests/sign_in_solve_allocations.rs
 - modify: surface/identity/src/features/usage/Usage.tsx
 - modify: surface/identity/src/features/usage/usage.css
 - modify: surface/identity/tests/usage.test.tsx
@@ -315,6 +316,15 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - modify: crates/lys-runner/tests/pty_stop.rs
 - modify: crates/lys-runner/src/session/stop.rs
 - modify: crates/lys-runner/src/session/lifecycle/terminal.rs
+- modify: crates/lys-identity-server/src/sign_in.rs
+- modify: crates/lys-identity-server/src/sign_in_tests.rs
+- modify: crates/lys-identity-server/src/sign_in_upstream.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_names.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/tests/sign_in_page.rs
+- modify: crates/lys-identity-server/Cargo.toml
+- modify: Cargo.lock
 
 **Checklist:**
 - C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6).
