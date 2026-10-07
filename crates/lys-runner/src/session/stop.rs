@@ -108,6 +108,7 @@ impl Sessions {
     fn cord(&self, stopped: &Stopped, ask: Ask) -> Result<Corded, RunnerError> {
         let mut table = self.lock()?;
         let mut corded = Corded::default();
+        let mut pending = Vec::new();
         for (id, session) in &mut table.sessions {
             if session.ended.is_some() {
                 continue;
@@ -123,7 +124,18 @@ impl Sessions {
             }
             if let Some(live) = &session.live {
                 let sent = if ask.kill || again {
-                    live.kill_proved()
+                    live.leader
+                        .as_ref()
+                        .ok_or_else(|| {
+                            RunnerError::refused(
+                                "leader_unproved",
+                                "the process's start identity was not recorded",
+                            )
+                        })
+                        .and_then(crate::pty::prepare_left_group)
+                        .map(|ending| {
+                            pending.push((id.clone(), ending));
+                        })
                 } else {
                     live.end()
                 };
@@ -133,8 +145,22 @@ impl Sessions {
             }
             corded.signalled.push(id.clone());
         }
-        drop(table);
-        self.wake();
+        after_table(table, || {
+            self.wake();
+            for (id, ending) in pending {
+                match ending.wait(None) {
+                    crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None } => {}
+                    crate::pty::Left::Ended {
+                        reason: Some(reason),
+                    } => {
+                        crate::error::said(&format!("session {id}: {reason}"));
+                    }
+                    left => {
+                        crate::error::said(&format!("session {id}: stop_signal_failed: {left:?}"));
+                    }
+                }
+            }
+        });
         Ok(corded)
     }
 
@@ -153,32 +179,6 @@ impl Sessions {
             }
         }
         Ok(())
-    }
-}
-
-impl super::Live {
-    /// End every member of the session's proved process group at once.
-    pub(crate) fn kill_proved(&self) -> Result<(), RunnerError> {
-        let leader = self.leader.as_ref().ok_or_else(|| {
-            RunnerError::refused(
-                "leader_unproved",
-                "the process's start identity was not recorded",
-            )
-        })?;
-        match crate::pty::end_left_group(leader)? {
-            crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None } => Ok(()),
-            crate::pty::Left::Ended {
-                reason: Some(reason),
-            } => {
-                crate::error::said(&format!("process group {}: {reason}", leader.pid));
-                Ok(())
-            }
-            crate::pty::Left::Reused => Err(RunnerError::refused(
-                "process_start_mismatch",
-                "the session leader was reused; its group was not signalled",
-            )),
-            crate::pty::Left::Unended { reason } => Err(RunnerError::refused("end_failed", reason)),
-        }
     }
 }
 
@@ -209,5 +209,40 @@ pub(super) fn left_behind(
             crate::error::said(&format!("session {id}: {error}"));
             (None, Some(error.to_string()))
         }
+    }
+}
+
+fn after_table<T, R>(guard: std::sync::MutexGuard<'_, T>, wait: impl FnOnce() -> R) -> R {
+    drop(guard);
+    wait()
+}
+
+#[cfg(test)]
+mod cord_tests {
+    use super::after_table;
+    use std::sync::{Arc, Mutex, mpsc};
+
+    #[test]
+    fn a_pending_exit_wait_leaves_the_session_table_readable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let table = Arc::new(Mutex::new(()));
+        let ending_table = Arc::clone(&table);
+        let (waiting, ready) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let ending = std::thread::spawn(move || -> Result<(), String> {
+            let guard = ending_table.lock().map_err(|error| error.to_string())?;
+            after_table(guard, || {
+                waiting.send(()).map_err(|error| error.to_string())?;
+                released.recv().map_err(|error| error.to_string())
+            })
+        });
+        ready.recv()?;
+        let readable = table.try_lock().is_ok();
+        release.send(())?;
+        ending
+            .join()
+            .map_err(|panic| format!("exit waiter panicked: {:?}", panic.as_ref().type_id()))??;
+        assert!(readable, "an exit wait held the session table mutex");
+        Ok(())
     }
 }

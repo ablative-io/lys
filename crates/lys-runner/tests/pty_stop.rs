@@ -122,3 +122,20 @@ fn ordinary_end_ends_a_leader_that_ignores_the_terminate_signal() -> TestResult 
     assert_eq!(pty::end_left_group(&leader)?, pty::Left::Gone);
     Ok(())
 }
+
+#[test]
+fn cancellation_refuses_an_unconfirmed_exit_without_a_clock() -> TestResult {
+    use std::os::fd::AsFd;
+    let mut harness = Harness::start()?;
+    let leader = harness.leader()?;
+    let (cancel, sender) = std::io::pipe()?;
+    let ending = pty::prepare_left_group(&leader)?;
+    drop(sender);
+    let pty::Left::Unended { reason } = ending.wait(Some(cancel.as_fd())) else {
+        return Err("cancelled cleanup accepted an unconfirmed exit".into());
+    };
+    assert!(reason.contains("cancelled"), "{reason}");
+    assert!(reason.contains(&leader.pid.to_string()), "{reason}");
+    assert!(!harness.0.child.wait()?.success());
+    Ok(())
+}

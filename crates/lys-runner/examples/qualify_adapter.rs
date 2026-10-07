@@ -374,7 +374,7 @@ async fn observe(options: &Options, evidence: &mut Evidence) -> Result<()> {
         return Err("qualification_version_report_invalid".to_owned());
     };
     let (line, version) = version(&bytes, &options.adapter)?;
-    if !probe.wait_exit()?.success() {
+    if !probe.stop(&mut cancel).await?.success() {
         return Err("qualification_version_probe_failed".to_owned());
     }
     evidence.record("version_report", json!({"line":line,"version":version}))?;
@@ -414,16 +414,16 @@ async fn observe(options: &Options, evidence: &mut Evidence) -> Result<()> {
     };
     if let Err(error) = protocol(&mut owned, binding, transport, evidence, &mut cancel).await {
         eprintln!("{error}");
-        evidence.cleanup = match owned.stop(true) {
-            Ok(_) => "ok".to_owned(),
+        evidence.cleanup = match owned.stop(&mut cancel).await {
+            Ok(_) => owned.cleanup.clone(),
             Err(cleanup) => cleanup,
         };
         return Err(error);
     }
-    let status = owned.stop(true)?;
+    let status = owned.stop(&mut cancel).await?;
     evidence.record(
         "stop",
-        json!({"exit_observed":true,"status":status.to_string()}),
+        json!({"exit_observed":true,"status":status.to_string(),"cleanup":owned.cleanup}),
     )?;
     evidence.record("terminal_writes", json!({"count":0}))?;
     evidence.file.sync_all().map_err(io_failed)
@@ -881,6 +881,20 @@ mod tests {
         );
         Ok(())
     }
+    #[tokio::test]
+    async fn an_already_observed_owned_exit_finishes_cleanup() -> Result<()> {
+        let owned::ExitFixture {
+            mut owned,
+            sender,
+            observed,
+        } = Owned::queued_exit()?;
+        drop(sender);
+        drop(observed);
+        let mut cancel = Cancellation::new()?;
+        assert!(owned.stop(&mut cancel).await?.success());
+        Ok(())
+    }
+
     async fn after_queued_exit(
         message: Option<Message>,
     ) -> Result<std::result::Result<Message, String>> {
@@ -902,7 +916,7 @@ mod tests {
             Ok::<(), String>(())
         });
         delivered?;
-        if !owned.wait_exit()?.success() {
+        if !owned.stop(&mut cancel).await?.success() {
             return Err("qualification_fixture_child_failed".to_owned());
         }
         Ok(received)
@@ -1004,7 +1018,7 @@ mod tests {
         );
         cancelled?;
         let received = received?;
-        if !owned.wait_exit()?.success() {
+        if !owned.stop(&mut cancel).await?.success() {
             return Err("qualification_fixture_child_failed".to_owned());
         }
         assert_eq!(

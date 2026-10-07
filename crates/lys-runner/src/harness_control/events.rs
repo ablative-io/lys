@@ -419,14 +419,10 @@ impl Sessions {
                 crate::error::said("control_input_caller_left: transport loss was not received");
             }
         }
-        let ended = match crate::pty::end_left_group(&leader) {
-            Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => Ok(()),
-            Ok(left) => Err(RunnerError::refused(
-                "control_process_end_unconfirmed",
-                format!("lost managed process group could not be ended: {left:?}"),
-            )),
-            Err(error) => Err(error),
-        };
+        let ended = lost_cleanup(crate::pty::end_left_group(&leader));
+        if let Ok(Some(diagnostic)) = &ended {
+            crate::error::said(&format!("session {id}: {diagnostic}"));
+        }
         let durable = self.writer.barrier();
         self.wake();
         if let Err(error) = &applied {
@@ -1347,5 +1343,58 @@ mod tests {
             );
             Ok(())
         })
+    }
+}
+
+fn lost_cleanup(
+    left: Result<crate::pty::Left, RunnerError>,
+) -> Result<Option<String>, RunnerError> {
+    match left {
+        Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => Ok(None),
+        Ok(crate::pty::Left::Ended {
+            reason: Some(reason),
+        }) => Ok(Some(format!("control_group_cleanup_proved: {reason}"))),
+        Ok(left) => Err(RunnerError::refused(
+            "control_process_end_unconfirmed",
+            format!("lost managed process group could not be ended: {left:?}"),
+        )),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::lost_cleanup;
+    use crate::error::RunnerError;
+    use crate::pty::Left;
+    #[test]
+    fn successful_cleanup_diagnostics_prove_the_lost_group()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let diagnostic = "EPERM errno 1; member exit observed";
+        assert_eq!(
+            lost_cleanup(Ok(Left::Ended {
+                reason: Some(diagnostic.to_owned())
+            }))?,
+            Some(format!("control_group_cleanup_proved: {diagnostic}"))
+        );
+        for left in [
+            Left::Unended {
+                reason: "still live".to_owned(),
+            },
+            Left::Reused,
+        ] {
+            let error = lost_cleanup(Ok(left))
+                .err()
+                .ok_or("unproved cleanup passed")?;
+            assert_eq!(error.name(), "control_process_end_unconfirmed");
+        }
+        let error = lost_cleanup(Err(RunnerError::refused(
+            "process_group_unreadable",
+            "denied",
+        )))
+        .err()
+        .ok_or("unreadable cleanup passed")?;
+        assert_eq!(error.name(), "process_group_unreadable");
+        Ok(())
     }
 }

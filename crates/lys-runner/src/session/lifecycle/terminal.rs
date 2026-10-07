@@ -133,16 +133,8 @@ impl Sessions {
             .and_then(|session| session.guard.leader.clone());
         drop(table);
         if let Some(leader) = cleanup {
-            match crate::pty::end_left_group(&leader) {
-                Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => {}
-                Ok(left) => {
-                    crate::error::said(&format!(
-                        "session {id}: group_cleanup_incomplete: {left:?}"
-                    ));
-                }
-                Err(error) => {
-                    crate::error::said(&format!("session {id}: group_cleanup_failed: {error}"));
-                }
+            if let Some(diagnostic) = terminal_cleanup(crate::pty::end_left_group(&leader)) {
+                crate::error::said(&format!("session {id}: {diagnostic}"));
             }
         }
         if pump.join().is_err() {
@@ -266,5 +258,52 @@ impl Sessions {
             crate::error::said(&format!("session {id}: output_exit_failed: {error}"));
         }
         self.wake();
+    }
+}
+
+fn terminal_cleanup(left: Result<crate::pty::Left, crate::error::RunnerError>) -> Option<String> {
+    match left {
+        Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => None,
+        Ok(crate::pty::Left::Ended {
+            reason: Some(reason),
+        }) => Some(format!("group_cleanup_proved: {reason}")),
+        Ok(left) => Some(format!("group_cleanup_incomplete: {left:?}")),
+        Err(error) => Some(format!("group_cleanup_failed: {error}")),
+    }
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::terminal_cleanup;
+    use crate::error::RunnerError;
+    use crate::pty::Left;
+    #[test]
+    fn successful_cleanup_diagnostics_are_kept_as_a_terminal_group_proof() {
+        let diagnostic = "EPERM errno 1; member exit observed";
+        assert_eq!(
+            terminal_cleanup(Ok(Left::Ended {
+                reason: Some(diagnostic.to_owned())
+            })),
+            Some(format!("group_cleanup_proved: {diagnostic}"))
+        );
+        for left in [
+            Left::Unended {
+                reason: "still live".to_owned(),
+            },
+            Left::Reused,
+        ] {
+            assert!(
+                terminal_cleanup(Ok(left))
+                    .is_some_and(|words| words.starts_with("group_cleanup_incomplete:"))
+            );
+        }
+        assert!(
+            terminal_cleanup(Err(RunnerError::refused(
+                "process_group_unreadable",
+                "denied"
+            )))
+            .is_some_and(|words| words.starts_with("group_cleanup_failed:")
+                && words.contains("process_group_unreadable"))
+        );
     }
 }

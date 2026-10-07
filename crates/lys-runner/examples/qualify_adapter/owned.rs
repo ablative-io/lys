@@ -41,6 +41,8 @@ pub(super) struct Owned {
     writer: Option<ChildStdin>,
     frames: mpsc::Receiver<Result<Message>>,
     reader: Option<JoinHandle<()>>,
+    reader_done: Option<tokio::sync::oneshot::Receiver<()>>,
+    pub(super) cleanup: String,
     exits: ExitEvents,
     exited: Option<ExitStatus>,
 }
@@ -104,6 +106,8 @@ impl Owned {
             leader: None,
             frames,
             reader: None,
+            reader_done: None,
+            cleanup: String::new(),
             exits: ExitEvents::Child(exits),
             exited: None,
         };
@@ -113,10 +117,13 @@ impl Owned {
             .and_then(|child| child.stdout.take())
             .ok_or("qualification_pipe_missing")?;
         let probe = mode == "probe";
+        let (finished, reader_done) = tokio::sync::oneshot::channel();
+        owned.reader_done = Some(reader_done);
         owned.reader = Some(
             std::thread::Builder::new()
                 .name("qualification-reader".to_owned())
                 .spawn(move || {
+                    let completion = Completion(Some(finished));
                     let mut reader = BufReader::new(stdout);
                     let ready = process::frame(&mut reader)
                         .map(Message::Frame)
@@ -163,6 +170,7 @@ impl Owned {
                             }
                         }
                     }
+                    drop(completion);
                 })
                 .map_err(io_failed)?,
         );
@@ -231,72 +239,148 @@ impl Owned {
         }
         Ok(())
     }
-    pub(super) fn stop(&mut self, force: bool) -> Result<ExitStatus> {
+    pub(super) async fn stop(&mut self, cancel: &mut Cancellation) -> Result<ExitStatus> {
         self.frames.close();
         self.writer.take();
-        let child = self.child.as_mut().ok_or("qualification_child_missing")?;
-        if child.try_wait().map_err(io_failed)?.is_none() {
-            if let Some(leader) = &self.leader {
-                if force {
-                    if start_identity(leader.pid).map_err(|error| error.to_string())?
-                        == leader.start
-                    {
-                        lys_runner::pty::end_group(leader.pid)
-                            .map_err(|error| error.to_string())?;
-                    } else {
-                        return Err("qualification_child_start_changed".to_owned());
-                    }
-                } else {
-                    lys_runner::pty::end(leader).map_err(|error| error.to_string())?;
-                }
-            } else {
-                child.kill().map_err(io_failed)?;
+        let child = self.child.take().ok_or("qualification_child_missing")?;
+        let job = Cleanup {
+            child: Some(child),
+            leader: self.leader.clone(),
+        };
+        let (cancellation, signal) = std::os::unix::net::UnixStream::pair().map_err(io_failed)?;
+        let mut cleanup = tokio::task::spawn_blocking(move || job.run(&cancellation));
+        let (joined, cancelled) = tokio::select! {
+            result = &mut cleanup => (result, false),
+            () = cancel.received() => {
+                drop(signal);
+                (cleanup.await, true)
+            }
+        };
+        let joined =
+            joined.map_err(|error| format!("qualification_cleanup_worker_failed:{error}"))??;
+        self.cleanup = joined.1;
+        if cancelled {
+            return Err(format!("qualification_cleanup_cancelled:{}", self.cleanup));
+        }
+        if let Some(done) = self.reader_done.take() {
+            tokio::select! {
+                completed = done => completed.map_err(|error| format!("qualification_reader_completion_failed:{error}"))?,
+                () = cancel.received() => return Err("qualification_cleanup_cancelled: output completion still awaited".to_owned()),
             }
         }
-        self.wait_exit()
+        if let Some(reader) = self.reader.take() {
+            tokio::task::spawn_blocking(move || reader.join())
+                .await
+                .map_err(|error| format!("qualification_reader_worker_failed:{error}"))?
+                .map_err(|panic| {
+                    format!(
+                        "qualification_reader_panicked:{:?}",
+                        panic.as_ref().type_id()
+                    )
+                })?;
+        }
+        Ok(joined.0)
     }
-    pub(super) fn wait_exit(&mut self) -> Result<ExitStatus> {
-        self.frames.close();
-        self.writer.take();
-        let status = self
+}
+
+struct Completion(Option<tokio::sync::oneshot::Sender<()>>);
+impl Drop for Completion {
+    fn drop(&mut self) {
+        if let Some(sender) = self.0.take()
+            && sender.send(()).is_err()
+        {
+            eprintln!("qualification_reader_observer_ended");
+        }
+    }
+}
+
+struct Cleanup {
+    child: Option<Child>,
+    leader: Option<Leader>,
+}
+impl Cleanup {
+    fn run(mut self, cancel: &std::os::unix::net::UnixStream) -> Result<(ExitStatus, String)> {
+        use std::os::fd::AsFd;
+        let observed = self
             .child
             .as_mut()
             .ok_or("qualification_child_missing")?
-            .wait()
+            .try_wait()
             .map_err(io_failed)?;
-        if let Some(leader) = &self.leader {
-            match lys_runner::pty::end_left_group(leader).map_err(|error| error.to_string())? {
-                lys_runner::pty::Left::Gone | lys_runner::pty::Left::Ended { reason: None } => {}
+        let diagnostics = if let Some(leader) = &self.leader {
+            match lys_runner::pty::prepare_left_group(leader)
+                .map_err(|error| error.to_string())?
+                .wait(Some(cancel.as_fd()))
+            {
+                lys_runner::pty::Left::Gone => "process group gone".to_owned(),
                 lys_runner::pty::Left::Ended {
                     reason: Some(reason),
-                }
-                | lys_runner::pty::Left::Unended { reason } => {
-                    return Err(format!("qualification_cleanup_failed:{reason}"));
+                } => reason,
+                lys_runner::pty::Left::Ended { reason: None } => {
+                    "all listed members exited".to_owned()
                 }
                 lys_runner::pty::Left::Reused => {
                     return Err("qualification_child_start_changed".to_owned());
                 }
+                lys_runner::pty::Left::Unended { reason } => {
+                    return Err(format!("qualification_cleanup_failed:{reason}"));
+                }
             }
-        }
-        if let Some(reader) = self.reader.take() {
-            reader.join().map_err(|panic| {
-                format!(
-                    "qualification_reader_panicked:{:?}",
-                    panic.as_ref().type_id()
-                )
-            })?;
-        }
+        } else if observed.is_some() {
+            "owned child exit observed; no group receipt".to_owned()
+        } else {
+            return Err("qualification_cleanup_failed: leader unproved".to_owned());
+        };
+        let status = match observed {
+            Some(status) => status,
+            None => self
+                .child
+                .as_mut()
+                .ok_or("qualification_child_missing")?
+                .wait()
+                .map_err(io_failed)?,
+        };
         self.child.take();
-        Ok(status)
+        Ok((status, diagnostics))
     }
 }
 
+fn refuse_child(child: &mut Child, leader: Option<&Leader>) {
+    let observed = match child.try_wait() {
+        Ok(status) => status.is_some(),
+        Err(error) => {
+            eprintln!("qualification_child_status_unreadable:{error}");
+            false
+        }
+    };
+    if let Some(leader) = leader {
+        match lys_runner::pty::prepare_left_group(leader) {
+            Ok(ending) => match ending.refuse() {
+                lys_runner::pty::Left::Gone => {}
+                left => eprintln!("qualification_cleanup_unconfirmed:{left:?}"),
+            },
+            Err(error) => eprintln!("qualification_cleanup_failed:{error}"),
+        }
+    } else if observed {
+    } else if let Err(error) = child.kill() {
+        eprintln!("qualification_unproved_child_signal_failed:{error}");
+    } else {
+        eprintln!("qualification_cleanup_unconfirmed: owned child exit not observed");
+    }
+}
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        if let Some(child) = &mut self.child {
+            refuse_child(child, self.leader.as_ref());
+        }
+    }
+}
 impl Drop for Owned {
     fn drop(&mut self) {
-        if self.child.is_some()
-            && let Err(error) = self.stop(true)
-        {
-            eprintln!("{error}");
+        self.frames.close();
+        self.writer.take();
+        if let Some(child) = &mut self.child {
+            refuse_child(child, self.leader.as_ref());
         }
     }
 }
@@ -394,6 +478,8 @@ impl Owned {
                 writer: None,
                 frames,
                 reader: None,
+                reader_done: None,
+                cleanup: String::new(),
                 exits: ExitEvents::Queued {
                     events,
                     observed: Some(observed),
