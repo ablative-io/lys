@@ -95,7 +95,8 @@
       "files": {
         "create": [],
         "modify": [
-          "crates/lys-identity-server/tests/stop_everything.rs"
+          "crates/lys-identity-server/tests/stop_everything.rs",
+          "crates/lys-identity-server/tests/openapi.rs"
         ],
         "delete": []
       },
@@ -122,5 +123,13 @@
     "The join test is posted red at the brief's head before the route lands.",
     "cargo nextest run for lys, lys-runner, lys-openapi and lys-identity-server whole, cargo test --doc, fmt, clippy pedantic in both configurations, ast-grep and the file-length check exit 0 at the head, on Dean.",
     "After install, `lys identity stop --reason <words>` on the live install records the pull with that reason, read back from GET /runtime/stop-everything, in a window Waffles calls."
+  ],
+  "amendments": [
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "the openapi route scanner reads the console route from its one wire definition",
+      "ruling": "The full workspace nextest at 98f0e035 failed at tests/openapi.rs:161, every_declared_route_has_an_entry_and_every_entry_a_route: the table entry post /runtime/stop-everything/console had no declared route (Brisket a0c5a573). The route is served: all 20 stop_everything tests passed in that run. The cause is the test's scanner. declared_in (tests/openapi.rs 26-63) takes a route's path only from a quoted literal, and cord_api.rs registers the console route as .route(console_stop::PATH, post(console)), as R1 requires. Putting a literal back in production would break R1's single wire definition, so the test changes and production does not. R3 adds tests/openapi.rs. declared_in resolves a first argument of exactly console_stop::PATH to lys_runner::console_stop::PATH, and reads every other route as before. The comparison between routes and table entries, and its planted-route failure, stay unchanged. One unit test, a_shared_console_route_is_read_from_its_wire_definition, pins both the single-line and the wrapped form. This is the ordinary case the scanner must permit. The change is exactly Brisket's proposal (proposed-openapi-scanner.patch), granted by Waffles (dd55e150). The FAIL at 98f0e035 is the red. The green is the full workspace nextest plus the eight non-install legs at the new exact head, on Annabel. A route whose path is any other non-literal is still skipped without a word. That is recorded as a finding for a later box, not changed here."
+    }
   ]
 }

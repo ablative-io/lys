@@ -92,6 +92,7 @@ Behavioural. Before any route code is written, THE SYSTEM's tests SHALL build a 
 
 **Files:**
 - modify: crates/lys-identity-server/tests/stop_everything.rs
+- modify: crates/lys-identity-server/tests/openapi.rs
 
 **Checklist:**
 - C505 — A console stop signed by the service's own key, posted through the service's real router, pulls the cord and records the console's claim as who, the reason and the service's own time (DIRECTORY-083 R2, R3).

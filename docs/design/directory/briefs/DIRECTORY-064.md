@@ -218,6 +218,7 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - modify: crates/lys-identity-server/tests/budget_feed.rs
 - modify: crates/lys-identity-server/tests/agent_pass.rs
 - modify: crates/lys-identity-server/tests/goals.rs
+- modify: crates/lys-identity-server/Cargo.toml
 
 **Checklist:**
 - C436 — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).
