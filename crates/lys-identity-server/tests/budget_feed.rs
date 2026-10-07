@@ -246,6 +246,10 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
             .ok_or("missing feed request")?;
         let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
         let answer = match act {
+            Act::ControlStatus { session } => Answer::ControlStatus {
+                session,
+                control: None,
+            },
             // A grant channel this stand-in closed is held again after the
             // next request it answers, so it may be asked for more than once.
             Act::GrantChannel => {
@@ -584,6 +588,10 @@ async fn serve_late(
             .ok_or("missing request")?;
         let answer =
             match verify_request(&line, &key, &greeting).map_err(|error| error.to_string())? {
+                Act::ControlStatus { session } => Answer::ControlStatus {
+                    session,
+                    control: None,
+                },
                 Act::Folders { .. } => Answer::Folders {
                     under: "/".to_owned(),
                     folders: Vec::new(),
@@ -756,6 +764,10 @@ async fn serve_holding(
         let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
         let channel = matches!(act, Act::GrantChannel);
         let answer = match act {
+            Act::ControlStatus { session } => Answer::ControlStatus {
+                session,
+                control: None,
+            },
             Act::Folders { .. } => Answer::Folders {
                 under: "/".to_owned(),
                 folders: Vec::new(),

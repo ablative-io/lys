@@ -2,6 +2,7 @@
 
 use std::error::Error;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
@@ -24,13 +25,20 @@ use tokio::sync::oneshot;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 struct Runner {
+    control_reads: Arc<AtomicUsize>,
     stop: Option<oneshot::Sender<()>>,
     task: Option<tokio::task::JoinHandle<Result<Vec<Operation>, String>>>,
 }
 
 impl Runner {
     fn start(listener: UnixListener, key: [u8; 32]) -> Self {
+        Self::with_control(listener, key, false)
+    }
+
+    fn with_control(listener: UnixListener, key: [u8; 32], refuse_control: bool) -> Self {
         let (stop, mut stopped) = oneshot::channel();
+        let control_reads = Arc::new(AtomicUsize::new(0));
+        let read_count = Arc::clone(&control_reads);
         let task = tokio::spawn(async move {
             let mut operations = Vec::new();
             loop {
@@ -50,20 +58,42 @@ impl Runner {
                     .await
                     .map_err(|error| error.to_string())?
                     .ok_or("runner request ended before its line")?;
-                match verify_request(&line, &key, &greeting).map_err(|error| error.to_string())? {
+                let answer = match verify_request(&line, &key, &greeting)
+                    .map_err(|error| error.to_string())?
+                {
                     RunnerAct::AsCaller { done, .. } => match *done {
-                        RunnerAct::Operate { operation } => operations.push(operation),
+                        RunnerAct::Operate { operation } => {
+                            operations.push(operation);
+                            Answer::Refused {
+                                refusal: "fixture_stop_observed".to_owned(),
+                                words: "the fixture records requests without starting processes"
+                                    .to_owned(),
+                                oldest: None,
+                            }
+                        }
                         other => return Err(format!("unexpected act for a caller: {other:?}")),
                     },
+                    RunnerAct::ControlStatus { session } => {
+                        read_count.fetch_add(1, Ordering::SeqCst);
+                        if refuse_control {
+                            Answer::Refused {
+                                refusal: "fixture_control_refused".to_owned(),
+                                words: "the control read is unavailable after the kept act"
+                                    .to_owned(),
+                                oldest: None,
+                            }
+                        } else {
+                            Answer::ControlStatus {
+                                session,
+                                control: None,
+                            }
+                        }
+                    }
                     other => return Err(format!("unexpected runner act: {other:?}")),
-                }
+                };
                 let reply = Reply {
                     version: lys_runner::protocol::PROTOCOL_VERSION,
-                    answer: Answer::Refused {
-                        refusal: "fixture_stop_observed".to_owned(),
-                        words: "the fixture records requests without starting processes".to_owned(),
-                        oldest: None,
-                    },
+                    answer,
                 };
                 let line = serde_json::to_string(&reply).map_err(|error| error.to_string())?;
                 write
@@ -73,6 +103,7 @@ impl Runner {
             }
         });
         Self {
+            control_reads,
             stop: Some(stop),
             task: Some(task),
         }
@@ -207,6 +238,10 @@ fn prepare(config: &lys_identity_server::Config, act: Act, machine: &str) -> Tes
 
 impl Table {
     async fn fresh(act: Act) -> TestResult<Self> {
+        Self::with_control(act, false).await
+    }
+
+    async fn with_control(act: Act, refuse_control: bool) -> TestResult<Self> {
         let machine = operation()?;
         let (
             service,
@@ -225,7 +260,12 @@ impl Table {
             })
             .await?;
         let path = service.dir.path().join("context-runner.sock");
-        let runner = Runner::start(UnixListener::bind(&path)?, key.public_key_bytes());
+        let listener = UnixListener::bind(&path)?;
+        let runner = if refuse_control {
+            Runner::with_control(listener, key.public_key_bytes(), true)
+        } else {
+            Runner::start(listener, key.public_key_bytes())
+        };
         let table = Self {
             service,
             client: reqwest::Client::builder()
@@ -315,6 +355,45 @@ fn unavailable_crossings(answer: &Value, expected: usize, reason: &str) -> TestR
         assert_eq!(receipt["crossing"]["unavailable"], reason, "{receipt}");
         assert_eq!(receipt["crossing"]["act"], "stop", "{receipt}");
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_control_review_does_not_replace_the_kept_usage_answer() -> TestResult {
+    let table = Table::with_control(Act::Stop, true).await?;
+    let answer = table
+        .report(report(
+            "refused-control",
+            Some(&table.sessions[0]),
+            Some(90),
+            1,
+        ))
+        .await?;
+    let (status, kept) = table
+        .service
+        .get(
+            &format!("/agents/{}/usage", table.agent),
+            Some(&table.cookie),
+        )
+        .await?;
+    let reads = table.runner.control_reads.load(Ordering::SeqCst);
+    let operations = table.runner.finish().await?;
+    stopped(&operations, &[&table.sessions[0]]);
+    assert_eq!(reads, 1, "the post-act control read was attempted");
+    let receipt = &answer["receipts"][0];
+    assert_eq!(receipt["crossing"]["figure"], 90, "{answer}");
+    assert_eq!(receipt["acted"]["stands"], "refused", "{answer}");
+    assert!(
+        receipt["acted"]["words"]
+            .as_str()
+            .is_some_and(|words| words.contains("fixture_stop_observed")),
+        "{answer}"
+    );
+    assert_eq!(status, 200, "{kept}");
+    assert_eq!(
+        kept["receipts"], answer["receipts"],
+        "the kept act remains readable"
+    );
     Ok(())
 }
 

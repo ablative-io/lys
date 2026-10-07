@@ -93,6 +93,7 @@ struct Runner {
     held: Mutex<BTreeMap<String, (String, OperationOutcome)>>,
     typed: AtomicUsize,
     asked: AtomicUsize,
+    texts: Mutex<Vec<String>>,
     lose_next: AtomicBool,
     answer: OperationState,
 }
@@ -104,6 +105,7 @@ impl Runner {
             held: Mutex::default(),
             typed: AtomicUsize::new(0),
             asked: AtomicUsize::new(0),
+            texts: Mutex::default(),
             lose_next: AtomicBool::new(false),
             answer,
         }
@@ -125,6 +127,10 @@ impl Deliver for Runner {
             let OperationRequest::Reminder { text } = operation.request else {
                 return Err(Undelivered::Refused("not a reminder".to_owned()));
             };
+            self.texts
+                .lock()
+                .expect("fixture text lock poisoned")
+                .push(text.clone());
             let mut held = self.held.lock().expect("fixture lock poisoned");
             if let Some((kept, outcome)) = held.get(&operation.operation) {
                 if *kept != text {
@@ -314,10 +320,44 @@ async fn a_crash_after_acceptance_does_not_type_the_reminder_twice() -> TestResu
     remind(&goals, &runner, at).await?;
     let asked = item(&goals, "op-g1")?.fired[0].sent[0].clone();
     assert_eq!(asked.state, Delivery::Pending, "no answer was kept");
+    let first_words = item(&goals, "op-g1")?.fired[0].text.clone();
+    let retry_at = at + 61;
+    let later = tempfile::tempdir()?;
+    let later_goals = opened(later.path())?;
+    later_goals.with(|store| {
+        store.set(goal(
+            "op-g1",
+            Kind::Goal,
+            at,
+            at + 3600,
+            vec![Remind::Before { seconds: 7200 }],
+        ))
+    })?;
+    remind(
+        &later_goals,
+        &Runner::new(OperationState::Delivered),
+        retry_at,
+    )
+    .await?;
+    let rebuilt_words = item(&later_goals, "op-g1")?.fired[0].text.clone();
+    assert_ne!(
+        first_words, rebuilt_words,
+        "the retry crosses a time-left boundary"
+    );
     drop(goals);
 
     let goals = opened(dir.path())?;
-    remind(&goals, &runner, at + 1).await?;
+    remind(&goals, &runner, retry_at).await?;
+    assert_eq!(
+        runner.asked.load(Ordering::SeqCst),
+        2,
+        "the pending operation is re-asked"
+    );
+    assert_eq!(
+        *runner.texts.lock().expect("fixture text lock poisoned"),
+        vec![first_words.clone(), first_words],
+        "both asks carry identical words"
+    );
     assert_eq!(runner.typed(), 1, "asked again under its id, typed once");
     let sent = item(&goals, "op-g1")?.fired[0].sent[0].clone();
     assert_eq!(sent.operation, asked.operation);

@@ -129,6 +129,17 @@ fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error
                 BufReader::new(&stream).read_line(&mut line)?;
                 let done = match verify_request(&line, &key, &greeting)? {
                     Act::AsCaller { done, .. } => done,
+                    Act::ControlStatus { session } => {
+                        writeln!(
+                            writer,
+                            "{}",
+                            reply_line(Answer::ControlStatus {
+                                session,
+                                control: None
+                            })
+                        )?;
+                        continue;
+                    }
                     Act::GrantChannel => {
                         writeln!(writer, "{}", reply_line(Answer::GrantChannel))?;
                         channels.push(stream);
@@ -169,7 +180,11 @@ fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error
             }
             Ok(())
         })();
-        result.map_err(|error| error.to_string())
+        let result = result.map_err(|error| error.to_string());
+        if let Err(error) = &result {
+            eprintln!("certificate stand-in result: {error}");
+        }
+        result
     });
     Ok((socket, receive, answering))
 }

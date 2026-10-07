@@ -310,7 +310,16 @@ fn a_restart_ends_only_a_group_with_its_recorded_start_identity() -> TestResult 
     assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
     assert_eq!(ended.status, None);
     assert_eq!(ended.signal.as_deref(), Some("SIGKILL"));
-    assert_eq!(ended.reason, None);
+    let reason = ended.reason.as_ref().ok_or("CleanupReceiptMissing")?;
+    assert!(reason.contains(&format!("process {pid} (")), "{reason}");
+    assert!(
+        reason.contains("SIGKILL accepted (errno 0); exit awaited"),
+        "{reason}"
+    );
+    assert!(
+        reason.contains(&format!("process {pid}: kernel exit observed")),
+        "{reason}"
+    );
     Ok(())
 }
 
@@ -359,9 +368,18 @@ fn a_restart_ends_an_orphaned_member_and_preserves_an_unrelated_group() -> TestR
     assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
     assert_eq!(ended.status, None);
     assert_eq!(ended.signal.as_deref(), Some("SIGKILL"));
-    assert_eq!(
-        ended.reason.as_deref(),
-        Some(format!("leaderless process group {pid}").as_str())
+    let reason = ended.reason.as_ref().ok_or("CleanupReceiptMissing")?;
+    assert!(
+        reason.contains(&format!("process {} (", orphan.child)),
+        "{reason}"
+    );
+    assert!(
+        reason.contains("SIGKILL accepted (errno 0); exit awaited"),
+        "{reason}"
+    );
+    assert!(
+        reason.contains(&format!("process {}: kernel exit observed", orphan.child)),
+        "{reason}"
     );
     Ok(())
 }
@@ -393,8 +411,8 @@ fn a_restart_names_and_preserves_a_member_in_another_session() -> TestResult {
     );
     assert_eq!(ended.signal, None);
     let reason = ended.reason.as_ref().ok_or("UnprovedMemberReasonMissing")?;
-    assert!(reason.contains(&format!("process {pid} not ended")));
-    assert!(reason.contains("process_session_mismatch"));
+    assert!(reason.contains(&format!("process {pid} (")), "{reason}");
+    assert!(reason.contains("process_session_mismatch"), "{reason}");
     Ok(())
 }
 
