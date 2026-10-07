@@ -38,7 +38,7 @@ fn pending(id: &str, kind: Kind) -> Pending {
 }
 fn ready() -> Result<Controller> {
     let mut control = Controller::new(binding(), Transport::Claude)?;
-    control.ingest(&binding(), &json!({"type":"system","subtype":"init","session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}))?;
+    first_turn(&mut control, &binding())?;
     Ok(control)
 }
 fn replay(uuid: &str) -> Value {
@@ -220,11 +220,26 @@ fn a_replay_claiming_the_owned_uuid_must_prove_its_sdk_envelope() -> Result {
 fn the_claude_init_version_must_match_the_probed_version() -> Result {
     for version in [json!("9.8.6"), Value::Null] {
         let mut control = Controller::new(binding(), Transport::Claude)?;
+        let bootstrap = control.bootstrap();
+        let id = &bootstrap.dispatches[0].frame["request_id"];
+        control.ingest(
+            &binding(),
+            &json!({"type":"control_response","response":{
+            "subtype":"success","request_id":id,"response":{}}}),
+        )?;
+        control.enqueue(pending("unqualified-first-turn", Kind::Reminder))?;
         let error = control.ingest(&binding(), &json!({"type":"system","subtype":"init",
             "session_id":"conversation","claude_code_version":version,"slash_commands":["compact"]}))
             .err().ok_or("init bypassed the probed version")?;
         assert_eq!(error.name(), "control_adapter_unqualified");
         assert!(!control.ready());
+        let lost = control.disconnected();
+        assert_eq!(lost.receipts[0].state, OperationState::Refused);
+        assert!(
+            lost.receipts[0]
+                .reason
+                .contains("control_adapter_unqualified")
+        );
     }
     Ok(())
 }
@@ -249,5 +264,325 @@ fn all_admitted_inputs_and_their_whole_encoded_words_remain_queued() -> Result {
             .dispatches
             .is_empty()
     );
+    Ok(())
+}
+
+#[test]
+fn a_claude_that_emits_init_only_after_input_binds_without_sending_a_turn() -> Result {
+    let mut control = Controller::new(binding(), Transport::Claude)?;
+    let bootstrap = control.bootstrap();
+    assert_eq!(
+        bootstrap.dispatches.len(),
+        1,
+        "Claude must receive initialize before any turn"
+    );
+    let frame = &bootstrap.dispatches[0].frame;
+    let id = frame["request_id"]
+        .as_str()
+        .ok_or("no initialization correlation")?;
+    assert_eq!(
+        frame,
+        &json!({"type":"control_request","request_id":id,
+        "request":{"subtype":"initialize"}})
+    );
+    assert!(bootstrap.receipts.is_empty());
+    let response = json!({"type":"control_response","response":{
+        "subtype":"success","request_id":id,"response":{"account":"discarded"}}});
+    let bound = control.ingest(&binding(), &response)?;
+    assert!(
+        bound
+            .events
+            .iter()
+            .any(|event| event.event == "control_bound")
+    );
+    assert!(bound.receipts.is_empty());
+    assert!(
+        bound.dispatches.is_empty(),
+        "the handshake sends no user input"
+    );
+    let turn = control.enqueue(pending("first-reminder", Kind::Reminder))?;
+    assert_eq!(turn.dispatches.len(), 1);
+    assert_eq!(turn.dispatches[0].frame["type"], "user");
+    let init = json!({"type":"system","subtype":"init","session_id":"conversation",
+        "claude_code_version":"9.8.7","slash_commands":["compact"]});
+    control.ingest(&binding(), &init)?;
+    Ok(())
+}
+
+fn first_turn(control: &mut Controller, source: &Binding) -> Result {
+    let bootstrap = control.bootstrap();
+    let correlation = bootstrap
+        .dispatches
+        .first()
+        .ok_or("initialize not written")?
+        .frame["request_id"]
+        .as_str()
+        .ok_or("initialize not correlated")?;
+    control.ingest(
+        source,
+        &json!({"type":"control_response","response":{
+        "subtype":"success","request_id":correlation,"response":{}}}),
+    )?;
+    let first = Pending::new(
+        "fixture-initialization".to_owned(),
+        Kind::Human,
+        "first turn".to_owned(),
+    );
+    let uuid = first.uuid.clone();
+    control.enqueue(first)?;
+    control.ingest(
+        source,
+        &json!({"type":"system","subtype":"init","session_id":"conversation",
+        "claude_code_version":"9.8.7","slash_commands":["compact"]}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"user","session_id":"conversation","uuid":uuid,
+        "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
+    )?;
+    control.ingest(
+        source,
+        &json!({"type":"result","session_id":"conversation",
+        "uuid":"fixture-initialization-result","is_error":false}),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn initialize_errors_and_foreign_correlations_refuse_the_claude_binding() -> Result {
+    for (subtype, foreign, expected) in [
+        ("error", false, "control_initialize_refused"),
+        ("success", true, "control_correlation_unsupported"),
+    ] {
+        let mut control = Controller::new(binding(), Transport::Claude)?;
+        let bootstrap = control.bootstrap();
+        let id = if foreign {
+            json!("foreign")
+        } else {
+            bootstrap.dispatches[0].frame["request_id"].clone()
+        };
+        let error = control
+            .ingest(
+                &binding(),
+                &json!({"type":"control_response","response":{
+            "subtype":subtype,"request_id":id,"response":{"private":"discarded"}}}),
+            )
+            .err()
+            .ok_or("invalid initialize was admitted")?;
+        assert_eq!(error.name(), expected);
+        assert!(!control.ready());
+    }
+    Ok(())
+}
+
+#[test]
+fn separate_claude_controllers_have_fresh_initialize_correlations() -> Result {
+    let first = Controller::new(binding(), Transport::Claude)?.bootstrap();
+    let second = Controller::new(binding(), Transport::Claude)?.bootstrap();
+    assert_ne!(
+        first.dispatches[0].frame["request_id"],
+        second.dispatches[0].frame["request_id"]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_first_replay_is_not_confirmed_until_its_serving_version_is_proved() -> Result {
+    for matches in [true, false] {
+        let mut control = Controller::new(binding(), Transport::Claude)?;
+        let bootstrap = control.bootstrap();
+        control.ingest(&binding(), &json!({"type":"control_response","response":{
+            "subtype":"success","request_id":bootstrap.dispatches[0].frame["request_id"],"response":{}}}))?;
+        let input = pending("first-reminder", Kind::Reminder);
+        let uuid = input.uuid.clone();
+        control.enqueue(input)?;
+        assert!(
+            control
+                .ingest(&binding(), &replay(&uuid))?
+                .receipts
+                .is_empty()
+        );
+        let init = json!({"type":"system","subtype":"init","session_id":"conversation",
+            "claude_code_version":if matches { "9.8.7" } else { "9.8.6" },"slash_commands":["compact"]});
+        if matches {
+            let proved = control.ingest(&binding(), &init)?;
+            assert_eq!(proved.receipts[0].state, OperationState::Confirmed);
+            assert_eq!(proved.receipts[0].operation, "first-reminder");
+        } else {
+            assert_eq!(
+                control
+                    .ingest(&binding(), &init)
+                    .err()
+                    .ok_or("wrong version was accepted")?
+                    .name(),
+                "control_adapter_unqualified"
+            );
+            assert_eq!(
+                control.disconnected().receipts[0].state,
+                OperationState::Refused
+            );
+        }
+    }
+    Ok(())
+}
+
+fn boundary(trigger: &str) -> Value {
+    json!({"type":"system","subtype":"compact_boundary","session_id":"conversation",
+        "compact_metadata":{"trigger":trigger}})
+}
+
+#[test]
+fn a_manual_boundary_before_its_replay_confirms_the_current_compaction() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    assert!(
+        control
+            .ingest(&binding(), &boundary("manual"))?
+            .receipts
+            .is_empty()
+    );
+    assert!(
+        control
+            .ingest(&binding(), &replay(&uuid))?
+            .receipts
+            .is_empty()
+    );
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Confirmed);
+    assert_eq!(update.receipts[0].reason, "harness_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_manual_boundary_after_its_replay_confirms_the_current_compaction() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    assert!(
+        control
+            .ingest(&binding(), &boundary("manual"))?
+            .receipts
+            .is_empty()
+    );
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Confirmed);
+    assert_eq!(update.receipts[0].reason, "harness_compacted");
+    Ok(())
+}
+
+#[test]
+fn an_auto_boundary_does_not_confirm_a_requested_compaction() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    control.ingest(&binding(), &boundary("auto"))?;
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Refused);
+    assert_eq!(update.receipts[0].reason, "not_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_boundary_without_a_current_compaction_changes_nothing() -> Result {
+    let mut control = ready()?;
+    let before = control.control_status();
+    let update = control.ingest(&binding(), &boundary("manual"))?;
+    assert!(update.events.is_empty());
+    assert!(update.receipts.is_empty());
+    assert!(update.dispatches.is_empty());
+    assert_eq!(control.control_status(), before);
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Refused);
+    assert_eq!(update.receipts[0].reason, "not_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_held_boundary_does_not_confirm_the_next_compaction() -> Result {
+    let mut control = ready()?;
+    let first = pending("first-compact", Kind::Compact);
+    let first_uuid = first.uuid.clone();
+    control.enqueue(first)?;
+    control.ingest(&binding(), &boundary("manual"))?;
+    control.ingest(&binding(), &replay(&first_uuid))?;
+    let first = control.ingest(&binding(), &result("first-result"))?;
+    assert_eq!(first.receipts[0].state, OperationState::Confirmed);
+    let second = pending("second-compact", Kind::Compact);
+    let second_uuid = second.uuid.clone();
+    control.enqueue(second)?;
+    control.ingest(&binding(), &replay(&second_uuid))?;
+    let second = control.ingest(&binding(), &result("second-result"))?;
+    assert_eq!(second.receipts[0].state, OperationState::Refused);
+    assert_eq!(second.receipts[0].reason, "not_compacted");
+    Ok(())
+}
+
+#[test]
+fn a_boundary_requires_a_closed_trigger_and_names_only_its_field() -> Result {
+    for metadata in [
+        json!({}),
+        json!({"trigger":"private fixture phrase"}),
+        json!({"trigger":1}),
+    ] {
+        let mut control = ready()?;
+        let mut frame = boundary("manual");
+        frame["compact_metadata"] = metadata;
+        let error = control
+            .ingest(&binding(), &frame)
+            .err()
+            .ok_or("invalid trigger was accepted")?;
+        assert_eq!(error.name(), "control_protocol_unsupported");
+        assert!(error.to_string().contains("compact_metadata.trigger"));
+        assert!(!error.to_string().contains("private fixture phrase"));
+    }
+    Ok(())
+}
+
+#[test]
+fn a_manual_boundary_still_requires_matching_admission_and_success() -> Result {
+    for admitted in [true, false] {
+        let mut control = ready()?;
+        let input = pending("compact", Kind::Compact);
+        let uuid = input.uuid.clone();
+        control.enqueue(input)?;
+        control.ingest(&binding(), &boundary("manual"))?;
+        control.ingest(&binding(), &replay(if admitted { &uuid } else { "other" }))?;
+        let mut end = result("compact-result");
+        end["is_error"] = json!(admitted);
+        let update = control.ingest(&binding(), &end);
+        if admitted {
+            let update = update?;
+            assert_eq!(update.receipts[0].state, OperationState::Refused);
+            assert_eq!(update.receipts[0].reason, "not_compacted");
+        } else {
+            let error = update
+                .err()
+                .ok_or("a result without matching admission was accepted")?;
+            assert_eq!(error.name(), "control_correlation_unsupported");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_status_success_without_a_manual_boundary_is_not_compaction_proof() -> Result {
+    let mut control = ready()?;
+    let input = pending("compact", Kind::Compact);
+    let uuid = input.uuid.clone();
+    control.enqueue(input)?;
+    control.ingest(&binding(), &replay(&uuid))?;
+    control.ingest(&binding(), &json!({"type":"system","subtype":"status","session_id":"conversation","status":null,"compact_result":"success"}))?;
+    let update = control.ingest(&binding(), &result("compact-result"))?;
+    assert_eq!(update.receipts[0].state, OperationState::Refused);
     Ok(())
 }

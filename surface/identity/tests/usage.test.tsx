@@ -311,3 +311,142 @@ describe('The saved control transport', () => {
     }
   });
 });
+
+async function managedControlView(control: unknown, receipts: unknown[], extra: Record<string, Route> = {}) {
+  const { createRoot } = await import('react-dom/client');
+  const { AgentUsage } = await import('../src/features/usage/Usage');
+  const { serve } = await import('./harness');
+  const session = 'session-old';
+  const routes = {
+    ...keeping(),
+    ['/agents/' + SCRIBE + '/control-sessions']: ok({ agent: SCRIBE, sessions: [session], after: null }),
+    ['/runtime/sessions/' + session + '/controls']: ok({ session, control }),
+    ['/runtime/sessions/' + session + '/control-receipts']: ok({ session, receipts, after: null }),
+    ...extra,
+  };
+  const posted: { path: string; body: unknown }[] = [];
+  const requests = serve(routes, posted);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => { root.render(<AgentUsage agent={SCRIBE} />); });
+  return { container, requests, posted, close: async () => { await act(async () => root.unmount()); container.remove(); } };
+}
+
+const currentControl = {
+  generation: 1, phase: 'active', active: 'operation-active', context: { state: 'held', crossing: 'crossing', reason: 'above_limit' },
+  boundary: null, crossing: 'crossing', queued: [],
+};
+const uncertainControl = {
+  operation: 'delivery-uncertain', session: 'session-old', request: 'goal_reminder', state: 'uncertain', at: 1,
+  text: null, prepared: false, certainty: 'possibly_sent', generation: null, uuid: null, reference: null, admitted: false, reconciled: null,
+};
+
+describe('managed control readback', () => {
+  it('shows the active hold and unconfirmed delivery without assuming work completed', async () => {
+    const view = await managedControlView(currentControl, [uncertainControl]);
+    try {
+      const panel = view.container.querySelector('section[aria-label="Managed controls"]');
+      expect(panel).not.toBeNull();
+      expect(panel?.textContent).toContain('Active turn');
+      expect(panel?.textContent).toContain('Held: above limit');
+      expect(panel?.textContent).toContain('Unconfirmed');
+      expect(panel?.textContent).toContain('Possible prior delivery');
+      expect(view.requests).toContain('/agents/' + SCRIBE + '/control-sessions');
+      expect(view.requests.some((path) => path.endsWith('/runtime/sessions'))).toBe(false);
+    } finally { await view.close(); }
+  });
+
+  it('names an unknown phase instead of displaying an idle boundary', async () => {
+    const view = await managedControlView({ ...currentControl, phase: 'unknown-new-phase' }, []);
+    try {
+      expect(view.container.textContent).toContain('ControlStatusUnreadable');
+      expect(view.container.textContent).not.toContain('Idle boundary');
+    } finally { await view.close(); }
+  });
+
+  it('keeps one person-decision operation identity across an unconfirmed response and retry', async () => {
+    let calls = 0;
+    const path = '/runtime/sessions/session-old/control-receipts/delivery-uncertain/reconcile';
+    const view = await managedControlView({ ...currentControl, phase: 'closed' }, [uncertainControl], {
+      ['POST ' + path]: (body) => {
+        calls += 1;
+        const decision = body as { operation: string; decision: string };
+        if (calls === 1) return refused(503, 'decision_unconfirmed', 'The decision write did not answer.');
+        return ok({ ...uncertainControl, reconciled: { operation: decision.operation, by: 'responsible-person', at: 2, decision: { choice: decision.decision } } });
+      },
+    });
+    try {
+      const button = () => [...view.container.querySelectorAll('button')].find((element) => element.textContent === 'Record not seen');
+      expect(button()).toBeDefined();
+      await act(async () => { button()?.click(); });
+      expect(view.container.textContent).toContain('decision_unconfirmed');
+      await act(async () => { button()?.click(); });
+      expect(view.posted.filter((entry) => entry.path === path)).toHaveLength(2);
+      const [first, second] = view.posted.filter((entry) => entry.path === path);
+      expect(second.body).toEqual(first.body);
+      expect(view.container.textContent).toContain('Person recorded not seen');
+      expect(view.container.textContent).toContain('Unconfirmed');
+    } finally { await view.close(); }
+  });
+});
+
+
+describe('resend recovery readback', () => {
+  it('reopens an unconfirmed resend under the kept id instead of creating another delivery', async () => {
+    const receipt = { ...uncertainControl, reference: { goal: 'goal', occurrence: 'old-occurrence', version: 'goal', prior: null } };
+    const lookup = '/goals/goal/resends/delivery-uncertain';
+    const resend = '/goals/goal/resend';
+    const routes: Record<string, Route> = {
+      [lookup]: ok({ goal: 'goal', prior: 'delivery-uncertain', occurrence: { operation: 'kept-resend', session: 'new-session' } }),
+      ['POST ' + resend]: (body) => {
+        const ask = body as { operation: string; prior: string; session: string };
+        expect(ask).toEqual({ operation: 'kept-resend', prior: 'delivery-uncertain', session: 'new-session' });
+        return ok({ goal: 'goal', occurrence: ask.operation, operation: 'kept-delivery', session: ask.session, prior: ask.prior,
+          reconciliation: { ...receipt, reconciled: { operation: ask.operation, by: 'responsible-person', at: 2, decision: { choice: 'resent', occurrence: ask.operation } } } });
+      },
+    };
+    for (let reload = 0; reload < 2; reload += 1) {
+      const view = await managedControlView(currentControl, [receipt], routes);
+      try {
+        const button = (words: string) => [...view.container.querySelectorAll('button')].find((element) => element.textContent === words);
+        await act(async () => { button('Resend options')?.click(); });
+        expect(view.requests).toContain(lookup);
+        expect(view.container.textContent).toContain('Finish the recorded resend');
+        expect(button('Send a new occurrence')).toBeUndefined();
+        await act(async () => { button('Finish the recorded resend')?.click(); });
+        expect(view.posted.filter((entry) => entry.path === resend)).toHaveLength(1);
+        expect(view.container.textContent).toContain('Person recorded resent under occurrence kept-resend');
+        expect(view.container.textContent).toContain('Unconfirmed');
+      } finally { await view.close(); }
+    }
+  });
+});
+
+describe('running session control readback', () => {
+  it('reads only the session explicitly opened, without asking a history route', async () => {
+    const { createRoot } = await import('react-dom/client');
+    const { MemoryRouter } = await import('react-router');
+    const { RunningList } = await import('../src/features/runtime/Sessions');
+    const { serve } = await import('./harness');
+    const requests = serve({ ...keeping(),
+      '/runtime/live': ok({ sessions: [{ session: 'session-old', agent: SCRIBE, machine: 'machine', machine_name: 'Computer', shown: 'running', first_report_at: 1, last_reported: 'running' }], unanswered: [] }),
+      '/runtime/sessions/session-old/controls': ok({ session: 'session-old', control: currentControl }),
+      '/runtime/sessions/session-old/control-receipts': ok({ session: 'session-old', receipts: [uncertainControl], after: null }),
+    });
+    const container = document.createElement('div'); document.body.appendChild(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => { root.render(<MemoryRouter><RunningList /></MemoryRouter>); });
+      expect(requests).not.toContain('/runtime/sessions/session-old/controls');
+      const button = container.querySelector<HTMLButtonElement>('button[aria-label="Read controls for Scribe"]');
+      expect(button).not.toBeNull();
+      await act(async () => { button?.click(); });
+      expect(container.textContent).toContain('Active turn');
+      expect(container.textContent).toContain('Held: above limit');
+      expect(requests).toContain('/runtime/sessions/session-old/controls');
+      expect(requests).toContain('/runtime/sessions/session-old/control-receipts');
+      expect(requests.some((path) => path.endsWith('/runtime/sessions'))).toBe(false);
+    } finally { await act(async () => root.unmount()); container.remove(); }
+  });
+});

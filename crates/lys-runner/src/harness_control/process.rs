@@ -115,8 +115,10 @@ pub fn frame(reader: &mut impl BufRead) -> Result<serde_json::Value, RunnerError
 /// # Errors
 /// Refuses invalid startup input, isolation, executable or exec failures.
 pub fn entry() -> Result<(), RunnerError> {
-    let mut reader = BufReader::new(std::io::stdin());
-    let entry: Entry = serde_json::from_value(frame(&mut reader)?).map_err(|error| {
+    let mut input = File::from(
+        rustix::io::dup(std::io::stdin()).map_err(|error| failed("control_entry_failed", error))?,
+    );
+    let entry: Entry = serde_json::from_value(startup_frame(&mut input)?).map_err(|error| {
         failed(
             "control_entry_invalid",
             format!("startup specification is invalid: {error}"),
@@ -141,17 +143,54 @@ pub fn entry() -> Result<(), RunnerError> {
         .write_all(b"\n")
         .and_then(|()| stdout.flush())
         .map_err(|error| failed("control_entry_failed", error))?;
-    if frame(&mut reader)? != serde_json::json!({"execute": true}) {
-        return Err(failed(
-            "control_entry_invalid",
-            "parent did not authorize the proved process",
-        ));
-    }
+    execute_permission(&mut input)?;
+    drop(input);
     let error = Command::new(selected.path)
         .args(entry.arguments)
         .current_dir(entry.directory)
         .exec();
     Err(failed("control_exec_failed", error))
+}
+
+fn startup_frame(input: &mut impl Read) -> Result<serde_json::Value, RunnerError> {
+    let mut line = Vec::new();
+    let mut byte = [0];
+    loop {
+        if let Err(error) = input.read_exact(&mut byte) {
+            if error.kind() == std::io::ErrorKind::UnexpectedEof {
+                return Err(if line.is_empty() {
+                    failed("control_transport_lost", "managed pipe ended")
+                } else {
+                    failed("control_frame_invalid", "managed frame is incomplete")
+                });
+            }
+            return Err(failed("control_transport_lost", error));
+        }
+        if byte[0] == b'\n' {
+            break;
+        }
+        line.push(byte[0]);
+    }
+    serde_json::from_slice(&line).map_err(|error| {
+        failed(
+            "control_frame_invalid",
+            format!("managed frame is not JSON: {error}"),
+        )
+    })
+}
+
+fn execute_permission(input: &mut impl Read) -> Result<(), RunnerError> {
+    let mut permission = [0; b"{\"execute\":true}\n".len()];
+    input
+        .read_exact(&mut permission)
+        .map_err(|error| failed("control_transport_lost", error))?;
+    if permission != *b"{\"execute\":true}\n" {
+        return Err(failed(
+            "control_entry_invalid",
+            "parent did not authorize the proved process",
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) struct Spawned {
@@ -484,4 +523,51 @@ fn report_version(
         .wait()
         .map_err(|error| failed("control_probe_cleanup_failed", error))?;
     Ok((status, read?))
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::{execute_permission, startup_frame};
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    fn exec_after_startup(entry: bool) -> Result<(), Box<dyn std::error::Error>> {
+        let (mut reader, mut writer) = std::io::pipe()?;
+        let first = b"{\"id\":\"lys-initialize\",\"method\":\"initialize\"}\n";
+        let mut bytes = Vec::new();
+        if entry {
+            bytes.extend_from_slice(b"{\"startup\":true}\n");
+        }
+        bytes.extend_from_slice(b"{\"execute\":true}\n");
+        bytes.extend_from_slice(first);
+        writer.write_all(&bytes)?;
+        drop(writer);
+        if entry {
+            assert_eq!(
+                startup_frame(&mut reader)?,
+                serde_json::json!({"startup":true})
+            );
+        }
+        execute_permission(&mut reader)?;
+        let output = Command::new("/bin/cat")
+            .stdin(reader)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()?;
+        assert!(output.status.success());
+        assert_eq!(output.stdout, first);
+        Ok(())
+    }
+
+    #[test]
+    fn startup_permission_preserves_the_first_frame_for_the_executed_program()
+    -> Result<(), Box<dyn std::error::Error>> {
+        exec_after_startup(false)
+    }
+
+    #[test]
+    fn startup_entry_takes_only_its_own_line_before_permission_and_exec()
+    -> Result<(), Box<dyn std::error::Error>> {
+        exec_after_startup(true)
+    }
 }

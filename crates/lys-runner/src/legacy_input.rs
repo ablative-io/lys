@@ -94,7 +94,9 @@ pub fn compact(
     operation: Operation,
     context: Option<&InputContext<'_>>,
 ) -> Result<OperationOutcome, RunnerError> {
-    let OperationRequest::Compact { text } = &operation.request else {
+    let (OperationRequest::Compact { text } | OperationRequest::ContextCompact { text, .. }) =
+        &operation.request
+    else {
         return Err(RunnerError::refused(
             "SessionInputInvalid",
             "the operation is not a compaction",

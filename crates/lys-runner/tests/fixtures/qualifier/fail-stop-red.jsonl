@@ -1,0 +1,3 @@
+{"claims_spawn":false,"fixture":true,"kind":"example-owned","step":"launcher"}
+{"cleanup":"ok","observed":false,"reason":"qualification_cancelled: the qualification was stopped","step":"version_report"}
+{"correlation":"lys-initialize","step":"bound"}

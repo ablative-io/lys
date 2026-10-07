@@ -137,19 +137,58 @@ pub(super) fn perform(
             let ended = sessions.end(&session, left)?;
             Ok(Answer::Ended { session, ended })
         }
+        Act::ControlStatus { session } => {
+            let control = sessions.control_status(&session)?;
+            Ok(Answer::ControlStatus { session, control })
+        }
         Act::Status { session } => Ok(Answer::Status {
             status: sessions.status(session.as_deref())?,
         }),
         Act::Operate { operation } => {
+            if matches!(
+                operation.request,
+                crate::operations::OperationRequest::BoundaryReply { .. }
+            ) {
+                if context.is_some() {
+                    return Err(RunnerError::refused(
+                        "control_boundary_service_required",
+                        "a person or agent cannot decide an owned context boundary",
+                    ));
+                }
+                return sessions
+                    .apply_boundary_reply(operation)
+                    .map(|outcome| Answer::Operation { outcome });
+            }
             let outcome = if matches!(
                 operation.request,
                 crate::operations::OperationRequest::Compact { .. }
+                    | crate::operations::OperationRequest::ContextCompact { .. }
             ) {
                 crate::legacy_input::compact(sessions, server, operation, context)?
             } else {
                 sessions.operate(operation)?
             };
             Ok(Answer::Operation { outcome })
+        }
+        Act::ControlReceipt { operation } => sessions
+            .control_receipt(&operation)
+            .map(|receipt| Answer::ControlReceipt { receipt }),
+        Act::ControlReceipts { session, after } => sessions
+            .control_receipts(&session, after.as_deref())
+            .map(|page| Answer::ControlReceipts { page }),
+        Act::ReconcileControl {
+            operation,
+            decision,
+        } => {
+            if context.is_some() {
+                return Err(RunnerError::refused(
+                    "control_reconciliation_service_required",
+                    "reconciliation requires the service's verified responsible person",
+                ));
+            }
+            sessions
+                .reconcile_control(&operation, decision)
+                .map(|receipt| Answer::ControlReceipt { receipt })
         }
         Act::Feed { cursor, follow } => {
             if follow {

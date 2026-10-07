@@ -3,14 +3,20 @@
 use std::collections::{BTreeSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use serde_json::Value;
 
 use crate::error::RunnerError;
 use crate::protocol::Launch;
 pub use crate::tracking_store::managed::{Binding, Executable, ManagedEvent};
 
 mod approval;
+mod context;
+mod initialize;
+mod reminders;
+pub use context::{
+    AppliedContext, BoundaryReply, ContextDecision, ContextReason, ControlPhase, ControlStatus,
+};
+pub use reminders::{QueuedReminder, ReminderDecision, ReminderReference};
 pub mod claude;
 pub mod codex;
 pub mod events;
@@ -70,28 +76,8 @@ pub struct Pending {
     pub kind: Kind,
     /// The admitted text.
     pub text: String,
-}
-
-impl Pending {
-    /// Construct a correlated input without putting its words into an identity.
-    #[must_use]
-    pub fn new(id: String, kind: Kind, text: String) -> Self {
-        let hash = crate::protocol::hex(&Sha256::digest(id.as_bytes()));
-        let uuid = format!(
-            "{}-{}-4{}-a{}-{}",
-            &hash[..8],
-            &hash[8..12],
-            &hash[13..16],
-            &hash[17..20],
-            &hash[20..32]
-        );
-        Self {
-            id,
-            uuid,
-            kind,
-            text,
-        }
-    }
+    pub(crate) reminder: Option<ReminderReference>,
+    pub(crate) authorised: Option<String>,
 }
 
 /// One frame whose turn was reserved by the dispatcher.
@@ -143,6 +129,7 @@ pub struct Update {
     pub receipts: Vec<Receipt>,
     /// Protocol frames to enqueue after their records are durable.
     pub dispatches: Vec<Dispatch>,
+    pub(super) admissions: Vec<(String, Binding, String, Option<String>)>,
 }
 
 /// The projection held under the session table, never an additional store.
@@ -161,8 +148,12 @@ pub struct Controller {
     turn: Option<String>,
     last_result: Option<String>,
     initialized: bool,
+    initialize: String,
+    refusal: Option<String>,
+    replayed: bool,
     closed: bool,
     pending_ids: BTreeSet<String>,
+    authority: context::Authority,
 }
 
 impl Controller {
@@ -193,27 +184,13 @@ impl Controller {
             turn: None,
             last_result: None,
             initialized: false,
+            initialize: crate::protocol::hex(&rand::random::<[u8; 16]>()),
+            refusal: None,
+            replayed: false,
             closed: false,
             pending_ids: BTreeSet::new(),
+            authority: context::Authority::default(),
         })
-    }
-
-    pub(crate) fn bootstrap(&self) -> Update {
-        if self.transport != Transport::Codex {
-            return Update::default();
-        }
-        Update {
-            dispatches: vec![Dispatch {
-                operation: String::new(),
-                frame: json!({
-                    "id":"lys-initialize", "method":"initialize", "params":{
-                        "clientInfo":{"name":"lys","title":null,"version":env!("CARGO_PKG_VERSION")},
-                        "capabilities":{"experimentalApi":false}
-                    }
-                }),
-            }],
-            ..Update::default()
-        }
     }
 
     pub(crate) fn active_turn(&self) -> Option<&str> {
@@ -223,7 +200,7 @@ impl Controller {
     /// Whether authoritative state currently permits a new turn.
     #[must_use]
     pub fn idle(&self) -> bool {
-        self.boundary == Boundary::Idle
+        self.boundary == Boundary::Idle && (!self.authority.required || self.authority.normal)
     }
 
     /// Whether the channel has been bound by harness evidence.
@@ -239,7 +216,13 @@ impl Controller {
         self.boundary = Boundary::Unknown;
         let mut update = Update::default();
         if let Some(current) = self.current.take() {
-            if current.kind == Kind::Compact || !self.admitted {
+            if let Some(reason) = &self.refusal {
+                update.receipts.push(receipt(
+                    &current.id,
+                    crate::operations::OperationState::Refused,
+                    reason,
+                ));
+            } else if current.kind == Kind::Compact || !self.admitted {
                 update.receipts.push(receipt(
                     &current.id,
                     crate::operations::OperationState::Uncertain,
@@ -299,14 +282,26 @@ impl Controller {
             ));
         }
         self.pending_ids.insert(pending.id.clone());
-        self.pending.push_back(pending);
+        if pending.kind == Kind::Compact {
+            let before_input = self
+                .pending
+                .iter()
+                .position(|held| held.kind != Kind::Compact)
+                .unwrap_or(self.pending.len());
+            self.pending.insert(before_input, pending);
+        } else {
+            self.pending.push_back(pending);
+        }
         let mut update = Update::default();
+        if self.boundary == Boundary::Idle {
+            self.request_boundary(&mut update)?;
+        }
         self.dispatch(&mut update)?;
         Ok(update)
     }
 
     fn dispatch(&mut self, update: &mut Update) -> Result<(), RunnerError> {
-        if !self.idle() {
+        if self.boundary != Boundary::Idle || !self.permitted() {
             return Ok(());
         }
         let Some(pending) = self.pending.pop_front() else {
@@ -314,6 +309,8 @@ impl Controller {
         };
         self.pending_ids.remove(&pending.id);
         self.boundary = Boundary::Reserved;
+        self.authority.waiting = None;
+        self.authority.answered = false;
         self.compacted = None;
         self.admitted = false;
         self.turn = None;
@@ -358,6 +355,11 @@ impl Controller {
                 "event belongs to another source",
             ));
         }
+        if self.transport == Transport::Claude
+            && let Some(update) = self.bind_claude(value)?
+        {
+            return Ok(update);
+        }
         if self.transport == Transport::Codex
             && let Some(update) = self.bind_codex(value)?
         {
@@ -393,12 +395,7 @@ impl Controller {
             self.last_result = Some(id.to_owned());
         }
         let observation = match self.transport {
-            Transport::Claude => claude::observe(
-                &self.binding.conversation,
-                &self.binding.harness_version,
-                value,
-                self.current.as_ref(),
-            )?,
+            Transport::Claude => self.observe_claude(value)?,
             Transport::Codex => {
                 codex::observe(&self.binding.conversation, value, self.current.as_ref())?
             }
@@ -412,6 +409,9 @@ impl Controller {
         match observation {
             Observation::Other | Observation::Accepted => {}
             Observation::Ready { compact } => {
+                if self.transport == Transport::Claude {
+                    return self.claude_version(compact);
+                }
                 if self.ready {
                     return Ok(update);
                 }
@@ -419,6 +419,7 @@ impl Controller {
                 self.compact = compact;
                 self.boundary = Boundary::Idle;
                 update.events.push(self.event("control_bound", None, None));
+                self.request_boundary(&mut update)?;
             }
             Observation::Started { turn } => {
                 if self.boundary == Boundary::Reserved || self.boundary == Boundary::Idle {
@@ -430,8 +431,17 @@ impl Controller {
                 }
             }
             Observation::Admitted { uuid, turn } => {
+                if self.transport == Transport::Claude && self.defer_claude_admission(&uuid) {
+                    return Ok(update);
+                }
                 if let Some(current) = &self.current {
                     if current.uuid == uuid && !self.admitted {
+                        update.admissions.push((
+                            current.id.clone(),
+                            self.binding.clone(),
+                            uuid,
+                            turn.clone(),
+                        ));
                         self.admitted = true;
                         if let Some(turn) = turn {
                             self.turn = Some(turn.clone());
@@ -453,17 +463,14 @@ impl Controller {
                 }
             }
             Observation::Compacted { turn } => {
-                if self
-                    .current
-                    .as_ref()
-                    .is_some_and(|current| current.kind == Kind::Compact)
-                    && ((self.transport == Transport::Claude && self.admitted)
-                        || (turn.is_some() && turn == self.turn))
-                {
+                if self.compaction_matches(turn.as_deref()) {
                     self.compacted = Some(turn.unwrap_or_default());
                 }
             }
             Observation::Completed { turn, failed } => {
+                if self.transport == Transport::Claude && !self.initialized {
+                    return Err(self.claude_unproved());
+                }
                 let matches = if self.transport == Transport::Claude {
                     self.current.is_some() && self.boundary != Boundary::Unknown
                 } else {
@@ -502,6 +509,8 @@ impl Controller {
                 }
                 self.boundary = Boundary::Idle;
                 self.turn = None;
+                self.compacted = None;
+                self.request_boundary(&mut update)?;
                 self.dispatch(&mut update)?;
             }
             Observation::Refused => {

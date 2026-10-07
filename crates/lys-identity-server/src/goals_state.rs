@@ -17,6 +17,10 @@ use lys_runner::operations::{OperationOutcome, OperationState};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod control;
+#[cfg(test)]
+pub(crate) use control::compaction_probe;
+mod fold;
 #[path = "goals_index.rs"]
 mod index;
 
@@ -27,7 +31,7 @@ mod operation_tests;
 /// The snapshot domain the goals' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/goals-state/v1";
 
-const FORMAT: &str = "lys-goals-state/v1";
+const FORMAT: &str = "lys-goals-state/v2";
 
 pub use crate::goals_types::{
     Change, Changed, Event, EvidenceKind, GoalError, Holder, HolderKind, Kind, Remind, Standing,
@@ -237,10 +241,24 @@ pub enum Line {
     Changed(Changed),
     /// A reminder fired.
     Fired(Fired),
+    /// A responsible person authorises a separate occurrence after uncertain delivery.
+    Resent(Resent),
     /// A runner's answer to a delivery.
     Answered(Answered),
     /// An event kept.
     Evented(Evented),
+}
+
+/// A distinct occurrence that leaves the regular reminder timer unchanged.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Resent {
+    /// The new occurrence and its intended session deliveries.
+    pub fired: Fired,
+    /// The original session operation whose delivery remains uncertain.
+    pub prior: String,
+    /// The responsible person authorising possible prior delivery.
+    pub by: String,
 }
 
 /// A reminder's timer.
@@ -343,6 +361,8 @@ pub struct Held {
     pub items: Vec<Item>,
     /// The operation ids of the events kept.
     pub events: Vec<String>,
+    /// Prior delivery identities retained by explicitly resent occurrences.
+    pub resends: std::collections::BTreeMap<String, String>,
     #[serde(skip)]
     index: Arc<index::Index>,
 }
@@ -352,14 +372,20 @@ pub struct Held {
 struct Records {
     items: Vec<Item>,
     events: Vec<String>,
+    resends: std::collections::BTreeMap<String, String>,
 }
 
 impl From<Records> for Held {
     fn from(records: Records) -> Self {
-        let index = Arc::new(index::Index::of(&records.items, &records.events));
+        let index = Arc::new(index::Index::of(
+            &records.items,
+            &records.events,
+            &records.resends,
+        ));
         Self {
             items: records.items,
             events: records.events,
+            resends: records.resends,
             index,
         }
     }
@@ -379,48 +405,6 @@ struct Sealed {
 }
 
 impl Held {
-    /// The item `id`.
-    pub fn item(&self, id: &str) -> Option<&Item> {
-        self.index
-            .items
-            .get(id)
-            .and_then(|position| self.items.get(*position))
-    }
-
-    fn position(&self, id: &str) -> Result<usize, String> {
-        self.index
-            .items
-            .get(id)
-            .copied()
-            .ok_or_else(|| format!("no goal `{id}` is held"))
-    }
-
-    fn item_mut(&mut self, id: &str) -> Result<&mut Item, String> {
-        let position = self.position(id)?;
-        self.items
-            .get_mut(position)
-            .ok_or_else(|| format!("no goal `{id}` is held"))
-    }
-
-    /// The judgement kept under `operation`.
-    pub fn marked(&self, operation: &str) -> Option<&Marked> {
-        self.items
-            .get(*self.index.marked.get(operation)?)?
-            .marked
-            .as_ref()
-    }
-
-    /// The change kept under an operation id.
-    pub fn changed(&self, operation: &str) -> Option<&Changed> {
-        let (item, change) = self.index.changed.get(operation)?;
-        self.items.get(*item)?.changes.get(*change)
-    }
-
-    /// Whether `operation` names a firing, event or aim change already kept.
-    pub fn kept(&self, operation: &str) -> bool {
-        self.index.kept.contains(operation)
-    }
-
     /// Every item held on `holder`, in the order set.
     pub fn of_holder<'a>(&'a self, holder: &'a Holder) -> impl Iterator<Item = &'a Item> + 'a {
         self.items
@@ -456,96 +440,6 @@ impl Held {
             .filter(|item| item.standing == Standing::Open && item.active())
             .flat_map(|item| item.timers.iter().filter_map(|timer| timer.next_due))
             .min()
-    }
-
-    /// Fold one leaf. A leaf that contradicts what came before is refused,
-    /// since every kept leaf was checked against it.
-    pub fn hold(&mut self, line: Line) -> Result<(), String> {
-        match line {
-            Line::Set(goal) => {
-                goal.check().map_err(|error| error.to_string())?;
-                if self.item(&goal.id).is_some() {
-                    return Err(format!("goal `{}` is already set", goal.id));
-                }
-                let timers = goal
-                    .reminders
-                    .iter()
-                    .map(|remind| Timer {
-                        remind: remind.clone(),
-                        next_due: first_due(&goal, remind),
-                    })
-                    .collect();
-                Arc::make_mut(&mut self.index)
-                    .items
-                    .insert(goal.id.clone(), self.items.len());
-                self.items.push(Item {
-                    goal,
-                    standing: Standing::Open,
-                    marked: None,
-                    timers,
-                    fired: Vec::new(),
-                    changes: Vec::new(),
-                });
-            }
-            Line::Marked(marked) => {
-                let position = self.position(&marked.goal)?;
-                let operation = marked.operation.clone();
-                let item = self.item_mut(&marked.goal)?;
-                if item.standing != Standing::Open || marked.standing == Standing::Open {
-                    return Err(format!("goal `{}` cannot be marked so", marked.goal));
-                }
-                item.standing = marked.standing;
-                item.marked = Some(marked);
-                for timer in &mut item.timers {
-                    timer.next_due = None;
-                }
-                Arc::make_mut(&mut self.index).mark(position, &operation);
-            }
-            Line::Changed(changed) => {
-                changed.change.check().map_err(|error| error.to_string())?;
-                if self.changed(&changed.operation).is_some() {
-                    return Err(format!(
-                        "operation `{}` already names a change",
-                        changed.operation
-                    ));
-                }
-                let item = self.item_mut(&changed.goal)?;
-                if item.standing != Standing::Open {
-                    return Err(format!("goal `{}` is already closed", changed.goal));
-                }
-                let change = item.changes.len();
-                let position = self.position(&changed.goal)?;
-                Arc::make_mut(&mut self.index).change(position, change, &changed.operation);
-                self.items[position].changes.push(changed);
-            }
-            Line::Fired(fired) => self.fire(fired)?,
-            Line::Answered(answered) => self.answer(&answered)?,
-            Line::Evented(evented) => {
-                if self.kept(&evented.operation) {
-                    return Err(format!("operation `{}` is already kept", evented.operation));
-                }
-                self.events.push(evented.operation.clone());
-                Arc::make_mut(&mut self.index)
-                    .kept
-                    .insert(evented.operation.clone());
-                for goal in &evented.goals {
-                    let item = self.item_mut(goal)?;
-                    if item.standing != Standing::Open {
-                        continue;
-                    }
-                    for timer in &mut item.timers {
-                        if timer.remind
-                            == (Remind::On {
-                                event: evented.event,
-                            })
-                        {
-                            timer.next_due = Some(timer.next_due.unwrap_or(evented.at));
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     fn fire(&mut self, fired: Fired) -> Result<(), String> {
@@ -585,6 +479,7 @@ impl Held {
         sent.state = answered.state;
         sent.words.clone_from(&answered.words);
         sent.at = answered.at;
+        Arc::make_mut(&mut self.index).answer((item, firing, delivery), sent);
         Ok(())
     }
 
@@ -597,22 +492,6 @@ impl Held {
             .get(*firing)?
             .sent
             .get(*delivery)
-    }
-
-    /// Every delivery still asked of a runner, with the text it types.
-    pub fn unsettled(&self) -> Vec<(Sent, String)> {
-        self.items
-            .iter()
-            .filter(|item| item.active())
-            .flat_map(|item| &item.fired)
-            .flat_map(|fired| {
-                fired
-                    .sent
-                    .iter()
-                    .filter(|sent| sent.state.unsettled())
-                    .map(|sent| (sent.clone(), fired.text.clone()))
-            })
-            .collect()
     }
 
     /// Fold every leaf of `tail`, in order.
@@ -638,14 +517,35 @@ impl Held {
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
-        let sealed: Sealed =
+        let value: serde_json::Value =
             serde_json::from_slice(bytes).map_err(|error| format!("goals state: {error}"))?;
-        if sealed.format != FORMAT {
-            return Err(format!(
-                "goals state is in format {}, not {FORMAT}",
-                sealed.format
-            ));
+        let format = value
+            .get("format")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("goals state has no format")?;
+        if format != FORMAT {
+            return Err(format!("goals state is in format {format}, not {FORMAT}"));
         }
+        let sealed: Sealed =
+            serde_json::from_value(value).map_err(|error| format!("goals state: {error}"))?;
         Ok(sealed.held)
     }
+}
+
+/// One pending occurrence with borrowed current authority facts.
+pub struct PendingReminder<'a> {
+    /// The aim and its current standing.
+    pub item: &'a Item,
+    /// The stable occurrence and original due instant.
+    pub fired: &'a Fired,
+    /// This session's delivery receipt.
+    pub sent: &'a Sent,
+    /// A possible earlier delivery, for an explicitly authorised resend.
+    pub prior: Option<&'a str>,
+    /// The currently saved words, without copying edit history.
+    pub words: &'a str,
+    /// Whether the currently saved policy permits reminders.
+    pub active: bool,
+    /// The operation that names the current saved revision.
+    pub version: &'a str,
 }

@@ -19,6 +19,7 @@ use jiff::{Timestamp, ToSpan, Zoned};
 use serde::{Deserialize, Serialize};
 
 use crate::budgets_crossing::{Acted, Crossing, Crossings};
+mod control;
 
 /// The snapshot domain the budgets' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/budgets-state/v2";

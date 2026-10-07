@@ -415,12 +415,12 @@ fn inactivity_suspends_unsettled_deliveries_without_losing_them() -> TestResult 
         "due": 1060, "fired": 1060, "late": false, "text": "reminder", "refused": null,
         "sent": [{"session": "session-1", "operation": "delivery-1", "state": "accepted", "words": "accepted", "at": 1060}],
     }))?)?;
-    assert_eq!(held.unsettled().len(), 1);
+    assert_eq!(held.unsettled()?.len(), 1);
     held.hold(activity("inactive", false)?)?;
-    assert!(held.unsettled().is_empty());
+    assert!(held.unsettled()?.is_empty());
     let mut held = Held::decode(&held.encode()?)?;
     held.hold(activity("active", true)?)?;
-    assert_eq!(held.unsettled()[0].0.operation, "delivery-1");
+    assert_eq!(held.unsettled()?[0].0.operation, "delivery-1");
     Ok(())
 }
 

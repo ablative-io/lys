@@ -31,13 +31,17 @@ use lys_identity::{AgentId, IdentityId, OperationId};
 use lys_runner::operations::Operation;
 use serde::Deserialize;
 
+mod control;
+pub(crate) use control::{ResendBody, ResendLookup, ResendView};
+pub(crate) use control::{boundary_reminders, control_recipient, team_control_recipient};
+
 use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
 use crate::error_team::TeamError;
 use crate::goals_state::{
     EvidenceKind, Goal, GoalError, Holder, HolderKind, Item, Kind, Marked, Remind, Standing,
 };
-use crate::goals_store::{Deliver, Delivering, Goals};
+use crate::goals_store::Goals;
 pub use crate::goals_views::GoalsView;
 use crate::goals_views::ItemView;
 use crate::grants::{caller, with_grants};
@@ -82,6 +86,8 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/agents/{id}/goals", get(agent_goals).post(set_agent_goal))
         .route("/teams/{id}/goals", get(team_goals).post(set_team_goal))
         .route("/goals/{goal}/mark", post(mark))
+        .route("/goals/{goal}/resend", post(control::resend))
+        .route("/goals/{goal}/resends/{prior}", get(control::resend_lookup))
         .route("/goals/{goal}/active", post(crate::goals_edit::active))
         .route("/goals/{goal}/words", post(crate::goals_edit::words))
 }
@@ -421,34 +427,6 @@ async fn mark(
 
 /// Reminders delivered through the runners the service reaches.
 struct Live<'a>(&'a Arc<AppState>);
-
-impl Deliver for Live<'_> {
-    fn sessions(&self, holder: &Holder) -> Result<Vec<String>, String> {
-        let agents = judged(self.0, holder).map_err(|error| error.to_string())?;
-        if self.0.runtime.is_none() {
-            return Ok(Vec::new());
-        }
-        with_runtime(self.0, |store| {
-            Ok(store
-                .sessions()
-                .iter()
-                .filter(|tracked| !tracked.stopped())
-                .filter(|tracked| {
-                    tracked
-                        .agent
-                        .as_ref()
-                        .is_some_and(|agent| agents.contains(agent))
-                })
-                .map(|tracked| tracked.session.clone())
-                .collect())
-        })
-        .map_err(|error| error.to_string())
-    }
-
-    fn operate(&self, operation: Operation) -> Delivering<'_> {
-        Box::pin(crate::runner_operate::operate(self.0, operation))
-    }
-}
 
 /// Start the task that fires each reminder when it falls due, for as long
 /// as `state` is served.

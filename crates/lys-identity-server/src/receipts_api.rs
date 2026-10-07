@@ -20,12 +20,15 @@ use crate::error::ServerError;
 use crate::routes::{AppState, hex, with_directory};
 use crate::runner_acts::ActReceipt;
 
+pub(crate) mod control;
+
 /// The receipt routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/receipts/{index}", get(receipt))
         .route("/service-key", get(service_key))
         .route("/runner-receipts/{index}", get(act_receipt))
+        .merge(control::routes())
 }
 
 async fn service_key(

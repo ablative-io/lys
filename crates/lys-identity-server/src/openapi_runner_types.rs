@@ -29,6 +29,42 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
     let policy = api.schema::<PolicyView>();
     vec![
         (
+            GET,
+            "/agents/{id}/control-sessions",
+            Some(api.schema::<crate::receipts_api::control::PageQuery>()),
+            Some(api.schema::<crate::runtime_state::control::ControlSessions>()),
+        ),
+        (
+            GET,
+            "/runtime/sessions/{session}/controls",
+            None,
+            Some(api.schema::<crate::receipts_api::control::Status>()),
+        ),
+        (
+            GET,
+            "/runtime/sessions/{session}/control-receipts",
+            Some(api.schema::<crate::receipts_api::control::PageQuery>()),
+            Some(api.schema::<lys_runner::operations::ControlPage>()),
+        ),
+        (
+            POST,
+            "/runtime/sessions/{session}/control-receipts/{operation}/reconcile",
+            Some(api.schema::<crate::receipts_api::control::DecisionBody>()),
+            Some(api.schema::<lys_runner::operations::ControlReceipt>()),
+        ),
+        (
+            GET,
+            "/goals/{goal}/resends/{prior}",
+            None,
+            Some(api.schema::<crate::goals_api::ResendLookup>()),
+        ),
+        (
+            POST,
+            "/goals/{goal}/resend",
+            Some(api.schema::<crate::goals_api::ResendBody>()),
+            Some(api.schema::<crate::goals_api::ResendView>()),
+        ),
+        (
             POST,
             "/budgets/person/{id}/confirm",
             Some(api.schema::<BudgetConfirmBody>()),

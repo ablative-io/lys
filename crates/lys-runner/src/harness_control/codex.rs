@@ -131,31 +131,171 @@ pub(super) fn observe(
         )
     })?;
     let params = value.get("params").ok_or_else(|| {
-        RunnerError::refused(
-            "control_protocol_unsupported",
-            "notification has no parameters",
+        notification_error(
+            method,
+            &Value::Null,
+            RunnerError::refused(
+                "control_protocol_unsupported",
+                "notification has no params object",
+            ),
         )
     })?;
+    notification(conversation, method, params)
+        .map_err(|error| notification_error(method, params, error))
+}
+
+enum NotificationKind {
+    Started,
+    Completed,
+    Item,
+    Other,
+    Ended,
+}
+
+fn notification(
+    conversation: &str,
+    method: &str,
+    params: &Value,
+) -> Result<Observation, RunnerError> {
+    if !params.is_object() {
+        return Err(RunnerError::refused(
+            "control_protocol_unsupported",
+            "notification has no params object",
+        ));
+    }
     if method == "thread/started" {
+        if params
+            .pointer("/thread/id")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            return Err(RunnerError::refused(
+                "control_correlation_unsupported",
+                "params.thread.id must be a nonempty string",
+            ));
+        }
+        return Ok(Observation::Other);
+    }
+    if matches!(
+        method,
+        "skills/changed"
+            | "project/changed"
+            | "command/exec/outputDelta"
+            | "process/outputDelta"
+            | "process/exited"
+            | "mcpServer/event/stream/notification"
+            | "account/updated"
+            | "account/gatewayOAuth/changed"
+            | "account/rateLimits/updated"
+            | "app/list/updated"
+            | "remoteControl/status/changed"
+            | "externalAgentConfig/import/progress"
+            | "externalAgentConfig/import/completed"
+            | "fs/changed"
+            | "deprecationNotice"
+            | "configWarning"
+            | "fuzzyFileSearch/sessionUpdated"
+            | "fuzzyFileSearch/sessionCompleted"
+            | "windows/worldWritableWarning"
+            | "windowsSandbox/setupCompleted"
+            | "account/login/completed"
+    ) {
+        return Ok(Observation::Other);
+    }
+    if matches!(
+        method,
+        "warning" | "mcpServer/oauthLogin/completed" | "mcpServer/startupStatus/updated"
+    ) && params.get("threadId").is_none_or(Value::is_null)
+    {
         return Ok(Observation::Other);
     }
     let thread = params
         .get("threadId")
         .and_then(Value::as_str)
+        .filter(|thread| !thread.is_empty())
         .ok_or_else(|| {
             RunnerError::refused(
                 "control_correlation_unsupported",
-                "notification has no thread identity",
+                "params.threadId must be a nonempty string",
             )
         })?;
+    let notification = match method {
+        "turn/started" => NotificationKind::Started,
+        "turn/completed" => NotificationKind::Completed,
+        "item/started" | "item/completed" => NotificationKind::Item,
+        "thread/closed" | "thread/archived" | "thread/deleted" | "thread/reverted" => {
+            NotificationKind::Ended
+        }
+        "error"
+        | "thread/status/changed"
+        | "thread/unarchived"
+        | "thread/name/updated"
+        | "thread/attachment/updated"
+        | "thread/goal/updated"
+        | "thread/goal/cleared"
+        | "thread/queue/changed"
+        | "thread/project/updated"
+        | "thread/environment/connected"
+        | "thread/environment/disconnected"
+        | "thread/settings/updated"
+        | "thread/tokenUsage/updated"
+        | "hook/started"
+        | "hook/completed"
+        | "turn/diff/updated"
+        | "turn/plan/updated"
+        | "item/autoApprovalReview/started"
+        | "item/autoApprovalReview/completed"
+        | "autoApprovalReview/strictReviewRequired"
+        | "rawResponseItem/completed"
+        | "rawResponse/completed"
+        | "item/agentMessage/delta"
+        | "item/plan/delta"
+        | "item/commandExecution/outputDelta"
+        | "item/commandExecution/terminalInteraction"
+        | "item/fileChange/outputDelta"
+        | "item/fileChange/patchUpdated"
+        | "serverRequest/resolved"
+        | "item/mcpToolCall/progress"
+        | "mcpServer/oauthLogin/completed"
+        | "mcpServer/startupStatus/updated"
+        | "item/reasoning/summaryTextDelta"
+        | "item/reasoning/summaryPartAdded"
+        | "item/reasoning/textDelta"
+        | "thread/compacted"
+        | "model/rerouted"
+        | "model/verification"
+        | "modelProvider/authRecoveryStarted"
+        | "modelProvider/authRecoveryCompleted"
+        | "turn/moderationMetadata"
+        | "model/safetyBuffering/updated"
+        | "warning"
+        | "guardianWarning"
+        | "thread/realtime/started"
+        | "thread/realtime/itemAdded"
+        | "thread/realtime/item/started"
+        | "thread/realtime/item/transcript/delta"
+        | "thread/realtime/item/completed"
+        | "thread/realtime/transcript/delta"
+        | "thread/realtime/transcript/done"
+        | "thread/realtime/outputAudio/delta"
+        | "thread/realtime/sdp"
+        | "thread/realtime/error"
+        | "thread/realtime/closed" => NotificationKind::Other,
+        _ => {
+            return Err(RunnerError::refused(
+                "control_protocol_unsupported",
+                "notification method is unsupported",
+            ));
+        }
+    };
     if thread != conversation {
         return Ok(Observation::Other);
     }
-    match method {
-        "turn/started" => Ok(Observation::Started {
+    match notification {
+        NotificationKind::Started => Ok(Observation::Started {
             turn: required(params, "/turn/id")?,
         }),
-        "turn/completed" => {
+        NotificationKind::Completed => {
             let status = required(params, "/turn/status")?;
             if !matches!(status.as_str(), "completed" | "failed" | "interrupted") {
                 return Err(RunnerError::refused(
@@ -168,7 +308,7 @@ pub(super) fn observe(
                 failed: status != "completed",
             })
         }
-        "item/completed" | "item/started" => {
+        NotificationKind::Item => {
             let kind = required(params, "/item/type")?;
             if kind == "contextCompaction" && method == "item/completed" {
                 Ok(Observation::Compacted {
@@ -204,26 +344,28 @@ pub(super) fn observe(
                 ))
             }
         }
-        "thread/status/changed"
-        | "thread/name/updated"
-        | "thread/tokenUsage/updated"
-        | "thread/compacted"
-        | "turn/diff/updated"
-        | "turn/plan/updated"
-        | "item/agentMessage/delta"
-        | "item/plan/delta"
-        | "item/commandExecution/outputDelta"
-        | "item/fileChange/outputDelta"
-        | "item/fileChange/patchUpdated"
-        | "item/mcpToolCall/progress"
-        | "item/reasoning/summaryTextDelta"
-        | "item/reasoning/summaryPartAdded"
-        | "item/reasoning/textDelta" => Ok(Observation::Other),
-        _ => Err(RunnerError::refused(
-            "control_protocol_unsupported",
-            "notification method is unsupported",
+        NotificationKind::Other => Ok(Observation::Other),
+        NotificationKind::Ended => Err(RunnerError::refused(
+            "control_thread_ended",
+            format!("the bound conversation ended or was rewritten by {method}"),
         )),
     }
+}
+
+fn notification_error(method: &str, params: &Value, mut error: RunnerError) -> RunnerError {
+    if let RunnerError::Refused { words, .. } = &mut error {
+        let keys: Vec<&str> = params
+            .as_object()
+            .into_iter()
+            .flat_map(|params| params.keys().map(String::as_str))
+            .collect();
+        *words = format!(
+            "{words}; method={}; params_keys={}",
+            json!(method),
+            json!(keys)
+        );
+    }
+    error
 }
 
 fn required(value: &Value, path: &str) -> Result<String, RunnerError> {

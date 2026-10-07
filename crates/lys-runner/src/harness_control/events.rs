@@ -32,8 +32,10 @@ pub(crate) fn live(
         session: binding.session.clone(),
         generation: binding.generation,
     };
+    let mut controller = Controller::new(binding, transport)?;
+    controller.require_boundary_authority()?;
     let runtime = Runtime {
-        controller: Controller::new(binding, transport)?,
+        controller,
         pipe: Input::new(writer),
         admissions: BTreeMap::new(),
         left: Arc::new(AtomicBool::new(false)),
@@ -143,19 +145,33 @@ pub(crate) fn enqueue_operation(
         .get(id)
         .ok_or_else(|| RunnerError::refused("session_unknown", "session is not held"))?
         .generation;
-    let kind = if matches!(request, OperationRequest::Compact { .. }) {
+    let kind = if matches!(
+        request,
+        OperationRequest::Compact { .. } | OperationRequest::ContextCompact { .. }
+    ) {
         Kind::Compact
     } else {
         Kind::Reminder
     };
-    let pending = Pending::new(
-        operation.to_owned(),
-        kind,
-        crate::operations::managed_take(table, id, operation)?,
-    );
-    let update = runtime(table, id, generation)?
-        .controller
-        .enqueue(pending)?;
+    let text = crate::operations::managed_take(table, id, operation)?;
+    let pending = match request {
+        OperationRequest::GoalReminder { reference, .. } => {
+            Pending::for_goal(operation.to_owned(), text, reference.clone())
+        }
+        _ => Pending::new(operation.to_owned(), kind, text),
+    };
+    let control = &mut runtime(table, id, generation)?.controller;
+    let update = if let OperationRequest::ContextCompact { crossing, .. } = request {
+        if crossing != operation {
+            return Err(RunnerError::refused(
+                "control_crossing_changed",
+                "the crossing does not name its operation",
+            ));
+        }
+        control.context_compact(pending)?
+    } else {
+        control.enqueue(pending)?
+    };
     match apply(table, id, generation, update) {
         Ok(()) => Ok(()),
         Err(error) => {
@@ -172,6 +188,13 @@ pub(super) fn apply(
     generation: u64,
     update: Update,
 ) -> Result<(), RunnerError> {
+    for (operation, binding, uuid, turn) in update.admissions {
+        if table.operations.get(&operation).is_some() {
+            table
+                .operations
+                .observed(&operation, &binding, &uuid, turn)?;
+        }
+    }
     if !update.events.is_empty() {
         table.feed.append(
             id,
@@ -240,12 +263,13 @@ pub(super) fn apply(
             continue;
         }
         if !dispatch.operation.is_empty() && table.operations.get(&dispatch.operation).is_some() {
-            crate::operations::managed_state(
-                table,
-                &dispatch.operation,
-                OperationState::Delivering,
-                "managed request prepared".to_owned(),
-            )?;
+            let (prepared, text) = runtime(table, id, generation)?
+                .controller
+                .preparation(&dispatch)?;
+            table
+                .operations
+                .prepare(&dispatch.operation, prepared, text)?;
+            table.operations.arm(&dispatch.operation)?;
         }
         let mut bytes = serde_json::to_vec(&dispatch.frame)
             .map_err(|error| RunnerError::refused("control_frame_invalid", error.to_string()))?;
@@ -395,14 +419,10 @@ impl Sessions {
                 crate::error::said("control_input_caller_left: transport loss was not received");
             }
         }
-        let ended = match crate::pty::end_left_group(&leader) {
-            Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => Ok(()),
-            Ok(left) => Err(RunnerError::refused(
-                "control_process_end_unconfirmed",
-                format!("lost managed process group could not be ended: {left:?}"),
-            )),
-            Err(error) => Err(error),
-        };
+        let ended = lost_cleanup(crate::pty::end_left_group(&leader));
+        if let Ok(Some(diagnostic)) = &ended {
+            crate::error::said(&format!("session {id}: {diagnostic}"));
+        }
         let durable = self.writer.barrier();
         self.wake();
         if let Err(error) = &applied {
@@ -547,9 +567,97 @@ mod tests {
         sessions.wake();
         Ok(())
     }
+
+    struct Service {
+        sessions: Arc<Sessions>,
+        ended: Arc<std::sync::atomic::AtomicBool>,
+        worker: Option<std::thread::JoinHandle<std::result::Result<(), crate::error::RunnerError>>>,
+    }
+
+    impl Service {
+        fn start(sessions: &Arc<Sessions>, source: &Binding) -> Result<Self> {
+            let ended = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let done = Arc::clone(&ended);
+            let owner = Arc::clone(sessions);
+            let source = source.clone();
+            let worker = std::thread::Builder::new()
+                .name("fixture-boundary-service".to_owned())
+                .spawn(move || {
+                    let mut answered = None;
+                    loop {
+                        let boundary = match owner.until_any(&done, |table| {
+                            table
+                                .sessions
+                                .get(&source.session)
+                                .and_then(|session| session.live.as_ref())
+                                .and_then(|live| live.control.as_ref())
+                                .and_then(|control| control.controller.control_status().boundary)
+                                .filter(|boundary| answered.as_ref() != Some(boundary))
+                        }) {
+                            Ok(boundary) => boundary,
+                            Err(error)
+                                if error.name() == "caller_left" && done.load(Ordering::SeqCst) =>
+                            {
+                                return Ok(());
+                            }
+                            Err(error) => return Err(error),
+                        };
+                        owner.apply_boundary_reply(Operation {
+                            operation: format!("fixture-{boundary}"),
+                            session: source.session.clone(),
+                            request: OperationRequest::BoundaryReply {
+                                reply: crate::harness_control::BoundaryReply {
+                                    generation: source.generation,
+                                    boundary: Some(boundary.clone()),
+                                    context: crate::harness_control::ContextDecision::Released,
+                                    reminders: Vec::new(),
+                                },
+                            },
+                        })?;
+                        answered = Some(boundary);
+                    }
+                })?;
+            Ok(Self {
+                sessions: Arc::clone(sessions),
+                ended,
+                worker: Some(worker),
+            })
+        }
+    }
+
+    impl Drop for Service {
+        fn drop(&mut self) {
+            self.ended.store(true, Ordering::SeqCst);
+            self.sessions.wake();
+            if let Some(worker) = self.worker.take() {
+                match worker.join() {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => panic!("fixture boundary service failed: {error}"),
+                    Err(reason) => panic!("fixture boundary service panicked: {reason:?}"),
+                }
+            }
+        }
+    }
     fn fixture(
         transport: Transport,
         human: bool,
+        test: impl FnOnce(&Arc<Sessions>, &Binding, &mpsc::Receiver<Vec<u8>>, &AtomicUsize) -> Result,
+    ) -> Result {
+        controlled_fixture(transport, human, true, test)
+    }
+    fn controlled_fixture(
+        transport: Transport,
+        human: bool,
+        automatic: bool,
+        test: impl FnOnce(&Arc<Sessions>, &Binding, &mpsc::Receiver<Vec<u8>>, &AtomicUsize) -> Result,
+    ) -> Result {
+        gated_fixture(transport, human, automatic, None, test)
+    }
+    fn gated_fixture(
+        transport: Transport,
+        human: bool,
+        automatic: bool,
+        gate: Option<mpsc::Receiver<()>>,
         test: impl FnOnce(&Arc<Sessions>, &Binding, &mpsc::Receiver<Vec<u8>>, &AtomicUsize) -> Result,
     ) -> Result {
         let directory = tempfile::tempdir()?;
@@ -594,7 +702,13 @@ mod tests {
         let (runtime, bridge) = super::live(
             binding.clone(),
             transport,
-            Box::new(Pipe(sender)),
+            match gate {
+                Some(release) => Box::new(PausedPipe {
+                    frames: sender,
+                    release,
+                }),
+                None => Box::new(Pipe(sender)),
+            },
             Arc::downgrade(&sessions),
         )?;
         let terminal_input = {
@@ -619,12 +733,71 @@ mod tests {
             )
         };
         match transport {
-            Transport::Claude => observe(
-                &sessions,
-                &binding,
-                &json!({"type":"system","subtype":"init",
-                "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
-            )?,
+            Transport::Claude => {
+                let initialize = {
+                    let mut table = sessions.lock()?;
+                    super::runtime(&mut table, "fixture", binding.generation)?
+                        .controller
+                        .bootstrap()
+                };
+                let correlation = initialize
+                    .dispatches
+                    .first()
+                    .ok_or("fixture initialize missing")?
+                    .frame["request_id"]
+                    .as_str()
+                    .ok_or("fixture initialize uncorrelated")?;
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"control_response",
+                    "response":{"subtype":"success","request_id":correlation,"response":{}}}),
+                )?;
+                let uuid = {
+                    let mut table = sessions.lock()?;
+                    let controller =
+                        &mut super::runtime(&mut table, "fixture", binding.generation)?.controller;
+                    let pending = super::Pending::new(
+                        "fixture-initialization".to_owned(),
+                        super::Kind::Human,
+                        "first turn".to_owned(),
+                    );
+                    let uuid = pending.uuid.clone();
+                    controller.enqueue(pending)?;
+                    let status = controller.control_status();
+                    let update =
+                        controller.boundary_reply(&crate::harness_control::BoundaryReply {
+                            generation: status.generation,
+                            boundary: status.boundary,
+                            context: crate::harness_control::ContextDecision::Released,
+                            reminders: Vec::new(),
+                        })?;
+                    assert_eq!(update.dispatches.len(), 1);
+                    assert_eq!(
+                        update.dispatches[0].frame["message"]["content"],
+                        "first turn"
+                    );
+                    uuid
+                };
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"system","subtype":"init",
+                    "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
+                )?;
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"user","session_id":"conversation","uuid":uuid,
+                    "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
+                )?;
+                observe(
+                    &sessions,
+                    &binding,
+                    &json!({"type":"result","session_id":"conversation",
+                    "uuid":"fixture-initialization-result","is_error":false}),
+                )?;
+            }
             Transport::Codex => {
                 observe(
                     &sessions,
@@ -643,7 +816,13 @@ mod tests {
             }
             Transport::Pty => return Err("fixture requires a managed adapter".into()),
         }
+        let service = if automatic {
+            Some(Service::start(&sessions, &binding)?)
+        } else {
+            None
+        };
         let result = test(&sessions, &binding, &frames, &terminal);
+        drop(service);
         drop(cleanup);
         drop(terminal_input);
         result
@@ -654,6 +833,192 @@ mod tests {
             session: "fixture".to_owned(),
             request,
         }
+    }
+
+    struct PausedPipe {
+        frames: mpsc::Sender<Vec<u8>>,
+        release: mpsc::Receiver<()>,
+    }
+    impl Write for PausedPipe {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.frames
+                .send(bytes.to_vec())
+                .map_err(std::io::Error::other)?;
+            self.release.recv().map_err(std::io::Error::other)?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    struct Release(mpsc::Sender<()>);
+    impl Drop for Release {
+        fn drop(&mut self) {
+            if let Err(error) = self.0.send(()) {
+                crate::error::said(&format!("fixture_release_failed: {error}"));
+            }
+        }
+    }
+    fn boundary_syncs(refused: usize) -> Result {
+        let (release, gate) = mpsc::channel();
+        gated_fixture(
+            Transport::Claude,
+            false,
+            false,
+            Some(gate),
+            move |sessions, source, frames, terminal| {
+                let release = Release(release);
+                for number in 0..=refused {
+                    sessions.operate(operation(
+                        &format!("delivery-{number}"),
+                        OperationRequest::GoalReminder {
+                            text: "saved words".to_owned(),
+                            reference: crate::harness_control::ReminderReference {
+                                goal: format!("goal-{number}"),
+                                occurrence: format!("occurrence-{number}"),
+                                version: "version".to_owned(),
+                                prior: None,
+                            },
+                        },
+                    ))?;
+                }
+                sessions.writer.barrier()?;
+                let (status, path) = {
+                    let mut table = sessions.lock()?;
+                    (
+                        super::runtime(&mut table, "fixture", source.generation)?
+                            .controller
+                            .control_status(),
+                        table.operations.test_journal_path().to_owned(),
+                    )
+                };
+                let reminders = status
+                    .queued
+                    .iter()
+                    .enumerate()
+                    .map(|(number, queued)| {
+                        if number < refused {
+                            crate::harness_control::ReminderDecision::Refuse {
+                                operation: queued.operation.clone(),
+                                reference: queued.reference.clone(),
+                                reason: "current goal withdrawn".to_owned(),
+                            }
+                        } else {
+                            crate::harness_control::ReminderDecision::Deliver {
+                                operation: queued.operation.clone(),
+                                reference: queued.reference.clone(),
+                                text: "current words".to_owned(),
+                            }
+                        }
+                    })
+                    .collect();
+                sessions.writer.serial_appends();
+                let before = sessions.writer.sync_count(&path)?;
+                let answer = sessions.apply_boundary_reply(operation(
+                    "decision",
+                    OperationRequest::BoundaryReply {
+                        reply: crate::harness_control::BoundaryReply {
+                            generation: source.generation,
+                            boundary: status.boundary,
+                            context: crate::harness_control::ContextDecision::Released,
+                            reminders,
+                        },
+                    },
+                ))?;
+                let syncs = sessions.writer.sync_count(&path)? - before;
+                let frame = frames.recv()?;
+                drop(release);
+                assert_eq!(answer.state, OperationState::Confirmed);
+                assert!(!frame.is_empty());
+                assert_eq!(terminal.load(Ordering::SeqCst), 0);
+                println!("boundary_batch refused={refused} dispatched=1 journal_syncs={syncs}");
+                assert_eq!(syncs, 1);
+                Ok(())
+            },
+        )
+    }
+    #[test]
+    fn one_boundary_dispatch_is_one_explicit_journal_sync() -> Result {
+        boundary_syncs(0)
+    }
+    #[test]
+    fn five_refusals_and_a_boundary_dispatch_are_one_explicit_journal_sync() -> Result {
+        boundary_syncs(5)
+    }
+
+    #[test]
+    fn a_boundary_journal_refusal_keeps_authority_and_queued_words_unchanged() -> Result {
+        controlled_fixture(
+            Transport::Claude,
+            false,
+            false,
+            |sessions, source, frames, terminal| {
+                let reference = crate::harness_control::ReminderReference {
+                    goal: "goal".to_owned(),
+                    occurrence: "occurrence".to_owned(),
+                    version: "old".to_owned(),
+                    prior: None,
+                };
+                sessions.operate(operation(
+                    "delivery",
+                    OperationRequest::GoalReminder {
+                        text: "old words".to_owned(),
+                        reference: reference.clone(),
+                    },
+                ))?;
+                let (before, offset) = {
+                    let mut table = sessions.lock()?;
+                    let status = super::runtime(&mut table, "fixture", source.generation)?
+                        .controller
+                        .control_status();
+                    let offset = table.operations.test_journal_offset(u64::MAX);
+                    (status, offset)
+                };
+                let mut reference = reference;
+                reference.version = "current".to_owned();
+                let reply = operation(
+                    "decision",
+                    OperationRequest::BoundaryReply {
+                        reply: crate::harness_control::BoundaryReply {
+                            generation: source.generation,
+                            boundary: before.boundary.clone(),
+                            context: crate::harness_control::ContextDecision::Released,
+                            reminders: vec![crate::harness_control::ReminderDecision::Deliver {
+                                operation: "delivery".to_owned(),
+                                reference,
+                                text: "current words".to_owned(),
+                            }],
+                        },
+                    },
+                );
+                let refused = sessions.apply_boundary_reply(reply.clone());
+                let after = {
+                    let mut table = sessions.lock()?;
+                    table.operations.test_journal_offset(offset);
+                    assert!(table.operations.get("decision").is_none());
+                    super::runtime(&mut table, "fixture", source.generation)?
+                        .controller
+                        .control_status()
+                };
+                assert!(
+                    refused
+                        .err()
+                        .ok_or("journal refusal was accepted")?
+                        .to_string()
+                        .contains("journal offset overflows")
+                );
+                assert_eq!(after, before);
+                assert!(matches!(frames.try_recv(), Err(mpsc::TryRecvError::Empty)));
+                assert_eq!(terminal.load(Ordering::SeqCst), 0);
+                assert_eq!(
+                    sessions.apply_boundary_reply(reply)?.state,
+                    OperationState::Confirmed
+                );
+                let frame: Value = serde_json::from_slice(&frames.recv()?)?;
+                assert_eq!(frame["message"]["content"], "Lys reminder\ncurrent words");
+                Ok(())
+            },
+        )
     }
 
     #[test]
@@ -741,7 +1106,7 @@ mod tests {
                 observe(
                     sessions,
                     source,
-                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation"}),
+                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":{"trigger":"manual"}}),
                 )?;
                 observe(
                     sessions,
@@ -829,7 +1194,7 @@ mod tests {
                 observe(
                     sessions,
                     source,
-                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation"}),
+                    &json!({"type":"system","subtype":"compact_boundary","session_id":"conversation","compact_metadata":{"trigger":"manual"}}),
                 )?;
                 observe(
                     sessions,
@@ -885,5 +1250,151 @@ mod tests {
                 Ok(())
             },
         )
+    }
+
+    fn control_answer(
+        sessions: &Arc<Sessions>,
+        session: &str,
+    ) -> std::result::Result<crate::protocol::Answer, Box<dyn std::error::Error>> {
+        let act: crate::protocol::Act =
+            serde_json::from_value(serde_json::json!({"act":"control_status","session":session}))?;
+        let dir = tempfile::tempdir()?;
+        let key = lys_core::Ed25519Identity::load_or_generate(&dir.path().join("key"))?;
+        let greeting = crate::protocol::Greeting::fresh("21");
+        let line = crate::protocol::sign_request(&key, &greeting, &act)?;
+        Ok(crate::socket::dispatch(
+            sessions,
+            &key.public_key_bytes(),
+            &greeting,
+            &line,
+            &std::sync::atomic::AtomicBool::new(false),
+        ))
+    }
+
+    #[test]
+    fn current_control_status_matches_the_same_sessions_status_fields() -> Result {
+        fixture(Transport::Claude, false, |sessions, _, _, _| {
+            sessions.until_any(&std::sync::atomic::AtomicBool::new(false), |table| {
+                table
+                    .sessions
+                    .get("fixture")
+                    .and_then(|session| session.live.as_ref())
+                    .and_then(|live| live.control.as_ref())
+                    .and_then(|runtime| runtime.controller.control_status().context)
+            })?;
+            let ordinary = sessions.status(Some("fixture"))?;
+            let answer = serde_json::to_value(control_answer(sessions, "fixture")?)?;
+            assert_eq!(answer["kind"], "control_status");
+            assert_eq!(answer["session"], "fixture");
+            assert_eq!(
+                answer["control"],
+                serde_json::to_value(&ordinary.sessions[0].control)?
+            );
+            assert!(!answer["control"].is_null());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn current_control_status_refuses_an_unknown_session_by_name() -> Result {
+        fixture(Transport::Claude, false, |sessions, _, _, _| {
+            let answer = serde_json::to_value(control_answer(sessions, "unknown")?)?;
+            assert_eq!(answer["kind"], "refused");
+            assert_eq!(answer["refusal"], "session_unknown");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn current_control_status_does_not_visit_long_account_move_history() -> Result {
+        fixture(Transport::Claude, false, |sessions, _, _, _| {
+            let mut rotation = crate::rotation::RotationState::new(crate::rotation::Rotation {
+                accounts: (0..10001)
+                    .map(|number| format!("handle-{number}"))
+                    .collect(),
+                variable: "LYS_ACCOUNT".to_owned(),
+                resume_arguments: Vec::new(),
+                limit: crate::rotation::Limit::PlanWindow,
+            })?;
+            for number in 0..10000 {
+                rotation.advance(number).ok_or("rotation ended early")?;
+            }
+            sessions
+                .lock()?
+                .sessions
+                .get_mut("fixture")
+                .ok_or("session absent")?
+                .rotation = Some(rotation);
+            crate::session::control_history::READS.with(|reads| reads.set(0));
+            assert_eq!(
+                sessions.status(Some("fixture"))?.sessions[0].moves.len(),
+                10000
+            );
+            assert_eq!(
+                crate::session::control_history::READS.with(std::cell::Cell::get),
+                10000
+            );
+            crate::session::control_history::READS.with(|reads| reads.set(0));
+            let answer = serde_json::to_value(control_answer(sessions, "fixture")?)?;
+            assert_eq!(answer["kind"], "control_status");
+            assert_eq!(
+                crate::session::control_history::READS.with(std::cell::Cell::get),
+                0
+            );
+            Ok(())
+        })
+    }
+}
+
+fn lost_cleanup(
+    left: Result<crate::pty::Left, RunnerError>,
+) -> Result<Option<String>, RunnerError> {
+    match left {
+        Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => Ok(None),
+        Ok(crate::pty::Left::Ended {
+            reason: Some(reason),
+        }) => Ok(Some(format!("control_group_cleanup_proved: {reason}"))),
+        Ok(left) => Err(RunnerError::refused(
+            "control_process_end_unconfirmed",
+            format!("lost managed process group could not be ended: {left:?}"),
+        )),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::lost_cleanup;
+    use crate::error::RunnerError;
+    use crate::pty::Left;
+    #[test]
+    fn successful_cleanup_diagnostics_prove_the_lost_group()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let diagnostic = "EPERM errno 1; member exit observed";
+        assert_eq!(
+            lost_cleanup(Ok(Left::Ended {
+                reason: Some(diagnostic.to_owned())
+            }))?,
+            Some(format!("control_group_cleanup_proved: {diagnostic}"))
+        );
+        for left in [
+            Left::Unended {
+                reason: "still live".to_owned(),
+            },
+            Left::Reused,
+        ] {
+            let error = lost_cleanup(Ok(left))
+                .err()
+                .ok_or("unproved cleanup passed")?;
+            assert_eq!(error.name(), "control_process_end_unconfirmed");
+        }
+        let error = lost_cleanup(Err(RunnerError::refused(
+            "process_group_unreadable",
+            "denied",
+        )))
+        .err()
+        .ok_or("unreadable cleanup passed")?;
+        assert_eq!(error.name(), "process_group_unreadable");
+        Ok(())
     }
 }
