@@ -14,6 +14,8 @@
 
 **S167.** As a person starting an agent, I want its session's handles issued to a key only its runner holds, so that the agent can use every handle it is launched with and no key is ever handed to it.
 
+**S168.** As a person, I want to connect my own service account to Lys from a screen, so that my agent can use it through a handle and nobody carries my tokens by hand.
+
 ## AI Agent — Uses a handle for its outbound calls and reads its sealed records
 
 **S4.** As an agent, I want to make my call with my handle and have the proxy swap in the credential, refreshing an expired OAuth token itself, so that I can do my work without ever seeing a credential.
@@ -23,6 +25,8 @@
 **S20.** As an agent holding a lease, I want to give it back by a relinquish recorded as my own act, so that ending my own access is never recorded as a revoke nobody asked for.
 
 **S165.** As an agent, I want the broker to sign my requests with the key it holds for me, so that I can prove who I am without ever holding the key.
+
+**S169.** As an agent that runs all day, I want to renew my handle by presenting it, within my grant, so that I keep working without a person issuing again and without ever seeing the credential.
 
 ## Token revolver — The worker that runs Claude sessions and builders and turns to the next account on usage-limit words
 

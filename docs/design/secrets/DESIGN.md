@@ -170,6 +170,18 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `docs/design/secrets/briefs/SECRETS-008.json` | a service issues a handle to a named key | SECRETS-008 |
 | `docs/design/secrets/briefs/SECRETS-008.md` | its rendered markdown | SECRETS-008 |
 | `crates/lys-secrets/src/broker/lineage.rs` | Derived handles, their line and the lend rules, with derive's checks shared with the issue route's derive. | SECRETS-008 |
+| `crates/lys-secrets/src/broker/oauth_consent_tests.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-secrets/src/broker/oauth_grants.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-identity-server/src/secrets_consent.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-identity-server/src/secrets_consent_tests.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-identity-server/src/secrets_api.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-secrets/src/bin/lys-secrets/consent.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-secrets/src/bin/lys-secrets/consent_tests.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-secrets/src/bin/lys-secrets/router.rs` | service consent or handle renewal; SECRETS-009 | SECRETS-009 |
+| `crates/lys-secrets/src/bin/lys-secrets/renew.rs` | service consent or handle renewal; SECRETS-010 | SECRETS-010 |
+| `crates/lys-secrets/src/bin/lys-secrets/renew_tests.rs` | service consent or handle renewal; SECRETS-010 | SECRETS-010 |
+| `crates/lys-secrets/src/broker/handles.rs` | service consent or handle renewal; SECRETS-010 | SECRETS-010 |
+| `crates/lys-secrets/src/broker/handles_tests.rs` | service consent or handle renewal; SECRETS-010 | SECRETS-010 |
 
 ## Inventory
 

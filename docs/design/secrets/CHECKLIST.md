@@ -77,3 +77,10 @@
 
 - [ ] **C416** — The service lys-identity-server derives a handle under one the agent holds, bound to a public key it names, only when the holder acts for the person it acts on behalf of (SECRETS-008 R1).
 - [ ] **C417** — Every issue through the route is on the audit record, and its handle token is in no log or audit line (SECRETS-008 R2).
+
+## Service consent and renewal (SECRETS-009, SECRETS-010)
+
+- [ ] **C418** — A provider's consent client is sealed once by the operator and never leaves the broker (SECRETS-009 R1).
+- [ ] **C419** — A signed-in person starts and finishes consent with a single-use state and PKCE bound to the session (SECRETS-009 R2).
+- [ ] **C420** — The broker exchanges the code and seals the grant with its provenance, owned by the person (SECRETS-009 R3).
+- [ ] **C422** — A holder renews its live handle within its grant, and the old one ends in the same act (SECRETS-010 R1).
