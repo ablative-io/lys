@@ -567,7 +567,12 @@ mod tests {
 
     impl Drop for Service {
         fn drop(&mut self) {
+            let table = match self.sessions.lock() {
+                Ok(table) => table,
+                Err(error) => panic!("fixture boundary service lock failed: {error}"),
+            };
             self.ended.store(true, Ordering::SeqCst);
+            drop(table);
             self.sessions.wake();
             if let Some(worker) = self.worker.take() {
                 match worker.join() {
