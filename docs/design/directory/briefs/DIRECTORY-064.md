@@ -303,6 +303,7 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - create: crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl
 - create: crates/lys-runner/tests/fixtures/qualifier/fixture-pass.jsonl
 - create: crates/lys-runner/examples/qualify_adapter/diagnostics.rs
+- create: crates/lys-runner/src/pty/cleanup.rs
 - modify: surface/identity/src/features/usage/Usage.tsx
 - modify: surface/identity/src/features/usage/usage.css
 - modify: surface/identity/tests/usage.test.tsx
@@ -311,6 +312,7 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - modify: surface/identity/vite.config.ts
 - modify: crates/lys-runner/src/pty.rs
 - modify: crates/lys-runner/tests/pty_stop.rs
+- modify: crates/lys-runner/src/session/stop.rs
 
 **Checklist:**
 - C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6).

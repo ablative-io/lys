@@ -325,7 +325,8 @@
           "crates/lys-runner/examples/qualify_adapter/owned.rs",
           "crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl",
           "crates/lys-runner/tests/fixtures/qualifier/fixture-pass.jsonl",
-          "crates/lys-runner/examples/qualify_adapter/diagnostics.rs"
+          "crates/lys-runner/examples/qualify_adapter/diagnostics.rs",
+          "crates/lys-runner/src/pty/cleanup.rs"
         ],
         "modify": [
           "surface/identity/src/features/usage/Usage.tsx",
@@ -335,7 +336,8 @@
           "surface/identity/src/api.ts",
           "surface/identity/vite.config.ts",
           "crates/lys-runner/src/pty.rs",
-          "crates/lys-runner/tests/pty_stop.rs"
+          "crates/lys-runner/tests/pty_stop.rs",
+          "crates/lys-runner/src/session/stop.rs"
         ],
         "delete": []
       },
@@ -729,6 +731,12 @@
       "by": "Archie",
       "subject": "Amendment 60's exit events: nix's event feature, end_left_group's signature and callers unchanged, cancellation in the same wait",
       "ruling": "Granted (Brisket 6e7285b2): crates/lys-runner/Cargo.toml enables nix 0.28's event feature for kqueue. It adds poll only if the Linux pidfd wait needs it, and the handback says which. No version change, no new dependency, no unsafe, and Cargo.lock unchanged (read back). pidfd comes from rustix's process feature, already enabled. end_left_group (pty.rs line 218) keeps its public signature. Its callers at main (harness_control/events.rs 398, session/adopt.rs 218, session/lifecycle/terminal.rs 136, session/stop.rs 168 and 198, tests/pty_stop.rs 86 and 122) do not change. It calls a private pty.rs function that takes an optional cancellation descriptor. With none, the wait is the exit events alone. Members are proved ours and sent SIGKILL, so the wait ends when the kernel reports each exit, not on a clock. The qualifier (owned.rs) runs the cancellable variant off its async thread, with its cancellation descriptor in the same kqueue (EVFILT_READ on a pipe, or EVFILT_USER) or poll set as the pidfds. A cancelled wait is Unended, naming the members still awaited. No timer, no polling loop, no sleep. If a runner caller is found running on an async thread, where blocking would stall others, the handback lists it with file and line, and it is ruled then. No caller is changed in this box without that."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "Amendment 60's cleanup is a private pty/cleanup.rs; the qualifier awaits it; cord() signals under the session table lock and waits only after releasing it",
+      "ruling": "Brisket ce88092e read every end_left_group caller at 118cb179: qualify_adapter/owned.rs 268, harness_control/events.rs 422, session/adopt.rs 218 and session/lifecycle/terminal.rs 136 (each on its own std thread), session/stop.rs 168 and 198, and tests/pty_stop.rs 86 and 122. Socket acts already run on spawn_blocking (socket/connection.rs 242). Granted: R6 creates crates/lys-runner/src/pty/cleanup.rs, private to pty. It holds amendment 60's cycle, proof, kqueue and pidfd wait, so pty.rs stays under the length line without packing. examples/qualify_adapter.rs (already R6) awaits the blocking cleanup at its two stop calls (lines 417 and 423) and carries the cleanup diagnostics into the existing stop record. Cargo.toml adds nix's poll feature beside event, for the Linux pidfd and cancellation wait set. owned.rs keeps a synchronous Drop path that refuses rather than waits. The finding is ruled, not deferred: cord() (stop.rs lines 109 to 136) holds the session table lock while kill_proved runs at line 126. With amendment 60, kill_proved can wait on the kernel's exit reports, so every other session would be held behind that lock for as long as the wait lasts, and there is no clock to end it. Granted for session/stop.rs, and only this (Waffles 7538c62b): under the lock, cord() marks each session ending and signals as now, registering each proved member's exit event before its signal, and keeps the registrations. It releases the lock, and only then waits on the events and lists again (amendment 60 steps 2 to 5). So no exit wait is ever under the table lock. A failure is still said per session as now. Nothing else in stop.rs changes, and no other caller changes. The red is by construction: while one session's end waits on an exit that has not arrived, a second thread reads the session table and is not blocked, and this fails at 118cb179. The handback names every other place where a lock is held across end_left_group, by file and line; none is changed without a ruling."
     }
   ]
 }

@@ -2656,6 +2656,11 @@
       "brief": "DIRECTORY-050"
     },
     {
+      "path": "crates/lys-runner/src/pty/cleanup.rs",
+      "note": "proving an uninspectable group's members gone: exit events registered before each signal (kqueue or pidfd), the wait with optional cancellation, listing again until empty; private to pty; DIRECTORY-064 R6, amendments 60 to 62",
+      "brief": "DIRECTORY-064"
+    },
+    {
       "path": "crates/lys-runner/src/session.rs",
       "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
       "brief": "DIRECTORY-050"
@@ -5683,6 +5688,11 @@
     {
       "path": "crates/lys-runner/src/session/lifecycle/managed.rs",
       "note": "The managed spawn branch of a session's lifecycle: the child entry started and proved.",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/session/stop.rs",
+      "note": "stopping every session: marks sessions ending and signals under the table lock, then waits on the exit events after the lock is released; DIRECTORY-064 R6, amendment 62",
       "brief": "DIRECTORY-064"
     },
     {
