@@ -631,6 +631,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/lib.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
 | `crates/lys-runner/src/pty.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
 | `crates/lys-runner/src/pty/cleanup.rs` | proving an uninspectable group's members gone: exit events registered before each signal (kqueue or pidfd), the wait with optional cancellation, listing again until empty; private to pty; DIRECTORY-064 R6, amendments 60 to 62 | DIRECTORY-064 |
+| `crates/lys-runner/src/pty/cleanup_tests.rs` | cleanup.rs's private tests: register before signal, receipts, the newcomer cycle, zombie, pid reuse, cancellation and the operational refusals; DIRECTORY-064 R6, amendment 64 | DIRECTORY-064 |
 | `crates/lys-runner/src/session.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
 | `crates/lys-runner/src/socket.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
 | `crates/lys-runner/tests/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |

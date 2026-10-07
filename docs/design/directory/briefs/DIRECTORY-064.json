@@ -326,7 +326,8 @@
           "crates/lys-runner/tests/fixtures/qualifier/fail-stop-red.jsonl",
           "crates/lys-runner/tests/fixtures/qualifier/fixture-pass.jsonl",
           "crates/lys-runner/examples/qualify_adapter/diagnostics.rs",
-          "crates/lys-runner/src/pty/cleanup.rs"
+          "crates/lys-runner/src/pty/cleanup.rs",
+          "crates/lys-runner/src/pty/cleanup_tests.rs"
         ],
         "modify": [
           "surface/identity/src/features/usage/Usage.tsx",
@@ -743,6 +744,12 @@
       "by": "Archie",
       "subject": "An exited, unreaped member with its exit receipt and unchanged start identity counts as gone in the listing; Live::kill_proved is removed",
       "ruling": "Brisket 81bbc078. 1. A process-exit event (NOTE_EXIT or pidfd) fires before the parent reaps, so peer::group_members can still list the exited member as a zombie, and cord waits before the lifecycle thread reaps the leader. A literal empty listing could then wait forever. Amendment 60's empty listing therefore means this: every member listed is either absent, or is one whose kernel exit receipt this cleanup holds and whose start identity is unchanged since it was proved. A listed pid with a different start identity is a new member: it is proved, registered and signalled like any other, or it is Unended. A listed member with no exit receipt is not gone. The red is by construction: an exited, unreaped member with its receipt passes the listing, and a reused pid with a new identity does not. 2. Live::kill_proved (stop.rs line 161) is called only from cord (line 126). Under amendment 62, cord registers, signals and keeps the registrations itself, so kill_proved is deleted, not renamed or kept unused. Every other part of stop.rs is unchanged."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "cleanup.rs's private tests move to crates/lys-runner/src/pty/cleanup_tests.rs",
+      "ruling": "Brisket d233e97e: with amendment 60 to 63's cases inline, pty.rs is 567 lines. Granted: R6 creates crates/lys-runner/src/pty/cleanup_tests.rs, declared from cleanup.rs under cfg(test), holding only the private cases already written: register before signal, exit receipts, the newcomer cycle, the zombie, pid reuse, cancellation and the operational refusals. It adds no public fixture or test API, and no production line moves into it. Every production file stays under the length line without packing. No other path changes."
     }
   ]
 }
