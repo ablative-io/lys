@@ -1621,17 +1621,19 @@ impl ReceiptRunner {
     }
 
     async fn finish(mut self) -> Result<Vec<&'static str>, Box<dyn Error>> {
-        self.stop
+        let stopped = self
+            .stop
             .take()
             .ok_or("missing runner stop signal")?
-            .send(())
-            .map_err(|()| "runner ended before its stop signal")?;
-        Ok(self
+            .send(());
+        let requests = self
             .task
             .take()
             .ok_or("missing runner task")?
             .await?
-            .map_err(std::io::Error::other)?)
+            .map_err(std::io::Error::other)?;
+        stopped.map_err(|()| "runner ended before its stop signal")?;
+        Ok(requests)
     }
 }
 
@@ -1649,6 +1651,18 @@ fn receipt_answer(
 ) -> Result<(&'static str, lys_runner::Answer), String> {
     use lys_runner::{Act, Answer};
     match act {
+        Act::Feed { .. } | Act::GrantChannel => Ok((
+            if matches!(act, Act::GrantChannel) {
+                "grants"
+            } else {
+                "feed"
+            },
+            Answer::Refused {
+                refusal: "fixture_standing_link_refused".to_owned(),
+                words: "the control fixture serves no standing feed or grant channel".to_owned(),
+                oldest: None,
+            },
+        )),
         Act::ControlStatus { session } if session == "session" => Ok((
             "status",
             Answer::ControlStatus {
@@ -1729,7 +1743,11 @@ impl ReceiptTable {
             Some(runner) => runner.finish().await?,
             None => Vec::new(),
         };
-        assert_eq!(requests, expected);
+        let controls = requests
+            .into_iter()
+            .filter(|request| !matches!(*request, "feed" | "grants"))
+            .collect::<Vec<_>>();
+        assert_eq!(controls, expected);
         Ok(())
     }
 }
@@ -1967,9 +1985,10 @@ async fn reconciliation_refuses_to_replace_a_kept_person_decision() -> TestResul
             &serde_json::json!({"operation":table.operation, "decision":"not_seen"}),
         )
         .await?;
+    table.finish(&["receipt"]).await?;
     assert_eq!(status, 409, "{answer}");
     assert_eq!(answer["refusal"], "control_already_reconciled");
-    table.finish(&["receipt"]).await
+    Ok(())
 }
 
 #[tokio::test]
@@ -1983,9 +2002,10 @@ async fn reconciliation_refuses_a_person_who_does_not_own_the_goal() -> TestResu
             &serde_json::json!({"operation":table.operation, "decision":"seen"}),
         )
         .await?;
+    table.finish(&["receipt"]).await?;
     assert_eq!(status, 403, "{answer}");
     assert_eq!(answer["refusal"], "not_permitted");
-    table.finish(&["receipt"]).await
+    Ok(())
 }
 
 #[tokio::test]
@@ -1995,9 +2015,10 @@ async fn resend_refuses_an_intended_session_outside_the_goal_authority() -> Test
         "/goals/goal/resend", Some(&table.cookie),
         &serde_json::json!({"operation":table.operation, "prior":"delivery", "session":"new-session"}),
     ).await?;
+    table.finish(&["receipt"]).await?;
     assert_eq!(status, 409, "{answer}");
     assert_eq!(answer["refusal"], "goal_authority_revoked");
-    table.finish(&["receipt"]).await
+    Ok(())
 }
 
 #[tokio::test]
