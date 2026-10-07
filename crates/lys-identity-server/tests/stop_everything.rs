@@ -24,8 +24,11 @@ use axum::response::{IntoResponse, Response};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
-use lys_identity::OperationId;
-use lys_identity_server::dev_seed::{Seeded, seed_configured};
+use lys_identity::{
+    Actor, AuthMethod, IdentityId, LifecycleState, LoginBinding, OperationId, Profile, Provenance,
+    Transition,
+};
+use lys_identity_server::dev_seed::{Seeded, SeededAgent, SeededPerson};
 use lys_identity_server::secrets_api::SecretsSettings;
 use lys_runner::{Options, Runner, Serving, console_stop};
 use serde_json::{Value, json};
@@ -35,13 +38,31 @@ type TestResult = Result<(), Box<dyn Error>>;
 const BEA: &str = "bea-subject";
 
 /// Every handle the stand-in broker was asked to end, by id.
-type Drops = Arc<Mutex<Vec<String>>>;
+type Drops = Arc<Mutex<BrokerProbe>>;
+
+#[derive(Default)]
+struct BrokerProbe {
+    drops: Vec<String>,
+    callers: Vec<(String, String)>,
+    refuse_drop: bool,
+}
 
 /// A broker holding one handle for each holder, `h-` and the holder, that
 /// ends each handle it is asked to and keeps the asking.
 async fn broker(request: Request, drops: &Drops) -> Response {
     let path = request.uri().path().to_owned();
     let query = request.uri().query().unwrap_or_default().to_owned();
+    let caller = request
+        .headers()
+        .get("lys-on-behalf-of")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let refuse_drop = {
+        let mut probe = drops.lock().expect("fixture lock poisoned");
+        probe.callers.push((path.clone(), caller));
+        probe.refuse_drop
+    };
     if path == "/_lys/handles" {
         let holder = query.strip_prefix("holder=").unwrap_or_default();
         return axum::Json(json!({ "holder": holder, "handles": [
@@ -51,6 +72,13 @@ async fn broker(request: Request, drops: &Drops) -> Response {
         .into_response();
     }
     if path == "/_lys/drop" {
+        if refuse_drop {
+            return (
+                axum::http::StatusCode::FORBIDDEN,
+                "BrokerOwnerRefused: custody denied",
+            )
+                .into_response();
+        }
         let Ok(bytes) = to_bytes(request.into_body(), usize::MAX).await else {
             return axum::Json(json!({ "refusal": "unreadable" })).into_response();
         };
@@ -59,6 +87,7 @@ async fn broker(request: Request, drops: &Drops) -> Response {
         drops
             .lock()
             .expect("fixture lock poisoned")
+            .drops
             .push(handle.clone());
         return axum::Json(json!({ "handle": handle, "outcome": "ended" })).into_response();
     }
@@ -74,6 +103,72 @@ fn login(subject: &str) -> Login {
 
 fn operation() -> Result<String, Box<dyn Error>> {
     Ok(OperationId::generate()?.to_string())
+}
+
+/// Stop cases need only one active agent per person, with every seed event
+/// still written through the directory's typed API.
+fn seed_stop(config: &lys_identity_server::Config) -> Result<Seeded, Box<dyn Error>> {
+    let mut directory = lys_identity_server::routes::open_directory(config)?;
+    let actor = Actor::new(
+        config.administrator_binding()?,
+        Provenance::new(AuthMethod::Oidc, lys_identity_server::session::now()),
+    );
+    let mut people = Vec::new();
+    for (subject, name, agent_name) in [
+        (ADMINISTRATOR, "Ada (test person)", "Scribe"),
+        (BEA, "Bea (test person)", "Reviewer"),
+    ] {
+        let at = lys_identity_server::session::now();
+        let (id, _) = directory.register_person(
+            actor.clone(),
+            OperationId::generate()?,
+            Profile::new(name)?,
+            at,
+        )?;
+        directory.bind_login(
+            actor.clone(),
+            OperationId::generate()?,
+            id,
+            LoginBinding::new(&config.issuer, subject)?,
+            at,
+        )?;
+        directory.transition(
+            actor.clone(),
+            OperationId::generate()?,
+            IdentityId::Person(id),
+            Transition::Activate,
+            "",
+            at,
+        )?;
+        let (agent, _) = directory.register_agent(
+            actor.clone(),
+            OperationId::generate()?,
+            id,
+            Profile::new(agent_name)?,
+            at,
+        )?;
+        directory.transition(
+            actor.clone(),
+            OperationId::generate()?,
+            IdentityId::Agent(agent),
+            Transition::Activate,
+            "",
+            at,
+        )?;
+        people.push(SeededPerson {
+            id,
+            display_name: name.to_owned(),
+            subject: subject.to_owned(),
+            agents: vec![SeededAgent {
+                id: agent,
+                display_name: agent_name.to_owned(),
+                state: LifecycleState::Active,
+            }],
+        });
+    }
+    let (tree_size, _) = directory.log()?.head()?;
+    assert_eq!(tree_size, 10);
+    Ok(Seeded { people, tree_size })
 }
 
 fn refused(answer: &(u16, Value), status: u16, name: &str) {
@@ -136,7 +231,7 @@ impl Table {
                 config.surface_dir = surface.then_some(screens);
             },
             move |config| {
-                let seeded = seed_configured(config, [ADMINISTRATOR, BEA])?;
+                let seeded = seed_stop(config)?;
                 let key = Ed25519Identity::load(&config.event_key_file)?;
                 let runner = Runner::open(&Options {
                     socket,
@@ -278,7 +373,12 @@ impl Table {
     }
 
     fn dropped(&self) -> Vec<String> {
-        let mut drops = self.drops.lock().expect("fixture lock poisoned").clone();
+        let mut drops = self
+            .drops
+            .lock()
+            .expect("fixture lock poisoned")
+            .drops
+            .clone();
         drops.sort();
         drops
     }
@@ -624,4 +724,487 @@ async fn console_stop_joins_the_bare_service_and_stops_a_running_session() -> Te
 #[tokio::test(flavor = "multi_thread")]
 async fn console_stop_joins_the_surface_service_and_stops_a_running_session() -> TestResult {
     console_join(true).await
+}
+
+/// Authentication and replay cases need the real service, but no runner or
+/// provisioned process unless the case asks what a pull stops.
+struct ConsoleTable {
+    service: Service,
+}
+
+impl ConsoleTable {
+    async fn set(reversible: bool) -> Result<Self, Box<dyn Error>> {
+        let (service, _) = Service::start_adjusted(
+            GRANT_MODEL,
+            None,
+            None,
+            None,
+            move |config| {
+                config.operator_upgrade_file =
+                    reversible.then(|| config.log_dir.with_file_name("upgrade.json"));
+            },
+            |config| {
+                if let Some(path) = &config.operator_upgrade_file {
+                    std::fs::write(path, "unfinished upgrade")?;
+                }
+                seed_stop(config)
+            },
+        )
+        .await?;
+        Ok(Self { service })
+    }
+
+    fn body() -> Result<console_stop::Body, Box<dyn Error>> {
+        Ok(console_stop::Body {
+            operation: operation()?,
+            by: "an unlisted person at this console".to_owned(),
+            reason: "end an unsafe run".to_owned(),
+            kill: true,
+        })
+    }
+
+    fn sign(&self, bytes: &[u8]) -> Result<String, Box<dyn Error>> {
+        let key = Ed25519Identity::load(&self.service.dir.path().join("service.key"))?;
+        Ok(lys_runner::protocol::hex(
+            &key.sign(&console_stop::signed_bytes(bytes)),
+        ))
+    }
+
+    async fn post(
+        &self,
+        bytes: Vec<u8>,
+        headers: &[(&str, &str)],
+    ) -> Result<(u16, Value), Box<dyn Error>> {
+        self.service
+            .post_carrying(console_stop::ROUTE, headers, bytes)
+            .await
+    }
+
+    async fn pull(&self, body: &console_stop::Body) -> Result<(u16, Value), Box<dyn Error>> {
+        let bytes = serde_json::to_vec(body)?;
+        let signature = self.sign(&bytes)?;
+        self.post(bytes, &[(console_stop::SIGNATURE, &signature)])
+            .await
+    }
+
+    async fn untouched(&self) -> TestResult {
+        let cookie = self.service.sign_in(login(ADMINISTRATOR)).await?;
+        let (status, view) = self
+            .service
+            .get("/runtime/stop-everything", Some(&cookie))
+            .await?;
+        assert_eq!(status, 200, "{view}");
+        assert_eq!(view["pulled"], Value::Null, "{view}");
+        assert_eq!(view["last"], Value::Null, "{view}");
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn console_stop_missing_signature_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    refused(
+        &table
+            .post(serde_json::to_vec(&ConsoleTable::body()?)?, &[])
+            .await?,
+        401,
+        "console_signature_refused",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_malformed_signature_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    refused(
+        &table
+            .post(
+                serde_json::to_vec(&ConsoleTable::body()?)?,
+                &[(console_stop::SIGNATURE, "not a signature")],
+            )
+            .await?,
+        401,
+        "console_signature_refused",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_duplicate_signature_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let bytes = serde_json::to_vec(&ConsoleTable::body()?)?;
+    let signature = table.sign(&bytes)?;
+    refused(
+        &table
+            .post(
+                bytes,
+                &[
+                    (console_stop::SIGNATURE, &signature),
+                    (console_stop::SIGNATURE, &signature),
+                ],
+            )
+            .await?,
+        401,
+        "console_signature_refused",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_another_key_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let bytes = serde_json::to_vec(&ConsoleTable::body()?)?;
+    let signature = lys_runner::protocol::hex(
+        &Ed25519Identity::ephemeral().sign(&console_stop::signed_bytes(&bytes)),
+    );
+    refused(
+        &table
+            .post(bytes, &[(console_stop::SIGNATURE, &signature)])
+            .await?,
+        401,
+        "console_signature_refused",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_changed_body_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let mut body = ConsoleTable::body()?;
+    let signature = table.sign(&serde_json::to_vec(&body)?)?;
+    body.reason = "a changed reason".to_owned();
+    refused(
+        &table
+            .post(
+                serde_json::to_vec(&body)?,
+                &[(console_stop::SIGNATURE, &signature)],
+            )
+            .await?,
+        401,
+        "console_signature_refused",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_another_domain_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let bytes = serde_json::to_vec(&ConsoleTable::body()?)?;
+    let key = Ed25519Identity::load(&table.service.dir.path().join("service.key"))?;
+    let mut other = b"lys-identity/another-act/v1\n".to_vec();
+    other.extend_from_slice(&bytes);
+    let signature = lys_runner::protocol::hex(&key.sign(&other));
+    refused(
+        &table
+            .post(bytes, &[(console_stop::SIGNATURE, &signature)])
+            .await?,
+        401,
+        "console_signature_refused",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_cookie_beside_signature_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let cookie = table.service.sign_in(login(ADMINISTRATOR)).await?;
+    let bytes = serde_json::to_vec(&ConsoleTable::body()?)?;
+    let signature = table.sign(&bytes)?;
+    refused(
+        &table
+            .post(
+                bytes,
+                &[(console_stop::SIGNATURE, &signature), ("cookie", &cookie)],
+            )
+            .await?,
+        401,
+        "console_signature_refused",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_unknown_member_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let mut body = serde_json::to_value(ConsoleTable::body()?)?;
+    body["nonce"] = json!("not part of this request");
+    let bytes = serde_json::to_vec(&body)?;
+    let signature = table.sign(&bytes)?;
+    let answer = table
+        .post(bytes, &[(console_stop::SIGNATURE, &signature)])
+        .await?;
+    refused(&answer, 400, "RequestMalformed");
+    assert!(
+        answer.1["reason"]
+            .as_str()
+            .ok_or("no reason")?
+            .contains("unknown field")
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_empty_claim_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let mut body = ConsoleTable::body()?;
+    body.by = "   ".to_owned();
+    refused(&table.pull(&body).await?, 400, "RequestMalformed");
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_empty_reason_is_named_and_pulls_nothing() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let mut body = ConsoleTable::body()?;
+    body.reason = "   ".to_owned();
+    refused(&table.pull(&body).await?, 400, "RequestMalformed");
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_is_admitted_during_a_reversible_upgrade() -> TestResult {
+    let table = ConsoleTable::set(true).await?;
+    let body = ConsoleTable::body()?;
+    let before = lys_identity_server::session::now();
+    let (status, pulled) = table.pull(&body).await?;
+    assert_eq!(status, 200, "{pulled}");
+    assert_eq!(pulled["pulled"]["by"], "console");
+    assert_eq!(pulled["pulled"]["by_name"], body.by);
+    let at = pulled["pulled"]["at"].as_u64().ok_or("no service time")?;
+    assert!(before <= at && at <= lys_identity_server::session::now());
+    Ok(())
+}
+
+#[tokio::test]
+async fn console_stop_replays_the_same_pull_without_new_work() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let body = ConsoleTable::body()?;
+    let first = table.pull(&body).await?;
+    assert_eq!(first.0, 200, "{}", first.1);
+    assert_eq!(table.pull(&body).await?, first);
+    Ok(())
+}
+
+#[tokio::test]
+async fn console_stop_released_operation_cannot_pull_again() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let body = ConsoleTable::body()?;
+    assert_eq!(table.pull(&body).await?.0, 200);
+    let cookie = table.service.sign_in(login(ADMINISTRATOR)).await?;
+    let release = json!({"operation": operation()?});
+    assert_eq!(
+        table
+            .service
+            .post("/runtime/stop-everything/release", Some(&cookie), &release)
+            .await?
+            .0,
+        200
+    );
+    refused(&table.pull(&body).await?, 409, "cord_reused");
+    let (status, view) = table
+        .service
+        .get("/runtime/stop-everything", Some(&cookie))
+        .await?;
+    assert_eq!(status, 200);
+    assert_eq!(view["pulled"], Value::Null);
+    Ok(())
+}
+
+#[tokio::test]
+async fn console_stop_spent_operation_cannot_name_another_console_person() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let mut body = ConsoleTable::body()?;
+    assert_eq!(table.pull(&body).await?.0, 200);
+    body.by = "another console person".to_owned();
+    refused(&table.pull(&body).await?, 409, "cord_reused");
+    Ok(())
+}
+
+#[tokio::test]
+async fn console_stop_cookie_and_run_pass_cannot_bypass_the_unverified_body_limit() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let cookie = table.service.sign_in(login(ADMINISTRATOR)).await?;
+    let bytes = vec![b' '; 2 * 1024 * 1024 + 1];
+    let signature = table.sign(&bytes)?;
+    refused(
+        &table
+            .post(
+                bytes,
+                &[
+                    (console_stop::SIGNATURE, &signature),
+                    ("cookie", &cookie),
+                    (lys_identity_server::agent_pass::HEADER, "unverified-pass"),
+                ],
+            )
+            .await?,
+        413,
+        "BodyTooLarge",
+    );
+    table.untouched().await
+}
+
+#[tokio::test]
+async fn console_stop_signature_does_not_admit_an_ordinary_pull() -> TestResult {
+    let table = ConsoleTable::set(false).await?;
+    let bytes =
+        serde_json::to_vec(&json!({"operation": operation()?, "reason": "not a console route"}))?;
+    let signature = table.sign(&bytes)?;
+    refused(
+        &table
+            .service
+            .post_carrying(
+                "/runtime/stop-everything",
+                &[(console_stop::SIGNATURE, &signature)],
+                bytes,
+            )
+            .await?,
+        401,
+        "NotSignedIn",
+    );
+    table.untouched().await
+}
+
+#[test]
+fn console_stop_openapi_names_its_signature_and_shared_body() -> TestResult {
+    let document = lys_identity_server::openapi::document()?;
+    let route = &document["paths"][console_stop::ROUTE]["post"];
+    assert_eq!(route["security"], json!([{"console_signature": []}]));
+    assert_eq!(
+        route["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/ConsoleStopBody"
+    );
+    assert_eq!(
+        document["components"]["securitySchemes"]["console_signature"]["name"],
+        console_stop::SIGNATURE
+    );
+    assert_eq!(
+        document["components"]["schemas"]["ConsoleStopBody"]["additionalProperties"],
+        false
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn console_stop_holds_new_starts_and_names_the_console_claim() -> TestResult {
+    let table = Table::set().await?;
+    let body = ConsoleTable::body()?;
+    let bytes = serde_json::to_vec(&body)?;
+    let key = Ed25519Identity::load(&table.service.dir.path().join("service.key"))?;
+    let signature = lys_runner::protocol::hex(&key.sign(&console_stop::signed_bytes(&bytes)));
+    assert_eq!(
+        table
+            .service
+            .post_carrying(
+                console_stop::ROUTE,
+                &[(console_stop::SIGNATURE, &signature)],
+                bytes
+            )
+            .await?
+            .0,
+        200
+    );
+    let answer = table.start(&table.agent(0)).await?;
+    refused(&answer, 409, "everything_stopped");
+    let reason = answer.1["reason"]
+        .as_str()
+        .ok_or("no start refusal reason")?;
+    assert!(
+        reason.contains(&body.by) && reason.contains(&body.reason),
+        "{reason}"
+    );
+    table.close()
+}
+
+async fn console_table_pull(
+    table: &Table,
+    body: &console_stop::Body,
+) -> Result<(u16, Value), Box<dyn Error>> {
+    let bytes = serde_json::to_vec(body)?;
+    let key = Ed25519Identity::load(&table.service.dir.path().join("service.key"))?;
+    let signature = lys_runner::protocol::hex(&key.sign(&console_stop::signed_bytes(&bytes)));
+    table
+        .service
+        .post_carrying(
+            console_stop::ROUTE,
+            &[(console_stop::SIGNATURE, &signature)],
+            bytes,
+        )
+        .await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn console_stop_ends_handles_as_each_directory_owner_and_replay_ends_nothing_twice()
+-> TestResult {
+    let table = Table::set().await?;
+    for person in 0..2 {
+        let agent = table.agent(person);
+        table.profile(&agent).await?;
+        table.started(&agent).await?;
+    }
+    let body = ConsoleTable::body()?;
+    let first = console_table_pull(&table, &body).await?;
+    assert_eq!(first.0, 200, "{}", first.1);
+    assert_eq!(first.1["handles_refused"], json!([]));
+    assert_eq!(first.1["stopped"].as_array().ok_or("no stopped")?.len(), 2);
+    assert_eq!(
+        first.1["handles_ended"]
+            .as_array()
+            .ok_or("no ended handles")?
+            .len(),
+        2
+    );
+    let before = {
+        let probe = table.drops.lock().expect("fixture lock poisoned");
+        assert_eq!(probe.callers.len(), 4);
+        for person in &table.seeded.people {
+            assert!(
+                probe
+                    .callers
+                    .contains(&("/_lys/handles".to_owned(), person.id.to_string()))
+            );
+            assert!(
+                probe
+                    .callers
+                    .contains(&("/_lys/drop".to_owned(), person.id.to_string()))
+            );
+        }
+        probe.callers.clone()
+    };
+    assert_eq!(console_table_pull(&table, &body).await?, first);
+    assert_eq!(table.dropped().len(), 2);
+    assert_eq!(
+        table.drops.lock().expect("fixture lock poisoned").callers,
+        before
+    );
+    table.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn console_stop_names_a_broker_refusal_instead_of_claiming_handles_ended() -> TestResult {
+    let table = Table::set().await?;
+    let agent = table.agent(0);
+    table.profile(&agent).await?;
+    let session = table.started(&agent).await?;
+    table
+        .drops
+        .lock()
+        .expect("fixture lock poisoned")
+        .refuse_drop = true;
+    let (status, pulled) = console_table_pull(&table, &ConsoleTable::body()?).await?;
+    assert_eq!(status, 200, "{pulled}");
+    assert_eq!(pulled["handles_ended"], json!([]));
+    let refusals = pulled["handles_refused"]
+        .as_array()
+        .ok_or("no handle refusals")?;
+    assert_eq!(refusals.len(), 1);
+    assert_eq!(refusals[0]["agent"], agent);
+    assert!(
+        refusals[0]["refusal"]
+            .as_str()
+            .ok_or("no refusal")?
+            .contains("BrokerOwnerRefused")
+    );
+    assert_eq!(pulled["stopped"][0]["session"], session);
+    assert!(table.dropped().is_empty());
+    table.close()
 }
