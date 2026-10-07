@@ -29,6 +29,7 @@
 use crate::sign_in_flights::Flights;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{ConnectInfo, State};
@@ -189,6 +190,11 @@ fn leading_zero_bits(hash: &[u8]) -> u32 {
 /// `version:difficulty:expires:salt:challenge:`, version 1 and the
 /// difficulty two digits.
 pub fn solve(challenge: &str) -> Result<String, ServerError> {
+    let counter = solve_counter(challenge)?;
+    Ok(format!("{challenge}{counter}"))
+}
+
+fn solve_counter(challenge: &str) -> Result<u64, ServerError> {
     if !challenge.starts_with("1:") || !challenge.ends_with(':') {
         return Err(failed(
             "the sign-in service's challenge is not one this service answers",
@@ -199,11 +205,27 @@ pub fn solve(challenge: &str) -> Result<String, ServerError> {
         .and_then(|digits| digits.parse::<u32>().ok())
         .filter(|difficulty| (10..99).contains(difficulty))
         .ok_or_else(|| failed("the sign-in service's challenge names no difficulty"))?;
+    let mut prefix = Sha256::new();
+    prefix.update(challenge.as_bytes());
+    let mut digits = [0u8; 20];
     let mut counter: u64 = 0;
     loop {
-        let answer = format!("{challenge}{counter}");
-        if leading_zero_bits(&Sha256::digest(answer.as_bytes())) >= difficulty {
-            return Ok(answer);
+        let mut value = counter;
+        let mut first = digits.len();
+        loop {
+            first -= 1;
+            digits[first] = b'0'
+                + u8::try_from(value % 10)
+                    .map_err(|error| failed(format!("the counter digit is invalid: {error}")))?;
+            value /= 10;
+            if value == 0 {
+                break;
+            }
+        }
+        let mut hash = prefix.clone();
+        hash.update(&digits[first..]);
+        if leading_zero_bits(&hash.finalize()) >= difficulty {
+            return Ok(counter);
         }
         counter = counter
             .checked_add(1)
@@ -247,6 +269,7 @@ struct Opened {
     jar: Jar,
     token: String,
     pow: String,
+    expires: u64,
 }
 
 /// The authorization request `begun` names, as the issuer's sign-in steps
@@ -272,7 +295,11 @@ fn request_fields(begun: &reqwest::Url) -> serde_json::Map<String, Value> {
 
 /// The code and state the issuer's accepting answer sends the browser back
 /// with, or the answer's refusal by name.
-fn accepted(answer: &reqwest::Response) -> Result<(String, String), ServerError> {
+async fn accepted(
+    answer: reqwest::Response,
+    expires: Option<u64>,
+    checked_at: u64,
+) -> Result<(String, String), ServerError> {
     match answer.status().as_u16() {
         202 => {
             let location = answer
@@ -291,11 +318,65 @@ fn accepted(answer: &reqwest::Response) -> Result<(String, String), ServerError>
         }
         200 => Err(ServerError::SecondFactorUnsupported),
         429 => Err(ServerError::SignInThrottled),
-        400..=499 => Err(ServerError::SignInRefused),
+        403 if expires.is_some_and(|expires| checked_at >= expires) => Err(challenge_expired()),
+        status @ 400..=499 => {
+            let error = match answer.json::<IssuerError>().await {
+                Ok(body)
+                    if !body.error.is_empty()
+                        && body
+                            .error
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_') =>
+                {
+                    body.error
+                }
+                Ok(_) | Err(_) => "unreadable".to_owned(),
+            };
+            if status == 401 && error == "Unauthorized" {
+                return Err(ServerError::SignInRefused);
+            }
+            tracing::warn!(refusal = "IssuerRefused", status, error = %error, "the issuer refused sign-in");
+            Err(ServerError::IssuerRefused { status, error })
+        }
         other => Err(failed(format!(
             "the sign-in service answered {other} to the sign-in"
         ))),
     }
+}
+
+#[derive(Deserialize)]
+struct IssuerError {
+    error: String,
+}
+
+fn unix_second() -> Result<u64, ServerError> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .map_err(|error| failed(format!("the sign-in clock is before its epoch: {error}")))
+}
+
+fn challenge_expired() -> ServerError {
+    tracing::warn!(
+        refusal = "IssuerChallengeExpired",
+        "the issuer's challenge expired"
+    );
+    ServerError::IssuerChallengeExpired
+}
+
+fn check_challenge(expires: u64) -> Result<(), ServerError> {
+    if unix_second()? >= expires {
+        return Err(challenge_expired());
+    }
+    Ok(())
+}
+
+fn challenge_expiry(challenge: &str) -> Result<u64, ServerError> {
+    challenge
+        .split(':')
+        .nth(2)
+        .and_then(|expires| expires.parse().ok())
+        .ok_or_else(|| failed("the sign-in service's challenge names no expiry"))
 }
 
 impl IssuerSignIn {
@@ -402,10 +483,17 @@ impl IssuerSignIn {
             .await
             .map_err(unreachable_issuer)?;
         let challenge = challenge.trim().to_owned();
+        let expires = challenge_expiry(&challenge)?;
         let pow = tokio::task::spawn_blocking(move || solve(&challenge))
             .await
             .map_err(|error| failed(format!("the challenge could not be answered: {error}")))??;
-        Ok(Opened { jar, token, pow })
+        check_challenge(expires)?;
+        Ok(Opened {
+            jar,
+            token,
+            pow,
+            expires,
+        })
     }
 
     /// POST `body` to `path` at the issuer inside the session `opened`.
@@ -416,6 +504,9 @@ impl IssuerSignIn {
         address: &str,
         body: &Value,
     ) -> Result<reqwest::Response, ServerError> {
+        if body.get("pow").is_some() {
+            check_challenge(opened.expires)?;
+        }
         self.http
             .post(format!("{}{path}", self.api))
             .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -449,7 +540,7 @@ impl IssuerSignIn {
                 &Value::Object(credentials),
             )
             .await?;
-        accepted(&answer)
+        accepted(answer, Some(opened.expires), unix_second()?).await
     }
 }
 

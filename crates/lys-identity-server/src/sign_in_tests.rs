@@ -106,3 +106,107 @@ fn the_connection_peer_is_the_address_and_no_peer_is_refused() -> Result<(), Box
     );
     Ok(())
 }
+
+#[test]
+fn a_difficulty_nineteen_counter_search_allocates_nothing() -> Result<(), Box<dyn Error>> {
+    let challenge = "1:19:4102444800:salt:challenge:";
+    let mut answer = None;
+    let allocations = allocation_counter::measure(|| {
+        answer = Some(super::solve_counter(challenge));
+    });
+    let counter = answer.ok_or("the search ran")??;
+    let hash = Sha256::digest(format!("{challenge}{counter}").as_bytes());
+    assert!(leading_zero_bits(&hash) >= 19);
+    assert_eq!(allocations.count_total, 0, "{allocations:?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_forbidden_answer_at_the_challenge_expiry_names_the_expiry() -> Result<(), Box<dyn Error>>
+{
+    for checked_at in [100, 101] {
+        let answer = forbidden_answer()?;
+        let refusal = super::accepted(answer, Some(100), checked_at)
+            .await
+            .err()
+            .ok_or("the issuer refused")?;
+        assert_eq!(refusal.name(), "IssuerChallengeExpired");
+        assert!(!refusal.to_string().contains("private-sentinel"));
+    }
+    Ok(())
+}
+
+fn forbidden_answer() -> Result<reqwest::Response, axum::http::Error> {
+    Ok(reqwest::Response::from(
+        axum::http::Response::builder()
+            .status(403)
+            .body(reqwest::Body::from(
+                r#"{"error":"Forbidden","message":"private-sentinel"}"#,
+            ))?,
+    ))
+}
+
+#[tokio::test]
+async fn a_forbidden_answer_one_second_before_expiry_names_its_cause() -> Result<(), Box<dyn Error>>
+{
+    for expires in [Some(100), None] {
+        let refusal = super::accepted(forbidden_answer()?, expires, 99)
+            .await
+            .err()
+            .ok_or("the issuer refused")?;
+        assert!(
+            matches!(refusal, crate::error::ServerError::IssuerRefused { status: 403, ref error } if error == "Forbidden")
+        );
+        assert!(!refusal.to_string().contains("private-sentinel"));
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn only_an_unauthorized_error_word_names_a_credential_refusal() -> Result<(), Box<dyn Error>>
+{
+    use crate::error::ServerError;
+    for (status, body, name, word) in [
+        (401, r#"{"error":"Unauthorized"}"#, "SignInRefused", None),
+        (
+            401,
+            r#"{"error":"Forbidden"}"#,
+            "IssuerRefused",
+            Some("Forbidden"),
+        ),
+        (401, "not-json", "IssuerRefused", Some("unreadable")),
+        (
+            400,
+            r#"{"error":false}"#,
+            "IssuerRefused",
+            Some("unreadable"),
+        ),
+        (
+            400,
+            r#"{"message":"private-sentinel"}"#,
+            "IssuerRefused",
+            Some("unreadable"),
+        ),
+        (429, "not-json", "SignInThrottled", None),
+        (200, "not-json", "SecondFactorUnsupported", None),
+    ] {
+        let answer = reqwest::Response::from(
+            axum::http::Response::builder()
+                .status(status)
+                .body(reqwest::Body::from(body))?,
+        );
+        let refusal = super::accepted(answer, Some(100), 99)
+            .await
+            .err()
+            .ok_or("the issuer refused")?;
+        assert_eq!(refusal.name(), name);
+        assert!(!refusal.to_string().contains("private-sentinel"));
+        if let Some(word) = word {
+            assert!(
+                matches!(refusal, ServerError::IssuerRefused { status: actual, ref error }
+                if actual == status && error == word)
+            );
+        }
+    }
+    Ok(())
+}

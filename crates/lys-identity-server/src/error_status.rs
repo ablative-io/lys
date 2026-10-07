@@ -228,9 +228,11 @@ impl ServerError {
             | Self::SkillUnknown { .. }
             | Self::PolicyRefused { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
+            | Self::IssuerRefused { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
-            Self::ConfigInvalid { .. }
+            Self::IssuerChallengeExpired
+            | Self::ConfigInvalid { .. }
             | Self::HarnessCatalogueUnreadable { .. }
             | Self::DirectoryUnavailable { .. }
             | Self::RequestsUnavailable { .. }

@@ -84,6 +84,17 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
         (ServerError::SessionUnknown, "SessionUnknown"),
         (ServerError::SignInStateUnknown, "SignInStateUnknown"),
         (ServerError::SignInRefused, "SignInRefused"),
+        (
+            ServerError::IssuerChallengeExpired,
+            "IssuerChallengeExpired",
+        ),
+        (
+            ServerError::IssuerRefused {
+                status: 403,
+                error: detail.to_owned(),
+            },
+            "IssuerRefused",
+        ),
         (ServerError::SignInThrottled, "SignInThrottled"),
         (ServerError::RegistrationThrottled, "RegistrationThrottled"),
         (
