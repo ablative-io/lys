@@ -543,3 +543,17 @@
 - [ ] **C512** — Goal reminders, budget crossings, the runner's managed input and peer restarts all mint dated IDs, and a resend after a restart carries the same ID (DIRECTORY-084 R3).
 - [ ] **C513** — The named migration operations_undated_ids_retired runs once and removes every undated ID from `seen`, each refused by its form after (DIRECTORY-084 R4).
 - [ ] **C514** — Tests show the set flat over ten windows, an expired ID refused after a reopen with nothing kept for it, and an old ID replayed after its window refused (DIRECTORY-084 R5).
+
+## MCP tokens for registered resources (DIRECTORY-085)
+
+- [ ] **C515** — A directory administrator registers a resource server by URI and public key, and Lys's own door is one (DIRECTORY-085 R1).
+- [ ] **C516** — Every MCP token names one resource, and /mcp refuses another's as token_wrong_audience (DIRECTORY-085 R2).
+- [ ] **C517** — A registered resource introspects a token and learns only about its own (DIRECTORY-085 R3).
+- [ ] **C518** — Every read through /mcp is kept as a leaf before it is answered (DIRECTORY-085 R4).
+- [ ] **C519** — A registered app exercises a grant for the subject a token names, and the Use is recorded with its action (DIRECTORY-085 R5).
+
+## Agent signature audience (DIRECTORY-086)
+
+- [ ] **C520** — The agent request signature names Lys's own origin, and another audience is refused (DIRECTORY-086 R1).
+- [ ] **C521** — v1 is retired in one cutover, and stored v1 draft evidence still verifies (DIRECTORY-086 R2).
+- [ ] **C522** — A signature made before the process started is refused (DIRECTORY-086 R3).

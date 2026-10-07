@@ -14,6 +14,7 @@ title: A person connects a service account from a screen, and the broker exchang
 > - C418 — A provider's consent client is sealed once by the operator and never leaves the broker (SECRETS-009 R1).
 > - C419 — A signed-in person starts and finishes consent with a single-use state and PKCE bound to the session (SECRETS-009 R2).
 > - C420 — The broker exchanges the code and seals the grant with its provenance, owned by the person (SECRETS-009 R3).
+> - C425 — One sealed grant reaches several named origins, chosen per call, with one refresh (SECRETS-009 R4).
 > **Stories:**
 > - S168 (Person, Grants an agent provisioned under them access to an account) — As a person, I want to connect my own service account to Lys from a screen, so that my agent can use it through a handle and nobody carries my tokens by hand.
 
@@ -23,7 +24,7 @@ Tom's work watcher (WATCHER-001) reads his three Google accounts through Lys (Wa
 
 ## Task
 
-Seal a provider's consent client once (R1); start and finish consent on the identity server's secrets screen with state and PKCE (R2); exchange the code and seal the grant inside the broker (R3). Out of scope: the screen's look, which is designed with Tom; providers other than through the same four steps; the watcher itself.
+Seal a provider's consent client once (R1); start and finish consent on the identity server's secrets screen with state and PKCE (R2); exchange the code and seal the grant inside the broker (R3); reach several named origins with one grant (R4). Out of scope: the screen's look, which is designed with Tom; providers other than through the same four steps; the watcher itself.
 
 ## Requirements
 
@@ -83,6 +84,28 @@ Behavioural. POST /_lys/oauth/consent admits only a trusted screen service actin
 
 **Checklist:**
 - C420 — The broker exchanges the code and seals the grant with its provenance, owned by the person (SECRETS-009 R3).
+
+**Stories:**
+- S168 (Person, Grants an agent provisioned under them access to an account) — As a person, I want to connect my own service account to Lys from a screen, so that my agent can use it through a handle and nobody carries my tokens by hand.
+
+### R4: One sealed grant reaches several named origins with one refresh
+
+Behavioural. Today a route binds one upstream per secret (files.rs 41-55, Route.upstream), so a grant that must reach www.googleapis.com and pubsub.googleapis.com would be sealed twice and refreshed twice, which is the wrong answer. Route gains named origins beside its upstream, each an https origin. The sealed consent client of R1 names them, and R3 writes them into the route it seals; `lys-secrets route-origin --name <secret> --origin <name>=<origin>` adds one to an existing route through the routes file the broker already rereads. A proxied call names an origin by the lys-origin request header, which is removed before the call leaves. With no header it goes to the upstream, as now. An unknown origin name is refused origin_unknown, and nothing is sent. Every origin uses the same grant, the same single refresh and reseal, and the same answer redaction. A route's origin list changes only by these acts, and each is audited.
+
+**Acceptance:**
+- Red at main: a call naming the second origin reaches the first origin's fixture. At the head it reaches the second, with the same access token.
+- After the grant's access token expires, calls to both origins pass on one refresh, counted at the fixture provider.
+- An unknown origin name is refused origin_unknown, and neither fixture is called.
+
+**Files:**
+- create: crates/lys-secrets/src/bin/lys-secrets/origins_tests.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/files.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/serve.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/cli.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/main.rs
+
+**Checklist:**
+- C425 — One sealed grant reaches several named origins, chosen per call, with one refresh (SECRETS-009 R4).
 
 **Stories:**
 - S168 (Person, Grants an agent provisioned under them access to an account) — As a person, I want to connect my own service account to Lys from a screen, so that my agent can use it through a handle and nobody carries my tokens by hand.

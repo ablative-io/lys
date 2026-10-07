@@ -5804,6 +5804,96 @@
       "path": "crates/lys-runner/tests/pty_stop.rs",
       "note": "a left process group is ended or proved gone; an exited, unreaped child's group is never read as gone from EPERM; DIRECTORY-064 R6, amendment 55",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_resources.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_resources_tests.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth_flow.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth_store.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth_store_tests.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth_tests.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_introspect.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_introspect_tests.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_receipts.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_receipts_tests.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_endpoint_tests.rs",
+      "note": "audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants_exercise.rs",
+      "note": "grant exercise for a subject or the signature audience; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants_exercise_tests.rs",
+      "note": "grant exercise for a subject or the signature audience; DIRECTORY-085",
+      "brief": "DIRECTORY-085"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_signature_audience_tests.rs",
+      "note": "grant exercise for a subject or the signature audience; DIRECTORY-086",
+      "brief": "DIRECTORY-086"
+    },
+    {
+      "path": "crates/lys-identity-server/src/drafts_api.rs",
+      "note": "grant exercise for a subject or the signature audience; DIRECTORY-086",
+      "brief": "DIRECTORY-086"
+    },
+    {
+      "path": "crates/lys-runner/src/dial/agent.rs",
+      "note": "grant exercise for a subject or the signature audience; DIRECTORY-086",
+      "brief": "DIRECTORY-086"
+    },
+    {
+      "path": "crates/lys-identity/src/draft_event.rs",
+      "note": "grant exercise for a subject or the signature audience; DIRECTORY-086",
+      "brief": "DIRECTORY-086"
     }
   ],
   "inventory": [

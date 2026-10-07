@@ -610,6 +610,14 @@
         {
           "id": "S153",
           "text": "As a person or an agent using an AI assistant, I want the assistant to reach Lys with my own identity and nothing more, so that it can never see a secret or do what I could not."
+        },
+        {
+          "id": "S269",
+          "text": "As a person whose records an assistant reads through Lys, I want every token to work only where it was meant and every read to be recorded, so that I can see who read what and nothing reaches a server it was not meant for."
+        },
+        {
+          "id": "S270",
+          "text": "As a person whose agent talks to many servers, I want what my agent signs for one server to be useless at Lys, so that no server it talks to can act or read as my agent."
         }
       ]
     },

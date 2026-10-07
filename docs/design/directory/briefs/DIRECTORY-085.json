@@ -1,0 +1,169 @@
+{
+  "id": "DIRECTORY-085",
+  "cluster": "directory",
+  "title": "MCP tokens bound to registered resources, introspection, and every read recorded",
+  "depends_on": [
+    "DIRECTORY-049"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C515",
+    "C516",
+    "C517",
+    "C518",
+    "C519"
+  ],
+  "stories": [
+    "S269"
+  ],
+  "design_anchor": [
+    "ADR-116"
+  ],
+  "purpose": "Lys is the authorization server for MCP. Its tokens name no resource, so a resource server other than Lys's own door has no way to tell a token meant for it from one meant for another, and DIRECTORY-049 R2's token_wrong_audience was written and never built. Its /mcp relay records only changes, so reads of records leave no trace. Percy's read of the handle path found both (Waffles, 7 October, bcfad2cc).",
+  "task": "Register resource servers (R1); bind every token to one resource and refuse it elsewhere (R2); answer introspection to registered resources (R3); record every read (R4); let a registered app exercise a grant for the subject a token names, recorded (R5). Out of scope: signed (JWT) access tokens; dynamic registration of resources; the screens' look.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "An administrator registers a resource server, and Lys's own door is one",
+      "spec": "Behavioural. A registered resource is a canonical resource URI as RFC 8707 section 2 defines it (absolute, no fragment) and the Ed25519 public key, in hex, that it signs its introspection requests with. Only a directory administrator registers or removes one, through the published API, and each act is a leaf of the directory log. Lys's own /mcp door is registered as itself at start, with no key, because it reads its own store. A second registration of the same URI is refused naming it. Nothing is kept for a resource but its URI, its key and who registered it; no shared secret exists.",
+      "acceptance": [
+        "An administrator registers a resource; a non-administrator is refused; both are on the log.",
+        "Registering a URI with a fragment, or one already registered, is refused by name."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/mcp_resources.rs",
+          "crates/lys-identity-server/src/mcp_resources_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/mcp_oauth.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C515"
+      ],
+      "stories": [
+        "S269"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Every token names its resource, and a token for another resource is refused",
+      "spec": "Behavioural. The authorization request and the token request take the RFC 8707 resource parameter, and it is required: an absent or unregistered resource is refused invalid_target (RFC 8707 section 2). Today authorize refuses any resource but the door's own (mcp_oauth_flow.rs 112-118), and a token carries no audience (Issued, mcp_oauth_store.rs 33-38), so /mcp's bearer check accepts any live access token (mcp_oauth.rs 187-207). Issued gains the audience, a refresh keeps it and cannot change it, and the store holds tokens as digests as now. The stored form is replaced, not read beside the old one: a token issued before this lands is refused, and its app connects again. /mcp refuses an access token whose audience is not its own resource as token_wrong_audience, answering 401 with WWW-Authenticate error=\"invalid_token\". That is DIRECTORY-049 R2's refusal, written and never built. No token is passed through to any resource.",
+      "acceptance": [
+        "Red at main: authorize naming a second registered resource is refused, so no token for it can exist. At the head a token for it is issued and /mcp refuses it as token_wrong_audience.",
+        "A token request with no resource, or an unregistered one, is refused invalid_target.",
+        "A refresh answers a token with the same audience, and a refresh naming another resource is refused."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/mcp_oauth.rs",
+          "crates/lys-identity-server/src/mcp_oauth_flow.rs",
+          "crates/lys-identity-server/src/mcp_oauth_store.rs",
+          "crates/lys-identity-server/src/mcp_oauth_store_tests.rs",
+          "crates/lys-identity-server/src/mcp_oauth_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C516"
+      ],
+      "stories": [
+        "S269"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "A registered resource asks Lys whether a token is live for it",
+      "spec": "Behavioural. Introspection follows RFC 7662 at POST /oauth/introspect, and the protected-resource and authorization-server documents name it. Lys's tokens are opaque and kept as digests, so introspection is chosen over signed tokens: there is no signing key to hold or rotate, and a revocation takes effect at the next call. The caller is admitted only by a signature from its registered key over the method, path, body digest and signing time, checked with the agent signature's existing nonce rules. A token whose audience is that resource answers active true with sub, client_id, aud, exp and scope. Any other token, live or not, answers active false, as RFC 7662 section 2.2 says, so a resource learns nothing about another's tokens. The token appears in no log, audit line or error's words.",
+      "acceptance": [
+        "A resource introspecting its own live token gets active true and its claims; another resource's token, an expired token or a revoked one gets active false.",
+        "An unsigned request, or one signed by an unregistered key, is refused."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/mcp_introspect.rs",
+          "crates/lys-identity-server/src/mcp_introspect_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/mcp_oauth.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C517"
+      ],
+      "stories": [
+        "S269"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "A read through /mcp is recorded before it is answered",
+      "spec": "Behavioural. Today the /mcp relay keeps a leaf only for a changing method (mcp_receipts.rs 322-325, used at mcp_endpoint.rs 455), so a read leaves no record. For anything that holds records, who read what is the record that matters. Every relayed call is now kept as a leaf of the directory log. A change is kept before it is made, as now. A read is kept before its answer is released, and a read whose leaf cannot be kept answers nothing but the refusal. A read's leaf carries the agent, the method, the recorded path (its query only as a SHA-256, as recorded_path does) and the kind read. It never carries the answer's body. The leaf is one durable write in the existing Kept path, with no second store and no per-leaf flush beyond the one that path already makes.",
+      "acceptance": [
+        "Red at main: a GET relayed through /mcp leaves no leaf. At the head it leaves one naming the agent and the path.",
+        "With the leaf write failing (a test-only seam on the real write path), the read answers the refusal and no body.",
+        "No read leaf contains any byte of the answer's body."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/mcp_receipts.rs",
+          "crates/lys-identity-server/src/mcp_receipts_tests.rs",
+          "crates/lys-identity-server/src/mcp_endpoint.rs",
+          "crates/lys-identity-server/src/mcp_endpoint_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C518"
+      ],
+      "stories": [
+        "S269"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "A registered app exercises a grant for the subject a token names, and the use is recorded",
+      "spec": "Behavioural. POST /grants/exercise is open to a registered app through its credential, for its own kinds only. Another app's kind is refused not_your_app, as grants_batch.rs refuses it. It takes the subject, the resource (kind and id) and the action. The subject is the one R3's introspection answered for a token whose audience is that app's registered resource. A subject with no live token for that resource is refused subject_not_presented, so an app cannot act for anyone it was not handed a token by. The grant is checked as an Exercise, the same decision route_actions.rs makes, and the Use is recorded with the action named. The answer is the subject and the use index. A refusal records nothing and answers its reason by name. Today /grants/check judges only the caller, and /grants/check/batch takes a subject but records nothing (grants_batch.rs 12 and 190), so no app can get a recorded Use for a subject.",
+      "acceptance": [
+        "Red at main: there is no route by which an app gets a recorded Use for a subject. At the head an exercise answers the subject and a use index, and the Use names the action.",
+        "Another app's kind is refused not_your_app; a subject without a live token for the app's resource is refused subject_not_presented; neither records a Use.",
+        "A subject whose grant is revoked is refused Revoked, and nothing is recorded."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/grants_exercise.rs",
+          "crates/lys-identity-server/src/grants_exercise_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity/src/grants/commit.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C519"
+      ],
+      "stories": [
+        "S269"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT accept a token at a resource other than its audience, or pass a token through to any resource.",
+    "SHALL NOT keep a shared secret for a resource; its key's public half is all Lys holds.",
+    "SHALL NOT answer a read whose leaf did not land.",
+    "SHALL NOT read a token in the old stored form beside the new one.",
+    "SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore], unsafe code or any bypass."
+  ],
+  "verification": [
+    "The design gate, parsed: every cluster clean, no FAIL, every file valid.",
+    "Each requirement's red at main quoted in the handback.",
+    "The piece's one Lys battery on the Mac, judged by parsed output: whole-crate nextest, cargo test --doc, ast-grep, file length, fmt and clippy pedantic in both configurations, 0 failed."
+  ]
+}

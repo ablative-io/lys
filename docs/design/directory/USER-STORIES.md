@@ -274,6 +274,10 @@
 
 **S153.** As a person or an agent using an AI assistant, I want the assistant to reach Lys with my own identity and nothing more, so that it can never see a secret or do what I could not.
 
+**S269.** As a person whose records an assistant reads through Lys, I want every token to work only where it was meant and every read to be recorded, so that I can see who read what and nothing reaches a server it was not meant for.
+
+**S270.** As a person whose agent talks to many servers, I want what my agent signs for one server to be useless at Lys, so that no server it talks to can act or read as my agent.
+
 ## Person running a team of agents — Starts, watches, talks to and stops agents from Lys
 
 **S154.** As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.

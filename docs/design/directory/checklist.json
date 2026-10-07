@@ -2060,6 +2060,56 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "MCP tokens for registered resources (DIRECTORY-085)",
+      "items": [
+        {
+          "id": "C515",
+          "text": "A directory administrator registers a resource server by URI and public key, and Lys's own door is one (DIRECTORY-085 R1).",
+          "done": false
+        },
+        {
+          "id": "C516",
+          "text": "Every MCP token names one resource, and /mcp refuses another's as token_wrong_audience (DIRECTORY-085 R2).",
+          "done": false
+        },
+        {
+          "id": "C517",
+          "text": "A registered resource introspects a token and learns only about its own (DIRECTORY-085 R3).",
+          "done": false
+        },
+        {
+          "id": "C518",
+          "text": "Every read through /mcp is kept as a leaf before it is answered (DIRECTORY-085 R4).",
+          "done": false
+        },
+        {
+          "id": "C519",
+          "text": "A registered app exercises a grant for the subject a token names, and the Use is recorded with its action (DIRECTORY-085 R5).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Agent signature audience (DIRECTORY-086)",
+      "items": [
+        {
+          "id": "C520",
+          "text": "The agent request signature names Lys's own origin, and another audience is refused (DIRECTORY-086 R1).",
+          "done": false
+        },
+        {
+          "id": "C521",
+          "text": "v1 is retired in one cutover, and stored v1 draft evidence still verifies (DIRECTORY-086 R2).",
+          "done": false
+        },
+        {
+          "id": "C522",
+          "text": "A signature made before the process started is refused (DIRECTORY-086 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

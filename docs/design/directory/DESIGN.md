@@ -1260,6 +1260,24 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/stop.rs` | `lys identity stop`: asks the service to stop everything, signed with the service key, then stops this computer's runner and services; DIRECTORY-083 R1 builds its request from console_stop.rs | DIRECTORY-083 |
 | `crates/lys-runner/tests/injection/cases.rs` | DIRECTORY-084: runner operation IDs carry their issue time | DIRECTORY-084 |
 | `crates/lys-runner/tests/pty_stop.rs` | a left process group is ended or proved gone; an exited, unreaped child's group is never read as gone from EPERM; DIRECTORY-064 R6, amendment 55 | DIRECTORY-064 |
+| `crates/lys-identity-server/src/mcp_resources.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_resources_tests.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_oauth.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_oauth_flow.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_oauth_store.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_oauth_store_tests.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_oauth_tests.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_introspect.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_introspect_tests.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_receipts.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_receipts_tests.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/mcp_endpoint_tests.rs` | audience-bound MCP tokens, introspection or read receipts; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/grants_exercise.rs` | grant exercise for a subject or the signature audience; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/grants_exercise_tests.rs` | grant exercise for a subject or the signature audience; DIRECTORY-085 | DIRECTORY-085 |
+| `crates/lys-identity-server/src/agent_signature_audience_tests.rs` | grant exercise for a subject or the signature audience; DIRECTORY-086 | DIRECTORY-086 |
+| `crates/lys-identity-server/src/drafts_api.rs` | grant exercise for a subject or the signature audience; DIRECTORY-086 | DIRECTORY-086 |
+| `crates/lys-runner/src/dial/agent.rs` | grant exercise for a subject or the signature audience; DIRECTORY-086 | DIRECTORY-086 |
+| `crates/lys-identity/src/draft_event.rs` | grant exercise for a subject or the signature audience; DIRECTORY-086 | DIRECTORY-086 |
 
 ## Inventory
 
