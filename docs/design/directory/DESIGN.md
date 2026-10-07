@@ -1240,7 +1240,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/session/lifecycle/managed.rs` | The managed spawn branch of a session's lifecycle: the child entry started and proved. | DIRECTORY-064 |
 | `crates/lys-runner/src/session/lifecycle/terminal.rs` | takes a proved Ended, with or without cleanup diagnostics, as ended; DIRECTORY-064 R6, amendment 65 | DIRECTORY-064 |
 | `crates/lys-runner/src/session/stop.rs` | stopping every session: marks sessions ending and signals under the table lock, then waits on the exit events after the lock is released; DIRECTORY-064 R6, amendment 62 | DIRECTORY-064 |
-| `crates/lys-runner/src/session/adopt.rs` | takes a proved Ended, with or without cleanup diagnostics, as ended; DIRECTORY-064 R6, amendment 65 | DIRECTORY-064 |
 | `docs/design/home/launch-template.schema.json` | The launch template schema. | DIRECTORY-064 |
 | `crates/lys-runner/src/launch_config.rs` | The runner launch Config: the typed members a launch carries. | DIRECTORY-064 |
 | `crates/lys-runner/src/durable.rs` | the runner's durable writer: appends and replacements with their syncs, and one decision's journal records as one explicit batch; DIRECTORY-064 R5 | DIRECTORY-064 |

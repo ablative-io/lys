@@ -339,7 +339,6 @@
           "crates/lys-runner/src/pty.rs",
           "crates/lys-runner/tests/pty_stop.rs",
           "crates/lys-runner/src/session/stop.rs",
-          "crates/lys-runner/src/session/adopt.rs",
           "crates/lys-runner/src/session/lifecycle/terminal.rs"
         ],
         "delete": []
@@ -758,6 +757,12 @@
       "by": "Archie",
       "subject": "Three end_left_group callers take a proved Ended with cleanup diagnostics as ended",
       "ruling": "Brisket c000ad65. Under amendments 59 to 63, a cleanup that proves every member gone after an EPERM probe returns Ended with its member and EPERM diagnostics as the reason. Three callers, unchanged since before amendment 59, read any Ended with a reason as unconfirmed: harness_control/events.rs 423 to 431 (managed_lost answers control_process_end_unconfirmed), session/adopt.rs 249 (record_unadopted keeps a failure reason) and session/lifecycle/terminal.rs 137 (emits group_cleanup_incomplete). That would turn a proved cleanup into a false failure. Granted, for those three classifications only: both Ended forms count as ended, and the diagnostics are kept as diagnostics in that caller's record or words, never dropped and never turned into a failure. Unended, Reused and every Err stay refused exactly as now. Each caller gets a red by construction: a proved Ended with diagnostics is classed as a failure at d4a4ca72 and as ended at the head. Lock reading accepted as posted: no Table is held across the exit wait (events drops at 413, terminal at 134, adopt waits on its own exit thread, approval.rs 51 drops before spawning), and start-up left_behind runs before the Table mutex exists under StateFile's directory lock (state.rs 90 and 110), which is the single-runner ownership lock and stays. No other caller changes."
+    },
+    {
+      "date": "2026-10-07",
+      "by": "Archie",
+      "subject": "session/adopt.rs is dormant and leaves this box; ESRCH after reaping and the cancellation pipe are recorded",
+      "ruling": "Brisket b01346b0, checked here at 075982c1: git grep finds no mod adopt and no caller of take_over (adopt.rs line 25) in crates/lys-runner, so the file is not compiled. 1. Amendment 65's adopt.rs classification is withdrawn, and adopt.rs leaves R6's files. It is not changed in this box. A test of an uncompiled file proves nothing, so no adopt classifier or test is pushed; adopt.rs stays byte for byte as at d4a4ca72 (Waffles 0c56c780). Whether it is wired in, with its classification and red, or retired is a later piece's, on the FOUND list; retiring it is a removal and is held for Tom. Amendment 65 stands for events.rs and terminal.rs, with their measured reds at 44e8760d. 2. Accepted: when peer::group_members answers ESRCH after the leader is reaped, the group counts as gone only if a fresh kernel probe of the group also answers ESRCH. EPERM, or a group that cannot be read, still refuses as amendments 59 to 63 say. ESRCH from both is amendment 59's \"gone\"; it is never inferred from one read. 3. Accepted: the cancellation descriptor is a std UnixStream::pair, not std::io::pipe, which is newer than the 1.85 MSRV. There is no dependency, version or MSRV change."
     }
   ]
 }

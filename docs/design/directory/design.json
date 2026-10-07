@@ -5706,11 +5706,6 @@
       "brief": "DIRECTORY-064"
     },
     {
-      "path": "crates/lys-runner/src/session/adopt.rs",
-      "note": "takes a proved Ended, with or without cleanup diagnostics, as ended; DIRECTORY-064 R6, amendment 65",
-      "brief": "DIRECTORY-064"
-    },
-    {
       "path": "docs/design/home/launch-template.schema.json",
       "note": "The launch template schema.",
       "brief": "DIRECTORY-064"
