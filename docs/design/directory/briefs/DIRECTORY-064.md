@@ -305,7 +305,6 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - create: crates/lys-runner/examples/qualify_adapter/diagnostics.rs
 - create: crates/lys-runner/src/pty/cleanup.rs
 - create: crates/lys-runner/src/pty/cleanup_tests.rs
-- create: crates/lys-identity-server/tests/sign_in_solve_allocations.rs
 - modify: surface/identity/src/features/usage/Usage.tsx
 - modify: surface/identity/src/features/usage/usage.css
 - modify: surface/identity/tests/usage.test.tsx

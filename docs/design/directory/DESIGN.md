@@ -1278,7 +1278,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/drafts_api.rs` | grant exercise for a subject or the signature audience; DIRECTORY-086 | DIRECTORY-086 |
 | `crates/lys-runner/src/dial/agent.rs` | grant exercise for a subject or the signature audience; DIRECTORY-086 | DIRECTORY-086 |
 | `crates/lys-identity/src/draft_event.rs` | grant exercise for a subject or the signature audience; DIRECTORY-086 | DIRECTORY-086 |
-| `crates/lys-identity-server/tests/sign_in_solve_allocations.rs` | the issuer challenge solver allocates nothing per counter, counted by a test-only allocator; DIRECTORY-064 amendment 67 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/sign_in_tests.rs` | the challenge solver and the sign-in refusals by cause | DIRECTORY-064 |
 | `crates/lys-identity-server/src/sign_in_upstream.rs` | the provider sign-in through the issuer, sharing the refusals by cause | DIRECTORY-064 |
 | `crates/lys-identity-server/src/error_names.rs` | the wire name of every identity-server refusal | DIRECTORY-064 |

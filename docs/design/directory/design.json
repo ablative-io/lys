@@ -5896,11 +5896,6 @@
       "brief": "DIRECTORY-086"
     },
     {
-      "path": "crates/lys-identity-server/tests/sign_in_solve_allocations.rs",
-      "note": "the issuer challenge solver allocates nothing per counter, counted by a test-only allocator; DIRECTORY-064 amendment 67",
-      "brief": "DIRECTORY-064"
-    },
-    {
       "path": "crates/lys-identity-server/src/sign_in_tests.rs",
       "note": "the challenge solver and the sign-in refusals by cause",
       "brief": "DIRECTORY-064"
