@@ -182,6 +182,8 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/src/bin/lys-secrets/renew_tests.rs` | service consent or handle renewal; SECRETS-010 | SECRETS-010 |
 | `crates/lys-secrets/src/broker/handles.rs` | service consent or handle renewal; SECRETS-010 | SECRETS-010 |
 | `crates/lys-secrets/src/broker/handles_tests.rs` | service consent or handle renewal; SECRETS-010 | SECRETS-010 |
+| `crates/lys-secrets/src/bin/lys-secrets/operator.rs` | operator issue over the peer-checked socket; SECRETS-010 | SECRETS-010 |
+| `crates/lys-secrets/src/bin/lys-secrets/operator_tests.rs` | operator issue over the peer-checked socket; SECRETS-010 | SECRETS-010 |
 
 ## Inventory
 

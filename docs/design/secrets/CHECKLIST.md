@@ -84,3 +84,5 @@
 - [ ] **C419** — A signed-in person starts and finishes consent with a single-use state and PKCE bound to the session (SECRETS-009 R2).
 - [ ] **C420** — The broker exchanges the code and seals the grant with its provenance, owned by the person (SECRETS-009 R3).
 - [ ] **C422** — A holder renews its live handle within its grant, and the old one ends in the same act (SECRETS-010 R1).
+- [ ] **C423** — The operator issues through the running broker, admitted only by the local socket peer's uid, with every issue recorded before its token (SECRETS-010 R2).
+- [ ] **C424** — A holder is named by its Ed25519 public key in hex, and nothing is written on the caller's side (SECRETS-010 R3).

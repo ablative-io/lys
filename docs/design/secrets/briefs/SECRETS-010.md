@@ -12,16 +12,18 @@ title: A resident agent renews its own handle by presenting it, within its grant
 > - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 > **Checklist:**
 > - C422 — A holder renews its live handle within its grant, and the old one ends in the same act (SECRETS-010 R1).
+> - C423 — The operator issues through the running broker, admitted only by the local socket peer's uid, with every issue recorded before its token (SECRETS-010 R2).
+> - C424 — A holder is named by its Ed25519 public key in hex, and nothing is written on the caller's side (SECRETS-010 R3).
 > **Stories:**
 > - S169 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent that runs all day, I want to renew my handle by presenting it, within my grant, so that I keep working without a person issuing again and without ever seeing the credential.
 
 ## Purpose
 
-A resident service such as Tom's work watcher holds a handle that ends after its uses or its minutes (`lys-secrets issue`, defaults 10 and 60, cli.rs 86-89), and nothing lets it renew. The broker can derive (lineage.rs 231), but no route serves it, and a derived handle cannot outlive the one above it. SECRETS-008's issue route is for a screen service acting for a person, not for a holder itself. Today a person must issue again by hand each time (Archie, 7 October, 9ab721d4).
+A resident service such as Tom's work watcher holds a handle that ends after its uses or its minutes (`lys-secrets issue`, defaults 10 and 60, cli.rs 86-89), and nothing lets it renew. The broker can derive (lineage.rs 231), but no route serves it, and a derived handle cannot outlive the one above it. SECRETS-008's issue route is for a screen service acting for a person, not for a holder itself. Today a person must issue again by hand each time (Archie, 7 October, 9ab721d4). Waffles ruled on 7 October (c7b4bbc3, 6d9b5f56) that issue goes through the running broker, admitted by the local socket peer's uid, and that the holder's private key lives only in the holder's memory.
 
 ## Task
 
-Add the renewal route (R1). Out of scope: changing what a grant allows; SECRETS-008.
+Add the renewal route (R1); move the operator's issue onto the running broker over a peer-checked local socket (R2); name the holder by its public key in hex (R3). Out of scope: changing what a grant allows; SECRETS-008's screen issue; a runner that vouches for the processes it launches, which would be a standing credential under another name (Waffles 6d9b5f56).
 
 ## Requirements
 
@@ -47,11 +49,58 @@ Behavioural. POST /_lys/handles/renew admits a holder by its live handle's token
 **Stories:**
 - S169 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent that runs all day, I want to renew my handle by presenting it, within my grant, so that I keep working without a person issuing again and without ever seeing the credential.
 
+### R2: The operator issues through the running broker, admitted by the socket peer's uid
+
+Behavioural. `lys-secrets issue` stops opening the store itself. Today it is refused StoreLocked while the broker runs (main.rs 179-205), so every issue needs a broker stop. The served broker also listens on a Unix socket in a folder named operator inside its own data root. At start the broker creates the folder 0700 if it is absent. It refuses to start, naming the path and the mode it found, if the folder or the socket is owned by another uid or is wider than 0700 (folder) or 0600 (socket). It never tightens a mode itself. Each connection's peer is read with getpeereid. A peer uid other than the broker's own is refused operator_uid_refused, and that refusal is recorded in the audit log with the peer's uid. The admitted operator asks for an issue with the holder identity, the holder public key, the secret, the uses, the minutes and the optional spend cap. It is the same issue_capped act as today, with the same grant checks. The handle and its audit line of kind issue are one durable write, and the line carries the peer's pid and uid, the holder public key, the secret's name, the uses and the lifetime. If that write does not land, the issue is refused and no token is answered. The token is answered once, on the socket, and appears in no log. Renewal stays R1's, by presentation. The screen issue for a person's agent stays SECRETS-008's. Nothing here adds a token, a key file or a standing credential: the authority is the OS user, as it is today through the store files.
+
+**Acceptance:**
+- Red at main: `lys-secrets issue` against a running broker is refused StoreLocked. At the head it answers a handle that a proxied call then uses.
+- A peer with a different uid is refused operator_uid_refused, and the refusal is in the audit log.
+- With the operator folder at 0755, the broker refuses to start, naming the path and 0755, and the mode is left unchanged.
+- When the audit write fails (a test-only seam on the real write path, as in route_write_fault_tests.rs), the issue is refused, no token is answered, and no handle is live after a reopen.
+
+**Files:**
+- create: crates/lys-secrets/src/bin/lys-secrets/operator.rs
+- create: crates/lys-secrets/src/bin/lys-secrets/operator_tests.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/serve.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/main.rs
+- modify: crates/lys-secrets/src/audit.rs
+- modify: crates/lys-secrets/src/broker.rs
+
+**Checklist:**
+- C423 — The operator issues through the running broker, admitted only by the local socket peer's uid, with every issue recorded before its token (SECRETS-010 R2).
+
+**Stories:**
+- S169 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent that runs all day, I want to renew my handle by presenting it, within my grant, so that I keep working without a person issuing again and without ever seeing the credential.
+
+### R3: The holder's key is named by its public half in hex and written nowhere
+
+Behavioural. `issue` takes `--holder-public-key <hex>`, the 32-byte Ed25519 public key, in place of `--holder-key <file>`. The file form is removed, not kept beside it. A value that is not 64 hex digits, or not a valid Ed25519 point, is refused naming the flag. Nothing is written to disk on the caller's side. A resident holder such as the watcher makes a fresh Ed25519 key in memory at each start and never writes it. A restart makes its old handle unusable by design, and it asks the operator for a new one (R2) or renews a live one (R1).
+
+**Acceptance:**
+- An issue with --holder-public-key answers a handle that a presentation signed by the matching in-memory key uses.
+- A short, non-hex or off-curve value is refused naming --holder-public-key, and no file appears in the caller's working folder or home.
+
+**Files:**
+- modify: crates/lys-secrets/src/bin/lys-secrets/cli.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/main.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/operator_tests.rs
+
+**Checklist:**
+- C424 — A holder is named by its Ed25519 public key in hex, and nothing is written on the caller's side (SECRETS-010 R3).
+
+**Stories:**
+- S169 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent that runs all day, I want to renew my handle by presenting it, within my grant, so that I keep working without a person issuing again and without ever seeing the credential.
+
 ## Boundaries
 
 - SHALL NOT let a renewal outlive the holder's grant or change its secret or key.
 - SHALL NOT renew an ended, dropped or revoked handle.
 - SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore], unsafe code or any bypass.
+- SHALL NOT admit an operator by anything but the socket peer's uid equal to the broker's own; no token, key file or password.
+- SHALL NOT widen, tighten or create anything but the absent operator folder at 0700.
+- SHALL NOT answer a token whose issue record did not land.
+- SHALL NOT keep `--holder-key <file>` or the direct store-open issue beside the new path.
 
 ## Verification
 
