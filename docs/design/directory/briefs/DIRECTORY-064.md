@@ -324,6 +324,8 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 - modify: crates/lys-identity-server/tests/sign_in_page.rs
 - modify: crates/lys-identity-server/Cargo.toml
 - modify: Cargo.lock
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/error_names_tests.rs
 
 **Checklist:**
 - C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6).

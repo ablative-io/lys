@@ -5914,6 +5914,11 @@
       "path": "crates/lys-identity-server/tests/sign_in_page.rs",
       "note": "the password sign-in page against a fixture issuer, refusals by cause",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_names_tests.rs",
+      "note": "refusal names and route declarations; DIRECTORY-064 amendment 67",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

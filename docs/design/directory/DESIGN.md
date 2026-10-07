@@ -1282,6 +1282,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/sign_in_upstream.rs` | the provider sign-in through the issuer, sharing the refusals by cause | DIRECTORY-064 |
 | `crates/lys-identity-server/src/error_names.rs` | the wire name of every identity-server refusal | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/sign_in_page.rs` | the password sign-in page against a fixture issuer, refusals by cause | DIRECTORY-064 |
+| `crates/lys-identity-server/src/error_names_tests.rs` | refusal names and route declarations; DIRECTORY-064 amendment 67 | DIRECTORY-064 |
 
 ## Inventory
 
