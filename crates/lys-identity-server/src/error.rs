@@ -82,6 +82,19 @@ pub enum ServerError {
     /// The email or the password is not right. Which one is never said.
     #[error("SignInRefused: the email or password is not right")]
     SignInRefused,
+    /// The challenge expired before the issuer could accept it.
+    #[error(
+        "IssuerChallengeExpired: the sign-in challenge expired; press sign-in again to start fresh"
+    )]
+    IssuerChallengeExpired,
+    /// An issuer refusal carries only its status and error word.
+    #[error("IssuerRefused: the sign-in issuer answered {status} {error}")]
+    IssuerRefused {
+        /// The HTTP status the issuer answered.
+        status: u16,
+        /// Only the issuer's error word is retained; unreadable bodies name no private data.
+        error: String,
+    },
     /// Too many sign-ins failed from the person's address for now.
     #[error(
         "SignInThrottled: too many sign-ins failed from this address; wait a little, then try again"

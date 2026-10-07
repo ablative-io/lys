@@ -44,6 +44,8 @@ fn server(error: &ServerError) -> &str {
         ServerError::SessionUnknown => "SessionUnknown",
         ServerError::SignInStateUnknown => "SignInStateUnknown",
         ServerError::SignInRefused => "SignInRefused",
+        ServerError::IssuerChallengeExpired => "IssuerChallengeExpired",
+        ServerError::IssuerRefused { .. } => "IssuerRefused",
         ServerError::SignInThrottled => "SignInThrottled",
         ServerError::RegistrationThrottled => "RegistrationThrottled",
         ServerError::SecondFactorUnsupported => "SecondFactorUnsupported",

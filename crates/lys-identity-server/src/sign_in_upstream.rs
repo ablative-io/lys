@@ -39,7 +39,7 @@ use sha2::{Digest, Sha256};
 
 use super::{
     IssuerSignIn, Opened, SIGN_IN_SCREEN, accepted, failed, query_value, request_fields,
-    unreachable_issuer,
+    unix_second, unreachable_issuer,
 };
 use crate::error::ServerError;
 use crate::oidc::Oidc;
@@ -210,7 +210,10 @@ impl IssuerSignIn {
             Ok(answer) if answer.status().is_client_error() && answer.status() != 429 => {
                 Err(failed("the sign-in through the provider was not accepted"))
             }
-            Ok(answer) => accepted(&answer),
+            Ok(answer) => match unix_second() {
+                Ok(checked_at) => accepted(answer, None, checked_at).await,
+                Err(error) => Err(error),
+            },
             Err(error) => Err(error),
         };
         match outcome {
