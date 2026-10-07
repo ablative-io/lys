@@ -200,6 +200,7 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - create: crates/lys-runner/src/protocol/acts.rs
 - create: crates/lys-identity-server/src/goals_state/fold.rs
 - create: crates/lys-identity-server/src/goals_store/control.rs
+- create: crates/lys-identity-server/tests/control_recovery.rs
 - modify: crates/lys-identity-server/src/goals_state.rs
 - modify: crates/lys-identity-server/src/goals_store.rs
 - modify: crates/lys-identity-server/src/goals_api.rs
@@ -212,6 +213,11 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 - modify: crates/lys-runner/src/protocol.rs
 - modify: crates/lys-identity-server/src/budgets_act.rs
 - modify: crates/lys-runner/src/operations/delivery.rs
+- modify: crates/lys-identity-server/src/budgets_act/control.rs
+- modify: crates/lys-identity-server/tests/context_stop.rs
+- modify: crates/lys-identity-server/tests/budget_feed.rs
+- modify: crates/lys-identity-server/tests/agent_pass.rs
+- modify: crates/lys-identity-server/tests/goals.rs
 
 **Checklist:**
 - C436 — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).

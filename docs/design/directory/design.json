@@ -5934,6 +5934,21 @@
       "path": "crates/lys-identity-server/tests/sign_in_proxy.rs",
       "note": "the sign-in routes through the proxy, and the provider sign-in's 303 naming its refusal",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/control_recovery.rs",
+      "note": "start-up boundary recovery continues past a session whose control read fails; DIRECTORY-064 amendment 69",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/context_stop.rs",
+      "note": "context limits stop or compact live sessions, and the usage report answers what it kept",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/budget_feed.rs",
+      "note": "native budget figures and refusals through the runner feed",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [
