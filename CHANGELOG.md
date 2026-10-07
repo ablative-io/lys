@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `lys-core` and `lys` are recorded here. The format
+All notable changes to `lys-core`, `lys-log-store` and `lys` are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) with the 0.x
 caveat that minor bumps may break.
@@ -11,7 +11,76 @@ unreleased things cannot be used to tell what a published version contains.
 
 ## [Unreleased]
 
-### Added — `lys-log-store` (new crate)
+## [0.3.0] — 2026-10-08
+
+### Breaking
+
+- `lys-core`: `TrustError::BundleVerification` now has discriminant 20 rather
+  than 18. Code that casts this enum variant to a number must account for the
+  change; `#[non_exhaustive]` does not protect numeric casts.
+- `lys-log-store`: `LeafStore::put_leaf` is replaced by
+  `append(index, leaves, pin)`. Store implementations must commit the leaves
+  and their pin as one append operation.
+- `lys-log-store`: the on-disk marker is v2 and leaves live in segment files.
+  `migrate_v1` upgrades a v1 directory once and keeps the original directory
+  whole. Interrupted switches have explicit recovery and refusal outcomes.
+  The crate requires Rust 1.89 for file locking.
+- With `unstable-anchor`, `lys-core::bundle::MAX_LINKS` has been removed.
+  These feature-gated APIs remain exempt from semantic versioning.
+
+### Added — `lys-core`
+
+- `merkle::root_from_consistency_path` derives the newer root from an RFC 6962
+  consistency path, checking the caller's independently held older root.
+- `attestation::verify_attestation_by_signer` and
+  `verify_attestation_bytes_by_signer` identify which supplied signer verified.
+- `ca::certificate_signing_key` and `CertificateSigningKey` expose a decoded
+  certificate subject key and its validity interval in Unix seconds.
+- `TrustError::DelegationVerification` and `TrustError::DelegationEncoding`.
+
+### Changed — `lys-core`
+
+- `Ed25519Identity::verify` refuses non-canonical public-key encodings.
+- Saving an identity key syncs the file and its containing directory before
+  reporting success.
+
+### Added and changed — `lys-core`, with `unstable-anchor`
+
+- `receipt::ConsistencyReceipt`, `sign_consistency_receipt`,
+  `verify_consistency_receipt` and `verify_consistency_receipt_bytes` use
+  `lys/consistency-receipt/v1`. Verification requires the independently held
+  older root; equal-size receipts are refused at issuance and verification.
+- `lys/delegation/v1` carries a typed origin subject and checks its signature
+  unconditionally. Arbitrary artifact size caps have been removed.
+
+### Added — `lys-log-store`
+
+- `open_with_snapshot`, `FrontierLog`, `Frontier` and signed `Snapshot` support
+  resuming the tree from an owner's snapshot and reading only its tail.
+  Snapshot refusals and any full reconstruction are returned in `Start`.
+- `UnfinishedTail` is exported at the crate root.
+- The `flush-counts` feature exposes `flush_count` and `process_flush_count`
+  for observing real durability calls in contract tests.
+
+### Changed — `lys-log-store`
+
+- One append operation writes its leaves and pin to a segment and flushes once;
+  a batch is one operation. The pin belongs to its last record.
+- Competing writers use the segment head's file lock. An append at a taken
+  index is refused without writing a second history.
+
+### Gate
+
+Release qualification runs on the exact release commit: the formatter,
+Clippy pedantic in both feature shapes, ast-grep against all seven Lys rules,
+full workspace nextest, doctests, Go and OpenSSL conformance outcomes,
+packaging for `lys-core` and `lys-log-store`, and published-baseline semver
+comparisons. Parsed results, explicit skips, command exits, archive hashes
+and package SHA256s are recorded in that commit's release hand-back.
+
+## [lys-log-store 0.2.0] — 2026-08-08
+
+### Added — `lys-log-store`
 
 - **Durable, append-only, write-once storage for a log**, so `lys-core` stays
   free of I/O. Three pieces: the `LeafStore` trait stating what a log needs from
@@ -46,63 +115,6 @@ unreleased things cannot be used to tell what a published version contains.
   the property the rest of this crate exists to make unrepresentable. Re-pinning
   the identical `(tree_size, root)` remains permitted, because a no-op must not
   be an error, and that idempotent repeat is the door the check stands in.
-
-### Added — `lys-core` (behind the off-by-default `unstable-anchor` feature)
-
-- **`merkle::root_from_consistency_path`** — RFC 6962 §2.1.4.2, deriving the
-  *newer* root rather than comparing two roots the caller already holds. A
-  verifier supplying both roots can only confirm a pair it already knew; deriving
-  is what lets a receipt tell it where the log got to, and is what RFC 9942's
-  detached payload is for. The older root is a required argument and is checked
-  against the path's own reconstruction, so a proof descending from a different
-  history is refused rather than producing a root a signature would appear to
-  endorse. Swept against `ct-merkle` over every size pair, and cross-checked
-  against the RFC's *recursive* `SUBPROOF` transcribed in Go.
-
-- **`receipt::ConsistencyReceipt`** with `sign_consistency_receipt`,
-  `verify_consistency_receipt` and `verify_consistency_receipt_bytes` —
-  `lys/consistency-receipt/v1`, RFC 9942 `vdp` type `-2`. Verification takes the
-  older root as a **required** argument; there is deliberately no overload
-  without it, because a verifier that accepted the anchor's word for both
-  endpoints would be checking a claim the anchor could make about any pair of
-  trees it liked.
-
-  **The content type differs from the inclusion receipt's as a security
-  property, not a naming convention.** Both kinds sign a bare 32-byte root with a
-  detached payload, so a shared type would give them byte-identical signing
-  preimages and an inclusion receipt could be re-labelled as a consistency one
-  with its signature still valid. The proof type `-1` versus `-2` lives in the
-  unprotected header and is free to rewrite, so it cannot be the discriminator.
-
-  **Equal sizes are refused at issuance and at verification.** An equal-size
-  proof is true but carries no derivation: the newer root would be the caller's
-  own argument handed back, collapsing the signature check into "has this anchor
-  ever signed this 32-byte value?" over an attacker-chosen value.
-
-### Internal
-
-- Go interop gate for the consistency receipt *envelope*, alongside the existing
-  one for its Merkle derivation: across all 136 size pairs, lys signs and
-  `veraison/go-cose` verifies, and go-cose signs and the artifacts are compared
-  byte-for-byte. Both implementations must also refuse the same inputs, including
-  a receipt of each kind presented as the other.
-
-  Building it found that the order of the two tree sizes in the RFC 9942 §5.3.1
-  proof body was pinned by nothing: swapping them in the encoder and decoder
-  together leaves every in-crate test passing, because that suite encodes and
-  decodes with the same pair of functions and so cannot disagree with itself
-  about which field comes first.
-
-### Changed — `lys`
-
-- The `lys log` commands now run on `lys-log-store`; the log directory layout,
-  the write-once rules and the integrity routine moved there rather than being
-  duplicated. **The on-disk layout is byte-identical** — the format marker,
-  filename width and `state.json` shape are unchanged, so existing log
-  directories open exactly as before.
-- Interrupted appends are still repaired at open and still reported, but the
-  library now *returns* the fact and the CLI prints it, instead of the library
-  writing to stderr on its caller's behalf.
 
 ## [0.2.0] — 2026-07-30
 
