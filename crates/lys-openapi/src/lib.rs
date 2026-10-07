@@ -58,6 +58,11 @@ pub enum Auth {
     Bearer,
     /// An agent's signature over the request.
     AgentSignature,
+    /// The service's signature over a console stop body.
+    ConsoleSignature {
+        /// The header from the shared wire definition.
+        header: &'static str,
+    },
     /// The install's operator token, carried in the dedicated header.
     Operator,
 }
@@ -70,6 +75,7 @@ impl Auth {
             Self::Session => Some("session_cookie"),
             Self::Bearer => Some("lys_bearer"),
             Self::AgentSignature => Some("agent_signature"),
+            Self::ConsoleSignature { .. } => Some("console_signature"),
             Self::Operator => Some("lys_operator"),
         }
     }
@@ -247,18 +253,35 @@ impl Api {
                 .or_insert_with(|| json!({}));
             item[route.method.word()] = Self::operation(route);
         }
+        let mut security = json!({
+            "session_cookie": {"type": "apiKey", "in": "cookie", "name": "lys_directory_session", "description": "A person's signed-in session."},
+            "lys_bearer": {"type": "http", "scheme": "bearer", "description": "An app's credential, `lys-app.{app}.{secret}`, or a registrar's, `lys-registrar.{account}.{secret}`."},
+            "agent_signature": {"type": "apiKey", "in": "header", "name": "lys-agent-signature", "description": "An agent's signature over the request's method, path, body digest, time and nonce."},
+            "lys_operator": {"type": "apiKey", "in": "header", "name": "lys-operator", "description": "The install's operator token, acting as the administrator without a sign-in."},
+        });
+        for auth in self.routes.iter().flat_map(|route| route.auth) {
+            if let Auth::ConsoleSignature { header } = auth {
+                if security
+                    .get("console_signature")
+                    .is_some_and(|scheme| scheme["name"].as_str() != Some(*header))
+                {
+                    return Err(vec![
+                        "the console signature scheme names more than one header".to_owned(),
+                    ]);
+                }
+                security["console_signature"] = json!({
+                    "type": "apiKey", "in": "header", "name": header,
+                    "description": "The service's own signature over the shared console signing payload. A session cookie cannot accompany it.",
+                });
+            }
+        }
         Ok(json!({
             "openapi": VERSION,
             "info": {"title": self.title, "version": self.version, "description": self.description},
             "paths": paths,
             "components": {
                 "schemas": self.schemas,
-                "securitySchemes": {
-                    "session_cookie": {"type": "apiKey", "in": "cookie", "name": "lys_directory_session", "description": "A person's signed-in session."},
-                    "lys_bearer": {"type": "http", "scheme": "bearer", "description": "An app's credential, `lys-app.{app}.{secret}`, or a registrar's, `lys-registrar.{account}.{secret}`."},
-                    "agent_signature": {"type": "apiKey", "in": "header", "name": "lys-agent-signature", "description": "An agent's signature over the request's method, path, body digest, time and nonce."},
-                    "lys_operator": {"type": "apiKey", "in": "header", "name": "lys-operator", "description": "The install's operator token, acting as the administrator without a sign-in."},
-                },
+                "securitySchemes": security,
             },
         }))
     }

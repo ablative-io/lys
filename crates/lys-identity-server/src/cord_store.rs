@@ -16,7 +16,7 @@
 //! snapshot every [`SNAPSHOT_EVERY`] leaves and at once after a rebuild, so a
 //! start reads the snapshot and only the leaves after it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -48,9 +48,9 @@ pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;
 pub struct Pull {
     /// The operation id it was sent under, which names it.
     pub operation: String,
-    /// The administrator who pulled it.
+    /// Who pulled the cord.
     pub by: String,
-    /// Their name when it was pulled; null when the directory names none.
+    /// The display name or console claim; null when no name was held.
     pub by_name: Option<String>,
     /// Why, in their words.
     pub reason: String,
@@ -184,7 +184,7 @@ struct Held {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Spent {
-    Pull(usize),
+    Pull(usize, bool),
     Release(usize),
 }
 
@@ -198,10 +198,20 @@ struct Records {
 
 impl From<Records> for Held {
     fn from(records: Records) -> Self {
+        let released: HashSet<&str> = records
+            .releases
+            .iter()
+            .map(|release| release.pull.as_str())
+            .collect();
         let pulls = records.pulls.iter().enumerate();
         let releases = records.releases.iter().enumerate();
         let operations = pulls
-            .map(|(at, kept)| (kept.pull.operation.clone(), Spent::Pull(at)))
+            .map(|(at, kept)| {
+                (
+                    kept.pull.operation.clone(),
+                    Spent::Pull(at, released.contains(kept.pull.operation.as_str())),
+                )
+            })
             .chain(releases.map(|(at, release)| (release.operation.clone(), Spent::Release(at))))
             .collect();
         Self {
@@ -235,12 +245,13 @@ impl Held {
                 }
                 let at = self.pulls.len();
                 self.operations
-                    .insert(pull.operation.clone(), Spent::Pull(at));
+                    .insert(pull.operation.clone(), Spent::Pull(at, false));
                 self.pulls.push(Kept { pull, result: None });
                 self.standing = Some(at);
             }
             Record::Finished(result) => {
-                let Some(Spent::Pull(at)) = self.operations.get(&result.operation).copied() else {
+                let Some(Spent::Pull(at, _)) = self.operations.get(&result.operation).copied()
+                else {
                     return Err(format!("no pull `{}` to finish", result.operation));
                 };
                 let kept = &mut self.pulls[at];
@@ -260,6 +271,13 @@ impl Held {
                     ));
                 }
                 let at = self.releases.len();
+                let Some(Spent::Pull(_, released)) = self.operations.get_mut(&release.pull) else {
+                    return Err(format!(
+                        "release `{}` names no kept pull",
+                        release.operation
+                    ));
+                };
+                *released = true;
                 self.operations
                     .insert(release.operation.clone(), Spent::Release(at));
                 self.releases.push(release);
@@ -448,11 +466,22 @@ impl<S: LeafStore> CordStore<S> {
     /// and the pull to carry out otherwise. The same operation in other
     /// words, or naming a release, is refused `cord_reused`.
     pub fn pull(&mut self, pull: Pull) -> Result<Pulling, ServerError> {
+        self.pulling(pull, false)
+    }
+
+    /// A console replay binds the recorded claim and cannot restore a released pull.
+    pub(crate) fn console_pull(&mut self, pull: Pull) -> Result<Pulling, ServerError> {
+        self.pulling(pull, true)
+    }
+
+    fn pulling(&mut self, pull: Pull, console: bool) -> Result<Pulling, ServerError> {
         self.settle()?;
         match self.held.operations.get(&pull.operation).copied() {
-            Some(Spent::Pull(at)) => {
+            Some(Spent::Pull(at, released)) => {
                 let kept = &self.held.pulls[at];
-                if !kept.pull.same_words(&pull) {
+                if !kept.pull.same_words(&pull)
+                    || (console && (released || kept.pull.by_name != pull.by_name))
+                {
                     return Err(reused(pull.operation));
                 }
                 Ok(match &kept.result {
@@ -472,7 +501,7 @@ impl<S: LeafStore> CordStore<S> {
     /// kept then.
     pub fn finish(&mut self, result: PullResult) -> Result<PullResult, ServerError> {
         self.settle()?;
-        let Some(Spent::Pull(at)) = self.held.operations.get(&result.operation).copied() else {
+        let Some(Spent::Pull(at, _)) = self.held.operations.get(&result.operation).copied() else {
             return Err(unavailable(format!(
                 "no pull `{}` is kept to finish",
                 result.operation

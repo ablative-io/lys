@@ -20,15 +20,15 @@
 //! is judged on an exit status alone: each answer is read for what it says.
 //!
 //! The request to the service is signed with the service's own key, which
-//! only the install's owner can read, over a fresh nonce: holding the
-//! install's files is the authority to turn it off.
+//! only the install's owner can read. The operation identifies the pull;
+//! holding the install's files is the authority to turn it off.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_runner::{Act, Answer, Client};
+use lys_runner::{Act, Answer, Client, console_stop};
 
 use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
@@ -38,12 +38,6 @@ use super::install::{login, proxy, services};
 use super::loopback_http::{Authority, Request, exchange};
 use super::upgrade::{self, swap};
 use crate::commands::output::Emitter;
-
-/// The domain the service's console request is signed under.
-pub const CONSOLE_DOMAIN: &str = "lys-identity/console-stop/v1";
-
-/// The header carrying the console request's signature.
-pub const CONSOLE_SIGNATURE: &str = "x-lys-console-signature";
 
 /// What `lys identity stop` is asked.
 #[derive(Debug, Clone)]
@@ -230,7 +224,7 @@ enum Unanswered {
 }
 
 /// The service's address and the console route under its prefix.
-fn console_endpoint(layout: &Layout) -> Result<(Authority, &'static str), Unanswered> {
+fn console_endpoint(layout: &Layout) -> Result<(Authority, String), Unanswered> {
     let path = layout.service_config();
     let unreadable = |detail: String| Unanswered::Refused(format!("{}: {detail}", path.display()));
     let bytes = std::fs::read(&path).map_err(|error| unreadable(error.to_string()))?;
@@ -240,13 +234,13 @@ fn console_endpoint(layout: &Layout) -> Result<(Authority, &'static str), Unansw
         .get("listen")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| unreadable("the installed service has no listen address".to_owned()))?;
-    let route = match config.get("surface_dir") {
-        None | Some(serde_json::Value::Null) => "/runtime/stop-everything/console",
-        Some(_) => "/api/runtime/stop-everything/console",
-    };
+    let under_api = !matches!(
+        config.get("surface_dir"),
+        None | Some(serde_json::Value::Null)
+    );
     let authority = Authority::parse(listen, None)
         .map_err(|error| unreadable(format!("the listen address {listen}: {error}")))?;
-    Ok((authority, route))
+    Ok((authority, console_stop::path(under_api)))
 }
 
 /// Ask the service to stop everything, signed with its own key.
@@ -258,28 +252,25 @@ fn ask_service(
     kill: bool,
 ) -> Result<String, Unanswered> {
     let (authority, route) = console_endpoint(layout)?;
-    let at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.as_secs());
-    let body = serde_json::to_vec(&serde_json::json!({
-        "operation": format!("op-{}", lys_runner::protocol::hex(&rand::random::<[u8; 16]>())),
-        "by": by,
-        "reason": reason,
-        "kill": kill,
-        "nonce": lys_runner::protocol::hex(&rand::random::<[u8; 32]>()),
-        "at": at,
-    }))
-    .map_err(|error| Unanswered::Refused(error.to_string()))?;
-    let mut signed = format!("{CONSOLE_DOMAIN}\n").into_bytes();
-    signed.extend_from_slice(&body);
-    let signature = lys_runner::protocol::hex(&key.sign(&signed));
+    let asked = console_stop::Request::new(
+        format!(
+            "op-{}",
+            lys_runner::protocol::hex(&rand::random::<[u8; 16]>())
+        ),
+        by.to_owned(),
+        reason.to_owned(),
+        kill,
+    );
+    let body =
+        serde_json::to_vec(&asked).map_err(|error| Unanswered::Refused(error.to_string()))?;
+    let signature = lys_runner::protocol::hex(&key.sign(&console_stop::signed_bytes(&body)));
     let headers = [
         ("Content-Type", b"application/json".as_slice()),
-        (CONSOLE_SIGNATURE, signature.as_bytes()),
+        (console_stop::SIGNATURE_HEADER, signature.as_bytes()),
     ];
     let request = Request {
         method: "POST",
-        path: route,
+        path: &route,
         headers: &headers,
         body: &body,
     };
