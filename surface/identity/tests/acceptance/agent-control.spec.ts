@@ -131,7 +131,7 @@ describe('Managed controls on the agent file', () => {
       expect(view.posted.filter((post) => post.path === path)).toEqual([]);
       await press(view.container, 'Record not seen');
       expect(words(view.container)).toContain('decision_unconfirmed');
-      const opposite = [...view.container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Record seen');
+      const opposite = [...view.container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.getAttribute('aria-label') === 'Record seen');
       expect(opposite?.disabled).toBe(true);
       await press(view.container, 'Record not seen');
       const attempts = view.posted.filter((post) => post.path === path);

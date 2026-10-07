@@ -5,6 +5,7 @@ import { useParams } from 'react-router';
 import { readTogether } from '../../reads';
 import { api, request, useLive } from '../../api';
 import { Gate } from '../signin/Gate';
+import { Act } from '../../shell/Act';
 import { clock } from '../file/time';
 import type { RuntimeSession } from './RuntimeSessions';
 
@@ -44,7 +45,7 @@ function Running({ sessions, unanswered, people, named, go }: Awaited<ReturnType
     {sessions.filter((entry) => name(entry).toLowerCase().includes(named.trim().toLowerCase())).map((entry) => <span className="running-chip" key={entry.session} data-session={entry.session} title={'Since ' + clock(entry.first_report_at)}>
       <a href={at(entry)} aria-current={entry.agent !== null && entry.agent === shown ? 'page' : undefined} onClick={() => go?.(entry.session)}>{name(entry)}</a>
       <span className="sec">{entry.machine_name ?? entry.machine}</span>
-      <button type="button" aria-label={'Read controls for ' + name(entry)} aria-expanded={control === entry.session} onClick={() => setControl(control === entry.session ? null : entry.session)}>Controls</button>
+      <Act symbol="more" name={'Read controls for ' + name(entry)} word="Controls" aria-expanded={control === entry.session} onClick={() => setControl(control === entry.session ? null : entry.session)} />
       <span className="running-state">{silent(entry) ? <span className="why-not">Its runner did not answer; last reported {entry.last_reported}</span> : entry.shown === 'running' ? <><span className="dot s-active" />Running</> : 'Starting, not yet confirmed'}</span>
     </span>)}
     {sessions.length ? null : <span className="empty dim">Nothing is running.</span>}

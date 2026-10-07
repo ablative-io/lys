@@ -5,6 +5,7 @@ import { controls, operationId, Refused, request, useLive, useLoad } from '../..
 import type { ControlReceiptsPage, ControlSessionsPage, CurrentControl, PublicControlReceipt, ResendLookup, ResendOccurrence } from '../../api';
 import { refreshLive } from '../../live';
 import { Gate } from '../signin/Gate';
+import { Act } from '../../shell/Act';
 import { UsageBudgets } from './UsageBudgets';
 import { UsageGoals } from './UsageGoals';
 import { tracking } from './contract';
@@ -72,8 +73,8 @@ export function ManagedControls({ agent }: { agent: string }) {
     <h3>Managed controls</h3>
     <Gate load={load} title="Control sessions" renderError={controlFailure} ok={(page) => <>
       <ControlSessionPage key={after ?? 'first'} page={page} />
-      {after ? <button type="button" onClick={() => setAfter(null)}>First sessions</button> : null}
-      {page.after ? <button type="button" onClick={() => setAfter(page.after)}>More sessions</button> : null}
+      {after ? <Act symbol="back" name="First sessions" word="First" onClick={() => setAfter(null)} /> : null}
+      {page.after ? <Act symbol="more" name="More sessions" word="More" onClick={() => setAfter(page.after)} /> : null}
     </>} />
   </section>;
 }
@@ -95,8 +96,8 @@ export function SessionControls({ session }: { session: string }) {
   return <Gate load={load} title="Current controls" renderError={controlFailure} ok={({ control, page }) => <>
     <CurrentControlState control={control} />
     <ControlOperations page={page} />
-    {after ? <button type="button" onClick={() => setAfter(null)}>First operations</button> : null}
-    {page.after ? <button type="button" onClick={() => setAfter(page.after)}>More operations</button> : null}
+    {after ? <Act symbol="back" name="First operations" word="First" onClick={() => setAfter(null)} /> : null}
+    {page.after ? <Act symbol="more" name="More operations" word="More" onClick={() => setAfter(page.after)} /> : null}
   </>} />;
 }
 
@@ -157,8 +158,8 @@ function ControlOperation({ receipt }: { receipt: PublicControlReceipt }) {
     {personal ? <p>Person recorded {personal.choice.replaceAll('_', ' ')}{personal.choice === 'resent' ? ' under occurrence ' + personal.occurrence : ''}. The harness outcome remains {controlOutcome(current)}.</p> : null}
     {failure ? <p role="status">{failure} Keep this decision when retrying; its response is unconfirmed.</p> : null}
     {current.state === 'uncertain' && !personal ? <div className="control-actions">
-      <button type="button" disabled={busy || (attempt.current !== null && attempt.current.choice !== 'seen')} onClick={() => void decide('seen')}>Record seen</button>
-      <button type="button" disabled={busy || (attempt.current !== null && attempt.current.choice !== 'not_seen')} onClick={() => void decide('not_seen')}>Record not seen</button>
+      <Act symbol="approve" name="Record seen" word="Seen" disabled={busy || (attempt.current !== null && attempt.current.choice !== 'seen')} onClick={() => void decide('seen')} />
+      <Act symbol="decline" name="Record not seen" word="Unseen" disabled={busy || (attempt.current !== null && attempt.current.choice !== 'not_seen')} onClick={() => void decide('not_seen')} />
       {current.reference ? <ResendOptions receipt={current} disabled={busy || attempt.current !== null} recorded={setRecorded} /> : null}
     </div> : null}
   </article>;
@@ -189,13 +190,13 @@ function ResendOptions({ receipt, disabled, recorded }: { receipt: PublicControl
     finally { sending.current = false; setBusy(false); }
   };
   return <div className="control-resend">
-    {!lookup ? <button type="button" disabled={disabled || busy} onClick={() => void open()}>Resend options</button> : lookup.occurrence ? <>
+    {!lookup ? <Act symbol="again" name="Resend options" word="Resend" disabled={disabled || busy} onClick={() => void open()} /> : lookup.occurrence ? <>
       <p>A resend is already recorded for session {lookup.occurrence.session}. Finish its person decision under occurrence {lookup.occurrence.operation}; this does not ask a second delivery.</p>
-      <button type="button" disabled={disabled || busy} onClick={() => void send()}>Finish the recorded resend</button>
+      <Act symbol="approve" name="Finish the recorded resend" word="Finish" disabled={disabled || busy} onClick={() => void send()} />
     </> : <>
       <p>Sending again creates a distinct occurrence labelled possible prior delivery. The current authority and turn boundary are checked before delivery.</p>
       <label>Intended session <input aria-label="Intended resend session" value={session} disabled={busy || attempted} onChange={(event) => setSession(event.target.value)} /></label>
-      <button type="button" disabled={disabled || busy || !session.trim()} onClick={() => void send()}>{attempted ? 'Retry the same resend request' : 'Send a new occurrence'}</button>
+      <Act symbol={attempted ? 'retry' : 'send'} name={attempted ? 'Retry the same resend request' : 'Send a new occurrence'} word={attempted ? 'Retry' : 'Send'} disabled={disabled || busy || !session.trim()} onClick={() => void send()} />
     </>}
     {failure ? <p role="status">{failure}{attempted ? ' Its answer is unconfirmed. Keep the same occurrence when retrying.' : ''}</p> : null}
   </div>;

@@ -377,7 +377,7 @@ describe('managed control readback', () => {
       },
     });
     try {
-      const button = () => [...view.container.querySelectorAll('button')].find((element) => element.textContent === 'Record not seen');
+      const button = () => [...view.container.querySelectorAll('button')].find((element) => element.getAttribute('aria-label') === 'Record not seen');
       expect(button()).toBeDefined();
       await act(async () => { button()?.click(); });
       expect(view.container.textContent).toContain('decision_unconfirmed');
@@ -409,10 +409,10 @@ describe('resend recovery readback', () => {
     for (let reload = 0; reload < 2; reload += 1) {
       const view = await managedControlView(currentControl, [receipt], routes);
       try {
-        const button = (words: string) => [...view.container.querySelectorAll('button')].find((element) => element.textContent === words);
+        const button = (words: string) => [...view.container.querySelectorAll('button')].find((element) => element.getAttribute('aria-label') === words);
         await act(async () => { button('Resend options')?.click(); });
         expect(view.requests).toContain(lookup);
-        expect(view.container.textContent).toContain('Finish the recorded resend');
+        expect(button('Finish the recorded resend')).toBeDefined();
         expect(button('Send a new occurrence')).toBeUndefined();
         await act(async () => { button('Finish the recorded resend')?.click(); });
         expect(view.posted.filter((entry) => entry.path === resend)).toHaveLength(1);
