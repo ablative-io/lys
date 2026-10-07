@@ -5929,6 +5929,11 @@
       "path": "crates/lys-identity-server/src/provider_tests.rs",
       "note": "the provider's unit tests, among them the OAuth answer of each refusal",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/sign_in_proxy.rs",
+      "note": "the sign-in routes through the proxy, and the provider sign-in's 303 naming its refusal",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

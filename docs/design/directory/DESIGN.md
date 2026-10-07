@@ -1285,6 +1285,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/error_names_tests.rs` | refusal names and route declarations; DIRECTORY-064 amendment 67 | DIRECTORY-064 |
 | `crates/lys-identity-server/src/provider/endpoints.rs` | the provider's routes and its OAuth error answers | DIRECTORY-064 |
 | `crates/lys-identity-server/src/provider_tests.rs` | the provider's unit tests, among them the OAuth answer of each refusal | DIRECTORY-064 |
+| `crates/lys-identity-server/tests/sign_in_proxy.rs` | the sign-in routes through the proxy, and the provider sign-in's 303 naming its refusal | DIRECTORY-064 |
 
 ## Inventory
 
