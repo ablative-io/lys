@@ -115,12 +115,13 @@ Behavioural. Today the /mcp relay keeps a leaf only for a changing method (mcp_r
 
 ### R5: A registered app exercises a grant for the subject a token names, and the use is recorded
 
-Behavioural. POST /grants/exercise is open to a registered app through its credential, for its own kinds only. Another app's kind is refused not_your_app, as grants_batch.rs refuses it. It takes the subject, the resource (kind and id) and the action. The subject is the one R3's introspection answered for a token whose audience is that app's registered resource. A subject with no live token for that resource is refused subject_not_presented, so an app cannot act for anyone it was not handed a token by. The grant is checked as an Exercise, the same decision route_actions.rs makes, and the Use is recorded with the action named. The answer is the subject and the use index. A refusal records nothing and answers its reason by name. Today /grants/check judges only the caller, and /grants/check/batch takes a subject but records nothing (grants_batch.rs 12 and 190), so no app can get a recorded Use for a subject.
+Behavioural. POST /grants/exercise is open to a registered app through its credential, for its own kinds only. Another app's kind is refused not_your_app, as grants_batch.rs refuses it. It takes the subject, the resource (kind and id) and the action. The subject is the one R3's introspection answered for a token whose audience is that app's registered resource. A subject with no live token for that resource is refused subject_not_presented, so an app cannot act for anyone it was not handed a token by. The grant is checked as an Exercise, the same decision route_actions.rs makes, and the Use is recorded with the action named. The request body is JSON with exactly these members, and any other is refused, as CheckWire refuses one (grants_batch.rs 37-47): {"subject": "<identity id>", "resource": {"kind": "<kind>", "id": "<id>"}, "action": "<action>", "at_least": <revision, optional>}. at_least means what it means for the batch. The Use is recorded as a new grant event kind, GrantChange::Exercise {grant, route, action, app}, with the subject as its holder, route Api and app the calling app's id. The existing Use kind and every stored signed event are unchanged, because they are records. A new kind is added for this, and no field is added to Use. The answer is 200 with exactly {"subject": "<identity id>", "grant": "<grant id>", "use_index": <u64>}, where use_index is the ledger index that record_use returns for that event (lys-identity/src/grants/commit.rs 221-227). A refusal answers the identity server's one refusal body, {"refusal": "<name>", "reason": "<words>", "fields": [...]} (error_status.rs 112-115), with the status that refusal already has. That is the broker's {refusal, reason} with fields added, and is not a second shape. The names are not_your_app, subject_not_presented, NotHeld, Revoked and StaleDecision. A refusal records nothing and answers its reason by name. Today /grants/check judges only the caller, and /grants/check/batch takes a subject but records nothing (grants_batch.rs 12 and 190), so no app can get a recorded Use for a subject.
 
 **Acceptance:**
 - Red at main: there is no route by which an app gets a recorded Use for a subject. At the head an exercise answers the subject and a use index, and the Use names the action.
 - Another app's kind is refused not_your_app; a subject without a live token for the app's resource is refused subject_not_presented; neither records a Use.
 - A subject whose grant is revoked is refused Revoked, and nothing is recorded.
+- The answer's members are exactly subject, grant and use_index, and use_index reads back the Exercise event naming the action and the app.
 
 **Files:**
 - create: crates/lys-identity-server/src/grants_exercise.rs
@@ -128,6 +129,7 @@ Behavioural. POST /grants/exercise is open to a registered app through its crede
 - modify: crates/lys-identity-server/src/grants.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
 - modify: crates/lys-identity/src/grants/commit.rs
+- modify: crates/lys-identity/src/grants/events.rs
 
 **Checklist:**
 - C519 — A registered app exercises a grant for the subject a token names, and the Use is recorded with its action (DIRECTORY-085 R5).
