@@ -35,7 +35,8 @@
     "ADR-106",
     "ADR-108",
     "ADR-112",
-    "ADR-134"
+    "ADR-134",
+    "ADR-138"
   ],
   "goals": [
     "After a put_leaf that fails before its link, no file exists under that leaf's 20-digit name, no temporary file of this writer's remains in leaves/, and a reopen reports the same extent as before the write.",
@@ -720,6 +721,56 @@
       "path": "crates/lys-secrets/tests/audit_flush_count.rs",
       "note": "One flush per audit append in the secrets broker",
       "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "docs/design/lys-log-store/STORES.md",
+      "note": "Every name Lys creates under its data path, with its contract, open, growing collections and bytes per act",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys/tests/store_inventory.rs",
+      "note": "Every name under a fresh install's data path has a row in STORES.md, and every row a name",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys/tests/store_bound.rs",
+      "note": "The stated mix to 2,000 sessions, measured from outside against B",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys/examples/store_levels.rs",
+      "note": "Prints the data path's levels from file metadata only, skipping .previous",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys-runner/src/operations_tests.rs",
+      "note": "The operations checkpoint, its rewrite and its crashes",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys-log-store/src/migrate_removal_tests.rs",
+      "note": "A kept v1 copy removed once proved, and kept when it does not match",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys/src/identity/install/server_config.rs",
+      "note": "Renders every store path the identity server opens under the data path",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys-runner/src/operations.rs",
+      "note": "The runner's operation outcomes, opened from a checkpoint and their live outcomes",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys-log-store/src/migrate.rs",
+      "note": "The one migration out of the v1 layout, and the removal of its kept copy once proved",
+      "brief": "LYSLOGSTORE-009"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/open.rs",
+      "note": "Opening a segment store, finishing an interrupted removal of a kept copy",
+      "brief": "LYSLOGSTORE-009"
     }
   ],
   "inventory": [

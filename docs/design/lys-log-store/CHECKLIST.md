@@ -61,3 +61,13 @@
 - [ ] **C36** — A crash at every write, flush and rename boundary of an append, a batch and the migration loses no acknowledged leaf and shows no unacknowledged one (LYSLOGSTORE-008 R5).
 - [ ] **C37** — Gate tests count one flush per append and per batch, and an open of 10,000 records reads only the tail (LYSLOGSTORE-008 R6).
 - [ ] **C38** — Every store on the log counts one flush per acknowledged act in the gate (LYSLOGSTORE-008 R7).
+
+## Stores within a bound (LYSLOGSTORE-009)
+
+- [ ] **C39** — Every name Lys creates under its data path has a row with its creator, contract, open, growing collections and bytes per act, and a test holds the list whole (LYSLOGSTORE-009 R1).
+- [ ] **C40** — No production open reads every leaf, and Log with its full-leaf opens is deleted (LYSLOGSTORE-009 R2).
+- [ ] **C41** — The runner's operations open from a checkpoint and their live outcomes, rewritten with one flush (LYSLOGSTORE-009 R3).
+- [ ] **C42** — A migration's kept copy is removed while running once a later start has checked it, and a mismatch is refused and kept (LYSLOGSTORE-009 R4).
+- [ ] **C43** — A bound test drives a stated mix to 2,000 sessions and measures the data path from outside, red at main (LYSLOGSTORE-009 R5).
+- [ ] **C44** — Every growing in-process collection holds only live records or contract-kept ids (LYSLOGSTORE-009 R6).
+- [ ] **C45** — Installed, with the data path's levels posted over seven days beside the acts counted (LYSLOGSTORE-009 R7).

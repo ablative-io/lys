@@ -230,6 +230,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Stores within a bound (LYSLOGSTORE-009)",
+      "items": [
+        {
+          "id": "C39",
+          "text": "Every name Lys creates under its data path has a row with its creator, contract, open, growing collections and bytes per act, and a test holds the list whole (LYSLOGSTORE-009 R1).",
+          "done": false
+        },
+        {
+          "id": "C40",
+          "text": "No production open reads every leaf, and Log with its full-leaf opens is deleted (LYSLOGSTORE-009 R2).",
+          "done": false
+        },
+        {
+          "id": "C41",
+          "text": "The runner's operations open from a checkpoint and their live outcomes, rewritten with one flush (LYSLOGSTORE-009 R3).",
+          "done": false
+        },
+        {
+          "id": "C42",
+          "text": "A migration's kept copy is removed while running once a later start has checked it, and a mismatch is refused and kept (LYSLOGSTORE-009 R4).",
+          "done": false
+        },
+        {
+          "id": "C43",
+          "text": "A bound test drives a stated mix to 2,000 sessions and measures the data path from outside, red at main (LYSLOGSTORE-009 R5).",
+          "done": false
+        },
+        {
+          "id": "C44",
+          "text": "Every growing in-process collection holds only live records or contract-kept ids (LYSLOGSTORE-009 R6).",
+          "done": false
+        },
+        {
+          "id": "C45",
+          "text": "Installed, with the data path's levels posted over seven days beside the acts counted (LYSLOGSTORE-009 R7).",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -116,3 +116,21 @@ rather than complaints:
   disagree with. **Writing the contract created the second party.**
 - `Cargo.lock` was gitignored here too, on the library convention, which is the
   wrong convention for a repository whose gates are its evidence.
+
+## The choice, 7 October 2026 (ADR-138)
+
+Lys's log stays on this crate's segment engine. Haematite stays the intended second
+backend. The reasons, and the conditions under which the log moves, are in ADR-138.
+Read again at `haematite@af5e18a` on 7 October:
+
+- **haematite #57** (*no committed lockfile*): `Cargo.lock` is now tracked (`git ls-files`).
+- **haematite #58** (*append not fsynced*): unchanged. Native production still constructs
+  `FsyncPolicy::CommitOnly` (`crates/haematite/src/shard/actor/native/boot.rs:577`), and
+  `COMMIT-DURABILITY-CONTRACT.md` says N1's text stands.
+- **haematite #11** (*recovery fails open*): the contract now says a corrupt WAL is no
+  longer written to, and a reopen cuts it and flushes before the first append. Not checked
+  in code for this section.
+
+The log moves onto haematite when, read at a named haematite commit: a durable-per-append
+path is in its contract; its prune and online reclaim are installed and measured; its
+startup reads no history; and its bound test is green.

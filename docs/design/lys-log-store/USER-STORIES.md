@@ -53,3 +53,5 @@
 **S8.** As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
 **S11.** As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+**S12.** As the operator of an estate where Lys runs behind every agent, I want every Lys store to stay within a bound I can measure from outside while it runs, so that the disk never fills with bytes nobody can reach and no start or command reads all of history.
