@@ -107,7 +107,7 @@ fn unsigned_seconds_reject_pre_epoch_instants_and_preserve_whole_seconds() {
         let error = unix_seconds(supplied).unwrap_err();
         assert!(
             std::error::Error::source(&error)
-                .is_some_and(|source| source.is::<std::num::TryFromIntError>())
+                .is_some_and(<(dyn std::error::Error + 'static)>::is::<std::num::TryFromIntError>)
         );
     }
     assert_eq!(unix_seconds(instant(0)).unwrap(), 0);
