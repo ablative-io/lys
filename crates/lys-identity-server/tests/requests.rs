@@ -45,6 +45,43 @@ struct Table {
     bea: String,
 }
 
+struct RequestWork {
+    started: std::time::Instant,
+    reads: u64,
+    extent: u64,
+}
+
+fn request_extent(table: &Table) -> Result<u64, Box<dyn Error>> {
+    use lys_log_store::LeafStore;
+    Ok(lys_log_store::FileLeafStore::open_read_only(&table.service.dir.path().join("requests"))?.extent())
+}
+
+impl RequestWork {
+    fn begin(table: &Table, clock: &ManualClock) -> Result<Self, Box<dyn Error>> {
+        let extent = request_extent(table)?;
+        Ok(Self { started: std::time::Instant::now(), reads: clock.reads(), extent })
+    }
+
+    fn completed(
+        self, table: &Table, clock: &ManualClock, outcome: &str,
+        status: u16, expected_reads: u64, expected_appends: u64,
+    ) -> TestResult {
+        let elapsed = self.started.elapsed();
+        let reads = clock.reads().checked_sub(self.reads).ok_or("clock count decreased")?;
+        let extent = request_extent(table)?;
+        let appended = extent.checked_sub(self.extent).ok_or("request extent decreased")?;
+        assert_eq!(reads, expected_reads, "{outcome}");
+        assert_eq!(appended, expected_appends, "{outcome}");
+        eprintln!("CLOCK_HTTP {}", json!({
+            "outcome": outcome, "status": status, "provider_reads": reads,
+            "elapsed_nanos": elapsed.as_nanos(),
+            "extent_before": self.extent, "extent_after": extent,
+            "request_appends": appended, "physical_syncs": null, "history_visits": null,
+        }));
+        Ok(())
+    }
+}
+
 impl Table {
     async fn set() -> Result<Self, Box<dyn Error>> {
         let (service, seeded) =
@@ -350,16 +387,20 @@ async fn a_kept_request_is_answered_again_after_the_end_it_asked_for() -> TestRe
     let soon = 1_700_000_002_u64;
     let mut body = Table::ask_body("4", "beta")?;
     body["ends_at"] = json!(soon);
+    let before = RequestWork::begin(&table, &clock)?;
     let (status, first) = table
         .service
         .post("/requests", Some(&table.bea), &body)
         .await?;
+    before.completed(&table, &clock, "append", status, 2, 1)?;
     assert_eq!(status, 200, "{first}");
     clock.set(1_700_000_003);
+    let before = RequestWork::begin(&table, &clock)?;
     let (status, replayed) = table
         .service
         .post("/requests", Some(&table.bea), &body)
         .await?;
+    before.completed(&table, &clock, "replay", status, 2, 0)?;
     assert_eq!(
         status, 200,
         "the kept request is answered, not judged again: {replayed}"
@@ -368,10 +409,12 @@ async fn a_kept_request_is_answered_again_after_the_end_it_asked_for() -> TestRe
     assert_eq!(replayed["asked_at"], first["asked_at"]);
     let mut late = Table::ask_body("4", "beta")?;
     late["ends_at"] = json!(soon);
+    let before = RequestWork::begin(&table, &clock)?;
     let fresh = table
         .service
         .post("/requests", Some(&table.bea), &late)
         .await?;
+    before.completed(&table, &clock, "refusal", fresh.0, 2, 0)?;
     refused(&fresh, 400, "RequestMalformed");
     Ok(())
 }
