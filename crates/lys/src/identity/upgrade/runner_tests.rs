@@ -224,7 +224,10 @@ fn put_back_runner_without_proxy_configuration_rejects_no_new_flag() -> TestResu
     let layout = &running.scratch.layout;
     let config_file = layout.service_config();
     let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(&config_file)?)?;
-    config.as_object_mut().ok_or("configuration is not an object")?.remove("model_proxy");
+    config
+        .as_object_mut()
+        .ok_or("configuration is not an object")?
+        .remove("model_proxy");
     std::fs::write(&config_file, serde_json::to_vec(&config)?)?;
     assert!(!install::proxy::configured(layout)?);
     let file = layout.binary("lys");
@@ -238,7 +241,10 @@ fn put_back_runner_without_proxy_configuration_rejects_no_new_flag() -> TestResu
     let mut restart = super::super::runner::Restart::prepare(layout)?;
     restart.stop(&mut |_| {})?;
     restart.start(layout, &mut |_| {}, "restored and ready")?;
-    assert!(matches!(running.client().ask(&Act::Status { session: None })?, Answer::Status { .. }));
+    assert!(matches!(
+        running.client().ask(&Act::Status { session: None })?,
+        Answer::Status { .. }
+    ));
     Ok(())
 }
 

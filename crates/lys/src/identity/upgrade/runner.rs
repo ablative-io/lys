@@ -137,14 +137,6 @@ impl Restart {
             layout.data_dir().join("runner").display().to_string(),
             "--server-key".into(),
             public.display().to_string(),
-            // Where the install's proxy keeps its state (`proxy::unit`).
-            "--proxy-state".into(),
-            layout
-                .data_dir()
-                .join("proxy")
-                .join("state")
-                .display()
-                .to_string(),
         ];
         let ports = Ports::load(layout)?;
         Ok(Self {
@@ -241,6 +233,7 @@ impl Restart {
                 &self.unit.pid,
             ));
         }
+        let configured_proxy = proxy::configured(layout)?;
         let before = std::fs::metadata(&self.unit.log)
             .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?
             .len();
@@ -263,6 +256,11 @@ impl Restart {
             .stdin(lock)
             .stdout(out)
             .stderr(err);
+        if configured_proxy {
+            command
+                .arg("--proxy-state")
+                .arg(layout.data_dir().join("proxy").join("state"));
+        }
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;
@@ -332,7 +330,7 @@ impl Restart {
         // The configuration in place decides: one put back from a build
         // before the proxy names none, and no proxy is started. One that
         // names it gets it, and a lys that cannot serve it is refused by name.
-        if !proxy::configured(layout)? {
+        if !configured_proxy {
             say("the service's configuration names no model proxy; none started");
             return Ok(());
         }
