@@ -153,7 +153,7 @@ mod tests {
         let error = unix_seconds(instant).unwrap_err();
         assert!(
             std::error::Error::source(&error)
-                .is_some_and(<(dyn std::error::Error + 'static)>::is::<std::num::TryFromIntError>)
+                .is_some_and(<dyn std::error::Error + 'static>::is::<std::num::TryFromIntError>)
         );
     }
 
@@ -167,7 +167,7 @@ mod tests {
             let error = utc_from_duration(Duration::MAX, before_epoch).unwrap_err();
             assert!(
                 std::error::Error::source(&error).is_some_and(
-                    <(dyn std::error::Error + 'static)>::is::<std::num::TryFromIntError>
+                    <dyn std::error::Error + 'static>::is::<std::num::TryFromIntError>
                 )
             );
             assert!(matches!(
