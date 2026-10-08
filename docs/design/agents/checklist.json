@@ -111,7 +111,7 @@
       "items": [
         {
           "id": "C719",
-          "text": "Every one of41 census paths has an actual-code benchmark, reproducible counter vector, native-time correlation and non-increasing case ratchet; unmeasured values remain unqualified (AGENTS-005 R1/R10).",
+          "text": "Every one of 41 census paths has an actual-code benchmark, reproducible counter vector, native-time correlation and non-increasing case ratchet; unmeasured values remain unqualified (AGENTS-005 R1/R10).",
           "done": false
         },
         {

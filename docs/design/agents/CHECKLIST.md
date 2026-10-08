@@ -29,7 +29,7 @@
 
 ## Counted seat-loop performance
 
-- [ ] **C719** — Every one of41 census paths has an actual-code benchmark, reproducible counter vector, native-time correlation and non-increasing case ratchet; unmeasured values remain unqualified (AGENTS-005 R1/R10).
+- [ ] **C719** — Every one of 41 census paths has an actual-code benchmark, reproducible counter vector, native-time correlation and non-increasing case ratchet; unmeasured values remain unqualified (AGENTS-005 R1/R10).
 - [ ] **C720** — Capture admission, frames, worker, completion, usage and drain remove repeated history/journal work while preserving every byte and durable completion stage (AGENTS-005 R2).
 - [ ] **C721** — Peer, hook, bind, status and source follow use indexed current identities/cursors instead of fleet, date and rotation history scans (AGENTS-005 R3).
 - [ ] **C722** — Delivery/reminder and lifecycle costs are indexed and bounded, with existing DIRECTORY-064 and AGENTS-004 durability/retention contracts preserved (AGENTS-005 R4/R9).
