@@ -384,11 +384,26 @@ async fn opening_projection_failure_is_reported_once_without_another_projection(
         )?;
         let before = writes.load(Ordering::Relaxed);
         let reports = Mutex::new(Vec::new());
+        let callbacks = AtomicU64::new(0);
+        let report_bytes = AtomicU64::new(0);
+        let callback_nanos = AtomicU64::new(0);
         let say = |words: &str| {
+            let started = std::time::Instant::now();
+            callbacks.fetch_add(1, Ordering::Relaxed);
+            let bytes = match u64::try_from(words.len()) {
+                Ok(bytes) => bytes,
+                Err(error) => panic!("opening_report_fixture_bytes_overflowed: {error}"),
+            };
+            report_bytes.fetch_add(bytes, Ordering::Relaxed);
             match reports.lock() {
                 Ok(mut reports) => reports.push(words.to_owned()),
                 Err(error) => panic!("opening_report_fixture_lock_poisoned: {error}"),
             }
+            let nanos = match u64::try_from(started.elapsed().as_nanos()) {
+                Ok(nanos) => nanos,
+                Err(error) => panic!("opening_report_fixture_duration_overflowed: {error}"),
+            };
+            callback_nanos.fetch_add(nanos, Ordering::Relaxed);
         };
         crate::grants::report_startup(&mut opened, &say);
         crate::grants::report_startup(&mut opened, &say);
@@ -397,15 +412,20 @@ async fn opening_projection_failure_is_reported_once_without_another_projection(
         let reports = reports.into_inner().map_err(|error| error.to_string())?;
         fault.store(false, Ordering::Release);
         drop(opened);
-        Ok((reports, before, after, consumed, revision))
+        Ok((reports, before, after, consumed, revision,
+            callbacks.load(Ordering::Relaxed), report_bytes.load(Ordering::Relaxed),
+            callback_nanos.load(Ordering::Relaxed)))
     })();
-    let (reports, before, after, consumed, revision) = table.finish(readings)?;
+    let (reports, before, after, consumed, revision, callbacks, bytes, nanos) = table.finish(readings)?;
     assert_eq!(before, 1);
     assert_eq!(after, before);
     assert!(consumed);
     assert_eq!(reports, [format!(
         "grant projection degraded at revision {revision}: {}", refusal(),
     )]);
+    assert_eq!(callbacks, 1);
+    assert_eq!(usize::try_from(bytes)?, reports[0].len());
+    eprintln!("startup Say fixture: {callbacks} callback, 1 mutex, {bytes} bytes, {nanos} ns; sink I/O not measured");
     Ok(())
 }
 
