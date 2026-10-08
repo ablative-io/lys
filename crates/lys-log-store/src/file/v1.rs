@@ -82,7 +82,7 @@ pub(crate) fn present(dir: &Path) -> StoreResult<bool> {
 /// Read the v1 store at `dir` whole: identity, pin, every leaf under the pin
 /// in order, and the snapshot. A leaf missing under the pin is `Corrupt`,
 /// named by index.
-pub(crate) fn read(dir: &Path) -> StoreResult<Contents> {
+pub(crate) fn identity(dir: &Path) -> StoreResult<(String, PinnedRoot)> {
     let config: Config = parse(dir, "log.json")?;
     if config.format != FORMAT {
         return Err(StoreError::Corrupt {
@@ -103,27 +103,33 @@ pub(crate) fn read(dir: &Path) -> StoreResult<Contents> {
         tree_size: state.tree_size,
         root,
     };
-    let count = usize::try_from(state.tree_size).map_err(|source| {
+    crate::validate_origin(&config.origin)?;
+    Ok((config.origin, pinned))
+}
+
+pub(crate) fn read(dir: &Path) -> StoreResult<Contents> {
+    let (origin, pinned) = identity(dir)?;
+    let count = usize::try_from(pinned.tree_size).map_err(|source| {
         StoreError::LeafCountUnrepresentable {
-            count: state.tree_size,
+            count: pinned.tree_size,
             source,
         }
     })?;
     let mut leaves = Vec::with_capacity(count);
-    for index in 0..state.tree_size {
+    for index in 0..pinned.tree_size {
         let Some(bytes) = leaf(dir, index)? else {
             return Err(StoreError::Corrupt {
                 path: dir.to_path_buf(),
                 reason: format!(
                     "leaf {index} is missing under the pin at {}",
-                    state.tree_size
+                    pinned.tree_size
                 ),
             });
         };
         leaves.push(bytes);
     }
     let mut beyond_pin = 0;
-    while leaf(dir, state.tree_size + beyond_pin)?.is_some() {
+    while leaf(dir, pinned.tree_size + beyond_pin)?.is_some() {
         beyond_pin += 1;
     }
     let snapshot_path = dir.join("snapshot.bin");
@@ -138,7 +144,7 @@ pub(crate) fn read(dir: &Path) -> StoreResult<Contents> {
         }
     };
     Ok(Contents {
-        origin: config.origin,
+        origin,
         pinned,
         leaves,
         beyond_pin,
@@ -158,7 +164,7 @@ fn parse<T: serde::de::DeserializeOwned>(dir: &Path, name: &str) -> StoreResult<
     })
 }
 
-fn leaf(dir: &Path, index: u64) -> StoreResult<Option<Vec<u8>>> {
+pub(super) fn leaf(dir: &Path, index: u64) -> StoreResult<Option<Vec<u8>>> {
     let path = dir
         .join("leaves")
         .join(format!("{index:0LEAF_NAME_WIDTH$}"));

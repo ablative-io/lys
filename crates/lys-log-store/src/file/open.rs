@@ -117,6 +117,7 @@ pub(super) fn scan(dir: &Path, read_only: bool) -> StoreResult<FileLeafStore> {
         reason: reasons.join(", then "),
     });
     Ok(FileLeafStore {
+        legacy: None,
         dir: dir.to_path_buf(),
         origin: config.origin,
         extent,

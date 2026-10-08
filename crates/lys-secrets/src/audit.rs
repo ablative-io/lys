@@ -230,11 +230,18 @@ impl AuditLog {
         key: &StoreKey,
     ) -> Result<(Self, Opened), SecretsError> {
         ensure_outside(anchor, guarded)?;
-        let started = open_with_snapshot(
-            FileLeafStore::open(dir)?,
-            STATE_DOMAIN,
-            &key.verifying_key(),
-        )?;
+        Self::open_store(FileLeafStore::open(dir)?, dir, anchor, guarded, key)
+    }
+
+    pub(crate) fn open_store(
+        store: FileLeafStore,
+        dir: &Path,
+        anchor: &Path,
+        guarded: &[&Path],
+        key: &StoreKey,
+    ) -> Result<(Self, Opened), SecretsError> {
+        ensure_outside(anchor, guarded)?;
+        let started = open_with_snapshot(store, STATE_DOMAIN, &key.verifying_key())?;
         let audit = Self {
             log: started.log,
             dir: dir.to_path_buf(),
@@ -265,8 +272,13 @@ impl AuditLog {
             every_line_audits,
             ..
         } = self;
+        let deferred = log.store().deferred_migration();
         drop(log);
-        let (log, tail) = FrontierLog::open(FileLeafStore::open(&dir)?)?;
+        let store = match deferred {
+            Some(ready) => FileLeafStore::open_deferred(&dir, ready)?,
+            None => FileLeafStore::open(&dir)?,
+        };
+        let (log, tail) = FrontierLog::open(store)?;
         let audit = Self {
             log,
             dir,
