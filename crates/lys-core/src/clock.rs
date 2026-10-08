@@ -139,6 +139,11 @@ mod tests {
             unix_seconds(instant),
             Err(ClockError::InstantOutOfRange)
         ));
+        let error = unix_seconds(instant).unwrap_err();
+        assert!(
+            std::error::Error::source(&error)
+                .is_some_and(|source| source.is::<std::num::TryFromIntError>())
+        );
     }
 
     #[test]
@@ -148,6 +153,11 @@ mod tests {
                 utc_from_duration(Duration::MAX, before_epoch),
                 Err(ClockError::InstantOutOfRange)
             ));
+            let error = utc_from_duration(Duration::MAX, before_epoch).unwrap_err();
+            assert!(
+                std::error::Error::source(&error)
+                    .is_some_and(|source| source.is::<std::num::TryFromIntError>())
+            );
             assert!(matches!(
                 utc_from_duration(Duration::from_secs(i64::MAX.unsigned_abs()), before_epoch),
                 Err(ClockError::InstantOutOfRange)
