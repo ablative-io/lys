@@ -208,7 +208,7 @@ impl IssuerSignIn {
             .await
         {
             Ok(answer) if answer.status().is_client_error() && answer.status() != 429 => {
-                Err(failed("the sign-in through the provider was not accepted"))
+                Err(callback_refusal(answer).await)
             }
             Ok(answer) => match unix_second() {
                 Ok(checked_at) => accepted(answer, None, checked_at).await,
@@ -228,6 +228,73 @@ impl IssuerSignIn {
             }
         }
     }
+}
+
+/// Only recognized refusal words enter the log; upstream bodies can carry
+/// credentials, personal details and text that would forge another log line.
+fn callback_summary(body: &[u8]) -> String {
+    let Ok(value) = serde_json::from_slice::<Value>(body) else {
+        return format!("body is not a JSON refusal ({} bytes)", body.len());
+    };
+    let error = match value.get("error").and_then(Value::as_str) {
+        Some(word @ ("BadRequest" | "Blocked" | "Connection" | "CSRFTokenError"
+            | "Database" | "DatabaseIo" | "Disabled" | "Encryption" | "Forbidden"
+            | "Internal" | "invalid_grant" | "invalid_target" | "JwtToken" | "JoseError"
+            | "MfaRequired" | "NoSession" | "NotFound" | "PasswordExpired" | "PasswordRefresh"
+            | "PreconditionRequired" | "Scim" | "SessionExpired" | "SessionTimeout"
+            | "Timeout" | "Unauthorized" | "NotAccepted")) => word,
+        _ => "unrecognized",
+    };
+    let message = match value.get("message").and_then(Value::as_str) {
+        Some(text) if text.starts_with("User with email '")
+            && text.ends_with("' already exists but is not linked to this provider.") => {
+                "existing account is not linked to this provider"
+            }
+        Some(text @ ("User not found" | "Invalid value for the Upstream User ID"
+            | "Cannot find any user id in the response" | "bad provider_id in link cookie"
+            | "bad user_id in link cookie" | "Invalid E-Mail"
+            | "No `email` in ID token claims. This is a mandatory claim"
+            | "Callback Code not found - timeout reached?"
+            | "Neither `access_token` nor `id_token` existed")) => text,
+        Some(text) if text.starts_with("HTTP ")
+            && text.contains(" during POST ")
+            && text.contains(" for upstream auth provider '") => {
+                "upstream token endpoint refused"
+            }
+        Some(_) => "unrecognized message redacted",
+        None => "no string message",
+    };
+    format!("body error={error}; message={message} ({} bytes)", body.len())
+}
+
+/// A callback refusal keeps its status even when its body cannot be read.
+async fn callback_refusal(mut answer: reqwest::Response) -> ServerError {
+    const MOST: usize = 4096;
+    let status = answer.status().as_u16();
+    let mut body = Vec::new();
+    loop {
+        match answer.chunk().await {
+            Ok(Some(chunk)) => {
+                if chunk.len() > MOST - body.len() {
+                    return failed(format!(
+                        "the provider callback answered {status}; body exceeds {MOST} bytes"
+                    ));
+                }
+                body.extend_from_slice(&chunk);
+            }
+            Ok(None) => break,
+            Err(error) => {
+                return failed(format!(
+                    "the provider callback answered {status}; body read failed: {}",
+                    super::unreached(error)
+                ));
+            }
+        }
+    }
+    failed(format!(
+        "the provider callback answered {status}; {}",
+        callback_summary(&body)
+    ))
 }
 
 /// Send the browser to Lys's sign-in screen naming the refusal.
