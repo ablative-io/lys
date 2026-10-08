@@ -5,6 +5,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
 
+/// The UTC instant a provider supplies without requiring consumers to name its dependency.
+pub type UtcInstant = DateTime<Utc>;
+
 /// A failure to obtain or represent a clock reading.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

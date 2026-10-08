@@ -15,7 +15,7 @@ use crate::routes::{AppState, Say, Shared, door_handles, open_directory, start};
 use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::Sessions;
 
-pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+pub(crate) async fn service_saying_with_clock(config: &Config, say: Say, clock: lys_core::clock::ClockSource) -> Result<Router, ServerError> {
     let kept_responsibilities = crate::kept_responsibilities::Kept::load(
         &config.log_dir.with_file_name("kept-responsibilities.json"),
     )?;
@@ -124,9 +124,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         setup_lock: tokio::sync::Mutex::new(()),
         sessions: match &config.sessions_file {
             Some(file) => {
-                Sessions::open(file.clone(), config.session_seconds, config.secure_cookie)?
+                Sessions::open_with_clock(file.clone(), config.session_seconds, config.secure_cookie, clock)?
             }
-            None => Sessions::new(config.session_seconds, config.secure_cookie),
+            None => Sessions::new_with_clock(config.session_seconds, config.secure_cookie, clock),
         },
         admission: Admission::new(
             crate::setup::administrator(config)?,

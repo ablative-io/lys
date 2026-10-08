@@ -6,7 +6,8 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Instant;
 
-use lys_identity_server::{Config, Say, service, service_saying};
+use lys_core::clock::ClockSource;
+use lys_identity_server::{Config, Say, service, service_saying, service_with_clock, service_saying_with_clock};
 
 /// Records a named elapsed interval for temporary fixture diagnosis.
 pub struct StageTimer {
@@ -172,15 +173,18 @@ pub(crate) async fn serve(
     listener: tokio::net::TcpListener,
     config: &Config,
     say: Option<Say>,
+    clock: &ClockSource,
 ) -> Result<(Serving, reqwest::Client), Box<dyn Error>> {
     let timing = StageTimer::new("serve.total");
     let stage = StageTimer::new("serve.refusals_inventory");
     let documented = crate::refusals::listed();
     drop(stage);
     let stage = StageTimer::new("serve.service_open");
-    let app = match say {
-        Some(say) => service_saying(config, say).await?,
-        None => service(config).await?,
+    let app = match (clock, say) {
+        (ClockSource::System, Some(say)) => service_saying(config, say).await?,
+        (ClockSource::System, None) => service(config).await?,
+        (ClockSource::Supplied(clock), Some(say)) => service_saying_with_clock(config, say, ClockSource::Supplied(Arc::clone(clock))).await?,
+        (ClockSource::Supplied(clock), None) => service_with_clock(config, ClockSource::Supplied(Arc::clone(clock))).await?,
     };
     drop(stage);
     let stage = StageTimer::new("serve.middleware");

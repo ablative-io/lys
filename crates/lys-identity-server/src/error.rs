@@ -156,6 +156,12 @@ pub enum ServerError {
         /// What is wrong with it.
         reason: String,
     },
+    /// The owned clock could not supply a representable instant.
+    #[error("ClockUnavailable: {reason}")]
+    ClockUnavailable {
+        /// The clock read or conversion failure.
+        reason: String,
+    },
     /// A body longer than is read before its caller is verified:
     /// `signed_first::UNVERIFIED_BODY_LIMIT` bytes.
     #[error("BodyTooLarge: the body is longer than is read before its caller is verified")]

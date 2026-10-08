@@ -33,7 +33,6 @@ use crate::requests_api::{
 use crate::requests_store::{Answer, Asked, Decided, Intended, RequestStore};
 use crate::requests_views::RequestView;
 use crate::routes::AppState;
-use crate::session::now;
 
 /// The refusal of an approval naming no source for anyone but a person.
 const NAME_THE_SOURCE: &str = "only a person is given access from the root authority; an agent's, a service account's or a connector's access is lent from a grant a person holds: name the source";
@@ -141,7 +140,7 @@ pub(crate) async fn approve(
     with_grants(&state, |judged| {
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let body = taken(body)?;
-        let at = now();
+        let at = state.sessions.now()?;
         with_requests(&state, |store| {
             let (asked, _, weighed) = seen(&judged, store, caller, &id, at)?;
             let by = decider(&judged, caller, &weighed)?;
@@ -258,7 +257,7 @@ pub(crate) async fn settle(
 ) -> Result<Json<RequestView>, ServerError> {
     with_grants(&state, |judged| {
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-        let at = now();
+        let at = state.sessions.now()?;
         with_requests(&state, |store| {
             let (asked, _, weighed) = seen(&judged, store, caller, &id, at)?;
             let decided = reconcile(&judged, store, &asked, &weighed, at)?;
@@ -282,7 +281,7 @@ pub(crate) async fn decline(
     with_grants(&state, |judged| {
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let body = taken(body)?;
-        let at = now();
+        let at = state.sessions.now()?;
         with_requests(&state, |store| {
             let (asked, _, weighed) = seen(&judged, store, caller, &id, at)?;
             let by = decider(&judged, caller, &weighed)?;

@@ -57,6 +57,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::ConfigInvalid { .. } => "ConfigInvalid",
         ServerError::BootstrapInterrupted { .. } => "BootstrapInterrupted",
         ServerError::RequestMalformed { .. } => "RequestMalformed",
+        ServerError::ClockUnavailable { .. } => "ClockUnavailable",
         ServerError::BodyTooLarge => "BodyTooLarge",
         ServerError::SecretsUnavailable { .. } => "SecretsUnavailable",
         ServerError::RequestsUnavailable { .. } => "RequestsUnavailable",

@@ -42,7 +42,6 @@ use crate::requests_store::{Asked, Decided, RequestStore};
 use crate::requests_views::{DecisionView, RequestList, RequestView};
 use crate::reviews_api::stands;
 use crate::routes::{AppState, identity_id};
-use crate::session::now;
 
 /// The access request routes.
 pub fn routes() -> Router<Arc<AppState>> {
@@ -307,7 +306,7 @@ pub(crate) fn listed(
             .map(|page| page.members(state))
             .transpose()?
             .flatten();
-        let at = now();
+        let at = state.sessions.now()?;
         with_requests(state, |store| {
             let (requests, totals) = if let Some(page) = &page {
                 let filtered = page.filtered() || !is_root(caller, judged.root);
@@ -379,7 +378,7 @@ async fn ask(
     with_grants(&state, |judged| {
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let body = taken(body)?;
-        let at = now();
+        let at = state.sessions.now()?;
         let responsible = match caller {
             IdentityId::Person(person) => Some(person),
             IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {

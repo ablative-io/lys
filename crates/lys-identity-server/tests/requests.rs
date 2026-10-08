@@ -5,6 +5,9 @@
 //! the in-process issuer, and no other server.
 
 use std::error::Error;
+use std::sync::Arc;
+
+use identity_contract::harness::ManualClock;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
@@ -55,6 +58,16 @@ impl Table {
             ada,
             bea,
         })
+    }
+
+    async fn set_with_clock(clock: &Arc<ManualClock>) -> Result<Self, Box<dyn Error>> {
+        let provider: Arc<dyn lys_core::clock::Clock> = clock.clone();
+        let (service, seeded) = Service::start_with_clock(provider, |config| {
+            Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
+        }).await?;
+        let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+        let bea = service.sign_in(login(BEA)).await?;
+        Ok(Self { service, seeded, ada, bea })
     }
 
     fn ask_body(resource: &str, relation: &str) -> Result<Value, Box<dyn Error>> {
@@ -332,11 +345,9 @@ async fn a_request_the_route_does_not_take_is_refused_by_name_and_kept_nowhere()
 
 #[tokio::test]
 async fn a_kept_request_is_answered_again_after_the_end_it_asked_for() -> TestResult {
-    let table = Table::set().await?;
-    let soon = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs()
-        + 2;
+    let clock = Arc::new(ManualClock::new(1_700_000_000));
+    let table = Table::set_with_clock(&clock).await?;
+    let soon = 1_700_000_002_u64;
     let mut body = Table::ask_body("4", "beta")?;
     body["ends_at"] = json!(soon);
     let (status, first) = table
@@ -344,7 +355,7 @@ async fn a_kept_request_is_answered_again_after_the_end_it_asked_for() -> TestRe
         .post("/requests", Some(&table.bea), &body)
         .await?;
     assert_eq!(status, 200, "{first}");
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    clock.set(1_700_000_003);
     let (status, replayed) = table
         .service
         .post("/requests", Some(&table.bea), &body)
@@ -495,5 +506,118 @@ async fn a_for_a_while_answer_ends_when_the_approver_says_and_ongoing_has_no_end
             .await?;
         assert_eq!(held["window"]["ends_at"], ends, "{held}");
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn request_clock_boundaries_and_service_isolation() -> TestResult {
+    let at = 1_700_000_000_u64;
+    let clock = Arc::new(ManualClock::new(i64::try_from(at)?));
+    let mut table = Table::set_with_clock(&clock).await?;
+    let other_clock = Arc::new(ManualClock::new(i64::try_from(at)?));
+    let mut other = Table::set_with_clock(&other_clock).await?;
+    let mut kept = None;
+    for end in [at + 1, at, at - 1] {
+        let before = table.listed(&table.bea).await?;
+        let mut body = Table::ask_body("4", "beta")?;
+        body["ends_at"] = json!(end);
+        let answer = table.service.post("/requests", Some(&table.bea), &body).await?;
+        if end > at {
+            assert_eq!(answer.0, 200, "{}", answer.1);
+            assert_eq!(answer.1["asked_at"], at);
+            kept = Some((body, answer.1));
+        } else {
+            refused(&answer, 400, "RequestMalformed");
+            assert_eq!(table.listed(&table.bea).await?, before);
+        }
+    }
+    let (body, first) = kept.ok_or("no future request kept")?;
+    clock.set(i64::try_from(at + 3)?);
+    let replay = table.service.post("/requests", Some(&table.bea), &body).await?;
+    assert_eq!(replay.0, 200, "{}", replay.1);
+    assert_eq!(replay.1["id"], first["id"]);
+    assert_eq!(replay.1["asked_at"], first["asked_at"]);
+    let mut changed = body.clone();
+    changed["why"] = json!("different content");
+    refused(&table.service.post("/requests", Some(&table.bea), &changed).await?, 409, "RequestReused");
+    let mut other_body = Table::ask_body("4", "beta")?;
+    other_body["ends_at"] = json!(at + 1);
+    let admitted = other.service.post("/requests", Some(&other.bea), &other_body).await?;
+    assert_eq!(admitted.0, 200, "{}", admitted.1);
+    assert_eq!(admitted.1["asked_at"], at);
+    table.service.restart().await?;
+    let reopened = table.service.post("/requests", Some(&table.bea), &body).await?;
+    assert_eq!(reopened.0, 200, "{}", reopened.1);
+    assert_eq!(reopened.1["id"], first["id"]);
+    assert_eq!(reopened.1["asked_at"], first["asked_at"]);
+    table.service.close()?;
+    other.service.close()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn clock_failure_refuses_http_before_request_or_session_mutation() -> TestResult {
+    let clock = Arc::new(ManualClock::new(1_700_000_000));
+    let mut table = Table::set_with_clock(&clock).await?;
+    let before = table.listed(&table.bea).await?;
+    for at in [1_700_000_000, -1] {
+        clock.set(at);
+        clock.refuse(at >= 0);
+        let body = Table::ask_body("4", "beta")?;
+        refused(&table.service.post("/requests", Some(&table.bea), &body).await?, 503, "ClockUnavailable");
+    }
+    clock.refuse(false);
+    clock.set(1_700_000_000);
+    assert_eq!(table.listed(&table.bea).await?, before);
+    table.service.close()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn request_decisions_and_lenders_use_the_same_supplied_clock() -> TestResult {
+    let at = 4_000_000_000_u64;
+    let clock = Arc::new(ManualClock::new(i64::try_from(at)?));
+    let mut table = Table::set_with_clock(&clock).await?;
+    let root = json!({
+        "operation": operation()?, "route": "api",
+        "holder": table.seeded.people[1].id.to_string(),
+        "resource": { "kind": "doc", "id": "4" }, "relation": "alpha",
+        "pass_on": { "kind": "to", "actions": ["read"], "recipients": ["person"] },
+        "window": { "starts_at": 0, "ends_at": at + 5 },
+    });
+    let lent = table.service.post("/grants/roots", Some(&table.ada), &root).await?;
+    assert_eq!(lent.0, 200, "{}", lent.1);
+    clock.set(i64::try_from(at + 1)?);
+    let asked = table.ask(&table.ada, "4", "beta").await?;
+    assert_eq!(asked["asked_at"], at + 1);
+    assert_eq!(asked["approvers"].as_array().map(Vec::len), Some(2));
+    let before = table.service.get("/requests", Some(&table.ada)).await?;
+    assert_eq!(before.0, 200, "{}", before.1);
+    assert_eq!(before.1["requests"][0]["approvers"].as_array().map(Vec::len), Some(2));
+    clock.set(i64::try_from(at + 6)?);
+    let settled = table.decide(&table.ada, &asked, "reconcile", &json!({})).await?;
+    assert_eq!(settled.0, 200, "{}", settled.1);
+    assert_eq!(settled.1["state"], "waiting");
+    assert_eq!(settled.1["approvers"].as_array().map(Vec::len), Some(1));
+    let after = table.service.get("/requests", Some(&table.ada)).await?;
+    assert_eq!(after.0, 200, "{}", after.1);
+    assert_eq!(after.1["requests"][0]["approvers"].as_array().map(Vec::len), Some(1));
+    clock.set(i64::try_from(at + 7)?);
+    let approved = table.decide(&table.ada, &asked, "approve", &approval(None)?).await?;
+    assert_eq!(approved.0, 200, "{}", approved.1);
+    assert_eq!(approved.1["decision"]["decided_at"], at + 7);
+    assert_eq!(approved.1["state"], "approved");
+    clock.set(i64::try_from(at + 8)?);
+    let next = table.ask(&table.bea, "9", "beta").await?;
+    clock.set(i64::try_from(at + 9)?);
+    let declined = table.decide(&table.ada, &next, "decline", &json!({ "note": "refused" })).await?;
+    assert_eq!(declined.0, 200, "{}", declined.1);
+    assert_eq!(declined.1["state"], "declined");
+    assert_eq!(declined.1["decision"]["decided_at"], at + 9);
+    clock.set(i64::try_from(at + 10)?);
+    let replay = table.decide(&table.ada, &asked, "approve", &approval(None)?).await?;
+    assert_eq!(replay.0, 200, "{}", replay.1);
+    assert_eq!(replay.1["decision"], approved.1["decision"]);
+    table.service.close()?;
     Ok(())
 }
