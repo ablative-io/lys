@@ -375,7 +375,7 @@ pub(crate) async fn issue(
             &state,
             &person,
             &id,
-            &[issued.credential_id.clone()],
+            std::slice::from_ref(&issued.credential_id),
             "duplicate issue operation",
         )
         .await?;
