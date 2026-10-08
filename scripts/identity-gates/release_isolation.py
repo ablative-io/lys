@@ -36,8 +36,8 @@ def checkout_identity(repository):
 
 
 def build_commands():
-    return [["cargo", "build", "--locked", "--release",
-             *[argument for package in PACKAGES for argument in ("-p", package)]]]
+    return [["cargo", "build", "--locked", "--release", "-p", package]
+            for package in PACKAGES]
 
 
 def prove(repository):
@@ -81,7 +81,7 @@ def prove(repository):
         "executed": sum(row["exit_code"] is not None for row in rows),
         "passed": sum(row["exit_code"] == 0 for row in rows),
         "failed": sum(row["exit_code"] not in (None, 0) for row in rows),
-        "not_started": sum(row["exit_code"] is None for row in rows),
+        "not_started": len(PACKAGES) - sum(row["exit_code"] is not None for row in rows),
     }
     result["passed"] = (result["source_refusal"] is None
                         and len(rows) == len(PACKAGES)
