@@ -33,6 +33,7 @@ mod view;
 #[cfg(test)]
 mod view_tests;
 mod watched;
+mod upgrade_window;
 
 use std::io::{Read, Write};
 use std::process::ExitCode;
