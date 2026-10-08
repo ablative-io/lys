@@ -12,8 +12,11 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+#[path = "cli/log.rs"]
 mod log;
+#[path = "cli/proxy.rs"]
 mod proxy;
+#[path = "cli/runner.rs"]
 mod runner;
 
 pub use log::{LogCommand, LogProveCommand, LogVerifyCommand};
