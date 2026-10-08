@@ -519,3 +519,30 @@ async fn all_four_boundaries_accept_a_proved_unrelated_degraded_grant() -> TestR
     assert_eq!(before, after);
     Ok(())
 }
+
+#[tokio::test]
+async fn projection_degradation_is_private_to_its_service_instance() -> TestResult {
+    let first = Table::fresh().await?;
+    let second = match Table::fresh().await {
+        Ok(second) => second,
+        Err(error) => return first.finish(Err(error)),
+    };
+    let readings = (|| -> TestResult<_> {
+        first.projection_pending()?;
+        let degraded = crate::grants::with_grants(&first.state, |judged| {
+            let frame = judged.grants.frame(judged.directory, None)?;
+            Ok(frame.degradation().is_some())
+        })?;
+        let healthy = crate::grants::with_grants(&second.state, |judged| {
+            let frame = judged.grants.frame(judged.directory, None)?;
+            Ok(frame.degradation().is_none())
+        })?;
+        Ok((degraded, healthy, Arc::ptr_eq(&first.fault, &second.fault)))
+    })();
+    let readings = first.finish(readings);
+    let (degraded, healthy, shared_fault) = second.finish(readings)?;
+    assert!(degraded);
+    assert!(healthy);
+    assert!(!shared_fault);
+    Ok(())
+}
