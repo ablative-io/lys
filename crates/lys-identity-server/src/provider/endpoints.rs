@@ -346,6 +346,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::Cord(..)
         | ServerError::Canvas(..)
         | ServerError::SessionsUnavailable { .. }
+        | ServerError::ClockUnavailable { .. }
         | ServerError::MemoryUnavailable { .. }
         | ServerError::ProvisioningUnavailable { .. }
         | ServerError::ProvisioningChanged { .. }

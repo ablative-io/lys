@@ -240,6 +240,7 @@ impl ServerError {
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
             | Self::SessionsUnavailable { .. }
+            | Self::ClockUnavailable { .. }
             | Self::MemoryUnavailable { .. }
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }

@@ -12,6 +12,9 @@ use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+
+use lys_core::clock::{Clock, ClockError, ClockSource, UtcInstant};
 
 use lys_core::Ed25519Identity;
 use lys_identity::Directory;
@@ -25,6 +28,47 @@ use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResul
 use crate::fake_issuer::{CLIENT_ID, CLIENT_SECRET, FakeIssuer, Login};
 pub use crate::harness_serve::StageTimer;
 use crate::harness_serve::{DropMarker, serve};
+
+/// A separately owned synchronous fixture clock; no wall-time scheduling.
+#[derive(Debug)]
+pub struct ManualClock {
+    seconds: AtomicI64,
+    refused: AtomicBool,
+    reads: AtomicU64,
+}
+
+impl ManualClock {
+    /// Construct one provider at an explicit whole Unix second.
+    #[must_use]
+    pub fn new(seconds: i64) -> Self {
+        Self { seconds: AtomicI64::new(seconds), refused: AtomicBool::new(false), reads: AtomicU64::new(0) }
+    }
+
+    /// Assign the next reading synchronously.
+    pub fn set(&self, seconds: i64) { self.seconds.store(seconds, Ordering::SeqCst); }
+
+    /// Explicitly refuse or admit provider reads.
+    pub fn refuse(&self, refused: bool) { self.refused.store(refused, Ordering::SeqCst); }
+
+    /// Provider calls completed by this independently owned fixture.
+    #[must_use]
+    pub fn reads(&self) -> u64 { self.reads.load(Ordering::SeqCst) }
+}
+
+impl Clock for ManualClock {
+    fn now(&self) -> Result<UtcInstant, ClockError> {
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        if self.refused.load(Ordering::SeqCst) {
+            return Err(ClockError::Unavailable { reason: "fixture read refused".to_owned() });
+        }
+        UtcInstant::from_timestamp(self.seconds.load(Ordering::SeqCst), 0).ok_or(ClockError::InstantOutOfRange)
+    }
+}
+
+struct ClockServing {
+    say: Option<Say>,
+    clock: ClockSource,
+}
 
 /// Where the next append fails, if anywhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,6 +278,7 @@ pub struct Service {
     pub dir: tempfile::TempDir,
     drop_dir: DropMarker,
     config: Config,
+    clock: ClockSource,
     drop_config: DropMarker,
     server: crate::harness_serve::Serving,
     drop_server: DropMarker,
@@ -342,6 +387,17 @@ impl Service {
         Self::start_judging(GRANT_MODEL, None, prepare).await
     }
 
+    /// Start the same HTTP service using a separately owned session/request clock.
+    ///
+    /// # Errors
+    /// Propagates fixture preparation, clock and actual service startup failures.
+    pub async fn start_with_clock<T: Send>(
+        clock: Arc<dyn Clock>,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
+        Box::pin(Self::start_clock_saying(GRANT_MODEL, None, None, None, |_| {}, ClockServing { say: None, clock: ClockSource::Supplied(clock) }, prepare)).await
+    }
+
     /// Start the service as [`Service::start_with`] does, judging grants by
     /// `model` and keeping their relationships in the permission database
     /// `spicedb` names, or in the process when it names none.
@@ -413,6 +469,19 @@ impl Service {
         say: Option<Say>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        Self::start_clock_saying(model, spicedb, secrets, sign_in_providers, adjust, ClockServing { say, clock: ClockSource::System }, prepare).await
+    }
+
+    async fn start_clock_saying<T: Send>(
+        model: &str,
+        spicedb: Option<SpiceDbSettings>,
+        secrets: Option<SecretsSettings>,
+        sign_in_providers: Option<SignInProvidersSettings>,
+        adjust: impl FnOnce(&mut Config) + Send,
+        serving: ClockServing,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
+        let ClockServing { say, clock } = serving;
         let timing = StageTimer::new("fixture.start");
         let stage = StageTimer::new("fixture.bootstrap");
         let dir = tempfile::TempDir::new()?;
@@ -498,7 +567,7 @@ impl Service {
         crate::service_template::restore(&config)?;
         drop(stage);
         let before = lys_log_store::process_flush_count();
-        let (server, client) = serve(listener, &config, say).await?;
+        let (server, client) = serve(listener, &config, say, &clock).await?;
         let startup_flushes = lys_log_store::process_flush_count() - before;
         drop(timing);
         Ok((
@@ -513,6 +582,7 @@ impl Service {
                 dir,
                 drop_dir: DropMarker::new("service.tempdir_dropped"),
                 config,
+                clock,
                 drop_config: DropMarker::new("service.config_dropped"),
                 server,
                 drop_server: DropMarker::new("service.fields_end"),
@@ -535,7 +605,7 @@ impl Service {
         self.config.listen = listen;
         self.config.redirect_url = format!("{}/callback", self.base);
         drop(stage);
-        let (server, client) = serve(listener, &self.config, None).await?;
+        let (server, client) = serve(listener, &self.config, None, &self.clock).await?;
         self.server = server;
         self.client = client;
         drop(timing);

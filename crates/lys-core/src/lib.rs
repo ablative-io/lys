@@ -35,6 +35,7 @@ pub mod bundle;
 pub mod ca;
 mod cbor;
 pub mod checkpoint;
+pub mod clock;
 #[cfg(feature = "unstable-anchor")]
 pub mod delegation;
 pub mod error;

@@ -26,6 +26,16 @@ use support::{
 };
 
 #[test]
+fn ordinary_cli_rejects_fixture_time_even_with_fixture_environment() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_lys"))
+        .env("LYS_CLOCK_FIXTURE", "unavailable")
+        .args(["--fixture-at", "1700000000", "ca", "issuer-cert"])
+        .output().unwrap();
+    assert_eq!(output.status.code(), Some(2), "{}", said(&output));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--fixture-at"));
+}
+
+#[test]
 fn an_issued_certificate_is_its_logged_leaf_and_a_stranger_verifies_both() {
     let bench = Bench::new();
     let issued = report(&bench.issue_into(&bench.log_dir, "agent-one"));

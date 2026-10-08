@@ -18,7 +18,7 @@ use std::process::ExitCode;
 use clap::{CommandFactory, FromArgMatches};
 
 use crate::cli::{
-    CaCommand, Cli, Command, InspectCommand, KeyCommand, LogCommand, LogProveCommand,
+    Cli, Command, InspectCommand, KeyCommand, LogCommand, LogProveCommand,
     LogVerifyCommand,
 };
 
@@ -145,54 +145,7 @@ fn main() -> ExitCode {
                 } => commands::log::verify::consistency(&artifact, &verifier_key, json),
             },
         },
-        Command::Ca(ca_command) => match ca_command {
-            CaCommand::Request { key, subject, out } => {
-                commands::ca::request(&key, &subject, &out, json)
-            }
-            CaCommand::Issue {
-                key,
-                subject,
-                request,
-                claims,
-                validity,
-                validity_days,
-                out,
-                issuer_out,
-                log,
-                log_key,
-                leaf_out,
-                artifact_out,
-            } => commands::duration::validity_window(validity_days, validity.as_deref()).and_then(
-                |ttl| {
-                    let entry = commands::ca_log::LogEntry::from_flags(
-                        &log,
-                        &leaf_out,
-                        log_key.as_deref(),
-                        artifact_out.as_deref(),
-                    )?;
-                    let outputs = commands::ca::IssueOutputs {
-                        certificate: &out,
-                        issuer_certificate: issuer_out.as_deref(),
-                        log: entry,
-                    };
-                    commands::ca::issue(
-                        &key,
-                        &subject,
-                        claims.as_deref(),
-                        ttl,
-                        &outputs,
-                        request.as_deref(),
-                        json,
-                    )
-                },
-            ),
-            CaCommand::IssuerCert { key, out } => commands::ca::issuer_cert(&key, &out, json),
-            CaCommand::Verify {
-                cert,
-                issuer_public_key,
-                at,
-            } => commands::ca::verify(&cert, &issuer_public_key, at.as_deref(), json),
-        },
+        Command::Ca(ca_command) => commands::ca_dispatch::run(ca_command, json, lys_core::clock::ClockSource::System),
         Command::Runner(runner_command) => commands::runner::run(runner_command),
         Command::Proxy(proxy_command) => commands::proxy::run(proxy_command),
         Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out, json),

@@ -170,7 +170,23 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
-    crate::routes_startup::service_saying(config, say).await
+    service_saying_with_clock(config, say, lys_core::clock::ClockSource::System).await
+}
+
+/// Construct the actual service with its session and request clock.
+///
+/// # Errors
+/// Propagates clock, configuration and store startup failures.
+pub async fn service_with_clock(config: &Config, clock: lys_core::clock::ClockSource) -> Result<Router, ServerError> {
+    service_saying_with_clock(config, Arc::new(|_| {}), clock).await
+}
+
+/// Construct the actual service with its clock and startup reporter.
+///
+/// # Errors
+/// Propagates clock, configuration and store startup failures.
+pub async fn service_saying_with_clock(config: &Config, say: Say, clock: lys_core::clock::ClockSource) -> Result<Router, ServerError> {
+    crate::routes_startup::service_saying_with_clock(config, say, clock).await
 }
 
 /// Open the directory `config` names, creating its log when the log's

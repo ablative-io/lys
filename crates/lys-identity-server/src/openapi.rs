@@ -58,6 +58,7 @@ pub(crate) fn route(
     // more of an unverified caller's body than `signed_first.rs` allows.
     for refusal in [
         "BodyTooLarge",
+        "ClockUnavailable",
         "OperatorRefused",
         "AgentSignatureRefused",
         "AgentPassRefused",
