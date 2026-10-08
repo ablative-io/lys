@@ -7,9 +7,58 @@ import unittest
 
 from upgrade_negative import UNDEFINED_LINE, poison_line, put_back, team_log_restored
 from upgrade_window import family_files, pending, profile_file, refuse_operator, refused_writes, unchanged
+from test_upgrade_directory import segment_store
 
 
 class WindowProofTests(unittest.TestCase):
+    def test_operator_segments_detect_an_offsets_write_after_refusal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            log = root / "log"
+            segments = segment_store(log, [(0, [(b"signed", 1)])])
+            config = {"operator_token_file": None, "log_dir": str(log)}
+
+            class Reader:
+                def ask(inner, method, path, body, **options):
+                    if inner.write:
+                        (segments / f"{0:020}.offsets").write_bytes(b"changed")
+                    return {
+                        "refusal": "OperatorRefused",
+                        "reason": "upgrade is reversible",
+                    }
+
+            reader = Reader()
+            reader.write = False
+            refuse_operator(reader, root, config)
+            reader.write = True
+            with self.assertRaisesRegex(RuntimeError, "offsets"):
+                refuse_operator(reader, root, config)
+
+    def test_family_migration_keeps_leaves_snapshot_and_every_backup_byte(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            config = {}
+            for family in ("teams", "budgets"):
+                log = root / family
+                (log / "leaves").mkdir(parents=True)
+                (log / "leaves" / f"{0:020}").write_bytes(b"old leaf")
+                (log / "snapshot.bin").write_bytes(b"old snapshot")
+                (log / "log.json").write_text(
+                    '{"format":"lys/log-dir/v1","origin":"fixture"}'
+                )
+                (log / "state.json").write_text('{"tree_size":1}')
+                config[family + "_dir"] = str(log)
+            before = family_files(root, config)
+            for family in ("teams", "budgets"):
+                log = root / family
+                log.rename(root / (family + ".v1"))
+                segment_store(log, [(0, [(b"old leaf", 1)])])
+                (log / "snapshot.bin").write_bytes(b"old snapshot")
+            unchanged(before, family_files(root, config))
+            (root / "teams.v1/state.json").write_text('{"tree_size":1}\n')
+            with self.assertRaisesRegex(RuntimeError, "teams/state.json"):
+                unchanged(before, family_files(root, config))
+
     def test_operator_refusal_requires_named_reason_and_no_appended_leaf(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -18,14 +67,15 @@ class WindowProofTests(unittest.TestCase):
             log = root / "log"
             leaves = log / "leaves"
             leaves.mkdir(parents=True)
-            (leaves / "000").write_bytes(b"old signed record")
+            (leaves / f"{0:020}").write_bytes(b"old signed record")
             config = {"operator_token_file": str(token), "log_dir": str(log)}
+
             class Reader:
                 def ask(inner, method, path, body, **options):
                     self.assertEqual((method, path), ("POST", "/agents"))
                     self.assertEqual(options, {"expected_status": 401, "operator": "fixture-token"})
                     if inner.append:
-                        (leaves / "001").write_bytes(b"unexpected write")
+                        (leaves / f"{1:020}").write_bytes(b"unexpected write")
                     return inner.answer
             reader = Reader()
             reader.append = False
@@ -34,7 +84,7 @@ class WindowProofTests(unittest.TestCase):
             reader.append = True
             with self.assertRaisesRegex(RuntimeError, "001"):
                 refuse_operator(reader, root, config)
-            (leaves / "001").unlink()
+            (leaves / f"{1:020}").unlink()
             reader.append = False
             reader.answer = {"refusal": "OperatorRefused", "reason": "wrong token"}
             with self.assertRaisesRegex(RuntimeError, "reversible"):
@@ -46,7 +96,7 @@ class WindowProofTests(unittest.TestCase):
             log = root / "log"
             leaves = log / "leaves"
             leaves.mkdir(parents=True)
-            (leaves / "000").write_bytes(b"old signed record")
+            (leaves / f"{0:020}").write_bytes(b"old signed record")
             config = {"operator_token_file": None, "log_dir": str(log)}
             presented = []
             class Reader:

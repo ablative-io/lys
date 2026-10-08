@@ -19,7 +19,12 @@ from upgrade_fixture import (
 )
 from upgrade_legacy import seed as seed_legacy, verify as verify_legacy
 from upgrade_window import (
-    MARKER, legacy_files, no_operator_token, pending, profile_file, unchanged,
+    MARKER,
+    legacy_files,
+    no_operator_token,
+    pending,
+    profile_file,
+    unchanged,
 )
 from upgrade_negative import exercise as exercise_negative, put_back as release_put_back
 from upgrade_restart import settle as settle_restart
@@ -30,13 +35,16 @@ from upgrade_teardown import terminate_fixture
 from upgrade_layout import inventory, executables, harness_inventory, harness_paths
 from upgrade_login import login
 from upgrade_release import old_release
+from upgrade_log import indexed_files, proof_directory
 
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
 
 
 def run(command, log, env=None, expected=0):
     with log.open("wb") as output:
-        completed = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, env=env)
+        completed = subprocess.run(
+            command, stdout=output, stderr=subprocess.STDOUT, env=env
+        )
     if completed.returncode != expected:
         raise RuntimeError(
             f"{command[0]} exited {completed.returncode}, expected {expected}; evidence: {log}"
@@ -46,9 +54,13 @@ def run(command, log, env=None, expected=0):
 def stamp(directory, expected, programs=PROGRAMS):
     versions = {}
     for name in programs:
-        output = subprocess.check_output([str(directory / name), "--version"], text=True).strip()
+        output = subprocess.check_output(
+            [str(directory / name), "--version"], text=True
+        ).strip()
         if f"({expected})" not in output or "dirty" in output:
-            raise RuntimeError(f"{directory / name} must be a clean build of {expected}: {output}")
+            raise RuntimeError(
+                f"{directory / name} must be a clean build of {expected}: {output}"
+            )
         versions[name] = {
             "version": output,
             "sha256": hashlib.sha256((directory / name).read_bytes()).hexdigest(),
@@ -57,64 +69,36 @@ def stamp(directory, expected, programs=PROGRAMS):
 
 
 def app_leaves(root, config):
-    directory = Path(config["grant_log_dir"]).with_name("apps")
-    if not directory.is_relative_to(root):
-        raise RuntimeError(f"fixture app log leaves its root: {directory}")
-    leaves = {
-        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in (directory / "leaves").iterdir()
-        if re.fullmatch(r"[0-9]{20}", path.name)
-    }
+    directory = proof_directory(
+        root, Path(config["grant_log_dir"]).with_name("apps"), "app log"
+    )
+    leaves = indexed_files(
+        root, directory, lambda content: hashlib.sha256(content).hexdigest()
+    )
     if len(leaves) < 3:
         raise RuntimeError("old app log does not hold model, registration and approval")
     return leaves
 
 
 def preserve_leaves(root, before):
+    directories = {}
     for name, digest in before.items():
-        if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
+        directory = proof_directory(root, (root / name).parent.parent, "app log")
+        if directory not in directories:
+            directories[directory] = indexed_files(
+                root, directory, lambda content: hashlib.sha256(content).hexdigest()
+            )
+        if directories[directory].get(name) != digest:
             raise RuntimeError(f"upgrade changed old app leaf {name}")
 
 
 def directory_path(root, config):
-    original_root = root.absolute()
-    root = root.resolve()
-    directory = Path(config["log_dir"])
-    if not directory.is_absolute() or not directory.resolve().is_relative_to(root):
-        raise RuntimeError("fixture directory log leaves its root")
-    if directory.is_relative_to(original_root):
-        relative = directory.relative_to(original_root)
-    elif directory.is_relative_to(root):
-        relative = directory.relative_to(root)
-    else:
-        raise RuntimeError("fixture directory log leaves its root")
-    if ".." in relative.parts:
-        raise RuntimeError("fixture directory log leaves its root")
-    directory = root / relative
-    current = directory
-    while current != root:
-        if current.is_symlink():
-            raise RuntimeError("fixture directory log contains a symlink")
-        current = current.parent
-    return directory
+    return proof_directory(root, config["log_dir"], "directory log")
 
 
 def directory_leaves(root, config):
     """Keep complete bytes, rather than treating equal digests as byte equality."""
-    directory = directory_path(root, config) / "leaves"
-    if directory.is_symlink():
-        raise RuntimeError("fixture directory leaves contain a symlink")
-    leaves = {}
-    for path in sorted(directory.iterdir()):
-        if re.fullmatch(r"\.\d+-\d{20}-\d+\.tmp", path.name):
-            continue
-        if re.fullmatch(r"[0-9]{20}", path.name) is None:
-            raise RuntimeError(f"unexpected directory leaf name {path.name}")
-        if path.is_symlink() or not path.is_file():
-            raise RuntimeError(f"directory leaf is a symlink or not a file: {path.name}")
-        if int(path.name) != len(leaves):
-            raise RuntimeError("directory leaf indexes are not contiguous from zero")
-        leaves[str(path.relative_to(root.resolve()))] = path.read_bytes().hex()
+    leaves = indexed_files(root, directory_path(root, config), bytes.hex)
     if not leaves:
         raise RuntimeError("empty directory cannot prove an upgrade")
     return leaves

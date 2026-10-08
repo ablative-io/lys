@@ -26,6 +26,7 @@ mod serve;
 mod serve_tests;
 mod signing;
 mod spice;
+mod upgrade_window;
 mod values;
 #[cfg(test)]
 mod values_tests;
@@ -70,7 +71,10 @@ fn open(at: &Where) -> Result<Broker<Grants>, SecretsError> {
 
 fn open_with(at: &Where, grants: Grants) -> Result<Broker<Grants>, SecretsError> {
     let layout = Layout::new(&at.root, &at.keys);
-    Broker::open(&layout.paths(), grants, Box::new(now_ms))
+    match upgrade_window::check(&at.root) {
+        Some(ready) => Broker::open_deferred(&layout.paths(), grants, Box::new(now_ms), ready),
+        None => Broker::open(&layout.paths(), grants, Box::new(now_ms)),
+    }
 }
 
 fn print_line(recorded: RecordedLine) {

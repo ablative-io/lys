@@ -84,11 +84,39 @@ impl<P: PermissionCheck> Broker<P> {
         clock: Clock,
         every: NonZeroU64,
     ) -> Result<Self, SecretsError> {
+        Self::open_selected(paths, permissions, clock, every, None)
+    }
+
+    /// Opens a managed broker while its installed reader can still be put back.
+    ///
+    /// # Errors
+    /// The errors of [`Self::open_every`] and the commit-point check.
+    pub fn open_deferred(
+        paths: &BrokerPaths,
+        permissions: P,
+        clock: Clock,
+        ready: lys_log_store::file::MigrationReady,
+    ) -> Result<Self, SecretsError> {
+        Self::open_selected(paths, permissions, clock, SNAPSHOT_EVERY, Some(ready))
+    }
+
+    fn open_selected(
+        paths: &BrokerPaths,
+        permissions: P,
+        clock: Clock,
+        every: NonZeroU64,
+        ready: Option<lys_log_store::file::MigrationReady>,
+    ) -> Result<Self, SecretsError> {
         let guarded = paths.guarded();
         let store_key = StoreKey::load(&paths.store_key, &guarded)?;
         let audit_key = StoreKey::load(&paths.audit_key, &guarded)?;
         let store = SecretStore::open(&paths.store_dir, &store_key)?;
-        let (audit, opened) = AuditLog::open(&paths.log_dir, &paths.anchor, &guarded, &audit_key)?;
+        let log = match ready {
+            Some(ready) => lys_log_store::FileLeafStore::open_deferred(&paths.log_dir, ready)?,
+            None => lys_log_store::FileLeafStore::open(&paths.log_dir)?,
+        };
+        let (audit, opened) =
+            AuditLog::open_store(log, &paths.log_dir, &paths.anchor, &guarded, &audit_key)?;
         let (audit, state, lines) = match opened.state.as_deref().map(Folded::decode) {
             None => (audit, Folded::default(), opened.lines),
             Some(Ok(state)) => (audit, state, opened.lines),

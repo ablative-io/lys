@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from upgrade_fixture import restored_records, same_records
 from upgrade_live import app_leaves, installation, network_subnets, preserve_leaves, stamp
+from test_upgrade_directory import segment_store
 
 
 AGENT = "agent-" + "22" * 16
@@ -327,6 +328,70 @@ class UpgradeProofTests(unittest.TestCase):
             root = Path(directory)
             with self.assertRaisesRegex(RuntimeError, "leaves its root"):
                 app_leaves(root, {"grant_log_dir": "/unrelated/grants"})
+
+    def test_app_segments_preserve_old_bytes_after_migration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            apps = root / "data/apps"
+            leaves = apps / "leaves"
+            leaves.mkdir(parents=True)
+            for index in range(3):
+                (leaves / f"{index:020}").write_bytes(f"old event {index}".encode())
+            before = app_leaves(root, {"grant_log_dir": str(root / "data/grants")})
+            segment_store(
+                apps,
+                [
+                    (
+                        0,
+                        [
+                            (f"old event {index}".encode(), 3 if index == 2 else None)
+                            for index in range(3)
+                        ]
+                        + [(b"new event", 4)],
+                    )
+                ],
+            )
+            preserve_leaves(root, before)
+            self.assertEqual(
+                len(app_leaves(root, {"grant_log_dir": str(root / "data/grants")})), 4
+            )
+
+    def test_app_segments_reject_rewritten_old_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            apps = root / "data/apps"
+            segment_store(
+                apps,
+                [
+                    (
+                        0,
+                        [
+                            (f"old event {index}".encode(), index + 1)
+                            for index in range(3)
+                        ],
+                    )
+                ],
+            )
+            before = app_leaves(root, {"grant_log_dir": str(root / "data/grants")})
+            segment_store(
+                apps,
+                [
+                    (
+                        0,
+                        [
+                            (
+                                b"rewritten"
+                                if index == 1
+                                else f"old event {index}".encode(),
+                                index + 1,
+                            )
+                            for index in range(3)
+                        ],
+                    )
+                ],
+            )
+            with self.assertRaisesRegex(RuntimeError, "old app leaf"):
+                preserve_leaves(root, before)
 
 
 if __name__ == "__main__":

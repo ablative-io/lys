@@ -1,6 +1,8 @@
 """Directory history and the old owner's snapshot must survive a real upgrade."""
 
 import hashlib
+import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +10,38 @@ from unittest.mock import Mock
 
 import upgrade_fixture
 import upgrade_live
+
+
+def segment_record(leaf, pin=None):
+    content = len(leaf).to_bytes(4, "little") + leaf + bytes([pin is not None])
+    if pin is not None:
+        content += pin.to_bytes(8, "little") + bytes(32)
+    crc = 0xFFFFFFFF
+    for byte in content:
+        crc ^= byte
+        for _ in range(8):
+            crc = (crc >> 1) ^ (0x82F63B78 if crc & 1 else 0)
+    return content + (crc ^ 0xFFFFFFFF).to_bytes(4, "little")
+
+
+def segment_store(directory, batches):
+    leaves = directory / "leaves"
+    if leaves.exists():
+        shutil.rmtree(leaves)
+    segments = leaves / "segments"
+    segments.mkdir(parents=True)
+    (directory / "log.json").write_text(
+        json.dumps({"format": "lys/log-dir/v2", "origin": "fixture"})
+    )
+    for first, records in batches:
+        content = b""
+        offsets = b""
+        for leaf, pin in records:
+            offsets += len(content).to_bytes(8, "little")
+            content += segment_record(leaf, pin)
+        (segments / f"{first:020}").write_bytes(content)
+        (segments / f"{first:020}.offsets").write_bytes(offsets)
+    return segments
 
 
 def cbor(value):
@@ -91,8 +125,86 @@ class DirectoryUpgradeTests(unittest.TestCase):
 
     def test_inventory_retains_every_byte_in_index_order(self):
         held = self.inventory()
-        self.assertEqual(list(held), [f"data/directory/leaves/{index:020}" for index in range(3)])
-        self.assertEqual(list(held.values()), [bytes([index, 0, 255]).hex() for index in range(3)])
+        self.assertEqual(
+            list(held), [f"data/directory/leaves/{index:020}" for index in range(3)]
+        )
+        self.assertEqual(
+            list(held.values()), [bytes([index, 0, 255]).hex() for index in range(3)]
+        )
+
+    def test_segments_preserve_the_flat_prefix_and_allow_a_new_tail(self):
+        before = self.inventory()
+        segment_store(
+            self.directory,
+            [
+                (0, [(bytes([0, 0, 255]), None), (bytes([1, 0, 255]), 2)]),
+                (2, [(bytes([2, 0, 255]), 3), (b"new", 4)]),
+            ],
+        )
+        after = self.inventory()
+        self.assertEqual(list(after.values()), [*before.values(), b"new".hex()])
+        self.assertEqual(
+            upgrade_live.preserve_directory(before, after),
+            {"before": 3, "after": 4, "preserved": 3, "appended": 1},
+        )
+
+    def test_segments_do_not_adopt_an_unpinned_tail(self):
+        before = self.inventory()
+        segment_store(
+            self.directory,
+            [
+                (
+                    0,
+                    [
+                        (bytes([index, 0, 255]), 3 if index == 2 else None)
+                        for index in range(3)
+                    ]
+                    + [(b"unfinished", None)],
+                )
+            ],
+        )
+        self.assertEqual(self.inventory(), before)
+
+    def test_segments_verify_every_checksum_including_earlier_records(self):
+        segments = segment_store(self.directory, [(0, [(b"first", 1), (b"second", 2)])])
+        path = segments / f"{0:020}"
+        content = bytearray(path.read_bytes())
+        content[4] ^= 1
+        path.write_bytes(content)
+        with self.assertRaisesRegex(RuntimeError, "CRC-32C"):
+            self.inventory()
+
+    def test_segments_reject_a_pin_at_the_wrong_index(self):
+        segment_store(self.directory, [(0, [(b"leaf", 2)])])
+        with self.assertRaisesRegex(RuntimeError, "pin.*tree size"):
+            self.inventory()
+
+    def test_segments_reject_a_gap_between_segments(self):
+        segment_store(self.directory, [(0, [(b"leaf", 1)]), (2, [(b"gap", 3)])])
+        with self.assertRaisesRegex(RuntimeError, "contiguous"):
+            self.inventory()
+
+    def test_segments_reject_a_symlink(self):
+        segments = segment_store(self.directory, [(0, [(b"leaf", 1)])])
+        path = segments / f"{0:020}"
+        held = self.root / "held"
+        path.rename(held)
+        path.symlink_to(held)
+        with self.assertRaisesRegex(RuntimeError, "symlink"):
+            self.inventory()
+
+    def test_segment_checksum_matches_the_standard_vector(self):
+        from upgrade_log import crc32c
+
+        self.assertEqual(crc32c(b"123456789"), 0xE3069283)
+
+    def test_segments_do_not_adopt_a_partial_final_record(self):
+        segments = segment_store(self.directory, [(0, [(b"kept", 1)])])
+        path = segments / f"{0:020}"
+        before = self.inventory()
+        with path.open("ab") as file:
+            file.write(segment_record(b"unfinished", 2)[:-2])
+        self.assertEqual(self.inventory(), before)
 
     def test_rewritten_leaf_is_rejected(self):
         before = self.inventory()
@@ -260,15 +372,24 @@ class DirectoryUpgradeTests(unittest.TestCase):
             {"id": "new", "display_name": "Created After Upgrade"},
             self.admin,
         ]
-        self.assertEqual(upgrade_fixture.admitted_after_upgrade(browser, self.admin), "new")
+        self.assertEqual(
+            upgrade_fixture.admitted_after_upgrade(browser, self.admin), "new"
+        )
         self.assertEqual(
             [call.args[:2] for call in browser.ask.call_args_list],
-            [("GET", "/me"), ("POST", "/people"), ("GET", "/identities/new"), ("GET", "/me")],
+            [
+                ("GET", "/me"),
+                ("POST", "/people"),
+                ("GET", "/identities/new"),
+                ("GET", "/me"),
+            ],
         )
 
     def test_substituted_administrator_is_rejected_before_write(self):
         browser = Mock()
-        browser.ask.return_value = dict(self.admin, person={"id": "different", "state": "active"})
+        browser.ask.return_value = dict(
+            self.admin, person={"id": "different", "state": "active"}
+        )
         with self.assertRaisesRegex(RuntimeError, "administrator"):
             upgrade_fixture.admitted_after_upgrade(browser, self.admin)
         browser.ask.assert_called_once_with("GET", "/me")
@@ -282,7 +403,9 @@ class DirectoryUpgradeTests(unittest.TestCase):
 
     def test_administrator_cannot_change_during_the_write(self):
         browser = Mock()
-        changed = dict(self.admin, signed_in={"provider": "fixture", "subject": "different"})
+        changed = dict(
+            self.admin, signed_in={"provider": "fixture", "subject": "different"}
+        )
         browser.ask.side_effect = [
             self.admin,
             {"person": "new"},
