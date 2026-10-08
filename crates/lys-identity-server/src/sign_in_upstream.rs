@@ -56,6 +56,7 @@ pub(super) struct Upstream {
     verifier: String,
     state: String,
     browser: [u8; 32],
+    continuation: Option<String>,
 }
 
 /// A PKCE verifier: 32 bytes from the secure random source, base64url.
@@ -78,12 +79,23 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<String, ServerError> {
+        self.begin_provider_to(oidc, provider, address, browser, None).await
+    }
+
+    async fn begin_provider_to(
+        &self,
+        oidc: &Oidc,
+        provider: &str,
+        address: IpAddr,
+        browser: [u8; 32],
+        continuation: Option<String>,
+    ) -> Result<String, ServerError> {
         let begun = reqwest::Url::parse(&oidc.begin_provider(address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;
         match self
-            .start_upstream(&begun, provider, address, state.clone(), browser)
+            .start_upstream(&begun, provider, address, state.clone(), browser, continuation)
             .await
         {
             Ok(location) => Ok(location),
@@ -101,6 +113,7 @@ impl IssuerSignIn {
         address: IpAddr,
         state: String,
         browser: [u8; 32],
+        continuation: Option<String>,
     ) -> Result<String, ServerError> {
         let client_address = address;
         let started_at = Instant::now();
@@ -166,6 +179,7 @@ impl IssuerSignIn {
                 verifier,
                 state,
                 browser,
+                continuation,
             },
             client_address,
             started_at,
@@ -183,6 +197,19 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<Actor, ServerError> {
+        self.finish_provider_to(oidc, code, upstream, address, browser)
+            .await
+            .map(|(actor, _)| actor)
+    }
+
+    async fn finish_provider_to(
+        &self,
+        oidc: &Oidc,
+        code: &str,
+        upstream: &str,
+        address: IpAddr,
+        browser: [u8; 32],
+    ) -> Result<(Actor, Option<String>), ServerError> {
         let held = self
             .upstream
             .lock()
@@ -217,7 +244,10 @@ impl IssuerSignIn {
             Err(error) => Err(error),
         };
         match outcome {
-            Ok((code, answered)) if answered == held.state => oidc.finish(code, &held.state).await,
+            Ok((code, answered)) if answered == held.state => {
+                let actor = oidc.finish(code, &held.state).await?;
+                Ok((actor, held.continuation))
+            }
             Ok(_) => {
                 oidc.abandon(&held.state)?;
                 Err(ServerError::SignInStateUnknown)
@@ -306,6 +336,168 @@ fn to_sign_in(error: &ServerError) -> Response {
     (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response()
 }
 
+/// The sign-in provider routes under the service's own routes.
+pub(super) fn routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/sign-in/providers", get(offered))
+        .route("/sign-in/providers/{id}", get(start))
+}
+
+/// The route the issuer's provider callback path is served at, on Lys's
+/// own origin, beside the screens rather than under `/api`.
+pub fn callback_routes(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route(super::PROVIDER_CALLBACK_PATH, get(callback))
+        .with_state(state)
+}
+
+/// The providers a person may sign in with, one button each: their id at
+/// the issuer, their name and which offered provider each is.
+async fn offered(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ServerError> {
+    let Some(api) = state.sign_in_providers.as_ref() else {
+        return Ok(Json(json!({ "providers": [] })));
+    };
+    let mut providers: Vec<Value> = api
+        .listed()
+        .await?
+        .into_iter()
+        .filter(|listed| listed.enabled)
+        .map(|listed| {
+            json!({
+                "id": listed.id,
+                "name": listed.name,
+                "provider": Provider::from_name(&listed.name),
+            })
+        })
+        .collect();
+    providers.sort_by_key(|provider| provider["name"].as_str().map(str::to_owned));
+    Ok(Json(json!({ "providers": providers })))
+}
+
+async fn begin(
+    state: &AppState,
+    extensions: &Extensions,
+    id: &str,
+    headers: &HeaderMap,
+    continuation: Option<String>,
+) -> Result<(String, String), ServerError> {
+    if id.is_empty()
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    {
+        return Err(failed("that sign-in provider is not set up"));
+    }
+    let address = state.sign_in.address(extensions, headers)?;
+    let (cookie, digest) =
+        crate::provider_browser::begin(state.sign_in.callback().starts_with("https://"))?;
+    let location = state
+        .sign_in
+        .begin_provider_to(&state.oidc, id, address, digest, continuation)
+        .await?;
+    Ok((location, cookie))
+}
+
+async fn start(
+    State(state): State<Arc<AppState>>,
+    extensions: Extensions,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    asked: Result<Query<Continue>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let target = asked
+        .map_err(|error| failed(format!("the provider continuation is malformed: {}", error.body_text())))
+        .and_then(|Query(asked)| continuation_target(asked.continuation));
+    let target = match target {
+        Ok(target) => target,
+        Err(error) => return to_sign_in(&error),
+    };
+    match begin(&state, &extensions, &id, &headers, target).await {
+        Ok((location, cookie)) => (
+            StatusCode::SEE_OTHER,
+            [(header::LOCATION, location), (header::SET_COOKIE, cookie)],
+        )
+            .into_response(),
+        Err(error) => to_sign_in(&error),
+    }
+}
+
+#[derive(Deserialize)]
+struct Continue {
+    #[serde(rename = "continue")]
+    continuation: Option<String>,
+}
+
+/// A continuation is a bounded request on the same origin, held in the
+/// one-use flight rather than trusted from a callback's query or referrer.
+fn continuation_target(target: Option<String>) -> Result<Option<String>, ServerError> {
+    let Some(target) = target else {
+        return Ok(None);
+    };
+    if target.len() > 8192
+        || !["/oauth/authorize?", "/oauth/mcp/authorize?"].iter().any(|path| target.starts_with(path))
+        || !target.is_ascii()
+        || target.bytes().any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+        || target.contains(['#', '\\'])
+    {
+        return Err(failed("the provider continuation is not a bounded authorize request on this origin"));
+    }
+    Ok(Some(target))
+}
+
+/// What a provider sends the person back with.
+#[derive(Deserialize)]
+struct Back {
+    code: Option<String>,
+    state: Option<String>,
+}
+
+async fn finish(
+    state: &AppState,
+    extensions: &Extensions,
+    back: Back,
+    headers: &HeaderMap,
+) -> Result<(String, Option<String>), ServerError> {
+    let (Some(code), Some(upstream)) = (back.code, back.state) else {
+        return Err(failed("the provider did not sign the person in"));
+    };
+    let address = state.sign_in.address(extensions, headers)?;
+    let (actor, continuation) = state
+        .sign_in
+        .finish_provider_to(
+            &state.oidc,
+            &code,
+            &upstream,
+            address,
+            crate::provider_browser::digest(headers)?,
+        )
+        .await?;
+    let cookie = crate::session_admission::begin(state, actor).await?;
+    Ok((cookie, continuation))
+}
+
+async fn callback(
+    State(state): State<Arc<AppState>>,
+    extensions: Extensions,
+    Query(back): Query<Back>,
+    headers: HeaderMap,
+) -> Response {
+    match finish(&state, &extensions, back, &headers).await {
+        Ok((cookie, continuation)) => (
+            StatusCode::SEE_OTHER,
+            [
+                (header::SET_COOKIE, cookie),
+                (header::LOCATION, match continuation {
+                    Some(target) => target,
+                    None => SIGNED_IN.to_owned(),
+                }),
+            ],
+        )
+            .into_response(),
+        Err(error) => to_sign_in(&error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::error::Error;
@@ -375,131 +567,5 @@ mod tests {
         assert!(words.contains("body exceeds 4096 bytes"), "{words}");
         assert!(!words.contains("private-token"), "{words}");
         Ok(())
-    }
-}
-
-/// The sign-in provider routes under the service's own routes.
-pub(super) fn routes() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/sign-in/providers", get(offered))
-        .route("/sign-in/providers/{id}", get(start))
-}
-
-/// The route the issuer's provider callback path is served at, on Lys's
-/// own origin, beside the screens rather than under `/api`.
-pub fn callback_routes(state: Arc<AppState>) -> Router {
-    Router::new()
-        .route(super::PROVIDER_CALLBACK_PATH, get(callback))
-        .with_state(state)
-}
-
-/// The providers a person may sign in with, one button each: their id at
-/// the issuer, their name and which offered provider each is.
-async fn offered(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ServerError> {
-    let Some(api) = state.sign_in_providers.as_ref() else {
-        return Ok(Json(json!({ "providers": [] })));
-    };
-    let mut providers: Vec<Value> = api
-        .listed()
-        .await?
-        .into_iter()
-        .filter(|listed| listed.enabled)
-        .map(|listed| {
-            json!({
-                "id": listed.id,
-                "name": listed.name,
-                "provider": Provider::from_name(&listed.name),
-            })
-        })
-        .collect();
-    providers.sort_by_key(|provider| provider["name"].as_str().map(str::to_owned));
-    Ok(Json(json!({ "providers": providers })))
-}
-
-async fn begin(
-    state: &AppState,
-    extensions: &Extensions,
-    id: &str,
-    headers: &HeaderMap,
-) -> Result<(String, String), ServerError> {
-    if id.is_empty()
-        || !id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
-    {
-        return Err(failed("that sign-in provider is not set up"));
-    }
-    let address = state.sign_in.address(extensions, headers)?;
-    let (cookie, digest) =
-        crate::provider_browser::begin(state.sign_in.callback().starts_with("https://"))?;
-    let location = state
-        .sign_in
-        .begin_provider(&state.oidc, id, address, digest)
-        .await?;
-    Ok((location, cookie))
-}
-
-async fn start(
-    State(state): State<Arc<AppState>>,
-    extensions: Extensions,
-    Path(id): Path<String>,
-    headers: HeaderMap,
-) -> Response {
-    match begin(&state, &extensions, &id, &headers).await {
-        Ok((location, cookie)) => (
-            StatusCode::SEE_OTHER,
-            [(header::LOCATION, location), (header::SET_COOKIE, cookie)],
-        )
-            .into_response(),
-        Err(error) => to_sign_in(&error),
-    }
-}
-
-/// What a provider sends the person back with.
-#[derive(Deserialize)]
-struct Back {
-    code: Option<String>,
-    state: Option<String>,
-}
-
-async fn finish(
-    state: &AppState,
-    extensions: &Extensions,
-    back: Back,
-    headers: &HeaderMap,
-) -> Result<String, ServerError> {
-    let (Some(code), Some(upstream)) = (back.code, back.state) else {
-        return Err(failed("the provider did not sign the person in"));
-    };
-    let address = state.sign_in.address(extensions, headers)?;
-    let actor = state
-        .sign_in
-        .finish_provider(
-            &state.oidc,
-            &code,
-            &upstream,
-            address,
-            crate::provider_browser::digest(headers)?,
-        )
-        .await?;
-    crate::session_admission::begin(state, actor).await
-}
-
-async fn callback(
-    State(state): State<Arc<AppState>>,
-    extensions: Extensions,
-    Query(back): Query<Back>,
-    headers: HeaderMap,
-) -> Response {
-    match finish(&state, &extensions, back, &headers).await {
-        Ok(cookie) => (
-            StatusCode::SEE_OTHER,
-            [
-                (header::SET_COOKIE, cookie),
-                (header::LOCATION, SIGNED_IN.to_owned()),
-            ],
-        )
-            .into_response(),
-        Err(error) => to_sign_in(&error),
     }
 }
