@@ -1,3 +1,5 @@
+//! Supplied instants keep clock boundaries independent of elapsed time.
+
 #![cfg(test)]
 
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
