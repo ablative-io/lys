@@ -166,8 +166,9 @@ mod tests {
             ));
             let error = utc_from_duration(Duration::MAX, before_epoch).unwrap_err();
             assert!(
-                std::error::Error::source(&error)
-                    .is_some_and(<(dyn std::error::Error + 'static)>::is::<std::num::TryFromIntError>)
+                std::error::Error::source(&error).is_some_and(
+                    <(dyn std::error::Error + 'static)>::is::<std::num::TryFromIntError>
+                )
             );
             assert!(matches!(
                 utc_from_duration(Duration::from_secs(i64::MAX.unsigned_abs()), before_epoch),
