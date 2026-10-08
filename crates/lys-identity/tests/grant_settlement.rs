@@ -480,8 +480,8 @@ fn startup_retains_the_original_projection_failure_and_selected_revision() -> Te
 
 #[test]
 fn healthy_settlement_keeps_no_degradation_and_emits_no_failure() -> TestResult {
+    let mut world = World::new()?;
     let capture = Observations::default();
-    let mut world = tracing::subscriber::with_default(capture.clone(), World::new)?;
     let readings =
         tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
             let grant = world.root(world.lee, "tern", PassOn::UseOnly, None)?;
