@@ -34,8 +34,10 @@ fn an_independent_append_invalidates_the_older_head_before_its_callback() -> Tes
         });
         let selected = held.with_current_head(|store| Ok((store.extent(), store.pinned())));
         gate.wait();
-        let written = writer.join().map_err(|_| "head fixture writer panicked")?;
-        written?;
+        match writer.join() {
+            Ok(written) => written?,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
         let mut called = false;
         let stale = held.with_current_head(|_| {
             called = true;
@@ -93,11 +95,10 @@ fn the_reading_holds_the_append_lock_and_releases_it_at_return() -> TestResult {
                 .join(format!("{:020}", 0)),
         )?;
         let blocked = held.with_current_head(|_| {
-            let attempted = std::thread::scope(|scope| scope.spawn(|| contender.try_lock()).join())
-                .map_err(|_| StoreError::Io {
-                    context: "head fixture contender panicked".to_owned(),
-                    source: std::io::Error::other("head fixture contender panicked"),
-                })?;
+            let attempted = match std::thread::scope(|scope| scope.spawn(|| contender.try_lock()).join()) {
+                Ok(attempted) => attempted,
+                Err(payload) => std::panic::resume_unwind(payload),
+            };
             match attempted {
                 Err(std::fs::TryLockError::WouldBlock) => Ok(true),
                 Err(std::fs::TryLockError::Error(source)) => Err(StoreError::Io {
