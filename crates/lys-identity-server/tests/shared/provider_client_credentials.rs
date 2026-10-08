@@ -340,19 +340,26 @@ async fn only_the_administrator_issues_and_revokes() -> TestResult {
 }
 
 #[tokio::test]
-async fn a_broker_that_holds_no_sealed_client_secret_is_refused_by_name_and_nothing_is_kept()
+async fn missing_approved_client_custody_is_prepared_and_the_issue_is_replayed_without_a_value()
 -> TestResult {
     let (service, cookie, _person, custody) = table_kept(CODE_SECONDS).await?;
     custody.lose(PRODUCT)?;
-    let refused = post(
+    let operation = OperationId::generate()?.to_string();
+    let body = json!({ "operation": operation });
+    let answer = post(
         &service,
         &format!("/apps/{PRODUCT}/credentials/issue"),
         Auth::Cookie(&cookie),
-        &json!({ "operation": OperationId::generate()?.to_string() }),
+        &body,
     )
     .await?;
-    assert_eq!(refused.0, 403, "{}", refused.1);
-    assert_eq!(refused.1["refusal"], "AppClientNoCustody", "{}", refused.1);
-    assert!(listed(&service, &cookie).await?.is_empty());
+    let first = ok(answer)?;
+    let credential = value(&first)?;
+    let repeated = issue(&service, &cookie, PRODUCT, &operation).await?;
+    assert_eq!(repeated["credential_id"], first["credential_id"]);
+    assert!(repeated["credential"].is_null());
+    assert_eq!(listed(&service, &cookie).await?.len(), 1);
+    let (status, token) = sign_in_with(&service, &cookie, &credential, false).await?;
+    assert_eq!(status, 200, "{token}");
     Ok(())
 }

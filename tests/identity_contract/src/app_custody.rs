@@ -178,6 +178,7 @@ async fn prepare(
     }
     let owner = owner(&headers);
     let app = body["app"].as_str().unwrap_or("missing");
+    kept!(custody).lost.retain(|lost| lost != app);
     let prefix = format!("lys-app-{owner}-{app}");
     Json(
         json!({"app": app, "client_secret_ref": format!("{prefix}-client"),
