@@ -107,6 +107,7 @@ THE SYSTEM SHALL carry one shared immutable projection-degradation value from Se
 - modify: crates/lys-identity-server/src/grant_settlement_tests.rs
 - modify: surface/identity/src/generated/grants.ts
 - modify: CHANGELOG.md
+- modify: crates/lys-identity-server/src/grants/handlers.rs
 
 **Checklist:**
 - C24 — Grant changes and their audit share one durable authoritative event; retries and uncertain outcomes preserve operation identity and replay-equivalent projections.

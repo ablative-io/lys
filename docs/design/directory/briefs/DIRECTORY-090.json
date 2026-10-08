@@ -111,7 +111,8 @@
           "crates/lys-identity-server/src/lib.rs",
           "crates/lys-identity-server/src/grant_settlement_tests.rs",
           "surface/identity/src/generated/grants.ts",
-          "CHANGELOG.md"
+          "CHANGELOG.md",
+          "crates/lys-identity-server/src/grants/handlers.rs"
         ],
         "delete": []
       },
