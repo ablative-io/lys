@@ -95,10 +95,11 @@ fn the_reading_holds_the_append_lock_and_releases_it_at_return() -> TestResult {
                 .join(format!("{:020}", 0)),
         )?;
         let blocked = held.with_current_head(|_| {
-            let attempted = match std::thread::scope(|scope| scope.spawn(|| contender.try_lock()).join()) {
-                Ok(attempted) => attempted,
-                Err(payload) => std::panic::resume_unwind(payload),
-            };
+            let attempted =
+                match std::thread::scope(|scope| scope.spawn(|| contender.try_lock()).join()) {
+                    Ok(attempted) => attempted,
+                    Err(payload) => std::panic::resume_unwind(payload),
+                };
             match attempted {
                 Err(std::fs::TryLockError::WouldBlock) => Ok(true),
                 Err(std::fs::TryLockError::Error(source)) => Err(StoreError::Io {
