@@ -196,15 +196,13 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 ),
             });
         }
-        let projected = match self.project() {
-            Ok(projected) => projected,
-            Err(_) => self.relationships.revision().unwrap_or(0),
-        };
-        if projected > index {
+        let reading = self.project_reading()?;
+        if reading.revision > index {
             Ok(Recorded {
                 event,
                 index,
                 receipt,
+                degraded: reading.degraded,
             })
         } else {
             Err(GrantError::ProjectionPending {

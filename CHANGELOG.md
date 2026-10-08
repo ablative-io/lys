@@ -20,6 +20,10 @@ unreleased things cannot be used to tell what a published version contains.
   `degraded: {step, refusal, revision}`. Healthy responses omit it. Private
   causes are reported through operator observation and are absent from this
   extension. OpenAPI and generated client types describe the same extension.
+- `Recorded` also adds the optional shared `degraded` field. Its JSON result
+  uses the same optional marker when a failed projection still has a readable
+  revision covering the original receipt. A failed revision read returns its
+  original refusal and produces no acknowledgement or invented revision.
 
 ## [0.3.0] — 2026-10-08
 

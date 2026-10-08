@@ -99,6 +99,8 @@ pub struct Recorded {
     pub index: u64,
     /// Its receipt.
     pub receipt: GrantReceipt,
+    /// The shared original projection failure of this acknowledgement's reading.
+    pub degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 /// The grants: their log, book and permission relationships, and the model

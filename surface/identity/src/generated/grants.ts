@@ -119,6 +119,7 @@ export interface Recorded {
   operation: string;
   grant: string;
   index: number;
+  degraded?: Degraded;
   receipt: {
     version: number;
     caller: IdentityId;

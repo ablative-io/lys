@@ -311,6 +311,9 @@ pub struct RecordedView {
     pub index: u64,
     /// Its receipt.
     pub receipt: ReceiptView,
+    /// The redacted failure of the revision selected for this acknowledgement.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 impl From<&Recorded> for RecordedView {
@@ -321,6 +324,7 @@ impl From<&Recorded> for RecordedView {
             operation: receipt.operation.to_string(),
             grant: receipt.grant.to_string(),
             index: recorded.index,
+            degraded: recorded.degraded.as_deref().map(crate::grants::DegradedView::from),
             receipt: ReceiptView {
                 version: receipt.version,
                 caller: receipt.caller.to_string(),

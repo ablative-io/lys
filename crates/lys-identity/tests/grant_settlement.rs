@@ -58,6 +58,7 @@ struct Faults {
     lost_acknowledgement: AtomicBool,
     log_unreadable: AtomicBool,
     advance_on_read: AtomicBool,
+    write_then_fail: AtomicBool,
 }
 
 #[derive(Clone, Default)]
@@ -88,6 +89,9 @@ impl RelationshipStore for Engine {
     ) -> Result<(), GrantError> {
         self.faults.writes.fetch_add(1, Ordering::Relaxed);
         if self.faults.write.load(Ordering::Relaxed) {
+            if self.faults.write_then_fail.load(Ordering::Relaxed) {
+                self.inner.write(revision, touch, delete)?;
+            }
             if self.faults.read_after_write.load(Ordering::Relaxed) {
                 self.faults.revision.store(true, Ordering::Relaxed);
             }
@@ -513,6 +517,59 @@ fn failed_mutation_revision_read_is_named_instead_of_inventing_revision_zero() -
         assert!(events.iter().any(|fields| fields.values().any(|value| value.contains(cause))));
     }
     assert_eq!(FileLeafStore::open(&world.dir.path().join("grants"))?.extent(), 2);
+    Ok(())
+}
+
+#[test]
+fn mutation_acknowledgement_uses_the_real_frontier_and_preserves_the_original_receipt() -> TestResult {
+    let engine = Engine::default();
+    let mut world = world(&engine)?;
+    let capture = Observations::default();
+    let reading = tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
+        let kinds = [RecipientKind::Person, RecipientKind::Agent];
+        let root = world.root(world.dana, "kite", pass(&["read"], &kinds)?, None)?;
+        let request = world.request(IdentityId::Person(world.dana), root,
+            IdentityId::Person(world.tom), "tern", PassOn::UseOnly, None)?;
+        engine.faults.write.store(true, Ordering::Relaxed);
+        let pending = world.delegate(&request);
+        let at_index = engine.inner.revision()?;
+        let before = world.events();
+        engine.faults.write_then_fail.store(true, Ordering::Relaxed);
+        let answered = world.delegate(&request)?;
+        let projected = engine.inner.revision()?;
+        let repeated = world.delegate(&request)?;
+        world.reopen(engine.clone())?;
+        let reopened = world.delegate(&request)?;
+        let mut changed = request.clone();
+        changed.relation = lys_identity::grants::Relation::new("kite")?;
+        let refused = world.delegate(&changed);
+        Ok((pending, at_index, answered, projected, repeated, reopened, refused,
+            before, world.events(), capture.read()?))
+    });
+    engine.faults.write.store(false, Ordering::Relaxed);
+    engine.faults.write_then_fail.store(false, Ordering::Relaxed);
+    let (pending, at_index, answered, projected, repeated, reopened, refused,
+        before, after, observations) = finish_world(world, reading)?;
+    assert_eq!(at_index, answered.index);
+    assert!(matches!(pending, Err(GrantError::ProjectionPending { index, operation, grant })
+        if index == answered.index && operation == answered.event.operation().to_string()
+            && grant == answered.event.grant().to_string()));
+    assert_eq!(projected, answered.index + 1);
+    let marker = answered.degraded.as_deref().ok_or("acknowledgement lost its projection cause")?;
+    assert_eq!(marker.revision(), projected);
+    assert_eq!(marker.error(), &GrantError::PermissionEngineUnavailable {
+        reason: WRITE_FAILURE.to_owned(),
+    });
+    assert!(observed(&observations, "project", WRITE_FAILURE, at_index));
+    assert!(observed(&observations, "project", WRITE_FAILURE, projected));
+    for retry in [repeated, reopened] {
+        assert_eq!(retry.event, answered.event);
+        assert_eq!(retry.index, answered.index);
+        assert_eq!(retry.receipt, answered.receipt);
+        assert!(retry.degraded.is_none());
+    }
+    assert!(matches!(refused, Err(GrantError::OperationReused { .. })));
+    assert_eq!(before, after);
     Ok(())
 }
 
