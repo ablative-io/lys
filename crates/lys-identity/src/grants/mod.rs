@@ -23,6 +23,7 @@ pub mod schema;
 pub mod schema_diff;
 #[cfg(test)]
 mod schema_tests;
+mod settlement;
 pub mod shipped;
 mod state;
 #[cfg(any(test, feature = "test-support"))]
@@ -54,6 +55,7 @@ pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};
 pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, owner_of};
 pub use schema_diff::{Named, SchemaDiff, Standing, diff, stranded};
+pub use settlement::ProjectionDegraded;
 pub use shipped::{SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, shipped_model};
 pub use types::{
     Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,

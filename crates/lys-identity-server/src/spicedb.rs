@@ -549,6 +549,8 @@ pub enum Relationships {
 pub struct FaultRelationships {
     held: MemoryRelationships,
     unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    projection_only: bool,
+    writes: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 #[cfg(test)]
@@ -557,12 +559,38 @@ impl Relationships {
         held: MemoryRelationships,
         unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
     ) -> Self {
-        Self::Fixture(FaultRelationships { held, unavailable })
+        Self::Fixture(FaultRelationships {
+            held,
+            unavailable,
+            projection_only: false,
+            writes: std::sync::Arc::default(),
+        })
+    }
+
+    pub(crate) fn faulted_projection(
+        held: MemoryRelationships,
+        unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        writes: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    ) -> Self {
+        Self::Fixture(FaultRelationships {
+            held,
+            unavailable,
+            projection_only: true,
+            writes,
+        })
     }
 }
 
 #[cfg(test)]
 impl FaultRelationships {
+    fn readable(&self) -> Result<(), GrantError> {
+        if self.projection_only {
+            Ok(())
+        } else {
+            self.ready()
+        }
+    }
+
     fn ready(&self) -> Result<(), GrantError> {
         if self.unavailable.load(std::sync::atomic::Ordering::Acquire) {
             Err(GrantError::PermissionEngineUnavailable {
@@ -581,7 +609,7 @@ impl RelationshipStore for Relationships {
             Self::SpiceDb(engine) => engine.admit_resource(resource),
             #[cfg(test)]
             Self::Fixture(engine) => {
-                engine.ready()?;
+                engine.readable()?;
                 engine.held.admit_resource(resource)
             }
         }
@@ -593,7 +621,7 @@ impl RelationshipStore for Relationships {
             Self::SpiceDb(engine) => engine.revision(),
             #[cfg(test)]
             Self::Fixture(engine) => {
-                engine.ready()?;
+                engine.readable()?;
                 engine.held.revision()
             }
         }
@@ -610,6 +638,7 @@ impl RelationshipStore for Relationships {
             Self::SpiceDb(engine) => engine.write(revision, touch, delete),
             #[cfg(test)]
             Self::Fixture(engine) => {
+                engine.writes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 engine.ready()?;
                 engine.held.write(revision, touch, delete)
             }
@@ -622,7 +651,7 @@ impl RelationshipStore for Relationships {
             Self::SpiceDb(engine) => engine.read(),
             #[cfg(test)]
             Self::Fixture(engine) => {
-                engine.ready()?;
+                engine.readable()?;
                 engine.held.read()
             }
         }

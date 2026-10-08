@@ -117,7 +117,12 @@ impl GrantSetup {
         Ok(())
     }
 
-    fn open(&self, root_authority: PersonId, model: Model) -> Result<GrantState, ServerError> {
+    fn open(
+        &self,
+        root_authority: PersonId,
+        model: Model,
+        say: &dyn Fn(&str),
+    ) -> Result<GrantState, ServerError> {
         if !self.log_dir.exists() {
             FileLeafStore::create(&self.log_dir, &self.log_origin).map_err(|error| {
                 ServerError::ConfigInvalid {
@@ -139,10 +144,18 @@ impl GrantSetup {
             model,
             root_authority,
         )?;
-        if self.spicedb.is_some() {
-            grants.project()?;
-        }
+        report_startup(&mut grants, say);
         Ok(grants)
+    }
+}
+
+pub(crate) fn report_startup(grants: &mut GrantState, say: &dyn Fn(&str)) {
+    if let Some(degraded) = grants.take_startup_degradation() {
+        say(&format!(
+            "grant projection degraded at revision {}: {}",
+            degraded.revision(),
+            degraded.error()
+        ));
     }
 }
 
@@ -246,7 +259,7 @@ fn with_directory_grants_model<A, T>(
         let grants = if let Some(grants) = &mut *slot {
             grants
         } else {
-            let opened = state.grant_setup.open(root, apps.model()?)?;
+            let opened = state.grant_setup.open(root, apps.model()?, &*state.say)?;
             (state.say)(&format!("grant log {}", opened.ledger().start()));
             slot.insert(opened)
         };

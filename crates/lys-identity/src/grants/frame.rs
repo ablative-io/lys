@@ -10,6 +10,7 @@
 //! grants have moved on is refused `StaleDecision`, never mixed with them.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use lys_log_store::LeafStore;
 
@@ -18,6 +19,7 @@ use super::authority::{ExerciseRequest, Grants, Permit};
 use super::error::GrantError;
 use super::events::GrantChange;
 use super::permission::{Relationship, RelationshipStore, confirm};
+use super::settlement::ProjectionDegraded;
 use super::types::GrantId;
 use crate::operation::OperationId;
 use crate::projection::Projection;
@@ -31,13 +33,15 @@ pub struct Frame<'d> {
     projected: u64,
     held: BTreeSet<Relationship>,
     unresolved: Option<(OperationId, GrantId)>,
+    degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 /// A frame's log settled and relationships projected, before they are read.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(super) struct Settled {
     pub(super) projected: u64,
     pub(super) unresolved: Option<(OperationId, GrantId)>,
+    pub(super) degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 impl<'d> Frame<'d> {
@@ -53,6 +57,7 @@ impl<'d> Frame<'d> {
             projected: settled.projected,
             held: grants.relationships.read()?,
             unresolved: settled.unresolved,
+            degraded: settled.degraded,
         })
     }
 
@@ -60,6 +65,12 @@ impl<'d> Frame<'d> {
     #[must_use]
     pub fn revision(&self) -> u64 {
         self.projected
+    }
+
+    /// The original projection failure shared by this reading, when degraded.
+    #[must_use]
+    pub fn degradation(&self) -> Option<&Arc<ProjectionDegraded>> {
+        self.degraded.as_ref()
     }
 }
 
@@ -79,11 +90,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Settle the log and project the relationships, refusing a projection
     /// older than `at_least`, and name the revocation held unresolved.
     pub(super) fn settle(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
-        self.settle_log().ok();
-        let projected = match self.project() {
-            Ok(projected) => projected,
-            Err(_) => self.relationships.revision()?,
-        };
+        self.settle_log().inspect_err(|error| {
+            tracing::warn!(step = "reconcile", error = %error, "grant log settlement refused");
+        })?;
+        let reading = self.project_reading()?;
+        let projected = reading.revision;
         if let Some(required) = at_least
             && projected < required
         {
@@ -102,6 +113,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         Ok(Settled {
             projected,
             unresolved,
+            degraded: reading.degraded,
         })
     }
 

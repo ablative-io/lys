@@ -11,6 +11,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
@@ -25,6 +26,7 @@ use super::projection::GrantBook;
 use super::receipt::GrantReceipt;
 use super::recovery::GrantLedger;
 use super::revocation::judge_revoke;
+use super::settlement::ProjectionDegraded;
 use super::state;
 use super::types::{Action, Grant, GrantId, Resource, Source};
 use super::usage::{self, Unreported};
@@ -108,6 +110,7 @@ pub struct Grants<S: LeafStore, R: RelationshipStore> {
     pub(super) folded: u64,
     pub(super) relationships: R,
     pub(super) unreported: BTreeMap<GrantId, Unreported>,
+    pub(super) startup_degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 fn root_matches(request: &RootRequest, grant: &Grant) -> bool {
@@ -183,13 +186,20 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             folded,
             relationships,
             unreported: BTreeMap::new(),
+            startup_degraded: None,
         };
         for (signed, coordinate) in events {
             grants.record_committed(&signed, coordinate)?;
         }
         grants.snapshot();
-        grants.project().ok();
+        grants.startup_degraded = grants.project_reading()?.degraded;
         Ok(grants)
+    }
+
+    /// Take the opening projection failure for its operator report.
+    #[must_use]
+    pub fn take_startup_degradation(&mut self) -> Option<Arc<ProjectionDegraded>> {
+        self.startup_degraded.take()
     }
 
     /// The model new requests are judged against.

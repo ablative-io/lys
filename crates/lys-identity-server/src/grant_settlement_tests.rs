@@ -10,7 +10,7 @@ use axum::http::{HeaderMap, header};
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
     Action, DelegateRequest, GrantError, Grants, MemoryRelationships, Model, PassOn, RecipientKind,
-    Relation, Resource, RootRequest, Route, Window,
+    Relation, RelationshipStore, Resource, RootRequest, Route, Window,
 };
 use lys_identity::log::Reopen;
 use lys_identity::{
@@ -317,5 +317,53 @@ async fn team_migration_keeps_the_original_grant_refusal() -> TestResult {
     assert!(healthy?, "healthy grant did not permit historical attribution");
     exact(&failed.err().ok_or("team membership answer discarded the original grant refusal")?);
     assert_eq!(before, after);
+    Ok(())
+}
+
+#[tokio::test]
+async fn opening_projection_failure_is_reported_once_without_another_projection() -> TestResult {
+    let table = Table::fresh().await?;
+    let readings = (|| -> TestResult<_> {
+        let administrator = table.state.admission.administrator_login()?
+            .ok_or("administrator absent from opening fixture")?;
+        let root = table.state.directory.lock().map_err(|error| error.to_string())?
+            .projection()?.person_for(&administrator)
+            .ok_or("administrator not bound in opening fixture")?;
+        let writes = Arc::new(AtomicU64::new(0));
+        let fault = Arc::new(AtomicBool::new(true));
+        let engine = Relationships::faulted_projection(
+            MemoryRelationships::default(), Arc::clone(&fault), Arc::clone(&writes),
+        );
+        let revision = engine.revision()?;
+        let path = table.dir.path().join("grants");
+        let mut opened = Grants::open(
+            Box::new(move || FileLeafStore::open(&path)),
+            Ed25519Identity::load(&table.state.grant_setup.key_file)?,
+            engine, table.state.grant_setup.model()?, root,
+        )?;
+        let before = writes.load(Ordering::Relaxed);
+        let reports = Mutex::new(Vec::new());
+        let say = |words: &str| {
+            match reports.lock() {
+                Ok(mut reports) => reports.push(words.to_owned()),
+                Err(error) => panic!("opening_report_fixture_lock_poisoned: {error}"),
+            }
+        };
+        crate::grants::report_startup(&mut opened, &say);
+        crate::grants::report_startup(&mut opened, &say);
+        let consumed = opened.take_startup_degradation().is_none();
+        let after = writes.load(Ordering::Relaxed);
+        let reports = reports.into_inner().map_err(|error| error.to_string())?;
+        fault.store(false, Ordering::Release);
+        drop(opened);
+        Ok((reports, before, after, consumed, revision))
+    })();
+    let (reports, before, after, consumed, revision) = table.finish(readings)?;
+    assert_eq!(before, 1);
+    assert_eq!(after, before);
+    assert!(consumed);
+    assert_eq!(reports, [format!(
+        "grant projection degraded at revision {revision}: {}", refusal(),
+    )]);
     Ok(())
 }

@@ -1,3 +1,5 @@
+//! Original settlement failures, selected revisions and retained opening state.
+
 #![cfg(test)]
 
 mod support;
@@ -19,12 +21,33 @@ use tracing::field::{Field, Visit};
 use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Metadata, Subscriber};
 
-use support::{World, alpha, pass};
+use support::{T0, World, actions, alpha, pass};
 
 type TestResult = Result<(), Box<dyn Error>>;
 const WRITE_FAILURE: &str = "settlement-fixture-write-refused";
 const READ_FAILURE: &str = "settlement-fixture-revision-unavailable";
 const LOG_FAILURE: &str = "settlement-fixture-reopen-unavailable";
+
+fn finish_world<S: LeafStore, R: RelationshipStore, T>(
+    world: World<S, R>,
+    result: Result<T, Box<dyn Error>>,
+) -> Result<T, Box<dyn Error>> {
+    let dir = Arc::clone(&world.dir);
+    drop(world);
+    let cleanup = Arc::try_unwrap(dir)
+        .map_err(|shared| {
+            format!("fixture directory still has {} owners", Arc::strong_count(&shared))
+        })
+        .and_then(|dir| dir.close().map_err(|error| error.to_string()));
+    match (result, cleanup) {
+        (Ok(value), Ok(())) => Ok(value),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(_), Err(error)) => Err(error.into()),
+        (Err(error), Err(cleanup)) => {
+            Err(format!("fixture act failed: {error}; fixture cleanup failed: {cleanup}").into())
+        }
+    }
+}
 
 #[derive(Default)]
 struct Faults {
@@ -328,9 +351,117 @@ fn startup_retains_the_original_projection_failure_and_selected_revision() -> Te
     let capture = Observations::default();
     let opened = tracing::subscriber::with_default(capture.clone(), || world.reopen(replacement.clone()));
     replacement.faults.write.store(false, Ordering::Relaxed);
-    let events = capture.read()?;
-    opened?;
+    let reading = (|| -> Result<_, Box<dyn Error>> {
+        opened?;
+        let writes = replacement.faults.writes.load(Ordering::Relaxed);
+        let degraded = world.grants.take_startup_degradation()
+            .ok_or("opening failure was not retained")?;
+        let consumed = world.grants.take_startup_degradation().is_none();
+        Ok((capture.read()?, degraded, consumed, writes,
+            replacement.faults.writes.load(Ordering::Relaxed)))
+    })();
+    let (events, degraded, consumed, before, after) = finish_world(world, reading)?;
     assert!(observed(&events, "project", WRITE_FAILURE, revision));
+    assert_eq!(degraded.revision(), revision);
+    assert_eq!(degraded.error(), &GrantError::PermissionEngineUnavailable {
+        reason: WRITE_FAILURE.to_owned(),
+    });
+    assert!(consumed);
+    assert_eq!(before, after, "consuming the opening failure retries no projection");
+    Ok(())
+}
+
+#[test]
+fn healthy_settlement_keeps_no_degradation_and_emits_no_failure() -> TestResult {
+    let capture = Observations::default();
+    let mut world = tracing::subscriber::with_default(capture.clone(), World::new)?;
+    let readings = tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
+        let grant = world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+        let before = world.events();
+        let healthy = world.grants.frame(world.directory.projection()?, None)?
+            .degradation().is_none();
+        let permit = world.exercise(IdentityId::Person(world.lee), "read", Route::Api)?;
+        Ok((grant, permit, healthy, world.grants.take_startup_degradation().is_none(),
+            world.now, before, world.events(), capture.read()?))
+    });
+    let (grant, permit, healthy, opening, now, before, after, events) = finish_world(world, readings)?;
+    assert_eq!(permit.grant, grant);
+    assert_eq!(permit.actions, actions(&["read"])?);
+    assert_eq!(now, T0);
+    assert_eq!(after, before + 1);
+    assert!(healthy);
+    assert!(opening);
+    assert!(events.is_empty(), "{events:?}");
+    Ok(())
+}
+
+#[test]
+fn degraded_frame_retains_the_selected_cause_and_recovers_without_a_marker() -> TestResult {
+    let engine = Engine::default();
+    let mut world = world(&engine)?;
+    let capture = Observations::default();
+    let readings = tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
+        world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+        let healthy = world.grants.frame(world.directory.projection()?, None)?
+            .degradation().is_none();
+        engine.faults.write.store(true, Ordering::Relaxed);
+        let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
+        let revision = engine.inner.revision()?;
+        let before = world.events();
+        let degraded = {
+            let frame = world.grants.frame(world.directory.projection()?, None)?;
+            Arc::clone(frame.degradation().ok_or("projection failure lost its reading marker")?)
+        };
+        engine.faults.write.store(false, Ordering::Relaxed);
+        let recovered = world.grants.frame(world.directory.projection()?, None)?
+            .degradation().is_none();
+        Ok((pending, healthy, degraded, recovered, revision, before, world.events(), capture.read()?))
+    });
+    engine.faults.write.store(false, Ordering::Relaxed);
+    let (pending, healthy, degraded, recovered, revision, before, after, events) = finish_world(world, readings)?;
+    assert!(matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
+        Some(GrantError::ProjectionPending { .. })));
+    assert!(healthy);
+    assert!(recovered);
+    assert_eq!(degraded.revision(), revision);
+    assert_eq!(degraded.error(), &GrantError::PermissionEngineUnavailable {
+        reason: WRITE_FAILURE.to_owned(),
+    });
+    assert!(observed(&events, "project", WRITE_FAILURE, revision));
+    assert_eq!(before, after);
+    Ok(())
+}
+
+#[test]
+fn failed_frame_revision_read_returns_the_read_cause_and_observes_both_failures() -> TestResult {
+    let engine = Engine::default();
+    let mut world = world(&engine)?;
+    let capture = Observations::default();
+    let readings = (|| -> Result<_, Box<dyn Error>> {
+        world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+        engine.faults.write.store(true, Ordering::Relaxed);
+        let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
+        let before = world.events();
+        engine.faults.read_after_write.store(true, Ordering::Relaxed);
+        let directory = world.directory.projection()?;
+        let frame = tracing::subscriber::with_default(capture.clone(), || {
+            world.grants.frame(directory, None)
+                .map(|frame| frame.revision())
+        });
+        Ok((pending, frame, before, world.events(), capture.read()?))
+    })();
+    engine.faults.write.store(false, Ordering::Relaxed);
+    engine.faults.revision.store(false, Ordering::Relaxed);
+    engine.faults.read_after_write.store(false, Ordering::Relaxed);
+    let (pending, frame, before, after, events) = finish_world(world, readings)?;
+    assert!(matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
+        Some(GrantError::ProjectionPending { .. })));
+    assert!(matches!(frame, Err(GrantError::PermissionEngineUnavailable { reason }) if reason == READ_FAILURE));
+    assert_eq!(before, after);
+    for (step, cause) in [("project", WRITE_FAILURE), ("revision", READ_FAILURE)] {
+        assert!(events.iter().any(|fields| fields.get("step").is_some_and(|value| value == step)
+            && fields.values().any(|value| value.contains(cause))), "{events:?}");
+    }
     Ok(())
 }
 
