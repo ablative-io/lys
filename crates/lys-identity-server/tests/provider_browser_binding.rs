@@ -9,6 +9,71 @@ use reqwest::{Client, Response, header};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[tokio::test]
+async fn the_provider_round_trip_keeps_the_original_authorize_request() -> TestResult {
+    for target in [
+        "/oauth/authorize?client_id=cambium&state=a%26b&code_challenge=challenge&scope=openid%20profile",
+        "/oauth/mcp/authorize?client_id=connector&state=original",
+    ] {
+        let service = Service::start().await?;
+        service.issuer.sign_in_as(Login {
+            subject: "person".to_owned(),
+            email: "person@example.test".to_owned(),
+        })?;
+        let browser = Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+        let start = browser
+            .get(format!("{}/sign-in/providers/google-provider", service.base))
+            .query(&[("continue", target)])
+            .send()
+            .await?;
+        assert_eq!(start.status(), 303);
+        let set = start.headers().get(header::SET_COOKIE).ok_or("browser cookie")?.to_str()?;
+        let cookie = set.split(';').next().ok_or("cookie pair")?;
+        let provider = browser.get(location(&start)?).send().await?;
+        let callback = location(&provider)?;
+        let answer = browser.get(&callback)
+            .query(&[("continue", "/oauth/authorize?state=changed")])
+            .header(header::COOKIE, cookie)
+            .send().await?;
+        assert_eq!(answer.status(), 303);
+        assert_eq!(location(&answer)?, target);
+        assert!(answer.headers().get(header::SET_COOKIE).is_some());
+        let replay = browser.get(&callback).header(header::COOKIE, cookie).send().await?;
+        assert_eq!(location(&replay)?, "/#/sign-in?refused=SignInStateUnknown");
+        assert!(replay.headers().get(header::SET_COOKIE).is_none());
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn unsafe_provider_continuations_are_refused_before_a_flight_begins() -> TestResult {
+    let service = Service::start().await?;
+    let browser = Client::builder().redirect(reqwest::redirect::Policy::none()).build()?;
+    for target in [
+        "https://elsewhere.example.test/oauth/authorize?state=foreign",
+        "//elsewhere.example.test/oauth/authorize?state=foreign",
+        "/api/directory/people",
+        "/oauth/authorize/../token?state=foreign",
+        "/oauth/authorize?state=original\r\nLocation: https://elsewhere.example.test",
+        "/oauth/authorize?state=original#fragment",
+        "",
+    ] {
+        let answer = browser.get(format!("{}/sign-in/providers/google-provider", service.base))
+            .query(&[("continue", target)]).send().await?;
+        assert_eq!(answer.status(), 303);
+        assert_eq!(location(&answer)?, "/#/sign-in?refused=SignInFailed", "{target:?}");
+        assert!(answer.headers().get(header::SET_COOKIE).is_none());
+    }
+    let answer = browser.get(format!("{}/sign-in/providers/google-provider", service.base))
+        .query(&[("continue", format!("/oauth/authorize?state={}", "a".repeat(8192)))])
+        .send().await?;
+    assert_eq!(location(&answer)?, "/#/sign-in?refused=SignInFailed");
+    assert!(answer.headers().get(header::SET_COOKIE).is_none());
+    Ok(())
+}
+
 fn location(answer: &Response) -> Result<String, Box<dyn Error>> {
     Ok(answer
         .headers()
