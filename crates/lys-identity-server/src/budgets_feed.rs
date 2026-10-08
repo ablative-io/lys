@@ -608,6 +608,7 @@ mod control_tests {
                 teams.insert(format!("team-{number}"), team(number, true)?);
             }
             crate::goals_state::compaction_probe::reset();
+            super::membership_probe::reset();
             let started = std::time::Instant::now();
             let candidates = held.compaction_holders("agent");
             let mut visited = BTreeSet::new();
@@ -623,6 +624,8 @@ mod control_tests {
                 );
             }
             let goals = crate::goals_state::compaction_probe::visits();
+            let (members, held_entries) = super::membership_probe::reads();
+            assert_eq!((members, held_entries), (count, 0));
             assert_eq!(goals.len(), count);
             assert!(goals.iter().all(|position| *position < count));
             assert_eq!(targets.len(), count);
@@ -631,10 +634,9 @@ mod control_tests {
                 (count..count + 1000).all(|number| !visited.contains(&format!("team-{number}")))
             );
             println!(
-                "compaction_probe holders={count} team_reads={} goal_reads={} members={} held=0 unrelated=1000 elapsed_us={}",
+                "compaction_probe holders={count} team_reads={} goal_reads={} members={members} held={held_entries} unrelated=1000 elapsed_us={}",
                 visited.len(),
                 goals.len(),
-                visited.len(),
                 started.elapsed().as_micros()
             );
         }
