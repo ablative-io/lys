@@ -369,10 +369,8 @@ pub(crate) fn judge(state: &AppState, asker: IdentityId, item: &Item) -> Result<
                 resource: Resource::new(kind, &item.goal.holder.id)?,
                 action: Action::new(action)?,
             };
-            Ok(held
-                .grants
-                .explain(held.directory, &request, now(), None)
-                .is_ok())
+            held.grants.explain(held.directory, &request, now(), None)?;
+            Ok(true)
         })?;
         if granted {
             return Ok(());

@@ -152,10 +152,8 @@ pub fn operator(
             resource: Resource::new("agent", agent)?,
             action: Action::new(OPERATE)?,
         };
-        Ok(judged
-            .grants
-            .explain(judged.directory, &request, now(), None)
-            .is_ok())
+        judged.grants.explain(judged.directory, &request, now(), None)?;
+        Ok(true)
     })?;
     if granted {
         return Ok(asker.to_string());
