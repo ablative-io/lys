@@ -116,6 +116,56 @@ mod tests {
         Ok(())
     }
 
+    fn control_session_index_memory(count: usize) -> Result<(), Box<dyn Error>> {
+        let mut held = Held::default();
+        for number in 0..count {
+            held.hold(report(number, "own"))?;
+        }
+        let mut copied = None;
+        let memory = allocation_counter::measure(|| {
+            copied = Some(held.index.by_agent.clone());
+        });
+        let copied = copied.ok_or("the derived index was not measured")?;
+        assert_eq!(copied, held.index.by_agent);
+        assert_eq!(copied.len(), 1);
+        let positions = copied.get("own").ok_or("the agent index is absent")?;
+        assert_eq!(positions.len(), count);
+        assert_eq!(positions.first(), Some(&0));
+        assert_eq!(positions.last(), Some(&(count - 1)));
+        assert!(memory.bytes_current > 0, "{memory:?}");
+        assert!(memory.count_current > 0, "{memory:?}");
+        READS.with(|reads| reads.set(0));
+        let mut page = None;
+        let reads = allocation_counter::measure(|| {
+            page = Some(
+                held.control_sessions("own", None)
+                    .map(|sessions| sessions.take(256).count()),
+            );
+        });
+        assert_eq!(page.ok_or("the page was not read")??, 256);
+        assert_eq!(READS.with(std::cell::Cell::get), 256);
+        assert_eq!(reads.count_total, 0, "{reads:?}");
+        println!(
+            "control_session_index sessions={count} agents={} positions={} derived_heap_bytes={} derived_allocations={} page_reads=256 page_allocations=0 tracked_clones=0 report_clones=0",
+            copied.len(),
+            positions.len(),
+            memory.bytes_current,
+            memory.count_current
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn control_session_index_measures_ten_thousand_positions() -> Result<(), Box<dyn Error>> {
+        control_session_index_memory(10_000)
+    }
+
+    #[test]
+    fn control_session_index_measures_one_hundred_thousand_positions() -> Result<(), Box<dyn Error>>
+    {
+        control_session_index_memory(100_000)
+    }
+
     #[test]
     fn control_session_index_reopens_with_stopped_ids_without_changing_snapshot_bytes()
     -> Result<(), Box<dyn Error>> {

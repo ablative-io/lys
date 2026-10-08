@@ -434,6 +434,33 @@ fn select_holders<'a>(
 }
 
 #[cfg(test)]
+pub(crate) mod membership_probe {
+    use std::cell::Cell;
+
+    thread_local! {
+        static MEMBERS: Cell<usize> = const { Cell::new(0) };
+        static HELD: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(crate) fn member() {
+        MEMBERS.with(|count| count.set(count.get() + 1));
+    }
+
+    pub(crate) fn held() {
+        HELD.with(|count| count.set(count.get() + 1));
+    }
+
+    pub(crate) fn reset() {
+        MEMBERS.with(|count| count.set(0));
+        HELD.with(|count| count.set(0));
+    }
+
+    pub(crate) fn reads() -> (usize, usize) {
+        (MEMBERS.with(Cell::get), HELD.with(Cell::get))
+    }
+}
+
+#[cfg(test)]
 mod control_tests {
     #[test]
     fn a_confirmed_control_cannot_be_downgraded_by_an_equal_or_later_feed_receipt() {
@@ -609,6 +636,97 @@ mod control_tests {
                 goals.len(),
                 visited.len(),
                 started.elapsed().as_micros()
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn compaction_counts_the_member_and_held_entries_actually_examined() -> TestResult {
+        use super::membership_probe;
+        use crate::teams_state::Hold;
+
+        membership_probe::reset();
+        membership_probe::member();
+        membership_probe::held();
+        assert_eq!(membership_probe::reads(), (1, 1));
+        for count in [10, 1000] {
+            let mut teams = BTreeMap::new();
+            let mut candidates = Vec::new();
+            for number in 0..count + 1000 {
+                let mut team = team(number, false)?;
+                team.members = if number % 3 == 2 {
+                    vec!["first-other".to_owned(), "second-other".to_owned()]
+                } else {
+                    vec!["before".to_owned(), "agent".to_owned(), "after".to_owned()]
+                };
+                let members: &[&str] = match number % 3 {
+                    0 => &["other"],
+                    1 => &["before", "agent", "after"],
+                    _ => &["agent"],
+                };
+                team.held = members
+                    .iter()
+                    .map(|member| Hold {
+                        operation: format!("hold-{number}-{member}"),
+                        team: team.created.id.clone(),
+                        member: (*member).to_owned(),
+                        reason: "membership requires confirmation".to_owned(),
+                        at: 1,
+                    })
+                    .collect();
+                let id = team.created.id.clone();
+                if number < count {
+                    candidates.push(Holder {
+                        kind: HolderKind::Team,
+                        id: id.clone(),
+                    });
+                }
+                teams.insert(id, team);
+            }
+            membership_probe::reset();
+            let mut visited = BTreeSet::new();
+            let targets = select_holders(&candidates, "agent", "owner", |id| {
+                visited.insert(id.to_owned());
+                teams.get(id)
+            })?;
+            let total = membership_probe::reads();
+            assert_eq!(total, (2 * count, count));
+            assert_eq!(targets.len(), count.div_ceil(3));
+            assert_eq!(visited.len(), count);
+            assert!(
+                (count..count + 1000).all(|number| !visited.contains(&format!("team-{number}")))
+            );
+            let mut per_holder = Vec::with_capacity(count);
+            for (number, candidate) in candidates.iter().enumerate() {
+                membership_probe::reset();
+                let selected =
+                    select_holders(std::slice::from_ref(candidate), "agent", "owner", |id| {
+                        teams.get(id)
+                    })?;
+                let reads = membership_probe::reads();
+                let expected = match number % 3 {
+                    0 => (2, 1),
+                    1 => (2, 2),
+                    _ => (2, 0),
+                };
+                assert_eq!(reads, expected, "{}", candidate.id);
+                assert_eq!(selected.len(), usize::from(number % 3 == 0));
+                per_holder.push((number, reads));
+            }
+            assert_eq!(
+                per_holder.iter().map(|(_, reads)| reads.0).sum::<usize>(),
+                total.0
+            );
+            assert_eq!(
+                per_holder.iter().map(|(_, reads)| reads.1).sum::<usize>(),
+                total.1
+            );
+            println!(
+                "compaction_membership holders={count} team_reads={} members={} held={} unrelated=1000 per_holder={per_holder:?}",
+                visited.len(),
+                total.0,
+                total.1
             );
         }
         Ok(())
