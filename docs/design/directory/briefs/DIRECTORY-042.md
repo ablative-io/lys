@@ -189,3 +189,12 @@ Behavioural. crates/lys-identity-server/src/spicedb_http.rs:22, grants.rs:112-12
 
 - cargo fmt --all --check, both clippy legs with -D warnings, cargo test --workspace --all-features --no-fail-fast, both cargo doc legs, ast-grep scan --config sgconfig.yml, sh scripts/design/gate.sh and (once LYSGATE-002 has landed) sh scripts/file-length.sh all exit 0 at the card's head, measured by the card round, never by the builder's own run.
 - Every counting test named in an acceptance line fails at the card's base commit and passes at its head: the dev record names each test and quotes its failing assertion at the base.
+
+## Amendments
+
+### Amendment 1: Overlap with DIRECTORY-025, found after firing; run 04667e0b cancelled before any round
+
+- **Date:** 2026-09-28
+- **By:** Waffles
+
+DIRECTORY-025 (building from 737461d) replaces the SpiceDB HTTP client with a pure-Rust gRPC client and answers every check, why and who through one evaluator at one revision. This brief's R1, R6, R7 and R8 therefore apply to the code 025 lands, not to spicedb_http.rs: after 025, a check decides once, who is answered from one revision, the schema is not read before every call, the client holds one reused connection, and it carries no timeout (CLAUDE.md, No time limits); where 025 already meets a row, the dev record shows the counting test that proves it and the row is not rebuilt. R2 to R5 (filtered relationship read, holder and change indexes, use events without a mirror round trip per event, revocation from the book) stand, measured against the code after 025.

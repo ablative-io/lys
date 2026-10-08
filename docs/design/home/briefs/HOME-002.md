@@ -284,3 +284,19 @@ Structure: the entry for steps 4 and 5 in the identity cluster's statement docum
 - cargo test -p lys-home --test launch_template reports every test in the file run and passed, with a non-zero count.
 - grep -rn 'Command::new\|process::Command' crates/lys-home/src/harness/claude_code/launch.rs crates/lys-home/src/harness/claude_code/launch_env.rs crates/lys-home/src/harness/claude_code/template.rs finds nothing.
 - Every file under crates/lys-home/src is at most 500 lines of code excluding comments and blank lines, and cli.rs gains only the render-launch variant and its dispatch.
+
+## Amendments
+
+### Amendment 1: Session::open persists an inferred head
+
+- **Date:** 2026-09-26
+- **By:** lead review of PR 14, relayed by the coordinator; recorded by the build seat
+
+Stated behaviour of R4: a session opened from a file with no .head beside it (one Pi wrote) takes its last indexed entry as the head and persists that head on the open, so a side leaf appended beside the context path is never taken for the head on reopen. Opening a session may therefore write beside the session file (a rebuilt index, a persisted head) before the command that opened it does anything else, by every command that opens a session, even one that then refuses; the session file itself is never written by an open. RECORD.md states the same.
+
+### Amendment 2: The rendered uuid is salted by the home session's own id (ADR-016)
+
+- **Date:** 2026-09-28
+- **By:** HOME-032, recorded by the build seat
+
+R2's derivation of a record uuid from the SHA-256 of the entry id's bytes is replaced by the rule docs/design/home/RECORD.md states in its section The rendered uuid: an entry id that is not uuid-shaped derives as UUIDv5 (RFC 9562) over the name `<entry id>#record` under the session's namespace, which is UUIDv5 of the lys render namespace `32c05904-d1f1-550c-9eee-2f6c8f98b665` over the home session's own id, the id in the home session's header, never the render target's session id that the rendered file's sessionId carries; an entry id that is uuid-shaped passes through unchanged (ADR-016). RECORD.md gives the rule's test vector and render_tests.rs pins it. R2's requirement text is kept as written; this amendment is the rule in force.

@@ -94,3 +94,54 @@ WHEN DIRECTORY-003 has not landed, THE SYSTEM SHALL NOT start R2. R2 SHALL NOT a
 - From the repository root: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory exit 0.
 - From the repository root, with submodules checked out: rg -n 'ID001_LINK_PAIR|ID001_LINK_REFUSAL|ID001_LINK_MIGRATION|ID001_LINK_AUDIT' vendor/rauthy finds each identifier in a test, and the fork gate's cargo test log for the pinned commit names each ID001_LINK_* test with its result; a test found but never run fails the check.
 - ID001_LINK_LIVE, after the row lands (CN5, CN6): a person installs the exact gated fork and shows Tom two linked providers resolving to one person in Rauthy's own account page, signing in through both, then posts a separate install and showing receipt to Tom with the Melbourne pass time, fork ref, artifact hash and observed result. A venue test or screenshot alone does not replace the live demonstration, and DIRECTORY-005 stays blocked until the receipt is recorded.
+
+## Amendments
+
+### Amendment 1: How the link-audit source authenticates, and how it learns the person
+
+- **Date:** 2026-09-28
+- **By:** Waffles
+
+The link-audit source authenticates with the agent request signature the identity server already verifies. It is registered as an agent under a person, and no new token type is added. The identity server serves a lookup from an exact issuer and subject to the person who holds that login, admitted only for the configured link-audit source. Both are built red first in lys, and the fork's sender is wired to these words.
+
+### Amendment 2: What the identity server serves today, read from main
+
+- **Date:** 2026-09-28
+- **By:** Archie
+
+On main at 6194599 the link-audit route POST /api/link-audit admits a session cookie only (crates/lys-identity-server/src/routes.rs signed_in, crates/lys-identity-server/src/admission.rs link_audit_source), so an unattended sender has no way in, and no route answers the person who holds a login: Projection::person_for exists in lys-identity and is served nowhere. The request body is person, source_operation_id, change (linked or unlinked), issuer, subject, observer and observed_at, unknown members refused. The receipt answered carries identity, change_kind, payload_commitment, operation and the log coordinate, and does not carry source_operation_id or the observation. The person is never inferred from an email address, and an issuer's user id is never taken to be a person id: the only mapping is a login binding written through POST /api/people/{id}/logins.
+
+### Amendment 3: A repeated source operation id answers only the delivery it was made for
+
+- **Date:** 2026-09-28
+- **By:** Archie
+
+Pull request 93 in lys: a source operation id delivered again is answered with its first receipt only when the person and the whole observation (change, issuer, subject, observer, observed_at) equal what was first accepted; otherwise it is refused as LinkSourceSeen and nothing is recorded. The fork's sender still checks identity and change_kind on every acknowledgement.
+
+### Amendment 4: The actor of a signed link-audit delivery is the person responsible for the agent
+
+- **Date:** 2026-09-28
+- **By:** Waffles
+
+The actor stays the human responsible for the agent, named by one of that person's bound logins. A new method, agent signature (wire code 2), is added, and the event keeps the agent's id. Old logs keep reading unchanged. Contract line 19 changes in the same pull request as the code. One test decodes an old log, and one shows that a signed delivery with no human signed in is refused unless the agent's responsible person resolves.
+
+### Amendment 5: The ruling as built, pull request 96 in lys
+
+- **Date:** 2026-09-28
+- **By:** Archie
+
+The login that names the actor is the configured link-audit source login, which the signing agent's responsible person must hold in the directory's bindings; an agent whose responsible person does not hold it is refused NotAdmitted and nothing is recorded. The agent's id is key 5 of the actor map, 16 bytes, present when the method is 2 and never otherwise, and an OIDC actor encodes byte for byte as before. POST /link-audit and POST /link-audit/person both admit the signature, over the method, the route's path without the product's /api prefix, and the exact bytes of the body. A request carrying both a session and a signature is judged by the signature alone. A malformed body on the two routes is refused 400 RequestMalformed, and the caller is admitted before the body is read. Not built: the responsible person's lifecycle state is not checked on either path, the receipt does not show the method or the agent, and the install does not yet provision the link-audit agent with its person, login and certificate.
+
+### Amendment 6: A suspended or ended person vouches for no agent
+
+- **Date:** 2026-09-28
+- **By:** Waffles
+
+A responsible person who is suspended or ended must not be able to vouch for an agent. Lifecycle state is checked on both paths, the cookie path included, red test first, in pull request 96 itself. The method and the agent in the receipt, and the install provisioning the link-audit agent with its person, login and certificate, go into a later brief and do not hold pull request 96.
+
+### Amendment 7: The lifecycle check as built, correcting the amendment before
+
+- **Date:** 2026-09-28
+- **By:** Archie
+
+The earlier amendment 'The ruling as built' says the responsible person's lifecycle state is not checked on either path. That is no longer so. In pull request 96 the person who holds the configured link-audit source login is refused NotAdmitted, status 403, while suspended and once retired, on POST /link-audit and POST /link-audit/person, by the agent's signature and by the person's own session, naming the state and the act to take and recording nothing. A registered or active person is admitted, a reinstated person is admitted again, and a login no person holds has no holder to refuse.

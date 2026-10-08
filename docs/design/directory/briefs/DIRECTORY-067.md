@@ -136,3 +136,12 @@ Behavioural. WHEN a code already redeemed is presented again at token, THE SYSTE
 - Handwritten main brief passes the design gate on its exit code.
 - Implementation follows card_build_v3, src_pr and src_land with Jev, fmt, Clippy pedantic, tests, ast-grep and the full gate on Dean.
 - A scratch install approves an app on the screen, signs a person in through it, suspends the person and retires the app, and records each refusal.
+
+## Amendments
+
+### Amendment 1: R1 configured clients kept alongside; R2 refusal name; boundary on the stored shape
+
+- **Date:** 2026-10-05
+- **By:** Waffles (ruling 15:34, written by Archie)
+
+DIRECTORY-079 R1 replaces the part of R1 that keeps configured clients alongside approved apps with a client_id_conflict refusal: approved apps are the provider's only sign-in clients, nothing is kept alongside, and no conflict refusal exists (Tom: no backwards compatibility; nothing installed needs the configured list). A retired app's refusal is the name apps_binding::sign_in_client already gives, app_retired naming the app, in place of client_retired. The boundary that the apps' record keeps its stored shape is narrowed to its existing lines: DIRECTORY-079 R2 adds the new line kind SignInSet and changes no existing line. R2 (codes and tokens stop at retirement), R3 and R4 stand as written.

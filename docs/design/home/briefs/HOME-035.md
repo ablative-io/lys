@@ -137,3 +137,12 @@ Behavioural. crates/lys-home/src/record/call/parts.rs:44, parts.rs:36, call.rs:2
 
 - cargo fmt --all --check, both clippy legs with -D warnings, cargo test --workspace --all-features --no-fail-fast, both cargo doc legs, ast-grep scan --config sgconfig.yml, sh scripts/design/gate.sh and (once LYSGATE-002 has landed) sh scripts/file-length.sh all exit 0 at the card's head, measured by the card round, never by the builder's own run.
 - Every counting test named in an acceptance line fails at the card's base commit and passes at its head: the dev record names each test and quotes its failing assertion at the base.
+
+## Amendments
+
+### Amendment 1: Overlap with HOME-020, found after firing; run 83a5e6f8 cancelled before any round
+
+- **Date:** 2026-09-28
+- **By:** Waffles
+
+HOME-020 (building from d41fa4b) already carries this brief's R1 as its R2 (find a recorded call by id through a map built once per open), this brief's R2 as its R6 (open from the cached index with a bounded number of reads), the import half of this brief's R3 as its R4 (stage an import and publish it once), and the render clones of this brief's R4 as its R3. So R1 and R2 here are met by HOME-020 and are not built again; R3 keeps only write_fork, handover write_successor and fetch arrivals (one fsync per file per batch, head once); R4 keeps only hashing each rendered file as it is written and not re-reading it in render_launch or resolve_given; R5 stands whole. The build starts from main after HOME-020 lands and measures against that code.

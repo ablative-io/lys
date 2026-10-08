@@ -266,3 +266,40 @@ Add docs/design/home/PROOF-COMPACTION.md with two sections, carrying hashes, cou
 - Import crates/lys-home/tests/fixtures/compaction.jsonl into a scratch home with lys-home import, run lys-home compactions on it, and check it exits 0 and the report lists two accounted compactions with empty entries_missing and blocks_missing and first_missing null.
 - grep -rn 'anchorUuid' crates/lys-home/src prints no line that reads it to find a first kept entry.
 - git diff of the landed change leaves crates/lys-home/tests/claude_code_round_trip.rs unchanged.
+
+## Amendments
+
+### Amendment 1: The importer did not already map a compaction
+
+- **Date:** 2026-09-27
+- **By:** the lead of the home card, answering the compaction survey
+
+The words' clause that the importer already turns the summary record into Pi's compaction entry with its summary and first kept entry is wrong: the importer pointed the compaction at itself with tokensBefore 0 and did not read compact_boundary at all. This brief replaces that mapping. The words are kept as they were typed in the roadmap row's provenance.
+
+### Amendment 2: A boundary without a preserved list or without a summary, and the listing's exit status
+
+- **Date:** 2026-09-27
+- **By:** the lead of the home card, answering the author's questions
+
+With no non-empty preserved list, the first kept entry is the first entry whose parent is the isCompactSummary record, now the compaction entry; a compaction never names itself. A compact_boundary with no isCompactSummary record under it is not a compaction: it imports as a lys.harness_event as today, with no loss entry, and the listing reports it separately as a boundary without a summary by entry id. The listing prints its full report either way, exits 0 only when every check passes and 1 when any entry or block is missing, naming the first missing one in the report; a refusal to run keeps its own named error and exit status.
+
+### Amendment 3: How a compaction that keeps nothing is written
+
+- **Date:** 2026-09-27
+- **By:** the lead of the home card, answering the author's questions
+
+Pi's type is kept: a compaction that keeps nothing writes firstKeptEntryId as the empty string, never JSON null, and the home's reader turns it into a typed nothing-kept at the one place it parses the field; a non-empty string naming no entry stays refused by name, so the empty string is the only sentinel. The lys.loss data carries first_kept as its own key, JSON null in that case and the entry id otherwise, and RECORD.md documents both. Such a pair imports as a compaction entry followed by its loss entry, its context path is the compaction alone, the listing reports it among compactions, and the render writes the pair back.
+
+### Amendment 4: The compact_boundary uuid comes from render-uuid/v2, alongside v1
+
+- **Date:** 2026-09-27
+- **By:** the lead of lys, answering the author's question on the boundary uuid's role
+
+ADR-016 is obeyed, not amended: render-uuid/v1's role list is closed at record, and a verifier of v1 must be able to name every role it meets, so compact_boundary cannot join v1. R6 defines render-uuid/v2, which carries v1's roles unchanged, byte for byte in derivation, and adds compact_boundary; the solution's role list names v2 beside v1. A render records in its report which version it used, and a file rendered under v1 keeps verifying under v1. A session with no compaction renders under v1 to the same bytes as before this brief; a session with a boundary renders under v2, and every derived uuid of a non-boundary record equals what v1 derives.
+
+### Amendment 5: Superseded by HOME-030
+
+- **Date:** 2026-09-28
+- **By:** Waffles, from the requirement-by-requirement audit of main at d41fa4b by Apollo
+
+The compaction import is built once, to HOME-030, the later design of the same work; HOME-008 is superseded and is not built.

@@ -150,3 +150,19 @@ Complete the section of docs/design/home/PROOF-RESUME.md that R3 adds with: the 
 - python3 -c "import uuid;ns=uuid.UUID('32c05904-d1f1-550c-9eee-2f6c8f98b665');print(uuid.uuid5(uuid.uuid5(ns,'multi'),'33333333-3333-4333-8333-333333333333-r0#record'))" prints d0426444-d38e-5376-aef6-035f7c3634e1, the value R2's test asserts.
 - Import crates/lys-home/tests/fixtures/multi_result.jsonl into a scratch home with lys-home import and render it twice with the command PROOF-RESUME.md records; shasum -a 256 prints the same hash for both files and it equals the hash PROOF-RESUME.md records.
 - git diff dfcca65 -- crates/lys-home/src/harness/claude_code/import.rs crates/lys-home/src/record/entries.rs prints nothing.
+
+## Amendments
+
+### Amendment 1: Numbering and the base commit
+
+- **Date:** 2026-09-26
+- **By:** the build seat, from the card's words
+
+Written as HOME-002 on lys main 0073b966 before the launch template took HOME-002, RM-006, ADR-012, C14 to C20 and S9 to S11 and the context record took HOME-003, RM-007, ADR-013, C21 to C23 and S12 to S13, and the lanterns card took HOME-004, RM-008, ADR-014 and ADR-015, C24 to C30 and S14 to S17, so it comes into the tree as HOME-007 with checklist C31 to C35, stories S18 and S19, anchor ADR-016, constraint CN9 and roadmap row RM-009; the diff base for the untouched importer is dfcca65, the main this build starts from, since entries.rs gained lys.given's constant between 0073b966 and there. On that main the launch template had already replaced record::fresh_id in record_uuid with an interim SHA-256 shaping of the entry id (version nibble 4, no namespace, no role, no session); R1 replaces that interim derivation with the scheme design.json fixes.
+
+### Amendment 2: The derived uuid is salted with the session id
+
+- **Date:** 2026-09-26
+- **By:** the render determinism follow-up card, relayed to the build
+
+The derived uuid of a record whose entry id is not uuid-shaped is salted with the id of the session being rendered, so two sessions with the same non-uuid entry id never collide: the name `<entry id>#<role>` is hashed under the session's namespace, itself UUIDv5 of the lys render namespace over the session id. R1's spec and acceptance and R2's expected uuids carry it; the target session id is still not mixed in.

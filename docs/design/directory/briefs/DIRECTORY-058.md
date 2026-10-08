@@ -191,3 +191,19 @@ Behavioural. No sign-in is an act in any log today: the directory's changes (cra
 
 - The full Lys gate and ast-grep scan exit 0 at the card's head, measured by the card round.
 - On a scratch install, read a receipt, verify it with verify_receipt_answer under the key read from /service-key, then present the forged tree and see it refused.
+
+## Amendments
+
+### Amendment 1: R3 grant receipts read back and proved under a signed head; R4 every sign-in and refused sign-in is a change in the directory log
+
+- **Date:** 2026-10-06
+- **By:** Archie
+
+DIRECTORY-007 is superseded (Waffles, 3b1e9e4c); what it held that must not be lost is that every sign-in and every permission change is an act in a log with a receipt. Neither 050 nor 058 named them: event.rs has no sign-in change, and a grant receipt is answered only in its write's answer with no route and no signed head (Archie, 6faa3c05). R3 and R4 carry them here, on R1's signed head and R2's verifier. Ruled by Waffles at 5e8e80b3.
+
+### Amendment 2: R4 records a sign-in by an actor bound to no identity, marked unregistered, binding and creating nothing
+
+- **Date:** 2026-10-06
+- **By:** Archie
+
+Waffles ruled at f1211552 that R4 takes DIRECTORY-007's way: the issuer and the subject as the issuer named them, marked unregistered, binding no identity, creating none, never a credential. begin admits an unbound actor today (session_admission.rs line 30), so the admitted case is recorded as well as the refused one. A wrong password stays the issuer's refusal, audited in the issuer's log and counted by Lys on the sign-in service's row, never a directory leaf (Waffles, e6a9d94a).

@@ -280,3 +280,26 @@ Structural: `docs/design/home/PROOF-FORK.md` records, as hashes, counts, paths, 
 - `cargo test -p lys-home --all-features --test fork` passes and its output shows the counted case and refusal assertions.
 - `grep -c 'fixture-text-' crates/lys-home/tests/fork.rs` counts only fixture construction and sentinel checks; no `#[test]` function name contains `fixture-text`.
 - Read PROOF-FORK.md against R9's acceptance: every figure is a hash, a count, a path, a command, a version or an exit code.
+
+## Amendments
+
+### Amendment 1: R1 and R2: the refusal for a lantern no session holds
+
+- **Date:** 2026-09-26
+- **By:** signed off by Waffles at 17:38 on 2026-09-26, from the cross-review of PR 19
+
+HOME-004 landed HomeError::UnknownLantern { session, id } for an epilogue on a lantern a session does not hold, so the fork's home-wide refusal is HomeError::NoSuchLantern { lantern }; the fork keeps UnknownLantern for a named session that does not hold the lantern.
+
+### Amendment 2: R6: the printed launch line
+
+- **Date:** 2026-09-26
+- **By:** signed off by Waffles at 17:38 on 2026-09-26, from the cross-review of PR 19
+
+The plain render prints no launch line; its report carries seed only. The printed launch line comes from the template's render (render-launch), which appends the seed as the first prompt and lists it in the manifest, so the child launches with the template's handles and not the bare seat login.
+
+### Amendment 3: The fixture's L2 and lit_in
+
+- **Date:** 2026-09-26
+- **By:** signed off by Waffles at 17:38 on 2026-09-26, from the cross-review of PR 19
+
+The light act on main records no lit_in and LanternData refuses an unknown field, so the fixtures write L2 by hand carrying lit_in and the fork reads the key from the entry's raw data as a stopgap. A lys.lantern entry whose data has no lit_in key follows R2's signed holder rule: one holder cuts, several holders refuse lantern_ambiguous until --session names one; explicit and tested, not a silent fallback. A lit_in that is present but is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which; never a fallback to any session. Lys board card 0a59xZFp, "LanternData carries lit_in and the light act records it", closes the gap: LanternData carries the field, the light act records it, and the fork reads the typed field.

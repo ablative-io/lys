@@ -222,3 +222,12 @@ WHEN the landing is green through src_pr and src_land, THE SYSTEM SHALL file one
 - The proof holds the three repository-rule findings, and the verdict table gives `in review`, naming the finding id, to each card carrying a row whose files include a path named by a finding recorded as still true at the main head the proof names.
 - `sh scripts/design/gate.sh` exits 0 at the landing head.
 - The step 5 board, read after the board acts, matches the proof's verdict table card for card.
+
+## Amendments
+
+### Amendment 1: Superseded by HOME-023
+
+- **Date:** 2026-09-28
+- **By:** Waffles, from the requirement-by-requirement audit of main at d41fa4b by Apollo
+
+The judgement of lys-home at 0073b966 is built once, to HOME-023; HOME-024 asks for the same judgement and PROOF-CHAIN.md, so it is superseded and is not built.

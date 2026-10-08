@@ -15,6 +15,7 @@ scout/dev/review blocks and the brief-level execution block are rendered
 in clearly-marked sections, so an enriched brief reads as
 spec-then-record.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -53,9 +54,7 @@ def build_adr_lookup(data: dict) -> dict[str, str]:
     return lookup
 
 
-def _resolve_checklist_ids(
-    ids: list[str], lookup: dict[str, str] | None
-) -> list[str]:
+def _resolve_checklist_ids(ids: list[str], lookup: dict[str, str] | None) -> list[str]:
     if not lookup:
         return list(ids)
     resolved = []
@@ -65,9 +64,7 @@ def _resolve_checklist_ids(
     return resolved
 
 
-def _resolve_story_ids(
-    ids: list[str], lookup: dict[str, dict] | None
-) -> list[str]:
+def _resolve_story_ids(ids: list[str], lookup: dict[str, dict] | None) -> list[str]:
     if not lookup:
         return list(ids)
     resolved = []
@@ -148,9 +145,7 @@ def _render_review(review: dict, lines: list[str]) -> None:
     if review.get("acceptance"):
         lines.append("- Acceptance verdicts:")
         for verdict in review["acceptance"]:
-            evidence = (
-                f" — {verdict['evidence']}" if verdict.get("evidence") else ""
-            )
+            evidence = f" — {verdict['evidence']}" if verdict.get("evidence") else ""
             lines.append(
                 f"  - [{_mark(verdict['met'])}] {verdict['criterion']}{evidence}"
             )
@@ -204,6 +199,19 @@ def _render_execution(execution: dict, lines: list[str]) -> None:
     if completed:
         lines.append(f"- **Completed:** {completed}")
     lines.append("")
+
+
+def _render_amendments(amendments: list[dict], lines: list[str]) -> None:
+    lines.append("## Amendments")
+    lines.append("")
+    for number, amendment in enumerate(amendments, start=1):
+        lines.append(f"### Amendment {number}: {amendment['subject']}")
+        lines.append("")
+        lines.append(f"- **Date:** {amendment['date']}")
+        lines.append(f"- **By:** {amendment['by']}")
+        lines.append("")
+        lines.append(amendment["ruling"])
+        lines.append("")
 
 
 def render(
@@ -342,6 +350,9 @@ def render(
             lines.append(f"- {step}")
         lines.append("")
 
+    if data.get("amendments"):
+        _render_amendments(data["amendments"], lines)
+
     # Brief-level execution record (appended by the pipeline) — last.
     if "execution" in data:
         _render_execution(data["execution"], lines)
@@ -376,9 +387,7 @@ def find_decisions_path(start: Path) -> Path | None:
 
 def load_lookups(
     cluster_dir: Path,
-) -> tuple[
-    dict[str, str] | None, dict[str, dict] | None, dict[str, str] | None
-]:
+) -> tuple[dict[str, str] | None, dict[str, dict] | None, dict[str, str] | None]:
     checklist_lookup = None
     stories_lookup = None
     adr_lookup = None

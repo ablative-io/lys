@@ -235,3 +235,12 @@ Write PROOF-GIVEN.md with: the Claude Code version answered by `claude --version
 - grep -n 'fn ' crates/lys-home/src/harness/claude_code/mod.rs returns nothing.
 - grep -rn 'norn' crates/lys-home/Cargo.toml returns nothing.
 - The fixture session file from the R6 test, written out in the proof step, parses with Pi's parseSessionEntries at 3d5cbe98 through node, and its entry count equals the count lys-home reports (the command is written in PROOF-GIVEN.md).
+
+## Amendments
+
+### Amendment 1: R2's cross-kind order is superseded by the request's order
+
+- **Date:** 2026-09-27
+- **By:** HOME-011
+
+R2's cross-kind order, user_claude_md first, then appended_instructions, mcp_config, claude_md_chain and memory_index, is superseded by HOME-011 and ADR-031: the documents now follow the order the harness's request gives, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, re-measured on 2.1.283 in PROOF-GIVEN.md. The within-directory order, CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md, is unchanged, and D/.claude/CLAUDE.md is still listed once, as user_claude_md. Entries written under the old order stand as written; an entry's order is told by its recorded time against the date of the commit that lands HOME-011, never by its harness_version.

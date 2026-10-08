@@ -331,3 +331,12 @@ Structure: the cluster design's non-goal on other harnesses reads `Harnesses oth
 - git diff --exit-code main -- crates/lys-home/src/harness/claude_code/render.rs crates/lys-home/src/harness/claude_code/import.rs crates/lys-home/src/harness/claude_code/events.rs exits 0.
 - grep -rn 'fn ' crates/lys-home/src/harness/codex/mod.rs returns nothing.
 - grep -rni 'codex' crates/lys-home/Cargo.toml returns nothing.
+
+## Amendments
+
+### Amendment 1: Superseded by HOME-009
+
+- **Date:** 2026-09-28
+- **By:** Waffles, from the requirement-by-requirement audit of main at d41fa4b by Apollo
+
+The Codex translation is finished to HOME-009, whose R1, R2, R5, R6, R7 and R9 are on main; HOME-033 is a second design of the same translation and is superseded, not built.
