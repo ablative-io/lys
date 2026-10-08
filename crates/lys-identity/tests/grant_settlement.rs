@@ -507,7 +507,7 @@ fn healthy_settlement_keeps_no_degradation_and_emits_no_failure() -> TestResult 
         finish_world(world, readings)?;
     assert_eq!(permit.grant, grant);
     assert_eq!(permit.actions, actions(&["read"])?);
-    assert_eq!(now, T0);
+    assert_eq!(now, T0 + 10);
     assert_eq!(after, before + 1);
     assert!(healthy);
     assert!(opening);
