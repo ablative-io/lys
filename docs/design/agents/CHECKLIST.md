@@ -26,3 +26,14 @@
 - [ ] **C716** — Every survival behaviour has an observed main red and exact-change green, explicit fault/ready/exit signals and complete counts; tests over two seconds are defects (AGENTS-004 R6).
 - [ ] **C717** — The actual roster N and 3N fixture keep per-seat work and memory bounded and unrelated seats responsive through one seat failure or handover (AGENTS-004 R7).
 - [ ] **C718** — Intentional stop/restart retain fresh authority and stop-key retries; the registry reports proven owner/liveness/unknown state and the real install survives all four transitions (AGENTS-004 R8).
+
+## Counted seat-loop performance
+
+- [ ] **C719** — Every one of41 census paths has an actual-code benchmark, reproducible counter vector, native-time correlation and non-increasing case ratchet; unmeasured values remain unqualified (AGENTS-005 R1/R10).
+- [ ] **C720** — Capture admission, frames, worker, completion, usage and drain remove repeated history/journal work while preserving every byte and durable completion stage (AGENTS-005 R2).
+- [ ] **C721** — Peer, hook, bind, status and source follow use indexed current identities/cursors instead of fleet, date and rotation history scans (AGENTS-005 R3).
+- [ ] **C722** — Delivery/reminder and lifecycle costs are indexed and bounded, with existing DIRECTORY-064 and AGENTS-004 durability/retention contracts preserved (AGENTS-005 R4/R9).
+- [ ] **C723** — Usage/feed enforcement touches only affected indexed memberships/standing and current immutable configuration, preserving all crossing actions (AGENTS-005 R5).
+- [ ] **C724** — Registry/liveness pages use current indexed fields and proven owner events instead of copying history and polling all seats; exact totals/freshness remain unchanged (AGENTS-005 R6).
+- [ ] **C725** — Terminal/pattern/transport paths count complete work, preserve every byte and match, and remove prefix re-search and shared network-wait holds (AGENTS-005 R7).
+- [ ] **C726** — Approval, connector, MCP refusal and nonce paths remove per-request global scans/copies/thread growth without stale grants or weakened replay/audit (AGENTS-005 R8).

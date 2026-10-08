@@ -119,6 +119,46 @@
       "path": "crates/lys-home/src/proxy/",
       "note": "single-writer listener/stream/journal custody",
       "brief": "AGENTS-004"
+    },
+    {
+      "path": "crates/lys-home/benches/",
+      "note": "actual-code seat-loop count workloads, per-case ratchets and native-time correlation",
+      "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-runner/benches/",
+      "note": "actual-code seat-loop count workloads, per-case ratchets and native-time correlation",
+      "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-identity-server/benches/",
+      "note": "actual-code seat-loop count workloads, per-case ratchets and native-time correlation",
+      "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-home/src/",
+      "note": "capture/journal/record counted seams and indexed current persistence",
+      "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-home/tests/",
+      "note": "retained-byte, old-install, count and fault regressions",
+      "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-home/Cargo.toml",
+      "note": "owned non-default benchmark target/instrumentation declaration; no unapproved dependency",
+      "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-runner/Cargo.toml",
+      "note": "owned non-default benchmark target/instrumentation declaration; no unapproved dependency",
+      "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-identity-server/Cargo.toml",
+      "note": "owned non-default benchmark target/instrumentation declaration; no unapproved dependency",
+      "brief": "AGENTS-005"
     }
   ],
   "principles": [

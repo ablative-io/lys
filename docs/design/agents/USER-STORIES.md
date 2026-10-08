@@ -6,6 +6,8 @@
 
 **S402.** As the owner, I want to set a seat's words, variables, countdowns and schedules in one place and see what was actually delivered, so that overnight work runs without a second system.
 
+**S411.** As the owner, I want every recurring seat path measured by a count proved to track real completion time and ratcheted only down, so that a performance claim cannot hide unmeasured work.
+
 ## Archie — an agent
 
 **S403.** As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind.
@@ -25,3 +27,9 @@
 **S409.** As an operator, I want counted work per seat to stay flat at three times the real roster, so that supervision remains cheap as the team grows.
 
 **S410.** As an operator, I want a deliberate stop to win over handover and the screen to name current ownership and unknown authority, so that I can trust what Lys says is running.
+
+**S412.** As an operator, I want a long captured stream and terminal output to cost only its new bytes with no lost data, so that historical work cannot stall today's conversation.
+
+**S413.** As an operator, I want one seat's ingest, delivery, registry and authority checks to ignore unrelated seats and history, so that three times the estate stays responsive.
+
+**S414.** As an operator, I want every disk sync, checkpoint, queue and replay cost counted while keeping durable outcomes and old-install recovery, so that speed does not come from weakened safety.

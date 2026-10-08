@@ -12,6 +12,10 @@
         {
           "id": "S402",
           "text": "As the owner, I want to set a seat's words, variables, countdowns and schedules in one place and see what was actually delivered, so that overnight work runs without a second system."
+        },
+        {
+          "id": "S411",
+          "text": "As the owner, I want every recurring seat path measured by a count proved to track real completion time and ratcheted only down, so that a performance claim cannot hide unmeasured work."
         }
       ]
     },
@@ -56,6 +60,18 @@
         {
           "id": "S410",
           "text": "As an operator, I want a deliberate stop to win over handover and the screen to name current ownership and unknown authority, so that I can trust what Lys says is running."
+        },
+        {
+          "id": "S412",
+          "text": "As an operator, I want a long captured stream and terminal output to cost only its new bytes with no lost data, so that historical work cannot stall today's conversation."
+        },
+        {
+          "id": "S413",
+          "text": "As an operator, I want one seat's ingest, delivery, registry and authority checks to ignore unrelated seats and history, so that three times the estate stays responsive."
+        },
+        {
+          "id": "S414",
+          "text": "As an operator, I want every disk sync, checkpoint, queue and replay cost counted while keeping durable outcomes and old-install recovery, so that speed does not come from weakened safety."
         }
       ]
     }

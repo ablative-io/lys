@@ -76,6 +76,14 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys/src/identity/upgrade.rs` | stage and select a compatible live handover | AGENTS-004 |
 | `crates/lys/src/identity/upgrade/` | replace live-session refusal and proxy stop for supervised seats | AGENTS-004 |
 | `crates/lys-home/src/proxy/` | single-writer listener/stream/journal custody | AGENTS-004 |
+| `crates/lys-home/benches/` | actual-code seat-loop count workloads, per-case ratchets and native-time correlation | AGENTS-005 |
+| `crates/lys-runner/benches/` | actual-code seat-loop count workloads, per-case ratchets and native-time correlation | AGENTS-005 |
+| `crates/lys-identity-server/benches/` | actual-code seat-loop count workloads, per-case ratchets and native-time correlation | AGENTS-005 |
+| `crates/lys-home/src/` | capture/journal/record counted seams and indexed current persistence | AGENTS-005 |
+| `crates/lys-home/tests/` | retained-byte, old-install, count and fault regressions | AGENTS-005 |
+| `crates/lys-home/Cargo.toml` | owned non-default benchmark target/instrumentation declaration; no unapproved dependency | AGENTS-005 |
+| `crates/lys-runner/Cargo.toml` | owned non-default benchmark target/instrumentation declaration; no unapproved dependency | AGENTS-005 |
+| `crates/lys-identity-server/Cargo.toml` | owned non-default benchmark target/instrumentation declaration; no unapproved dependency | AGENTS-005 |
 
 ## Inventory
 
