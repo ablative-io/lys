@@ -141,7 +141,8 @@
           "crates/lys-identity-server/src/grants_refusals.rs",
           "crates/lys-identity-server/src/runner_sessions.rs",
           "crates/lys-identity-server/src/teams_migration.rs",
-          "crates/lys-identity-server/src/grant_settlement_tests.rs"
+          "crates/lys-identity-server/src/grant_settlement_tests.rs",
+          "crates/lys-identity-server/src/spicedb.rs"
         ],
         "delete": []
       },

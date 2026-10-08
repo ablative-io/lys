@@ -132,6 +132,7 @@ THE SYSTEM SHALL replace the four explain(...,None).is_ok() collapses at goals_a
 - modify: crates/lys-identity-server/src/runner_sessions.rs
 - modify: crates/lys-identity-server/src/teams_migration.rs
 - modify: crates/lys-identity-server/src/grant_settlement_tests.rs
+- modify: crates/lys-identity-server/src/spicedb.rs
 
 **Checklist:**
 - C23 — Every grant is bounded by a live, acyclic ancestry to a responsible person; scope is evaluated by model actions/resources, never display-name rank.
