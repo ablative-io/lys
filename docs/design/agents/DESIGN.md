@@ -69,6 +69,13 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `surface/identity/src/api.ts` | the surface's API client | AGENTS-001 |
 | `surface/identity/tests/` | surface tests | AGENTS-001 |
 | `docs/ops/` | the move of a seat from herdr and Argus to Lys | AGENTS-002 |
+| `crates/lys/src/cli/runner.rs` | typed independent seat-owner command | AGENTS-004 |
+| `crates/lys/src/identity/install.rs` | install an independent Lys seat owner without ending supervised harnesses | AGENTS-004 |
+| `crates/lys/src/identity/install/services.rs` | process groups and event-driven custody/readiness | AGENTS-004 |
+| `crates/lys/src/identity/install/proxy.rs` | keep accepted proxy streams alive across install swaps | AGENTS-004 |
+| `crates/lys/src/identity/upgrade.rs` | stage and select a compatible live handover | AGENTS-004 |
+| `crates/lys/src/identity/upgrade/` | replace live-session refusal and proxy stop for supervised seats | AGENTS-004 |
+| `crates/lys-home/src/proxy/` | single-writer listener/stream/journal custody | AGENTS-004 |
 
 ## Inventory
 

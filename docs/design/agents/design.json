@@ -84,6 +84,41 @@
       "path": "docs/ops/",
       "note": "the move of a seat from herdr and Argus to Lys",
       "brief": "AGENTS-002"
+    },
+    {
+      "path": "crates/lys/src/cli/runner.rs",
+      "note": "typed independent seat-owner command",
+      "brief": "AGENTS-004"
+    },
+    {
+      "path": "crates/lys/src/identity/install.rs",
+      "note": "install an independent Lys seat owner without ending supervised harnesses",
+      "brief": "AGENTS-004"
+    },
+    {
+      "path": "crates/lys/src/identity/install/services.rs",
+      "note": "process groups and event-driven custody/readiness",
+      "brief": "AGENTS-004"
+    },
+    {
+      "path": "crates/lys/src/identity/install/proxy.rs",
+      "note": "keep accepted proxy streams alive across install swaps",
+      "brief": "AGENTS-004"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade.rs",
+      "note": "stage and select a compatible live handover",
+      "brief": "AGENTS-004"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/",
+      "note": "replace live-session refusal and proxy stop for supervised seats",
+      "brief": "AGENTS-004"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/",
+      "note": "single-writer listener/stream/journal custody",
+      "brief": "AGENTS-004"
     }
   ],
   "principles": [
