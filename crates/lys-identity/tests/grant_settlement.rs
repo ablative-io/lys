@@ -57,6 +57,7 @@ struct Faults {
     revision: AtomicBool,
     lost_acknowledgement: AtomicBool,
     log_unreadable: AtomicBool,
+    advance_on_read: AtomicBool,
 }
 
 #[derive(Clone, Default)]
@@ -98,7 +99,16 @@ impl RelationshipStore for Engine {
     }
 
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
-        self.inner.read()
+        let held = self.inner.read()?;
+        if self.faults.advance_on_read.swap(false, Ordering::Relaxed) {
+            let mut writer = self.inner.clone();
+            let revision = writer.revision()?.checked_add(1)
+                .ok_or_else(|| GrantError::PermissionEngineUnavailable {
+                    reason: "fixture relationship revision overflowed".to_owned(),
+                })?;
+            writer.write(revision, &[], &[])?;
+        }
+        Ok(held)
     }
 }
 
@@ -503,5 +513,70 @@ fn failed_mutation_revision_read_is_named_instead_of_inventing_revision_zero() -
         assert!(events.iter().any(|fields| fields.values().any(|value| value.contains(cause))));
     }
     assert_eq!(FileLeafStore::open(&world.dir.path().join("grants"))?.extent(), 2);
+    Ok(())
+}
+
+struct ChangedReading {
+    result: Result<(), GrantError>,
+    projected: u64,
+    actual: u64,
+    before: u64,
+    after: u64,
+}
+
+fn changed_reading(change_on_read: bool) -> Result<ChangedReading, Box<dyn Error>> {
+    let engine = Engine::default();
+    let mut world = world(&engine)?;
+    let reading = (|| -> Result<_, Box<dyn Error>> {
+        world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+        engine.faults.write.store(true, Ordering::Relaxed);
+        let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
+        if !matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
+            Some(GrantError::ProjectionPending { .. })) {
+            return Err(format!("the reading fixture did not leave projection pending: {pending:?}").into());
+        }
+        let projected = engine.inner.revision()?;
+        let before = world.events();
+        let directory = world.directory.projection()?;
+        let result = if change_on_read {
+            engine.faults.advance_on_read.store(true, Ordering::Relaxed);
+            world.grants.frame(directory, None).map(drop)
+        } else {
+            let frame = world.grants.frame(directory, None)?;
+            let mut writer = engine.inner.clone();
+            writer.write(projected + 1, &[], &[])?;
+            let request = ExerciseRequest {
+                caller: IdentityId::Person(world.lee), route: Route::Api,
+                resource: alpha()?, action: lys_identity::grants::Action::new("read")?,
+            };
+            world.grants.explain_in(&frame, &request, world.now).map(drop)
+        };
+        Ok(ChangedReading { result, projected, actual: engine.inner.revision()?,
+            before, after: world.events() })
+    })();
+    engine.faults.write.store(false, Ordering::Relaxed);
+    engine.faults.advance_on_read.store(false, Ordering::Relaxed);
+    finish_world(world, reading)
+}
+
+#[test]
+fn degraded_relationships_that_move_during_the_read_make_no_frame() -> TestResult {
+    let reading = changed_reading(true)?;
+    assert_eq!(reading.actual, reading.projected + 1);
+    assert_eq!(reading.result, Err(GrantError::StaleDecision {
+        required: reading.actual, projected: reading.projected,
+    }));
+    assert_eq!(reading.before, reading.after);
+    Ok(())
+}
+
+#[test]
+fn degraded_frame_cannot_be_explained_after_the_relationship_revision_moves() -> TestResult {
+    let reading = changed_reading(false)?;
+    assert_eq!(reading.actual, reading.projected + 1);
+    assert_eq!(reading.result, Err(GrantError::StaleDecision {
+        required: reading.actual, projected: reading.projected,
+    }));
+    assert_eq!(reading.before, reading.after);
     Ok(())
 }

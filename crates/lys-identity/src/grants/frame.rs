@@ -51,14 +51,16 @@ impl<'d> Frame<'d> {
         directory: &'d Projection,
         settled: Settled,
     ) -> Result<Self, GrantError> {
-        Ok(Frame {
+        let frame = Frame {
             directory,
             folded: grants.folded,
             projected: settled.projected,
             held: grants.relationships.read()?,
             unresolved: settled.unresolved,
             degraded: settled.degraded,
-        })
+        };
+        frame.current_degraded_revision(grants)?;
+        Ok(frame)
     }
 
     /// The revision every decision in this frame is made at.
@@ -71,6 +73,33 @@ impl<'d> Frame<'d> {
     #[must_use]
     pub fn degradation(&self) -> Option<&Arc<ProjectionDegraded>> {
         self.degraded.as_ref()
+    }
+
+    fn current_degraded_revision<S: LeafStore, R: RelationshipStore>(
+        &self,
+        grants: &Grants<S, R>,
+    ) -> Result<(), GrantError> {
+        if self.degraded.is_none() {
+            return Ok(());
+        }
+        let actual = grants.relationships.revision().inspect_err(|error| {
+            tracing::warn!(step = "revision", error = %error, "degraded reading could not be certified");
+        })?;
+        if actual > self.projected {
+            return Err(GrantError::StaleDecision {
+                required: actual,
+                projected: self.projected,
+            });
+        }
+        if actual < self.projected {
+            return Err(GrantError::PermissionEngineUnavailable {
+                reason: format!(
+                    "the relationship revision decreased from {} to {actual}",
+                    self.projected
+                ),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -142,6 +171,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 projected: frame.projected,
             });
         }
+        frame.current_degraded_revision(self)?;
         self.unresolved_issue(request)?;
         self.decide_in(frame, request, only, at)
     }
