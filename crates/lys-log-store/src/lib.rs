@@ -69,6 +69,7 @@ pub mod migrate;
 pub mod snapshot;
 pub mod start;
 pub mod store;
+pub mod witness;
 
 pub use error::{StoreError, StoreResult};
 pub use file::{FileLeafStore, UnfinishedTail};

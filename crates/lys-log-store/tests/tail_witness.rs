@@ -4,6 +4,7 @@ use std::error::Error;
 use std::sync::{Arc, Barrier};
 
 use lys_log_store::{FileLeafStore, LeafStore, Log, StoreError, StoreResult};
+use lys_log_store::witness::{FileTailProvider, TailWitnessProvider};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -112,6 +113,137 @@ fn the_reading_holds_the_append_lock_and_releases_it_at_return() -> TestResult {
     let (blocked, released) = finish(dir, result)?;
     assert!(blocked?);
     released?;
+    Ok(())
+}
+
+#[test]
+fn a_tail_contains_every_index_and_rejects_each_changed_bound_or_leaf() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let mut log = Log::open(FileLeafStore::create(dir.path(), "example.test/tail-bounds")?)?;
+        log.append(b"settled prefix")?;
+        let settled = lys_log_store::Frontier::from_leaves([b"settled prefix"]);
+        log.append(b"first tail event")?;
+        log.append(b"second tail event")?;
+        drop(log);
+        let provider = FileTailProvider::new(FileLeafStore::open_read_only(dir.path())?);
+        let witness = provider.acquire(&settled)?;
+        if witness.leaves.len() != 2 {
+            return Err("tail fixture did not return its two committed leaves".into());
+        }
+        let mut seen = false;
+        provider.verify(&witness, &settled, &mut |_| { seen = true; Ok(()) })?;
+        let mut cases = Vec::new();
+        let mut changed = witness.clone(); changed.origin.push_str("/other"); cases.push(changed);
+        let mut changed = witness.clone(); changed.lower.tree_size = 0; cases.push(changed);
+        let mut changed = witness.clone(); changed.lower.root[0] ^= 1; cases.push(changed);
+        let mut changed = witness.clone(); changed.upper.tree_size += 1; cases.push(changed);
+        let mut changed = witness.clone(); changed.upper.root[0] ^= 1; cases.push(changed);
+        let mut changed = witness.clone(); changed.leaves.remove(0); cases.push(changed);
+        let mut changed = witness.clone(); changed.leaves.push(changed.leaves[0].clone()); cases.push(changed);
+        let mut changed = witness.clone(); changed.leaves.swap(0, 1); cases.push(changed);
+        let mut changed = witness.clone(); changed.leaves[0].bytes.push(0); cases.push(changed);
+        let mut refused = Vec::new();
+        for changed in cases {
+            let mut called = false;
+            let result = provider.verify(&changed, &settled, &mut |_| { called = true; Ok(()) });
+            refused.push((result, called));
+        }
+        drop(provider);
+        Ok((witness, seen, refused))
+    })();
+    let (witness, seen, refused) = finish(dir, result)?;
+    assert!(seen);
+    assert_eq!(witness.lower.tree_size, 1);
+    assert_eq!(witness.upper.tree_size, 3);
+    assert_eq!(witness.leaves.iter().map(|leaf| leaf.index).collect::<Vec<_>>(), [1, 2]);
+    assert_eq!(witness.leaves[0].bytes, b"first tail event");
+    assert_eq!(witness.leaves[1].bytes, b"second tail event");
+    assert_eq!(refused.len(), 9);
+    for (result, called) in refused {
+        assert!(matches!(result, Err(StoreError::Corrupt { .. })));
+        assert!(!called);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_second_writer_invalidates_an_acquired_tail_before_verification() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let mut writer = Log::open(FileLeafStore::create(dir.path(), "example.test/tail-race")?)?;
+        let settled = lys_log_store::Frontier::new();
+        writer.append(b"first event")?;
+        let provider = FileTailProvider::new(FileLeafStore::open_read_only(dir.path())?);
+        let witness = provider.acquire(&settled)?;
+        writer.append(b"independent later event")?;
+        let mut called = false;
+        let stale = provider.verify(&witness, &settled, &mut |_| { called = true; Ok(()) });
+        drop(writer);
+        drop(provider);
+        let reopened = FileTailProvider::new(FileLeafStore::open_read_only(dir.path())?);
+        let fresh = reopened.acquire(&settled)?;
+        let mut fresh_called = false;
+        reopened.verify(&fresh, &settled, &mut |_| { fresh_called = true; Ok(()) })?;
+        drop(reopened);
+        Ok((stale, called, fresh, fresh_called))
+    })();
+    let (stale, called, fresh, fresh_called) = finish(dir, result)?;
+    assert!(matches!(stale, Err(StoreError::LeafAlreadyWritten { index: 1 })));
+    assert!(!called);
+    assert!(fresh_called);
+    assert_eq!(fresh.upper.tree_size, 2);
+    assert_eq!(fresh.leaves.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_reopened_provider_refuses_the_previous_owners_witness() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        drop(FileLeafStore::create(dir.path(), "example.test/tail-owner")?);
+        let settled = lys_log_store::Frontier::new();
+        let first = FileTailProvider::new(FileLeafStore::open_read_only(dir.path())?);
+        let old = first.acquire(&settled)?;
+        drop(first);
+        let second = FileTailProvider::new(FileLeafStore::open_read_only(dir.path())?);
+        let mut called = false;
+        let refused = second.verify(&old, &settled, &mut |_| { called = true; Ok(()) });
+        let fresh = second.acquire(&settled)?;
+        let accepted = second.verify(&fresh, &settled, &mut |_| Ok(()));
+        drop(second);
+        Ok((refused, called, accepted))
+    })();
+    let (refused, called, accepted) = finish(dir, result)?;
+    assert!(matches!(refused, Err(StoreError::Corrupt { .. })));
+    assert!(!called);
+    accepted?;
+    Ok(())
+}
+
+#[cfg(feature = "flush-counts")]
+#[test]
+fn bounded_tail_acquisition_and_verification_perform_no_physical_flush() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let mut writer = Log::open(FileLeafStore::create(dir.path(), "example.test/tail-flush")?)?;
+        writer.append(b"committed tail")?;
+        drop(writer);
+        let provider = FileTailProvider::new(FileLeafStore::open_read_only(dir.path())?);
+        let settled = lys_log_store::Frontier::new();
+        let before = lys_log_store::flush_count();
+        let witness = provider.acquire(&settled)?;
+        let acquired = lys_log_store::flush_count();
+        let verified = provider.verify(&witness, &settled, &mut |_| Ok(()));
+        let after = lys_log_store::flush_count();
+        drop(provider);
+        Ok((witness, verified, before, acquired, after))
+    })();
+    let (witness, verified, before, acquired, after) = finish(dir, result)?;
+    assert_eq!(witness.leaves.len(), 1);
+    verified?;
+    assert_eq!(acquired, before);
+    assert_eq!(after, before);
     Ok(())
 }
 
