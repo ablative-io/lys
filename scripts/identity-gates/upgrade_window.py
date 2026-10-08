@@ -9,6 +9,7 @@ import secrets
 from upgrade_fixture import Browser, operation
 from upgrade_provenance import verify as verify_provenance
 from upgrade_legacy import verify
+from upgrade_log import log_leaves, physical_files, proof_directory
 
 MARKER = "lys-disposable-upgrade-proof/v1"
 # The name a development install's operator token file has under state/.
@@ -19,18 +20,42 @@ def family_files(root, config):
     """Hash every file, including snapshots and pins, in both migration families."""
     result = {}
     for key in ("teams_dir", "budgets_dir"):
-        directory = Path(config[key]).resolve()
-        if not directory.is_relative_to(root) or not directory.is_dir():
-            raise RuntimeError(f"fixture {key} is not a directory under {root}: {directory}")
-        found = False
-        for path in sorted(directory.rglob("*")):
-            if path.is_symlink():
-                raise RuntimeError(f"fixture family contains a symbolic link: {path}")
-            if path.is_file():
-                found = True
-                result[str(path.relative_to(root))] = hashlib.sha256(path.read_bytes()).hexdigest()
-        if not found:
-            raise RuntimeError(f"empty fixture family cannot prove rollback: {directory}")
+        directory = proof_directory(root, config[key], key)
+        if not directory.is_dir():
+            raise RuntimeError(
+                f"fixture {key} is not a directory under {root}: {directory}"
+            )
+        kept = directory.with_name(directory.name + ".v1")
+        original = directory
+        if kept.exists() or kept.is_symlink():
+            kept = proof_directory(root, kept, key + " backup")
+            if log_leaves(kept) != log_leaves(directory):
+                raise RuntimeError(
+                    f"reversible upgrade changed legacy record {directory}/leaves"
+                )
+            original = kept
+        elif (directory / "leaves").is_dir():
+            log_leaves(directory)
+        files = physical_files(original)
+        if original != directory:
+            snapshot = directory / "snapshot.bin"
+            current = None
+            if snapshot.exists() or snapshot.is_symlink():
+                if snapshot.is_symlink() or not snapshot.is_file():
+                    raise RuntimeError(
+                        f"fixture snapshot is a symlink or not a file: {snapshot}"
+                    )
+                current = hashlib.sha256(snapshot.read_bytes()).hexdigest()
+            if files.get("snapshot.bin") != current:
+                raise RuntimeError(
+                    f"reversible upgrade changed legacy record {snapshot}"
+                )
+        if not files:
+            raise RuntimeError(
+                f"empty fixture family cannot prove rollback: {directory}"
+            )
+        prefix = str(directory.relative_to(root.resolve()))
+        result.update({f"{prefix}/{name}": digest for name, digest in files.items()})
     return result
 
 
@@ -66,33 +91,54 @@ def refused_writes(fixture, provisioning):
     budgets = f"/budgets/person/{fixture['person']}/confirm"
     held = fixture["budgets_before"]
     if fixture["release"]["budgets"] == "per_measure":
-        version = next(value for value in held["budgets"] if value["measure"] == "tokens")["version"]
+        version = next(
+            value for value in held["budgets"] if value["measure"] == "tokens"
+        )["version"]
     elif fixture["release"]["budgets"] == "limits":
         # A limits release keeps one version for the holder's whole collection.
         version = held["version"]
     else:
-        raise RuntimeError(f"no budget confirmation for the {fixture['release']['budgets']} model")
+        raise RuntimeError(
+            f"no budget confirmation for the {fixture['release']['budgets']} model"
+        )
     profile = provisioning["profile"]
     path = f"/agents/{provisioning['agent']}/provisioning"
-    change = {name: profile[name] for name in (
-        "model_access", "tools", "skills", "mcp_servers", "instructions", "note")}
+    change = {
+        name: profile[name]
+        for name in (
+            "model_access",
+            "tools",
+            "skills",
+            "mcp_servers",
+            "instructions",
+            "note",
+        )
+    }
     change.update(operation=operation(), from_version=profile["version"])
     return [
         (team, {"operation": operation()}, "TeamsUnavailable"),
         (budgets, {"measure": "tokens", "version": version}, "BudgetsUnavailable"),
         (path, change, "ProvisioningUnavailable"),
-        (f"{path}/{profile['version']}/review", {"operation": operation()}, "ProvisioningUnavailable"),
-        ("/skills", {"name": "upgrade-fixture-skill", "text": "# Held during upgrade\n"},
-         "ProvisioningUnavailable"),
+        (
+            f"{path}/{profile['version']}/review",
+            {"operation": operation()},
+            "ProvisioningUnavailable",
+        ),
+        (
+            "/skills",
+            {"name": "upgrade-fixture-skill", "text": "# Held during upgrade\n"},
+            "ProvisioningUnavailable",
+        ),
     ]
-
 
 
 def no_operator_token(root, config):
     """A service install keeps no standing operator token: its configuration names none, and
     no operator token file exists anywhere under the install."""
     if "operator_token_file" not in config or config["operator_token_file"] is not None:
-        raise RuntimeError("the installed configuration must name operator_token_file as null")
+        raise RuntimeError(
+            "the installed configuration must name operator_token_file as null"
+        )
     held = [str(path) for path in root.rglob(OPERATOR_TOKEN_NAME)]
     if held:
         raise RuntimeError(f"a service install holds an operator token file: {held}")
@@ -113,21 +159,26 @@ def refuse_operator(browser, root, config):
         if not token.is_relative_to(root):
             raise RuntimeError("operator proof paths leave the disposable root")
         presented = token.read_text().strip()
-    directory = Path(config["log_dir"]).resolve()
-    if not directory.is_relative_to(root):
-        raise RuntimeError("operator proof paths leave the disposable root")
-    def leaves():
-        return {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in (directory / "leaves").iterdir() if path.is_file()}
-    before = leaves()
-    if not before:
+    directory = proof_directory(root, config["log_dir"], "operator log")
+    before_leaves = log_leaves(directory)
+    before = physical_files(directory / "leaves")
+    if not before_leaves:
         raise RuntimeError("operator proof requires a nonempty identity log")
-    answer = browser.ask("POST", "/agents", {
-        "operation": operation(), "display_name": "Must not be admitted during rollback",
-    }, expected_status=401, operator=presented)
+    answer = browser.ask(
+        "POST",
+        "/agents",
+        {
+            "operation": operation(),
+            "display_name": "Must not be admitted during rollback",
+        },
+        expected_status=401,
+        operator=presented,
+    )
     if answer.get("refusal") != "OperatorRefused" or "reversible" not in answer.get("reason", ""):
         raise RuntimeError("operator write did not name the reversible upgrade refusal")
-    unchanged(before, leaves())
+    unchanged(before, physical_files(directory / "leaves"))
+    if before_leaves != log_leaves(directory):
+        raise RuntimeError("operator refusal changed indexed leaf bytes")
     return None if token is None else hashlib.sha256(token.read_bytes()).hexdigest()
 
 
@@ -142,24 +193,43 @@ def check(root):
     verify_provenance(browser, context["provenance"])
     operator_digest = refuse_operator(browser, root, config)
     backup = root / "config.previous/identity.json"
-    if hashlib.sha256(backup.read_bytes()).hexdigest() != context["original_config_sha256"]:
-        raise RuntimeError("reversible window backup differs from the old original config")
+    if (
+        hashlib.sha256(backup.read_bytes()).hexdigest()
+        != context["original_config_sha256"]
+    ):
+        raise RuntimeError(
+            "reversible window backup differs from the old original config"
+        )
     fixture = context["legacy"]
     counts = verify(browser, fixture)
     unchanged(context["files"], legacy_files(root, config))
     writes = refused_writes(fixture, context["provisioning"])
     for path, body, kind in writes:
+        disk_before = {
+            key: physical_files(proof_directory(root, config[key], key))
+            for key in ("teams_dir", "budgets_dir")
+        }
         refusal = browser.ask("POST", path, body, expected_status=503)
-        if refusal.get("refusal") != kind or "upgrade_pending" not in refusal.get("reason", ""):
+        if refusal.get("refusal") != kind or "upgrade_pending" not in refusal.get(
+            "reason", ""
+        ):
             raise RuntimeError(f"{path} did not refuse {kind} naming upgrade_pending")
         unchanged(context["files"], legacy_files(root, config))
+        for key, held in disk_before.items():
+            unchanged(held, physical_files(proof_directory(root, config[key], key)))
     # A refused confirmation must also leave every legacy byte alone.
     unchanged(context["files"], legacy_files(root, config))
     verify(browser, fixture)
     pending(root)
-    receipt = {"passed": True, "operator_token_sha256": operator_digest, "legacy_files": len(context["files"]),
-               "operator_write_refused": True, "writes_refused": len(writes), "refused_routes": [path for path, body, kind in writes],
-               **counts}
+    receipt = {
+        "passed": True,
+        "operator_token_sha256": operator_digest,
+        "legacy_files": len(context["files"]),
+        "operator_write_refused": True,
+        "writes_refused": len(writes),
+        "refused_routes": [path for path, body, kind in writes],
+        **counts,
+    }
     (root.parent / "evidence/window.json").write_text(json.dumps(receipt, indent=2))
 
 
