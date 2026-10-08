@@ -20,6 +20,13 @@ pub(crate) fn path_str(path: &Path) -> &str {
     path.to_str().expect("tempdir path was not UTF-8")
 }
 
+/// Execute the separately built, uninstalled fixture with explicit creation time.
+pub(crate) fn run_lys_at(args: &[&str], at: &str) -> Output {
+    let fixture = std::env::var_os("LYS_CLOCK_FIXTURE")
+        .expect("LYS_CLOCK_FIXTURE must name the prebuilt clock fixture example");
+    Command::new(fixture).arg(at).args(args).output().expect("clock fixture executes")
+}
+
 /// Everything a command said, on either stream.
 pub(crate) fn said(output: &Output) -> String {
     format!(
@@ -266,6 +273,13 @@ pub(crate) fn openssl_verify(dir: &Path, issuer: &str, cert: &str) -> Output {
         .current_dir(dir)
         .output()
         .unwrap()
+}
+
+/// Verify the actual files at their explicitly supplied creation instant.
+pub(crate) fn openssl_verify_at(dir: &Path, issuer: &str, cert: &str, at: i64) -> Output {
+    Command::new(openssl())
+        .args(["verify", "-attime", &at.to_string(), "-CAfile", issuer, cert])
+        .current_dir(dir).output().unwrap()
 }
 
 /// `scripts/verify_inclusion.py <artifact> <leaf> [expected-root-base64]`.

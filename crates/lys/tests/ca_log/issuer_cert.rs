@@ -2,22 +2,18 @@
 //! same bytes `lys ca issue --issuer-out` writes on every call, and the
 //! refusals that leave no stored file behind.
 //!
-//! The pauses between calls are what make byte identity mean something: the
-//! issuer certificate carries the second it was built, so a certificate built
-//! again a second or more later differs from the stored one.
+//! Supplied creation seconds make regeneration observable without waiting:
+//! a fresh certificate at a later instant differs from the stored one.
 
 use std::path::Path;
 use std::process::Command;
 
 use crate::support::{
     Bench, assert_success, corrupt_first_leaf, dir_bytes, leaf_files, openssl, path_str,
-    pem_to_der, report, run_lys, said,
+    pem_to_der, report, run_lys, run_lys_at, said,
 };
 
-/// Long enough that a certificate built again carries another second.
-fn let_a_second_pass() {
-    std::thread::sleep(std::time::Duration::from_secs(2));
-}
+const T0: i64 = 1_700_000_000;
 
 fn issuer_cert(key: &Path, out: &Path) -> std::process::Output {
     run_lys(&[
@@ -29,6 +25,12 @@ fn issuer_cert(key: &Path, out: &Path) -> std::process::Output {
         "--out",
         path_str(out),
     ])
+}
+
+fn issuer_cert_at(key: &Path, out: &Path, at: i64) -> std::process::Output {
+    run_lys_at(&[
+        "--json", "ca", "issuer-cert", "--key", path_str(key), "--out", path_str(out),
+    ], &at.to_string())
 }
 
 fn generate(key: &Path) {
@@ -80,6 +82,15 @@ fn issue_with_issuer_out(
     ])
 }
 
+fn issue_at(bench: &Bench, key: &Path, subject: &str, issuer_out: &Path, at: i64) -> std::process::Output {
+    run_lys_at(&[
+        "ca", "issue", "--key", path_str(key), "--subject", subject,
+        "--validity", "1h", "--out", path_str(&bench.path(&format!("{subject}.pem"))),
+        "--log", path_str(&bench.log_dir), "--leaf-out", path_str(&bench.path(&format!("{subject}.leaf"))),
+        "--issuer-out", path_str(issuer_out),
+    ], &at.to_string())
+}
+
 #[test]
 fn issuer_cert_writes_the_stored_certificate_and_every_later_call_writes_the_same_bytes() {
     let bench = Bench::new();
@@ -87,7 +98,7 @@ fn issuer_cert_writes_the_stored_certificate_and_every_later_call_writes_the_sam
     let stored = bench.path("issuer.key.issuer.pem");
     assert!(!stored.exists());
 
-    let written = report(&issuer_cert(&bench.issuer_key, &issuer_pem));
+    let written = report(&issuer_cert_at(&bench.issuer_key, &issuer_pem, T0));
     let text = std::fs::read_to_string(&issuer_pem).unwrap();
     let begin = "-----BEGIN CERTIFICATE-----";
     let blocks = text.lines().filter(|line| *line == begin).count();
@@ -122,24 +133,22 @@ fn issuer_cert_writes_the_stored_certificate_and_every_later_call_writes_the_sam
     assert!(!leaked, "the issuer key's seed is in the certificate");
     assert!(!text.lines().any(|line| line.contains("PRIVATE")));
 
-    let_a_second_pass();
     let again = bench.path("issuer-again.pem");
-    assert_success(&issuer_cert(&bench.issuer_key, &again));
+    assert_success(&issuer_cert_at(&bench.issuer_key, &again, T0 + 2));
     assert_eq!(bytes(&issuer_pem), bytes(&again));
 
     // `ca issue --issuer-out` writes the same stored bytes, and they anchor
     // the certificate it issued.
-    let_a_second_pass();
     let at_issue = bench.path("issuer-at-issue.pem");
-    assert_success(&issue_with_issuer_out(
+    assert_success(&issue_at(
         &bench,
         &bench.issuer_key,
-        &bench.log_dir,
         "agent-x",
         &at_issue,
+        T0 + 4,
     ));
     assert_eq!(bytes(&issuer_pem), bytes(&at_issue));
-    let verified = crate::support::openssl_verify(bench.dir(), "issuer.pem", "agent-x.pem");
+    let verified = crate::support::openssl_verify_at(bench.dir(), "issuer.pem", "agent-x.pem", T0 + 4);
     assert_success(&verified);
     assert_eq!(
         String::from_utf8_lossy(&verified.stdout).trim(),
@@ -156,18 +165,51 @@ fn an_issuer_certificate_first_built_by_issue_is_the_one_issuer_cert_writes_late
     assert!(!stored.exists());
 
     let first = bench.path("first.pem");
-    assert_success(&issue_with_issuer_out(
+    assert_success(&issue_at(
         &bench,
         &key,
-        &bench.log_dir,
         "agent-y",
         &first,
+        T0,
     ));
     assert_eq!(bytes(&first), bytes(&stored));
 
-    let_a_second_pass();
     let later = bench.path("later.pem");
-    assert_success(&issuer_cert(&key, &later));
+    assert_success(&issuer_cert_at(&key, &later, T0 + 2));
+    assert_eq!(bytes(&first), bytes(&later));
+}
+
+#[test]
+fn issuer_regeneration_control() {
+    use x509_parser::prelude::FromDer;
+    let first = Bench::new();
+    let later = Bench::new();
+    std::fs::copy(&first.issuer_key, &later.issuer_key).unwrap();
+    let first_pem = first.path("first.pem");
+    let later_pem = later.path("later.pem");
+    assert_success(&issuer_cert_at(&first.issuer_key, &first_pem, T0));
+    assert_success(&issuer_cert_at(&later.issuer_key, &later_pem, T0 + 2));
+    let first_der = pem_to_der(&std::fs::read_to_string(first_pem).unwrap());
+    let later_der = pem_to_der(&std::fs::read_to_string(later_pem).unwrap());
+    let (_, first_cert) = x509_parser::certificate::X509Certificate::from_der(&first_der).unwrap();
+    let (_, later_cert) = x509_parser::certificate::X509Certificate::from_der(&later_der).unwrap();
+    assert_eq!(first_cert.validity().not_before.timestamp(), T0);
+    assert_eq!(later_cert.validity().not_before.timestamp(), T0 + 2);
+    assert_eq!(first_cert.public_key(), later_cert.public_key());
+    assert_eq!(first_cert.validity().not_after, later_cert.validity().not_after);
+    assert_ne!(first_der, later_der);
+}
+
+#[test]
+fn real_stored_issuer_export_does_not_read_a_failed_clock() {
+    let bench = Bench::new();
+    let first = bench.path("first.pem");
+    assert_success(&issuer_cert_at(&bench.issuer_key, &first, T0));
+    let later = bench.path("later.pem");
+    let output = run_lys_at(&[
+        "--json", "ca", "issuer-cert", "--key", path_str(&bench.issuer_key), "--out", path_str(&later),
+    ], "unavailable");
+    assert_success(&output);
     assert_eq!(bytes(&first), bytes(&later));
 }
 

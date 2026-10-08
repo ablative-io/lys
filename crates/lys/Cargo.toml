@@ -15,6 +15,16 @@ categories = ["cryptography", "command-line-utilities"]
 name = "lys"
 path = "src/main.rs"
 
+[features]
+default = []
+clock-fixture = []
+
+[[example]]
+name = "clock-cli"
+path = "tests/clock_cli.rs"
+required-features = ["clock-fixture"]
+test = false
+
 [dependencies]
 lys-core.workspace = true
 lys-log-store.workspace = true
