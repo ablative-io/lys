@@ -59,6 +59,11 @@ struct Faults {
     log_unreadable: AtomicBool,
     advance_on_read: AtomicBool,
     write_then_fail: AtomicBool,
+    revisions: AtomicU64,
+    reads: AtomicU64,
+    appends: AtomicU64,
+    pins: AtomicU64,
+    snapshots: AtomicU64,
 }
 
 #[derive(Clone, Default)]
@@ -73,6 +78,7 @@ impl RelationshipStore for Engine {
     }
 
     fn revision(&self) -> Result<u64, GrantError> {
+        self.faults.revisions.fetch_add(1, Ordering::Relaxed);
         if self.faults.revision.load(Ordering::Relaxed) {
             return Err(GrantError::PermissionEngineUnavailable {
                 reason: READ_FAILURE.to_owned(),
@@ -103,6 +109,7 @@ impl RelationshipStore for Engine {
     }
 
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
+        self.faults.reads.fetch_add(1, Ordering::Relaxed);
         let held = self.inner.read()?;
         if self.faults.advance_on_read.swap(false, Ordering::Relaxed) {
             let mut writer = self.inner.clone();
@@ -142,6 +149,7 @@ impl LeafStore for Store {
     }
 
     fn append(&mut self, index: u64, leaves: &[&[u8]], pin: PinnedRoot) -> StoreResult<()> {
+        self.faults.appends.fetch_add(1, Ordering::Relaxed);
         self.inner.append(index, leaves, pin)?;
         if self
             .faults
@@ -159,6 +167,7 @@ impl LeafStore for Store {
     }
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
+        self.faults.pins.fetch_add(1, Ordering::Relaxed);
         self.inner.pin(pin)
     }
 
@@ -167,6 +176,7 @@ impl LeafStore for Store {
     }
 
     fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        self.faults.snapshots.fetch_add(1, Ordering::Relaxed);
         self.inner.put_snapshot(bytes)
     }
 }
@@ -635,5 +645,86 @@ fn degraded_frame_cannot_be_explained_after_the_relationship_revision_moves() ->
         required: reading.actual, projected: reading.projected,
     }));
     assert_eq!(reading.before, reading.after);
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct OperationCounts {
+    revisions: u64,
+    reads: u64,
+    writes: u64,
+    appends: u64,
+    pins: u64,
+    snapshots: u64,
+}
+
+impl Faults {
+    fn counts(&self) -> OperationCounts {
+        OperationCounts {
+            revisions: self.revisions.load(Ordering::Relaxed),
+            reads: self.reads.load(Ordering::Relaxed),
+            writes: self.writes.load(Ordering::Relaxed),
+            appends: self.appends.load(Ordering::Relaxed),
+            pins: self.pins.load(Ordering::Relaxed),
+            snapshots: self.snapshots.load(Ordering::Relaxed),
+        }
+    }
+}
+
+impl OperationCounts {
+    fn since(self, before: Self) -> Result<Self, Box<dyn Error>> {
+        let delta = |after: u64, before: u64| after.checked_sub(before)
+            .ok_or_else(|| "fixture operation counter decreased".to_owned());
+        Ok(Self {
+            revisions: delta(self.revisions, before.revisions)?,
+            reads: delta(self.reads, before.reads)?,
+            writes: delta(self.writes, before.writes)?,
+            appends: delta(self.appends, before.appends)?,
+            pins: delta(self.pins, before.pins)?,
+            snapshots: delta(self.snapshots, before.snapshots)?,
+        })
+    }
+}
+
+#[test]
+fn frame_metadata_shares_one_failure_and_keeps_healthy_and_degraded_work_bounded() -> TestResult {
+    let engine = Engine::default();
+    let mut world = world(&engine)?;
+    let reading = (|| -> Result<_, Box<dyn Error>> {
+        world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+        let request = ExerciseRequest {
+            caller: IdentityId::Person(world.lee), route: Route::Api,
+            resource: alpha()?, action: lys_identity::grants::Action::new("read")?,
+        };
+        let before = engine.faults.counts();
+        let healthy = world.grants.frame(world.directory.projection()?, None)?;
+        let permitted = world.grants.explain_in(&healthy, &request, world.now)?;
+        let omitted = healthy.degradation().is_none() && permitted.degraded.is_none();
+        let healthy_counts = engine.faults.counts().since(before)?;
+        engine.faults.write.store(true, Ordering::Relaxed);
+        let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
+        if !matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
+            Some(GrantError::ProjectionPending { .. })) {
+            return Err(format!("counter fixture did not leave projection pending: {pending:?}").into());
+        }
+        let before = engine.faults.counts();
+        let frame = world.grants.frame(world.directory.projection()?, None)?;
+        let first = world.grants.explain_in(&frame, &request, world.now)?;
+        let second = world.grants.explain_in(&frame, &request, world.now)?;
+        let shared = frame.degradation().zip(first.degraded.as_ref()).zip(second.degraded.as_ref())
+            .is_some_and(|((frame, first), second)|
+                Arc::ptr_eq(frame, first) && Arc::ptr_eq(frame, second) && Arc::strong_count(frame) == 3);
+        Ok((omitted, healthy_counts, shared, engine.faults.counts().since(before)?))
+    })();
+    engine.faults.write.store(false, Ordering::Relaxed);
+    let (omitted, healthy, shared, degraded) = finish_world(world, reading)?;
+    assert!(omitted);
+    assert!(shared);
+    assert_eq!(healthy, OperationCounts {
+        revisions: 1, reads: 1, writes: 0, appends: 0, pins: 0, snapshots: 0,
+    });
+    assert_eq!(degraded, OperationCounts {
+        revisions: 5, reads: 1, writes: 1, appends: 0, pins: 0, snapshots: 0,
+    });
     Ok(())
 }
