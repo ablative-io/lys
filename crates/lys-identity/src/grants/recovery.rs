@@ -142,11 +142,7 @@ impl<S: LeafStore> GrantLedger<S> {
             .verify(witness, settled, &mut |certified| {
                 result = Some(match reading.take() {
                     Some(reading) => {
-                        if certified != witness {
-                            Err(super::tail_witness::unavailable(
-                                "tail provider substituted its certified reading",
-                            ))
-                        } else {
+                        if certified == witness {
                             super::tail_witness::authenticate(
                                 certified,
                                 settled,
@@ -154,6 +150,10 @@ impl<S: LeafStore> GrantLedger<S> {
                                 &self.service_key,
                             )
                             .and_then(|events| reading(&events))
+                        } else {
+                            Err(super::tail_witness::unavailable(
+                                "tail provider substituted its certified reading",
+                            ))
                         }
                     }
                     None => Err(super::tail_witness::unavailable(
