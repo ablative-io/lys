@@ -68,12 +68,10 @@ impl<P: PermissionCheck> Broker<P> {
         expected_digest: &str,
     ) -> Result<(String, String, String, Option<Secret>), SecretsError> {
         app_named(app)?;
-        operation.parse::<lys_identity::OperationId>().map_err(|error| SecretsError::InvalidName {
-            what: "operation", name: operation.to_owned(), reason: error.to_string(),
-        })?;
+        operation.parse::<lys_identity::OperationId>()?;
         if expected_digest.len() != 64 || !expected_digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err(SecretsError::InvalidName {
-                what: "digest", name: expected_digest.to_owned(), reason: "expected a SHA-256 hex digest".to_owned(),
+                what: "digest", name: expected_digest.to_owned(), reason: "expected a SHA-256 hex digest",
             });
         }
         let (client, owner) = match self.app_client_entry(app) {
