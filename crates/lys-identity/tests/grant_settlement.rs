@@ -9,6 +9,7 @@ use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use lys_identity::IdentityId;
 use lys_identity::grants::{
@@ -64,6 +65,9 @@ struct Faults {
     appends: AtomicU64,
     pins: AtomicU64,
     snapshots: AtomicU64,
+    leaves: AtomicU64,
+    snapshot_reads: AtomicU64,
+    reopens: AtomicU64,
 }
 
 #[derive(Clone, Default)]
@@ -145,6 +149,7 @@ impl LeafStore for Store {
     }
 
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>> {
+        self.faults.leaves.fetch_add(1, Ordering::Relaxed);
         self.inner.leaf(index)
     }
 
@@ -172,6 +177,7 @@ impl LeafStore for Store {
     }
 
     fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+        self.faults.snapshot_reads.fetch_add(1, Ordering::Relaxed);
         self.inner.snapshot()
     }
 
@@ -188,6 +194,7 @@ fn world(engine: &Engine) -> Result<World<Store, Engine>, Box<dyn Error>> {
             let path = path.to_owned();
             let faults = Arc::clone(&faults);
             Box::new(move || {
+                faults.reopens.fetch_add(1, Ordering::Relaxed);
                 if faults.log_unreadable.load(Ordering::Relaxed) {
                     return Err(log_failure());
                 }
@@ -205,6 +212,27 @@ fn world(engine: &Engine) -> Result<World<Store, Engine>, Box<dyn Error>> {
 struct Observations {
     events: Arc<Mutex<Vec<BTreeMap<String, String>>>>,
     spans: Arc<AtomicU64>,
+    callbacks: Arc<AtomicU64>,
+    locks: Arc<AtomicU64>,
+    fields: Arc<AtomicU64>,
+    bytes: Arc<AtomicU64>,
+    nanos: Arc<AtomicU64>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ObservationCosts {
+    callbacks: u64,
+    locks: u64,
+    fields: u64,
+    bytes: u64,
+    nanos: u64,
+}
+
+fn observation_count(value: usize) -> u64 {
+    match u64::try_from(value) {
+        Ok(value) => value,
+        Err(error) => panic!("observation_fixture_count_overflowed: {error}"),
+    }
 }
 
 struct Fields(BTreeMap<String, String>);
@@ -246,12 +274,25 @@ impl Subscriber for Observations {
     }
 
     fn event(&self, event: &Event<'_>) {
+        let started = Instant::now();
+        self.callbacks.fetch_add(1, Ordering::Relaxed);
         let mut fields = Fields(BTreeMap::new());
         event.record(&mut fields);
+        self.fields.fetch_add(observation_count(fields.0.len()), Ordering::Relaxed);
+        for (name, value) in &fields.0 {
+            self.bytes.fetch_add(observation_count(name.len()), Ordering::Relaxed);
+            self.bytes.fetch_add(observation_count(value.len()), Ordering::Relaxed);
+        }
+        self.locks.fetch_add(1, Ordering::Relaxed);
         match self.events.lock() {
             Ok(mut events) => events.push(fields.0),
             Err(error) => panic!("observation_fixture_lock_poisoned: {error}"),
         }
+        let nanos = match u64::try_from(started.elapsed().as_nanos()) {
+            Ok(nanos) => nanos,
+            Err(error) => panic!("observation_fixture_duration_overflowed: {error}"),
+        };
+        self.nanos.fetch_add(nanos, Ordering::Relaxed);
     }
 
     fn enter(&self, span: &Id) {
@@ -264,6 +305,16 @@ impl Subscriber for Observations {
 }
 
 impl Observations {
+    fn costs(&self) -> ObservationCosts {
+        ObservationCosts {
+            callbacks: self.callbacks.load(Ordering::Relaxed),
+            locks: self.locks.load(Ordering::Relaxed),
+            fields: self.fields.load(Ordering::Relaxed),
+            bytes: self.bytes.load(Ordering::Relaxed),
+            nanos: self.nanos.load(Ordering::Relaxed),
+        }
+    }
+
     fn read(&self) -> Result<Vec<BTreeMap<String, String>>, Box<dyn Error>> {
         match self.events.lock() {
             Ok(events) => Ok(events.clone()),
@@ -658,7 +709,43 @@ struct OperationCounts {
     snapshots: u64,
 }
 
+#[derive(Debug, Default, PartialEq, Eq)]
+struct LogCounts {
+    leaves: u64,
+    snapshots: u64,
+    reopens: u64,
+    appends: u64,
+    pins: u64,
+    snapshot_writes: u64,
+}
+
+impl LogCounts {
+    fn since(self, before: Self) -> Result<Self, Box<dyn Error>> {
+        let delta = |after: u64, before: u64| after.checked_sub(before)
+            .ok_or_else(|| "fixture log counter decreased".to_owned());
+        Ok(Self {
+            leaves: delta(self.leaves, before.leaves)?,
+            snapshots: delta(self.snapshots, before.snapshots)?,
+            reopens: delta(self.reopens, before.reopens)?,
+            appends: delta(self.appends, before.appends)?,
+            pins: delta(self.pins, before.pins)?,
+            snapshot_writes: delta(self.snapshot_writes, before.snapshot_writes)?,
+        })
+    }
+}
+
 impl Faults {
+    fn log_counts(&self) -> LogCounts {
+        LogCounts {
+            leaves: self.leaves.load(Ordering::Relaxed),
+            snapshots: self.snapshot_reads.load(Ordering::Relaxed),
+            reopens: self.reopens.load(Ordering::Relaxed),
+            appends: self.appends.load(Ordering::Relaxed),
+            pins: self.pins.load(Ordering::Relaxed),
+            snapshot_writes: self.snapshots.load(Ordering::Relaxed),
+        }
+    }
+
     fn counts(&self) -> OperationCounts {
         OperationCounts {
             revisions: self.revisions.load(Ordering::Relaxed),
@@ -726,5 +813,84 @@ fn frame_metadata_shares_one_failure_and_keeps_healthy_and_degraded_work_bounded
     assert_eq!(degraded, OperationCounts {
         revisions: 5, reads: 1, writes: 1, appends: 0, pins: 0, snapshots: 0,
     });
+    Ok(())
+}
+
+#[test]
+fn observation_and_log_reads_are_counted_for_allowed_stale_and_revoked_answers() -> TestResult {
+    let engine = Engine::default();
+    let mut world = world(&engine)?;
+    let reading = (|| -> Result<_, Box<dyn Error>> {
+        let root = world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+        let request = ExerciseRequest {
+            caller: IdentityId::Person(world.lee),
+            route: Route::Api,
+            resource: alpha()?,
+            action: lys_identity::grants::Action::new("read")?,
+        };
+        let healthy = Observations::default();
+        let before = engine.faults.log_counts();
+        let permitted = tracing::subscriber::with_default(healthy.clone(), || {
+            world.grants.explain(world.directory.projection()?, &request, world.now, None)
+        })?;
+        let healthy_log = engine.faults.log_counts().since(before)?;
+        let healthy_cost = healthy.costs();
+        engine.faults.write.store(true, Ordering::Relaxed);
+        let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
+        if !matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
+            Some(GrantError::ProjectionPending { .. })) {
+            return Err(format!("cost fixture did not leave projection pending: {pending:?}").into());
+        }
+        let capture = Observations::default();
+        let before = engine.faults.log_counts();
+        let allowed = tracing::subscriber::with_default(capture.clone(), || {
+            world.grants.explain(world.directory.projection()?, &request, world.now, None)
+        })?;
+        let allowed_log = engine.faults.log_counts().since(before)?;
+        let before = engine.faults.log_counts();
+        let stale = tracing::subscriber::with_default(capture.clone(), || {
+            world.grants.explain(world.directory.projection()?, &request, world.now,
+                Some(world.grants.revision()))
+        });
+        let stale_log = engine.faults.log_counts().since(before)?;
+        let revoke = world.grants.revoke(&lys_identity::grants::RevokeRequest {
+            operation: lys_identity::OperationId::generate()?,
+            caller: IdentityId::Person(world.admin),
+            route: Route::Api,
+            grant: root,
+            reason: "cost fixture revocation".to_owned(),
+        }, world.now);
+        if !matches!(revoke, Err(GrantError::ProjectionPending { .. })) {
+            return Err(format!("cost fixture revocation was not pending: {revoke:?}").into());
+        }
+        let before = engine.faults.log_counts();
+        let revoked = tracing::subscriber::with_default(capture.clone(), || {
+            world.grants.explain(world.directory.projection()?, &request, world.now, None)
+        });
+        let revoked_log = engine.faults.log_counts().since(before)?;
+        let events = capture.read()?;
+        Ok((root, permitted, allowed, stale, revoked, healthy_log, allowed_log,
+            stale_log, revoked_log, healthy_cost, capture.costs(), events))
+    })();
+    engine.faults.write.store(false, Ordering::Relaxed);
+    let (root, healthy, allowed, stale, revoked, healthy_log, allowed_log,
+        stale_log, revoked_log, healthy_cost, observed_cost, events) = finish_world(world, reading)?;
+    assert_eq!(healthy.grant, root);
+    assert_eq!(allowed.grant, root);
+    assert_eq!(healthy.path, [root]);
+    assert_eq!(allowed.path, [root]);
+    assert!(matches!(stale, Err(GrantError::StaleDecision { .. })));
+    assert!(matches!(revoked, Err(GrantError::Revoked { grant }) if grant == root.to_string()));
+    for counts in [healthy_log, allowed_log, stale_log, revoked_log] {
+        assert_eq!(counts, LogCounts::default());
+    }
+    assert_eq!(healthy_cost, ObservationCosts::default());
+    assert_eq!(observed_cost.callbacks, 3);
+    assert_eq!(observed_cost.locks, observed_cost.callbacks);
+    assert_eq!(events.len(), 3);
+    assert!(observed_cost.fields >= 3 * 3);
+    assert!(observed_cost.bytes > 0);
+    assert!(events.iter().all(|fields| fields.get("step").is_some_and(|step| step == "project")));
+    eprintln!("grant observation fixture costs: {observed_cost:?}; physical syncs not measured");
     Ok(())
 }
