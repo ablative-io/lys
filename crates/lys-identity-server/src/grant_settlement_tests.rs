@@ -56,6 +56,10 @@ async fn discover(
             let answer = document.clone();
             async move { Json(answer) }
         }),
+    )
+    .route(
+        "/jwks",
+        axum::routing::get(|| async { Json(json!({ "keys": [] })) }),
     );
     let worker = tokio::spawn(async move { axum::serve(listener, router).await });
     let result = crate::oidc::Oidc::discover(config).await;
