@@ -1,8 +1,8 @@
 //! Boundary authority reads current saved words and current recipient admission.
 
 use super::{
-    AgentId, AppState, GoalError, HolderKind, IdentityId, ServerError, TeamError,
-    with_directory, with_runtime,
+    AgentId, AppState, GoalError, HolderKind, IdentityId, ServerError, TeamError, with_directory,
+    with_runtime,
 };
 use super::{Holder, goals, now};
 use std::str::FromStr;
