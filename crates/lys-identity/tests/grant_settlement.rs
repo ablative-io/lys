@@ -735,7 +735,7 @@ fn mutation_acknowledgement_uses_the_real_frontier_and_preserves_the_original_re
             let repeated = world.delegate(&request)?;
             world.reopen(engine.clone())?;
             let reopened = world.delegate(&request)?;
-            let mut changed = request.clone();
+            let mut changed = request;
             changed.relation = lys_identity::grants::Relation::new("kite")?;
             let refused = world.delegate(&changed);
             Ok((
@@ -914,7 +914,7 @@ struct LogCounts {
 }
 
 impl LogCounts {
-    fn since(self, before: Self) -> Result<Self, Box<dyn Error>> {
+    fn since(self, before: &Self) -> Result<Self, Box<dyn Error>> {
         let delta = |after: u64, before: u64| {
             after
                 .checked_sub(before)
@@ -956,7 +956,7 @@ impl Faults {
 }
 
 impl OperationCounts {
-    fn since(self, before: Self) -> Result<Self, Box<dyn Error>> {
+    fn since(self, before: &Self) -> Result<Self, Box<dyn Error>> {
         let delta = |after: u64, before: u64| {
             after
                 .checked_sub(before)
@@ -989,7 +989,7 @@ fn frame_metadata_shares_one_failure_and_keeps_healthy_and_degraded_work_bounded
         let healthy = world.grants.frame(world.directory.projection()?, None)?;
         let permitted = world.grants.explain_in(&healthy, &request, world.now)?;
         let omitted = healthy.degradation().is_none() && permitted.degraded.is_none();
-        let healthy_counts = engine.faults.counts().since(before)?;
+        let healthy_counts = engine.faults.counts().since(&before)?;
         engine.faults.write.store(true, Ordering::Relaxed);
         let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
         if !matches!(
@@ -1020,7 +1020,7 @@ fn frame_metadata_shares_one_failure_and_keeps_healthy_and_degraded_work_bounded
             omitted,
             healthy_counts,
             shared,
-            engine.faults.counts().since(before)?,
+            engine.faults.counts().since(&before)?,
         ))
     })();
     engine.faults.write.store(false, Ordering::Relaxed);
@@ -1071,7 +1071,7 @@ fn observation_and_log_reads_are_counted_for_allowed_stale_and_revoked_answers()
                 .grants
                 .explain(world.directory.projection()?, &request, world.now, None)
         })?;
-        let healthy_log = engine.faults.log_counts().since(before)?;
+        let healthy_log = engine.faults.log_counts().since(&before)?;
         let healthy_cost = healthy.costs();
         engine.faults.write.store(true, Ordering::Relaxed);
         let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
@@ -1093,7 +1093,7 @@ fn observation_and_log_reads_are_counted_for_allowed_stale_and_revoked_answers()
                 .grants
                 .explain(world.directory.projection()?, &request, world.now, None)
         })?;
-        let allowed_log = engine.faults.log_counts().since(before)?;
+        let allowed_log = engine.faults.log_counts().since(&before)?;
         let before = engine.faults.log_counts();
         let stale = tracing::subscriber::with_default(capture.clone(), || {
             world.grants.explain(
@@ -1103,7 +1103,7 @@ fn observation_and_log_reads_are_counted_for_allowed_stale_and_revoked_answers()
                 Some(world.grants.revision()),
             )
         });
-        let stale_log = engine.faults.log_counts().since(before)?;
+        let stale_log = engine.faults.log_counts().since(&before)?;
         let revoke = world.grants.revoke(
             &lys_identity::grants::RevokeRequest {
                 operation: lys_identity::OperationId::generate()?,
@@ -1123,7 +1123,7 @@ fn observation_and_log_reads_are_counted_for_allowed_stale_and_revoked_answers()
                 .grants
                 .explain(world.directory.projection()?, &request, world.now, None)
         });
-        let revoked_log = engine.faults.log_counts().since(before)?;
+        let revoked_log = engine.faults.log_counts().since(&before)?;
         let events = capture.read()?;
         Ok((
             root,
