@@ -481,3 +481,41 @@ async fn serialized_grant_answers_share_the_selected_degradation_and_omit_privat
     assert!(document.to_string().contains("DegradedView"));
     Ok(())
 }
+
+#[tokio::test]
+async fn all_four_boundaries_accept_a_proved_unrelated_degraded_grant() -> TestResult {
+    let table = Table::fresh().await?;
+    let readings = (|| -> TestResult<_> {
+        table.projection_pending()?;
+        let before = table.count()?;
+        let goal = crate::goals_api::judge(&table.state, IdentityId::Person(table.asker), &table.goal());
+        let operator = crate::runner_sessions::operator(
+            &table.state, &table.headers()?, &table.agent.to_string(), "stop",
+        );
+        let question = lys_runner::refusals::GrantQuestion {
+            attempt: "attempt".to_owned(), session: "session".to_owned(),
+            agent: table.holder.to_string(), policy_version: 1, rule: "read".to_owned(),
+            resource: lys_runner::judge::NamedResource {
+                kind: "agent".to_owned(), id: table.agent.to_string(),
+            }, action: "read".to_owned(),
+        };
+        let answer = crate::grants_refusals::judged(&table.state, &question);
+        let added = crate::teams_state::Changed {
+            operation: "legacy-add".to_owned(), team: "legacy-team".to_owned(),
+            member: table.agent.to_string(), at: 0,
+            by: crate::read_views::Login {
+                provider: table.actor.binding().issuer().to_owned(),
+                subject: table.actor.binding().subject().to_owned(),
+            },
+        };
+        let team = crate::teams_migration::test_permitted(&table.state, &added);
+        Ok((goal, operator, answer, team, before, table.count()?))
+    })();
+    let (goal, operator, answer, team, before, after) = table.finish(readings)?;
+    goal?;
+    operator?;
+    assert!(answer.permitted, "{}", answer.words);
+    assert!(team?);
+    assert_eq!(before, after);
+    Ok(())
+}
