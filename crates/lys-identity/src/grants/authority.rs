@@ -171,7 +171,15 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         root_authority: PersonId,
         every: NonZeroU64,
     ) -> Result<Self, GrantError> {
-        Self::open_with_tail_provider(reopen, key, relationships, model, root_authority, every, None)
+        Self::open_with_tail_provider(
+            reopen,
+            key,
+            relationships,
+            model,
+            root_authority,
+            every,
+            None,
+        )
     }
 
     /// Open with an explicit optional capability for authenticated tail readings.
@@ -188,7 +196,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         every: NonZeroU64,
         tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
     ) -> Result<Self, GrantError> {
-        let (mut ledger, opening) = GrantLedger::open_with_tail_provider(reopen, &key, every, tail_provider)?;
+        let (mut ledger, opening) =
+            GrantLedger::open_with_tail_provider(reopen, &key, every, tail_provider)?;
         let read = opening
             .state
             .as_deref()

@@ -107,12 +107,15 @@ impl<S: LeafStore> GrantLedger<S> {
     /// # Errors
     /// Names an absent capability and preserves the provider's original refusal.
     pub fn acquire_tail(&self) -> Result<TailWitness, GrantError> {
-        let provider = self.tail_provider.as_ref().ok_or_else(|| {
-            super::tail_witness::unavailable("tail witness capability is absent")
-        })?;
-        provider.acquire(self.ledger.trusted_frontier()).map_err(|error| {
-            GrantError::LogUnavailable { reason: error.to_string() }
-        })
+        let provider = self
+            .tail_provider
+            .as_ref()
+            .ok_or_else(|| super::tail_witness::unavailable("tail witness capability is absent"))?;
+        provider
+            .acquire(self.ledger.trusted_frontier())
+            .map_err(|error| GrantError::LogUnavailable {
+                reason: error.to_string(),
+            })
     }
 
     /// Authenticate every tail event and read it within a fresh provider callback.
@@ -127,30 +130,45 @@ impl<S: LeafStore> GrantLedger<S> {
         witness: &TailWitness,
         reading: impl FnOnce(&[SignedGrantEvent]) -> Result<T, GrantError>,
     ) -> Result<T, GrantError> {
-        let provider = self.tail_provider.as_ref().ok_or_else(|| {
-            super::tail_witness::unavailable("tail witness capability is absent")
-        })?;
+        let provider = self
+            .tail_provider
+            .as_ref()
+            .ok_or_else(|| super::tail_witness::unavailable("tail witness capability is absent"))?;
         let settled = self.ledger.trusted_frontier();
         let mut reading = Some(reading);
         let mut result = None;
-        provider.verify(witness, settled, &mut |certified| {
-            result = Some(match reading.take() {
-                Some(reading) => {
-                    if certified != witness {
-                        Err(super::tail_witness::unavailable("tail provider substituted its certified reading"))
-                    } else {
-                        super::tail_witness::authenticate(
-                            certified, settled, self.ledger.origin(), &self.service_key,
-                        ).and_then(|events| reading(&events))
+        provider
+            .verify(witness, settled, &mut |certified| {
+                result = Some(match reading.take() {
+                    Some(reading) => {
+                        if certified != witness {
+                            Err(super::tail_witness::unavailable(
+                                "tail provider substituted its certified reading",
+                            ))
+                        } else {
+                            super::tail_witness::authenticate(
+                                certified,
+                                settled,
+                                self.ledger.origin(),
+                                &self.service_key,
+                            )
+                            .and_then(|events| reading(&events))
+                        }
                     }
-                },
-                None => Err(super::tail_witness::unavailable("tail provider repeated its reading callback")),
-            });
-            Ok(())
-        }).map_err(|error| GrantError::LogUnavailable { reason: error.to_string() })?;
+                    None => Err(super::tail_witness::unavailable(
+                        "tail provider repeated its reading callback",
+                    )),
+                });
+                Ok(())
+            })
+            .map_err(|error| GrantError::LogUnavailable {
+                reason: error.to_string(),
+            })?;
         match result {
             Some(result) => result,
-            None => Err(super::tail_witness::unavailable("tail provider omitted its reading callback")),
+            None => Err(super::tail_witness::unavailable(
+                "tail provider omitted its reading callback",
+            )),
         }
     }
 
