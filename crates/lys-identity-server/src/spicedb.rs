@@ -538,6 +538,40 @@ pub enum Relationships {
     Memory(MemoryRelationships),
     /// Relationships held in `SpiceDB`.
     SpiceDb(SpiceDb),
+    #[cfg(test)]
+    /// An instance-private failure of the in-process permission engine.
+    Fixture(FaultRelationships),
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+/// Fault state used only by the service's grant-settlement tests.
+pub struct FaultRelationships {
+    held: MemoryRelationships,
+    unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+#[cfg(test)]
+impl Relationships {
+    pub(crate) fn faulted(
+        held: MemoryRelationships,
+        unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Self {
+        Self::Fixture(FaultRelationships { held, unavailable })
+    }
+}
+
+#[cfg(test)]
+impl FaultRelationships {
+    fn ready(&self) -> Result<(), GrantError> {
+        if self.unavailable.load(std::sync::atomic::Ordering::Acquire) {
+            Err(GrantError::PermissionEngineUnavailable {
+                reason: "instance-private settlement refusal".to_owned(),
+            })
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl RelationshipStore for Relationships {
@@ -545,6 +579,11 @@ impl RelationshipStore for Relationships {
         match self {
             Self::Memory(held) => held.admit_resource(resource),
             Self::SpiceDb(engine) => engine.admit_resource(resource),
+            #[cfg(test)]
+            Self::Fixture(engine) => {
+                engine.ready()?;
+                engine.held.admit_resource(resource)
+            }
         }
     }
 
@@ -552,6 +591,11 @@ impl RelationshipStore for Relationships {
         match self {
             Self::Memory(held) => held.revision(),
             Self::SpiceDb(engine) => engine.revision(),
+            #[cfg(test)]
+            Self::Fixture(engine) => {
+                engine.ready()?;
+                engine.held.revision()
+            }
         }
     }
 
@@ -564,6 +608,11 @@ impl RelationshipStore for Relationships {
         match self {
             Self::Memory(held) => held.write(revision, touch, delete),
             Self::SpiceDb(engine) => engine.write(revision, touch, delete),
+            #[cfg(test)]
+            Self::Fixture(engine) => {
+                engine.ready()?;
+                engine.held.write(revision, touch, delete)
+            }
         }
     }
 
@@ -571,6 +620,11 @@ impl RelationshipStore for Relationships {
         match self {
             Self::Memory(held) => held.read(),
             Self::SpiceDb(engine) => engine.read(),
+            #[cfg(test)]
+            Self::Fixture(engine) => {
+                engine.ready()?;
+                engine.held.read()
+            }
         }
     }
 }

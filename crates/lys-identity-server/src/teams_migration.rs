@@ -147,3 +147,8 @@ fn permitted(state: &AppState, added: &Changed) -> Result<bool, ServerError> {
             .is_ok())
     })
 }
+
+#[cfg(test)]
+pub(crate) fn test_permitted(state: &AppState, added: &Changed) -> Result<bool, ServerError> {
+    permitted(state, added)
+}

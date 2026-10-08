@@ -108,6 +108,8 @@ pub mod goals_state;
 pub mod goals_store;
 pub mod goals_types;
 pub mod goals_views;
+#[cfg(test)]
+mod grant_settlement_tests;
 pub mod grant_contract;
 mod grant_sight;
 mod grant_token_store;
