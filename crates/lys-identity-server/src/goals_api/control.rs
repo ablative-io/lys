@@ -494,8 +494,16 @@ pub(crate) fn team_control_recipient(
 ) -> bool {
     team.retired.is_none()
         && team.created.owner == responsible
-        && team.members.iter().any(|member| member == agent)
-        && !team.held.iter().any(|held| held.member == agent)
+        && team.members.iter().any(|member| {
+            #[cfg(test)]
+            crate::budgets_feed::membership_probe::member();
+            member == agent
+        })
+        && !team.held.iter().any(|held| {
+            #[cfg(test)]
+            crate::budgets_feed::membership_probe::held();
+            held.member == agent
+        })
 }
 
 #[derive(Clone, Copy)]
