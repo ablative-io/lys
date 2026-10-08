@@ -3,10 +3,11 @@
 use std::error::Error;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::os::unix::fs::PermissionsExt;
-use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use axum::extract::{ConnectInfo, State};
-use axum::http::Request;
+use axum::http::{Request, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router};
 use lys_identity_server::Config;
@@ -22,11 +23,13 @@ type Cases = watch::Receiver<IssuerRefusalFixture>;
 
 pub(super) struct Observed {
     pub status: u16,
+    pub location: Option<String>,
     pub body: String,
     pub log: String,
     pub cookie: bool,
     pub pow: usize,
     pub authorize: usize,
+    pub provider_posts: usize,
 }
 
 struct Issuer {
@@ -74,6 +77,7 @@ impl Drop for Issuer {
 pub(super) struct PublicSignIn {
     router: Option<Router>,
     next: watch::Sender<IssuerRefusalFixture>,
+    provider_posts: Arc<AtomicUsize>,
     issuer: Issuer,
     directory: tempfile::TempDir,
 }
@@ -103,6 +107,8 @@ impl PublicSignIn {
             "id_token_signing_alg_values_supported": ["EdDSA"],
         });
         let (next, cases) = watch::channel(IssuerRefusalFixture::new(401, "Unauthorized", 4_102_444_800)?);
+        let provider_posts = Arc::new(AtomicUsize::new(0));
+        let issuer_provider_posts = Arc::clone(&provider_posts);
         let routes = Router::new()
             .route("/.well-known/openid-configuration", axum::routing::get(move || {
                 let discovery = discovery.clone();
@@ -113,6 +119,18 @@ impl PublicSignIn {
                 "<template id=\"tpl_csrf_token\">fixture-request-token</template>"
             }).post(refuse))
             .route("/pow", axum::routing::post(challenge))
+            .route("/providers/login", axum::routing::post(move || {
+                let provider_posts = Arc::clone(&issuer_provider_posts);
+                async move {
+                    provider_posts.fetch_add(1, Ordering::SeqCst);
+                    (
+                        StatusCode::ACCEPTED,
+                        [(header::LOCATION,
+                            "https://provider.example.test/login?redirect_uri=http%3A%2F%2F127.0.0.1%2Fauth%2Fv1%2Fproviders%2Fcallback&state=fixture-provider-state")],
+                        "fixture-request-token",
+                    )
+                }
+            }))
             .with_state(cases);
         let (stop, stopped) = oneshot::channel();
         let serving = tokio::spawn(async move {
@@ -150,7 +168,7 @@ impl PublicSignIn {
             Ok::<_, Failure>(lys_identity_server::service(&config).await?)
         }.await;
         match outcome {
-            Ok(router) => Ok(Self { router: Some(router), next, issuer, directory }),
+            Ok(router) => Ok(Self { router: Some(router), next, provider_posts, issuer, directory }),
             Err(error) => match issuer.close().await {
                 Ok(()) => Err(error),
                 Err(cleanup) => Err(format!("public sign-in start failed: {error}; cleanup failed: {cleanup}").into()),
@@ -167,6 +185,7 @@ impl PublicSignIn {
     ) -> Result<Observed, Failure> {
         let fixture = IssuerRefusalFixture::new(status, error, expires)?;
         drop(self.next.send_replace(fixture.clone()));
+        self.provider_posts.store(0, Ordering::SeqCst);
         let mut body = json!({
             "email": "attempt-private-email-sentinel",
             "password": "attempt-private-password-sentinel",
@@ -185,15 +204,47 @@ impl PublicSignIn {
         let response = self.router.as_ref().ok_or("public sign-in router is closed")?
             .clone().oneshot(request).with_subscriber(logs).await?;
         let status = response.status().as_u16();
+        let location = response.headers().get(header::LOCATION)
+            .map(|value| value.to_str().map(str::to_owned)).transpose()?;
         let cookie = response.headers().contains_key(axum::http::header::SET_COOKIE);
         let body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
         let log = captured.text.lock()
             .map_err(|error| std::io::Error::other(format!("public log capture lock poisoned: {error}")))?
             .clone();
         Ok(Observed {
-            status, body: String::from_utf8(body.to_vec())?, log, cookie,
+            status, location, body: String::from_utf8(body.to_vec())?, log, cookie,
             pow: fixture.pow.load(Ordering::SeqCst),
             authorize: fixture.authorize.load(Ordering::SeqCst),
+            provider_posts: self.provider_posts.load(Ordering::SeqCst),
+        })
+    }
+
+    pub(super) async fn provider_start(&mut self, expires: u64) -> Result<Observed, Failure> {
+        let fixture = IssuerRefusalFixture::new(401, "Unauthorized", expires)?;
+        drop(self.next.send_replace(fixture.clone()));
+        self.provider_posts.store(0, Ordering::SeqCst);
+        let mut request = Request::builder()
+            .method("GET")
+            .uri("/sign-in/providers/example")
+            .body(axum::body::Body::empty())?;
+        request.extensions_mut().insert(ConnectInfo(SocketAddr::from((Ipv4Addr::LOCALHOST, 1234))));
+        let logs = RefusalLog::default();
+        let captured = logs.clone();
+        let response = self.router.as_ref().ok_or("public sign-in router is closed")?
+            .clone().oneshot(request).with_subscriber(logs).await?;
+        let status = response.status().as_u16();
+        let location = response.headers().get(header::LOCATION)
+            .map(|value| value.to_str().map(str::to_owned)).transpose()?;
+        let cookie = response.headers().contains_key(header::SET_COOKIE);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
+        let log = captured.text.lock()
+            .map_err(|error| std::io::Error::other(format!("public log capture lock poisoned: {error}")))?
+            .clone();
+        Ok(Observed {
+            status, location, body: String::from_utf8(body.to_vec())?, log, cookie,
+            pow: fixture.pow.load(Ordering::SeqCst),
+            authorize: fixture.authorize.load(Ordering::SeqCst),
+            provider_posts: self.provider_posts.load(Ordering::SeqCst),
         })
     }
 

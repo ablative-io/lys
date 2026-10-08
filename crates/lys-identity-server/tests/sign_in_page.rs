@@ -711,3 +711,51 @@ fn assert_public_refusal_privacy(seen: &public_sign_in::Observed) {
         assert!(!seen.log.contains(sentinel), "private data in public refusal log");
     }
 }
+
+#[tokio::test]
+async fn the_public_provider_start_refuses_expiry_before_posting_to_the_provider() -> TestResult {
+    let mut service = public_sign_in::PublicSignIn::start().await?;
+    let outcome = async {
+        let expired = service.provider_start(1).await?;
+        let live = service.provider_start(4_102_444_800).await?;
+        Ok::<_, Box<dyn Error>>((expired, live))
+    }
+    .await;
+    let cleanup = service.close().await;
+    let (expired, live) = match (outcome, cleanup) {
+        (Ok(answers), Ok(())) => answers,
+        (Err(error), Ok(())) | (Ok(_), Err(error)) => return Err(error),
+        (Err(error), Err(cleanup)) => {
+            return Err(format!("public provider fixture failed: {error}; cleanup failed: {cleanup}").into());
+        }
+    };
+    assert_eq!(expired.status, 303);
+    assert_eq!(
+        expired.location.as_deref(),
+        Some("/#/sign-in?refused=IssuerChallengeExpired")
+    );
+    assert!(!expired.cookie);
+    assert_eq!(expired.pow, 1, "one challenge, no retry");
+    assert_eq!(expired.authorize, 0);
+    assert_eq!(expired.provider_posts, 0);
+    assert!(expired.log.contains("WARN") && expired.log.contains("IssuerChallengeExpired"));
+    assert_public_refusal_privacy(&expired);
+
+    assert_eq!(live.status, 303);
+    assert!(live.cookie);
+    assert_eq!(live.pow, 1, "one challenge, no retry");
+    assert_eq!(live.authorize, 0);
+    assert_eq!(live.provider_posts, 1);
+    let location = reqwest::Url::parse(live.location.as_deref().ok_or("live provider redirect missing")?)?;
+    assert_eq!(location.scheme(), "https");
+    assert_eq!(location.host_str(), Some("provider.example.test"));
+    assert_eq!(location.path(), "/login");
+    let query: Vec<_> = location.query_pairs().collect();
+    assert_eq!(query.len(), 2);
+    assert!(query.iter().any(|(name, value)| name == "redirect_uri"
+        && value == "http://127.0.0.1/auth/v1/providers/callback"));
+    assert!(query.iter().any(|(name, value)| name == "state" && value == "fixture-provider-state"));
+    assert!(!live.log.contains("IssuerChallengeExpired"));
+    assert_public_refusal_privacy(&live);
+    Ok(())
+}
