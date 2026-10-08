@@ -14,8 +14,8 @@ use lys_identity::grants::{
     Relation, RelationshipStore, Resource, RootRequest, Route, Window,
 };
 use lys_identity::{
-    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, PersonId, Profile,
-    Provenance, Transition,
+    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, PersonId,
+    Profile, Provenance, Transition,
 };
 use lys_log_store::{FileLeafStore, LeafStore};
 use serde_json::json;
