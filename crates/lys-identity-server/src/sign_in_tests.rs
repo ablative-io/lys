@@ -149,7 +149,7 @@ fn an_allocating_counter_search_proves_the_measurement_detects_it() -> Result<()
     let challenge = "1:10:4102444800:salt:challenge:";
     let mut answer = None;
     let allocations = allocation_counter::measure(|| {
-        for counter in 0..=415 {
+        for counter in 0_u64..=415 {
             let candidate = format!("{challenge}{counter}");
             if leading_zero_bits(&Sha256::digest(candidate.as_bytes())) >= 10 {
                 answer = Some(counter);
