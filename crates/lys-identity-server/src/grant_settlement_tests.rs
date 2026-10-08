@@ -1,6 +1,7 @@
 #![cfg(test)]
 
 use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -12,9 +13,9 @@ use lys_identity::grants::{
     Action, DelegateRequest, GrantError, Grants, MemoryRelationships, Model, PassOn, RecipientKind,
     Relation, RelationshipStore, Resource, RootRequest, Route, Window,
 };
-use lys_identity::log::Reopen;
 use lys_identity::{
-    Actor, AgentId, AuthMethod, IdentityId, LoginBinding, OperationId, PersonId, Provenance,
+    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, PersonId, Profile,
+    Provenance, Transition,
 };
 use lys_log_store::{FileLeafStore, LeafStore};
 use serde_json::json;
@@ -24,9 +25,6 @@ use crate::goals_state::{Goal, Holder, HolderKind, Item, Kind, Standing};
 use crate::grants::GrantSetup;
 use crate::routes::AppState;
 use crate::spicedb::Relationships;
-
-#[path = "../../lys-identity/tests/support/world.rs"]
-mod world;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -83,7 +81,17 @@ struct Table {
     state: AppState,
     fault: Arc<AtomicBool>,
     engine: MemoryRelationships,
-    dir: Arc<tempfile::TempDir>,
+    dir: tempfile::TempDir,
+    asker: PersonId,
+    agent: AgentId,
+    holder: AgentId,
+    actor: Actor,
+}
+
+struct ReadyTable {
+    state: AppState,
+    fault: Arc<AtomicBool>,
+    engine: MemoryRelationships,
     asker: PersonId,
     agent: AgentId,
     holder: AgentId,
@@ -149,16 +157,31 @@ impl Table {
     }
 
     async fn fresh() -> TestResult<Self> {
+        let dir = tempfile::TempDir::new()?;
+        match Self::prepare(dir.path()).await {
+            Ok(ready) => Ok(Self {
+                state: ready.state,
+                fault: ready.fault,
+                engine: ready.engine,
+                dir,
+                asker: ready.asker,
+                agent: ready.agent,
+                holder: ready.holder,
+                actor: ready.actor,
+            }),
+            Err(error) => match dir.close() {
+                Ok(()) => Err(error),
+                Err(cleanup) => Err(format!(
+                    "fixture construction failed: {error}; fixture cleanup failed: {cleanup}"
+                )
+                .into()),
+            },
+        }
+    }
+
+    async fn prepare(path: &Path) -> TestResult<ReadyTable> {
         let fault = Arc::new(AtomicBool::new(false));
         let engine = MemoryRelationships::default();
-        let mut held = world::World::with(
-            Box::new(|path: &Path| -> Reopen<FileLeafStore> {
-                let path = path.to_owned();
-                Box::new(move || FileLeafStore::open(&path))
-            }),
-            Relationships::faulted(engine.clone(), Arc::clone(&fault)),
-        )?;
-        let path = held.dir.path();
         let key_file = path.join("service.key");
         let model_file = path.join("model.json");
         std::fs::write(
@@ -178,6 +201,15 @@ impl Table {
         }))?;
         std::fs::write(&config.client_secret_file, b"synthetic-test-credential")?;
         let oidc = discover(&config, listener).await?;
+        std::fs::write(&key_file, [7; 32])?;
+        std::fs::set_permissions(&key_file, std::fs::Permissions::from_mode(0o600))?;
+        FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+        FileLeafStore::create(&config.grant_log_dir, &config.grant_log_origin)?;
+        let log_dir = config.log_dir.clone();
+        let mut directory = Directory::open(
+            Box::new(move || FileLeafStore::open(&log_dir)),
+            Ed25519Identity::load(&key_file)?,
+        )?;
         let administrator = LoginBinding::new(&issuer, "administrator")?;
         let actor = Actor::new(
             LoginBinding::new(&issuer, "asker")?,
@@ -187,67 +219,114 @@ impl Table {
             administrator.clone(),
             Provenance::new(AuthMethod::Oidc, crate::session::now()),
         );
-        held.directory.bind_login(
+        let created_at = 1_800_000_000;
+        let now = created_at + 10;
+        let (admin, _) = directory.register_person(
             setup_actor.clone(),
             OperationId::generate()?,
-            held.admin,
-            administrator.clone(),
-            held.now,
+            Profile::new("Administrator")?,
+            created_at,
         )?;
-        held.directory.bind_login(
+        let (responsible, _) = directory.register_person(
+            setup_actor.clone(),
+            OperationId::generate()?,
+            Profile::new("Responsible")?,
+            created_at,
+        )?;
+        let (asker, _) = directory.register_person(
+            setup_actor.clone(),
+            OperationId::generate()?,
+            Profile::new("Asker")?,
+            created_at,
+        )?;
+        let (holder, _) = directory.register_agent(
+            setup_actor.clone(),
+            OperationId::generate()?,
+            asker,
+            Profile::new("Holder")?,
+            created_at,
+        )?;
+        let (agent, _) = directory.register_agent(
+            setup_actor.clone(),
+            OperationId::generate()?,
+            responsible,
+            Profile::new("Target")?,
+            created_at,
+        )?;
+        for identity in [admin, responsible, asker]
+            .map(IdentityId::Person)
+            .into_iter()
+            .chain([holder, agent].map(IdentityId::Agent))
+        {
+            directory.transition(
+                setup_actor.clone(),
+                OperationId::generate()?,
+                identity,
+                Transition::Activate,
+                "",
+                created_at,
+            )?;
+        }
+        directory.bind_login(
+            setup_actor.clone(),
+            OperationId::generate()?,
+            admin,
+            administrator.clone(),
+            now,
+        )?;
+        directory.bind_login(
             setup_actor,
             OperationId::generate()?,
-            held.tom,
+            asker,
             actor.binding().clone(),
-            held.now,
+            now,
         )?;
         let model: Model = config.grant_model()?;
         let log_dir = path.join("grants");
-        held.grants = Grants::open(
+        let mut grants = Grants::open(
             Box::new(move || FileLeafStore::open(&log_dir)),
             Ed25519Identity::load(&key_file)?,
             Relationships::faulted(engine.clone(), Arc::clone(&fault)),
             model.clone(),
-            held.admin,
+            admin,
         )?;
-        let resource = Resource::new("agent", &held.dana_agent.to_string())?;
+        let resource = Resource::new("agent", &agent.to_string())?;
         let pass_on = PassOn::to(
             [Action::new("read")?].into_iter().collect(),
             [RecipientKind::Agent].into_iter().collect(),
         )?;
-        let root = held
-            .grants
+        let root = grants
             .issue_root(
-                held.directory.projection()?,
+                directory.projection()?,
                 &RootRequest {
                     operation: OperationId::generate()?,
-                    caller: IdentityId::Person(held.admin),
+                    caller: IdentityId::Person(admin),
                     route: Route::Api,
-                    holder: held.tom,
+                    holder: asker,
                     resource: resource.clone(),
                     relation: Relation::new("operator")?,
                     pass_on,
                     window: Window::new(0, None)?,
                 },
-                held.now,
+                now,
             )?
             .event
             .grant();
-        held.grants.delegate(
-            held.directory.projection()?,
+        grants.delegate(
+            directory.projection()?,
             &DelegateRequest {
                 operation: OperationId::generate()?,
-                caller: IdentityId::Person(held.tom),
+                caller: IdentityId::Person(asker),
                 route: Route::Api,
                 source: root,
-                recipient: IdentityId::Agent(held.tom_agent),
-                responsible: held.tom,
+                recipient: IdentityId::Agent(holder),
+                responsible: asker,
                 resource,
                 relation: Relation::new("reader")?,
                 pass_on: PassOn::UseOnly,
                 window: Window::new(0, None)?,
             },
-            held.now,
+            now,
         )?;
         let key = Arc::new(Ed25519Identity::load(&key_file)?);
         let say: crate::Say = Arc::new(|_| {});
@@ -255,7 +334,7 @@ impl Table {
         let model_revision = apps.model_revision();
         let state = AppState {
             changes: crate::changes::Changes::new()?,
-            directory: Mutex::new(held.directory),
+            directory: Mutex::new(directory),
             oidc,
             sign_in: crate::sign_in::IssuerSignIn::configured(&config)?,
             provider: None,
@@ -272,7 +351,7 @@ impl Table {
                 Some(administrator),
                 config.link_audit_binding()?,
             ),
-            grants: Mutex::new(Some(held.grants)),
+            grants: Mutex::new(Some(grants)),
             grant_setup: GrantSetup {
                 log_dir: config.grant_log_dir.clone(),
                 log_origin: config.grant_log_origin.clone(),
@@ -331,14 +410,13 @@ impl Table {
             )?),
             say,
         };
-        Ok(Self {
+        Ok(ReadyTable {
             state,
             fault,
             engine,
-            dir: held.dir,
-            asker: held.tom,
-            agent: held.dana_agent,
-            holder: held.tom_agent,
+            asker,
+            agent,
+            holder,
             actor,
         })
     }
@@ -364,9 +442,7 @@ impl Table {
     fn close(self) -> TestResult {
         self.fault.store(false, Ordering::Release);
         drop(self.state);
-        Arc::try_unwrap(self.dir)
-            .map_err(|_| "fixture directory still shared")?
-            .close()?;
+        self.dir.close()?;
         Ok(())
     }
 
