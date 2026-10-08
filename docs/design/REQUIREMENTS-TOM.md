@@ -36,3 +36,37 @@ in use, forever basically."
 |---|---|---|---|---|
 | I1 | "Lys identity comes first" | 25 Sep 22:37 | DIRECTORY cluster | landed in part |
 | I2 | Other people and their AIs sign in to Cambium through Lys (see Cambium register P1–P3) | 8 Oct ~12:58 | Chippy readiness box (post 667aaee4) | in a box |
+
+
+### I2 installed sign-in defects, 9 October 2026
+
+Installed build d310a9ead52bfa8b5e6ff0a35e781d38f8ba046f serves the public issuer
+https://lys.ablative.com.au. The existing approved `cambium` app has its profile
+permission and public callback; schema v2 contains `cambium.workspace`, and Tom
+holds read access to workspace `ablative`. Public discovery and JWKS returned
+HTTP 200, key id `5a99f13dce7955e6`. This is configuration evidence, not a completed
+sign-in. Captured native gaps:
+
+| Gap | Evidence | Required behavior | Status |
+|---|---|---|---|
+| Imported approved app has no sealed client custody | POST `/api/apps/cambium/credentials/issue` returned HTTP 403 `AppClientNoCustody`; `app_client.rs:56-71` requires a sealed entry, while reapproval refuses an already decided app | Establish custody through the native durable API for the same approved app, preserving its identity and earlier approval, then issue a client credential | source direction e232d421f70509d789186c46491ec32f87c6f18cd79176bae50a2b657333eb98; implementation and qualification open |
+| Approved-app bearer cannot be delivered | Approval returns `client_secret_ref` and `api_credential_ref`; no bearer issue/export route is served; both requested credential files remain absent | Native issue returns plaintext once and a reference on replay; rotation revokes the old value, survives restart, and log replay never exposes plaintext | same source direction; implementation and qualification open |
+| Generated public RP origin crashes the pinned provider | Rauthy 0.36.2 panicked parsing `RAUTHY_RP_ORIGIN=https://lys.ablative.com.au`; its parser requires a numeric port | Generate a valid RP origin; a generated `:443` correction recovered the existing service without changing its browser origin | runtime correction only; generator defect open |
+| Native identity stop is nonzero | `lys identity stop --json` exited 1 after `/api/runtime/stop-everything/console` returned HTTP 404 `NotAnApiRoute`; subsequent native start exited 0 | Native stop and its server route agree and preserve failure evidence | clean stop acceptance open |
+
+Fresh `cambium-door` registration returned HTTP 400 `app_id_invalid`, because ids
+permit lowercase letters, digits and underscores. No new app was created. Another
+app id cannot own `cambium.workspace`; schema and grant boundaries enforce the app
+prefix. The existing client id remains `cambium`. No validation was weakened and no
+historical log was rewritten.
+
+Primary evidence: `/private/tmp/scone-sign-in-20261009-0751`, including the refusals,
+complete 25-session census, config hashes, public discovery/JWKS and native outputs.
+END bdcbfd27b173ebe88afe734a6c197db0fb4505ac4369a1eb05880bb8f737c610 records two of eight
+Lys delivery requirements unwritten (25%): the client credential and app-bearer files.
+Browser sign-in, membership proof, source qualification and source-repair installation
+remain unconfirmed. No Cargo, formatter, Clippy or gate result is inferred.
+
+This register-only delta adds no production locks, whole-state clones, explicit sync
+sites or history loops. Existing API durability costs and physical sync totals were
+not measured.
