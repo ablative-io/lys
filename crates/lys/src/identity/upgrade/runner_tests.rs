@@ -222,6 +222,10 @@ fn runner_environment_is_the_login(dir: &Path) -> TestResult {
 fn put_back_runner_without_proxy_configuration_rejects_no_new_flag() -> TestResult {
     let running = Running::new()?;
     let layout = &running.scratch.layout;
+    let config_file = layout.service_config();
+    let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(&config_file)?)?;
+    config.as_object_mut().ok_or("configuration is not an object")?.remove("model_proxy");
+    std::fs::write(&config_file, serde_json::to_vec(&config)?)?;
     assert!(!install::proxy::configured(layout)?);
     let file = layout.binary("lys");
     let original = std::fs::read_to_string(&file)?;
