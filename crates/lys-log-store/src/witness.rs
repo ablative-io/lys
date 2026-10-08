@@ -63,7 +63,7 @@ impl std::fmt::Debug for TailWitness {
             .field("lower_size", &self.lower.tree_size)
             .field("upper_size", &self.upper.tree_size)
             .field("leaves", &self.leaves.len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
