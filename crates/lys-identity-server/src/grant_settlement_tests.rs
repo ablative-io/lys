@@ -30,6 +30,12 @@ mod world;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+fn wire(value: impl serde::Serialize) -> Result<serde_json::Value, ServerError> {
+    serde_json::to_value(value).map_err(|error| ServerError::RequestMalformed {
+        reason: format!("grant fixture answer could not be encoded: {error}"),
+    })
+}
+
 fn refusal() -> GrantError {
     GrantError::PermissionEngineUnavailable {
         reason: "instance-private settlement refusal".to_owned(),
@@ -75,6 +81,7 @@ async fn discover(
 struct Table {
     state: AppState,
     fault: Arc<AtomicBool>,
+    engine: MemoryRelationships,
     dir: Arc<tempfile::TempDir>,
     asker: PersonId,
     agent: AgentId,
@@ -83,6 +90,40 @@ struct Table {
 }
 
 impl Table {
+    fn projection_pending(&self) -> TestResult {
+        let path = self.dir.path().join("grants");
+        let administrator = self.state.admission.administrator_login()?
+            .ok_or("administrator absent")?;
+        let root = self.state.directory.lock().map_err(|error| error.to_string())?
+            .projection()?.person_for(&administrator).ok_or("administrator unbound")?;
+        let grants = Grants::open(
+            Box::new(move || FileLeafStore::open(&path)),
+            Ed25519Identity::load(&self.state.grant_setup.key_file)?,
+            Relationships::faulted_projection(
+                self.engine.clone(), Arc::clone(&self.fault), Arc::new(AtomicU64::new(0)),
+            ), self.state.grant_setup.model()?, root,
+        )?;
+        *self.state.grants.lock().map_err(|error| error.to_string())? = Some(grants);
+        self.fault.store(true, Ordering::Release);
+        crate::grants::with_grants(&self.state, |judged| {
+            let request = RootRequest {
+                operation: OperationId::generate()?, caller: IdentityId::Person(judged.root),
+                route: Route::Api, holder: self.asker,
+                resource: Resource::new("agent", &self.holder.to_string())?,
+                relation: Relation::new("reader")?, pass_on: PassOn::UseOnly,
+                window: Window::new(0, None)?,
+            };
+            match judged.grants.issue_root(judged.directory, &request, crate::session::now()) {
+                Err(GrantError::ProjectionPending { .. }) => Ok(()),
+                Err(error) => Err(error.into()),
+                Ok(_) => Err(ServerError::RequestMalformed {
+                    reason: "pending projection was acknowledged".to_owned(),
+                }),
+            }
+        })?;
+        Ok(())
+    }
+
     async fn fresh() -> TestResult<Self> {
         let fault = Arc::new(AtomicBool::new(false));
         let engine = MemoryRelationships::default();
@@ -126,7 +167,7 @@ impl Table {
         held.grants = Grants::open(
             Box::new(move || FileLeafStore::open(&log_dir)),
             Ed25519Identity::load(&key_file)?,
-            Relationships::faulted(engine, Arc::clone(&fault)),
+            Relationships::faulted(engine.clone(), Arc::clone(&fault)),
             model.clone(),
             held.admin,
         )?;
@@ -178,7 +219,7 @@ impl Table {
             operator_upgrade_file: None, runners: crate::runner_client::Runners::new(Arc::clone(&key), None),
             acts: Mutex::new(crate::runner_acts::ActStore::open(&path.join("runner-acts"), key)?), say,
         };
-        Ok(Self { state, fault, dir: held.dir, asker: held.tom, agent: held.dana_agent, holder: held.tom_agent, actor })
+        Ok(Self { state, fault, engine, dir: held.dir, asker: held.tom, agent: held.dana_agent, holder: held.tom_agent, actor })
     }
 
     fn count(&self) -> TestResult<u64> {
@@ -365,5 +406,78 @@ async fn opening_projection_failure_is_reported_once_without_another_projection(
     assert_eq!(reports, [format!(
         "grant projection degraded at revision {revision}: {}", refusal(),
     )]);
+    Ok(())
+}
+
+#[tokio::test]
+async fn serialized_grant_answers_share_the_selected_degradation_and_omit_private_causes() -> TestResult {
+    let table = Table::fresh().await?;
+    let readings = (|| -> TestResult<_> {
+        let healthy = crate::grants::with_grants(&table.state, |judged| {
+            let frame = judged.grants.frame(judged.directory, None)?;
+            let request = lys_identity::grants::ExerciseRequest {
+                caller: IdentityId::Person(table.asker), route: Route::Api,
+                resource: Resource::new("agent", &table.agent.to_string())?,
+                action: Action::new("read")?,
+            };
+            let permit = judged.grants.explain_in(&frame, &request, crate::session::now())?;
+            wire(crate::grant_contract::PermitView::from(&permit))
+        })?;
+        table.projection_pending()?;
+        let degraded = crate::grants::with_grants(&table.state, |mut judged| {
+            let frame = judged.grants.frame(judged.directory, None)?;
+            let request = lys_identity::grants::ExerciseRequest {
+                caller: IdentityId::Person(table.asker), route: Route::Api,
+                resource: Resource::new("agent", &table.agent.to_string())?,
+                action: Action::new("read")?,
+            };
+            let permit = judged.grants.explain_in(&frame, &request, crate::session::now())?;
+            let shared = permit.degraded.as_ref().zip(frame.degradation())
+                .is_some_and(|(permit, frame)| Arc::ptr_eq(permit, frame));
+            let marker = permit.degraded.as_deref().ok_or(ServerError::RequestMalformed {
+                reason: "degraded permit lost its marker".to_owned(),
+            })?;
+            let view = crate::grants::DegradedView::from(marker);
+            let permit_json = wire(crate::grant_contract::PermitView::from(&permit))?;
+            let who = wire(crate::grant_contract::WhoPage {
+                holders: Vec::new(), revision: frame.revision(), complete: true, next: None,
+                degraded: Some(view.clone()),
+            })?;
+            let reach = wire(crate::grants_reach::ReachAnswer {
+                revision: frame.revision(), resources: Vec::new(), degraded: Some(view.clone()),
+            })?;
+            let which = wire(crate::grants_batch::WhichPage {
+                ids: Vec::new(), next: None, revision: frame.revision(), degraded: Some(view),
+            })?;
+            let check = crate::grants_batch::one(&mut judged, None, &crate::grants_batch::CheckWire {
+                subject: table.asker.to_string(), kind: "agent".to_owned(),
+                id: table.agent.to_string(), action: "read".to_owned(),
+            }, crate::session::now(), None);
+            let batch = wire(crate::grants_batch::BatchAnswer {
+                revision: frame.revision(), degraded: check.degraded.clone(), results: vec![check],
+            })?;
+            Ok((shared, frame.revision(), [permit_json, who, reach, which, batch]))
+        })?;
+        table.fault.store(false, Ordering::Release);
+        let recovered = crate::grants::with_grants(&table.state, |judged| {
+            let frame = judged.grants.frame(judged.directory, None)?;
+            Ok(frame.degradation().is_none())
+        })?;
+        Ok((healthy, degraded, recovered, crate::openapi::document()?))
+    })();
+    let (healthy, (shared, revision, answers), recovered, document) = table.finish(readings)?;
+    assert!(healthy.get("degraded").is_none());
+    let legacy: serde_json::Map<String, serde_json::Value> = serde_json::from_value(healthy)?;
+    assert_eq!(legacy["permitted"], true);
+    assert_eq!(legacy.len(), 7);
+    assert!(shared);
+    assert!(recovered);
+    for answer in answers {
+        assert_eq!(answer["degraded"], json!({
+            "step": "project", "refusal": "PermissionEngineUnavailable", "revision": revision,
+        }));
+        assert!(!answer.to_string().contains("instance-private"));
+    }
+    assert!(document.to_string().contains("DegradedView"));
     Ok(())
 }

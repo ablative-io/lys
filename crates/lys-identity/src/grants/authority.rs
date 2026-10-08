@@ -86,6 +86,8 @@ pub struct Permit {
     /// or why it could not be recorded. None for an explanation, which
     /// records no use.
     pub use_event: Option<Result<u64, GrantError>>,
+    /// The shared original failure of the selected relationship reading.
+    pub degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 /// A recorded grant change and where it stands.

@@ -100,7 +100,7 @@ pub fn api() -> Api {
     let mut api = Api::new(
         "Lys directory",
         env!("CARGO_PKG_VERSION"),
-        "Sign-in, identities, grants and the apps that register with Lys. Every refusal answers {refusal, reason, fields}.",
+        "Sign-in, identities, grants and the apps that register with Lys. Every refusal answers {refusal, reason, fields}. Grant answers optionally name a degraded reading with {step, refusal, revision}; private causes remain in operator observation.",
     );
     let named = types(&mut api);
     for E(method, path, summary, auth, refusals, ..) in TABLE {

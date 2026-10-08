@@ -159,6 +159,57 @@ pub(crate) fn report_startup(grants: &mut GrantState, say: &dyn Fn(&str)) {
     }
 }
 
+/// The public, redacted description of a selected degraded reading.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+pub struct DegradedView {
+    /// The failed settlement step.
+    pub step: &'static str,
+    /// The existing stable refusal name, without private error text.
+    pub refusal: String,
+    /// The actual selected relationship revision.
+    pub revision: u64,
+}
+
+impl From<&lys_identity::grants::ProjectionDegraded> for DegradedView {
+    fn from(degraded: &lys_identity::grants::ProjectionDegraded) -> Self {
+        Self {
+            step: "project",
+            refusal: ServerError::Grant(degraded.error().clone()).name(),
+            revision: degraded.revision(),
+        }
+    }
+}
+
+/// Decide a question through the same resource reach against one reading.
+pub(crate) fn decide_in<S: LeafStore>(
+    judged: &Judged<'_, S>,
+    frame: &lys_identity::grants::Frame<'_>,
+    request: &ExerciseRequest,
+    at: u64,
+) -> Result<(lys_identity::grants::Permit, lys_identity::grants::Resource), GrantError> {
+    let mut first = None;
+    for resource in judged.apps.reach(&request.resource) {
+        let asked = ExerciseRequest { resource: resource.clone(), ..request.clone() };
+        let only = crate::agent_signature::token_grant(asked.caller);
+        let decided = judged.grants.explain_in_by(frame, &asked, only, at).and_then(|permit| {
+            if let Relationships::SpiceDb(engine) = judged.grants.relationships()
+                && !engine.check(&asked.resource, &asked.action, asked.caller, at)?
+            {
+                return Err(GrantError::PermissionAbsent { grant: permit.grant.to_string() });
+            }
+            Ok(permit)
+        });
+        match decided {
+            Ok(permit) => return Ok((permit, resource)),
+            Err(error) => { first.get_or_insert(error); }
+        }
+    }
+    Err(first.unwrap_or_else(|| GrantError::NotHeld {
+        identity: request.caller.to_string(), resource: request.resource.to_string(),
+        action: request.action.to_string(),
+    }))
+}
+
 /// The grant routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()

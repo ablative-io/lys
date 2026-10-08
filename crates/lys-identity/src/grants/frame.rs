@@ -157,6 +157,20 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         self.explain_only(frame, request, None, at)
     }
 
+    /// Explain from one reading while restricting authority to the named grant.
+    ///
+    /// # Errors
+    /// Returns the original refusal when the reading or selected lineage is invalid.
+    pub fn explain_in_by(
+        &self,
+        frame: &Frame<'_>,
+        request: &ExerciseRequest,
+        only: Option<GrantId>,
+        at: u64,
+    ) -> Result<Permit, GrantError> {
+        self.explain_only(frame, request, only, at)
+    }
+
     /// [`Grants::explain_in`] resting only on `only` when it names a grant.
     pub(super) fn explain_only(
         &self,
@@ -231,6 +245,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                         model_version: grant.parts().model_version,
                         revision: frame.projected,
                         use_event: None,
+                        degraded: frame.degraded.as_ref().map(Arc::clone),
                     });
                 }
                 Err(error) => {

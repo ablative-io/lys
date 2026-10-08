@@ -75,6 +75,9 @@ pub struct ReachAnswer {
     pub revision: u64,
     /// Each resource's holders, in the order asked.
     pub resources: Vec<ReachView>,
+    /// The reading's degradation, including empty resource results.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 /// `POST /grants/reach`.
@@ -153,6 +156,7 @@ pub(crate) async fn reach(
         Ok(Json(ReachAnswer {
             revision: frame.revision(),
             resources,
+            degraded: frame.degradation().map(|held| crate::grants::DegradedView::from(held.as_ref())),
         }))
     })
 }

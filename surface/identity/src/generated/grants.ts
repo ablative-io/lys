@@ -133,6 +133,13 @@ export interface Recorded {
 /** `UseEventView`: whether a check's use was recorded, and why not when it was not. */
 export type UseEvent = { recorded: true; index: number } | { recorded: false; reason: string };
 
+/** A selected reading whose projection failed; private causes are omitted. */
+export interface Degraded {
+  step: 'project';
+  refusal: string;
+  revision: number;
+}
+
 /**
  * `PermitView`: a permitted decision and the authority path it rests on. POST
  * /grants/why answers it and records nothing; POST /grants/check answers it
@@ -147,6 +154,7 @@ export interface Permit {
   model_version: number;
   revision: number;
   use_event?: UseEvent;
+  degraded?: Degraded;
 }
 
 /** GET /grants/model: `ModelView`, each relation with the actions it carries. */
@@ -164,6 +172,7 @@ export interface WhoAnswer {
   revision: number;
   complete: boolean;
   next: string | null;
+  degraded?: Degraded;
 }
 
 /** `PAGE_MAX`. */
@@ -179,6 +188,31 @@ export interface ReachBody {
 export interface ReachAnswer {
   revision: number;
   resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[] }[] })[];
+  degraded?: Degraded;
+}
+
+/** One result from the batch, retaining the reading used for its proof. */
+export interface CheckAnswer {
+  allowed: boolean;
+  grant?: string;
+  path?: string[];
+  via?: string;
+  refusal?: string;
+  reason?: string;
+  degraded?: Degraded;
+}
+
+export interface BatchAnswer {
+  revision: number;
+  results: CheckAnswer[];
+  degraded?: Degraded;
+}
+
+export interface WhichPage {
+  ids: string[];
+  next?: string;
+  revision: number;
+  degraded?: Degraded;
 }
 
 

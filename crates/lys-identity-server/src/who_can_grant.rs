@@ -24,6 +24,9 @@ pub struct CanGrant {
     pub kind: &'static str,
     /// Its current display name.
     pub display_name: String,
+    /// The selected proof's redacted degradation, when a grant proved eligibility.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 /// Read eligible chain holders without recording a request or exercising a grant.
@@ -42,7 +45,11 @@ pub fn for_agent(
     })
 }
 
-fn named(judged: &Judged<'_>, identity: IdentityId) -> Result<CanGrant, ServerError> {
+fn named(
+    judged: &Judged<'_>,
+    identity: IdentityId,
+    degraded: Option<crate::grants::DegradedView>,
+) -> Result<CanGrant, ServerError> {
     let record =
         judged
             .directory
@@ -59,6 +66,7 @@ fn named(judged: &Judged<'_>, identity: IdentityId) -> Result<CanGrant, ServerEr
             IdentityId::Connector(_) => "connector",
         },
         display_name: record.profile().display_name().to_owned(),
+        degraded,
     })
 }
 
@@ -155,7 +163,7 @@ pub(crate) fn for_judged(
         }
         possible.entry(grant.holder()).or_default().push(grant.id());
     }
-    let mut eligible = BTreeSet::new();
+    let mut eligible = BTreeMap::new();
     if !possible.is_empty() {
         let frame = judged.grants.frame(judged.directory, None)?;
         for (holder, sources) in possible {
@@ -182,8 +190,8 @@ pub(crate) fn for_judged(
                 action: action.clone(),
             };
             match judged.grants.explain_in(&frame, &request, at) {
-                Ok(_) => {
-                    eligible.insert(holder);
+                Ok(permit) => {
+                    eligible.insert(holder, permit.degraded.as_deref().map(crate::grants::DegradedView::from));
                 }
                 Err(error) if crate::grants_batch::unanswered(&error) => return Err(error.into()),
                 Err(_) => {}
@@ -192,11 +200,13 @@ pub(crate) fn for_judged(
     }
     let mut answer = Vec::new();
     for holder in chain {
-        if holder != caller && holder != root && eligible.contains(&holder) {
-            answer.push(named(judged, holder)?);
+        if holder != caller && holder != root
+            && let Some(degraded) = eligible.remove(&holder)
+        {
+            answer.push(named(judged, holder, degraded)?);
         }
     }
-    answer.push(named(judged, root)?);
+    answer.push(named(judged, root, None)?);
     Ok(answer)
 }
 
