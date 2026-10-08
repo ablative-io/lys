@@ -219,6 +219,26 @@ fn runner_environment_is_the_login(dir: &Path) -> TestResult {
 }
 
 #[test]
+fn put_back_runner_without_proxy_configuration_rejects_no_new_flag() -> TestResult {
+    let running = Running::new()?;
+    let layout = &running.scratch.layout;
+    assert!(!install::proxy::configured(layout)?);
+    let file = layout.binary("lys");
+    let original = std::fs::read_to_string(&file)?;
+    let guarded = original.replacen(
+        "#!/bin/sh\n",
+        "#!/bin/sh\nfor argument in \"$@\"; do\nif [ \"$argument\" = --proxy-state ]; then echo 'runner_unsupported_proxy_flag' >&2; exit 2; fi\ndone\n",
+        1,
+    );
+    std::fs::write(&file, guarded)?;
+    let mut restart = super::super::runner::Restart::prepare(layout)?;
+    restart.stop(&mut |_| {})?;
+    restart.start(layout, &mut |_| {}, "restored and ready")?;
+    assert!(matches!(running.client().ask(&Act::Status { session: None })?, Answer::Status { .. }));
+    Ok(())
+}
+
+#[test]
 fn upgrade_places_the_new_lys_and_restarts_the_runner_on_it() -> TestResult {
     let running = Running::new()?;
     let new = running.new_build(false)?;
