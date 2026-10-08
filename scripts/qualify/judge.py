@@ -40,6 +40,8 @@ def stage_a(path, adapter):
         leaked = FORBIDDEN.intersection(entry)
         if leaked:
             return fail(adapter, entry["step"], "carries-" + ",".join(sorted(leaked)))
+        if "observed" in entry and type(entry["observed"]) is not bool:
+            return fail(adapter, entry["step"], "observed-not-boolean")
         if entry.get("observed") is False:
             # Amendment 50: the protocol failure comes whole, with cleanup's result apart.
             reason = " ".join(str(entry.get("reason") or "").split())
@@ -57,8 +59,8 @@ def stage_a(path, adapter):
     launcher = seen["launcher"]
     if launcher.get("kind") != "example-owned" or launcher.get("claims_spawn") is not False:
         return fail(adapter, "launcher", "not-example-owned-or-claims-spawn")
-    if launcher.get("fixture") not in (True, False):
-        return fail(adapter, "launcher", "fixture-not-stated")
+    if type(launcher.get("fixture")) is not bool:
+        return fail(adapter, "launcher", "fixture-not-boolean")
     if not seen["bound"].get("correlation"):
         return fail(adapter, "bound", "no-correlation")
     reported, started = seen["version_report"].get("version"), seen["init"].get("version")

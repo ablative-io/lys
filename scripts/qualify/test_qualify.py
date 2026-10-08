@@ -42,7 +42,7 @@ with Path(fields["--evidence"]).open("x") as evidence:
 
 
 class QualificationPinTests(unittest.TestCase):
-    def stage_a(self, fixtures):
+    def stage_a(self, fixtures, markers=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             tools = root / "tools"
@@ -56,6 +56,9 @@ class QualificationPinTests(unittest.TestCase):
             disk.chmod(0o700)
             records = [json.loads(line) for line in
                        (FIXTURES / "fixture-pass.jsonl").read_text().splitlines()]
+            if markers is not None:
+                for step, fields in markers.items():
+                    next(record for record in records if record["step"] == step).update(fields)
             (root / "controls.json").write_text(json.dumps({
                 "fixtures": fixtures, "records": records,
             }))
@@ -133,6 +136,59 @@ class QualificationPinTests(unittest.TestCase):
         self.assertIn("result=FAIL proved=1", self.end(result))
         self.assertIn("codex:fixture-evidence-is-never-a-pin", self.end(result))
         self.assert_pins(result, ("claude-code",))
+
+    def test_a_numeric_zero_fixture_marker_is_refused_without_pins(self):
+        result = self.stage_a(dict.fromkeys(ADAPTERS, 0))
+        self.assertEqual(result["pins"], b"")
+        self.assertIn("result=FAIL proved=0", self.end(result))
+        for adapter in ADAPTERS:
+            self.assertIn(f"{adapter}:launcher:fixture-not-boolean", self.end(result))
+            value = json.loads(result["evidence"][adapter].splitlines()[0])["fixture"]
+            self.assertIs(type(value), int)
+            self.assertEqual(value, 0)
+
+    def test_a_numeric_one_fixture_marker_is_refused_without_pins(self):
+        result = self.stage_a(dict.fromkeys(ADAPTERS, 1))
+        self.assertEqual(result["pins"], b"")
+        self.assertIn("result=FAIL proved=0", self.end(result))
+        for adapter in ADAPTERS:
+            self.assertIn(f"{adapter}:launcher:fixture-not-boolean", self.end(result))
+            value = json.loads(result["evidence"][adapter].splitlines()[0])["fixture"]
+            self.assertIs(type(value), int)
+            self.assertEqual(value, 1)
+
+    def test_a_numeric_zero_observed_marker_is_refused_without_pins(self):
+        result = self.stage_a(dict.fromkeys(ADAPTERS, False), {"launcher": {"observed": 0}})
+        self.assertEqual(result["pins"], b"")
+        self.assertIn("result=FAIL proved=0", self.end(result))
+        for adapter in ADAPTERS:
+            self.assertIn(f"{adapter}:launcher:observed-not-boolean", self.end(result))
+            value = json.loads(result["evidence"][adapter].splitlines()[0])["observed"]
+            self.assertIs(type(value), int)
+            self.assertEqual(value, 0)
+
+    def test_a_numeric_one_observed_marker_is_refused_without_pins(self):
+        result = self.stage_a(dict.fromkeys(ADAPTERS, False), {"launcher": {"observed": 1}})
+        self.assertEqual(result["pins"], b"")
+        self.assertIn("result=FAIL proved=0", self.end(result))
+        for adapter in ADAPTERS:
+            self.assertIn(f"{adapter}:launcher:observed-not-boolean", self.end(result))
+            value = json.loads(result["evidence"][adapter].splitlines()[0])["observed"]
+            self.assertIs(type(value), int)
+            self.assertEqual(value, 1)
+
+    def test_identity_markers_refuse_numeric_stand_ins_without_pins(self):
+        for step, field, value, reason in [
+            ("launcher", "claims_spawn", 0, "not-example-owned-or-claims-spawn"),
+            ("compaction", "turn_completed", 1, "no-evidence-or-turn-completion"),
+            ("stop", "exit_observed", 1, "exit-not-observed"),
+        ]:
+            with self.subTest(marker=field):
+                result = self.stage_a(dict.fromkeys(ADAPTERS, False), {step: {field: value}})
+                self.assertEqual(result["pins"], b"")
+                self.assertIn("result=FAIL proved=0", self.end(result))
+                for adapter in ADAPTERS:
+                    self.assertIn(f"{adapter}:{step}:{reason}", self.end(result))
 
     def test_stored_fixture_pass_and_failure_keep_their_named_verdicts(self):
         for name, code, prefix in [
