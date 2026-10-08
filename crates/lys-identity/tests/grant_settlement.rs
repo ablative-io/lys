@@ -37,7 +37,10 @@ fn finish_world<S: LeafStore, R: RelationshipStore, T>(
     drop(world);
     let cleanup = Arc::try_unwrap(dir)
         .map_err(|shared| {
-            format!("fixture directory still has {} owners", Arc::strong_count(&shared))
+            format!(
+                "fixture directory still has {} owners",
+                Arc::strong_count(&shared)
+            )
         })
         .and_then(|dir| dir.close().map_err(|error| error.to_string()));
     match (result, cleanup) {
@@ -117,10 +120,11 @@ impl RelationshipStore for Engine {
         let held = self.inner.read()?;
         if self.faults.advance_on_read.swap(false, Ordering::Relaxed) {
             let mut writer = self.inner.clone();
-            let revision = writer.revision()?.checked_add(1)
-                .ok_or_else(|| GrantError::PermissionEngineUnavailable {
+            let revision = writer.revision()?.checked_add(1).ok_or_else(|| {
+                GrantError::PermissionEngineUnavailable {
                     reason: "fixture relationship revision overflowed".to_owned(),
-                })?;
+                }
+            })?;
             writer.write(revision, &[], &[])?;
         }
         Ok(held)
@@ -278,10 +282,13 @@ impl Subscriber for Observations {
         self.callbacks.fetch_add(1, Ordering::Relaxed);
         let mut fields = Fields(BTreeMap::new());
         event.record(&mut fields);
-        self.fields.fetch_add(observation_count(fields.0.len()), Ordering::Relaxed);
+        self.fields
+            .fetch_add(observation_count(fields.0.len()), Ordering::Relaxed);
         for (name, value) in &fields.0 {
-            self.bytes.fetch_add(observation_count(name.len()), Ordering::Relaxed);
-            self.bytes.fetch_add(observation_count(value.len()), Ordering::Relaxed);
+            self.bytes
+                .fetch_add(observation_count(name.len()), Ordering::Relaxed);
+            self.bytes
+                .fetch_add(observation_count(value.len()), Ordering::Relaxed);
         }
         self.locks.fetch_add(1, Ordering::Relaxed);
         match self.events.lock() {
@@ -323,12 +330,7 @@ impl Observations {
     }
 }
 
-fn observed(
-    events: &[BTreeMap<String, String>],
-    step: &str,
-    cause: &str,
-    revision: u64,
-) -> bool {
+fn observed(events: &[BTreeMap<String, String>], step: &str, cause: &str, revision: u64) -> bool {
     events.iter().any(|fields| {
         fields.get("step").is_some_and(|value| value == step)
             && fields
@@ -368,7 +370,10 @@ fn projection_failure_keeps_unrelated_authority_and_names_its_actual_revision() 
     engine.faults.write.store(false, Ordering::Relaxed);
     let events = capture.read()?;
     assert!(matches!(
-        pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
+        pending
+            .as_ref()
+            .err()
+            .and_then(|error| error.downcast_ref::<GrantError>()),
         Some(GrantError::ProjectionPending { .. })
     ));
     assert_eq!(result?.grant, healthy.grant);
@@ -377,10 +382,15 @@ fn projection_failure_keeps_unrelated_authority_and_names_its_actual_revision() 
     let failures = engine.faults.writes.load(Ordering::Relaxed) - writes;
     assert_eq!(failures, 2);
     assert_eq!(
-        u64::try_from(events.iter().filter(|fields| {
-            fields.get("step").is_some_and(|step| step == "project")
-                && fields.values().any(|value| value.contains(WRITE_FAILURE))
-        }).count())?,
+        u64::try_from(
+            events
+                .iter()
+                .filter(|fields| {
+                    fields.get("step").is_some_and(|step| step == "project")
+                        && fields.values().any(|value| value.contains(WRITE_FAILURE))
+                })
+                .count()
+        )?,
         failures,
         "every failed attempt keeps its own observation"
     );
@@ -403,14 +413,22 @@ fn unreadable_reconciliation_refuses_unrelated_authority_with_the_original_cause
         PassOn::UseOnly,
         None,
     )?;
-    engine.faults.lost_acknowledgement.store(true, Ordering::Relaxed);
+    engine
+        .faults
+        .lost_acknowledgement
+        .store(true, Ordering::Relaxed);
     let pending = world.delegate(&request);
     let before = FileLeafStore::open(&world.dir.path().join("grants"))?.extent();
     let result = explain(&mut world);
     engine.faults.log_unreadable.store(false, Ordering::Relaxed);
     let after = FileLeafStore::open(&world.dir.path().join("grants"))?.extent();
-    assert!(matches!(pending, Err(GrantError::OperationUnresolved { .. })));
-    assert!(matches!(result, Err(GrantError::LogUnavailable { reason }) if reason.contains(LOG_FAILURE)));
+    assert!(matches!(
+        pending,
+        Err(GrantError::OperationUnresolved { .. })
+    ));
+    assert!(
+        matches!(result, Err(GrantError::LogUnavailable { reason }) if reason.contains(LOG_FAILURE))
+    );
     assert_eq!(after, before, "a refused explanation appends no use event");
     Ok(())
 }
@@ -424,25 +442,39 @@ fn startup_retains_the_original_projection_failure_and_selected_revision() -> Te
     replacement.faults.write.store(true, Ordering::Relaxed);
     let revision = replacement.inner.revision()?;
     let capture = Observations::default();
-    let opened = tracing::subscriber::with_default(capture.clone(), || world.reopen(replacement.clone()));
+    let opened =
+        tracing::subscriber::with_default(capture.clone(), || world.reopen(replacement.clone()));
     replacement.faults.write.store(false, Ordering::Relaxed);
     let reading = (|| -> Result<_, Box<dyn Error>> {
         opened?;
         let writes = replacement.faults.writes.load(Ordering::Relaxed);
-        let degraded = world.grants.take_startup_degradation()
+        let degraded = world
+            .grants
+            .take_startup_degradation()
             .ok_or("opening failure was not retained")?;
         let consumed = world.grants.take_startup_degradation().is_none();
-        Ok((capture.read()?, degraded, consumed, writes,
-            replacement.faults.writes.load(Ordering::Relaxed)))
+        Ok((
+            capture.read()?,
+            degraded,
+            consumed,
+            writes,
+            replacement.faults.writes.load(Ordering::Relaxed),
+        ))
     })();
     let (events, degraded, consumed, before, after) = finish_world(world, reading)?;
     assert!(observed(&events, "project", WRITE_FAILURE, revision));
     assert_eq!(degraded.revision(), revision);
-    assert_eq!(degraded.error(), &GrantError::PermissionEngineUnavailable {
-        reason: WRITE_FAILURE.to_owned(),
-    });
+    assert_eq!(
+        degraded.error(),
+        &GrantError::PermissionEngineUnavailable {
+            reason: WRITE_FAILURE.to_owned(),
+        }
+    );
     assert!(consumed);
-    assert_eq!(before, after, "consuming the opening failure retries no projection");
+    assert_eq!(
+        before, after,
+        "consuming the opening failure retries no projection"
+    );
     Ok(())
 }
 
@@ -450,16 +482,29 @@ fn startup_retains_the_original_projection_failure_and_selected_revision() -> Te
 fn healthy_settlement_keeps_no_degradation_and_emits_no_failure() -> TestResult {
     let capture = Observations::default();
     let mut world = tracing::subscriber::with_default(capture.clone(), World::new)?;
-    let readings = tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
-        let grant = world.root(world.lee, "tern", PassOn::UseOnly, None)?;
-        let before = world.events();
-        let healthy = world.grants.frame(world.directory.projection()?, None)?
-            .degradation().is_none();
-        let permit = world.exercise(IdentityId::Person(world.lee), "read", Route::Api)?;
-        Ok((grant, permit, healthy, world.grants.take_startup_degradation().is_none(),
-            world.now, before, world.events(), capture.read()?))
-    });
-    let (grant, permit, healthy, opening, now, before, after, events) = finish_world(world, readings)?;
+    let readings =
+        tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
+            let grant = world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+            let before = world.events();
+            let healthy = world
+                .grants
+                .frame(world.directory.projection()?, None)?
+                .degradation()
+                .is_none();
+            let permit = world.exercise(IdentityId::Person(world.lee), "read", Route::Api)?;
+            Ok((
+                grant,
+                permit,
+                healthy,
+                world.grants.take_startup_degradation().is_none(),
+                world.now,
+                before,
+                world.events(),
+                capture.read()?,
+            ))
+        });
+    let (grant, permit, healthy, opening, now, before, after, events) =
+        finish_world(world, readings)?;
     assert_eq!(permit.grant, grant);
     assert_eq!(permit.actions, actions(&["read"])?);
     assert_eq!(now, T0);
@@ -475,33 +520,62 @@ fn degraded_frame_retains_the_selected_cause_and_recovers_without_a_marker() -> 
     let engine = Engine::default();
     let mut world = world(&engine)?;
     let capture = Observations::default();
-    let readings = tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
-        world.root(world.lee, "tern", PassOn::UseOnly, None)?;
-        let healthy = world.grants.frame(world.directory.projection()?, None)?
-            .degradation().is_none();
-        engine.faults.write.store(true, Ordering::Relaxed);
-        let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
-        let revision = engine.inner.revision()?;
-        let before = world.events();
-        let degraded = {
-            let frame = world.grants.frame(world.directory.projection()?, None)?;
-            Arc::clone(frame.degradation().ok_or("projection failure lost its reading marker")?)
-        };
-        engine.faults.write.store(false, Ordering::Relaxed);
-        let recovered = world.grants.frame(world.directory.projection()?, None)?
-            .degradation().is_none();
-        Ok((pending, healthy, degraded, recovered, revision, before, world.events(), capture.read()?))
-    });
+    let readings =
+        tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
+            world.root(world.lee, "tern", PassOn::UseOnly, None)?;
+            let healthy = world
+                .grants
+                .frame(world.directory.projection()?, None)?
+                .degradation()
+                .is_none();
+            engine.faults.write.store(true, Ordering::Relaxed);
+            let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
+            let revision = engine.inner.revision()?;
+            let before = world.events();
+            let degraded = {
+                let frame = world.grants.frame(world.directory.projection()?, None)?;
+                Arc::clone(
+                    frame
+                        .degradation()
+                        .ok_or("projection failure lost its reading marker")?,
+                )
+            };
+            engine.faults.write.store(false, Ordering::Relaxed);
+            let recovered = world
+                .grants
+                .frame(world.directory.projection()?, None)?
+                .degradation()
+                .is_none();
+            Ok((
+                pending,
+                healthy,
+                degraded,
+                recovered,
+                revision,
+                before,
+                world.events(),
+                capture.read()?,
+            ))
+        });
     engine.faults.write.store(false, Ordering::Relaxed);
-    let (pending, healthy, degraded, recovered, revision, before, after, events) = finish_world(world, readings)?;
-    assert!(matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
-        Some(GrantError::ProjectionPending { .. })));
+    let (pending, healthy, degraded, recovered, revision, before, after, events) =
+        finish_world(world, readings)?;
+    assert!(matches!(
+        pending
+            .as_ref()
+            .err()
+            .and_then(|error| error.downcast_ref::<GrantError>()),
+        Some(GrantError::ProjectionPending { .. })
+    ));
     assert!(healthy);
     assert!(recovered);
     assert_eq!(degraded.revision(), revision);
-    assert_eq!(degraded.error(), &GrantError::PermissionEngineUnavailable {
-        reason: WRITE_FAILURE.to_owned(),
-    });
+    assert_eq!(
+        degraded.error(),
+        &GrantError::PermissionEngineUnavailable {
+            reason: WRITE_FAILURE.to_owned(),
+        }
+    );
     assert!(observed(&events, "project", WRITE_FAILURE, revision));
     assert_eq!(before, after);
     Ok(())
@@ -517,25 +591,45 @@ fn failed_frame_revision_read_returns_the_read_cause_and_observes_both_failures(
         engine.faults.write.store(true, Ordering::Relaxed);
         let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
         let before = world.events();
-        engine.faults.read_after_write.store(true, Ordering::Relaxed);
+        engine
+            .faults
+            .read_after_write
+            .store(true, Ordering::Relaxed);
         let directory = world.directory.projection()?;
         let frame = tracing::subscriber::with_default(capture.clone(), || {
-            world.grants.frame(directory, None)
+            world
+                .grants
+                .frame(directory, None)
                 .map(|frame| frame.revision())
         });
         Ok((pending, frame, before, world.events(), capture.read()?))
     })();
     engine.faults.write.store(false, Ordering::Relaxed);
     engine.faults.revision.store(false, Ordering::Relaxed);
-    engine.faults.read_after_write.store(false, Ordering::Relaxed);
+    engine
+        .faults
+        .read_after_write
+        .store(false, Ordering::Relaxed);
     let (pending, frame, before, after, events) = finish_world(world, readings)?;
-    assert!(matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
-        Some(GrantError::ProjectionPending { .. })));
-    assert!(matches!(frame, Err(GrantError::PermissionEngineUnavailable { reason }) if reason == READ_FAILURE));
+    assert!(matches!(
+        pending
+            .as_ref()
+            .err()
+            .and_then(|error| error.downcast_ref::<GrantError>()),
+        Some(GrantError::ProjectionPending { .. })
+    ));
+    assert!(
+        matches!(frame, Err(GrantError::PermissionEngineUnavailable { reason }) if reason == READ_FAILURE)
+    );
     assert_eq!(before, after);
     for (step, cause) in [("project", WRITE_FAILURE), ("revision", READ_FAILURE)] {
-        assert!(events.iter().any(|fields| fields.get("step").is_some_and(|value| value == step)
-            && fields.values().any(|value| value.contains(cause))), "{events:?}");
+        assert!(
+            events.iter().any(
+                |fields| fields.get("step").is_some_and(|value| value == step)
+                    && fields.values().any(|value| value.contains(cause))
+            ),
+            "{events:?}"
+        );
     }
     Ok(())
 }
@@ -546,14 +640,24 @@ fn mutation_acknowledgement_retains_the_projection_cause_and_real_revision() -> 
     let mut world = world(&engine)?;
     let kinds = [RecipientKind::Person, RecipientKind::Agent];
     let root = world.root(world.dana, "kite", pass(&["read"], &kinds)?, None)?;
-    let request = world.request(IdentityId::Person(world.dana), root, IdentityId::Person(world.tom), "tern", PassOn::UseOnly, None)?;
+    let request = world.request(
+        IdentityId::Person(world.dana),
+        root,
+        IdentityId::Person(world.tom),
+        "tern",
+        PassOn::UseOnly,
+        None,
+    )?;
     let revision = engine.inner.revision()?;
     let capture = Observations::default();
     engine.faults.write.store(true, Ordering::Relaxed);
     let answer = tracing::subscriber::with_default(capture.clone(), || world.delegate(&request));
     engine.faults.write.store(false, Ordering::Relaxed);
     let events = capture.read()?;
-    assert!(matches!(answer, Err(GrantError::ProjectionPending { index: 1, .. })));
+    assert!(matches!(
+        answer,
+        Err(GrantError::ProjectionPending { index: 1, .. })
+    ));
     assert!(observed(&events, "project", WRITE_FAILURE, revision));
     Ok(())
 }
@@ -564,63 +668,124 @@ fn failed_mutation_revision_read_is_named_instead_of_inventing_revision_zero() -
     let mut world = world(&engine)?;
     let kinds = [RecipientKind::Person, RecipientKind::Agent];
     let root = world.root(world.dana, "kite", pass(&["read"], &kinds)?, None)?;
-    let request = world.request(IdentityId::Person(world.dana), root, IdentityId::Person(world.tom), "tern", PassOn::UseOnly, None)?;
+    let request = world.request(
+        IdentityId::Person(world.dana),
+        root,
+        IdentityId::Person(world.tom),
+        "tern",
+        PassOn::UseOnly,
+        None,
+    )?;
     let capture = Observations::default();
     engine.faults.write.store(true, Ordering::Relaxed);
-    engine.faults.read_after_write.store(true, Ordering::Relaxed);
+    engine
+        .faults
+        .read_after_write
+        .store(true, Ordering::Relaxed);
     let answer = tracing::subscriber::with_default(capture.clone(), || world.delegate(&request));
     engine.faults.write.store(false, Ordering::Relaxed);
-    engine.faults.read_after_write.store(false, Ordering::Relaxed);
+    engine
+        .faults
+        .read_after_write
+        .store(false, Ordering::Relaxed);
     engine.faults.revision.store(false, Ordering::Relaxed);
     let events = capture.read()?;
-    assert!(matches!(answer, Err(GrantError::PermissionEngineUnavailable { reason }) if reason == READ_FAILURE));
+    assert!(
+        matches!(answer, Err(GrantError::PermissionEngineUnavailable { reason }) if reason == READ_FAILURE)
+    );
     for cause in [WRITE_FAILURE, READ_FAILURE] {
-        assert!(events.iter().any(|fields| fields.values().any(|value| value.contains(cause))));
+        assert!(
+            events
+                .iter()
+                .any(|fields| fields.values().any(|value| value.contains(cause)))
+        );
     }
-    assert_eq!(FileLeafStore::open(&world.dir.path().join("grants"))?.extent(), 2);
+    assert_eq!(
+        FileLeafStore::open(&world.dir.path().join("grants"))?.extent(),
+        2
+    );
     Ok(())
 }
 
 #[test]
-fn mutation_acknowledgement_uses_the_real_frontier_and_preserves_the_original_receipt() -> TestResult {
+fn mutation_acknowledgement_uses_the_real_frontier_and_preserves_the_original_receipt() -> TestResult
+{
     let engine = Engine::default();
     let mut world = world(&engine)?;
     let capture = Observations::default();
-    let reading = tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
-        let kinds = [RecipientKind::Person, RecipientKind::Agent];
-        let root = world.root(world.dana, "kite", pass(&["read"], &kinds)?, None)?;
-        let request = world.request(IdentityId::Person(world.dana), root,
-            IdentityId::Person(world.tom), "tern", PassOn::UseOnly, None)?;
-        engine.faults.write.store(true, Ordering::Relaxed);
-        let pending = world.delegate(&request);
-        let at_index = engine.inner.revision()?;
-        let before = world.events();
-        engine.faults.write_then_fail.store(true, Ordering::Relaxed);
-        let answered = world.delegate(&request)?;
-        let projected = engine.inner.revision()?;
-        let repeated = world.delegate(&request)?;
-        world.reopen(engine.clone())?;
-        let reopened = world.delegate(&request)?;
-        let mut changed = request.clone();
-        changed.relation = lys_identity::grants::Relation::new("kite")?;
-        let refused = world.delegate(&changed);
-        Ok((pending, at_index, answered, projected, repeated, reopened, refused,
-            before, world.events(), capture.read()?))
-    });
+    let reading =
+        tracing::subscriber::with_default(capture.clone(), || -> Result<_, Box<dyn Error>> {
+            let kinds = [RecipientKind::Person, RecipientKind::Agent];
+            let root = world.root(world.dana, "kite", pass(&["read"], &kinds)?, None)?;
+            let request = world.request(
+                IdentityId::Person(world.dana),
+                root,
+                IdentityId::Person(world.tom),
+                "tern",
+                PassOn::UseOnly,
+                None,
+            )?;
+            engine.faults.write.store(true, Ordering::Relaxed);
+            let pending = world.delegate(&request);
+            let at_index = engine.inner.revision()?;
+            let before = world.events();
+            engine.faults.write_then_fail.store(true, Ordering::Relaxed);
+            let answered = world.delegate(&request)?;
+            let projected = engine.inner.revision()?;
+            let repeated = world.delegate(&request)?;
+            world.reopen(engine.clone())?;
+            let reopened = world.delegate(&request)?;
+            let mut changed = request.clone();
+            changed.relation = lys_identity::grants::Relation::new("kite")?;
+            let refused = world.delegate(&changed);
+            Ok((
+                pending,
+                at_index,
+                answered,
+                projected,
+                repeated,
+                reopened,
+                refused,
+                before,
+                world.events(),
+                capture.read()?,
+            ))
+        });
     engine.faults.write.store(false, Ordering::Relaxed);
-    engine.faults.write_then_fail.store(false, Ordering::Relaxed);
-    let (pending, at_index, answered, projected, repeated, reopened, refused,
-        before, after, observations) = finish_world(world, reading)?;
+    engine
+        .faults
+        .write_then_fail
+        .store(false, Ordering::Relaxed);
+    let (
+        pending,
+        at_index,
+        answered,
+        projected,
+        repeated,
+        reopened,
+        refused,
+        before,
+        after,
+        observations,
+    ) = finish_world(world, reading)?;
     assert_eq!(at_index, answered.index);
-    assert!(matches!(pending, Err(GrantError::ProjectionPending { index, operation, grant })
+    assert!(
+        matches!(pending, Err(GrantError::ProjectionPending { index, operation, grant })
         if index == answered.index && operation == answered.event.operation().to_string()
-            && grant == answered.event.grant().to_string()));
+            && grant == answered.event.grant().to_string())
+    );
     assert_eq!(projected, answered.index + 1);
-    let marker = answered.degraded.as_deref().ok_or("acknowledgement lost its projection cause")?;
+    let marker = answered
+        .degraded
+        .as_deref()
+        .ok_or("acknowledgement lost its projection cause")?;
     assert_eq!(marker.revision(), projected);
-    assert_eq!(marker.error(), &GrantError::PermissionEngineUnavailable {
-        reason: WRITE_FAILURE.to_owned(),
-    });
+    assert_eq!(
+        marker.error(),
+        &GrantError::PermissionEngineUnavailable {
+            reason: WRITE_FAILURE.to_owned(),
+        }
+    );
     assert!(observed(&observations, "project", WRITE_FAILURE, at_index));
     assert!(observed(&observations, "project", WRITE_FAILURE, projected));
     for retry in [repeated, reopened] {
@@ -649,9 +814,17 @@ fn changed_reading(change_on_read: bool) -> Result<ChangedReading, Box<dyn Error
         world.root(world.lee, "tern", PassOn::UseOnly, None)?;
         engine.faults.write.store(true, Ordering::Relaxed);
         let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
-        if !matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
-            Some(GrantError::ProjectionPending { .. })) {
-            return Err(format!("the reading fixture did not leave projection pending: {pending:?}").into());
+        if !matches!(
+            pending
+                .as_ref()
+                .err()
+                .and_then(|error| error.downcast_ref::<GrantError>()),
+            Some(GrantError::ProjectionPending { .. })
+        ) {
+            return Err(format!(
+                "the reading fixture did not leave projection pending: {pending:?}"
+            )
+            .into());
         }
         let projected = engine.inner.revision()?;
         let before = world.events();
@@ -664,16 +837,29 @@ fn changed_reading(change_on_read: bool) -> Result<ChangedReading, Box<dyn Error
             let mut writer = engine.inner.clone();
             writer.write(projected + 1, &[], &[])?;
             let request = ExerciseRequest {
-                caller: IdentityId::Person(world.lee), route: Route::Api,
-                resource: alpha()?, action: lys_identity::grants::Action::new("read")?,
+                caller: IdentityId::Person(world.lee),
+                route: Route::Api,
+                resource: alpha()?,
+                action: lys_identity::grants::Action::new("read")?,
             };
-            world.grants.explain_in(&frame, &request, world.now).map(drop)
+            world
+                .grants
+                .explain_in(&frame, &request, world.now)
+                .map(drop)
         };
-        Ok(ChangedReading { result, projected, actual: engine.inner.revision()?,
-            before, after: world.events() })
+        Ok(ChangedReading {
+            result,
+            projected,
+            actual: engine.inner.revision()?,
+            before,
+            after: world.events(),
+        })
     })();
     engine.faults.write.store(false, Ordering::Relaxed);
-    engine.faults.advance_on_read.store(false, Ordering::Relaxed);
+    engine
+        .faults
+        .advance_on_read
+        .store(false, Ordering::Relaxed);
     finish_world(world, reading)
 }
 
@@ -681,9 +867,13 @@ fn changed_reading(change_on_read: bool) -> Result<ChangedReading, Box<dyn Error
 fn degraded_relationships_that_move_during_the_read_make_no_frame() -> TestResult {
     let reading = changed_reading(true)?;
     assert_eq!(reading.actual, reading.projected + 1);
-    assert_eq!(reading.result, Err(GrantError::StaleDecision {
-        required: reading.actual, projected: reading.projected,
-    }));
+    assert_eq!(
+        reading.result,
+        Err(GrantError::StaleDecision {
+            required: reading.actual,
+            projected: reading.projected,
+        })
+    );
     assert_eq!(reading.before, reading.after);
     Ok(())
 }
@@ -692,9 +882,13 @@ fn degraded_relationships_that_move_during_the_read_make_no_frame() -> TestResul
 fn degraded_frame_cannot_be_explained_after_the_relationship_revision_moves() -> TestResult {
     let reading = changed_reading(false)?;
     assert_eq!(reading.actual, reading.projected + 1);
-    assert_eq!(reading.result, Err(GrantError::StaleDecision {
-        required: reading.actual, projected: reading.projected,
-    }));
+    assert_eq!(
+        reading.result,
+        Err(GrantError::StaleDecision {
+            required: reading.actual,
+            projected: reading.projected,
+        })
+    );
     assert_eq!(reading.before, reading.after);
     Ok(())
 }
@@ -721,8 +915,11 @@ struct LogCounts {
 
 impl LogCounts {
     fn since(self, before: Self) -> Result<Self, Box<dyn Error>> {
-        let delta = |after: u64, before: u64| after.checked_sub(before)
-            .ok_or_else(|| "fixture log counter decreased".to_owned());
+        let delta = |after: u64, before: u64| {
+            after
+                .checked_sub(before)
+                .ok_or_else(|| "fixture log counter decreased".to_owned())
+        };
         Ok(Self {
             leaves: delta(self.leaves, before.leaves)?,
             snapshots: delta(self.snapshots, before.snapshots)?,
@@ -760,8 +957,11 @@ impl Faults {
 
 impl OperationCounts {
     fn since(self, before: Self) -> Result<Self, Box<dyn Error>> {
-        let delta = |after: u64, before: u64| after.checked_sub(before)
-            .ok_or_else(|| "fixture operation counter decreased".to_owned());
+        let delta = |after: u64, before: u64| {
+            after
+                .checked_sub(before)
+                .ok_or_else(|| "fixture operation counter decreased".to_owned())
+        };
         Ok(Self {
             revisions: delta(self.revisions, before.revisions)?,
             reads: delta(self.reads, before.reads)?,
@@ -780,8 +980,10 @@ fn frame_metadata_shares_one_failure_and_keeps_healthy_and_degraded_work_bounded
     let reading = (|| -> Result<_, Box<dyn Error>> {
         world.root(world.lee, "tern", PassOn::UseOnly, None)?;
         let request = ExerciseRequest {
-            caller: IdentityId::Person(world.lee), route: Route::Api,
-            resource: alpha()?, action: lys_identity::grants::Action::new("read")?,
+            caller: IdentityId::Person(world.lee),
+            route: Route::Api,
+            resource: alpha()?,
+            action: lys_identity::grants::Action::new("read")?,
         };
         let before = engine.faults.counts();
         let healthy = world.grants.frame(world.directory.projection()?, None)?;
@@ -790,29 +992,63 @@ fn frame_metadata_shares_one_failure_and_keeps_healthy_and_degraded_work_bounded
         let healthy_counts = engine.faults.counts().since(before)?;
         engine.faults.write.store(true, Ordering::Relaxed);
         let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
-        if !matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
-            Some(GrantError::ProjectionPending { .. })) {
-            return Err(format!("counter fixture did not leave projection pending: {pending:?}").into());
+        if !matches!(
+            pending
+                .as_ref()
+                .err()
+                .and_then(|error| error.downcast_ref::<GrantError>()),
+            Some(GrantError::ProjectionPending { .. })
+        ) {
+            return Err(
+                format!("counter fixture did not leave projection pending: {pending:?}").into(),
+            );
         }
         let before = engine.faults.counts();
         let frame = world.grants.frame(world.directory.projection()?, None)?;
         let first = world.grants.explain_in(&frame, &request, world.now)?;
         let second = world.grants.explain_in(&frame, &request, world.now)?;
-        let shared = frame.degradation().zip(first.degraded.as_ref()).zip(second.degraded.as_ref())
-            .is_some_and(|((frame, first), second)|
-                Arc::ptr_eq(frame, first) && Arc::ptr_eq(frame, second) && Arc::strong_count(frame) == 3);
-        Ok((omitted, healthy_counts, shared, engine.faults.counts().since(before)?))
+        let shared = frame
+            .degradation()
+            .zip(first.degraded.as_ref())
+            .zip(second.degraded.as_ref())
+            .is_some_and(|((frame, first), second)| {
+                Arc::ptr_eq(frame, first)
+                    && Arc::ptr_eq(frame, second)
+                    && Arc::strong_count(frame) == 3
+            });
+        Ok((
+            omitted,
+            healthy_counts,
+            shared,
+            engine.faults.counts().since(before)?,
+        ))
     })();
     engine.faults.write.store(false, Ordering::Relaxed);
     let (omitted, healthy, shared, degraded) = finish_world(world, reading)?;
     assert!(omitted);
     assert!(shared);
-    assert_eq!(healthy, OperationCounts {
-        revisions: 1, reads: 1, writes: 0, appends: 0, pins: 0, snapshots: 0,
-    });
-    assert_eq!(degraded, OperationCounts {
-        revisions: 5, reads: 1, writes: 1, appends: 0, pins: 0, snapshots: 0,
-    });
+    assert_eq!(
+        healthy,
+        OperationCounts {
+            revisions: 1,
+            reads: 1,
+            writes: 0,
+            appends: 0,
+            pins: 0,
+            snapshots: 0,
+        }
+    );
+    assert_eq!(
+        degraded,
+        OperationCounts {
+            revisions: 5,
+            reads: 1,
+            writes: 1,
+            appends: 0,
+            pins: 0,
+            snapshots: 0,
+        }
+    );
     Ok(())
 }
 
@@ -831,50 +1067,94 @@ fn observation_and_log_reads_are_counted_for_allowed_stale_and_revoked_answers()
         let healthy = Observations::default();
         let before = engine.faults.log_counts();
         let permitted = tracing::subscriber::with_default(healthy.clone(), || {
-            world.grants.explain(world.directory.projection()?, &request, world.now, None)
+            world
+                .grants
+                .explain(world.directory.projection()?, &request, world.now, None)
         })?;
         let healthy_log = engine.faults.log_counts().since(before)?;
         let healthy_cost = healthy.costs();
         engine.faults.write.store(true, Ordering::Relaxed);
         let pending = world.root(world.dana, "kite", PassOn::UseOnly, None);
-        if !matches!(pending.as_ref().err().and_then(|error| error.downcast_ref::<GrantError>()),
-            Some(GrantError::ProjectionPending { .. })) {
-            return Err(format!("cost fixture did not leave projection pending: {pending:?}").into());
+        if !matches!(
+            pending
+                .as_ref()
+                .err()
+                .and_then(|error| error.downcast_ref::<GrantError>()),
+            Some(GrantError::ProjectionPending { .. })
+        ) {
+            return Err(
+                format!("cost fixture did not leave projection pending: {pending:?}").into(),
+            );
         }
         let capture = Observations::default();
         let before = engine.faults.log_counts();
         let allowed = tracing::subscriber::with_default(capture.clone(), || {
-            world.grants.explain(world.directory.projection()?, &request, world.now, None)
+            world
+                .grants
+                .explain(world.directory.projection()?, &request, world.now, None)
         })?;
         let allowed_log = engine.faults.log_counts().since(before)?;
         let before = engine.faults.log_counts();
         let stale = tracing::subscriber::with_default(capture.clone(), || {
-            world.grants.explain(world.directory.projection()?, &request, world.now,
-                Some(world.grants.revision()))
+            world.grants.explain(
+                world.directory.projection()?,
+                &request,
+                world.now,
+                Some(world.grants.revision()),
+            )
         });
         let stale_log = engine.faults.log_counts().since(before)?;
-        let revoke = world.grants.revoke(&lys_identity::grants::RevokeRequest {
-            operation: lys_identity::OperationId::generate()?,
-            caller: IdentityId::Person(world.admin),
-            route: Route::Api,
-            grant: root,
-            reason: "cost fixture revocation".to_owned(),
-        }, world.now);
+        let revoke = world.grants.revoke(
+            &lys_identity::grants::RevokeRequest {
+                operation: lys_identity::OperationId::generate()?,
+                caller: IdentityId::Person(world.admin),
+                route: Route::Api,
+                grant: root,
+                reason: "cost fixture revocation".to_owned(),
+            },
+            world.now,
+        );
         if !matches!(revoke, Err(GrantError::ProjectionPending { .. })) {
             return Err(format!("cost fixture revocation was not pending: {revoke:?}").into());
         }
         let before = engine.faults.log_counts();
         let revoked = tracing::subscriber::with_default(capture.clone(), || {
-            world.grants.explain(world.directory.projection()?, &request, world.now, None)
+            world
+                .grants
+                .explain(world.directory.projection()?, &request, world.now, None)
         });
         let revoked_log = engine.faults.log_counts().since(before)?;
         let events = capture.read()?;
-        Ok((root, permitted, allowed, stale, revoked, healthy_log, allowed_log,
-            stale_log, revoked_log, healthy_cost, capture.costs(), events))
+        Ok((
+            root,
+            permitted,
+            allowed,
+            stale,
+            revoked,
+            healthy_log,
+            allowed_log,
+            stale_log,
+            revoked_log,
+            healthy_cost,
+            capture.costs(),
+            events,
+        ))
     })();
     engine.faults.write.store(false, Ordering::Relaxed);
-    let (root, healthy, allowed, stale, revoked, healthy_log, allowed_log,
-        stale_log, revoked_log, healthy_cost, observed_cost, events) = finish_world(world, reading)?;
+    let (
+        root,
+        healthy,
+        allowed,
+        stale,
+        revoked,
+        healthy_log,
+        allowed_log,
+        stale_log,
+        revoked_log,
+        healthy_cost,
+        observed_cost,
+        events,
+    ) = finish_world(world, reading)?;
     assert_eq!(healthy.grant, root);
     assert_eq!(allowed.grant, root);
     assert_eq!(healthy.path, [root]);
@@ -890,7 +1170,11 @@ fn observation_and_log_reads_are_counted_for_allowed_stale_and_revoked_answers()
     assert_eq!(events.len(), 3);
     assert!(observed_cost.fields >= 3 * 3);
     assert!(observed_cost.bytes > 0);
-    assert!(events.iter().all(|fields| fields.get("step").is_some_and(|step| step == "project")));
+    assert!(
+        events
+            .iter()
+            .all(|fields| fields.get("step").is_some_and(|step| step == "project"))
+    );
     eprintln!("grant observation fixture costs: {observed_cost:?}; physical syncs not measured");
     Ok(())
 }

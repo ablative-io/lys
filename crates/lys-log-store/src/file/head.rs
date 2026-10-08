@@ -179,10 +179,16 @@ mod tests {
             let mut store = FileLeafStore::create(dir.path(), "example.test/head-refusals")?;
             let mut calls = 0;
             store.legacy = Some(Arc::new(|| Ok(false)));
-            let legacy = store.with_current_head(|_| { calls += 1; Ok(()) });
+            let legacy = store.with_current_head(|_| {
+                calls += 1;
+                Ok(())
+            });
             store.legacy = None;
             store.durability_uncertain = Some(3);
-            let uncertain = store.with_current_head(|_| { calls += 1; Ok(()) });
+            let uncertain = store.with_current_head(|_| {
+                calls += 1;
+                Ok(())
+            });
             drop(store);
             Ok((legacy, uncertain, calls))
         })();
@@ -191,11 +197,16 @@ mod tests {
             (Err(error), Ok(())) => return Err(error),
             (Ok(_), Err(error)) => return Err(error.into()),
             (Err(error), Err(cleanup)) => {
-                return Err(format!("head fixture failed: {error}; cleanup failed: {cleanup}").into());
+                return Err(
+                    format!("head fixture failed: {error}; cleanup failed: {cleanup}").into(),
+                );
             }
         };
         assert!(matches!(legacy, Err(StoreError::MigrationPending { .. })));
-        assert!(matches!(uncertain, Err(StoreError::ReopenRequired { index: 3 })));
+        assert!(matches!(
+            uncertain,
+            Err(StoreError::ReopenRequired { index: 3 })
+        ));
         assert_eq!(calls, 0);
         Ok(())
     }

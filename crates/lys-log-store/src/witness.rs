@@ -20,8 +20,11 @@ pub struct TailLeaf {
 
 impl std::fmt::Debug for TailLeaf {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("TailLeaf").field("index", &self.index)
-            .field("bytes", &self.bytes.len()).finish()
+        formatter
+            .debug_struct("TailLeaf")
+            .field("index", &self.index)
+            .field("bytes", &self.bytes.len())
+            .finish()
     }
 }
 
@@ -42,8 +45,11 @@ pub struct TailWitness {
 
 impl PartialEq for TailWitness {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.owner, &other.owner) && self.origin == other.origin
-            && self.lower == other.lower && self.upper == other.upper && self.leaves == other.leaves
+        Arc::ptr_eq(&self.owner, &other.owner)
+            && self.origin == other.origin
+            && self.lower == other.lower
+            && self.upper == other.upper
+            && self.leaves == other.leaves
     }
 }
 
@@ -51,10 +57,13 @@ impl Eq for TailWitness {}
 
 impl std::fmt::Debug for TailWitness {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("TailWitness").field("origin", &self.origin)
+        formatter
+            .debug_struct("TailWitness")
+            .field("origin", &self.origin)
             .field("lower_size", &self.lower.tree_size)
             .field("upper_size", &self.upper.tree_size)
-            .field("leaves", &self.leaves.len()).finish()
+            .field("leaves", &self.leaves.len())
+            .finish()
     }
 }
 
@@ -88,32 +97,50 @@ pub(super) fn validate(
     path: &Path,
 ) -> StoreResult<()> {
     let corrupt = |reason: &str| StoreError::Corrupt {
-        path: path.to_path_buf(), reason: reason.to_owned(),
+        path: path.to_path_buf(),
+        reason: reason.to_owned(),
     };
-    let lower = PinnedRoot { tree_size: settled.size(), root: settled.root() };
+    let lower = PinnedRoot {
+        tree_size: settled.size(),
+        root: settled.root(),
+    };
     if witness.origin != origin {
         return Err(corrupt("tail witness names a different log origin"));
     }
     if witness.lower != lower {
-        return Err(corrupt("tail witness does not begin at the trusted settled frontier"));
+        return Err(corrupt(
+            "tail witness does not begin at the trusted settled frontier",
+        ));
     }
     if witness.upper != upper || upper.tree_size < lower.tree_size {
-        return Err(corrupt("tail witness does not end at the certified current frontier"));
+        return Err(corrupt(
+            "tail witness does not end at the certified current frontier",
+        ));
     }
-    let count = u64::try_from(witness.leaves.len()).map_err(|source|
-        StoreError::LeafCountUnrepresentable { count: upper.tree_size, source })?;
+    let count = u64::try_from(witness.leaves.len()).map_err(|source| {
+        StoreError::LeafCountUnrepresentable {
+            count: upper.tree_size,
+            source,
+        }
+    })?;
     if count != upper.tree_size - lower.tree_size {
-        return Err(corrupt("tail witness does not contain the entire contiguous range"));
+        return Err(corrupt(
+            "tail witness does not contain the entire contiguous range",
+        ));
     }
     let mut extended = settled.clone();
     for (index, leaf) in (lower.tree_size..upper.tree_size).zip(&witness.leaves) {
         if leaf.index != index {
-            return Err(corrupt("tail witness indexes are omitted, duplicated or reordered"));
+            return Err(corrupt(
+                "tail witness indexes are omitted, duplicated or reordered",
+            ));
         }
         extended.push(&leaf.bytes);
     }
     if extended.size() != upper.tree_size || extended.root() != upper.root {
-        return Err(corrupt("tail witness leaves do not extend to the certified root"));
+        return Err(corrupt(
+            "tail witness leaves do not extend to the certified root",
+        ));
     }
     Ok(())
 }
