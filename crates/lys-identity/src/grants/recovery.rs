@@ -14,7 +14,8 @@ use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_core::merkle::InclusionProof;
-use lys_log_store::{LeafStore, Start, TailWitness, TailWitnessProvider};
+use lys_log_store::{LeafStore, Start};
+use lys_log_store::witness::{TailWitness, TailWitnessProvider};
 
 use super::error::GrantError;
 use super::events::{GrantEvent, SignedGrantEvent, verify_grant_event};

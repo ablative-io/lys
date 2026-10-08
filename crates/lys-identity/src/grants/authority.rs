@@ -14,7 +14,8 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_log_store::{LeafStore, TailWitnessProvider};
+use lys_log_store::LeafStore;
+use lys_log_store::witness::TailWitnessProvider;
 
 use super::admission::{DelegateRequest, RootRequest, Route, judge_delegation, judge_root};
 use super::error::GrantError;

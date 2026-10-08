@@ -1,6 +1,7 @@
 //! Authenticate a complete tail inside its provider's current-head reading.
 
-use lys_log_store::{Frontier, PinnedRoot, TailWitness};
+use lys_log_store::{Frontier, PinnedRoot};
+use lys_log_store::witness::TailWitness;
 
 use super::{GrantError, SignedGrantEvent, verify_grant_event};
 use crate::IdentityError;
