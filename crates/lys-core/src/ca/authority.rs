@@ -293,9 +293,11 @@ impl CertificateAuthority {
     }
 
     fn creation_time(&self) -> TrustResult<DateTime<Utc>> {
-        self.clock.now().map_err(|error| TrustError::CertificateGeneration {
-            reason: format!("certificate creation {error}"),
-        })
+        self.clock
+            .now()
+            .map_err(|error| TrustError::CertificateGeneration {
+                reason: format!("certificate creation {error}"),
+            })
     }
 }
 

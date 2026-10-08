@@ -18,8 +18,7 @@ use std::process::ExitCode;
 use clap::{CommandFactory, FromArgMatches};
 
 use crate::cli::{
-    Cli, Command, InspectCommand, KeyCommand, LogCommand, LogProveCommand,
-    LogVerifyCommand,
+    Cli, Command, InspectCommand, KeyCommand, LogCommand, LogProveCommand, LogVerifyCommand,
 };
 
 /// What `--version` prints after the name: the crate version and the commit
@@ -145,7 +144,9 @@ fn main() -> ExitCode {
                 } => commands::log::verify::consistency(&artifact, &verifier_key, json),
             },
         },
-        Command::Ca(ca_command) => commands::ca_dispatch::run(ca_command, json, lys_core::clock::ClockSource::System),
+        Command::Ca(ca_command) => {
+            commands::ca_dispatch::run(ca_command, json, lys_core::clock::ClockSource::System)
+        }
         Command::Runner(runner_command) => commands::runner::run(runner_command),
         Command::Proxy(proxy_command) => commands::proxy::run(proxy_command),
         Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out, json),

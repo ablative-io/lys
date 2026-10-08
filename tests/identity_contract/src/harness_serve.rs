@@ -7,7 +7,9 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use lys_core::clock::ClockSource;
-use lys_identity_server::{Config, Say, service, service_saying, service_with_clock, service_saying_with_clock};
+use lys_identity_server::{
+    Config, Say, service, service_saying, service_saying_with_clock, service_with_clock,
+};
 
 /// Records a named elapsed interval for temporary fixture diagnosis.
 pub struct StageTimer {
@@ -183,8 +185,12 @@ pub(crate) async fn serve(
     let app = match (clock, say) {
         (ClockSource::System, Some(say)) => service_saying(config, say).await?,
         (ClockSource::System, None) => service(config).await?,
-        (ClockSource::Supplied(clock), Some(say)) => service_saying_with_clock(config, say, ClockSource::Supplied(Arc::clone(clock))).await?,
-        (ClockSource::Supplied(clock), None) => service_with_clock(config, ClockSource::Supplied(Arc::clone(clock))).await?,
+        (ClockSource::Supplied(clock), Some(say)) => {
+            service_saying_with_clock(config, say, ClockSource::Supplied(Arc::clone(clock))).await?
+        }
+        (ClockSource::Supplied(clock), None) => {
+            service_with_clock(config, ClockSource::Supplied(Arc::clone(clock))).await?
+        }
     };
     drop(stage);
     let stage = StageTimer::new("serve.middleware");

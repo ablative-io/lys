@@ -95,7 +95,9 @@ fn utc_from_duration(duration: Duration, before_epoch: bool) -> Result<DateTime<
             (seconds, 0)
         } else {
             (
-                seconds.checked_sub(1).ok_or(ClockError::InstantOutOfRange)?,
+                seconds
+                    .checked_sub(1)
+                    .ok_or(ClockError::InstantOutOfRange)?,
                 1_000_000_000 - nanos,
             )
         }
@@ -112,7 +114,9 @@ mod tests {
     #[test]
     fn system_conversion_preserves_epoch_and_fractional_seconds() {
         assert_eq!(
-            utc_from_duration(Duration::ZERO, false).unwrap().timestamp(),
+            utc_from_duration(Duration::ZERO, false)
+                .unwrap()
+                .timestamp(),
             0
         );
         let instant = utc_from_duration(Duration::new(7, 123_456_789), false).unwrap();
@@ -131,7 +135,10 @@ mod tests {
                 .timestamp(),
             -7
         );
-        assert!(matches!(unix_seconds(instant), Err(ClockError::InstantOutOfRange)));
+        assert!(matches!(
+            unix_seconds(instant),
+            Err(ClockError::InstantOutOfRange)
+        ));
     }
 
     #[test]

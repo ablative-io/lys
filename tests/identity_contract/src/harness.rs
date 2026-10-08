@@ -11,8 +11,8 @@
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use lys_core::clock::{Clock, ClockError, ClockSource, UtcInstant};
 
@@ -41,27 +41,40 @@ impl ManualClock {
     /// Construct one provider at an explicit whole Unix second.
     #[must_use]
     pub fn new(seconds: i64) -> Self {
-        Self { seconds: AtomicI64::new(seconds), refused: AtomicBool::new(false), reads: AtomicU64::new(0) }
+        Self {
+            seconds: AtomicI64::new(seconds),
+            refused: AtomicBool::new(false),
+            reads: AtomicU64::new(0),
+        }
     }
 
     /// Assign the next reading synchronously.
-    pub fn set(&self, seconds: i64) { self.seconds.store(seconds, Ordering::SeqCst); }
+    pub fn set(&self, seconds: i64) {
+        self.seconds.store(seconds, Ordering::SeqCst);
+    }
 
     /// Explicitly refuse or admit provider reads.
-    pub fn refuse(&self, refused: bool) { self.refused.store(refused, Ordering::SeqCst); }
+    pub fn refuse(&self, refused: bool) {
+        self.refused.store(refused, Ordering::SeqCst);
+    }
 
     /// Provider calls completed by this independently owned fixture.
     #[must_use]
-    pub fn reads(&self) -> u64 { self.reads.load(Ordering::SeqCst) }
+    pub fn reads(&self) -> u64 {
+        self.reads.load(Ordering::SeqCst)
+    }
 }
 
 impl Clock for ManualClock {
     fn now(&self) -> Result<UtcInstant, ClockError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
         if self.refused.load(Ordering::SeqCst) {
-            return Err(ClockError::Unavailable { reason: "fixture read refused".to_owned() });
+            return Err(ClockError::Unavailable {
+                reason: "fixture read refused".to_owned(),
+            });
         }
-        UtcInstant::from_timestamp(self.seconds.load(Ordering::SeqCst), 0).ok_or(ClockError::InstantOutOfRange)
+        UtcInstant::from_timestamp(self.seconds.load(Ordering::SeqCst), 0)
+            .ok_or(ClockError::InstantOutOfRange)
     }
 }
 
@@ -395,7 +408,19 @@ impl Service {
         clock: Arc<dyn Clock>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
-        Box::pin(Self::start_clock_saying(GRANT_MODEL, None, None, None, |_| {}, ClockServing { say: None, clock: ClockSource::Supplied(clock) }, prepare)).await
+        Box::pin(Self::start_clock_saying(
+            GRANT_MODEL,
+            None,
+            None,
+            None,
+            |_| {},
+            ClockServing {
+                say: None,
+                clock: ClockSource::Supplied(clock),
+            },
+            prepare,
+        ))
+        .await
     }
 
     /// Start the service as [`Service::start_with`] does, judging grants by
@@ -469,7 +494,19 @@ impl Service {
         say: Option<Say>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
-        Self::start_clock_saying(model, spicedb, secrets, sign_in_providers, adjust, ClockServing { say, clock: ClockSource::System }, prepare).await
+        Self::start_clock_saying(
+            model,
+            spicedb,
+            secrets,
+            sign_in_providers,
+            adjust,
+            ClockServing {
+                say,
+                clock: ClockSource::System,
+            },
+            prepare,
+        )
+        .await
     }
 
     async fn start_clock_saying<T: Send>(
