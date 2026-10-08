@@ -16,9 +16,29 @@ use crate::routes::AppState;
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Saved {
-    app: String,
-    client_secret_ref: String,
-    api_credential_ref: String,
+    pub(crate) app: String,
+    pub(crate) client_secret_ref: String,
+    pub(crate) api_credential_ref: String,
+}
+
+/// Keep confirmed custody as a new operation, retaining the original approval.
+pub(crate) fn keep_custody(
+    state: &AppState,
+    headers: &HeaderMap,
+    prepared: crate::apps_state::CustodyPrepared,
+    previous_digest: &str,
+) -> Result<(), ServerError> {
+    with_apps(state, |apps, projection| {
+        acting(state, apps.held(), headers, projection)?.administrator()?;
+        if apps.held().operation(&prepared.operation).is_none() {
+            let current = apps.app(&prepared.app).and_then(|app| app.approved.as_ref())
+                .ok_or_else(|| AppError::AppNotApproved { app: prepared.app.clone() })?;
+            if current.client.secret_sha256 != previous_digest {
+                return Err(ServerError::SecretsUnavailable { reason: "app custody changed while the broker was preparing this operation".to_owned() });
+            }
+        }
+        apps.keep(Line::CustodyPrepared(prepared)).map(|_kept| ())
+    })
 }
 
 /// Prepare before activation. A repeated request reconciles the broker's sealed value.

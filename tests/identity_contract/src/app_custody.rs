@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::sync::{Arc, Mutex};
+use std::collections::BTreeMap;
 
 /// Fixed fixture bytes, never used by a production service.
 pub fn secret() -> String {
@@ -39,6 +40,8 @@ struct Kept {
     /// Apps whose sealed client secret the stand-in no longer holds.
     lost: Vec<String>,
     issued: Vec<Held>,
+    current: BTreeMap<String, String>,
+    bearers: BTreeMap<String, (String, String)>,
 }
 
 /// A running stand-in: its address, and its credentials as it holds them.
@@ -122,6 +125,7 @@ pub async fn serve() -> Result<Custody, Box<dyn Error>> {
     };
     let router = axum::Router::new()
         .route("/_lys/apps/prepare", axum::routing::post(prepare))
+        .route("/_lys/apps/bearer/issue", axum::routing::post(issue_bearer))
         .route("/_lys/apps/client", axum::routing::post(authenticate))
         .route("/_lys/apps/client/issue", axum::routing::post(issue))
         .route("/_lys/apps/client/end", axum::routing::post(end))
@@ -188,6 +192,34 @@ async fn prepare(
     .into_response()
 }
 
+async fn issue_bearer(
+    State(custody): State<Custody>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Response {
+    let mut kept = kept!(custody);
+    if kept.down { return down(); }
+    let Some(app) = body["app"].as_str() else { return refused(StatusCode::BAD_REQUEST, "RequestMalformed"); };
+    let Some(operation) = body["operation"].as_str() else { return refused(StatusCode::BAD_REQUEST, "RequestMalformed"); };
+    let repeated = kept.bearers.get(operation).cloned();
+    let secret = match &repeated {
+        Some((held_app, secret)) if held_app == app => secret.clone(),
+        Some(_) => return refused(StatusCode::CONFLICT, "OperationReused"),
+        None => digest(operation),
+    };
+    let current = kept.current.get(app).cloned().unwrap_or_else(|| digest(&self::secret()));
+    let next = digest(&secret);
+    if body["expected_digest"].as_str() != Some(current.as_str()) && current != next {
+        return refused(StatusCode::FORBIDDEN, "AppClientCustodyMismatch");
+    }
+    kept.current.insert(app.to_owned(), next.clone());
+    kept.bearers.insert(operation.to_owned(), (app.to_owned(), secret.clone()));
+    let owner = owner(&headers);
+    Json(json!({"app": app, "owner": owner, "client_secret_ref": format!("lys-app-{owner}-{app}-client"),
+        "api_credential_ref": format!("lys-app-{owner}-{app}-api-{operation}"), "client_secret_sha256": next,
+        "credential": if repeated.is_some() { None } else { Some(format!("lys-app.{app}.{secret}")) }})).into_response()
+}
+
 async fn issue(
     State(custody): State<Custody>,
     headers: HeaderMap,
@@ -217,8 +249,9 @@ async fn issue(
         digest: digest(&value),
         ended: false,
     });
+    let current = kept.current.get(&app).cloned().unwrap_or_else(|| digest(&secret()));
     Json(json!({"app": app, "credential_id": credential_id,
-        "owner": owner(&headers), "value": value}))
+        "owner": owner(&headers), "value": value, "client_secret_sha256": current}))
     .into_response()
 }
 
@@ -227,13 +260,14 @@ async fn authenticate(State(custody): State<Custody>, Json(body): Json<Value>) -
     if kept.down {
         return down();
     }
-    if body["secret_sha256"].as_str() != Some(digest(&secret()).as_str()) {
+    let app = body["app"].as_str().unwrap_or("missing");
+    let current = kept.current.get(app).cloned().unwrap_or_else(|| digest(&secret()));
+    if body["secret_sha256"].as_str() != Some(current.as_str()) {
         return refused(
             StatusCode::FORBIDDEN,
             "AppClientCustodyMismatch: the sealed client secret is not the approved one",
         );
     }
-    let app = body["app"].as_str().unwrap_or("missing");
     let presented = digest(body["presented"].as_str().unwrap_or_default());
     let live: Vec<&str> = body["live"]
         .as_array()

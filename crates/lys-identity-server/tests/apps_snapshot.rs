@@ -15,7 +15,7 @@ use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
     Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
     ClientCredentialsEnded, Connected, Decided, Held, Line, LysRecorded, Placed, Proposed,
-    Registered, SignInSet, Standing,
+    Registered, SignInSet, Standing, CustodyPrepared,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -26,6 +26,31 @@ const FIXTURE: &str = include_str!("fixtures/apps-state-v1.json");
 /// The same record with client credentials kept on it (DIRECTORY-081),
 /// written once with them and never regenerated.
 const CREDENTIAL_FIXTURE: &str = include_str!("fixtures/apps-state-081.json");
+
+#[test]
+fn old_install_custody_is_migrated_by_a_new_line_and_replay_retains_the_imported_bytes() -> TestResult {
+    let old: serde_json::Value = serde_json::from_str(FIXTURE)?;
+    let mut held = Held::decode(FIXTURE.as_bytes())?;
+    let history = held.app("notes").ok_or("no imported app")?.history.clone();
+    let original = serde_json::to_vec(&history)?;
+    let prepared = Line::CustodyPrepared(CustodyPrepared {
+        operation: op(90), app: "notes".to_owned(), client: Client { client_id: "notes".to_owned(), secret_sha256: "ef".repeat(32) },
+        owner: format!("person-{}", "ab".repeat(16)), client_secret_ref: format!("lys-app-person-{}-notes-client", "ab".repeat(16)),
+        api_credential_ref: format!("lys-app-person-{}-notes-api-{}", "ab".repeat(16), op(90)), bearer_issued: true, by: operator(), at: 90,
+    });
+    held.hold(prepared.clone())?;
+    let app = held.app("notes").ok_or("no migrated app")?;
+    assert_eq!(app.approved.as_ref().ok_or("no approval")?.client.secret_sha256, "ef".repeat(32));
+    assert_eq!(serde_json::to_vec(&app.history[..history.len()])?, original);
+    let encoded = held.encode()?;
+    let reopened = Held::decode(&encoded)?;
+    assert_eq!(held, reopened);
+    let mut replay = Held::decode(FIXTURE.as_bytes())?;
+    replay.hold(prepared)?;
+    assert_eq!(replay.encode()?, encoded);
+    assert_eq!(serde_json::from_str::<serde_json::Value>(FIXTURE)?, old);
+    Ok(())
+}
 
 fn login(subject: &str) -> Login {
     Login {
@@ -202,6 +227,7 @@ fn kind(line: &Line) -> &'static str {
         Line::ClientCredentialIssued(_) => "client_credential_issued",
         Line::ClientCredentialRevoked(_) => "client_credential_revoked",
         Line::ClientCredentialsEnded(_) => "client_credentials_ended",
+        Line::CustodyPrepared(_) => "custody_prepared",
     }
 }
 
@@ -225,6 +251,7 @@ fn actor(line: &Line) -> Option<By> {
         | Line::ClientCredentialIssued(ClientCredentialIssued { by, .. })
         | Line::ClientCredentialRevoked(ClientCredentialRevoked { by, .. }) => Some(by.clone()),
         Line::ClientCredentialsEnded(_) => None,
+        Line::CustodyPrepared(prepared) => Some(prepared.by.clone()),
     }
 }
 

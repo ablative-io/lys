@@ -31,6 +31,7 @@ mod fold;
 mod client_lines;
 pub use client_lines::{
     ClientCredential, ClientCredentialIssued, ClientCredentialRevoked, ClientCredentialsEnded,
+    CustodyPrepared,
 };
 
 #[cfg(test)]
@@ -294,6 +295,8 @@ pub enum Line {
     ClientCredentialRevoked(ClientCredentialRevoked),
     /// The broker's confirmation that it ended an app's credentials.
     ClientCredentialsEnded(ClientCredentialsEnded),
+    /// An approved app's current credential digest and sealed references.
+    CustodyPrepared(CustodyPrepared),
 }
 
 impl Line {
@@ -315,6 +318,7 @@ impl Line {
             Self::ClientCredentialIssued(line) => &line.operation,
             Self::ClientCredentialRevoked(line) => &line.operation,
             Self::ClientCredentialsEnded(line) => &line.operation,
+            Self::CustodyPrepared(line) => &line.operation,
         }
     }
 
@@ -336,6 +340,7 @@ impl Line {
             Self::ClientCredentialIssued(line) => Some(&line.app),
             Self::ClientCredentialRevoked(line) => Some(&line.app),
             Self::ClientCredentialsEnded(line) => Some(&line.app),
+            Self::CustodyPrepared(line) => Some(&line.app),
         }
     }
 }

@@ -10,6 +10,30 @@ use serde::{Deserialize, Serialize};
 
 use super::{App, By, Line};
 
+/// Confirmed custody for an approved app, without a credential value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CustodyPrepared {
+    /// The operation that established this custody or rotated it.
+    pub operation: String,
+    /// The approved app.
+    pub app: String,
+    /// The current client id and secret digest.
+    pub client: super::Client,
+    /// The owner of the sealed entries.
+    pub owner: String,
+    /// The sealed client reference.
+    pub client_secret_ref: String,
+    /// The sealed bearer reference.
+    pub api_credential_ref: String,
+    /// Whether this operation issued a bearer rather than adopting client custody.
+    pub bearer_issued: bool,
+    /// The administrator who requested custody.
+    pub by: By,
+    /// When custody was confirmed.
+    pub at: u64,
+}
+
 /// A virtual client credential issued for an approved app.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

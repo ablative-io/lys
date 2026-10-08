@@ -45,7 +45,7 @@ struct End {
 
 /// The trusted screen service's caller and its body, read whole, or the
 /// refusal. Anything but a screen service is refused.
-async fn asked<T: DeserializeOwned>(
+pub(crate) async fn asked<T: DeserializeOwned>(
     shared: &Arc<Shared>,
     request: Request,
 ) -> Result<(Caller, T), (StatusCode, String)> {
@@ -91,6 +91,7 @@ pub async fn issue(State(shared): State<Arc<Shared>>, request: Request) -> Answe
             "app": asked.app,
             "credential_id": issued.credential_id,
             "owner": issued.owner,
+            "client_secret_sha256": issued.client_secret_sha256,
             "value": value,
         })))
     })

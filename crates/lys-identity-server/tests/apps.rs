@@ -40,7 +40,7 @@ fn action(kind: &str, id: &str, action: &str) -> Value {
 
 #[tokio::test]
 async fn an_app_bearer_issue_answers_once_and_rotation_ends_the_old_value() -> TestResult {
-    let (service, _) = seeded().await?;
+    let (mut service, _) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     register(&service, &admin, NOTES).await?;
     approve(&service, &admin, NOTES).await?;
@@ -54,12 +54,20 @@ async fn an_app_bearer_issue_answers_once_and_rotation_ends_the_old_value() -> T
     assert_eq!(repeated["reference"], reference);
     assert!(repeated["credential"].is_null());
     ok(get(&service, "/apps/me", Auth::Bearer(credential)).await?)?;
-    let second = ok(post(&service, &path, Auth::Cookie(&admin), &json!({"operation": op()?})).await?)?;
+    let rotation = json!({"operation": op()?});
+    let second = ok(post(&service, &path, Auth::Cookie(&admin), &rotation).await?)?;
     let rotated = second["credential"].as_str().ok_or("no rotated bearer")?;
     assert_ne!(rotated, credential);
     refused(&get(&service, "/apps/me", Auth::Bearer(credential)).await?, 401, "credential_refused")?;
     ok(get(&service, "/apps/me", Auth::Bearer(rotated)).await?)?;
     assert!(!held_anywhere(service.dir.path(), credential.as_bytes())?);
+    assert!(!held_anywhere(service.dir.path(), rotated.as_bytes())?);
+    service.restart().await?;
+    refused(&get(&service, "/apps/me", Auth::Bearer(credential)).await?, 401, "credential_refused")?;
+    ok(get(&service, "/apps/me", Auth::Bearer(rotated)).await?)?;
+    let replayed = ok(post(&service, &path, Auth::Cookie(&admin), &rotation).await?)?;
+    assert_eq!(replayed["reference"], second["reference"]);
+    assert!(replayed["credential"].is_null());
     assert!(!held_anywhere(service.dir.path(), rotated.as_bytes())?);
     Ok(())
 }

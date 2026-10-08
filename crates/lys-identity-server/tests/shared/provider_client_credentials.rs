@@ -363,3 +363,23 @@ async fn missing_approved_client_custody_is_prepared_and_the_issue_is_replayed_w
     assert_eq!(status, 200, "{token}");
     Ok(())
 }
+
+#[tokio::test]
+async fn bearer_rotation_keeps_two_issued_virtual_clients_live() -> TestResult {
+    let (service, cookie, _person, _custody) = table_kept(CODE_SECONDS).await?;
+    let first = value(&issue(&service, &cookie, PRODUCT, &OperationId::generate()?.to_string()).await?)?;
+    let second = value(&issue(&service, &cookie, PRODUCT, &OperationId::generate()?.to_string()).await?)?;
+    for _ in 0..2 {
+        let answer = ok(post(&service, &format!("/apps/{PRODUCT}/bearer/issue"), Auth::Cookie(&cookie),
+            &json!({"operation": OperationId::generate()?.to_string()})).await?)?;
+        assert!(answer["credential"].as_str().is_some());
+        let listed = listed(&service, &cookie).await?;
+        assert_eq!(listed.len(), 2);
+        assert!(listed.iter().all(|credential| credential["live"] == true));
+        for credential in [&first, &second] {
+            let (status, token) = sign_in_with(&service, &cookie, credential, false).await?;
+            assert_eq!(status, 200, "{token}");
+        }
+    }
+    Ok(())
+}
