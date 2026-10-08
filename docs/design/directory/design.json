@@ -296,6 +296,56 @@
   ],
   "structure": [
     {
+      "path": "CHANGELOG.md",
+      "note": "Public grant response marker and Rust source-shape compatibility notes.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/witness.rs",
+      "note": "Complete ephemeral tail-witness capability, frontier/range binding and verification contract.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/witness.rs",
+      "note": "Real file-backed tail reading and tested cross-writer coherence for one bounded reading.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/tests/tail_witness.rs",
+      "note": "Real-store completeness, second-writer race, integrity, failure and reopen witness proofs.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/lib.rs",
+      "note": "Export the explicit complete-tail witness capability without changing stored bytes.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/store.rs",
+      "note": "Keep opaque leaf storage separate from the explicitly supplied witness capability.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/file.rs",
+      "note": "Connect the complete file-backed witness provider to store ownership.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/head.rs",
+      "note": "Prove head ownership and cross-writer invalidation for the witness reading, without a lifetime lease assumption.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/open.rs",
+      "note": "Verify fresh store identity/frontier and reopen invalidation for witness acquisition.",
+      "brief": "DIRECTORY-090"
+    },
+    {
+      "path": "crates/lys-log-store/src/error.rs",
+      "note": "Preserve named store and witness verification failures without fabricated tails.",
+      "brief": "DIRECTORY-090"
+    },
+    {
       "path": "crates/lys-core/src/clock.rs",
       "note": "The instance-owned Clock contract, SystemClock default, supplied UTC instant and checked conversion; DIRECTORY-088.",
       "brief": "DIRECTORY-088"
