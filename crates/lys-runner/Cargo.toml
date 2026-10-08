@@ -54,5 +54,9 @@ lys-secrets = { path = "../lys-secrets" }
 rcgen.workspace = true
 tempfile.workspace = true
 
+[[example]]
+name = "qualify_adapter"
+test = true
+
 [lints]
 workspace = true

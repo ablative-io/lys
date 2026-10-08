@@ -88,6 +88,7 @@ parallel sh scripts/file-length.sh
 parallel python3 -B -m unittest discover -s scripts/identity-gates -p surface_fixture_tests.py
 parallel python3 -B -m unittest discover -s scripts/identity-gates -p 'test_*.py'
 parallel python3 -B -m unittest discover -s scripts/identity-gates -p spicedb_fixture_tests.py
+parallel python3 -B -m unittest discover -s scripts/qualify -p 'test_*.py'
 parallel surface_leg
 leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
 leg cargo test --doc --workspace --all-features
