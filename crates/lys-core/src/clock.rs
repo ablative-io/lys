@@ -93,12 +93,15 @@ pub fn unix_seconds(instant: DateTime<Utc>) -> Result<u64, ClockError> {
 }
 
 fn utc_from_duration(duration: Duration, before_epoch: bool) -> Result<DateTime<Utc>, ClockError> {
-    let seconds = i64::try_from(duration.as_secs()).map_err(|source| ClockError::InstantOutOfRange {
-        source: Some(source),
-    })?;
+    let seconds =
+        i64::try_from(duration.as_secs()).map_err(|source| ClockError::InstantOutOfRange {
+            source: Some(source),
+        })?;
     let nanos = duration.subsec_nanos();
     let (seconds, nanos) = if before_epoch {
-        let seconds = seconds.checked_neg().ok_or(ClockError::InstantOutOfRange { source: None })?;
+        let seconds = seconds
+            .checked_neg()
+            .ok_or(ClockError::InstantOutOfRange { source: None })?;
         if nanos == 0 {
             (seconds, 0)
         } else {
