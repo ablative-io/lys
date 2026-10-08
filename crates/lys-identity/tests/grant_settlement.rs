@@ -33,9 +33,9 @@ fn witnessed_world(engine: &Engine) -> Result<World<Store, Engine>, Box<dyn Erro
     let mut world = world(engine)?;
     let opened = (|| -> Result<_, Box<dyn Error>> {
         let path = world.dir.path().join("grants");
-        let provider = Arc::new(lys_log_store::witness::FileTailProvider::new(FileLeafStore::open(
-            &path,
-        )?));
+        let provider = Arc::new(lys_log_store::witness::FileTailProvider::new(
+            FileLeafStore::open(&path)?,
+        ));
         let faults = Arc::clone(&engine.faults);
         let reopen = Box::new(move || {
             faults.reopens.fetch_add(1, Ordering::Relaxed);
