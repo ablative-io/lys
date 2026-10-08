@@ -20,7 +20,11 @@ pub enum ClockError {
     },
     /// The instant cannot be represented by the receiving time type.
     #[error("clock unavailable: instant is outside the supported time range")]
-    InstantOutOfRange,
+    InstantOutOfRange {
+        /// The original integer conversion failure, when one produced the refusal.
+        #[source]
+        source: Option<std::num::TryFromIntError>,
+    },
 }
 
 /// A UTC clock supplied when an owner is constructed.
@@ -83,28 +87,32 @@ impl Clock for SystemClock {
 ///
 /// Returns [`ClockError::InstantOutOfRange`] for a pre-epoch instant.
 pub fn unix_seconds(instant: DateTime<Utc>) -> Result<u64, ClockError> {
-    u64::try_from(instant.timestamp()).map_err(|_| ClockError::InstantOutOfRange)
+    u64::try_from(instant.timestamp()).map_err(|source| ClockError::InstantOutOfRange {
+        source: Some(source),
+    })
 }
 
 fn utc_from_duration(duration: Duration, before_epoch: bool) -> Result<DateTime<Utc>, ClockError> {
-    let seconds = i64::try_from(duration.as_secs()).map_err(|_| ClockError::InstantOutOfRange)?;
+    let seconds = i64::try_from(duration.as_secs()).map_err(|source| ClockError::InstantOutOfRange {
+        source: Some(source),
+    })?;
     let nanos = duration.subsec_nanos();
     let (seconds, nanos) = if before_epoch {
-        let seconds = seconds.checked_neg().ok_or(ClockError::InstantOutOfRange)?;
+        let seconds = seconds.checked_neg().ok_or(ClockError::InstantOutOfRange { source: None })?;
         if nanos == 0 {
             (seconds, 0)
         } else {
             (
                 seconds
                     .checked_sub(1)
-                    .ok_or(ClockError::InstantOutOfRange)?,
+                    .ok_or(ClockError::InstantOutOfRange { source: None })?,
                 1_000_000_000 - nanos,
             )
         }
     } else {
         (seconds, nanos)
     };
-    DateTime::from_timestamp(seconds, nanos).ok_or(ClockError::InstantOutOfRange)
+    DateTime::from_timestamp(seconds, nanos).ok_or(ClockError::InstantOutOfRange { source: None })
 }
 
 #[cfg(test)]
@@ -137,7 +145,7 @@ mod tests {
         );
         assert!(matches!(
             unix_seconds(instant),
-            Err(ClockError::InstantOutOfRange)
+            Err(ClockError::InstantOutOfRange { .. })
         ));
         let error = unix_seconds(instant).unwrap_err();
         assert!(
@@ -151,7 +159,7 @@ mod tests {
         for before_epoch in [false, true] {
             assert!(matches!(
                 utc_from_duration(Duration::MAX, before_epoch),
-                Err(ClockError::InstantOutOfRange)
+                Err(ClockError::InstantOutOfRange { .. })
             ));
             let error = utc_from_duration(Duration::MAX, before_epoch).unwrap_err();
             assert!(
@@ -160,7 +168,7 @@ mod tests {
             );
             assert!(matches!(
                 utc_from_duration(Duration::from_secs(i64::MAX.unsigned_abs()), before_epoch),
-                Err(ClockError::InstantOutOfRange)
+                Err(ClockError::InstantOutOfRange { .. })
             ));
         }
     }

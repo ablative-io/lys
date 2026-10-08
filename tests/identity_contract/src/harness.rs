@@ -74,7 +74,7 @@ impl Clock for ManualClock {
             });
         }
         UtcInstant::from_timestamp(self.seconds.load(Ordering::SeqCst), 0)
-            .ok_or(ClockError::InstantOutOfRange)
+            .ok_or(ClockError::InstantOutOfRange { source: None })
     }
 }
 

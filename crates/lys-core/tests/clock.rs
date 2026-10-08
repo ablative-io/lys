@@ -51,7 +51,7 @@ impl Clock for SuppliedClock {
             });
         }
         DateTime::from_timestamp(self.seconds.load(Ordering::SeqCst), self.nanos)
-            .ok_or(ClockError::InstantOutOfRange)
+            .ok_or(ClockError::InstantOutOfRange { source: None })
     }
 }
 
@@ -96,13 +96,20 @@ fn system_clock_and_existing_authority_constructor_use_system_time() {
 fn unsigned_seconds_reject_pre_epoch_instants_and_preserve_whole_seconds() {
     assert!(matches!(
         unix_seconds(instant(-1)),
-        Err(ClockError::InstantOutOfRange)
+        Err(ClockError::InstantOutOfRange { .. })
     ));
     let just_before_epoch = instant(-1).with_nanosecond(999_999_999).unwrap();
     assert!(matches!(
         unix_seconds(just_before_epoch),
-        Err(ClockError::InstantOutOfRange)
+        Err(ClockError::InstantOutOfRange { .. })
     ));
+    for supplied in [instant(-1), just_before_epoch] {
+        let error = unix_seconds(supplied).unwrap_err();
+        assert!(
+            std::error::Error::source(&error)
+                .is_some_and(|source| source.is::<std::num::TryFromIntError>())
+        );
+    }
     assert_eq!(unix_seconds(instant(0)).unwrap(), 0);
     assert_eq!(unix_seconds(instant(FIRST)).unwrap(), 1_700_000_000);
     let fractional = instant(FIRST).with_nanosecond(999_999_999).unwrap();
