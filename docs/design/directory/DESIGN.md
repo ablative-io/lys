@@ -158,6 +158,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 
 | Path | Note | Brief |
 |------|------|-------|
+| `crates/lys-core/src/clock.rs` | The instance-owned Clock contract, SystemClock default, supplied UTC instant and checked conversion; DIRECTORY-088. | DIRECTORY-088 |
+| `crates/lys-core/tests/clock.rs` | Clock isolation, supplied creation-time/error/count controls and preserved old-state proof; DIRECTORY-088. | DIRECTORY-088 |
+| `crates/lys/src/commands/ca_dispatch.rs` | One real CA dispatcher shared by the production entry and separate clock fixture; DIRECTORY-088. | DIRECTORY-088 |
+| `crates/lys/tests/clock_cli.rs` | Uninstalled, default-off real CLI fixture supplying time to the shared CA dispatcher; DIRECTORY-088. | DIRECTORY-088 |
+| `crates/lys-core/src/ca/authority.rs` | Issuer and both leaf creation paths read the owned clock with unchanged certificate/validity semantics; DIRECTORY-088. | DIRECTORY-088 |
+| `crates/lys-core/src/lib.rs` | Declares and exports the owned clock contract used by CA and request/session construction; DIRECTORY-088. | DIRECTORY-088 |
 | `docs/design/directory/design.json` | the directory design; gains a structure row for every path a row brief names | DIRECTORY-001 |
 | `docs/design/directory/DESIGN.md` | rendered markdown | DIRECTORY-001 |
 | `docs/design/directory/checklist.json` | the directory checklist; gains the row items | DIRECTORY-001 |

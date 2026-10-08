@@ -296,6 +296,36 @@
   ],
   "structure": [
     {
+      "path": "crates/lys-core/src/clock.rs",
+      "note": "The instance-owned Clock contract, SystemClock default, supplied UTC instant and checked conversion; DIRECTORY-088.",
+      "brief": "DIRECTORY-088"
+    },
+    {
+      "path": "crates/lys-core/tests/clock.rs",
+      "note": "Clock isolation, supplied creation-time/error/count controls and preserved old-state proof; DIRECTORY-088.",
+      "brief": "DIRECTORY-088"
+    },
+    {
+      "path": "crates/lys/src/commands/ca_dispatch.rs",
+      "note": "One real CA dispatcher shared by the production entry and separate clock fixture; DIRECTORY-088.",
+      "brief": "DIRECTORY-088"
+    },
+    {
+      "path": "crates/lys/tests/clock_cli.rs",
+      "note": "Uninstalled, default-off real CLI fixture supplying time to the shared CA dispatcher; DIRECTORY-088.",
+      "brief": "DIRECTORY-088"
+    },
+    {
+      "path": "crates/lys-core/src/ca/authority.rs",
+      "note": "Issuer and both leaf creation paths read the owned clock with unchanged certificate/validity semantics; DIRECTORY-088.",
+      "brief": "DIRECTORY-088"
+    },
+    {
+      "path": "crates/lys-core/src/lib.rs",
+      "note": "Declares and exports the owned clock contract used by CA and request/session construction; DIRECTORY-088.",
+      "brief": "DIRECTORY-088"
+    },
+    {
       "path": "docs/design/directory/design.json",
       "note": "the directory design; gains a structure row for every path a row brief names",
       "brief": "DIRECTORY-001"
