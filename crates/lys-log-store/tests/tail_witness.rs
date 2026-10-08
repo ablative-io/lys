@@ -73,6 +73,48 @@ fn a_callback_refusal_releases_the_head_before_another_writer() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn the_reading_holds_the_append_lock_and_releases_it_at_return() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let held = FileLeafStore::create(dir.path(), "example.test/current-head-lock")?;
+        let contender = std::fs::OpenOptions::new().append(true).open(
+            dir.path().join("leaves").join("segments").join(format!("{:020}", 0)),
+        )?;
+        let blocked = held.with_current_head(|_| {
+            let attempted = std::thread::scope(|scope| {
+                scope.spawn(|| contender.try_lock()).join()
+            }).map_err(|_| StoreError::Io {
+                context: "head fixture contender panicked".to_owned(),
+                source: std::io::Error::other("head fixture contender panicked"),
+            })?;
+            match attempted {
+                Err(std::fs::TryLockError::WouldBlock) => Ok(true),
+                Err(std::fs::TryLockError::Error(source)) => Err(StoreError::Io {
+                    context: "head fixture could not test contention".to_owned(), source,
+                }),
+                Ok(()) => {
+                    contender.unlock().map_err(|source| StoreError::Io {
+                        context: "head fixture could not release the contender".to_owned(), source,
+                    })?;
+                    Ok(false)
+                }
+            }
+        });
+        let released = contender.try_lock();
+        if released.is_ok() {
+            contender.unlock()?;
+        }
+        drop(contender);
+        drop(held);
+        Ok((blocked, released))
+    })();
+    let (blocked, released) = finish(dir, result)?;
+    assert!(blocked?);
+    released?;
+    Ok(())
+}
+
 #[cfg(feature = "flush-counts")]
 #[test]
 fn current_head_reading_performs_no_physical_flush() -> TestResult {
