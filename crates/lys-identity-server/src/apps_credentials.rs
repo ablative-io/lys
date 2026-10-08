@@ -31,10 +31,17 @@ pub(crate) fn keep_custody(
     with_apps(state, |apps, projection| {
         acting(state, apps.held(), headers, projection)?.administrator()?;
         if apps.held().operation(&prepared.operation).is_none() {
-            let current = apps.app(&prepared.app).and_then(|app| app.approved.as_ref())
-                .ok_or_else(|| AppError::AppNotApproved { app: prepared.app.clone() })?;
+            let current = apps
+                .app(&prepared.app)
+                .and_then(|app| app.approved.as_ref())
+                .ok_or_else(|| AppError::AppNotApproved {
+                    app: prepared.app.clone(),
+                })?;
             if current.client.secret_sha256 != previous_digest {
-                return Err(ServerError::SecretsUnavailable { reason: "app custody changed while the broker was preparing this operation".to_owned() });
+                return Err(ServerError::SecretsUnavailable {
+                    reason: "app custody changed while the broker was preparing this operation"
+                        .to_owned(),
+                });
             }
         }
         apps.keep(Line::CustodyPrepared(prepared)).map(|_kept| ())

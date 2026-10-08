@@ -36,8 +36,8 @@ use crate::apps_api::{malformed, view, with_apps};
 use crate::apps_binding::{Acting, acting};
 use crate::apps_error::AppError;
 use crate::apps_state::{
-    App, By, Client, ClientCredentialIssued, ClientCredentialRevoked, ClientCredentialsEnded, CustodyPrepared, Line,
-    Standing,
+    App, By, Client, ClientCredentialIssued, ClientCredentialRevoked, ClientCredentialsEnded,
+    CustodyPrepared, Line, Standing,
 };
 use crate::apps_views::{AppView, ClientCredentialGiven};
 use crate::error::ServerError;
@@ -114,14 +114,27 @@ pub(crate) async fn issue_bearer(
         may_issue(&acting(&state, apps.held(), &headers, projection)?)?;
         if let Some(line) = apps.held().operation(&operation) {
             return match line {
-                Line::CustodyPrepared(prepared) if prepared.app == id && prepared.bearer_issued => Ok((Some(crate::apps_views::AppBearerGiven {
-                    app: id.clone(), reference: prepared.api_credential_ref, credential: None,
-                }), String::new())),
-                _ => Err(AppError::AppOperationReused { operation: operation.clone() }.into()),
+                Line::CustodyPrepared(prepared) if prepared.app == id && prepared.bearer_issued => {
+                    Ok((
+                        Some(crate::apps_views::AppBearerGiven {
+                            app: id.clone(),
+                            reference: prepared.api_credential_ref,
+                            credential: None,
+                        }),
+                        String::new(),
+                    ))
+                }
+                _ => Err(AppError::AppOperationReused {
+                    operation: operation.clone(),
+                }
+                .into()),
             };
         }
         let app = approved(apps, &id)?;
-        let approval = app.approved.as_ref().ok_or_else(|| AppError::AppNotApproved { app: id.clone() })?;
+        let approval = app
+            .approved
+            .as_ref()
+            .ok_or_else(|| AppError::AppNotApproved { app: id.clone() })?;
         Ok((None, approval.client.secret_sha256.clone()))
     })?;
     if let Some(given) = repeated {
@@ -130,27 +143,58 @@ pub(crate) async fn issue_bearer(
     let answer = crate::secrets_api::ask(&state, &headers, Method::POST, "/_lys/apps/bearer/issue", encoded(&json!({
         "app": id, "operation": operation, "expected_digest": expected, "upstream": state.identity_upstream,
     }))).await?;
-    let issued: IssuedBearer = serde_json::from_value(answer).map_err(|_error| unconfirmed("the app bearer's issue"))?;
+    let issued: IssuedBearer =
+        serde_json::from_value(answer).map_err(|_error| unconfirmed("the app bearer's issue"))?;
     let prefix = format!("lys-app-{}-{id}", issued.owner);
-    let shaped = issued.client_secret_sha256.len() == 64 && issued.client_secret_sha256.bytes().all(|byte| byte.is_ascii_hexdigit());
+    let shaped = issued.client_secret_sha256.len() == 64
+        && issued
+            .client_secret_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit());
     let value_valid = issued.credential.as_ref().is_none_or(|value| {
-        value.strip_prefix(&format!("lys-app.{id}.")).is_some_and(|secret| {
-            secret.len() == 64 && secret.bytes().all(|byte| byte.is_ascii_hexdigit())
-                && crate::apps_binding::sha256_hex(secret) == issued.client_secret_sha256
-        })
+        value
+            .strip_prefix(&format!("lys-app.{id}."))
+            .is_some_and(|secret| {
+                secret.len() == 64
+                    && secret.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    && crate::apps_binding::sha256_hex(secret) == issued.client_secret_sha256
+            })
     });
-    if issued.app != id || !shaped || !value_valid || issued.client_secret_ref != format!("{prefix}-client")
+    if issued.app != id
+        || !shaped
+        || !value_valid
+        || issued.client_secret_ref != format!("{prefix}-client")
         || issued.api_credential_ref != format!("{prefix}-api-{operation}")
     {
         return Err(unconfirmed("the app bearer's custody"));
     }
-    let by = with_apps(&state, |apps, projection| may_issue(&acting(&state, apps.held(), &headers, projection)?))?;
-    crate::apps_credentials::keep_custody(&state, &headers, CustodyPrepared {
-        operation, app: id.clone(), client: Client { client_id: id.clone(), secret_sha256: issued.client_secret_sha256 },
-        owner: issued.owner, client_secret_ref: issued.client_secret_ref, api_credential_ref: issued.api_credential_ref.clone(),
-        bearer_issued: true, by, at: now(),
-    }, &expected)?;
-    Ok(Json(crate::apps_views::AppBearerGiven { app: id, reference: issued.api_credential_ref, credential: issued.credential }))
+    let by = with_apps(&state, |apps, projection| {
+        may_issue(&acting(&state, apps.held(), &headers, projection)?)
+    })?;
+    crate::apps_credentials::keep_custody(
+        &state,
+        &headers,
+        CustodyPrepared {
+            operation,
+            app: id.clone(),
+            client: Client {
+                client_id: id.clone(),
+                secret_sha256: issued.client_secret_sha256,
+            },
+            owner: issued.owner,
+            client_secret_ref: issued.client_secret_ref,
+            api_credential_ref: issued.api_credential_ref.clone(),
+            bearer_issued: true,
+            by,
+            at: now(),
+        },
+        &expected,
+    )?;
+    Ok(Json(crate::apps_views::AppBearerGiven {
+        app: id,
+        reference: issued.api_credential_ref,
+        credential: issued.credential,
+    }))
 }
 
 /// Who acts, when they hold `issue_app_client_credential`; its refusal
@@ -199,20 +243,24 @@ pub(crate) async fn issue(
     let (repeated, previous_digest) = with_apps(&state, |apps, projection| {
         may_issue(&acting(&state, apps.held(), &headers, projection)?)?;
         match apps.held().operation(&operation) {
-            Some(Line::ClientCredentialIssued(issued)) if issued.app == id => {
-                Ok((Some(ClientCredentialGiven {
+            Some(Line::ClientCredentialIssued(issued)) if issued.app == id => Ok((
+                Some(ClientCredentialGiven {
                     app: issued.app,
                     credential_id: issued.credential_id,
                     credential: None,
-                }), String::new()))
-            }
+                }),
+                String::new(),
+            )),
             Some(_) => Err(AppError::AppOperationReused {
                 operation: operation.clone(),
             }
             .into()),
             None => {
                 let app = approved(apps, &id)?;
-                let approval = app.approved.as_ref().ok_or_else(|| AppError::AppNotApproved { app: id.clone() })?;
+                let approval = app
+                    .approved
+                    .as_ref()
+                    .ok_or_else(|| AppError::AppNotApproved { app: id.clone() })?;
                 Ok((None, approval.client.secret_sha256.clone()))
             }
         }
@@ -234,7 +282,14 @@ pub(crate) async fn issue(
         Ok(answer) => answer,
         Err(ServerError::SecretsRefused { refusal, .. }) if refusal == "AppClientNoCustody" => {
             crate::apps_credentials::prepare(&state, &headers, &id).await?;
-            crate::secrets_api::ask_as(&state, &person, Method::POST, "/_lys/apps/client/issue", encoded(&json!({"app": id}))).await?
+            crate::secrets_api::ask_as(
+                &state,
+                &person,
+                Method::POST,
+                "/_lys/apps/client/issue",
+                encoded(&json!({"app": id})),
+            )
+            .await?
         }
         Err(error) => return Err(error),
     };
@@ -250,30 +305,59 @@ pub(crate) async fn issue(
             .strip_prefix(APP_CLIENT_PREFIX)
             .and_then(|rest| rest.strip_prefix(id.as_str()))
             .is_some_and(|rest| rest.starts_with('.'));
-    if issued.app != id || !shaped || issued.client_secret_sha256.len() != 64
-        || !issued.client_secret_sha256.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if issued.app != id
+        || !shaped
+        || issued.client_secret_sha256.len() != 64
+        || !issued
+            .client_secret_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
         return Err(unconfirmed("the credential's issue"));
     }
     let current = with_apps(&state, |apps, _projection| {
-        approved(apps, &id)?.approved.as_ref().map(|approved| approved.client.secret_sha256.clone())
+        approved(apps, &id)?
+            .approved
+            .as_ref()
+            .map(|approved| approved.client.secret_sha256.clone())
             .ok_or_else(|| AppError::AppNotApproved { app: id.clone() }.into())
     })?;
     if current != issued.client_secret_sha256 {
-        let by = with_apps(&state, |apps, projection| may_issue(&acting(&state, apps.held(), &headers, projection)?))?;
+        let by = with_apps(&state, |apps, projection| {
+            may_issue(&acting(&state, apps.held(), &headers, projection)?)
+        })?;
         let prefix = format!("lys-app-{}-{id}", issued.owner);
-        crate::apps_credentials::keep_custody(&state, &headers, CustodyPrepared {
-            operation: OperationId::generate()?.to_string(), app: id.clone(),
-            client: Client { client_id: id.clone(), secret_sha256: issued.client_secret_sha256.clone() },
-            owner: issued.owner.clone(), client_secret_ref: format!("{prefix}-client"), api_credential_ref: format!("{prefix}-api"),
-            bearer_issued: false, by, at: now(),
-        }, &previous_digest)?;
+        crate::apps_credentials::keep_custody(
+            &state,
+            &headers,
+            CustodyPrepared {
+                operation: OperationId::generate()?.to_string(),
+                app: id.clone(),
+                client: Client {
+                    client_id: id.clone(),
+                    secret_sha256: issued.client_secret_sha256.clone(),
+                },
+                owner: issued.owner.clone(),
+                client_secret_ref: format!("{prefix}-client"),
+                api_credential_ref: format!("{prefix}-api"),
+                bearer_issued: false,
+                by,
+                at: now(),
+            },
+            &previous_digest,
+        )?;
     }
     let kept = with_apps(&state, |apps, projection| {
         let by = may_issue(&acting(&state, apps.held(), &headers, projection)?)?;
         if let Some(line) = apps.held().operation(&operation) {
             return match line {
-                Line::ClientCredentialIssued(previous) if previous.app == id => Ok(Some(previous.credential_id)),
-                _ => Err(AppError::AppOperationReused { operation: operation.clone() }.into()),
+                Line::ClientCredentialIssued(previous) if previous.app == id => {
+                    Ok(Some(previous.credential_id))
+                }
+                _ => Err(AppError::AppOperationReused {
+                    operation: operation.clone(),
+                }
+                .into()),
             };
         }
         apps.keep(Line::ClientCredentialIssued(ClientCredentialIssued {
@@ -287,8 +371,19 @@ pub(crate) async fn issue(
         Ok(None)
     });
     if let Ok(Some(previous)) = &kept {
-        end_at_broker(&state, &person, &id, &[issued.credential_id.clone()], "duplicate issue operation").await?;
-        return Ok(Json(ClientCredentialGiven { app: id, credential_id: previous.clone(), credential: None }));
+        end_at_broker(
+            &state,
+            &person,
+            &id,
+            &[issued.credential_id.clone()],
+            "duplicate issue operation",
+        )
+        .await?;
+        return Ok(Json(ClientCredentialGiven {
+            app: id,
+            credential_id: previous.clone(),
+            credential: None,
+        }));
     }
     if let Err(refused) = kept {
         // Kept nowhere, so ended at once: a credential the record does not

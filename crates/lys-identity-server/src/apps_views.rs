@@ -382,8 +382,14 @@ pub struct AppBearerGiven {
 
 impl std::fmt::Debug for AppBearerGiven {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AppBearerGiven").field("app", &self.app).field("reference", &self.reference)
-            .field("credential", &self.credential.as_ref().map(|_value| "[redacted]")).finish()
+        f.debug_struct("AppBearerGiven")
+            .field("app", &self.app)
+            .field("reference", &self.reference)
+            .field(
+                "credential",
+                &self.credential.as_ref().map(|_value| "[redacted]"),
+            )
+            .finish()
     }
 }
 

@@ -110,12 +110,23 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
             if app.approved.is_none()
                 || prepared.client.client_id != prepared.app
                 || prepared.client.secret_sha256.len() != 64
-                || !prepared.client.secret_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+                || !prepared
+                    .client
+                    .secret_sha256
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
                 || prepared.owner.parse::<lys_identity::PersonId>().is_err()
-                || prepared.client_secret_ref != format!("lys-app-{}-{}-client", prepared.owner, prepared.app)
-                || prepared.api_credential_ref != if prepared.bearer_issued {
-                    format!("lys-app-{}-{}-api-{}", prepared.owner, prepared.app, prepared.operation)
-                } else { format!("lys-app-{}-{}-api", prepared.owner, prepared.app) } =>
+                || prepared.client_secret_ref
+                    != format!("lys-app-{}-{}-client", prepared.owner, prepared.app)
+                || prepared.api_credential_ref
+                    != if prepared.bearer_issued {
+                        format!(
+                            "lys-app-{}-{}-api-{}",
+                            prepared.owner, prepared.app, prepared.operation
+                        )
+                    } else {
+                        format!("lys-app-{}-{}-api", prepared.owner, prepared.app)
+                    } =>
         {
             Err(Refused::Credential)
         }

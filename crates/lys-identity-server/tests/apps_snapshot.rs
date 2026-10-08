@@ -14,8 +14,8 @@ use std::error::Error;
 use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
     Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
-    ClientCredentialsEnded, Connected, Decided, Held, Line, LysRecorded, Placed, Proposed,
-    Registered, SignInSet, Standing, CustodyPrepared,
+    ClientCredentialsEnded, Connected, CustodyPrepared, Decided, Held, Line, LysRecorded, Placed,
+    Proposed, Registered, SignInSet, Standing,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -28,19 +28,36 @@ const FIXTURE: &str = include_str!("fixtures/apps-state-v1.json");
 const CREDENTIAL_FIXTURE: &str = include_str!("fixtures/apps-state-081.json");
 
 #[test]
-fn old_install_custody_is_migrated_by_a_new_line_and_replay_retains_the_imported_bytes() -> TestResult {
+fn old_install_custody_is_migrated_by_a_new_line_and_replay_retains_the_imported_bytes()
+-> TestResult {
     let old: serde_json::Value = serde_json::from_str(FIXTURE)?;
     let mut held = Held::decode(FIXTURE.as_bytes())?;
     let history = held.app("notes").ok_or("no imported app")?.history.clone();
     let original = serde_json::to_vec(&history)?;
     let prepared = Line::CustodyPrepared(CustodyPrepared {
-        operation: op(90), app: "notes".to_owned(), client: Client { client_id: "notes".to_owned(), secret_sha256: "ef".repeat(32) },
-        owner: format!("person-{}", "ab".repeat(16)), client_secret_ref: format!("lys-app-person-{}-notes-client", "ab".repeat(16)),
-        api_credential_ref: format!("lys-app-person-{}-notes-api-{}", "ab".repeat(16), op(90)), bearer_issued: true, by: operator(), at: 90,
+        operation: op(90),
+        app: "notes".to_owned(),
+        client: Client {
+            client_id: "notes".to_owned(),
+            secret_sha256: "ef".repeat(32),
+        },
+        owner: format!("person-{}", "ab".repeat(16)),
+        client_secret_ref: format!("lys-app-person-{}-notes-client", "ab".repeat(16)),
+        api_credential_ref: format!("lys-app-person-{}-notes-api-{}", "ab".repeat(16), op(90)),
+        bearer_issued: true,
+        by: operator(),
+        at: 90,
     });
     held.hold(prepared.clone())?;
     let app = held.app("notes").ok_or("no migrated app")?;
-    assert_eq!(app.approved.as_ref().ok_or("no approval")?.client.secret_sha256, "ef".repeat(32));
+    assert_eq!(
+        app.approved
+            .as_ref()
+            .ok_or("no approval")?
+            .client
+            .secret_sha256,
+        "ef".repeat(32)
+    );
     assert_eq!(serde_json::to_vec(&app.history[..history.len()])?, original);
     let encoded = held.encode()?;
     let reopened = Held::decode(&encoded)?;

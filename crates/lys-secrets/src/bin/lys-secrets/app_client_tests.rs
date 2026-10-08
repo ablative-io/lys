@@ -81,17 +81,25 @@ impl Fixture {
     async fn bearer(&self, operation: &str, expected: &str) -> Result<Value, String> {
         let body = json!({"app": "notes_app", "operation": operation, "expected_digest": expected,
             "upstream": "http://127.0.0.1:8491/api"});
-        let request = signed(&self.key, "/_lys/apps/bearer/issue", &body).map_err(|error| error.to_string())?;
-        crate::save_app::issue_bearer(State(Arc::clone(&self.shared)), request).await
-            .map(|answer| answer.0).map_err(|error| format!("{} {}", error.0, error.1))
+        let request = signed(&self.key, "/_lys/apps/bearer/issue", &body)
+            .map_err(|error| error.to_string())?;
+        crate::save_app::issue_bearer(State(Arc::clone(&self.shared)), request)
+            .await
+            .map(|answer| answer.0)
+            .map_err(|error| format!("{} {}", error.0, error.1))
     }
 
     fn reopen(&mut self) -> Outcome {
         let layout = self.shared.layout.clone();
         let grants = Grants::File(FileGrants::new(layout.grants()));
         let broker = Broker::open(&layout.paths(), grants.clone(), Box::new(now_ms))?;
-        self.shared = Arc::new(Shared { broker: Mutex::new(broker), layout,
-            client: reqwest::Client::new(), window: Mutex::new(ServiceWindow::new()), permissions: Arc::new(grants) });
+        self.shared = Arc::new(Shared {
+            broker: Mutex::new(broker),
+            layout,
+            client: reqwest::Client::new(),
+            window: Mutex::new(ServiceWindow::new()),
+            permissions: Arc::new(grants),
+        });
         Ok(())
     }
     /// Prepares `app`'s custody, answering its client secret's digest.
@@ -177,8 +185,14 @@ async fn real_bearer_custody_survives_reopen_and_replay_never_answers_plaintext(
     let client = fixture.issue("notes_app").await?;
     let operation = lys_identity::OperationId::generate()?.to_string();
     let first = fixture.bearer(&operation, &old).await?;
-    let value = first["credential"].as_str().ok_or("no bearer value")?.to_owned();
-    let digest = first["client_secret_sha256"].as_str().ok_or("no digest")?.to_owned();
+    let value = first["credential"]
+        .as_str()
+        .ok_or("no bearer value")?
+        .to_owned();
+    let digest = first["client_secret_sha256"]
+        .as_str()
+        .ok_or("no digest")?
+        .to_owned();
     assert!(value.starts_with("lys-app.notes_app."));
     assert!(!fixture.audit()?.contains(&value));
     fixture.reopen()?;
@@ -186,20 +200,36 @@ async fn real_bearer_custody_survives_reopen_and_replay_never_answers_plaintext(
     assert!(repeated["credential"].is_null());
     assert_eq!(repeated["api_credential_ref"], first["api_credential_ref"]);
     let client_value = client["value"].as_str().ok_or("no virtual client value")?;
-    let client_id = client["credential_id"].as_str().ok_or("no virtual client id")?;
-    fixture.authenticate("notes_app", client_value, &[client_id], &digest).await?;
+    let client_id = client["credential_id"]
+        .as_str()
+        .ok_or("no virtual client id")?;
+    fixture
+        .authenticate("notes_app", client_value, &[client_id], &digest)
+        .await?;
     let rotation = lys_identity::OperationId::generate()?.to_string();
     let second = fixture.bearer(&rotation, &digest).await?;
-    assert!(second["credential"].as_str().is_some_and(|next| next != value));
+    assert!(
+        second["credential"]
+            .as_str()
+            .is_some_and(|next| next != value)
+    );
     assert!(fixture.bearer(&operation, &old).await.is_err());
-    let next_digest = second["client_secret_sha256"].as_str().ok_or("no rotated digest")?;
+    let next_digest = second["client_secret_sha256"]
+        .as_str()
+        .ok_or("no rotated digest")?;
     fixture.reopen()?;
     let replayed = fixture.bearer(&rotation, &digest).await?;
     assert_eq!(replayed["api_credential_ref"], second["api_credential_ref"]);
     assert!(replayed["credential"].is_null());
-    fixture.authenticate("notes_app", client_value, &[client_id], next_digest).await?;
+    fixture
+        .authenticate("notes_app", client_value, &[client_id], next_digest)
+        .await?;
     assert!(!fixture.audit()?.contains(&value));
-    assert!(!fixture.audit()?.contains(second["credential"].as_str().ok_or("no rotated value")?));
+    assert!(
+        !fixture
+            .audit()?
+            .contains(second["credential"].as_str().ok_or("no rotated value")?)
+    );
     fixture.close()
 }
 
@@ -207,14 +237,29 @@ async fn real_bearer_custody_survives_reopen_and_replay_never_answers_plaintext(
 async fn missing_bearer_custody_is_created_and_invalid_operations_write_nothing() -> Outcome {
     let fixture = fixture()?;
     let before = fixture.audit()?;
-    assert!(fixture.bearer("invalid-operation", &"00".repeat(32)).await.is_err());
+    assert!(
+        fixture
+            .bearer("invalid-operation", &"00".repeat(32))
+            .await
+            .is_err()
+    );
     assert_eq!(fixture.audit()?, before);
-    let first = fixture.bearer(&lys_identity::OperationId::generate()?.to_string(), &"00".repeat(32)).await?;
+    let first = fixture
+        .bearer(
+            &lys_identity::OperationId::generate()?.to_string(),
+            &"00".repeat(32),
+        )
+        .await?;
     assert!(first["credential"].as_str().is_some());
     let virtual_client = fixture.issue("notes_app").await?;
-    fixture.authenticate("notes_app", virtual_client["value"].as_str().ok_or("no value")?,
-        &[virtual_client["credential_id"].as_str().ok_or("no id")?],
-        first["client_secret_sha256"].as_str().ok_or("no digest")?).await?;
+    fixture
+        .authenticate(
+            "notes_app",
+            virtual_client["value"].as_str().ok_or("no value")?,
+            &[virtual_client["credential_id"].as_str().ok_or("no id")?],
+            first["client_secret_sha256"].as_str().ok_or("no digest")?,
+        )
+        .await?;
     fixture.close()
 }
 

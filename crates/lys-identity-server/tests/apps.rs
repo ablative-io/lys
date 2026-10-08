@@ -58,12 +58,20 @@ async fn an_app_bearer_issue_answers_once_and_rotation_ends_the_old_value() -> T
     let second = ok(post(&service, &path, Auth::Cookie(&admin), &rotation).await?)?;
     let rotated = second["credential"].as_str().ok_or("no rotated bearer")?;
     assert_ne!(rotated, credential);
-    refused(&get(&service, "/apps/me", Auth::Bearer(credential)).await?, 401, "credential_refused")?;
+    refused(
+        &get(&service, "/apps/me", Auth::Bearer(credential)).await?,
+        401,
+        "credential_refused",
+    )?;
     ok(get(&service, "/apps/me", Auth::Bearer(rotated)).await?)?;
     assert!(!held_anywhere(service.dir.path(), credential.as_bytes())?);
     assert!(!held_anywhere(service.dir.path(), rotated.as_bytes())?);
     service.restart().await?;
-    refused(&get(&service, "/apps/me", Auth::Bearer(credential)).await?, 401, "credential_refused")?;
+    refused(
+        &get(&service, "/apps/me", Auth::Bearer(credential)).await?,
+        401,
+        "credential_refused",
+    )?;
     ok(get(&service, "/apps/me", Auth::Bearer(rotated)).await?)?;
     let replayed = ok(post(&service, &path, Auth::Cookie(&admin), &rotation).await?)?;
     assert_eq!(replayed["reference"], second["reference"]);

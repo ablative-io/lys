@@ -69,14 +69,20 @@ impl<P: PermissionCheck> Broker<P> {
     ) -> Result<(String, String, String, Option<Secret>), SecretsError> {
         app_named(app)?;
         operation.parse::<lys_identity::OperationId>()?;
-        if expected_digest.len() != 64 || !expected_digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        if expected_digest.len() != 64
+            || !expected_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
             return Err(SecretsError::InvalidName {
-                what: "digest", name: expected_digest.to_owned(), reason: "expected a SHA-256 hex digest",
+                what: "digest",
+                name: expected_digest.to_owned(),
+                reason: "expected a SHA-256 hex digest",
             });
         }
         let (client, owner) = match self.app_client_entry(app) {
             Ok(entry) => entry,
-            Err(SecretsError::AppClient(AppClientRefusal::NoCustody { .. })) => (format!("lys-app-{by}-{app}-client"), by.to_owned()),
+            Err(SecretsError::AppClient(AppClientRefusal::NoCustody { .. })) => {
+                (format!("lys-app-{by}-{app}-client"), by.to_owned())
+            }
             Err(error) => return Err(error),
         };
         let prefix = format!("lys-app-{owner}-{app}");
@@ -86,7 +92,8 @@ impl<P: PermissionCheck> Broker<P> {
             if entry.owner != owner || entry.class != EntryClass::Key {
                 return Err(SecretsError::SecretExists { name: staged });
             }
-            self.store.open_for_use(&self.store_key, &staged, EntryClass::Key)?
+            self.store
+                .open_for_use(&self.store_key, &staged, EntryClass::Key)?
         } else {
             Secret::new(hex(&random_bytes::<32>()?).into_bytes())
         };
@@ -95,10 +102,17 @@ impl<P: PermissionCheck> Broker<P> {
             if entry.owner != owner || entry.class != EntryClass::Key {
                 return Err(SecretsError::SecretExists { name: client });
             }
-            let held = self.store.open_for_use(&self.store_key, &client, EntryClass::Key)?;
+            let held = self
+                .store
+                .open_for_use(&self.store_key, &client, EntryClass::Key)?;
             let current = hex(&sha256(held.expose()));
-            if !same(current.as_bytes(), expected_digest.as_bytes()) && !same(current.as_bytes(), digest.as_bytes()) {
-                return Err(AppClientRefusal::CustodyMismatch { app: app.to_owned() }.into());
+            if !same(current.as_bytes(), expected_digest.as_bytes())
+                && !same(current.as_bytes(), digest.as_bytes())
+            {
+                return Err(AppClientRefusal::CustodyMismatch {
+                    app: app.to_owned(),
+                }
+                .into());
             }
         }
         self.seal_once(&staged, EntryClass::Key, &owner, &value)?;
@@ -112,7 +126,9 @@ impl<P: PermissionCheck> Broker<P> {
             if entry.owner != owner || entry.class != EntryClass::Credential {
                 return Err(SecretsError::SecretExists { name: api });
             }
-            let held = self.store.open_for_use(&self.store_key, &api, EntryClass::Credential)?;
+            let held = self
+                .store
+                .open_for_use(&self.store_key, &api, EntryClass::Credential)?;
             if !same(held.expose(), credential.expose()) {
                 self.store.replace(&self.store_key, &api, &credential)?;
             }
@@ -120,7 +136,9 @@ impl<P: PermissionCheck> Broker<P> {
             self.seal_once(&api, EntryClass::Credential, &owner, &credential)?;
         }
         if self.store.entry(&client).is_some() {
-            let held = self.store.open_for_use(&self.store_key, &client, EntryClass::Key)?;
+            let held = self
+                .store
+                .open_for_use(&self.store_key, &client, EntryClass::Key)?;
             if !same(held.expose(), value.expose()) {
                 self.store.replace(&self.store_key, &client, &value)?;
             }
@@ -128,8 +146,19 @@ impl<P: PermissionCheck> Broker<P> {
         } else {
             self.seal_once(&client, EntryClass::Key, &owner, &value)?;
         }
-        self.record(AuditKind::Issue, (None, Some(by), Some(&reference)), None, None, "app custody confirmed")?;
-        Ok((owner, reference, digest, if repeated { None } else { Some(credential) }))
+        self.record(
+            AuditKind::Issue,
+            (None, Some(by), Some(&reference)),
+            None,
+            None,
+            "app custody confirmed",
+        )?;
+        Ok((
+            owner,
+            reference,
+            digest,
+            if repeated { None } else { Some(credential) },
+        ))
     }
 
     /// The app's sealed client entry, by name, with its owner. App ids hold
@@ -166,7 +195,9 @@ impl<P: PermissionCheck> Broker<P> {
     ) -> Result<IssuedAppClient, SecretsError> {
         app_named(app)?;
         let (client, owner) = self.app_client_entry(app)?;
-        let sealed_client = self.store.open_for_use(&self.store_key, &client, EntryClass::Key)?;
+        let sealed_client = self
+            .store
+            .open_for_use(&self.store_key, &client, EntryClass::Key)?;
         let client_secret_sha256 = hex(&sha256(sealed_client.expose()));
         let credential_id = hex(&random_bytes::<8>()?);
         let value = Secret::new(

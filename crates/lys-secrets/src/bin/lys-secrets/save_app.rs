@@ -34,11 +34,23 @@ struct IssueBearer {
 /// Issue the bearer only on the operation's first durable preparation.
 pub async fn issue_bearer(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (who, asked): (_, IssueBearer) = crate::app_client::asked(&shared, request).await?;
-    let url = reqwest::Url::parse(&asked.upstream).map_err(|_error| (StatusCode::BAD_REQUEST, "RequestMalformed: invalid identity upstream".to_owned()))?;
-    if url.scheme() != "http" || !matches!(url.host_str(), Some("127.0.0.1" | "[::1]"))
-        || !url.username().is_empty() || url.password().is_some() || url.query().is_some() || url.fragment().is_some()
+    let url = reqwest::Url::parse(&asked.upstream).map_err(|_error| {
+        (
+            StatusCode::BAD_REQUEST,
+            "RequestMalformed: invalid identity upstream".to_owned(),
+        )
+    })?;
+    if url.scheme() != "http"
+        || !matches!(url.host_str(), Some("127.0.0.1" | "[::1]"))
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
     {
-        return Err((StatusCode::BAD_REQUEST, "RequestMalformed: identity upstream must be loopback".to_owned()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "RequestMalformed: identity upstream must be loopback".to_owned(),
+        ));
     }
     let layout = shared.layout.clone();
     on_broker(&shared, move |broker| {
