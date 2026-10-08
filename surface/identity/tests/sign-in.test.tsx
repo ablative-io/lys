@@ -250,11 +250,11 @@ describe('A product signing in through Lys', () => {
       '/oauth/authorize?client_id=cambium&state=a%26b&scope=openid%20profile',
       '/oauth/mcp/authorize?client_id=connector&state=original',
     ]) {
-      await mount('#/sign-in?continue=' + encodeURIComponent(target), {
+      const { container } = await mount('#/sign-in?continue=' + encodeURIComponent(target), {
         ...SERVICE,
         '/sign-in/providers': ok({ providers: [{ id: 'provider-1', name: 'Google', provider: 'google' }] }),
       });
-      expect($('.sign-in-providers a')?.getAttribute('href'))
+      expect(container.querySelector('.sign-in-providers a')?.getAttribute('href'))
         .toBe('/api/sign-in/providers/provider-1?continue=' + encodeURIComponent(target));
     }
   });
