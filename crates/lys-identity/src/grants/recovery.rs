@@ -10,10 +10,11 @@
 //! applied, whoever wrote it.
 
 use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_core::merkle::InclusionProof;
-use lys_log_store::{LeafStore, Start};
+use lys_log_store::{LeafStore, Start, TailWitness, TailWitnessProvider};
 
 use super::error::GrantError;
 use super::events::{GrantEvent, SignedGrantEvent, verify_grant_event};
@@ -62,6 +63,7 @@ pub struct GrantLedger<S: LeafStore> {
     reopen: Reopen<S>,
     service_key: [u8; 32],
     uncertain: Option<Uncertain>,
+    tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
 }
 
 impl<S: LeafStore> GrantLedger<S> {
@@ -73,6 +75,19 @@ impl<S: LeafStore> GrantLedger<S> {
         key: &Ed25519Identity,
         every: NonZeroU64,
     ) -> Result<(Self, Opening<SignedGrantEvent>), GrantError> {
+        Self::open_with_tail_provider(reopen, key, every, None)
+    }
+
+    /// Open with an explicitly supplied current-head tail capability.
+    ///
+    /// # Errors
+    /// Retains the original opening failure; no capability is inferred from storage.
+    pub fn open_with_tail_provider(
+        reopen: Reopen<S>,
+        key: &Ed25519Identity,
+        every: NonZeroU64,
+        tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
+    ) -> Result<(Self, Opening<SignedGrantEvent>), GrantError> {
         let (ledger, opening) = Ledger::open(&reopen, key, every)?;
         Ok((
             Self {
@@ -80,9 +95,63 @@ impl<S: LeafStore> GrantLedger<S> {
                 reopen,
                 service_key: key.public_key_bytes(),
                 uncertain: None,
+                tail_provider,
             },
             opening,
         ))
+    }
+
+    /// Acquire the complete tail after this owner's actual trusted frontier.
+    /// An uncertain append stays held; acquiring evidence never reconciles it.
+    ///
+    /// # Errors
+    /// Names an absent capability and preserves the provider's original refusal.
+    pub fn acquire_tail(&self) -> Result<TailWitness, GrantError> {
+        let provider = self.tail_provider.as_ref().ok_or_else(|| {
+            super::tail_witness::unavailable("tail witness capability is absent")
+        })?;
+        provider.acquire(self.ledger.trusted_frontier()).map_err(|error| {
+            GrantError::LogUnavailable { reason: error.to_string() }
+        })
+    }
+
+    /// Authenticate every tail event and read it within a fresh provider callback.
+    /// This supplies signed events, without asserting their authority effects.
+    /// The callback must not append through the same provider's head lock.
+    ///
+    /// # Errors
+    /// Preserves provider, signature and reading failures; stale or incomplete
+    /// evidence never reaches the reading. No permission failure is waived.
+    pub fn with_verified_tail<T>(
+        &self,
+        witness: &TailWitness,
+        reading: impl FnOnce(&[SignedGrantEvent]) -> Result<T, GrantError>,
+    ) -> Result<T, GrantError> {
+        let provider = self.tail_provider.as_ref().ok_or_else(|| {
+            super::tail_witness::unavailable("tail witness capability is absent")
+        })?;
+        let settled = self.ledger.trusted_frontier();
+        let mut reading = Some(reading);
+        let mut result = None;
+        provider.verify(witness, settled, &mut |certified| {
+            result = Some(match reading.take() {
+                Some(reading) => {
+                    if certified != witness {
+                        Err(super::tail_witness::unavailable("tail provider substituted its certified reading"))
+                    } else {
+                        super::tail_witness::authenticate(
+                            certified, settled, self.ledger.origin(), &self.service_key,
+                        ).and_then(|events| reading(&events))
+                    }
+                },
+                None => Err(super::tail_witness::unavailable("tail provider repeated its reading callback")),
+            });
+            Ok(())
+        }).map_err(|error| GrantError::LogUnavailable { reason: error.to_string() })?;
+        match result {
+            Some(result) => result,
+            None => Err(super::tail_witness::unavailable("tail provider omitted its reading callback")),
+        }
     }
 
     /// Refuse the snapshot's state, which the owner could not read, by

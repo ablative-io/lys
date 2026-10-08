@@ -317,6 +317,16 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         (self.frontier.size(), self.frontier.root())
     }
 
+    /// The frontier of events already verified and handed to the owner.
+    pub(crate) fn trusted_frontier(&self) -> &Frontier {
+        &self.frontier
+    }
+
+    /// The immutable origin of the opened log.
+    pub(crate) fn origin(&self) -> &str {
+        self.log.origin()
+    }
+
     /// The recorded leaf at `index`, read from the store.
     pub(crate) fn leaf(&self, index: u64) -> Result<Option<Vec<u8>>, K::Error> {
         if index >= self.len() {

@@ -26,6 +26,7 @@ mod schema_tests;
 mod settlement;
 pub mod shipped;
 mod state;
+mod tail_witness;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 pub mod types;

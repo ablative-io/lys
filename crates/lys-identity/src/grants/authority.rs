@@ -14,7 +14,7 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_log_store::LeafStore;
+use lys_log_store::{LeafStore, TailWitnessProvider};
 
 use super::admission::{DelegateRequest, RootRequest, Route, judge_delegation, judge_root};
 use super::error::GrantError;
@@ -171,7 +171,24 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         root_authority: PersonId,
         every: NonZeroU64,
     ) -> Result<Self, GrantError> {
-        let (mut ledger, opening) = GrantLedger::open(reopen, &key, every)?;
+        Self::open_with_tail_provider(reopen, key, relationships, model, root_authority, every, None)
+    }
+
+    /// Open with an explicit optional capability for authenticated tail readings.
+    /// Ordinary permission reads do not acquire or verify tail evidence.
+    ///
+    /// # Errors
+    /// Retains the original opening, state and projection failures.
+    pub fn open_with_tail_provider(
+        reopen: Reopen<S>,
+        key: Ed25519Identity,
+        relationships: R,
+        model: Model,
+        root_authority: PersonId,
+        every: NonZeroU64,
+        tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
+    ) -> Result<Self, GrantError> {
+        let (mut ledger, opening) = GrantLedger::open_with_tail_provider(reopen, &key, every, tail_provider)?;
         let read = opening
             .state
             .as_deref()
