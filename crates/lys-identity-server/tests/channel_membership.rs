@@ -670,3 +670,51 @@ async fn an_agent_is_admitted_only_by_its_own_grants() -> TestResult {
     );
     Ok(())
 }
+
+/// ACCESS-006 R2: revoking one chain removes only what it gave; an
+/// independent chain keeps its exact effective action, with its own grant
+/// as the evidence, at the revision that revoked the other.
+#[tokio::test]
+async fn revoking_one_chain_keeps_an_independent_one() -> TestResult {
+    let rooms = rooms().await?;
+    let reader = grant(&rooms, &rooms.bea, ("channel", "ward-a"), "reader").await?;
+    let member = grant(&rooms, &rooms.bea, ("workspace", "ward"), "member").await?;
+    let bea = (rooms.bea.as_str(), "person");
+    let before = decide(&rooms, &ask(&rooms, bea, "ward-a", "read")).await?;
+    assert_eq!(before["verdict"]["grant"], reader["grant"], "{before}");
+
+    let grant_id = reader["grant"]
+        .as_str()
+        .ok_or("the issue names its grant")?;
+    let revoke = json!({"operation": op()?, "route": "api", "reason": "one chain ends"});
+    let revoked = ok(post(
+        &rooms.service,
+        &format!("/grants/{grant_id}/revoke"),
+        Auth::Cookie(&rooms.admin),
+        &revoke,
+    )
+    .await?)?;
+    let fence = revoked["receipt"]["revision"]
+        .as_u64()
+        .ok_or("the revoke names its revision")?;
+    let mut request = ask(&rooms, bea, "ward-a", "read");
+    request["at_least"] = json!(fence);
+    let after = decide(&rooms, &request).await?;
+    assert_eq!(after["verdict"]["outcome"], "allowed", "{after}");
+    assert_eq!(after["verdict"]["grant"], member["grant"], "{after}");
+    assert_eq!(
+        after["verdict"]["scope"],
+        json!({"kind": kind("workspace"), "id": "ward"})
+    );
+    assert!(
+        after["revision"]
+            .as_u64()
+            .is_some_and(|revision| revision >= fence)
+    );
+    let post = decide(&rooms, &ask(&rooms, bea, "ward-a", "post")).await?;
+    assert_eq!(
+        post["verdict"]["refusal"], "NotHeld",
+        "the member chain never gave post"
+    );
+    Ok(())
+}
