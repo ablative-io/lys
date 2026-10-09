@@ -52,7 +52,12 @@ impl FileTailProvider {
     }
 
     fn current(&self) -> StoreResult<Option<Arc<Reading>>> {
-        Ok(self.reading.lock().map_err(|_| poisoned())?.as_ref().map(Arc::clone))
+        Ok(self
+            .reading
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(Arc::clone))
     }
 
     fn reopen(&self) -> StoreResult<Arc<Reading>> {

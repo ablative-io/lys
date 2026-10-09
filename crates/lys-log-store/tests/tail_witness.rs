@@ -396,7 +396,9 @@ fn a_faulted_acquisition_keeps_its_original_error_and_invents_no_tail() -> TestR
             FileLeafStore::open_read_only(dir.path())?,
         ));
         let settled = lys_log_store::Frontier::new();
-        faults.refuse(TailFaultStep::Acquire, || sentinel("tail acquisition")).unwrap();
+        faults
+            .refuse(TailFaultStep::Acquire, || sentinel("tail acquisition"))
+            .unwrap();
         let refused = provider.acquire(&settled);
         faults.clear(TailFaultStep::Acquire).unwrap();
         let witness = provider.acquire(&settled)?;
@@ -439,7 +441,9 @@ fn a_faulted_verification_never_reaches_its_reading() -> TestResult {
         ));
         let settled = lys_log_store::Frontier::new();
         let witness = provider.acquire(&settled)?;
-        faults.refuse(TailFaultStep::Verify, || sentinel("tail verification")).unwrap();
+        faults
+            .refuse(TailFaultStep::Verify, || sentinel("tail verification"))
+            .unwrap();
         let mut called = false;
         let refused = provider.verify(&witness, &settled, &mut |_| {
             called = true;

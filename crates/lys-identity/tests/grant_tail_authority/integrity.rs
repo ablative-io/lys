@@ -177,7 +177,9 @@ fn a_fault_provider_refuses_by_its_original_error_and_is_complete_without_one() 
             source: std::io::Error::other("tail-authority-sentinel"),
         }
     };
-    faults.refuse(TailFaultStep::Acquire, sentinel("tail-authority-acquire")).unwrap();
+    faults
+        .refuse(TailFaultStep::Acquire, sentinel("tail-authority-acquire"))
+        .unwrap();
     let refused = world.grants.ledger().acquire_tail();
     assert!(
         matches!(&refused, Err(GrantError::LogUnavailable { reason }) if reason.contains("tail-authority-acquire")),
@@ -185,7 +187,9 @@ fn a_fault_provider_refuses_by_its_original_error_and_is_complete_without_one() 
     );
     faults.clear(TailFaultStep::Acquire).unwrap();
     let witness = world.grants.ledger().acquire_tail()?;
-    faults.refuse(TailFaultStep::Verify, sentinel("tail-authority-verify")).unwrap();
+    faults
+        .refuse(TailFaultStep::Verify, sentinel("tail-authority-verify"))
+        .unwrap();
     let refused = world.grants.tail_authority(&witness, chain.second);
     assert!(
         matches!(&refused, Err(GrantError::LogUnavailable { reason }) if reason.contains("tail-authority-verify")),
