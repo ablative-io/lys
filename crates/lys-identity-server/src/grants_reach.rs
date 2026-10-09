@@ -6,8 +6,9 @@
 //! `/grants/who` asked of every resource and action together: the same
 //! holders, the same decisions, all made at the one revision the answer
 //! names, from one reading of the permission engine, so the graph costs one
-//! read rather than one per holder, action and resource. It is a question:
-//! nothing is recorded.
+//! read rather than one per holder, action and resource. Each action is
+//! answered with the mode of the grant it rests on, so a screen names a held
+//! right as held (ACCESS-001 R4). It is a question: nothing is recorded.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
@@ -16,7 +17,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use lys_identity::IdentityId;
-use lys_identity::grants::{Action, ExerciseRequest, Resource};
+use lys_identity::grants::{Action, ExerciseRequest, Grant, Resource};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -55,6 +56,9 @@ pub struct ReachHolder {
     pub holder: String,
     /// The actions it may take, in the order asked.
     pub actions: Vec<String>,
+    /// Each action's mode, beside it: `outright`, `by_draft` or `by_two`,
+    /// the mode of the grant the action rests on.
+    pub modes: Vec<&'static str>,
 }
 
 /// Who may act on one resource.
@@ -124,6 +128,7 @@ pub(crate) async fn reach(
             let mut permitted = Vec::new();
             for (text, (holder, held)) in holders {
                 let mut may = Vec::new();
+                let mut modes = Vec::new();
                 for action in actions.iter().filter(|action| held.contains(action)) {
                     let request = ExerciseRequest {
                         caller: holder,
@@ -132,7 +137,14 @@ pub(crate) async fn reach(
                         action: action.clone(),
                     };
                     match judged.grants.explain_in(&frame, &request, at) {
-                        Ok(_) => may.push(action.to_string()),
+                        // A permit naming a grant the book no longer holds is
+                        // answered as not permitted, as `which` answers it.
+                        Ok(permit) => {
+                            if let Some(grant) = judged.grants.book().grant(permit.grant) {
+                                may.push(action.to_string());
+                                modes.push(Grant::mode(grant).as_str());
+                            }
+                        }
                         Err(error) if unanswered(&error) => return Err(error.into()),
                         Err(_) => {}
                     }
@@ -141,6 +153,7 @@ pub(crate) async fn reach(
                     permitted.push(ReachHolder {
                         holder: text,
                         actions: may,
+                        modes,
                     });
                 }
             }

@@ -130,3 +130,31 @@ async fn a_grant_read_back_names_its_mode() -> TestResult {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn reach_names_each_actions_mode_beside_it() -> TestResult {
+    let (service, seeded) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea = seeded.people[1].id.to_string();
+    registered(&service, &admin, NOTES).await?;
+    let doc = format!("{NOTES}.doc");
+    held_root(&service, &admin, &bea, (&doc, "1"), "by_draft").await?;
+    ok(root(&service, &admin, &bea, (&doc, "2"), "editor").await?)?;
+    let asked = json!({"route": "browser", "resources": [
+        {"kind": doc, "id": "1", "actions": ["write"]},
+        {"kind": doc, "id": "2", "actions": ["write"]},
+    ]});
+    let answer = ok(post(&service, "/grants/reach", Auth::Cookie(&admin), &asked).await?)?;
+    let holder = |n: usize| -> Result<Value, Box<dyn std::error::Error>> {
+        answer["resources"][n]["holders"]
+            .as_array()
+            .and_then(|holders| holders.iter().find(|entry| entry["holder"] == bea.as_str()))
+            .cloned()
+            .ok_or_else(|| format!("bea reaches resource {n}: {answer}").into())
+    };
+    let held = holder(0)?;
+    assert_eq!(held["actions"], json!(["write"]), "{answer}");
+    assert_eq!(held["modes"], json!(["by_draft"]), "{answer}");
+    assert_eq!(holder(1)?["modes"], json!(["outright"]), "{answer}");
+    Ok(())
+}
