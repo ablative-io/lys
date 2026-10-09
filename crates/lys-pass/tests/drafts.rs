@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! A product receipt prevents a second execution after acknowledgment loss.
 
 use lys_pass::drafts::{ApprovedDraft, Execution, Executor, execute_once};

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Signed passes are trusted only for their issuer, audience and lifetime.
 
 use lys_pass::{Decision, KeySet, VerifiedPass};

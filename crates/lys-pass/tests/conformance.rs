@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Products use the same refusal bytes and authorization vectors.
 
 use lys_pass::{Refusal, conformance};

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Deliberate routes never use cached rights to answer a live refusal.
 
 use lys_pass::{Client, Target};
