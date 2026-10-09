@@ -2,8 +2,7 @@
   "log": { "identity": "lys-membership-vectors", "epoch": 1 },
   "kinds": [
     { "kind": "sample.workspace", "actions": ["read", "post"], "parents": [] },
-    { "kind": "sample.channel", "actions": ["read", "post"], "parents": ["sample.workspace"] },
-    { "kind": "sample.restricted", "actions": ["read", "post"], "parents": [] }
+    { "kind": "sample.channel", "actions": ["read", "post"], "parents": ["sample.workspace"] }
   ],
   "subjects": [
     { "label": "reader", "kind": "person", "responsible": null },
@@ -14,11 +13,11 @@
     { "label": "former", "kind": "person", "responsible": null }
   ],
   "placements": [
-    { "child": { "kind": "sample.channel", "id": "ward-a" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
-    { "child": { "kind": "sample.channel", "id": "ward-b" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
-    { "child": { "kind": "sample.channel", "id": "ward-c" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
-    { "child": { "kind": "sample.restricted", "id": "ward-secret" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
-    { "child": { "kind": "sample.channel", "id": "elsewhere-a" }, "parent": { "kind": "sample.workspace", "id": "elsewhere" } }
+    { "child": { "kind": "sample.channel", "id": "ward-a" }, "parent": { "kind": "sample.workspace", "id": "ward" }, "restricted": false },
+    { "child": { "kind": "sample.channel", "id": "ward-b" }, "parent": { "kind": "sample.workspace", "id": "ward" }, "restricted": false },
+    { "child": { "kind": "sample.channel", "id": "ward-c" }, "parent": { "kind": "sample.workspace", "id": "ward" }, "restricted": false },
+    { "child": { "kind": "sample.channel", "id": "ward-secret" }, "parent": { "kind": "sample.workspace", "id": "ward" }, "restricted": true },
+    { "child": { "kind": "sample.channel", "id": "elsewhere-a" }, "parent": { "kind": "sample.workspace", "id": "elsewhere" }, "restricted": false }
   ],
   "grants": [
     { "label": "reader-grant", "holder": "reader", "resource": { "kind": "sample.channel", "id": "ward-a" }, "actions": ["read"], "mode": "outright", "revoked": false },

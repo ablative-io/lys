@@ -257,7 +257,7 @@
         "kind": "person"
       },
       "resource": {
-        "kind": "sample.restricted",
+        "kind": "sample.channel",
         "id": "ward-secret"
       },
       "action": "read",

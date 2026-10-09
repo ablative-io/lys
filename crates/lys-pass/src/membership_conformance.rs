@@ -31,8 +31,7 @@ pub struct Kind {
     pub kind: String,
     /// Its declared actions.
     pub actions: Vec<String>,
-    /// The parent kinds whose grants flow down to it; none for a
-    /// restricted kind.
+    /// The parent kinds whose grants flow down to it.
     pub parents: Vec<String>,
 }
 
@@ -56,6 +55,10 @@ pub struct Placement {
     pub child: Resource,
     /// The resource it is placed in.
     pub parent: Resource,
+    /// Whether the placement is restricted (Lys ACCESS-004 R2): nothing
+    /// held on the parent reaches the child, though it stays placed within
+    /// the parent's workspace.
+    pub restricted: bool,
 }
 
 /// One labelled grant of the world.
