@@ -40,7 +40,7 @@ fn build_box(operation: &str) -> Value {
 }
 
 #[tokio::test]
-async fn the_administrator_names_and_retires_machines_and_everyone_signed_in_reads_them()
+async fn the_administrator_names_and_retires_machines_and_admitted_people_read_them()
 -> TestResult {
     let (service, seeded) =
         Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
@@ -54,7 +54,11 @@ async fn the_administrator_names_and_retires_machines_and_everyone_signed_in_rea
     assert_eq!(status, 200, "{empty}");
     assert_eq!(empty, json!({ "machines": [], "reports_served": true }));
 
-    let body = build_box(&operation);
+    let mut body = build_box(&operation);
+    let admitted = seeded.people[1].agents.iter()
+        .find(|agent| agent.state == lys_identity::LifecycleState::Active)
+        .ok_or("active agent missing")?;
+    body["may_run"] = json!([admitted.id.to_string()]);
     let by_bea = service.post("/network/machines", Some(&bea), &body).await?;
     refused(&by_bea, 403, "NotAdmitted");
     let (status, named) = service.post("/network/machines", Some(&ada), &body).await?;

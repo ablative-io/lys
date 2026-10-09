@@ -112,8 +112,13 @@ impl Table {
 
     async fn named(&self) -> Result<String, Box<dyn Error>> {
         let id = operation()?;
+        let mut body = computer(&id);
+        let admitted = self.seeded.people[1].agents.iter()
+            .find(|agent| agent.state == lys_identity::LifecycleState::Active)
+            .ok_or("active agent missing")?;
+        body["may_run"] = json!([admitted.id.to_string()]);
         let named = self
-            .sent("/network/machines", &self.ada, &computer(&id))
+            .sent("/network/machines", &self.ada, &body)
             .await?;
         assert_eq!(named["id"], id);
         Ok(id)
