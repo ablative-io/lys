@@ -121,6 +121,47 @@ fn a_difficulty_nineteen_counter_search_allocates_nothing() -> Result<(), Box<dy
     Ok(())
 }
 
+#[test]
+fn counter_search_matches_known_answers_without_allocating() -> Result<(), Box<dyn Error>> {
+    for (challenge, expected) in [
+        ("1:10:4102444800:salt:challenge:", 415),
+        (
+            "1:10:4102444800:abcdefghijklmnop:abcdefghijklmnopqrstuvwxyz0123456789abcdefghijk:",
+            48,
+        ),
+    ] {
+        let mut answer = None;
+        let allocations = allocation_counter::measure(|| {
+            answer = Some(super::solve_counter(challenge));
+        });
+        let counter = answer.ok_or("the counter search ran")??;
+        assert_eq!(counter, expected);
+        assert_eq!(allocations.count_total, 0, "{allocations:?}");
+        let expected_answer = format!("{challenge}{expected}");
+        assert_eq!(solve(challenge)?, expected_answer);
+        assert!(leading_zero_bits(&Sha256::digest(expected_answer.as_bytes())) >= 10);
+    }
+    Ok(())
+}
+
+#[test]
+fn an_allocating_counter_search_proves_the_measurement_detects_it() -> Result<(), Box<dyn Error>> {
+    let challenge = "1:10:4102444800:salt:challenge:";
+    let mut answer = None;
+    let allocations = allocation_counter::measure(|| {
+        for counter in 0_u64..=415 {
+            let candidate = format!("{challenge}{counter}");
+            if leading_zero_bits(&Sha256::digest(candidate.as_bytes())) >= 10 {
+                answer = Some(counter);
+                break;
+            }
+        }
+    });
+    assert_eq!(answer.ok_or("the allocating search answered")?, 415);
+    assert!(allocations.count_total > 0, "{allocations:?}");
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_forbidden_answer_at_the_challenge_expiry_names_the_expiry() -> Result<(), Box<dyn Error>>
 {
