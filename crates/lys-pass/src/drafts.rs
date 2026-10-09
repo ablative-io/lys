@@ -110,6 +110,43 @@ pub enum ExecuteError<E: std::error::Error + 'static> {
     Contract(#[source] Error),
 }
 
+/// A stopped pull or execution, preserving a committed outcome on acknowledgment failure.
+#[derive(Debug, thiserror::Error)]
+pub enum RunError<E: std::error::Error + 'static> {
+    /// Lys did not answer a valid approved page.
+    #[error("draft_pull_failed")]
+    Pull(#[source] Error),
+    /// The product did not complete a valid atomic execution.
+    #[error("draft_execution_failed: {draft}")]
+    Execution {
+        /// The draft at which the runner stopped.
+        draft: String,
+        /// The preserved product or digest error.
+        #[source]
+        source: ExecuteError<E>,
+    },
+    /// The product outcome exists but Lys did not acknowledge it.
+    #[error("draft_acknowledgment_failed: {draft}")]
+    Record {
+        /// The draft whose product receipt must be reused on retry.
+        draft: String,
+        /// The committed product receipt, never an instruction to execute again.
+        receipt: Box<Execution>,
+        /// The live acknowledgment failure.
+        #[source]
+        source: Error,
+    },
+}
+
+/// One explicit pull's results, with no background polling or automatic retry.
+#[derive(Debug)]
+pub struct RunReport {
+    /// Draft outcomes successfully acknowledged by Lys, including receipt replays.
+    pub acknowledged: usize,
+    /// The next page to pull explicitly, or the end.
+    pub next: Option<String>,
+}
+
 /// Hash the exact prepared words without canonicalizing or changing them.
 #[must_use]
 pub fn request_digest(words: &str) -> String {
@@ -147,6 +184,20 @@ fn validate(grant: &str, target: &Target, digest: &str, words: &str) -> Result<(
 }
 
 impl Client {
+    /// Pull one approved page, invoke the durable executor once per draft, and close each outcome.
+    pub async fn run_approved<E: Executor>(&self, connector_pass: &str, app: &str, after: Option<&str>, executor: &mut E) -> Result<RunReport, RunError<E::Error>> {
+        let page = self.approved_drafts(connector_pass, app, after).await.map_err(RunError::Pull)?;
+        let mut report = RunReport { acknowledged: 0, next: page.next };
+        for draft in &page.drafts {
+            let receipt = execute_once(draft, executor).map_err(|source| RunError::Execution { draft: draft.id.clone(), source })?;
+            self.record_execution(connector_pass, draft, &receipt).await.map_err(|source| RunError::Record {
+                draft: draft.id.clone(), receipt: Box::new(receipt), source,
+            })?;
+            report.acknowledged += 1;
+        }
+        Ok(report)
+    }
+
     /// Record a held act using its caller's pass; an ordinary refusal is never a draft.
     pub async fn create_draft(&self, pass: &str, draft: &DraftRequest) -> Result<DraftCreated, Error> {
         validate(&draft.grant, &draft.target, &draft.request_digest, &draft.words)?;
@@ -169,9 +220,14 @@ impl Client {
             .map_err(|error| Error::Transport(Box::new(error)))?;
         let page: ApprovedPage = response.error_for_status().map_err(|error| Error::Transport(Box::new(error)))?
             .json().await.map_err(|error| Error::Transport(Box::new(error)))?;
+        if page.total < page.drafts.len() || after.is_some_and(|cursor| page.next.as_deref() == Some(cursor)) {
+            return Err(Error::CannotAsk("draft population or continuation differs"));
+        }
+        let mut ids = std::collections::BTreeSet::new();
         for draft in &page.drafts {
             validate(&draft.grant, &draft.target, &draft.request_digest, &draft.words)?;
-            if draft.app != app || draft.id.is_empty() || !crate::rights::audience_owns(&draft.target.kind, app) {
+            if draft.app != app || draft.id.is_empty() || !crate::rights::audience_owns(&draft.target.kind, app)
+                || !ids.insert(&draft.id) {
                 return Err(Error::CannotAsk("approved draft belongs to another app"));
             }
         }
