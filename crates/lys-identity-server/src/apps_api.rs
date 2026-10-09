@@ -38,11 +38,12 @@ use axum::{Json, Router};
 use lys_core::Ed25519Identity;
 use lys_identity::OperationId;
 use lys_identity::grants::{AppSchema, LYS_APP, app_id};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::apps_binding::{Acting, Binding, Registrar, acting, new_secret};
 use crate::apps_error::AppError;
+use crate::apps_read::{AppRead, AppsRead, read_view, sees};
 use crate::apps_state::{
     Approved, By, Client, Decided, Line, LysRecorded, Registered, SignInSet, Standing,
 };
@@ -430,61 +431,6 @@ pub(crate) fn view(apps: &AppStore, id: &str) -> Result<AppView, ServerError> {
     apps.app(id)
         .map(AppView::from)
         .ok_or_else(|| AppError::AppUnknown { app: id.to_owned() }.into())
-}
-
-/// Whether `who` may see `app`: the administrator sees every app, an app
-/// itself, a registrar those it registered, and a person only those whose
-/// approved client has a sign-in destination.
-fn sees(who: &Acting, app: &crate::apps_state::App) -> bool {
-    match who {
-        Acting::Administrator(_) => true,
-        Acting::App { app: own, .. } => *own == app.registered.app,
-        Acting::Registrar { service_account } => {
-            app.registered.by
-                == By::ServiceAccount {
-                    id: service_account.clone(),
-                }
-        }
-        Acting::Person(_) => {
-            app.standing() == Standing::Approved
-                && app
-                    .approved
-                    .as_ref()
-                    .is_some_and(|approved| approved.client.client_id == app.registered.app)
-                && app
-                    .sign_in
-                    .as_ref()
-                    .is_some_and(|settings| !settings.redirects.is_empty())
-        }
-    }
-}
-
-#[derive(Serialize)]
-#[serde(untagged)]
-enum AppRead {
-    Personal {
-        id: String,
-        name: String,
-        state: Standing,
-    },
-    Registry(Box<AppView>),
-}
-
-#[derive(Serialize)]
-struct AppsRead {
-    apps: Vec<AppRead>,
-}
-
-fn read_view(who: &Acting, app: &crate::apps_state::App) -> AppRead {
-    if matches!(who, Acting::Person(_)) {
-        AppRead::Personal {
-            id: app.registered.app.clone(),
-            name: app.registered.name.clone(),
-            state: app.standing(),
-        }
-    } else {
-        AppRead::Registry(Box::new(AppView::from(app)))
-    }
 }
 
 async fn list(
