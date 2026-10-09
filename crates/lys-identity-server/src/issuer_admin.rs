@@ -142,6 +142,7 @@ pub(super) fn routes(config: &Config) -> Result<Router, ServerError> {
     let host = HeaderValue::from_str(host).map_err(|error| refused(&format!("invalid public issuer host: {error}")))?;
     let proxy = Arc::new(Proxy { http, upstream, public, host, trusted: config.trusted_proxies.clone() });
     Ok(Router::new().route("/auth/v1", any(carry))
+        .route("/auth/v1/", any(carry))
         .route("/auth/v1/{*path}", any(carry)).with_state(proxy))
 }
 

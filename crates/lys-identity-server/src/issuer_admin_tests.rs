@@ -28,6 +28,9 @@ fn native_target_keeps_the_complete_path_and_query_on_the_private_origin() -> Te
     let uri = "/auth/v1/oidc/callback?code=opaque%2Bcode&state=held".parse()?;
     assert_eq!(target(&upstream, &uri)?.as_str(), "http://127.0.0.1:18080/auth/v1/oidc/callback?code=opaque%2Bcode&state=held");
     assert_eq!(target(&reqwest::Url::parse("http://127.0.0.1:18080")?, &uri)?.as_str(), "http://127.0.0.1:18080/oidc/callback?code=opaque%2Bcode&state=held");
+    for path in ["/auth/v1", "/auth/v1/"] {
+        assert_eq!(target(&upstream, &path.parse()?)?.path(), path);
+    }
     for path in ["/api/people", "/auth/v1/providers/callback", "/auth/v1/providers/callback/", "/auth/v1/%70roviders/callback", "/auth/v1/providers%2fcallback", "/auth/v1/%2e%2e/users"] {
         assert!(target(&upstream, &path.parse()?).is_err(), "{path}");
     }
