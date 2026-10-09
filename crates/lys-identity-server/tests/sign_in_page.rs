@@ -648,8 +648,22 @@ async fn the_public_password_route_names_refusals_without_retry_or_private_data(
         (400, "BadRequest", 4_102_444_800, "IssuerRefused", 502, 1),
         (401, "Unauthorized", 4_102_444_800, "SignInRefused", 401, 1),
         (401, "Forbidden", 4_102_444_800, "IssuerRefused", 502, 1),
-        (429, "TooManyRequests", 4_102_444_800, "SignInThrottled", 429, 1),
-        (200, "SecondFactor", 4_102_444_800, "SecondFactorUnsupported", 403, 1),
+        (
+            429,
+            "TooManyRequests",
+            4_102_444_800,
+            "SignInThrottled",
+            429,
+            1,
+        ),
+        (
+            200,
+            "SecondFactor",
+            4_102_444_800,
+            "SecondFactorUnsupported",
+            403,
+            1,
+        ),
         (403, "Forbidden", 1, "IssuerChallengeExpired", 503, 0),
     ];
     let mut service = public_sign_in::PublicSignIn::start().await?;
@@ -658,7 +672,9 @@ async fn the_public_password_route_names_refusals_without_retry_or_private_data(
         for (status, error, expires, _, _, _) in cases {
             answers.push(service.request(status, error, expires, false).await?);
         }
-        let malformed = service.request(401, "Unauthorized", 4_102_444_800, true).await?;
+        let malformed = service
+            .request(401, "Unauthorized", 4_102_444_800, true)
+            .await?;
         Ok::<_, Box<dyn Error>>((answers, malformed))
     }
     .await;
@@ -667,7 +683,10 @@ async fn the_public_password_route_names_refusals_without_retry_or_private_data(
         (Ok(answers), Ok(())) => answers,
         (Err(error), Ok(())) | (Ok(_), Err(error)) => return Err(error),
         (Err(error), Err(cleanup)) => {
-            return Err(format!("public sign-in fixture failed: {error}; cleanup failed: {cleanup}").into());
+            return Err(format!(
+                "public sign-in fixture failed: {error}; cleanup failed: {cleanup}"
+            )
+            .into());
         }
     };
     assert_eq!(answers.len(), cases.len());
@@ -707,8 +726,14 @@ fn assert_public_refusal_privacy(seen: &public_sign_in::Observed) {
         "attempt-private-password-sentinel",
         "fixture-request-token",
     ] {
-        assert!(!seen.body.contains(sentinel), "private data in public refusal body");
-        assert!(!seen.log.contains(sentinel), "private data in public refusal log");
+        assert!(
+            !seen.body.contains(sentinel),
+            "private data in public refusal body"
+        );
+        assert!(
+            !seen.log.contains(sentinel),
+            "private data in public refusal log"
+        );
     }
 }
 
@@ -726,7 +751,10 @@ async fn the_public_provider_start_refuses_expiry_before_posting_to_the_provider
         (Ok(answers), Ok(())) => answers,
         (Err(error), Ok(())) | (Ok(_), Err(error)) => return Err(error),
         (Err(error), Err(cleanup)) => {
-            return Err(format!("public provider fixture failed: {error}; cleanup failed: {cleanup}").into());
+            return Err(format!(
+                "public provider fixture failed: {error}; cleanup failed: {cleanup}"
+            )
+            .into());
         }
     };
     assert_eq!(expired.status, 303);
@@ -746,7 +774,11 @@ async fn the_public_provider_start_refuses_expiry_before_posting_to_the_provider
     assert_eq!(live.pow, 1, "one challenge, no retry");
     assert_eq!(live.authorize, 0);
     assert_eq!(live.provider_posts, 1);
-    let location = reqwest::Url::parse(live.location.as_deref().ok_or("live provider redirect missing")?)?;
+    let location = reqwest::Url::parse(
+        live.location
+            .as_deref()
+            .ok_or("live provider redirect missing")?,
+    )?;
     assert_eq!(location.scheme(), "https");
     assert_eq!(location.host_str(), Some("provider.example.test"));
     assert_eq!(location.path(), "/login");
@@ -754,7 +786,11 @@ async fn the_public_provider_start_refuses_expiry_before_posting_to_the_provider
     assert_eq!(query.len(), 2);
     assert!(query.iter().any(|(name, value)| name == "redirect_uri"
         && value == "http://127.0.0.1/auth/v1/providers/callback"));
-    assert!(query.iter().any(|(name, value)| name == "state" && value == "fixture-provider-state"));
+    assert!(
+        query
+            .iter()
+            .any(|(name, value)| name == "state" && value == "fixture-provider-state")
+    );
     assert!(!live.log.contains("IssuerChallengeExpired"));
     assert_public_refusal_privacy(&live);
     Ok(())

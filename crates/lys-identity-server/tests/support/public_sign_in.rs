@@ -106,7 +106,11 @@ impl PublicSignIn {
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": ["EdDSA"],
         });
-        let (next, cases) = watch::channel(IssuerRefusalFixture::new(401, "Unauthorized", 4_102_444_800)?);
+        let (next, cases) = watch::channel(IssuerRefusalFixture::new(
+            401,
+            "Unauthorized",
+            4_102_444_800,
+        )?);
         let provider_posts = Arc::new(AtomicUsize::new(0));
         let issuer_provider_posts = Arc::clone(&provider_posts);
         let routes = Router::new()
@@ -142,7 +146,10 @@ impl PublicSignIn {
                 })
                 .await
         });
-        let mut issuer = Issuer { stop: Some(stop), serving: Some(serving) };
+        let mut issuer = Issuer {
+            stop: Some(stop),
+            serving: Some(serving),
+        };
         let outcome = async {
             let key = directory.path().join("service.key");
             let secret = directory.path().join("client.secret");
@@ -166,12 +173,22 @@ impl PublicSignIn {
             }))?;
             config.validate()?;
             Ok::<_, Failure>(lys_identity_server::service(&config).await?)
-        }.await;
+        }
+        .await;
         match outcome {
-            Ok(router) => Ok(Self { router: Some(router), next, provider_posts, issuer, directory }),
+            Ok(router) => Ok(Self {
+                router: Some(router),
+                next,
+                provider_posts,
+                issuer,
+                directory,
+            }),
             Err(error) => match issuer.close().await {
                 Ok(()) => Err(error),
-                Err(cleanup) => Err(format!("public sign-in start failed: {error}; cleanup failed: {cleanup}").into()),
+                Err(cleanup) => Err(format!(
+                    "public sign-in start failed: {error}; cleanup failed: {cleanup}"
+                )
+                .into()),
             },
         }
     }
@@ -198,21 +215,42 @@ impl PublicSignIn {
             .uri("/sign-in")
             .header(axum::http::header::CONTENT_TYPE, "application/json")
             .body(axum::body::Body::from(body.to_string()))?;
-        request.extensions_mut().insert(ConnectInfo(SocketAddr::from((Ipv4Addr::LOCALHOST, 1234))));
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::from((Ipv4Addr::LOCALHOST, 1234))));
         let logs = RefusalLog::default();
         let captured = logs.clone();
-        let response = self.router.as_ref().ok_or("public sign-in router is closed")?
-            .clone().oneshot(request).with_subscriber(logs).await?;
+        let response = self
+            .router
+            .as_ref()
+            .ok_or("public sign-in router is closed")?
+            .clone()
+            .oneshot(request)
+            .with_subscriber(logs)
+            .await?;
         let status = response.status().as_u16();
-        let location = response.headers().get(header::LOCATION)
-            .map(|value| value.to_str().map(str::to_owned)).transpose()?;
-        let cookie = response.headers().contains_key(axum::http::header::SET_COOKIE);
+        let location = response
+            .headers()
+            .get(header::LOCATION)
+            .map(|value| value.to_str().map(str::to_owned))
+            .transpose()?;
+        let cookie = response
+            .headers()
+            .contains_key(axum::http::header::SET_COOKIE);
         let body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
-        let log = captured.text.lock()
-            .map_err(|error| std::io::Error::other(format!("public log capture lock poisoned: {error}")))?
+        let log = captured
+            .text
+            .lock()
+            .map_err(|error| {
+                std::io::Error::other(format!("public log capture lock poisoned: {error}"))
+            })?
             .clone();
         Ok(Observed {
-            status, location, body: String::from_utf8(body.to_vec())?, log, cookie,
+            status,
+            location,
+            body: String::from_utf8(body.to_vec())?,
+            log,
+            cookie,
             pow: fixture.pow.load(Ordering::SeqCst),
             authorize: fixture.authorize.load(Ordering::SeqCst),
             provider_posts: self.provider_posts.load(Ordering::SeqCst),
@@ -227,21 +265,40 @@ impl PublicSignIn {
             .method("GET")
             .uri("/sign-in/providers/example")
             .body(axum::body::Body::empty())?;
-        request.extensions_mut().insert(ConnectInfo(SocketAddr::from((Ipv4Addr::LOCALHOST, 1234))));
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::from((Ipv4Addr::LOCALHOST, 1234))));
         let logs = RefusalLog::default();
         let captured = logs.clone();
-        let response = self.router.as_ref().ok_or("public sign-in router is closed")?
-            .clone().oneshot(request).with_subscriber(logs).await?;
+        let response = self
+            .router
+            .as_ref()
+            .ok_or("public sign-in router is closed")?
+            .clone()
+            .oneshot(request)
+            .with_subscriber(logs)
+            .await?;
         let status = response.status().as_u16();
-        let location = response.headers().get(header::LOCATION)
-            .map(|value| value.to_str().map(str::to_owned)).transpose()?;
+        let location = response
+            .headers()
+            .get(header::LOCATION)
+            .map(|value| value.to_str().map(str::to_owned))
+            .transpose()?;
         let cookie = response.headers().contains_key(header::SET_COOKIE);
         let body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
-        let log = captured.text.lock()
-            .map_err(|error| std::io::Error::other(format!("public log capture lock poisoned: {error}")))?
+        let log = captured
+            .text
+            .lock()
+            .map_err(|error| {
+                std::io::Error::other(format!("public log capture lock poisoned: {error}"))
+            })?
             .clone();
         Ok(Observed {
-            status, location, body: String::from_utf8(body.to_vec())?, log, cookie,
+            status,
+            location,
+            body: String::from_utf8(body.to_vec())?,
+            log,
+            cookie,
             pow: fixture.pow.load(Ordering::SeqCst),
             authorize: fixture.authorize.load(Ordering::SeqCst),
             provider_posts: self.provider_posts.load(Ordering::SeqCst),
@@ -251,13 +308,17 @@ impl PublicSignIn {
     pub(super) async fn close(mut self) -> Result<(), Failure> {
         drop(self.router.take());
         let shutdown = self.issuer.close().await;
-        let cleanup = self.directory.close().map_err(|error| -> Failure { error.into() });
+        let cleanup = self
+            .directory
+            .close()
+            .map_err(|error| -> Failure { error.into() });
         match (shutdown, cleanup) {
             (Ok(()), Ok(())) => Ok(()),
             (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
-            (Err(error), Err(cleanup)) => {
-                Err(format!("public sign-in shutdown failed: {error}; directory cleanup failed: {cleanup}").into())
-            }
+            (Err(error), Err(cleanup)) => Err(format!(
+                "public sign-in shutdown failed: {error}; directory cleanup failed: {cleanup}"
+            )
+            .into()),
         }
     }
 }
