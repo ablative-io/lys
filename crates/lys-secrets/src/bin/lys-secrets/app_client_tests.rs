@@ -89,18 +89,28 @@ impl Fixture {
             .map_err(|error| format!("{} {}", error.0, error.1))
     }
 
-    fn reopen(&mut self) -> Outcome {
-        let layout = self.shared.layout.clone();
+    fn reopen(self) -> Result<Self, Box<dyn std::error::Error>> {
+        let Self { dir, key, shared } = self;
+        let Shared { broker, layout, .. } = Arc::try_unwrap(shared).map_err(|remaining| {
+            format!(
+                "fixture broker is still held by {} owners",
+                Arc::strong_count(&remaining)
+            )
+        })?;
+        drop(broker);
         let grants = Grants::File(FileGrants::new(layout.grants()));
         let broker = Broker::open(&layout.paths(), grants.clone(), Box::new(now_ms))?;
-        self.shared = Arc::new(Shared {
-            broker: Mutex::new(broker),
-            layout,
-            client: reqwest::Client::new(),
-            window: Mutex::new(ServiceWindow::new()),
-            permissions: Arc::new(grants),
-        });
-        Ok(())
+        Ok(Self {
+            dir,
+            key,
+            shared: Arc::new(Shared {
+                broker: Mutex::new(broker),
+                layout,
+                client: reqwest::Client::new(),
+                window: Mutex::new(ServiceWindow::new()),
+                permissions: Arc::new(grants),
+            }),
+        })
     }
     /// Prepares `app`'s custody, answering its client secret's digest.
     async fn prepared(&self, app: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -195,7 +205,7 @@ async fn real_bearer_custody_survives_reopen_and_replay_never_answers_plaintext(
         .to_owned();
     assert!(value.starts_with("lys-app.notes_app."));
     assert!(!fixture.audit()?.contains(&value));
-    fixture.reopen()?;
+    fixture = fixture.reopen()?;
     let repeated = fixture.bearer(&operation, &old).await?;
     assert!(repeated["credential"].is_null());
     assert_eq!(repeated["api_credential_ref"], first["api_credential_ref"]);
@@ -217,7 +227,7 @@ async fn real_bearer_custody_survives_reopen_and_replay_never_answers_plaintext(
     let next_digest = second["client_secret_sha256"]
         .as_str()
         .ok_or("no rotated digest")?;
-    fixture.reopen()?;
+    fixture = fixture.reopen()?;
     let replayed = fixture.bearer(&rotation, &digest).await?;
     assert_eq!(replayed["api_credential_ref"], second["api_credential_ref"]);
     assert!(replayed["credential"].is_null());
