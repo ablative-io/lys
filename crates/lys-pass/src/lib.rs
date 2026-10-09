@@ -5,6 +5,7 @@ pub mod deliberate;
 pub mod drafts;
 pub mod membership;
 pub mod membership_conformance;
+pub mod membership_pages;
 pub mod refusal;
 pub mod rights;
 pub mod signin;

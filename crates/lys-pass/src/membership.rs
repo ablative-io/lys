@@ -149,36 +149,53 @@ fn malformed(value: &str) -> bool {
 /// checks: the contract version, the grant log `served`, then every member's
 /// shape. Identity, kind and placement are the provider's to judge after.
 pub fn validate(request: &MembershipRequest, served: &GrantLog) -> Result<(), Refused> {
-    if request.contract != CONTRACT_VERSION {
+    check(
+        request.contract,
+        &request.log,
+        served,
+        &[
+            ("workspace kind", request.workspace.kind.as_str()),
+            ("workspace id", request.workspace.id.as_str()),
+            ("subject id", request.subject.id.as_str()),
+            ("subject kind", request.subject.kind.as_str()),
+            ("resource kind", request.resource.kind.as_str()),
+            ("resource id", request.resource.id.as_str()),
+            ("action", request.action.as_str()),
+        ],
+    )
+}
+
+/// The contract version, then the grant log against `served`, then each
+/// named member's shape, refused by the first that fails.
+pub(crate) fn check(
+    contract: u32,
+    log: &GrantLog,
+    served: &GrantLog,
+    members: &[(&'static str, &str)],
+) -> Result<(), Refused> {
+    if contract != CONTRACT_VERSION {
         return Err(Refused {
             name: CONTRACT_UNSUPPORTED,
             reason: format!(
-                "contract {} is not served; this provider speaks {CONTRACT_VERSION}",
-                request.contract
+                "contract {contract} is not served; this provider speaks {CONTRACT_VERSION}"
             ),
         });
     }
-    if &request.log != served {
+    if log != served {
         return Err(Refused {
             name: LOG_MISMATCH,
             reason: "the request names another grant log or reset epoch".to_owned(),
         });
     }
-    let members = [
-        ("log identity", request.log.identity.as_str()),
-        ("workspace kind", request.workspace.kind.as_str()),
-        ("workspace id", request.workspace.id.as_str()),
-        ("subject id", request.subject.id.as_str()),
-        ("subject kind", request.subject.kind.as_str()),
-        ("resource kind", request.resource.kind.as_str()),
-        ("resource id", request.resource.id.as_str()),
-        ("action", request.action.as_str()),
-    ];
-    if let Some((member, _)) = members.iter().find(|(_, value)| malformed(value)) {
-        return Err(Refused {
-            name: REQUEST_MALFORMED,
-            reason: format!("the {member} is empty or contains control characters"),
-        });
+    let shaped =
+        std::iter::once(("log identity", log.identity.as_str())).chain(members.iter().copied());
+    for (member, value) in shaped {
+        if malformed(value) {
+            return Err(Refused {
+                name: REQUEST_MALFORMED,
+                reason: format!("the {member} is empty or contains control characters"),
+            });
+        }
     }
     Ok(())
 }
