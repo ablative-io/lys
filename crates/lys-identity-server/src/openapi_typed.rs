@@ -356,6 +356,17 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<WhichPage>()),
             &[WHICH],
         ),
+        route(
+            (
+                POST,
+                "/grants/membership",
+                "Whether a subject may read or post in a placed channel, at one revision",
+            ),
+            A,
+            Some(api.schema::<lys_pass::membership::MembershipRequest>()),
+            Some(api.schema::<lys_pass::membership::MembershipDecision>()),
+            &[BATCH],
+        ),
     ];
     for route in routes {
         api.route(route);

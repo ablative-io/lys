@@ -70,6 +70,7 @@ mod certificates_issue;
 mod certificates_own;
 pub mod certificates_store;
 mod changes;
+pub mod channel_membership;
 pub mod config;
 pub mod configuration_api;
 pub mod configuration_store;

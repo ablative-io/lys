@@ -153,7 +153,7 @@ pub(crate) fn unanswered(error: &GrantError) -> bool {
 
 /// Who asks: the administrator, or an app for its own kinds, as the app
 /// they act for.
-fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, ServerError> {
+pub(crate) fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, ServerError> {
     let who = crate::apps_api::with_apps(state, |apps, projection| {
         acting(state, apps.held(), headers, projection)
     })?;
@@ -168,7 +168,10 @@ fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, Server
 
 /// The mode of the grant a decision named, from the book it was decided on;
 /// none if the book no longer names it, which is answered as not allowed.
-fn mode_of<S: lys_log_store::LeafStore>(judged: &Judged<'_, S>, grant: GrantId) -> Option<Mode> {
+pub(crate) fn mode_of<S: lys_log_store::LeafStore>(
+    judged: &Judged<'_, S>,
+    grant: GrantId,
+) -> Option<Mode> {
     judged.grants.book().grant(grant).map(Grant::mode)
 }
 
