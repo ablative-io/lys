@@ -11,6 +11,8 @@ import type { Machine } from './contract';
 import { NewCode } from './JoinCode';
 import type { Connecting } from './JoinCode';
 import { Act } from '../../shell/Act';
+import { MachineHolders } from './MachineIdentities';
+import type { MachineIdentity } from './contract';
 
 export type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
 
@@ -46,8 +48,8 @@ function reached(machine: Machine, runner: RunnerRecord | null, joining: boolean
 const connectable = ({ machine, asked, runner }: Computer): boolean =>
   machine.state === 'in_use' && machine.runtime !== null && asked === 'answered' && (runner === null || runner.kind === 'dialled');
 
-export function MachineDetail({ computer, admin, me, teams, names, changed, connecting, connect, done }: { computer: Computer; admin: boolean; me: string; teams: OrgTeam[]; names: Map<string, string>; changed: (message: string) => void;
-  connecting: Connecting | null; connect: (next: Connecting) => void; done: () => void }) {
+export function MachineDetail({ computer, admin, me, teams, names, changed, machines = null, connecting, connect, done }: { computer: Computer; admin: boolean; me: string; teams: OrgTeam[]; names: Map<string, string>; changed: (message: string) => void;
+  machines?: MachineIdentity[] | null; connecting: Connecting | null; connect: (next: Connecting) => void; done: () => void }) {
   const { machine, runner, running } = computer;
   const now = status(computer);
   return <section className="card" aria-label={machine.name}>
@@ -70,6 +72,7 @@ export function MachineDetail({ computer, admin, me, teams, names, changed, conn
     {computer.answers === false && computer.reason && !waiting(computer) ? <p className="why-not">Its runner did not answer: {computer.reason}</p> : null}
     {computer.asked === 'unread' ? <p className="why-not">Lys could not ask its runner: {computer.reason}</p> : null}
     {admin && connectable(computer) ? <NewCode machine={machine.id} name={machine.name} connecting={connecting?.machine === machine.id && connecting.at === 'panel' ? connecting : null} connect={connect} done={done} /> : null}
+    {machines ? <><div className="section-h">As a machine</div><MachineHolders machine={machine.id} identities={machines} me={me} changed={changed} /></> : null}
     <p className="sec">Websites its agents' services may connect to: {machine.may_reach.join(', ') || 'none'}.</p>
     {admin && machine.state !== 'retired' ? <Retire machine={machine} changed={changed} /> : null}
   </section>;

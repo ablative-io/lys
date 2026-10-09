@@ -215,6 +215,7 @@ export const SERVICE: Record<string, Route> = {
   '/roles': ok({ roles: [] }),
   '/teams': ok({ teams: [] }),
   '/network': ok({ machines: [], total: 0, next: null }),
+  '/network/machine-identities': ok({ machines: [], revision: 0 }),
   '/secrets': ok({ secrets: [] }),
   '/configuration': ok({ source: 'startup_configuration', mutable_in_browser: false,
     sign_in: { provider_origin: ISSUER, session_seconds: 3600, secure_cookie: true },

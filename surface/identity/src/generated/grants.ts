@@ -9,7 +9,7 @@ export interface ResourceRef {
   id: string;
 }
 
-export type RecipientKind = 'person' | 'agent' | 'service_account';
+export type RecipientKind = 'person' | 'agent' | 'service_account' | 'connector' | 'machine';
 
 /** `pass_on_json` and `PassOnWire`: what a holder may pass on, stated affirmatively. */
 export type PassOn = { kind: 'use_only' } | { kind: 'to'; actions: string[]; recipients: RecipientKind[] };

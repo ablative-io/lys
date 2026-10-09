@@ -66,3 +66,34 @@ export function confirmRunner(value: unknown, machine: string, local: boolean): 
     throw new Refused(200, { refusal: 'RunnerReceiptMismatch', reason: 'The computer’s runner is missing or could not be confirmed. Its addition remains unresolved; no runner is invented.' });
   }
 }
+
+/** One grant a machine holds, as GET /network/machine-identities serves it (ACCESS-005 R2). */
+export interface MachineGrant {
+  grant: string; resource: { kind: string; id: string }; relation: string; actions: string[];
+  window: { starts_at: number; ends_at: number | null }; mode: 'outright' | 'by_draft' | 'by_two'; admitted: boolean;
+}
+/** A machine: the identity a computer's join made from its own key, answering to the administrator who gave the code. */
+export interface MachineIdentity {
+  identity: string; machine: string; key: string; responsible: string; responsible_name: string | null;
+  joined_at: number; state: string; replaced: boolean; grants: MachineGrant[];
+}
+export interface MachineIdentities { machines: MachineIdentity[]; revision: number }
+
+function readableMachineGrant(value: unknown): value is MachineGrant {
+  return isRecord(value) && typeof value.grant === 'string' && isRecord(value.resource) && typeof value.resource.kind === 'string'
+    && typeof value.resource.id === 'string' && typeof value.relation === 'string' && strings(value.actions)
+    && (value.mode === 'outright' || value.mode === 'by_draft' || value.mode === 'by_two') && typeof value.admitted === 'boolean';
+}
+function readableMachineIdentity(value: unknown): value is MachineIdentity {
+  return isRecord(value) && typeof value.identity === 'string' && /^machine-[0-9a-f]{32}$/.test(value.identity)
+    && typeof value.machine === 'string' && typeof value.key === 'string' && typeof value.responsible === 'string'
+    && (value.responsible_name === null || typeof value.responsible_name === 'string') && typeof value.joined_at === 'number'
+    && typeof value.state === 'string' && typeof value.replaced === 'boolean' && Array.isArray(value.grants) && value.grants.every(readableMachineGrant);
+}
+/** The machines as the service answered them, or a refusal naming what it did not say. */
+export function readMachineIdentities(value: unknown): MachineIdentities {
+  if (!isRecord(value) || !Array.isArray(value.machines) || !value.machines.every(readableMachineIdentity) || typeof value.revision !== 'number') {
+    throw new Refused(0, { refusal: 'MachinesUnreadable', reason: 'The service did not answer the machines in the shape this page reads.' });
+  }
+  return { machines: value.machines, revision: value.revision };
+}

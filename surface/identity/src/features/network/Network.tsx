@@ -20,6 +20,8 @@ import type { Machine, NetworkView } from './contract';
 import { ConnectRow } from './JoinCode';
 import type { Connecting } from './JoinCode';
 import { MachineDetail, status, waiting } from './MachineDetail';
+import { readIdentities } from './MachineIdentities';
+import type { MachineIdentity } from './contract';
 import type { RunnerRecord } from './MachineDetail';
 import { Act } from '../../shell/Act';
 
@@ -110,13 +112,18 @@ export function Network() {
   const load = useLoad(() => readTogether({
     computers: readComputers(), people: api.people(), me: api.me(),
     teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })),
+    // The machines the joins made, and what each holds (ACCESS-005 R2): the administrator's to read; anyone else is told nothing of them.
+    machines: readIdentities().then((list): Machines => ({ list, refused: '' }), (problem: unknown): Machines => ({ list: [], refused: problemWords(problem) })),
   }), 'network:' + revision);
   return <div className="page fill">
-    <Gate load={load} title="Network" ok={(data) => <Computers {...data} teams={data.teams.teams} teamsRefused={data.teams.refused} notice={notice} connecting={connecting} connect={setConnecting} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
+    <Gate load={load} title="Network" ok={(data) => <Computers {...data} teams={data.teams.teams} teamsRefused={data.teams.refused} machines={data.machines} notice={notice} connecting={connecting} connect={setConnecting} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
   </div>;
 }
 
-function Computers({ computers: read, people, me, teams, teamsRefused, notice, connecting, connect, refresh }: { computers: Awaited<ReturnType<typeof readComputers>>; people: PeopleView; me: { person: { id: string } }; teams: OrgTeam[]; teamsRefused: string; notice: string;
+/** The machines as read for the page: every one, or none and why. */
+type Machines = { list: MachineIdentity[]; refused: string };
+
+function Computers({ computers: read, people, me, teams, teamsRefused, machines, notice, connecting, connect, refresh }: { computers: Awaited<ReturnType<typeof readComputers>>; people: PeopleView; me: { person: { id: string } }; teams: OrgTeam[]; teamsRefused: string; machines: Machines; notice: string;
   connecting: Connecting | null; connect: (next: Connecting | null) => void; refresh: (message: string) => void }) {
   const admin = people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
@@ -164,6 +171,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, notice, c
     {notice ? <p role="status">{notice}</p> : null}
     {feed ? <p className="why-not">Lys stopped hearing about changes, so a computer waiting for its runner reads Up only when this page is opened again. {feed}</p> : null}
     {teamsRefused ? <p className="why-not">Teams cannot be read, so computers are listed without their team. {teamsRefused}</p> : null}
+    {admin && machines.refused ? <p className="why-not">The machines cannot be read, so what each computer holds as a machine is not shown. {machines.refused}</p> : null}
     <div className="body halves">
       <Listing<Computer> groups={groups} columns={columns} id={(computer) => computer.machine.id} href={(computer) => '#/network?computer=' + computer.machine.id}
         words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers" empty="No computer yet. Add the one Lys runs on to start agents here."
@@ -180,6 +188,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, notice, c
         </>} />
       <div className="pane">
         {selected ? <MachineDetail key={selected.machine.id} computer={selected} admin={admin} me={me.person.id} teams={teams} names={names} changed={changed}
+          machines={admin && !machines.refused ? machines.list : null}
           connecting={connecting} connect={connectHere} done={done} /> : computers.length ? <p className="dim">Choose a computer.</p> : null}
       </div>
     </div>
