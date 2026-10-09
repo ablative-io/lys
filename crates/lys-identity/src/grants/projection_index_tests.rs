@@ -165,3 +165,42 @@ fn a_grant_state_holding_a_person_an_agent_and_a_service_account_keeps_its_bytes
     );
     Ok(())
 }
+
+/// A by-two grant snapshotted and read back is still by two (ACCESS-001 R1):
+/// the snapshot holds each grant in its canonical encoding, key 14 with it.
+#[test]
+fn a_held_mode_survives_the_snapshot() -> Result<(), Box<dyn Error>> {
+    let person = PersonId::from_bytes([2; 16]);
+    let operation = OperationId::from_bytes([9; 16]);
+    let grant = Grant::new(GrantParts {
+        id: GrantId::from_bytes([9; 16]),
+        issuer: IdentityId::Person(person),
+        holder: IdentityId::Person(person),
+        responsible: person,
+        resource: Resource::new("doc", "alpha")?,
+        relation: Relation::new("viewer")?,
+        actions: [Action::new("read")?].into(),
+        pass_on: PassOn::UseOnly,
+        source: Source::Root,
+        window: Window::new(0, None)?,
+        model_version: 1,
+        operation,
+    })?
+    .with_mode(crate::grants::Mode::ByTwo);
+    let event = GrantEvent::new(
+        operation,
+        IdentityId::Person(person),
+        1,
+        GrantChange::Issue(Box::new(grant)),
+    )?;
+    assert_eq!(event.version(), 4);
+    let mut book = GrantBook::new();
+    book.apply(&event, 1)?;
+    let decoded = super::state::decode(super::state::encode(&book)?)?;
+    assert_eq!(decoded, book);
+    let kept = decoded
+        .grant(GrantId::from_bytes([9; 16]))
+        .ok_or("the snapshot keeps the grant")?;
+    assert_eq!(kept.mode(), crate::grants::Mode::ByTwo);
+    Ok(())
+}

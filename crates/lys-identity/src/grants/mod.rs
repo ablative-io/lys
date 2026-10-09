@@ -56,6 +56,7 @@ pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, 
 pub use schema_diff::{Named, SchemaDiff, Standing, diff, stranded};
 pub use shipped::{SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, shipped_model};
 pub use types::{
-    Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
+    Action, Grant, GrantId, GrantParts, Mode, PassOn, RecipientKind, Relation, Resource, Source,
+    Window,
 };
 pub use usage::{Unreported, Usage};

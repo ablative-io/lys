@@ -2,11 +2,14 @@
 //!
 //! A grant is a canonical CBOR map (RFC 8949 section 4.2) with integer keys 1
 //! to 12, every one required; docs/design/identity/GRANT-CONTRACT.md gives
-//! each key and code. Decoding is strict: a key outside 1 to 12 is refused
+//! each key and code. Decoding is strict: a key outside 1 to 14 is refused
 //! `MemberUnknown`, a missing key `MemberMissing`, an unknown recipient kind
 //! `RecipientKindUnknown`, a malformed lineage `LineageMalformed`, and bytes
 //! that are not the canonical encoding of what they decode to
-//! `GrantNotCanonical`. No member has a default.
+//! `GrantNotCanonical`. No member has a default. Two keys are written only
+//! when they say something: 13, true for a one-time grant, and 14, the mode
+//! (`1` by draft, `2` by two); absent, the grant is outright, so a grant
+//! written before the mode existed keeps its bytes (ACCESS-001 R1).
 
 use std::collections::BTreeSet;
 
@@ -14,7 +17,8 @@ use ciborium::Value;
 
 use super::error::GrantError;
 use super::types::{
-    Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
+    Action, Grant, GrantId, GrantParts, Mode, PassOn, RecipientKind, Relation, Resource, Source,
+    Window,
 };
 use crate::encoding::{MAJOR_ARRAY, bytes, head, map, text, uint};
 use crate::id::{AgentId, ConnectorId, ID_LEN, IdentityId, PersonId, ServiceAccountId};
@@ -79,7 +83,8 @@ pub(crate) fn recipient_code(kind: RecipientKind) -> u64 {
 /// Append the canonical encoding of `grant` to `out`.
 pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     let parts = grant.parts();
-    map(out, if grant.is_once() { 13 } else { 12 });
+    let held = mode_code(grant.mode());
+    map(out, 12 + u64::from(grant.is_once()) + u64::from(held.is_some()));
     uint(out, 1);
     bytes(out, parts.id.as_bytes());
     uint(out, 2);
@@ -136,6 +141,19 @@ pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     if grant.is_once() {
         uint(out, 13);
         out.push(TRUE);
+    }
+    if let Some(code) = held {
+        uint(out, 14);
+        uint(out, code);
+    }
+}
+
+/// A held mode's wire code; outright is written by its absence.
+fn mode_code(mode: Mode) -> Option<u64> {
+    match mode {
+        Mode::Outright => None,
+        Mode::ByDraft => Some(1),
+        Mode::ByTwo => Some(2),
     }
 }
 
@@ -265,17 +283,30 @@ fn read_window(value: Value) -> Result<Window, GrantError> {
 }
 
 /// Take every member of a grant map, refusing an unknown or a missing one by name.
-fn members(value: Value) -> Result<([Value; 12], bool), GrantError> {
+fn members(value: Value) -> Result<([Value; 12], bool, Mode), GrantError> {
     let Value::Map(pairs) = value else {
         return Err(malformed("a grant is a map of keys 1 to 12"));
     };
     let mut slots: [Option<Value>; 12] = Default::default();
     let mut once = None;
+    let mut mode = None;
     for (key, value) in pairs {
         let key = as_uint(&key, "a grant's keys are unsigned integers")?;
         if key == 13 {
             if value != Value::Bool(true) || once.replace(true).is_some() {
                 return Err(malformed("a one-time grant names key 13 once, as true"));
+            }
+            continue;
+        }
+        if key == 14 {
+            const MODE: &str = "a held mode names key 14 once, as 1 by draft or 2 by two";
+            let held = match as_uint(&value, MODE)? {
+                1 => Mode::ByDraft,
+                2 => Mode::ByTwo,
+                _ => return Err(malformed(MODE)),
+            };
+            if mode.replace(held).is_some() {
+                return Err(malformed(MODE));
             }
             continue;
         }
@@ -295,12 +326,12 @@ fn members(value: Value) -> Result<([Value; 12], bool), GrantError> {
     let taken = <[Value; 12]>::try_from(taken)
         .ok()
         .ok_or_else(|| malformed("a grant is a map of keys 1 to 12"))?;
-    Ok((taken, once.is_some()))
+    Ok((taken, once.is_some(), mode.unwrap_or(Mode::Outright)))
 }
 
 /// The grant a decoded CBOR value names, checked against the contract.
 pub(crate) fn read_grant(value: Value) -> Result<Grant, GrantError> {
-    let (grant_members, once) = members(value)?;
+    let (grant_members, once, mode) = members(value)?;
     let [
         id,
         issuer,
@@ -333,11 +364,12 @@ pub(crate) fn read_grant(value: Value) -> Result<Grant, GrantError> {
         model_version: as_uint(&model_version, "a model version is an unsigned integer")?,
         operation: OperationId::from_bytes(as_id(operation, "an operation id is 16 bytes")?),
     };
-    if once {
+    let grant = if once {
         Grant::once(parts)
     } else {
         Grant::new(parts)
-    }
+    }?;
+    Ok(grant.with_mode(mode))
 }
 
 /// The grant `encoded` names, refused unless the bytes are its canonical encoding.

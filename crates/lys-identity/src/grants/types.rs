@@ -324,11 +324,40 @@ pub struct GrantParts {
     pub operation: OperationId,
 }
 
+/// How a grant's actions may be exercised (ACCESS-001 R1, D3): outright, or
+/// held until a draft is approved, by one approver or by two.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Mode {
+    /// Exercised at once. Every grant written before the mode existed is outright.
+    Outright,
+    /// Exercised through a draft one approver approves.
+    ByDraft,
+    /// Exercised through a draft two approvers approve.
+    ByTwo,
+}
+
+impl Mode {
+    /// The mode in words, as the API and the console name it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Outright => "outright",
+            Self::ByDraft => "by_draft",
+            Self::ByTwo => "by_two",
+        }
+    }
+
+    /// Whether exercise is held for approval.
+    pub fn is_held(self) -> bool {
+        self != Self::Outright
+    }
+}
+
 /// A checked grant: every member present, pass-on inside exercise, lineage well formed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grant {
     parts: GrantParts,
     once: bool,
+    mode: Mode,
 }
 
 impl Grant {
@@ -361,7 +390,11 @@ impl Grant {
             Source::Grant(source) if source == parts.id => Err(GrantError::LineageMalformed {
                 reason: "a grant does not derive from itself",
             }),
-            Source::Root | Source::Grant(_) => Ok(Self { parts, once: false }),
+            Source::Root | Source::Grant(_) => Ok(Self {
+                parts,
+                once: false,
+                mode: Mode::Outright,
+            }),
         }
     }
 
@@ -381,6 +414,18 @@ impl Grant {
     /// Whether the grant is spent by its first exercise.
     pub fn is_once(&self) -> bool {
         self.once
+    }
+
+    /// The grant exercised in `mode`.
+    #[must_use]
+    pub fn with_mode(mut self, mode: Mode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    /// How the grant's actions may be exercised.
+    pub fn mode(&self) -> Mode {
+        self.mode
     }
 
     /// Every member of the grant.

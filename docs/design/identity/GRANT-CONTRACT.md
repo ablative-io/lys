@@ -36,6 +36,8 @@ A canonical CBOR map (RFC 8949 section 4.2) with integer keys 1 to 12. Every key
 | 11 | model version | the model version it was judged under, 1 or more |
 | 12 | authorising operation | the operation id of the signed event that authorised it, 16 bytes |
 
+Two optional keys follow key 12 and are written only when they say something, so a grant without them keeps the bytes and signature it had before they existed. Key 13 is `true` for a one-time grant. Key 14 is the mode (ACCESS-001 R1, D3): `1` by draft, `2` by two. Absent, the grant is outright. Any other code, or the key named twice, is refused `GrantMalformed`. An event issuing a grant with key 14 is version 4 under `application/vnd.lys.grant-event.v4+cbor`; every earlier event keeps its version and envelope.
+
 A token is one or more bytes of `a-z`, `0-9`, `_`, `-` and `.`, and at most the permission engine's (SpiceDB's) own bound for what it becomes there: an action (a permission) and a relation 64 bytes, a resource kind (an object type) 128 bytes, a resource id (an object id) 1024 bytes.
 
 Exercising and passing on are separate members. Pass-on is stated affirmatively: `0` is written out for use-only, and an absent key 8 is refused, never read as permission. Recipient kinds are a closed set, and an unknown code is refused `RecipientKindUnknown`.

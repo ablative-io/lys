@@ -10,7 +10,8 @@
 //! `lys/identity-event/v1`, with its own content type, [`GRANT_ENVELOPE`], in
 //! the protected header; an event naming a service account is version 2 under
 //! [`SERVICE_ACCOUNT_ENVELOPE`], and one naming a connector version 3 under
-//! [`CONNECTOR_ENVELOPE`], so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
+//! [`CONNECTOR_ENVELOPE`]; one issuing a held grant is version 4 under
+//! [`HELD_MODE_ENVELOPE`], so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
 //! operation id, `3` caller, `4` recorded-at, `5` change kind (`1` issue, `2`
 //! revoke, `3` use) and `6` the change: the grant's own map; for a revocation
 //! `1` grant id and `2` reason; for a use `1` grant id and `2` route (`1`
@@ -41,6 +42,8 @@ pub const GRANT_EVENT_VERSION: u64 = 1;
 pub const SERVICE_ACCOUNT_ENVELOPE: &str = "application/vnd.lys.grant-event.v2+cbor";
 /// Separate signed envelope for grant events that name a connector.
 pub const CONNECTOR_ENVELOPE: &str = "application/vnd.lys.grant-event.v3+cbor";
+/// Separate signed envelope for events issuing a grant held by draft or by two.
+pub const HELD_MODE_ENVELOPE: &str = "application/vnd.lys.grant-event.v4+cbor";
 
 const COSE_SIGN1_TAG: u64 = 18;
 const SIGNATURE_LEN: usize = 64;
@@ -59,7 +62,7 @@ fn kind_envelope(kind: super::types::RecipientKind) -> (u64, &'static str) {
 
 /// Whether the grants read events of `version`.
 fn version_read(version: u64) -> bool {
-    matches!(version, GRANT_EVENT_VERSION | 2 | 3)
+    matches!(version, GRANT_EVENT_VERSION | 2 | 3 | 4)
 }
 
 /// One change to the grants.
@@ -95,8 +98,8 @@ pub struct GrantEvent {
 impl GrantEvent {
     /// Version two adds service-account principals. Events using only the
     /// original principal and recipient kinds retain their original bytes.
-    /// Version three adds the connector. Each event takes the version of the
-    /// newest kind it names.
+    /// Version three adds the connector, and four a held mode. Each event
+    /// takes the version of the newest kind or mode it names.
     pub fn version(&self) -> u64 {
         self.newest().0
     }
@@ -114,8 +117,11 @@ impl GrantEvent {
             if let PassOn::To { recipients, .. } = grant.pass_on() {
                 kinds.extend(recipients.iter().copied());
             }
-            for kind in kinds {
-                let named = kind_envelope(kind);
+            let mut named: Vec<_> = kinds.into_iter().map(kind_envelope).collect();
+            if grant.mode().is_held() {
+                named.push((4, HELD_MODE_ENVELOPE));
+            }
+            for named in named {
                 if named.0 > newest.0 {
                     newest = named;
                 }
@@ -442,8 +448,13 @@ pub fn verify_grant_event(
         as_bytes(signature, SHAPE)?,
     );
     let (content_type, kid) = header(&protected)?;
-    if ![GRANT_ENVELOPE, SERVICE_ACCOUNT_ENVELOPE, CONNECTOR_ENVELOPE]
-        .contains(&content_type.as_str())
+    if ![
+        GRANT_ENVELOPE,
+        SERVICE_ACCOUNT_ENVELOPE,
+        CONNECTOR_ENVELOPE,
+        HELD_MODE_ENVELOPE,
+    ]
+    .contains(&content_type.as_str())
     {
         return Err(GrantError::EnvelopeMismatch {
             reason: format!("it names {content_type}"),
