@@ -165,6 +165,7 @@ mod openapi_types;
 pub mod operator;
 #[cfg(test)]
 mod pass_provenance_tests;
+pub mod people_admit;
 pub mod provider;
 pub mod provisioning_api;
 pub mod provisioning_store;

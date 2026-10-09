@@ -184,6 +184,12 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
             Some(receipt.clone()),
         ),
         (POST, "/people/{id}/logins", Some(bound), Some(receipt)),
+        (
+            POST,
+            "/people/admit",
+            Some(api.schema::<crate::people_admit::AdmitBody>()),
+            Some(api.schema::<crate::people_admit::Admitted>()),
+        ),
         (GET, "/me", None, Some(api.schema::<MeView>())),
         (
             GET,

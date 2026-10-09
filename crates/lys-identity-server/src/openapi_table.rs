@@ -154,6 +154,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]] scope("person", "person.profile.set", ["id"]);
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY] scope("identity", "identity.transition", ["id"]);
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY] scope("person", "person.login.bind", ["id"]);
+    POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, first root grant" S [ADMIN_BODY, &["RelationUnknown"]] scope("person", "person.create", []);
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
     GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("person", "read", []);
     GET "/agents/{id}" "An agent the caller answers for" S [PERSON, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
