@@ -23,7 +23,9 @@ use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::http::HeaderMap;
 use lys_identity::IdentityId;
-use lys_identity::grants::{Action, ExerciseRequest, GrantError, Resource, Route};
+use lys_identity::grants::{
+    Action, ExerciseRequest, Grant, GrantError, GrantId, Mode, Resource, Route,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::apps_binding::{Acting, acting};
@@ -78,6 +80,11 @@ pub struct CheckAnswer {
     /// The refusal's words, when refused.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// How the right is exercised, beside it: outright, by_draft or by_two
+    /// (ACCESS-001 R1). A held right answers allowed false with its grant,
+    /// so a product holds the act for a draft rather than refusing it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
 }
 
 /// A batch's answers.
@@ -114,6 +121,8 @@ pub struct WhichBody {
 pub struct WhichPage {
     /// The ids, in order.
     pub ids: Vec<String>,
+    /// Each id's mode, beside it: outright, by_draft or by_two.
+    pub modes: Vec<String>,
     /// The cursor of the next page; absent on the last.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
@@ -157,6 +166,15 @@ fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, Server
     }
 }
 
+/// The mode of the grant a decision named, from the book it was decided on;
+/// none if the book no longer names it, which is answered as not allowed.
+fn mode_of<S: lys_log_store::LeafStore>(
+    judged: &Judged<'_, S>,
+    grant: GrantId,
+) -> Option<Mode> {
+    judged.grants.book().grant(grant).map(Grant::mode)
+}
+
 /// The answer to one check, decided as the batch decides every one.
 pub(crate) fn one<S: lys_log_store::LeafStore>(
     judged: &mut Judged<'_, S>,
@@ -172,6 +190,7 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
         via: None,
         refusal: Some(error.name()),
         reason: Some(error.to_string()),
+        mode: None,
     };
     let asked = (|| -> Result<ExerciseRequest, ServerError> {
         judged.apps.admit_kind(acting_for, &check.kind)?;
@@ -189,7 +208,8 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
     };
     match decide(judged, &request, at, at_least, Decision::Explain) {
         Ok((permit, via)) => CheckAnswer {
-            allowed: true,
+            allowed: mode_of(judged, permit.grant) == Some(Mode::Outright),
+            mode: mode_of(judged, permit.grant).map(|mode| mode.as_str().to_owned()),
             grant: Some(permit.grant.to_string()),
             path: permit.path.iter().map(ToString::to_string).collect(),
             via: Some(via.to_string()),
@@ -258,6 +278,7 @@ pub async fn which(
         );
         let after = body.after.as_deref();
         let mut ids = Vec::new();
+        let mut modes = Vec::new();
         let mut more = false;
         for id in candidates
             .into_iter()
@@ -269,20 +290,25 @@ pub async fn which(
                 resource: Resource::new(&body.kind, &id)?,
                 action: action.clone(),
             };
-            match decide(&mut judged, &request, at, body.at_least, Decision::Explain) {
-                Ok(_) => {}
+            let mode = match decide(&mut judged, &request, at, body.at_least, Decision::Explain) {
+                Ok((permit, _)) => match mode_of(&judged, permit.grant) {
+                    Some(mode) => mode,
+                    None => continue,
+                },
                 Err(error) if unanswered(&error) => return Err(error.into()),
                 Err(_) => continue,
-            }
+            };
             if ids.len() == body.page_size {
                 more = true;
                 break;
             }
             ids.push(id);
+            modes.push(mode.as_str().to_owned());
         }
         let next = if more { ids.last().cloned() } else { None };
         Ok(Json(WhichPage {
             ids,
+            modes,
             next,
             revision: judged.grants.revision(),
         }))
