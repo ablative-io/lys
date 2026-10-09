@@ -199,7 +199,11 @@ impl Client {
     }
 
     /// Record a held act using its caller's pass; an ordinary refusal is never a draft.
-    pub async fn create_draft(&self, pass: &str, draft: &DraftRequest) -> Result<DraftCreated, Error> {
+    pub async fn create_draft(&self, pass: &str, draft: &DraftRequest, judgment: &crate::deliberate::CheckAnswer) -> Result<DraftCreated, Error> {
+        if judgment.allowed || !matches!(judgment.mode, Some(crate::Mode::ByDraft | crate::Mode::ByTwo))
+            || judgment.grant.as_deref() != Some(draft.grant.as_str()) || judgment.refusal.is_some() {
+            return Err(Error::Invalid("only a held-mode right may create a draft"));
+        }
         validate(&draft.grant, &draft.target, &draft.request_digest, &draft.words)?;
         if pass.is_empty() || draft.operation.is_empty() { return Err(Error::Invalid("draft caller pass or operation is missing")); }
         let response = self.http.post(self.endpoint("drafts")?).bearer_auth(pass).json(draft)
