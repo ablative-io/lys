@@ -91,3 +91,13 @@ async fn runner_pulls_approved_drafts_and_records_once_after_receipt_retry() -> 
     assert!(requests[1].contains("receipt_digest"));
     Ok(())
 }
+
+#[tokio::test]
+async fn ordinary_refusal_cannot_become_a_draft() -> Result<(), Box<dyn std::error::Error>> {
+    let client = lys_pass::Client::new(reqwest::Client::builder().no_proxy().build()?, url::Url::parse("http://127.0.0.1:1")?)?;
+    let draft = lys_pass::drafts::DraftRequest { operation: "operation".to_owned(), grant: "grant".to_owned(), target: Target::new("sample.file", "held", "write")?, request_digest: lys_pass::drafts::request_digest("prepared"), words: "prepared".to_owned() };
+    let refused: lys_pass::deliberate::CheckAnswer = serde_json::from_str("{\"allowed\":false,\"refusal\":\"not_held\"}")?;
+    let error = client.create_draft("caller-pass", &draft, &refused).await.err().ok_or("ordinary refusal made a draft")?;
+    assert_eq!(error.name(), "contract_refused");
+    Ok(())
+}
