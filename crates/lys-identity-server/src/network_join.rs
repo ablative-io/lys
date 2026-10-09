@@ -19,7 +19,13 @@
 //!   the computer's runner as dialled in with that key, is spent, and the
 //!   answer is `{"machine", "server_key"}`, the public key every request to
 //!   a runner is signed with. A code that is wrong, used or replaced is
-//!   refused `RunnerJoinRefused`, which never says which.
+//!   refused `RunnerJoinRefused`, which never says which. The same write
+//!   that spends the code makes the computer's machine identity (ACCESS-005
+//!   R1): `machine-` and 32 hex digits from the secure random source, made
+//!   once and kept on the spent code beside its key, answering to the person
+//!   who asked for the code. A code spent before machines were identities
+//!   is read as it was and is never given one afterwards: a machine is made
+//!   only from a join's own key, at that join.
 //!
 //! Only the SHA-256 digest of a code is kept, while it waits, beside the
 //! operation that asked for it, who asked and when, and later when it was
@@ -43,7 +49,7 @@ use axum::extract::{Path as RoutePath, State};
 use axum::http::HeaderMap;
 use axum::routing::post;
 use axum::{Json, Router};
-use lys_identity::OperationId;
+use lys_identity::{MachineId, OperationId};
 use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -76,6 +82,10 @@ pub enum JoinStanding {
         at: u64,
         /// The computer's Ed25519 public key, as 64 hexadecimal characters.
         key: String,
+        /// The machine identity this join made (ACCESS-005 R1); absent on a
+        /// code spent before machines were identities.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        identity: Option<String>,
     },
     /// Replaced by a newer code for the same computer, before it was used.
     Replaced {
@@ -276,16 +286,17 @@ impl JoinStore {
     }
 
     /// Spend the code `code` for `machine` on the computer whose public key
-    /// is `key`, at `at`, answering who asked for the code. A code that is
-    /// wrong, used or replaced is refused `RunnerJoinRefused`, and which of
-    /// these is never said.
+    /// is `key`, at `at`, answering who asked for the code and the machine
+    /// identity made, in the same write, for that key. A code that is wrong,
+    /// used or replaced is refused `RunnerJoinRefused`, and which of these is
+    /// never said.
     pub fn redeem(
         &mut self,
         machine: &str,
         code: &str,
         key: &str,
         at: u64,
-    ) -> Result<String, ServerError> {
+    ) -> Result<(String, MachineId), ServerError> {
         let given = digest(code);
         let found = self
             .kept
@@ -310,13 +321,19 @@ impl JoinStore {
         let Some(record) = next.codes.get_mut(index) else {
             return Err(MachineError::JoinRefused.into());
         };
+        let identity = MachineId::generate().map_err(|error| {
+            unavailable(format!(
+                "no random bytes could be read for a machine identity: {error}"
+            ))
+        })?;
         record.standing = JoinStanding::Used {
             at,
             key: key.to_owned(),
+            identity: Some(identity.to_string()),
         };
         let by = record.issued_by.clone();
         self.write(next)?;
-        Ok(by)
+        Ok((by, identity))
     }
 
     /// Keep `next`: written and flushed first, then held. When the write
@@ -353,7 +370,20 @@ fn checked(path: &Path, kept: Kept) -> Result<Kept, ServerError> {
     }
     let mut operations = std::collections::BTreeSet::new();
     let mut waiting = std::collections::BTreeSet::new();
+    let mut identities = std::collections::BTreeSet::new();
     for record in &kept.codes {
+        if let JoinStanding::Used {
+            identity: Some(identity),
+            ..
+        } = &record.standing
+        {
+            if MachineId::from_str(identity).is_err() {
+                return Err(refused("holds a machine identity that is not one"));
+            }
+            if !identities.insert(identity.as_str()) {
+                return Err(refused("names one machine identity for two joins"));
+            }
+        }
         if !operations.insert(record.operation.as_str()) {
             return Err(refused("names one operation for two connection codes"));
         }
@@ -370,7 +400,7 @@ fn checked(path: &Path, kept: Kept) -> Result<Kept, ServerError> {
 }
 
 /// Act on the connection codes.
-fn with_joins<T>(
+pub(crate) fn with_joins<T>(
     state: &AppState,
     act: impl FnOnce(&mut JoinStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
@@ -438,6 +468,7 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/network/machines/{id}/join-code", post(issue))
         .route("/runner/join", post(join))
+        .merge(crate::network_machines::routes())
 }
 
 fn malformed(rejection: &JsonRejection) -> ServerError {
@@ -547,12 +578,12 @@ async fn join(
         .map(|by| (record, by))
     });
     body.code.zeroize();
-    let (record, by) = redeemed?;
+    let (record, (by, identity)) = redeemed?;
     with_network(&state, |store| {
         store.name_runner(&body.machine, Some(record))
     })?;
     (state.say)(&format!(
-        "computer {} joined with key {}, under a connection code given by {by}",
+        "computer {} joined with key {} as {identity}, under a connection code given by {by}",
         body.machine, body.key
     ));
     Ok(Json(RunnerJoined {

@@ -9,6 +9,23 @@
 
 use lys_identity::grants::GrantError;
 
+/// The definitions every schema holds beside the resource kinds.
+pub(super) const FIXED: [&str; 8] = [
+    "person",
+    "agent",
+    "service_account",
+    "connector",
+    "machine",
+    "grant",
+    "lys_revision",
+    "lys_mirror",
+];
+/// Principals that also carry ordinary resource relations. `machine` is the
+/// computer a grant is on (`/network/machines/{id}`) and, since ACCESS-005, a
+/// holder: its one definition carries both, its holders named `machine-`
+/// and 32 hex digits beside the computers' own ids.
+pub(super) const RESOURCE_SUBJECTS: [&str; 4] = ["person", "agent", "service_account", "machine"];
+
 /// The prefix of an engine name that stands for an escaped Lys name.
 pub(super) const MAPPED: &str = "x0_";
 

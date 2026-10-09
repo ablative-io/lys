@@ -104,7 +104,8 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::NotHeld { .. }
         | GrantError::EnvelopeMismatch { .. }
         | GrantError::PermissionAbsent { .. }
-        | GrantError::ModeHeld { .. } => StatusCode::FORBIDDEN,
+        | GrantError::ModeHeld { .. }
+        | GrantError::MachineRefused { .. } => StatusCode::FORBIDDEN,
     }
 }
 

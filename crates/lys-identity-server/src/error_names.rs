@@ -238,6 +238,7 @@ fn grant(error: &GrantError) -> &str {
         GrantError::PermissionEngineUnavailable { .. } => "PermissionEngineUnavailable",
         GrantError::PermissionAbsent { .. } => "PermissionAbsent",
         GrantError::ModeHeld { .. } => "ModeHeld",
+        GrantError::MachineRefused { .. } => "MachineRefused",
         GrantError::Identity(error) => identity(error),
     }
 }

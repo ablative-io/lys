@@ -217,6 +217,12 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
         ),
         (
             GET,
+            "/network/machine-identities",
+            None,
+            Some(api.schema::<crate::network_machines::MachineIdentities>()),
+        ),
+        (
+            GET,
             "/runner-receipts/{index}",
             None,
             Some(api.schema::<ActReceipt>()),

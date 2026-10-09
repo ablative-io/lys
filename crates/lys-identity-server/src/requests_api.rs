@@ -382,12 +382,13 @@ async fn ask(
         let at = now();
         let responsible = match caller {
             IdentityId::Person(person) => Some(person),
-            IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
-                judged
-                    .directory
-                    .record(caller)
-                    .and_then(lys_identity::projection::Record::responsible)
-            }
+            IdentityId::Agent(_)
+            | IdentityId::ServiceAccount(_)
+            | IdentityId::Connector(_)
+            | IdentityId::Machine(_) => judged
+                .directory
+                .record(caller)
+                .and_then(lys_identity::projection::Record::responsible),
         }
         .ok_or(ServerError::NoPerson)?;
         let asked = Asked {

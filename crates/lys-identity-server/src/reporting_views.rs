@@ -82,7 +82,7 @@ pub(crate) fn edge(identity: IdentityId) -> Result<ReportingEdge, ServerError> {
     let kind = match identity {
         IdentityId::Person(_) => ReportingKind::Person,
         IdentityId::Agent(_) => ReportingKind::Agent,
-        IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+        IdentityId::ServiceAccount(_) | IdentityId::Connector(_) | IdentityId::Machine(_) => {
             return Err(lys_identity::IdentityError::AnswersToUnknown {
                 identity: identity.to_string(),
             }

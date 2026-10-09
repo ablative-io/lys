@@ -155,6 +155,7 @@ pub mod memory_api;
 pub mod message_edges;
 pub mod network_api;
 pub mod network_join;
+mod network_machines;
 mod network_personal;
 pub mod network_store;
 pub mod oidc;

@@ -13,7 +13,7 @@ use std::net::{TcpListener, TcpStream};
 #[test]
 fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
 -> Result<(), Box<dyn Error>> {
-    let old = "definition person {}\ndefinition agent {}\ndefinition grant {\n relation holder: person | agent\n}\ndefinition service_account {\n relation viewer: grant#holder\n permission view = viewer\n}\ndefinition directory {\n relation viewer: grant#holder\n permission view = viewer\n}\ndefinition fixture/doc {\n relation viewer: grant#holder\n permission view = viewer\n}";
+    let old = "definition person {}\ndefinition agent {}\ndefinition grant {\n relation holder: person | agent\n}\ndefinition service_account {\n relation viewer: grant#holder\n permission view = viewer\n}\ndefinition directory {\n relation viewer: grant#holder\n permission view = viewer\n}\ndefinition machine {\n relation viewer: grant#holder\n permission view = viewer\n}\ndefinition fixture/doc {\n relation viewer: grant#holder\n permission view = viewer\n}";
     let temp = tempfile::tempdir()?;
     let key = temp.path().join("key");
     std::fs::write(&key, "fixture-only")?;
@@ -107,7 +107,10 @@ fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
     assert!(schema.contains("definition directory {"));
     assert!(schema.contains("definition fixture/doc {"));
     assert!(schema.contains("person | person with unexpired"));
-    for kind in ["person", "agent"] {
+    // A machine is both the computer a grant is on and, since ACCESS-005, a
+    // holder: one definition carries both, as a person's does.
+    assert!(schema.contains("machine | machine with unexpired"));
+    for kind in ["person", "agent", "machine"] {
         assert_eq!(schema.matches(&format!("definition {kind} {{")).count(), 1);
         assert!(schema.contains(&format!(
             "definition {kind} {{\n  relation viewer: grant#holder\n  permission view = viewer\n}}"

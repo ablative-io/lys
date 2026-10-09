@@ -1056,7 +1056,7 @@ async fn an_identity_of_no_known_kind_is_refused_by_name() -> TestResult {
         answer
             .1
             .to_string()
-            .contains("person, agent, service account or connector"),
+            .contains("person, agent, service account, connector or machine"),
         "{}",
         answer.1
     );

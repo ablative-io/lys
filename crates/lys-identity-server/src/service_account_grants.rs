@@ -76,18 +76,21 @@ pub(crate) fn admit(
 }
 
 /// A request projection augmented from the accounts' current committed
-/// state and the connectors of the apps `apps` holds.
+/// state, the connectors of the apps `apps` holds and the machines the
+/// spent connection codes made (ACCESS-005 R1).
 pub(crate) fn projection(
     state: &AppState,
     directory: &Projection,
     apps: &crate::apps_state::Held,
 ) -> Result<Projection, ServerError> {
+    let machines = crate::network_machines::joined_now(state)?;
     let Some(accounts) = &state.service_accounts else {
-        if apps.apps.iter().all(|app| app.connector.is_none()) {
+        if apps.apps.iter().all(|app| app.connector.is_none()) && machines.is_empty() {
             return Ok(directory.shared());
         }
         let connectors = crate::apps_connector::with_connectors(Arc::default(), apps)?;
-        return Ok(directory.with_accounts(connectors));
+        let accounts = crate::network_machines::with_machines(connectors, &machines, directory)?;
+        return Ok(directory.with_accounts(accounts));
     };
     let mut accounts =
         accounts
@@ -96,15 +99,17 @@ pub(crate) fn projection(
                 reason: format!("the service accounts lock is poisoned: {error}"),
             })?;
     accounts.settle()?;
-    expanded(directory, accounts.held(), apps)
+    expanded(directory, accounts.held(), apps, &machines)
 }
 
 fn expanded(
     directory: &Projection,
     accounts: &crate::service_accounts_state::Held,
     apps: &crate::apps_state::Held,
+    machines: &[crate::network_machines::Joined],
 ) -> Result<Projection, ServerError> {
     let accounts = crate::apps_connector::with_connectors(accounts.grant_accounts()?, apps)?;
+    let accounts = crate::network_machines::with_machines(accounts, machines, directory)?;
     let projection = directory.with_accounts(accounts);
     #[cfg(test)]
     tests::copied(directory, &projection);

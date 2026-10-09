@@ -15,7 +15,7 @@ use crate::service_accounts_state::{Created, Held, Line, Retired};
 
 /// The projection over `held` beside apps that hold no connector.
 fn expanded(directory: &Projection, held: &Held) -> Result<Projection, crate::ServerError> {
-    super::expanded(directory, held, &crate::apps_state::Held::default())
+    super::expanded(directory, held, &crate::apps_state::Held::default(), &[])
 }
 
 thread_local! {
@@ -313,12 +313,12 @@ fn connected(
 fn a_retired_apps_connector_is_judged_retired() -> Result<(), Box<dyn Error>> {
     let (directory, owner) = directory()?;
     let (apps, identity) = connected(owner, true)?;
-    let view = super::expanded(&directory, &Held::default(), &apps)?;
+    let view = super::expanded(&directory, &Held::default(), &apps, &[])?;
     let record = view.record(identity).ok_or("connector missing")?;
     assert_eq!(record.state(), LifecycleState::Retired);
     assert_eq!(record.responsible(), Some(owner));
     let (apps, identity) = connected(owner, false)?;
-    let view = super::expanded(&directory, &Held::default(), &apps)?;
+    let view = super::expanded(&directory, &Held::default(), &apps, &[])?;
     let record = view.record(identity).ok_or("connector missing")?;
     assert_eq!(record.state(), LifecycleState::Active);
     Ok(())
@@ -337,7 +337,7 @@ fn a_connector_follows_its_approver_through_suspension_and_reinstatement()
         (301, Transition::Reinstate, LifecycleState::Active),
     ] {
         change_owner(&mut directory, owner, transition, index)?;
-        let view = super::expanded(&directory, &Held::default(), &apps)?;
+        let view = super::expanded(&directory, &Held::default(), &apps, &[])?;
         let record = view.record(identity).ok_or("connector missing")?;
         assert_eq!(record.state(), state, "{transition:?}");
         assert_eq!(record.responsible(), Some(owner));

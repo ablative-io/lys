@@ -164,9 +164,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/grants/{id}/tokens/{token_id}/revoke" "Revoke one grant credential" C [SIGNED, &["GrantTokenResponsibleRequired", "GrantTokenUnavailable", "GrantTokenUnknown"]] scope("grant", "grant.revoke", ["id"]);
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]] scope("grant", "read", []);
     GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];
-    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused", "WithheldFromAgents"]] scope("grant", "grant.delegate", []);
+    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused", "WithheldFromAgents", "MachineRefused"]] scope("grant", "grant.delegate", []);
     GET "/grants/model" "Lys's own permission model" S [SIGNED] scope("grant", "read", []);
-    POST "/grants/roots" "Issue a root grant, outright or held by draft or by two" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused", "WithheldFromAgents", "grant_mode_on_hot_action"]];
+    POST "/grants/roots" "Issue a root grant, outright or held by draft or by two" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused", "WithheldFromAgents", "MachineRefused", "grant_mode_on_hot_action"]];
     POST "/grants/agent-roots" "Record the administrator's roots for giving people and agents access" S [ADMIN, &["NoPerson", "RelationUnknown"], &["RootAuthorityRefused", "WithheldFromAgents"]];
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]] scope("grant", "grant.check", []);
     POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, UNANSWERED, &["NotHeld"]] scope("grant", "grant.why", []);
@@ -255,6 +255,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
     POST "/network/machines/{id}/join-code" "Give a one-time connection code for another computer" S [ADMIN_BODY, &["NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "NetworkUnavailable", "RunnerJoinUnreachable", "RunnerJoinOperationReused"]] scope("machine", "machine.runner.set", ["id"]);
     POST "/runner/join" "Join another computer's runner with its connection code" P [&["RequestMalformed", "RunnerJoinRefused", "MachineRetired", "NetworkUnavailable"]];
+    GET "/network/machine-identities" "The computers that joined, as machine identities, and the grants each holds" S [ADMIN, &["NetworkUnavailable", "IdentifierMalformed"]] scope("machine", "read", []);
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
     GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown"]] scope("agent", "read", ["id"]);
     GET "/agents/{id}/calls" "An agent's model calls, newest first" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RequestMalformed"]] scope("agent", "read", ["id"]);

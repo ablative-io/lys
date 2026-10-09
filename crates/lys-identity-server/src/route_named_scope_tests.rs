@@ -45,6 +45,7 @@ scopes! {
     agent_goals: "GET", "/agents/one/goals", "agent", "one", "read";
     grant_token_revoke: "POST", "/grants/one/tokens/two/revoke", "grant", "one", "grant.revoke";
     network_list: "GET", "/network", "machine", "all", "read";
+    machine_identities: "GET", "/network/machine-identities", "machine", "all", "read";
     machines_create: "POST", "/network/machines", "machine", "all", "machine.create";
     runtime_sessions: "GET", "/runtime/sessions", "runtime-session", "all", "read";
     runtime_edges: "GET", "/runtime/message-edges", "runtime-session", "all", "read";

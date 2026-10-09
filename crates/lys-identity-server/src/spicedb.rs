@@ -37,7 +37,9 @@ mod credential;
 mod names;
 mod wire;
 pub use credential::{SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
-use names::{engine_ident, engine_ident_on, engine_name_for, lys_name_on};
+use names::{
+    FIXED, RESOURCE_SUBJECTS, engine_ident, engine_ident_on, engine_name_for, lys_name_on,
+};
 use wire::{object_json, relationship_json, relationship_of};
 
 #[path = "spicedb_scope.rs"]
@@ -45,18 +47,6 @@ pub(crate) mod scope;
 
 /// The line of an environment file that holds the preshared key.
 const KEY_LINE: &str = "SPICEDB_GRPC_PRESHARED_KEY=";
-/// The definitions every schema holds beside the resource kinds.
-const FIXED: [&str; 7] = [
-    "person",
-    "agent",
-    "service_account",
-    "connector",
-    "grant",
-    "lys_revision",
-    "lys_mirror",
-];
-/// Principals that also carry ordinary resource relations.
-const RESOURCE_SUBJECTS: [&str; 3] = ["person", "agent", "service_account"];
 /// The definitions the mirror's revision is kept in.
 const MIRROR_SCHEMA: &str = "\ndefinition lys_revision {}\n\ndefinition lys_mirror {\n  relation revision: lys_revision\n}\n";
 

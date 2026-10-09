@@ -177,9 +177,10 @@ pub(crate) fn person_record(projection: &Projection, id: PersonId) -> Result<&Re
 pub(crate) fn own_person(projection: &Projection, actor: &Actor) -> Result<PersonId, ServerError> {
     match crate::caller_admission::active_caller(projection, actor)? {
         IdentityId::Person(person) => Ok(person),
-        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
-            Err(ServerError::NoPerson)
-        }
+        IdentityId::Agent(_)
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_) => Err(ServerError::NoPerson),
     }
 }
 
@@ -256,7 +257,8 @@ async fn every_person(
                     )),
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_) => None,
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_) => None,
                 })
                 .collect();
             return Ok(Json(PeopleView {

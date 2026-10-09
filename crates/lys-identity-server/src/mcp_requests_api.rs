@@ -262,7 +262,10 @@ fn declaration(
                 })
         }
         IdentityId::Person(_) if administrator => profiles.declared_server(&asked.server),
-        IdentityId::Person(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => None,
+        IdentityId::Person(_)
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_) => None,
     };
     server.cloned().ok_or_else(|| ServerError::McpBeyondRemit {
         approver: by.to_string(),

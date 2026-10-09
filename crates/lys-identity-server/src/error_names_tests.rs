@@ -1166,6 +1166,13 @@ fn grant_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "ModeHeld",
         ),
         (
+            ServerError::Grant(GrantError::MachineRefused {
+                machine: detail.to_owned(),
+                act: detail.to_owned(),
+            }),
+            "MachineRefused",
+        ),
+        (
             ServerError::Grant(GrantError::Identity(IdentityError::IdentifierMalformed {
                 kind: detail,
                 text: detail.to_owned(),
@@ -1516,6 +1523,7 @@ fn grant_authority_refusals_keep_their_forbidden_status() {
                 | "EnvelopeMismatch"
                 | "PermissionAbsent"
                 | "ModeHeld"
+                | "MachineRefused"
         ) {
             assert_eq!(error.status(), StatusCode::FORBIDDEN, "{name}");
         }

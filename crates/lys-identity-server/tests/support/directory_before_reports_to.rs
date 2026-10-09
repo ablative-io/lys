@@ -53,6 +53,7 @@ fn identity(value: IdentityId) -> Value {
         IdentityId::Agent(id) => (2, *id.as_bytes()),
         IdentityId::ServiceAccount(id) => (3, *id.as_bytes()),
         IdentityId::Connector(id) => (4, *id.as_bytes()),
+        IdentityId::Machine(id) => (5, *id.as_bytes()),
     };
     array(vec![uint(kind), bytes(&id)])
 }

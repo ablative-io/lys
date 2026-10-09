@@ -57,6 +57,7 @@ fn named(judged: &Judged<'_>, identity: IdentityId) -> Result<CanGrant, ServerEr
             IdentityId::Agent(_) => "agent",
             IdentityId::ServiceAccount(_) => "service_account",
             IdentityId::Connector(_) => "connector",
+            IdentityId::Machine(_) => "machine",
         },
         display_name: record.profile().display_name().to_owned(),
     })
@@ -143,7 +144,7 @@ pub(crate) fn for_judged(
                 .is_some_and(|actions| actions.contains(action))
             || matches!(
                 grant.holder(),
-                IdentityId::ServiceAccount(_) | IdentityId::Connector(_)
+                IdentityId::ServiceAccount(_) | IdentityId::Connector(_) | IdentityId::Machine(_)
             )
         {
             continue;

@@ -306,9 +306,10 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
         }
         Some("agent") => AgentId::from_str(text).map(IdentityId::Agent),
         Some("connector") => lys_identity::ConnectorId::from_str(text).map(IdentityId::Connector),
+        Some("machine") => lys_identity::MachineId::from_str(text).map(IdentityId::Machine),
         Some("person") => PersonId::from_str(text).map(IdentityId::Person),
         _ => Err(lys_identity::IdentityError::IdentifierMalformed {
-            kind: "person, agent, service account or connector",
+            kind: "person, agent, service account, connector or machine",
             text: text.to_owned(),
         }),
     };
@@ -387,7 +388,10 @@ pub(crate) async fn register_agent(
             let projection = directory.projection()?;
             let own = match crate::caller_admission::active_caller(projection, &actor)? {
                 IdentityId::Person(person) => person,
-                IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+                IdentityId::Agent(_)
+                | IdentityId::ServiceAccount(_)
+                | IdentityId::Connector(_)
+                | IdentityId::Machine(_) => {
                     return Err(ServerError::NotAdmitted {
                         reason: "an agent registration requires a person or an admitted service account",
                     });

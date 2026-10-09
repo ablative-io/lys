@@ -216,7 +216,10 @@ pub(crate) async fn approve(
                 ),
                 (
                     None,
-                    IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_),
+                    IdentityId::Agent(_)
+                    | IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_),
                 ) => {
                     return Err(malformed(NAME_THE_SOURCE));
                 }
