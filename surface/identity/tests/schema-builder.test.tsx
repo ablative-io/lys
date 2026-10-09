@@ -115,6 +115,31 @@ describe('the permission template builder', () => {
     expect((put?.body as { schema: SchemaJson }).schema.kinds['fixture_notes.doc']?.relations).toEqual({ reader: ['read', 'write'], editor: ['read', 'write'], auditor: ['read'] });
   });
 
+  it('carries a kind\'s hot actions through an edit, as it carries its roles, keeping only actions still declared', async () => {
+    const doc = documents.kinds['fixture_notes.doc'];
+    if (!doc) throw new Error('no document kind');
+    const hotDocuments: SchemaJson = { kinds: { 'fixture_notes.doc': { ...doc, hot: ['read'], roles: { auditor: ['read'] } } } };
+    const calls = stub({ ['POST /apps/' + APP + '/schema/check']: () => applies, ['PUT /apps/' + APP + '/schema']: () => ok({ applied: true }) });
+    await render(<SchemaBuilder app={APP} version={1} initial={hotDocuments} />);
+    await click(labelled('reader carries write'));
+    await click(button('Check the change'));
+    await click(button('Save version 2'));
+    const put = calls.find((call) => call.method === 'PUT');
+    const saved = (put?.body as { schema: SchemaJson }).schema.kinds['fixture_notes.doc'];
+    expect(saved?.hot).toEqual(['read']);
+    expect(saved?.roles).toEqual({ auditor: ['read'] });
+
+    const draft = fromSchema(APP, { kinds: { 'fixture_notes.doc': { actions: ['read', 'write'], hot: ['read', 'write'] } } });
+    expect(toSchema(APP, draft).kinds['fixture_notes.doc']?.hot).toEqual(['read', 'write']);
+    const kind = draft.kinds[0];
+    if (!kind) throw new Error('no kind opened');
+    kind.actions = ['write'];
+    expect(toSchema(APP, draft).kinds['fixture_notes.doc']?.hot).toEqual(['write']);
+    kind.actions = [];
+    expect(toSchema(APP, draft).kinds['fixture_notes.doc']).not.toHaveProperty('hot');
+    expect(toSchema(APP, fromSchema(APP, documents)).kinds['fixture_notes.doc']).not.toHaveProperty('hot');
+  });
+
   it('asks the draft on the bench and shows the path, and closes the bench', async () => {
     const calls = stub({
       'POST /apps/bench': () => ok({ bench: 'b1', app: APP }),

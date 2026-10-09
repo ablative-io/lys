@@ -20,13 +20,13 @@ import './schema-builder.css';
 import { Act } from '../../shell/Act';
 
 /** A kind as the schema JSON writes it. */
-export interface SchemaKindJson { actions: string[]; relations?: Record<string, string[]>; parents?: string[]; roles?: Record<string, string[]> }
+export interface SchemaKindJson { actions: string[]; relations?: Record<string, string[]>; parents?: string[]; hot?: string[]; roles?: Record<string, string[]> }
 /** An app's schema as the API takes it. */
 export interface SchemaJson { kinds: Record<string, SchemaKindJson> }
 /** One relation of a draft kind. */
 export interface DraftRelation { name: string; actions: string[] }
-/** One kind of the draft, named within the app's prefix; `roles` are carried through an edit as they were read (ACCESS-004 R1). */
-export interface DraftKind { name: string; actions: string[]; relations: DraftRelation[]; parents: string[]; roles?: Record<string, string[]> }
+/** One kind of the draft, named within the app's prefix; its `hot` actions (ACCESS-001 R2) and `roles` (ACCESS-004 R1) are carried through an edit as they were read. */
+export interface DraftKind { name: string; actions: string[]; relations: DraftRelation[]; parents: string[]; hot?: string[]; roles?: Record<string, string[]> }
 /** The draft being built. */
 export interface Draft { kinds: DraftKind[] }
 
@@ -50,6 +50,9 @@ export function toSchema(app: string, draft: Draft): SchemaJson {
       relations: Object.fromEntries(kind.relations.map((relation) => [relation.name, kind.actions.filter((action) => relation.actions.includes(action))])),
       parents: kind.parents.map((parent) => app + '.' + parent),
     };
+    // A hot action is kept only while its kind still declares it; none left, and `hot` is not written.
+    const hot = (kind.hot ?? []).filter((action) => kind.actions.includes(action));
+    if (hot.length) body.hot = hot;
     // A role keeps only the actions its kind still declares; one left carrying none is dropped, and the dry run names it.
     const roles = Object.entries(kind.roles ?? {}).map(([role, may]) => [role, may.filter((action) => kind.actions.includes(action))] as const).filter(([, may]) => may.length);
     if (roles.length) body.roles = Object.fromEntries(roles);
@@ -72,6 +75,7 @@ export function fromSchema(app: string, schema: unknown): Draft {
       actions: [...(kind.actions ?? [])],
       relations: Object.entries(kind.relations ?? {}).map(([relation, actions]) => ({ name: relation, actions: [...actions] })),
       parents: (kind.parents ?? []).map(local),
+      ...(kind.hot ? { hot: [...kind.hot] } : {}),
       ...(kind.roles ? { roles: { ...kind.roles } } : {}),
     })),
   };
