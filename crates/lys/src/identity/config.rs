@@ -42,6 +42,10 @@ pub struct DeploymentConfig {
     /// The passwords Lys takes; Lys's own policy when the table is absent.
     #[serde(default)]
     pub password_policy: PasswordPolicy,
+    /// The identity settings (ACCESS-002 R2); their stated defaults when
+    /// the table is absent.
+    #[serde(default)]
+    pub identity: super::install::settings::IdentitySettings,
     #[serde(skip)]
     base: PathBuf,
 }
@@ -399,6 +403,13 @@ impl DeploymentConfig {
             ));
         }
         validate_admin_url(&self.issuer.admin_url)?;
+        if self.identity.pass_lifetime == 0 {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                "identity.pass_lifetime",
+                "a pass lives at least one second: every pass has an expiry after its issue",
+            ));
+        }
         self.validate_database()?;
         if self
             .clients

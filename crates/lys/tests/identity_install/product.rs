@@ -15,6 +15,10 @@
 //! userinfo answers the same subject. A revoked credential is then refused
 //! `credential_refused`, and once the app is retired its other credential is
 //! refused `app_retired`.
+//!
+//! ACCESS-002 R2: build.json records the pass lifetime's stated default
+//! after the first install, and a lifetime chosen in the deployment
+//! configuration after the install runs again.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -151,6 +155,15 @@ fn register(installed: &Installed<'_>, read: &mut Heard, cookie: &str) -> TestRe
     assert_eq!(answer["app"]["client_id"], PRODUCT);
     assert_eq!(answer["app"]["sign_in"]["redirects"], json!([CALLBACK]));
     Ok(answer["app"]["sign_in"].clone())
+}
+
+/// The pass lifetime `install/build.json` records (ACCESS-002 R2).
+fn recorded_pass_lifetime(installed: &Installed<'_>) -> TestResult<u64> {
+    let build: Value =
+        serde_json::from_slice(&std::fs::read(installed.root.join("install/build.json"))?)?;
+    Ok(build["settings"]["identity.pass_lifetime"]
+        .as_u64()
+        .ok_or("build.json records no pass lifetime")?)
 }
 
 /// Runs the install again, which keeps what it wrote and restarts the
@@ -392,7 +405,26 @@ pub fn signs_in_through_lys(installed: &Installed<'_>, read: &mut Heard) -> Test
     let first = handed_a_code(installed, read, &cookie, "at approval")?;
     signed_in(installed, read, &first, &credential, true, "at approval")?;
 
+    assert_eq!(
+        recorded_pass_lifetime(installed)?,
+        600,
+        "build.json records the pass lifetime's stated default"
+    );
+    // A chosen pass lifetime (ACCESS-002 R2): named in the deployment
+    // configuration, it is what the run again records.
+    let deployment = installed.root.join("deployment.toml");
+    let mut chosen = std::fs::read_to_string(&deployment)?;
+    chosen.push_str("\n[identity]\npass_lifetime = 900\n");
+    std::fs::write(&deployment, chosen)?;
     install_again(installed, read)?;
+    assert_eq!(
+        recorded_pass_lifetime(installed)?,
+        900,
+        "build.json records the chosen pass lifetime"
+    );
+    let config: Value =
+        serde_json::from_slice(&std::fs::read(installed.root.join("identity.json"))?)?;
+    assert_eq!(config["provider"]["pass_seconds"], 900, "{config}");
     let cookie = sign_in(installed, read, "a sign-in after the restart")?;
     let kept = ask(
         installed.service_port,

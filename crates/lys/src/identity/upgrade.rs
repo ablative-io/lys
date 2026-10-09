@@ -265,6 +265,8 @@ pub struct BuildRecord {
     /// The environment the services were started with: the names kept
     /// from the login and the login shell's `PATH`.
     pub environment: login::EnvironmentRecord,
+    /// The settings the service configuration runs with (ACCESS-002 R2).
+    pub settings: install::settings::RecordedSettings,
 }
 
 /// The placed screens package.
@@ -320,10 +322,12 @@ pub fn record_build(
         environment.kept.join(","),
         environment.path
     ));
+    let settings = install::settings::recorded(layout)?;
     let record = BuildRecord {
         binaries,
         surface,
         environment,
+        settings,
     };
     let text = serde_json::to_vec_pretty(&record).map_err(|error| {
         refuse(

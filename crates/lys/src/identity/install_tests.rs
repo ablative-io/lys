@@ -847,3 +847,38 @@ fn a_detached_service_starts_with_the_given_environment_only() -> Result<(), Box
     }
     Ok(())
 }
+
+/// ACCESS-002 R2: the pass lifetime is `identity.pass_lifetime`, ten minutes
+/// when the deployment configuration names none and what it names when it
+/// does, written into the service's configuration as `provider.pass_seconds`
+/// and read back as build.json records it; a lifetime of zero is refused.
+#[test]
+fn the_pass_lifetime_is_a_setting_with_its_stated_default() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    let layout = Layout::at(root.path().to_path_buf());
+    let text = render_deployment(None);
+    for (deployment, expected) in [
+        (text.clone(), super::settings::PASS_LIFETIME_SECONDS),
+        (format!("{text}\n[identity]\npass_lifetime = 900\n"), 900),
+    ] {
+        let config = DeploymentConfig::parse(&deployment, root.path().to_path_buf())?;
+        assert_eq!(config.identity.pass_lifetime, expected);
+        let rendered =
+            server_config::render(&layout, &config, &server_config::Carried::default(), false);
+        assert_eq!(rendered["provider"]["pass_seconds"], expected);
+        private_files::write(&layout.service_config(), rendered.to_string().as_bytes())?;
+        let recorded = super::settings::recorded(&layout)?;
+        assert_eq!(recorded.pass_lifetime, Some(expected));
+        assert_eq!(
+            serde_json::to_value(recorded)?["identity.pass_lifetime"],
+            expected
+        );
+    }
+    assert_eq!(super::settings::PASS_LIFETIME_SECONDS, 600);
+    let zero = DeploymentConfig::parse(
+        &format!("{text}\n[identity]\npass_lifetime = 0\n"),
+        root.path().to_path_buf(),
+    );
+    assert!(zero.is_err(), "a pass lifetime of zero was taken");
+    Ok(())
+}

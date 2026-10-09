@@ -53,6 +53,7 @@ pub mod ports;
 pub mod proxy;
 pub mod server_config;
 pub mod services;
+pub mod settings;
 pub mod setup_code;
 pub mod surface;
 

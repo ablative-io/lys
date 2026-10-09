@@ -173,6 +173,7 @@ pub fn render(
         },
         "provider": {
             "key_file": state.join(PROVIDER_KEY_FILE).display().to_string(),
+            "pass_seconds": config.identity.pass_lifetime,
         },
         "requests_dir": dir("requests"),
         "certificates_dir": dir("certificates"),
