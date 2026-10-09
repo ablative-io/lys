@@ -57,7 +57,7 @@ mod tests {
     use lys_core::Ed25519Identity;
     use identity_contract::lys_identity_server::Config;
     use identity_contract::lys_identity_server::dev_seed::seed_configured;
-    use crate::teams_state::{Changed, Created, Hold, Line};
+    use crate::teams_state::{Changed, Checked, Created, Hold, Line};
     use crate::teams_store::TeamStore;
 
     type Outcome = Result<(), Box<dyn Error>>;
@@ -74,6 +74,7 @@ mod tests {
         let mut store = TeamStore::open(config.teams_dir.as_deref().ok_or("teams disabled")?,
             Arc::new(Ed25519Identity::load(&config.event_key_file)?))?;
         let mut expected = BTreeSet::new();
+        let mut migrated = Vec::new();
         for index in 1..=4 {
             let id = format!("op-{index:032x}");
             store.keep(Line::Created(Created { id: id.clone(), name: id.clone(),
@@ -84,11 +85,18 @@ mod tests {
                     member: person.clone(), by: by.clone(), at: 2 }))?;
             }
             if index == 4 {
-                store.keep(Line::Held(Hold { operation: format!("op-{:032x}", 20), team: id.clone(),
-                    member: person.clone(), reason: "membership awaits admission".to_owned(), at: 3 }))?;
+                // A hold is a migration line: it goes through the migration writer.
+                migrated.push(Line::Held(Hold { operation: format!("op-{:032x}", 20), team: id.clone(),
+                    member: person.clone(), reason: "membership awaits admission".to_owned(), at: 3 }));
             }
             if index <= 2 { expected.insert(id); }
         }
+        migrated.push(Line::Checked(Checked {
+            operation: "lys/teams/legacy-membership/v1/checked".to_owned(),
+            at: 4,
+        }));
+        store.stage_migration(migrated)?;
+        store.finish_migration()?;
         Ok(expected)
     }
 

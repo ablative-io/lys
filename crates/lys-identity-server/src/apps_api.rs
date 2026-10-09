@@ -84,7 +84,10 @@ mod tests {
         for id in ["ready", "no_settings", "retired", "pending"] {
             apps.keep(Line::Registered(Registered { operation: format!("register-{id}"), app: id.to_owned(),
                 name: id.to_owned(), redirects: vec!["https://app.example.test/callback".to_owned()],
-                schema: json!({"kinds": {}}), service_account: None, by: By::Start, at: 1 }))?;
+                // The smallest schema Lys reads back: one kind, one action, one relation.
+                schema: json!({"kinds": {format!("{id}.doc"): {
+                    "actions": ["read"], "relations": {"reader": ["read"]}, "parents": []}}}),
+                service_account: None, by: By::Start, at: 1 }))?;
             if id == "pending" { continue; }
             apps.keep(Line::Approved(Approved { operation: format!("approve-{id}"), app: id.to_owned(),
                 client: Client { client_id: id.to_owned(), secret_sha256: sha256_hex("fixture-client-secret") },
