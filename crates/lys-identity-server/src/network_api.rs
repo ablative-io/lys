@@ -26,7 +26,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 use crate::error_team::TeamError;
-use crate::grants::caller;
 use crate::network_store::{AgentsRecorded, Machine, NetworkStore, Retirement, TeamRecorded};
 use crate::read_api::own_person;
 use crate::read_views::AgentSummary;
@@ -410,7 +409,7 @@ async fn list(
     let actor = signed_in(&state, &headers)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        caller(&state, &headers, directory)?;
+        crate::caller_admission::active_caller(directory, &actor)?;
         let scope = PersonalNetwork::read(&state, directory, &actor)?;
         let page = crate::list_page::Page::read(query, "/network")?;
         let teams = page
