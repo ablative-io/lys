@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -25,8 +27,24 @@ fn native_target_keeps_the_complete_path_and_query_on_the_private_origin() -> Te
     let upstream = reqwest::Url::parse("http://127.0.0.1:18080/auth/v1")?;
     let uri = "/auth/v1/oidc/callback?code=opaque%2Bcode&state=held".parse()?;
     assert_eq!(target(&upstream, &uri)?.as_str(), "http://127.0.0.1:18080/auth/v1/oidc/callback?code=opaque%2Bcode&state=held");
-    for path in ["/api/people", "/auth/v1/providers/callback", "/auth/v1/providers/callback/"] {
+    assert_eq!(target(&reqwest::Url::parse("http://127.0.0.1:18080")?, &uri)?.as_str(), "http://127.0.0.1:18080/oidc/callback?code=opaque%2Bcode&state=held");
+    for path in ["/api/people", "/auth/v1/providers/callback", "/auth/v1/providers/callback/", "/auth/v1/%70roviders/callback", "/auth/v1/providers%2fcallback", "/auth/v1/%2e%2e/users"] {
         assert!(target(&upstream, &path.parse()?).is_err(), "{path}");
+    }
+    Ok(())
+}
+
+#[test]
+fn native_oidc_redirects_return_to_the_public_origin_and_keep_state() -> TestResult {
+    let upstream = reqwest::Url::parse("http://127.0.0.1:18080/auth/v1")?;
+    let public = reqwest::Url::parse("https://identity.example.test")?;
+    let mut headers = HeaderMap::new();
+    headers.insert(header::LOCATION, HeaderValue::from_static("http://127.0.0.1:18080/auth/v1/oidc/callback?code=opaque%2Bcode&state=held"));
+    let carried = response_headers(&headers, &upstream, &public)?;
+    assert_eq!(carried[header::LOCATION], "https://identity.example.test/auth/v1/oidc/callback?code=opaque%2Bcode&state=held");
+    for external in ["https://provider.example.test/authorize?state=held", "/auth/v1/admin"] {
+        headers.insert(header::LOCATION, HeaderValue::from_str(external)?);
+        assert_eq!(response_headers(&headers, &upstream, &public)?[header::LOCATION], external);
     }
     Ok(())
 }

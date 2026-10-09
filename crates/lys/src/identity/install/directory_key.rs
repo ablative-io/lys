@@ -78,7 +78,7 @@ fn rights(access: &Value) -> IdentityResult<Rights> {
 fn forbidden(error: IdentityError, right: &str) -> IdentityError {
     if error.kind() != ErrorKind::RauthyForbidden { return error; }
     IdentityError::new(ErrorKind::RauthyForbidden, "verify live API key rights", API_KEY_NAME,
-        format!("missing API key rights: {right}; in the issuer administrator screen, edit the {API_KEY_NAME} API key and grant {right}, then rerun the install; bootstrap declarations do not update a live key"))
+        format!("the live key cannot exercise the required API key rights: {right}; in the issuer administrator screen, edit the {API_KEY_NAME} API key and grant {right}, then rerun the install; bootstrap declarations do not update a live key"))
 }
 
 fn keys(api: &RauthyApi) -> IdentityResult<Vec<Value>> {
@@ -112,8 +112,9 @@ fn exact(name: &str, current: Option<&Rights>, wanted: &Rights) -> IdentityResul
 
 fn configure_rights() -> IdentityResult<Rights> {
     let bytes = base64::engine::general_purpose::STANDARD.decode(bootstrap_api_key())
-        .map_err(|_| invalid_rights())?;
-    let declaration: Value = serde_json::from_slice(&bytes).map_err(|_| invalid_rights())?;
+        .map_err(|error| IdentityError::new(ErrorKind::RauthyUnexpected, "decode declared API key rights", API_KEY_NAME, error.to_string()))?;
+    let declaration: Value = serde_json::from_slice(&bytes).map_err(|error|
+        IdentityError::new(ErrorKind::RauthyUnexpected, "parse declared API key rights", API_KEY_NAME, error.to_string()))?;
     rights(&declaration["access"])
 }
 

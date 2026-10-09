@@ -168,6 +168,7 @@ fn upgrade_preflight_checks_live_rights_and_never_mutates_a_key() -> TestResult 
         let config = deployment(root.path(), &url, token)?;
         let layout = crate::identity::install::layout::Layout::at(root.path().to_path_buf());
         let text = include_str!("../../../../../deploy/identity/config.example.toml")
+            .replace("public_origin = \"http://localhost:8480\"", "public_origin = \"http://localhost:8490\"")
             .replace("admin_url = \"http://127.0.0.1:8480\"", &format!("admin_url = \"{url}\""));
         std::fs::write(layout.deployment_config(), text)?;
         let before = std::fs::read(layout.deployment_config())?;
