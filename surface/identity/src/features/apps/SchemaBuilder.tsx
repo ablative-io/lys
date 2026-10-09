@@ -20,13 +20,13 @@ import './schema-builder.css';
 import { Act } from '../../shell/Act';
 
 /** A kind as the schema JSON writes it. */
-export interface SchemaKindJson { actions: string[]; relations?: Record<string, string[]>; parents?: string[] }
+export interface SchemaKindJson { actions: string[]; relations?: Record<string, string[]>; parents?: string[]; roles?: Record<string, string[]> }
 /** An app's schema as the API takes it. */
 export interface SchemaJson { kinds: Record<string, SchemaKindJson> }
 /** One relation of a draft kind. */
 export interface DraftRelation { name: string; actions: string[] }
-/** One kind of the draft, named within the app's prefix. */
-export interface DraftKind { name: string; actions: string[]; relations: DraftRelation[]; parents: string[] }
+/** One kind of the draft, named within the app's prefix; `roles` are carried through an edit as they were read (ACCESS-004 R1). */
+export interface DraftKind { name: string; actions: string[]; relations: DraftRelation[]; parents: string[]; roles?: Record<string, string[]> }
 /** The draft being built. */
 export interface Draft { kinds: DraftKind[] }
 
@@ -35,7 +35,8 @@ export interface Named { kind: string; name: string }
 export interface Strand { kind: string; relation: string; count: number }
 export interface SchemaCheck {
   current: number; next: number; applies: boolean; stranded: Strand[];
-  diff: { kinds_added: string[]; kinds_removed: string[]; relations_added: Named[]; relations_removed: Named[]; actions_added: Named[]; actions_removed: Named[]; parents_added: Named[]; parents_removed: Named[] };
+  diff: { kinds_added: string[]; kinds_removed: string[]; relations_added: Named[]; relations_removed: Named[]; actions_added: Named[]; actions_removed: Named[]; parents_added: Named[]; parents_removed: Named[];
+    roles_added?: Named[]; roles_removed?: Named[]; roles_changed?: { kind: string; role: string; words: string[] }[] };
 }
 
 export { send };
@@ -44,11 +45,15 @@ export { send };
 export function toSchema(app: string, draft: Draft): SchemaJson {
   const kinds: Record<string, SchemaKindJson> = {};
   for (const kind of draft.kinds) {
-    kinds[app + '.' + kind.name] = {
+    const body: SchemaKindJson = {
       actions: [...kind.actions],
       relations: Object.fromEntries(kind.relations.map((relation) => [relation.name, kind.actions.filter((action) => relation.actions.includes(action))])),
       parents: kind.parents.map((parent) => app + '.' + parent),
     };
+    // A role keeps only the actions its kind still declares; one left carrying none is dropped, and the dry run names it.
+    const roles = Object.entries(kind.roles ?? {}).map(([role, may]) => [role, may.filter((action) => kind.actions.includes(action))] as const).filter(([, may]) => may.length);
+    if (roles.length) body.roles = Object.fromEntries(roles);
+    kinds[app + '.' + kind.name] = body;
   }
   return { kinds };
 }
@@ -67,6 +72,7 @@ export function fromSchema(app: string, schema: unknown): Draft {
       actions: [...(kind.actions ?? [])],
       relations: Object.entries(kind.relations ?? {}).map(([relation, actions]) => ({ name: relation, actions: [...actions] })),
       parents: (kind.parents ?? []).map(local),
+      ...(kind.roles ? { roles: { ...kind.roles } } : {}),
     })),
   };
 }
@@ -199,6 +205,8 @@ function CheckAnswer({ check }: { check: SchemaCheck }) {
       {listed('Relations added', named(diff.relations_added))}{listed('Relations removed', named(diff.relations_removed))}
       {listed('Actions added', named(diff.actions_added))}{listed('Actions removed', named(diff.actions_removed))}
       {listed('Parents added', named(diff.parents_added))}{listed('Parents removed', named(diff.parents_removed))}
+      {listed('Roles added', named(diff.roles_added ?? []))}{listed('Roles removed', named(diff.roles_removed ?? []))}
+      {listed('Roles changed', (diff.roles_changed ?? []).flatMap((change) => change.words))}
     </ul>
     {check.stranded.length
       ? <div role="alert" className="sb-stranded"><b>This change cannot be saved.</b> It would strand standing grants: {check.stranded.map((strand) => strand.count + ' standing grant' + (strand.count === 1 ? '' : 's') + ' of ' + strand.relation + ' on ' + strand.kind).join('; ')}. Revoke them first through the ordinary revoke route.</div>

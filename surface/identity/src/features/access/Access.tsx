@@ -11,7 +11,7 @@ import { useWhose, WhoseSelect } from '../../shell/Whose';
 import { DirectoryGate as Gate, ErrorWords, problemWords } from '../people/Words';
 import { readTeams } from '../teams/Teams';
 import { reachWithModes } from '../grants/check';
-import type { Reached } from '../grants/check';
+import type { Reached, ReachedMap } from '../grants/check';
 import { CheckBox, resourcesSeen, WhoChoice } from '../grants/CheckBox';
 import { ActForm, ActPanel, ChangeButtons, grantColumns } from '../grants/GrantTable';
 import type { Act } from '../grants/GrantTable';
@@ -22,7 +22,7 @@ import type { GrantWorld } from '../grants/model';
 import type { Grant } from '../../generated/grants';
 import { Pill } from '../people/Pill';
 
-type ReachMap = Map<string, Map<string, Reached>>;
+type ReachMap = ReachedMap;
 
 /** /grants/who is asked only for the segment on screen, once per world: every resource for "reach", one for "who". */
 const reachOfAll = new WeakMap<GrantWorld, Promise<ReachMap>>();
@@ -77,13 +77,22 @@ function Reach({ w, id }: { w: GrantWorld; id: string }) {
   return (
     <Gate load={load} title="Access" ok={(reach) => {
       const rows = [...reach].map(([res, byHolder]) => [res, byHolder.get(id)] as const).filter((row): row is readonly [string, Reached] => !!row[1]?.actions.length);
-      return rows.length ? (
-        <table><tbody>
-          {rows.map(([res, held]) => (
-            <tr key={res}><td>{resourceName(w, resourceFromText(res))}</td><td>{actionWords(w.model, resourceFromText(res), held.actions)}</td><td className="sec mode">{modesOf(w, res, held)}</td></tr>
-          ))}
-        </tbody></table>
-      ) : <div className="dim">Nothing.</div>;
+      // A restricted place is reached only by a grant on it, never through its parent, so it is shown apart (ACCESS-004 R2).
+      const open = rows.filter(([res]) => !reach.restricted.has(res));
+      const apart = rows.filter(([res]) => reach.restricted.has(res));
+      const table = (shown: (readonly [string, Reached])[]) => <table><tbody>
+        {shown.map(([res, held]) => (
+          <tr key={res}><td>{resourceName(w, resourceFromText(res))}</td><td>{actionWords(w.model, resourceFromText(res), held.actions)}</td><td className="sec mode">{modesOf(w, res, held)}</td></tr>
+        ))}
+      </tbody></table>;
+      return rows.length ? <>
+        {open.length ? table(open) : null}
+        {apart.length ? <section className="restricted-places" aria-label="Restricted places">
+          <h4>Restricted places</h4>
+          <p className="note">Reached only by a grant on the place itself; nothing held on the place it sits in reaches it.</p>
+          {table(apart)}
+        </section> : null}
+      </> : <div className="dim">Nothing.</div>;
     }} />
   );
 }

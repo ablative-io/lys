@@ -184,7 +184,8 @@ export interface ReachBody {
 export interface ReachAnswer {
   revision: number;
   /** Each holder's `modes` stand beside its `actions`: the mode of the grant each action rests on. */
-  resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[]; modes: GrantMode[] }[] })[];
+  /** `restricted`: the resource is placed in its parent restricted, so only a grant on it reaches it (ACCESS-004 R2). */
+  resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[]; modes: GrantMode[] }[]; restricted?: boolean })[];
 }
 
 

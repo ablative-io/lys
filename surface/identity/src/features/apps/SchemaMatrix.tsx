@@ -11,7 +11,8 @@
  */
 import './schema-matrix.css';
 
-export interface MatrixKind { actions?: string[]; relations?: Record<string, string[]>; parents?: string[] }
+/** A kind of a schema; `roles` are its named bundles of actions (ACCESS-004 R1), listed under its matrix. */
+export interface MatrixKind { actions?: string[]; relations?: Record<string, string[]>; parents?: string[]; roles?: Record<string, string[]> }
 
 /** More relations than this, and the single-action ones are named beside their action instead of each taking a column. */
 const COLUMNS = 8;
@@ -46,7 +47,10 @@ export function SchemaMatrix({ kinds, label, sentence }: { kinds: [string, Matri
             </tr>;
           }) : <tr><td colSpan={width} className="dim">It has no relation of its own.</td></tr>}
         </tbody>
-        {body.parents?.length ? <tfoot><tr><td colSpan={width} className="note">What is held on {body.parents.join(' or ')} reaches it.</td></tr></tfoot> : null}
+        {body.parents?.length || Object.keys(body.roles ?? {}).length ? <tfoot>
+          {body.parents?.length ? <tr><td colSpan={width} className="note">What is held on {body.parents.join(' or ')} reaches it.</td></tr> : null}
+          {Object.entries(body.roles ?? {}).map(([role, may]) => <tr key={'role:' + role} className="role"><td colSpan={width} className="note" aria-label={'Role ' + role}>The role <b>{role}</b> carries {may.map(say).join(', ')}.</td></tr>)}
+        </tfoot> : null}
       </table>;
     })}
     {kinds.length ? null : <p className="dim">It declares no kind.</p>}

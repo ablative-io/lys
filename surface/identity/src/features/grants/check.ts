@@ -95,11 +95,18 @@ export async function reachMap(resources: { resource: ResourceRef; actions: stri
 export interface Reached { actions: string[]; modes: GrantMode[] }
 
 /**
+ * The reach of every resource asked about, by resource then holder, with the
+ * resources the service named restricted (ACCESS-004 R2): placed in a parent
+ * whose relations do not flow to them, so only a grant on the place reaches it.
+ */
+export type ReachedMap = Map<string, Map<string, Reached>> & { restricted: Set<string> };
+
+/**
  * {@link reachMap} with each action's mode, as the service answers it beside
  * the action. An answer whose modes do not stand one beside each action is
  * refused, never padded.
  */
-export async function reachWithModes(resources: { resource: ResourceRef; actions: string[] }[]): Promise<Map<string, Map<string, Reached>>> {
+export async function reachWithModes(resources: { resource: ResourceRef; actions: string[] }[]): Promise<ReachedMap> {
   const answered = await reachAnswered(resources);
   for (const [res, byHolder] of answered) {
     for (const [holder, held] of byHolder) {
@@ -111,8 +118,8 @@ export async function reachWithModes(resources: { resource: ResourceRef; actions
   return answered;
 }
 
-async function reachAnswered(resources: { resource: ResourceRef; actions: string[] }[]): Promise<Map<string, Map<string, Reached>>> {
-  const out = new Map<string, Map<string, Reached>>();
+async function reachAnswered(resources: { resource: ResourceRef; actions: string[] }[]): Promise<ReachedMap> {
+  const out: ReachedMap = Object.assign(new Map<string, Map<string, Reached>>(), { restricted: new Set<string>() });
   if (!resources.length) return out;
   const answer = await api.reach({ route: 'browser', resources: resources.map(({ resource, actions }) => ({ ...resource, actions })) });
   resources.forEach(({ resource }, n) => {
@@ -121,6 +128,7 @@ async function reachAnswered(resources: { resource: ResourceRef; actions: string
       throw new Refused(502, { refusal: 'PermissionAnswerIncomplete', reason: `The permission service did not answer for ${resourceText(resource)}.` });
     }
     out.set(resourceText(resource), new Map(answered.holders.map(({ holder, actions, modes }) => [holder, { actions, modes }])));
+    if (answered.restricted === true) out.restricted.add(resourceText(resource));
   });
   return out;
 }

@@ -10,7 +10,10 @@
  * keep the app's secrets before it takes effect, and nobody is shown them; an
  * approved app is issued client credentials here instead, each shown once, and
  * they are revoked here. A proposed schema change waits
- * here the same way. The permission template is built and edited here too, and
+ * here the same way, each change it makes to a role named in words ("adds
+ * seat_retire to administrator") so a widening is seen before it is approved
+ * (ACCESS-004 R1); a schema's roles are listed under its matrix. The
+ * permission template is built and edited here too, and
  * saved through the same routes an upload uses.
  */
 import { ConfigTabs } from '../settings/ConfigTabs';
@@ -25,6 +28,7 @@ import './apps.css';
 import { ClientCredentials, CustodyConfirmed, credentialRecord } from './ClientCredentials';
 import type { CredentialRecord, StoredCredentials } from './ClientCredentials';
 import { Act } from '../../shell/Act';
+import { roleChanges } from './roleChanges';
 
 /** Who made an act on the apps. */
 export interface By { kind: 'person' | 'operator' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
@@ -175,6 +179,7 @@ function AppCard({ app, changed, stored, saved, approved, edit }: { edit: () => 
     </div> : null}
     {app.pending ? <div className="app-waiting" aria-label={'Change waiting for ' + app.id}>
       <b>A change waits for you, replacing version {app.pending.replaces}, from {who(app.pending.by)}</b>
+      <RoleChanges before={app.schema} after={app.pending.schema} app={app.id} />
       <SchemaTable app={app.id} schema={app.pending.schema} label={'Schema waiting for ' + app.id} />
       <Act symbol="approve" name={'Approve the change'} word="Approve" tone="primary" disabled={busy} onClick={() => { void act('/schema/approve', {}, () => changed('The change to ' + app.name + ' is approved.')); }} />
       <Act symbol="decline" name={'Decline the change'} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/schema/decline', { reason }, () => changed('The change to ' + app.name + ' was declined.')); }} />
@@ -187,6 +192,14 @@ function AppCard({ app, changed, stored, saved, approved, edit }: { edit: () => 
     </div> : null}
     {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
   </article>;
+}
+
+/** Each role a waiting change adds, removes, widens or narrows, in words, before its matrix. */
+function RoleChanges({ before, after, app }: { before: unknown; after: unknown; app: string }) {
+  const words = roleChanges(before, after);
+  if (!words.length) return null;
+  return <div aria-label={'Role changes waiting for ' + app}><b>What it does to roles</b>
+    <ul className="app-list">{words.map((sentence) => <li key={sentence}>{sentence}</li>)}</ul></div>;
 }
 
 /** Change an approved app's sign-in settings; the next sign-in follows them, with nothing restarted. */
