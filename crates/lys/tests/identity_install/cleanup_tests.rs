@@ -49,6 +49,10 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
         children.push(held);
     }
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))?;
+    // Each service's exit lock, opened before the scratch root is removed:
+    // a lock held is a service still running.
+    let exits = ["runner", "identity", "secrets"]
+        .map(|name| std::fs::File::open(run.join(format!("{name}.exit"))));
     let failed = std::panic::catch_unwind(|| {
         let estate = Estate {
             root,
@@ -62,9 +66,12 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
         std::panic::panic_any(guard.root.path().to_path_buf());
     });
     assert!(failed.is_err());
+    // A killed service lets go of its lock while it is still exiting, so its
+    // exit status is read only once the lock shows it gone: then reaping it
+    // cannot wait on a live service.
     let mut running = 0;
-    for held in &mut children {
-        if held.0.try_wait()?.is_none() {
+    for exit in exits {
+        if flock(&exit?, FlockOperation::NonBlockingLockExclusive).is_err() {
             running += 1;
         }
     }
@@ -72,6 +79,14 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
         running, 0,
         "a failed install left owned Lys services running"
     );
+    for held in &mut children {
+        let status = held.0.wait()?;
+        assert_eq!(
+            std::os::unix::process::ExitStatusExt::signal(&status),
+            Some(9),
+            "each owned service was stopped by the cleanup: {status:?}"
+        );
+    }
     Ok(())
 }
 
