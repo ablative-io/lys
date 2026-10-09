@@ -228,6 +228,7 @@ export const SERVICE: Record<string, Route> = {
   'POST /runtime/stop-everything/release': refused(409, 'cord_not_pulled', 'cord_not_pulled: nothing is stopped, so there is nothing to let start again'),
   '/drafts?state=waiting': ok({ drafts: [] }),
   '/drafts?state=decided': ok({ drafts: [] }),
+  '/product-drafts': ok({ drafts: [], next: null, total: 0 }),
   '/requests': ok({ requests: [] }),
   '/reviews': ok({ scope: 'personal', due: [], unanswered: [], revision: 0, judged_at: 1790000000 }),
   '/runtime/found': ok({ sessions: [] }),

@@ -72,3 +72,64 @@ export async function readDrafts(filter: DraftFilter): Promise<Draft[]> {
 /** Whether an answer confirms exactly the decision that was sent. */
 export const confirms = (id: string) => (answer: DraftAnswer, body: Record<string, unknown>): boolean =>
   answer.draft === id && answer.operation === body.operation && answer.creation_hash === body.creation_hash;
+
+/**
+ * A product's held act (ACCESS-001 R3, R4), as `GET /product-drafts` answers it: lys-pass's `ApprovedDraft`
+ * (crates/lys-pass/src/drafts.rs) with, for a person who may see it, who holds the grant, who answers for the
+ * holder, who approved and when, and how the product closed it. The screen shows only what is answered.
+ */
+export interface ProductDraft {
+  id: string;
+  /** The product the act is for. */
+  app: string;
+  /** The held grant the act rests on. */
+  grant: string;
+  target: DraftTarget;
+  /** SHA-256 of the exact words, which a decision names so it decides exactly this act. */
+  request_digest: string;
+  /** The prepared act's exact words. */
+  words: string;
+  state?: ProductDraftState;
+  /** The held grant's mode: `by_draft` takes one approver, `by_two` two different ones. */
+  mode?: string;
+  holder?: string;
+  responsible?: string;
+  approvals?: ProductApproval[];
+  /** The product's record of executing it, once it has. */
+  execution?: ProductExecution;
+}
+
+export type ProductDraftState = 'waiting' | 'approved' | 'refused' | 'executed' | 'refused_on_execution';
+
+/** One approval of a product draft: who and when (seconds since the epoch). */
+export interface ProductApproval { by: string; at: number }
+
+/** lys-pass's `Execution`: the product applied the act, or committed a refusal of its own instead. */
+export type ProductExecution =
+  | { state: 'executed'; request_digest: string; receipt_digest: string }
+  | { state: 'refused_on_execution'; request_digest: string; refusal: string; reason: string };
+
+/** lys-pass's `ApprovedPage` shape: one page and the cursor to the next. */
+export interface ProductDraftPage extends Paged { drafts: ProductDraft[] }
+
+/** `POST /product-drafts/{id}/approve`: the decision's own operation and the exact act it decides. */
+export interface ProductApproveBody { operation: string; request_digest: string }
+/** `POST /product-drafts/{id}/refuse`. */
+export interface ProductRefuseBody { operation: string; request_digest: string; reason: string }
+
+/** What a decision on a product draft answers: the draft and the operation recorded. */
+export interface ProductDraftAnswer { draft: string; operation: string }
+
+/** Every product draft the caller may see, every page of it. */
+export async function readProductDrafts(): Promise<ProductDraft[]> {
+  const answer = await readEveryPage<ProductDraftPage>('/product-drafts', (read, page) => {
+    if (!page || !Array.isArray(page.drafts)) throw new Error('ProductDraftsUnreadable: a later page did not answer a list of product drafts.');
+    return { ...read, drafts: [...read.drafts, ...page.drafts] };
+  });
+  if (!answer || !Array.isArray(answer.drafts)) throw new Error('ProductDraftsUnreadable: the service did not answer a list of product drafts.');
+  return answer.drafts;
+}
+
+/** Whether an answer confirms exactly the decision on a product draft that was sent. */
+export const confirmsProduct = (id: string) => (answer: ProductDraftAnswer, body: Record<string, unknown>): boolean =>
+  answer.draft === id && answer.operation === body.operation;

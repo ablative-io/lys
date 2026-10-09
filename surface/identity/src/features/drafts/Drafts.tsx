@@ -18,6 +18,7 @@ import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 import { Gate } from '../signin/Gate';
 import { confirms, readDrafts } from './contract';
+import { ProductDrafts } from './ProductDrafts';
 import type { Draft, DraftAnswer, DraftFilter } from './contract';
 import './drafts.css';
 import { Act } from '../../shell/Act';
@@ -136,6 +137,9 @@ export function Drafts() {
       <div className="seg">{([['waiting', 'Waiting'], ['decided', 'Decided']] as [DraftFilter, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
       {load.status === 'ok' && load.data.model instanceof Refused ? <p className="why-not">What each action means could not be read, so actions are named as the agent wrote them. <small className="refusal-name">{load.data.model.refusal.refusal}</small></p> : null}
     </div>
-    <Gate load={load} title="your drafts" ok={(data) => <Table drafts={data.drafts} show={show} model={data.model} names={namesOf(data.people)} person={data.me.person.id} changed={() => setVersion((v) => v + 1)} />} />
+    <Gate load={load} title="your drafts" ok={(data) => <>
+      <Table drafts={data.drafts} show={show} model={data.model} names={namesOf(data.people)} person={data.me.person.id} changed={() => setVersion((v) => v + 1)} />
+      <ProductDrafts names={namesOf(data.people)} person={data.me.person.id} />
+    </>} />
   </div>;
 }
