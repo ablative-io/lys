@@ -38,7 +38,7 @@ function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: 
   for (const grant of world.list.grants) {
     if (!world.who.has(grant.holder) && !show.installed) continue;
     add(grant.holder, nameOf(world, grant.holder), world.who.has(grant.holder) ? 'agent' : 'app', true);
-    const kind = grant.resource.kind.toLowerCase(), id = grant.resource.id.toLowerCase();
+    const kind = grant.resource.kind.toLowerCase(), id = grant.resource.id; // an id is compared as its product names it, never case-folded
     const members = world.who.has(grant.resource.id) ? [grant.resource.id]
       : kind === 'agents' || id === 'agents' || (kind === 'agent' && id === '*') ? [...world.who].filter(([, w]) => w.kind === 'agent').map(([k]) => k)
       : kind === 'people' || id === 'people' || (kind === 'person' && id === '*') ? [...world.who].filter(([, w]) => w.kind === 'person').map(([k]) => k)

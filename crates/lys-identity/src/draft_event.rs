@@ -158,6 +158,11 @@ fn token(value: &str) -> bool {
         })
 }
 
+/// A resource id, as the grant resource takes it: case kept, never folded.
+fn resource_id(value: &str) -> bool {
+    !value.is_empty() && value.bytes().all(crate::grants::types::resource_id_byte)
+}
+
 fn request(method: &str, path: &str) -> Result<(), IdentityError> {
     if !matches!(method, "POST" | "PUT" | "PATCH" | "DELETE")
         || !path.starts_with('/')
@@ -210,7 +215,7 @@ impl DraftEvent {
         match self {
             Self::Created(event) => {
                 if !token(&event.target.kind)
-                    || !token(&event.target.id)
+                    || !resource_id(&event.target.id)
                     || !token(&event.target.action)
                     || event.corrects == Some(event.operation)
                 {

@@ -70,10 +70,27 @@ impl FromStr for GrantId {
     }
 }
 
-/// Refuse `text` unless it is a token: 1 to `max` bytes of `a-z`, `0-9`, `_`, `-` and `.`.
-fn token(kind: &'static str, text: &str, max: usize) -> Result<String, GrantError> {
-    let allowed =
-        |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"_-.".contains(&byte);
+/// Whether `byte` may stand in a name the model defines (a kind, an action
+/// or a relation): `a-z`, `0-9`, `_`, `-` and `.`.
+fn name_byte(byte: u8) -> bool {
+    byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"_-.".contains(&byte)
+}
+
+/// Whether `byte` may stand in a resource id: `A-Z`, `a-z`, `0-9`, `_`, `-`
+/// and `.`. A product's id is named in Lys exactly as the product names it,
+/// so no case is folded and two ids that differ only in case are two
+/// resources.
+pub(crate) fn resource_id_byte(byte: u8) -> bool {
+    byte.is_ascii_uppercase() || name_byte(byte)
+}
+
+/// Refuse `text` unless it is a token: 1 to `max` bytes, each `allowed`.
+fn token(
+    kind: &'static str,
+    text: &str,
+    max: usize,
+    allowed: fn(u8) -> bool,
+) -> Result<String, GrantError> {
     if text.is_empty() || text.len() > max || !text.bytes().all(allowed) {
         return Err(GrantError::TokenInvalid {
             kind,
@@ -91,7 +108,7 @@ pub struct Action(String);
 impl Action {
     /// The action `name`, refused unless it is a token.
     pub fn new(name: &str) -> Result<Self, GrantError> {
-        token("action", name, ACTION_MAX_BYTES).map(Self)
+        token("action", name, ACTION_MAX_BYTES, name_byte).map(Self)
     }
 
     /// The action's name.
@@ -114,7 +131,7 @@ pub struct Relation(String);
 impl Relation {
     /// The relation `name`, refused unless it is a token.
     pub fn new(name: &str) -> Result<Self, GrantError> {
-        token("relation", name, RELATION_MAX_BYTES).map(Self)
+        token("relation", name, RELATION_MAX_BYTES, name_byte).map(Self)
     }
 
     /// The relation's name.
@@ -137,11 +154,12 @@ pub struct Resource {
 }
 
 impl Resource {
-    /// The resource `id` of `kind`, each refused unless it is a token.
+    /// The resource `id` of `kind`, each refused unless it is a token: the
+    /// kind lowercase, the id as the product names it, case and all.
     pub fn new(kind: &str, id: &str) -> Result<Self, GrantError> {
         Ok(Self {
-            kind: token("resource kind", kind, RESOURCE_KIND_MAX_BYTES)?,
-            id: token("resource id", id, RESOURCE_ID_MAX_BYTES)?,
+            kind: token("resource kind", kind, RESOURCE_KIND_MAX_BYTES, name_byte)?,
+            id: token("resource id", id, RESOURCE_ID_MAX_BYTES, resource_id_byte)?,
         })
     }
 

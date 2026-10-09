@@ -16,6 +16,11 @@ pub(super) fn actor() -> Value {
 }
 
 pub(super) fn created() -> Vec<u8> {
+    created_on("team", "team.example", "write")
+}
+
+/// A created draft whose target is `kind`, `id` and `action`.
+fn created_on(kind: &str, id: &str, action: &str) -> Vec<u8> {
     let value = Value::Array(vec![
         1.into(),
         0.into(),
@@ -23,9 +28,9 @@ pub(super) fn created() -> Vec<u8> {
         actor(),
         1.into(),
         Value::Array(vec![
-            Value::Text("team".into()),
-            Value::Text("team.example".into()),
-            Value::Text("write".into()),
+            Value::Text(kind.into()),
+            Value::Text(id.into()),
+            Value::Text(action.into()),
         ]),
         Value::Text("POST".into()),
         Value::Text("/api/teams/example".into()),
@@ -47,6 +52,24 @@ fn leaf(body: &[u8], key: &Ed25519Identity) -> Vec<u8> {
     );
     let signature = key.sign(&sig_structure(&protected, body));
     cose_sign1(&protected, body, &signature)
+}
+
+#[test]
+fn a_draft_names_its_resource_id_as_the_product_names_it() {
+    let stream = "mHyUs0FppSFqSzfT5kjBzZk23asX6tgScUEKNwJawq0";
+    let decoded = super::decode(&created_on("team", stream, "write")).unwrap();
+    let super::DraftEvent::Created(event) = decoded else {
+        panic!("a created draft decodes as created");
+    };
+    assert_eq!(event.target.id, stream);
+    for bad in ["a/b", "a:b", "a=b", "a+b", "a b"] {
+        assert!(
+            super::decode(&created_on("team", bad, "write")).is_err(),
+            "{bad:?}"
+        );
+    }
+    assert!(super::decode(&created_on("Team", "one", "write")).is_err());
+    assert!(super::decode(&created_on("team", "one", "Write")).is_err());
 }
 
 #[test]

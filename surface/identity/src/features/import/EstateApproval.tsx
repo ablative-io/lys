@@ -16,7 +16,8 @@ export function planOf(value: unknown): Plan {
     if (!resource || ![resource.kind, resource.id, resource.relation, resource.evidence].every((x) => typeof x === 'string' && x.trim())
       || !Array.isArray(resource.actions) || !resource.actions.length || resource.actions.some((a) => typeof a !== 'string' || !a.trim())
       || !Array.isArray(resource.seats) || !resource.seats.length || resource.seats.some((name) => !names.has(name))) throw new Error('Invalid resource or seat');
-    if (![resource.kind,resource.id,resource.relation,...resource.actions].every((token)=>/^[a-z0-9_.-]+$/.test(token))) throw new Error('Invalid resource token: '+resource.id+'; use lowercase letters, digits, _, - or .');
+    // Kinds, relations and actions are lowercase; an id is named as its product names it, case kept (the served token rule).
+    if (![resource.kind,resource.relation,...resource.actions].every((token)=>/^[a-z0-9_.-]+$/.test(token)) || !/^[A-Za-z0-9_.-]+$/.test(resource.id)) throw new Error('Invalid resource token: '+resource.id+'; use lowercase letters, digits, _, - or . (an id may also use uppercase letters)');
     const key = JSON.stringify([resource.kind, resource.id, resource.relation]);
     if (seen.has(key)) throw new Error('Repeated resource');
     seen.add(key);

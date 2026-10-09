@@ -42,6 +42,14 @@ it('invalid resource ids never reach an approval button or a mutation',async()=>
   expect(text()).toContain('Invalid resource token');expect(approve()).toBeNull();expect(posted).toEqual([]);
 });
 
+it('a resource id keeps its product\'s case, and an uppercase kind or action is still refused',()=>{
+  const stream='mHyUs0FppSFqSzfT5kjBzZk23asX6tgScUEKNwJawq0';
+  expect(planOf({...plan,resources:[{...plan.resources[0],id:stream}]}).resources[0]?.id).toBe(stream);
+  expect(()=>planOf({...plan,resources:[{...plan.resources[0],kind:'Cambium.channel'}]})).toThrow('Invalid resource token');
+  expect(()=>planOf({...plan,resources:[{...plan.resources[0],actions:['Read']}]})).toThrow('Invalid resource token');
+  for(const bad of ['a/b','a:b','a=b','a+b','a b']) expect(()=>planOf({...plan,resources:[{...plan.resources[0],id:bad}]})).toThrow('Invalid resource token');
+});
+
 it('approval applies through the installed loader with no file download',async()=>{
   const grant='grant-'+'d'.repeat(32);
   const receipt=(body:unknown)=>ok({operation:(body as {operation:string}).operation,grant,receipt:{caller:ADA}});

@@ -20,7 +20,7 @@ pub enum GrantError {
     },
     /// An action, relation or resource name is not a token this contract records.
     #[error(
-        "TokenInvalid: the {kind} `{text}` is not a token of 1 to {max} bytes of a-z, 0-9, `_`, `-` and `.`"
+        "TokenInvalid: the {kind} `{text}` is not a token of 1 to {max} bytes of a-z, 0-9, `_`, `-` and `.` (a resource id also A-Z)"
     )]
     TokenInvalid {
         /// What the token names.
