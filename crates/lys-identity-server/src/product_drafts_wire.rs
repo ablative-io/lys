@@ -245,6 +245,10 @@ const CREATE: &[&str] = &[
     "OperationReused",
     "product_draft_grant_refused",
     "product_draft_digest_mismatch",
+    "PassRefused",
+    "TokenUnknown",
+    "ProviderUnavailable",
+    "SessionsUnavailable",
 ];
 const READ: &[&str] = &[
     "NotAdmitted",

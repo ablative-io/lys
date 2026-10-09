@@ -144,7 +144,11 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::ReviewReused { .. }
         | ServerError::DirectoryUnavailable { .. }
         | ServerError::SignInProvidersUnavailable { .. }
-        | ServerError::Provider(ProviderError::Unavailable { .. } | ProviderError::TokenUnknown)
+        | ServerError::Provider(
+            ProviderError::Unavailable { .. }
+            | ProviderError::TokenUnknown
+            | ProviderError::PassRefused { .. },
+        )
         | ServerError::ProviderRefused { .. }
         | ServerError::SignInProvidersRefused { .. }
         | ServerError::NotPermitted { .. }

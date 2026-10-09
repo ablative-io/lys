@@ -52,6 +52,7 @@ use crate::session::now;
 mod token_store;
 use token_store::Tokens;
 
+mod bearer;
 mod client_auth;
 mod endpoints;
 mod exchange;
@@ -59,6 +60,7 @@ mod issue;
 mod keys;
 mod refusal;
 mod rights_claim;
+pub(crate) use bearer::{pass_holder, presented_pass};
 pub use endpoints::routes;
 pub use keys::{RotateAnswer, RotateBody};
 

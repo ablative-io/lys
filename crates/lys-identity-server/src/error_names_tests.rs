@@ -640,6 +640,12 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "HolderRetired",
         ),
         (
+            ServerError::Provider(ProviderError::PassRefused {
+                refusal: detail.to_owned(),
+            }),
+            "PassRefused",
+        ),
+        (
             ServerError::ProviderRefused {
                 provider: detail,
                 status: 7,

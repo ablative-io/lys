@@ -90,15 +90,20 @@ pub(crate) fn app_of(kind: &str) -> Option<&str> {
         .filter(|app| !app.is_empty())
 }
 
-/// The identity a product draft is asked by: an app's connector through
-/// the app's credential, or else the signed-in caller (a person, or an
-/// agent through its pass). A bearer that does not verify is refused by
-/// name, never passed over for a session.
+/// The identity a product draft is asked by: the holder through the pass
+/// Lys issued it for the target's app (`passed`, verified before any lock
+/// is taken), an app's connector through the app's credential, or else the
+/// signed-in caller (a person, or an agent through its run pass). A bearer
+/// that does not verify is refused by name, never passed over for a session.
 fn holder(
     state: &AppState,
     headers: &HeaderMap,
     judged: &Judged<'_>,
+    passed: Option<IdentityId>,
 ) -> Result<IdentityId, ServerError> {
+    if let Some(holder) = passed {
+        return Ok(holder);
+    }
     if !headers.contains_key(header::AUTHORIZATION) {
         return crate::grants::caller(state, headers, judged.directory);
     }
@@ -154,8 +159,9 @@ fn judge(
     headers: &HeaderMap,
     mut judged: Judged<'_>,
     body: ProductDraftBody,
+    passed: Option<IdentityId>,
 ) -> Result<Created, ServerError> {
-    let caller = holder(state, headers, &judged)?;
+    let caller = holder(state, headers, &judged, passed)?;
     if body.operation.is_empty() || body.operation.chars().any(char::is_control) {
         return Err(malformed("operation is the product's own non-empty id"));
     }
@@ -224,9 +230,18 @@ async fn create(
     body: Result<Json<ProductDraftBody>, JsonRejection>,
 ) -> Result<Json<ProductDraftCreated>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    // A holder's pass is verified for the target's app before any lock.
+    let passed = match crate::provider::presented_pass(&headers) {
+        Some(pass) => {
+            let app = app_of(&body.target.kind)
+                .ok_or_else(|| malformed("the target names a kind of an app, `app.kind`"))?;
+            Some(crate::provider::pass_holder(&state, pass, app)?)
+        }
+        None => None,
+    };
     with_directory_grants(
         &state,
-        |judged| judge(&state, &headers, judged, body),
+        |judged| judge(&state, &headers, judged, body, passed),
         |directory, created| {
             let draft = created.operation;
             directory.record_product_draft(ProductDraftEvent::Created(Arc::new(created)))?;

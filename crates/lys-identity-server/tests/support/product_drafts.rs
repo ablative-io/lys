@@ -1,6 +1,7 @@
 //! What the product draft tests share: the service with Ada (the
 //! administrator), Bea and Cy seeded, the fixture apps registered, and the
-//! grants a draft rests on and is decided under.
+//! grants a draft rests on and is decided under. Lys's provider is on, so a
+//! person signs in to the fixture app and holds the pass it issues.
 
 use std::error::Error;
 
@@ -86,8 +87,15 @@ impl Table {
                     service: "identity".to_owned(),
                     service_key_file: config.event_key_file.clone(),
                 });
+                config.provider = Some(lys_identity_server::provider::ProviderSettings {
+                    key_file: config.log_dir.with_file_name("provider.key"),
+                    code_seconds: lys_identity_server::provider::CODE_SECONDS,
+                    pass_seconds: lys_identity_server::provider::PASS_SECONDS,
+                    rights_bytes: None,
+                });
             },
             |config| {
+                std::fs::write(config.log_dir.with_file_name("provider.key"), [8u8; 32])?;
                 let seeded = seed_configured(config, [ADMINISTRATOR, BEA])?;
                 let cy = third_person(config)?;
                 Ok((seeded, cy))
@@ -145,6 +153,64 @@ impl Table {
         Ok(issued["grant"]
             .as_str()
             .ok_or("the issue names its grant")?
+            .to_owned())
+    }
+
+    /// The pass Lys issues Bea for the fixture app: she signs in to it
+    /// through Lys's provider, and the app exchanges the code with its
+    /// secret (ACCESS-002).
+    pub async fn bea_pass(&self) -> Result<String, Box<dyn Error>> {
+        use base64::Engine;
+        use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+        use sha2::Digest;
+        const BACK: &str = "https://app.example.test/signed-in";
+        const VERIFIER: &str = "a-product-draft-verifier-of-enough-length-0123456789-ab";
+        let challenge = URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(VERIFIER.as_bytes()));
+        let answer = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?
+            .get(format!("{}/oauth/authorize", self.service.base))
+            .query(&[
+                ("client_id", NOTES),
+                ("redirect_uri", BACK),
+                ("response_type", "code"),
+                ("scope", "openid"),
+                ("code_challenge", challenge.as_str()),
+                ("code_challenge_method", "S256"),
+            ])
+            .header(reqwest::header::COOKIE, &self.bea)
+            .send()
+            .await?;
+        let back = answer
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .ok_or("authorize sends the browser nowhere")?
+            .to_str()?;
+        let code = reqwest::Url::parse(back)?
+            .query_pairs()
+            .find(|(key, _)| key == "code")
+            .map(|(_, value)| value.into_owned())
+            .ok_or("the app is given a code")?;
+        let secret = identity_contract::app_custody::secret();
+        let token: Value = reqwest::Client::new()
+            .post(format!("{}/oauth/token", self.service.base))
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Basic {}", STANDARD.encode(format!("{NOTES}:{secret}"))),
+            )
+            .form(&[
+                ("grant_type", "authorization_code"),
+                ("code", code.as_str()),
+                ("redirect_uri", BACK),
+                ("code_verifier", VERIFIER),
+            ])
+            .send()
+            .await?
+            .json()
+            .await?;
+        Ok(token["access_token"]
+            .as_str()
+            .ok_or_else(|| format!("no pass is issued: {token}"))?
             .to_owned())
     }
 

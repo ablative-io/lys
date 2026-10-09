@@ -316,7 +316,9 @@ impl Executor for Ledger {
 /// ACCESS-003 R2 against the real routes: lys-pass's draft body is what the
 /// server records, its approved page parses, its runner executes each draft
 /// once and records it, and a second run finds nothing left. `create_draft`
-/// reaches the route and is refused for a caller that does not hold the grant.
+/// with the pass Lys issued Bea for the app records her held act (the same
+/// operation and request answering the same draft); with the connector's
+/// credential, which does not hold her grant, or a forged pass, it is refused.
 #[tokio::test]
 async fn lys_pass_hands_off_and_runs_approved_drafts_against_the_real_routes() -> TestResult {
     let table = Table::set().await?;
@@ -344,6 +346,12 @@ async fn lys_pass_hands_off_and_runs_approved_drafts_against_the_real_routes() -
         reason: None,
         degraded: None,
     };
+    let pass = table.bea_pass().await?;
+    let created = client.create_draft(&pass, &held, &judgment).await?;
+    assert_eq!(
+        created.draft, draft,
+        "Bea's pass records her held act; the same operation and request answer the same draft"
+    );
     assert!(
         client
             .create_draft(&table.notes, &held, &judgment)
@@ -351,6 +359,19 @@ async fn lys_pass_hands_off_and_runs_approved_drafts_against_the_real_routes() -
             .is_err(),
         "the connector does not hold Bea's grant"
     );
+    let mut forged = pass.clone();
+    let last = forged.pop().ok_or("an empty pass")?;
+    forged.push(if last == 'A' { 'B' } else { 'A' });
+    refused_as(
+        &post(
+            &table.service,
+            "/product-drafts",
+            Auth::Bearer(&forged),
+            &serde_json::to_value(&held)?,
+        )
+        .await?,
+        "PassRefused",
+    )?;
 
     let empty = client.approved_drafts(&table.notes, NOTES, None).await?;
     assert_eq!((empty.drafts.len(), empty.total), (0, 0));

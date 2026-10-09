@@ -65,6 +65,13 @@ pub enum ProviderError {
         /// Its recorded lifecycle state.
         state: lys_identity::LifecycleState,
     },
+    /// A bearer pass that lys-pass's verifier refuses for this route: its
+    /// signature, key, issuer, audience or instant (ACCESS-002).
+    #[error("PassRefused: the pass is refused: {refusal}")]
+    PassRefused {
+        /// lys-pass's name for the refusal.
+        refusal: String,
+    },
 }
 
 impl ProviderError {
@@ -85,6 +92,7 @@ impl ProviderError {
             Self::RefreshUnknown => "RefreshUnknown",
             Self::SessionEnded => "SessionEnded",
             Self::HolderRetired { .. } => "HolderRetired",
+            Self::PassRefused { .. } => "PassRefused",
         }
     }
 
@@ -93,7 +101,9 @@ impl ProviderError {
     pub const fn status(&self) -> StatusCode {
         match self {
             Self::Unavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-            Self::ClientUnknown | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
+            Self::ClientUnknown | Self::TokenUnknown | Self::PassRefused { .. } => {
+                StatusCode::UNAUTHORIZED
+            }
             Self::ScopeNotGranted { .. } => StatusCode::FORBIDDEN,
             Self::RedirectUnregistered
             | Self::ScopeUnknown { .. }
