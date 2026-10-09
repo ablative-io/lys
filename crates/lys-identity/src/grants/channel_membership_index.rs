@@ -18,6 +18,11 @@
 //! is revoked. Existing connections are rechecked by the consumer with the
 //! same call once it is ready again; the index holds no clock and calls
 //! nothing.
+//!
+//! An index made [`MembershipIndex::following_placements`] also applies
+//! the placements the stream orders with the changes (`placements`): each
+//! placement in turn at the revision it was kept after, and readiness only
+//! after a placement mark names the index's own revision.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
@@ -95,6 +100,23 @@ pub enum Applied {
         /// The revision delivered and projected.
         revision: u64,
     },
+    /// A placement moved the placement cursor.
+    Placement {
+        /// Its position, counting from one.
+        placement: u64,
+        /// The grants whose reach it widened.
+        widens: usize,
+    },
+    /// An identical placement already applied: nothing applied.
+    PlacementDuplicate {
+        /// Its position.
+        placement: u64,
+    },
+    /// A placement mark moved the placement cursor, or was already passed.
+    PlacementMark {
+        /// The placement cursor after it.
+        placement: u64,
+    },
 }
 
 /// A consumer's index of one identified grant log.
@@ -107,6 +129,10 @@ pub struct MembershipIndex {
     revoked: BTreeMap<String, u64>,
     evidence: BTreeMap<u64, [u8; 32]>,
     window: NonZeroUsize,
+    following: bool,
+    placed: Option<u64>,
+    placements: BTreeMap<u64, ChangeFrame>,
+    marked: bool,
 }
 
 impl MembershipIndex {
@@ -124,7 +150,25 @@ impl MembershipIndex {
             revoked: BTreeMap::new(),
             evidence: BTreeMap::new(),
             window,
+            following: false,
+            placed: None,
+            placements: BTreeMap::new(),
+            marked: false,
         }
+    }
+
+    /// The same index, applying the placements of a stream read that
+    /// follows them, and ready only once a placement mark names its revision.
+    #[must_use]
+    pub fn following_placements(mut self) -> Self {
+        self.following = true;
+        self
+    }
+
+    /// The count of placements applied, the cursor's second half.
+    #[must_use]
+    pub fn placed(&self) -> Option<u64> {
+        self.placed
     }
 
     /// The log this index reads.
@@ -202,6 +246,11 @@ impl MembershipIndex {
                 event,
             } => self.change(*revision, grant, *change, event),
             ChangeFrame::Watermark { revision } => self.watermark(*revision),
+            ChangeFrame::Placement { .. } => self.placement(frame),
+            ChangeFrame::PlacementMark {
+                revision,
+                placement,
+            } => self.mark(*revision, *placement),
             ChangeFrame::Ready { revision } => self.readied(*revision),
             ChangeFrame::Unready {
                 refusal: name,
@@ -218,6 +267,7 @@ impl MembershipIndex {
                 }
                 self.cursor = None;
                 self.evidence.clear();
+                self.forget_placements();
                 Err(refusal(
                     STREAM_RESET,
                     "the cursor cannot be continued; read a baseline",
@@ -234,6 +284,7 @@ impl MembershipIndex {
         }
         self.cursor = Some(revision);
         self.evidence.clear();
+        self.forget_placements();
         self.ready = false;
         Applied::Baseline { revision }
     }
@@ -299,6 +350,7 @@ impl MembershipIndex {
             self.revoked.entry(grant.to_owned()).or_insert(revision);
         }
         self.cursor = Some(revision);
+        self.marked = false;
         self.evidence.insert(revision, evidence);
         while self.evidence.len() > self.window.get() {
             self.evidence.pop_first();
@@ -311,6 +363,9 @@ impl MembershipIndex {
             .cursor
             .ok_or_else(|| refusal(STREAM_GAP, "no baseline has been applied"))?;
         let through = cursor.max(revision);
+        if through != cursor {
+            self.marked = false;
+        }
         self.cursor = Some(through);
         Ok(Applied::Watermark { revision: through })
     }
@@ -323,6 +378,12 @@ impl MembershipIndex {
                     "Ready names revision {revision}, and the index stands at {:?}",
                     self.cursor
                 ),
+            ));
+        }
+        if self.following && !self.marked {
+            return Err(refusal(
+                STREAM_READY_DISAGREES,
+                format!("Ready names revision {revision} before a placement mark names it"),
             ));
         }
         self.ready = true;
@@ -363,6 +424,9 @@ impl MembershipIndex {
         Ok(())
     }
 }
+
+#[path = "channel_membership_placements.rs"]
+mod placements;
 
 #[cfg(test)]
 #[path = "channel_membership_index_tests.rs"]

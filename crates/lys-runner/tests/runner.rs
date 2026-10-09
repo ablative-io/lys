@@ -522,7 +522,10 @@ fn a_program_that_drops_one_hang_up_is_told_again_when_it_prints() -> TestResult
     assert!(output.text.contains("at h-account-two"), "{output:?}");
     let end = output.ended.ok_or("no end")?;
     assert_eq!(end.how, EndedHow::AccountsExhausted);
-    assert_eq!(end.status, None, "the repeated hang-up must end the program");
+    assert_eq!(
+        end.status, None,
+        "the repeated hang-up must end the program"
+    );
     assert!(
         end.signal.is_some(),
         "the program ended without a signal: {end:?}"

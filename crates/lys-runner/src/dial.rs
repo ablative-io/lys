@@ -82,6 +82,12 @@ pub fn next_route(machine: &str) -> String {
     format!("/runner/dial/{machine}/next")
 }
 
+/// The route the machine identity a computer's join made asks for a pass
+/// to an app on, signed as every dial is, by the key that join recorded.
+pub fn pass_route(machine: &str) -> String {
+    format!("/runner/dial/{machine}/pass")
+}
+
 /// The route a machine posts the reply to a ticket on.
 pub fn reply_route(machine: &str, ticket: &str) -> String {
     format!("/runner/dial/{machine}/replies/{ticket}")

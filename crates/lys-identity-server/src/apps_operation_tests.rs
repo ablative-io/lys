@@ -71,6 +71,7 @@ fn apps_operation_lookups_touch_only_the_named_record_after_restore_and_tail_wri
         parent_kind: "app-255/parent".to_owned(),
         parent_id: "parent".to_owned(),
         restricted: false,
+        revision: None,
         by: By::Start,
         at: 2,
     }))?;

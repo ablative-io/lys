@@ -19,6 +19,16 @@
 //! is complete; [`ChangeFrame::Unready`] withdraws readiness by the name of
 //! what is not complete, and [`ChangeFrame::Reset`] says the cursor names
 //! another log, or a revision this log no longer holds.
+//!
+//! A read that asks for `placements` also follows the apps' placements,
+//! which change what a grant reaches without being grant events. Each
+//! placement is kept after one grant revision and before the next, so the
+//! two are one order: a [`ChangeFrame::Placement`] stands after the change
+//! at its `revision`, and the cursor gains the count of placements applied
+//! (`placed`). Placements the consumer may not see are covered by a
+//! [`ChangeFrame::PlacementMark`], and one names the head and every
+//! placement before each Ready or Unready of such a read. A read that does
+//! not ask is answered exactly as before placements were followed.
 
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +62,13 @@ pub struct ChangesRequest {
     /// committed change before answering.
     #[serde(default)]
     pub wait: bool,
+    /// Whether the read follows placements too.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub placements: bool,
+    /// The count of placements applied, the cursor's second half: absent
+    /// for a first read, and given with `after` whenever `placements` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placed: Option<u64>,
 }
 
 /// What a change did to its grant.
@@ -73,6 +90,10 @@ pub enum ResetReason {
     OtherLog,
     /// The cursor is past what this log holds: it was rolled back.
     Rollback,
+    /// The cursor's placements and revision are not one position of the
+    /// order, or a placement after it was kept before placements were
+    /// ordered with the grant log.
+    Unordered,
 }
 
 /// One frame of the stream.
@@ -102,6 +123,33 @@ pub enum ChangeFrame {
     Watermark {
         /// The last revision covered.
         revision: u64,
+    },
+    /// One placement the consumer may see: `child` placed in `parent`,
+    /// kept after the change at `revision` and before the next.
+    Placement {
+        /// The grant revision it was kept after.
+        revision: u64,
+        /// Its position among the placements, counting from one.
+        placement: u64,
+        /// The resource placed, as `kind:id`.
+        child: String,
+        /// The resource it was placed in, as `kind:id`.
+        parent: String,
+        /// Whether nothing held on the parent reaches the child.
+        restricted: bool,
+        /// The grants, in id order, whose reach the placement widened to
+        /// the child when it was kept: issued and not withdrawn by then, on
+        /// the parent or a resource the parent was placed in. Empty for a
+        /// restricted placement or a child already placed.
+        widens: Vec<String>,
+    },
+    /// Every placement through `placement` not otherwise sent is not the
+    /// consumer's to see, the last kept after the change at `revision`.
+    PlacementMark {
+        /// The grant revision the last covered placement was kept after.
+        revision: u64,
+        /// The count of placements covered.
+        placement: u64,
     },
     /// Every frame through `revision` is delivered, and the permission
     /// projection is complete through it.

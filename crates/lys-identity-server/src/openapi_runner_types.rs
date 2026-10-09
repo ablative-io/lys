@@ -4,7 +4,8 @@
 //! The acts on a session, the wake, the live list and a machine's runner
 //! answer the runner's own answer inside Lys's envelope, so they name no
 //! answer schema. The dial routes take the runner protocol's own lines, not
-//! JSON, so they name no body either.
+//! JSON, so they name no body either; a machine's pass is the one dial
+//! route that takes and answers JSON.
 
 use lys_openapi::Api;
 
@@ -203,6 +204,12 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
         (GET, "/runner/protocol", None, None),
         (POST, "/runner/dial/{machine}/next", None, None),
         (POST, "/runner/dial/{machine}/replies/{ticket}", None, None),
+        (
+            POST,
+            "/runner/dial/{machine}/pass",
+            Some(api.schema::<crate::machine_pass::PassAsked>()),
+            Some(api.schema::<crate::provider::MachinePass>()),
+        ),
         (
             POST,
             "/network/machines/{id}/join-code",

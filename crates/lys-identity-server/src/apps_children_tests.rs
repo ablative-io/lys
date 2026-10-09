@@ -13,6 +13,7 @@ fn placed(child: &str, parent: &str, restricted: bool) -> Placed {
         parent_kind: "rooms.workspace".to_owned(),
         parent_id: parent.to_owned(),
         restricted,
+        revision: None,
         by: By::Start,
         at: 1,
     }

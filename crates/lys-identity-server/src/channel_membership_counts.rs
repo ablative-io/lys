@@ -6,7 +6,16 @@
 //! emitted, skipped and pages refused, holds of the grant authority (each
 //! takes the directory, apps and grants locks once, in that order) and of
 //! the cursor book's lock, and what is retained: the cursors kept and
-//! released, and the entries of the grant book's live indexes. A count is
+//! released, and the entries of the grant book's live indexes.
+//!
+//! Every call ends in exactly one outcome, counted apart: a decision or
+//! admission allowed, held for approval, refused at a revision, or
+//! unanswered (refused before lookup, or a decision the grants could not
+//! make, answered with no revision); a page answered or refused whole; or a
+//! call failed because the grant log or the authority could not be held. A
+//! failure is never counted as a success, so the calls are always the sum of
+//! the outcomes. A call refused before it reaches the capability (an asker
+//! not signed in, an app not admitted) is not a call. A count is
 //! never reset while the service runs; a test reads it before and after the
 //! work it measures. Physical store reads are counted by the log store
 //! where it reads (`lys_log_store::process_read_count`) and shown here as a
@@ -23,6 +32,7 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use serde::Serialize;
 
+use lys_pass::membership::Verdict;
 use lys_pass::membership_pages::CURSORS_UNAVAILABLE;
 
 use crate::channel_membership::Named;
@@ -42,6 +52,12 @@ pub(crate) struct Counts {
     emitted: AtomicU64,
     skipped: AtomicU64,
     refused_pages: AtomicU64,
+    answered_pages: AtomicU64,
+    allowed: AtomicU64,
+    held: AtomicU64,
+    refused: AtomicU64,
+    unanswered: AtomicU64,
+    failed: AtomicU64,
     authority_holds: AtomicU64,
     cursor_locks: AtomicU64,
 }
@@ -51,10 +67,36 @@ fn add(counter: &AtomicU64, by: u64) {
 }
 
 impl Counts {
-    /// One logical call of the capability, and the authority hold it takes.
+    /// One logical call of the capability.
     pub(crate) fn call(&self) {
         add(&self.calls, 1);
+    }
+
+    /// One hold of the grant authority, taken by a call once its grant log
+    /// is read.
+    pub(crate) fn hold(&self) {
         add(&self.authority_holds, 1);
+    }
+
+    /// The outcome of one decision or admission call: its revision and
+    /// verdict as answered, or the failure that left it unanswered by the
+    /// route. A verdict with no revision was refused before lookup or not
+    /// decided by the grants, and is never counted with those decided.
+    pub(crate) fn decided(&self, outcome: Result<(Option<u64>, &Verdict), &ServerError>) {
+        let counter = match outcome {
+            Ok((None, _)) => &self.unanswered,
+            Ok((Some(_), Verdict::Allowed { .. })) => &self.allowed,
+            Ok((Some(_), Verdict::Held { .. })) => &self.held,
+            Ok((Some(_), Verdict::Refused { .. })) => &self.refused,
+            Err(_) => &self.failed,
+        };
+        add(counter, 1);
+    }
+
+    /// One call failed because the grant log or the authority could not be
+    /// held: answered as an error, counted apart from every answer.
+    pub(crate) fn failed(&self) {
+        add(&self.failed, 1);
     }
 
     /// One decision made through the grants.
@@ -69,6 +111,7 @@ impl Counts {
 
     /// A page answered with `emitted` rows and `skipped` candidates.
     pub(crate) fn page(&self, emitted: u64, skipped: u64) {
+        add(&self.answered_pages, 1);
         add(&self.emitted, emitted);
         add(&self.skipped, skipped);
     }
@@ -138,6 +181,20 @@ pub struct MembershipCounts {
     pub rows_skipped: u64,
     /// Pages refused whole.
     pub pages_refused: u64,
+    /// Pages answered, complete or with a continuation.
+    pub pages_answered: u64,
+    /// Decisions and admissions answered allowed at a revision.
+    pub answers_allowed: u64,
+    /// Decisions answered held for approval at a revision.
+    pub answers_held: u64,
+    /// Decisions and admissions answered refused at a revision.
+    pub answers_refused: u64,
+    /// Decisions and admissions answered with no revision: refused before
+    /// lookup, or not decided by the grants.
+    pub answers_unanswered: u64,
+    /// Calls failed because the grant log or the authority could not be
+    /// held. Every call is exactly one of the answers, the pages and these.
+    pub calls_failed: u64,
     /// Holds of the grant authority by the capability.
     pub authority_holds: u64,
     /// Holds of the cursor book's lock.
@@ -199,6 +256,12 @@ pub async fn counts(
         rows_emitted: read(&counts.emitted),
         rows_skipped: read(&counts.skipped),
         pages_refused: read(&counts.refused_pages),
+        pages_answered: read(&counts.answered_pages),
+        answers_allowed: read(&counts.allowed),
+        answers_held: read(&counts.held),
+        answers_refused: read(&counts.refused),
+        answers_unanswered: read(&counts.unanswered),
+        calls_failed: read(&counts.failed),
         authority_holds: read(&counts.authority_holds),
         cursor_locks: read(&counts.cursor_locks),
         cursors_retained: wide(retained),
@@ -209,3 +272,7 @@ pub async fn counts(
         readiness_waiting: wide(state.changes.waiting()),
     }))
 }
+
+#[cfg(test)]
+#[path = "channel_membership_counts_tests.rs"]
+mod tests;

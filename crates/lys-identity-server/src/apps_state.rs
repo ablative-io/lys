@@ -228,6 +228,12 @@ pub struct Placed {
     /// keeps its bytes, and from every unrestricted placement.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub restricted: bool,
+    /// The grant revision it was kept after, read under the grants' one
+    /// hold, which orders it with the grant changes (DIRECTORY-089 R1).
+    /// Absent from a line kept before placements were ordered, which keeps
+    /// its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>,
     /// Who placed it.
     pub by: By,
     /// When.
@@ -540,6 +546,12 @@ impl Held {
     /// The parent a resource of `kind` and `id` is placed in.
     pub fn parent(&self, kind: &str, id: &str) -> Option<&Placed> {
         self.placements.get(self.index.parent(kind, id)?)
+    }
+
+    /// The position among the placements of the one that places the
+    /// resource of `kind` and `id` in its parent, read from the index.
+    pub fn parent_position(&self, kind: &str, id: &str) -> Option<usize> {
+        self.index.parent(kind, id)
     }
 
     /// The resources placed in the resource of `kind` and `id`, by their

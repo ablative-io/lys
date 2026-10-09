@@ -414,9 +414,12 @@ async fn place(
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let child = Resource::new(&body.child.kind, &body.child.id)?;
     let parent = Resource::new(&body.parent.kind, &body.parent.id)?;
-    crate::apps_api::with_apps(&state, |apps, projection| {
-        let who = acting(&state, apps.held(), &headers, projection)?;
+    // Kept under the grants' one hold, after the revision they stand at, so
+    // the grant change stream orders it with the grant changes.
+    crate::grants::with_schema_grants(&state, |judged| {
+        let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         may_change(&who, &id)?;
+        let apps = judged.apps;
         for kind in [child.kind(), parent.kind()] {
             if owner_of(kind) != id {
                 return Err(AppError::NotYourApp {
@@ -442,6 +445,15 @@ async fn place(
             }
             .into());
         }
+        // An uncertain grant append is resolved first, so the revision read
+        // is the one every change before this placement stands at.
+        judged.grants.settle_log()?;
+        let revision = match apps.held().operation(&operation) {
+            // Sent again, it is the same act: it names the revision it was
+            // first kept after.
+            Some(Line::Placed(kept)) => kept.revision,
+            _ => Some(judged.grants.revision()),
+        };
         let kept = apps.keep(Line::Placed(Placed {
             operation,
             app: id.clone(),
@@ -450,19 +462,20 @@ async fn place(
             parent_kind: parent.kind().to_owned(),
             parent_id: parent.id().to_owned(),
             restricted: body.restricted,
+            revision,
             by: who.by(),
             at: now(),
         }))?;
-        let slot = state.grants.lock().map_err(|error| {
+        let count = u64::try_from(apps.held().placements.len()).map_err(|error| {
             lys_identity::grants::GrantError::LogUnavailable {
-                reason: format!("the grants lock is poisoned: {error}"),
+                reason: format!("the placements cannot be counted: {error}"),
             }
         })?;
+        state.grant_setup.changes.placed(count);
         // A restricted child is given no parent relationship, so the
         // engine's permissions on the parent never flow to it.
         if !body.restricted
-            && let Some(grants) = &*slot
-            && let Relationships::SpiceDb(engine) = grants.relationships()
+            && let Relationships::SpiceDb(engine) = judged.grants.relationships()
         {
             engine.place(&child, &parent)?;
         }

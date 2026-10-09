@@ -258,3 +258,114 @@ fn withdrawal_and_baselines_never_readmit_a_revoked_grant() -> TestResult {
     );
     Ok(())
 }
+
+fn placement(revision: u64, placement: u64, widens: &[&str]) -> ChangeFrame {
+    ChangeFrame::Placement {
+        revision,
+        placement,
+        child: "notes.channel:general".to_owned(),
+        parent: "notes.workspace:team".to_owned(),
+        restricted: false,
+        widens: widens.iter().map(|grant| (*grant).to_owned()).collect(),
+    }
+}
+
+/// `d089_r1_replay_live_race`, placement half: an index following
+/// placements applies each one in turn at the revision it was kept after,
+/// tells an identical duplicate from a conflict, an omitted placement from
+/// an omitted revision, and is ready only once a mark names its revision.
+#[test]
+fn placements_apply_in_order_with_the_changes() -> TestResult {
+    let signer = signer()?;
+    let mut index = index(&signer)?.following_placements();
+    index.apply(
+        &log(),
+        &ChangeFrame::Baseline {
+            revision: 5,
+            revoked: Vec::new(),
+        },
+    )?;
+    let unmarked = index.apply(&log(), &ChangeFrame::Ready { revision: 5 });
+    assert_eq!(unmarked.map_err(|r| r.name), Err(STREAM_READY_DISAGREES));
+    let mark = ChangeFrame::PlacementMark {
+        revision: 5,
+        placement: 2,
+    };
+    assert_eq!(
+        index.apply(&log(), &mark)?,
+        Applied::PlacementMark { placement: 2 }
+    );
+    index.apply(&log(), &ChangeFrame::Ready { revision: 5 })?;
+    assert_eq!((index.placed(), index.is_ready()), (Some(2), true));
+
+    let widening = placement(5, 3, &["grant-a"]);
+    assert_eq!(
+        index.apply(&log(), &widening)?,
+        Applied::Placement {
+            placement: 3,
+            widens: 1
+        }
+    );
+    assert_eq!(
+        index.apply(&log(), &widening)?,
+        Applied::PlacementDuplicate { placement: 3 }
+    );
+    assert_eq!(index.placed(), Some(3), "a duplicate applies nothing");
+    let conflicting = index.apply(&log(), &placement(5, 3, &["grant-b"]));
+    assert_eq!(conflicting.map_err(|r| r.name), Err(STREAM_INTEGRITY));
+    let omitted = index
+        .apply(&log(), &placement(5, 5, &[]))
+        .err()
+        .ok_or("accepted")?;
+    assert_eq!((omitted.name, omitted.gap), (STREAM_GAP, Some(1)));
+
+    index.apply(&log(), &revoke(&signer, 6, GrantId::generate()?)?)?;
+    let before = index.apply(&log(), &placement(5, 4, &[]));
+    assert_eq!(before.map_err(|r| r.name), Err(STREAM_INTEGRITY));
+    let ahead = index
+        .apply(&log(), &placement(7, 4, &[]))
+        .err()
+        .ok_or("accepted")?;
+    assert_eq!((ahead.name, ahead.gap), (STREAM_GAP, Some(1)));
+    assert_eq!(index.placed(), Some(3), "a refused placement moves nothing");
+    index.apply(&log(), &placement(6, 4, &[]))?;
+    let unmarked = index.apply(&log(), &ChangeFrame::Ready { revision: 6 });
+    assert_eq!(unmarked.map_err(|r| r.name), Err(STREAM_READY_DISAGREES));
+    let early_mark = ChangeFrame::PlacementMark {
+        revision: 7,
+        placement: 4,
+    };
+    let early = index.apply(&log(), &early_mark);
+    assert_eq!(early.map_err(|r| r.name), Err(STREAM_GAP));
+    let barrier = ChangeFrame::PlacementMark {
+        revision: 6,
+        placement: 4,
+    };
+    index.apply(&log(), &barrier)?;
+    index.apply(&log(), &ChangeFrame::Ready { revision: 6 })?;
+    assert_eq!((index.placed(), index.is_ready()), (Some(4), true));
+
+    let reset = ChangeFrame::Reset {
+        reason: ResetReason::Unordered,
+        from: Some(log()),
+    };
+    assert_eq!(
+        index.apply(&log(), &reset).map_err(|r| r.name),
+        Err(STREAM_RESET)
+    );
+    assert_eq!(index.placed(), None, "a reset forgets the placement cursor");
+    Ok(())
+}
+
+/// An index that does not follow placements refuses a placement frame by
+/// name, and its readiness needs no mark.
+#[test]
+fn an_index_not_following_placements_refuses_them() -> TestResult {
+    let signer = signer()?;
+    let mut index = index(&signer)?;
+    ready_at(&mut index, 2)?;
+    let refused = index.apply(&log(), &placement(2, 1, &[]));
+    assert_eq!(refused.map_err(|r| r.name), Err(STREAM_INTEGRITY));
+    assert!(!index.is_ready());
+    Ok(())
+}

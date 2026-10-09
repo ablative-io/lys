@@ -27,7 +27,10 @@
 //! kinds as the live grants give them at issue (`rights_claim`), living
 //! `pass_seconds` and never past the sign-in it stands on. A refresh token,
 //! kept beside it, issues a new pass from the grants live at that moment
-//! (`issue`). Passes and ID tokens are signed with the current key; a
+//! (`issue`). A machine, which signs in nowhere, asks for its pass with the
+//! key its join recorded and is answered one from the same reading, living
+//! `pass_seconds`, with no refresh token: it asks again (`machine_issue`,
+//! ACCESS-005). Passes and ID tokens are signed with the current key; a
 //! retired key stays published until every token it signed has ended
 //! (`keys`).
 
@@ -60,12 +63,14 @@ mod exchange;
 mod grant_binding;
 mod issue;
 mod keys;
+mod machine_issue;
 mod refusal;
 mod rights_claim;
 pub(crate) use bearer::{pass_holder, presented_pass};
 pub use endpoints::routes;
 pub(crate) use grant_binding::signed_binding;
 pub use keys::{RotateAnswer, RotateBody};
+pub(crate) use machine_issue::{MachinePass, machine_pass};
 
 /// How long a code lives when the configuration says nothing, in seconds:
 /// the ten minutes RFC 6749 (section 4.1.2) recommends as a code's longest

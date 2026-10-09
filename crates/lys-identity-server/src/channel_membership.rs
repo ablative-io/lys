@@ -210,17 +210,25 @@ pub async fn membership(
         reason: refused.body_text(),
     })?;
     let acting_for = asker(&state, &headers)?;
-    let served = served_log(&state)?;
-    let at = now();
     let counts = &state.membership.counts;
     counts.call();
-    with_grants(&state, |mut judged| {
-        Ok(Json(judge(
-            &mut judged,
-            (acting_for.as_deref(), counts),
-            &served,
-            &request,
-            at,
-        )))
-    })
+    let decided = served_log(&state).and_then(|served| {
+        let at = now();
+        counts.hold();
+        with_grants(&state, |mut judged| {
+            Ok(judge(
+                &mut judged,
+                (acting_for.as_deref(), counts),
+                &served,
+                &request,
+                at,
+            ))
+        })
+    });
+    counts.decided(
+        decided
+            .as_ref()
+            .map(|decision| (decision.revision, &decision.verdict)),
+    );
+    decided.map(Json)
 }

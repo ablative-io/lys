@@ -10,6 +10,9 @@
 //!   `x-lys-runner-ticket` header, once there is one; the ask ends then, or
 //!   when the bridge leaves
 //! - `POST /runner/dial/{machine}/replies/{ticket}`: the runner's reply
+//! - `POST /runner/dial/{machine}/pass`: the machine the computer's join
+//!   made asks for a pass to an app, signed as a dial is, but by the key
+//!   its join recorded (`machine_pass.rs`, ACCESS-005)
 //!
 //! Each POST is admitted only when the machine's record names a dialled
 //! runner and the request is signed by the key that record names, over the
@@ -41,6 +44,7 @@ use lys_runner::protocol::{read_greeting, unhex};
 use serde_json::{Value, json};
 
 use crate::error::ServerError;
+use crate::machine_pass::PASS_ROUTE;
 use crate::network_api::with_network;
 use crate::routes::AppState;
 use crate::runner_client::{RunnerRecord, dial_key};
@@ -52,6 +56,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route(EPOCH_ROUTE, get(epoch))
         .route("/runner/dial/{machine}/next", post(next))
         .route("/runner/dial/{machine}/replies/{ticket}", post(reply))
+        .route(PASS_ROUTE, post(crate::machine_pass::pass))
 }
 
 fn refused(reason: impl Into<String>) -> ServerError {
@@ -80,6 +85,22 @@ fn admitted(
     };
     let key = dial_key(&key)
         .ok_or_else(|| refused(format!("machine `{machine}`'s key does not read")))?;
+    signed_by(state, machine, &key, headers, route, body)
+}
+
+/// Admit a request from `machine` on `route` carrying `body` when it is
+/// signed by `key` as a dial is: over the dial domain, the method, the
+/// route, this server's epoch, a nonce used once in it, and the body. The
+/// caller names the key: a dial's is its runner record's, a machine pass's
+/// the key its join recorded (`machine_pass`).
+pub(crate) fn signed_by(
+    state: &AppState,
+    machine: &str,
+    key: &[u8; 32],
+    headers: &HeaderMap,
+    route: &str,
+    body: &[u8],
+) -> Result<(), ServerError> {
     let epoch = header(headers, EPOCH_HEADER)?;
     if epoch != state.runners.hub().epoch() {
         return Err(crate::error_machine::MachineError::DialStale {
@@ -96,13 +117,13 @@ fn admitted(
     let signature = unhex(header(headers, SIGNATURE_HEADER)?)
         .ok_or_else(|| refused("the dial's signature is not lowercase hex"))?;
     Ed25519Identity::verify(
-        &key,
+        key,
         &dial_signed_bytes("POST", route, epoch, nonce, body),
         &signature,
     )
-    .map_err(|_forged| {
+    .map_err(|forged| {
         refused(format!(
-            "the dial is not signed by machine `{machine}`'s key"
+            "the dial is not signed by machine `{machine}`'s key: {forged}"
         ))
     })?;
     if !state.runners.hub().fresh(machine, nonce)? {

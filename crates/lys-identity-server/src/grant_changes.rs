@@ -17,6 +17,10 @@
 //! ends or its connection is dropped; no task outlives the request. After
 //! the wait the asker is judged again and the page read again.
 //!
+//! A read following placements (`placements`) is given them in order with
+//! the changes, and its wait is also released by the placement signal the
+//! placements route sends under the same hold, subscribed the same way.
+//!
 //! The log's identity (`identity`) is recorded once and is the one every
 //! membership decision and pass binding names.
 
@@ -38,14 +42,17 @@ use crate::grants_batch::asker;
 use crate::routes::AppState;
 
 mod identity;
+mod placements;
 mod stream;
 
 pub use identity::{Reset, reset};
 
-/// The grant log's served identity and its commit signal.
+/// The grant log's served identity, its commit signal and its placement
+/// signal.
 pub struct GrantChanges {
     identity: Mutex<Option<LogName>>,
     revision: watch::Sender<u64>,
+    placements: watch::Sender<u64>,
 }
 
 impl Default for GrantChanges {
@@ -53,6 +60,7 @@ impl Default for GrantChanges {
         Self {
             identity: Mutex::new(None),
             revision: watch::channel(0).0,
+            placements: watch::channel(0).0,
         }
     }
 }
@@ -90,6 +98,19 @@ impl GrantChanges {
             }
         });
     }
+
+    /// Signal the count of placements once one is kept, under the hold
+    /// that kept it: readers following placements wake only when it moved.
+    pub(crate) fn placed(&self, count: u64) {
+        self.placements.send_if_modified(|held| {
+            if *held == count {
+                false
+            } else {
+                *held = count;
+                true
+            }
+        });
+    }
 }
 
 /// The grant log this service serves, by its recorded identity and epoch.
@@ -122,10 +143,28 @@ pub async fn changes(
     if request.after.is_some() && request.log.is_none() {
         return Err(malformed("a cursor names the grant log it belongs to"));
     }
+    match (request.placements, request.after, request.placed) {
+        (false, _, Some(_)) => {
+            return Err(malformed(
+                "a placement cursor is given only by a read following placements",
+            ));
+        }
+        (true, Some(_), None) => {
+            return Err(malformed(
+                "a cursor following placements names the placements applied",
+            ));
+        }
+        (true, None, Some(_)) => {
+            return Err(malformed("a first read names no placements applied"));
+        }
+        _ => {}
+    }
     let acting_for = asker(&state, &headers)?;
     let log = served(&state)?;
-    // Subscribed before the hold: a commit after the read wakes this wait.
+    // Subscribed before the hold: a commit or placement after the read
+    // wakes this wait.
     let mut live = state.grant_setup.changes.revision.subscribe();
+    let mut placing = state.grant_setup.changes.placements.subscribe();
     let read = with_grants(&state, |mut judged| {
         stream::page(&mut judged, acting_for.as_deref(), &log, &request)
     })?;
@@ -134,11 +173,17 @@ pub async fn changes(
     }
     drop(read);
     let place = state.changes.hold_place()?;
-    live.changed()
-        .await
-        .map_err(|error| ServerError::RuntimeUnavailable {
-            reason: format!("the grant commit signal closed: {error}"),
-        })?;
+    let woken = if request.placements {
+        tokio::select! {
+            woken = live.changed() => woken,
+            woken = placing.changed() => woken,
+        }
+    } else {
+        live.changed().await
+    };
+    woken.map_err(|error| ServerError::RuntimeUnavailable {
+        reason: format!("the grant commit signal closed: {error}"),
+    })?;
     drop(place);
     let acting_for = asker(&state, &headers)?;
     let read = with_grants(&state, |mut judged| {
@@ -174,6 +219,12 @@ pub struct ChangesRequestSchema {
     /// Whether to wait for the next commit when nothing follows the cursor.
     #[serde(default)]
     pub wait: bool,
+    /// Whether the read follows placements too.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub placements: bool,
+    /// The count of placements applied; given with `after` when following.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placed: Option<u64>,
 }
 
 /// The published shape of what a change did.
@@ -196,6 +247,8 @@ pub enum ResetReasonSchema {
     OtherLog,
     /// Past what the log holds.
     Rollback,
+    /// Not one position of the order of changes and placements.
+    Unordered,
 }
 
 /// The published shape of one frame ([`lys_identity::grants::change_stream::ChangeFrame`]).
@@ -225,6 +278,28 @@ pub enum ChangeFrameSchema {
     Watermark {
         /// The last revision covered.
         revision: u64,
+    },
+    /// One placement, kept after the change at `revision`.
+    Placement {
+        /// The grant revision it was kept after.
+        revision: u64,
+        /// Its position among the placements, from one.
+        placement: u64,
+        /// The resource placed, `kind:id`.
+        child: String,
+        /// Its parent, `kind:id`.
+        parent: String,
+        /// Whether nothing held on the parent reaches the child.
+        restricted: bool,
+        /// The grants whose reach it widened to the child.
+        widens: Vec<String>,
+    },
+    /// Hidden placements through this count.
+    PlacementMark {
+        /// The grant revision the last covered placement was kept after.
+        revision: u64,
+        /// The count of placements covered.
+        placement: u64,
     },
     /// Delivered and projected through this revision.
     Ready {
@@ -354,6 +429,18 @@ mod tests {
                     event: "d2".to_owned(),
                 },
                 ChangeFrame::Watermark { revision: 3 },
+                ChangeFrame::Placement {
+                    revision: 3,
+                    placement: 1,
+                    child: "app.channel:general".to_owned(),
+                    parent: "app.workspace:team".to_owned(),
+                    restricted: false,
+                    widens: vec!["grant-02".to_owned()],
+                },
+                ChangeFrame::PlacementMark {
+                    revision: 3,
+                    placement: 2,
+                },
                 ChangeFrame::Ready { revision: 3 },
                 ChangeFrame::Unready {
                     refusal: "StaleDecision".to_owned(),
@@ -362,6 +449,10 @@ mod tests {
                 ChangeFrame::Reset {
                     reason: ResetReason::Rollback,
                     from: Some(log.clone()),
+                },
+                ChangeFrame::Reset {
+                    reason: ResetReason::Unordered,
+                    from: None,
                 },
             ],
         };
@@ -373,8 +464,22 @@ mod tests {
             after: Some(3),
             limit: 8,
             wait: true,
+            placements: false,
+            placed: None,
         };
         let wire = serde_json::to_value(&request)?;
+        assert!(
+            wire.get("placements").is_none() && wire.get("placed").is_none(),
+            "a read not following placements keeps its bytes: {wire}"
+        );
+        let published: ChangesRequestSchema = serde_json::from_value(wire.clone())?;
+        assert_eq!(serde_json::to_value(&published)?, wire);
+        let following = ChangesRequest {
+            placements: true,
+            placed: Some(2),
+            ..request
+        };
+        let wire = serde_json::to_value(&following)?;
         let published: ChangesRequestSchema = serde_json::from_value(wire.clone())?;
         assert_eq!(serde_json::to_value(&published)?, wire);
         Ok(())

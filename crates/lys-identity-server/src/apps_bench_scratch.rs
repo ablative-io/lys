@@ -259,6 +259,7 @@ fn place(
             parent_kind: parent.kind().to_owned(),
             parent_id: parent.id().to_owned(),
             restricted: false,
+            revision: None,
             by: draft.by.clone(),
             at,
         }))?;

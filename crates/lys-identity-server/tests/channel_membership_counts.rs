@@ -5,8 +5,10 @@
 //! including the zeros, is kept and must be the same at every size; no
 //! question flushes anything durable or reads a single leaf of the log; a
 //! revocation reaches only the revoked subject, the correct subject still
-//! answered and counted; and an idle service holds no registered readiness
-//! wait, a waiting reader holding one only until the commit wakes it.
+//! answered and counted; every call is counted in exactly its one outcome,
+//! so a refusal or a failure is never counted as an answer allowed; and an
+//! idle service holds no registered readiness wait, a waiting reader holding
+//! one only until the commit wakes it.
 
 use identity_contract::apps::TestResult;
 use identity_contract::membership_world::{World, delta, ids, ward_schema};
@@ -136,7 +138,66 @@ async fn matrix(
     let (answer, work) = measured(world, "/recipients", &second).await?;
     assert_eq!(answer["outcome"]["complete"], true, "{answer}");
     cases.push(("recipient continuation", work));
+
+    let zero = world.resources("ward", (&bea, "person"), 0, &Value::Null);
+    let (answer, work) = measured(world, "/resources", &zero).await?;
+    assert_eq!(
+        answer["outcome"]["refusal"], "membership_page_bound_invalid",
+        "{answer}"
+    );
+    cases.push(("page refused", work));
     Ok(cases)
+}
+
+/// Every outcome a call can end in, each counted apart.
+const OUTCOMES: [&str; 7] = [
+    "answers_allowed",
+    "answers_held",
+    "answers_refused",
+    "answers_unanswered",
+    "pages_answered",
+    "pages_refused",
+    "calls_failed",
+];
+
+/// The one outcome each case of the matrix ends in, in the matrix's order.
+const ENDED: [&str; 7] = [
+    "answers_allowed",
+    "answers_refused",
+    "answers_unanswered",
+    "pages_answered",
+    "pages_answered",
+    "pages_answered",
+    "pages_refused",
+];
+
+#[tokio::test]
+async fn every_call_is_counted_in_its_one_outcome_and_failures_never_as_success() -> TestResult {
+    let (world, former) = wards().await?;
+    let cases = matrix(&world, &former).await?;
+    assert_eq!(cases.len(), ENDED.len(), "{cases:?}");
+    for ((case, work), ended) in cases.iter().zip(ENDED) {
+        for outcome in OUTCOMES {
+            let expected = i128::from(outcome == ended);
+            assert_eq!(
+                count(work, outcome),
+                Some(expected),
+                "{case} ends {ended}, so {outcome} moves by {expected}: {work:?}"
+            );
+        }
+    }
+    // Over the service's whole life so far, opening the world included, the
+    // calls are exactly the sum of their outcomes.
+    let total = world.counts().await?;
+    let mut ended = 0_u64;
+    for outcome in OUTCOMES {
+        ended += total[outcome]
+            .as_u64()
+            .ok_or_else(|| format!("{outcome} is not a count: {total}"))?;
+    }
+    assert_eq!(total["calls"].as_u64(), Some(ended), "{total}");
+    assert_eq!(total["calls_failed"], 0, "{total}");
+    Ok(())
 }
 
 #[tokio::test]

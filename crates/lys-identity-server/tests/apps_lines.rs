@@ -156,6 +156,7 @@ fn lines() -> Vec<Line> {
             parent_kind: "notes_book".to_owned(),
             parent_id: "shelf".to_owned(),
             restricted: false,
+            revision: None,
             by: account(),
             at: 11,
         }),

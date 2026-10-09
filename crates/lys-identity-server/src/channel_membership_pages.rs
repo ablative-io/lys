@@ -411,7 +411,8 @@ fn recipients_page<S: LeafStore>(
 
 /// Serve one page: the asker, the log, the time and a next cursor's
 /// randomness are fixed before the grants are held, and a refusal is the
-/// whole page's, counted.
+/// whole page's, counted. A call whose grant log or authority cannot be
+/// held is counted failed, apart from every page answered or refused.
 fn serve<T>(
     state: &AppState,
     headers: &HeaderMap,
@@ -419,26 +420,32 @@ fn serve<T>(
     page: impl FnOnce(&mut Judged<'_>, &Asking<'_>, &T) -> Result<MembershipPage, Named>,
 ) -> Result<Json<MembershipPage>, ServerError> {
     let acting_for = asker(state, headers)?;
-    let served = served_log(state)?;
-    let mut random = [0_u8; HANDLE_BYTES];
-    rand::rng().fill_bytes(&mut random);
     let membership = &state.membership;
     membership.counts.call();
-    let asking = Asking {
-        acting_for: acting_for.as_deref(),
-        served: &served,
-        at: now(),
-        random,
-        membership,
-    };
-    with_grants(state, |mut judged| {
-        Ok(Json(page(&mut judged, &asking, request).unwrap_or_else(
-            |(name, reason)| {
-                membership.counts.refused_page();
-                membership_pages::refused_page(&served, &name, &reason)
-            },
-        )))
-    })
+    let paged = served_log(state).and_then(|served| {
+        let mut random = [0_u8; HANDLE_BYTES];
+        rand::rng().fill_bytes(&mut random);
+        let asking = Asking {
+            acting_for: acting_for.as_deref(),
+            served: &served,
+            at: now(),
+            random,
+            membership,
+        };
+        membership.counts.hold();
+        with_grants(state, |mut judged| {
+            Ok(Json(page(&mut judged, &asking, request).unwrap_or_else(
+                |(name, reason)| {
+                    membership.counts.refused_page();
+                    membership_pages::refused_page(&served, &name, &reason)
+                },
+            )))
+        })
+    });
+    if paged.is_err() {
+        membership.counts.failed();
+    }
+    paged
 }
 
 /// A page of the resources one subject may act on within a workspace.
