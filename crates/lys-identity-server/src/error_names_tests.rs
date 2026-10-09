@@ -10,6 +10,7 @@ use crate::apps_error::{AppError, Strand};
 use crate::error::ServerError;
 use crate::error_budget::BudgetError;
 use crate::error_cord::CordError;
+use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
 use crate::error_team::TeamError;
 use crate::goals_types::GoalError;
@@ -702,6 +703,29 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
                 reason: detail.to_owned(),
             }),
             "runner_dial_stale",
+        ),
+        (
+            ServerError::GrantStream(GrantStreamError::IdentityUnavailable {
+                reason: detail.to_owned(),
+            }),
+            "grant_log_identity_unavailable",
+        ),
+        (
+            ServerError::GrantStream(GrantStreamError::BindingUnsupported {
+                asked: detail.to_owned(),
+                served: 1,
+            }),
+            "grant_binding_unsupported",
+        ),
+        (
+            ServerError::GrantStream(GrantStreamError::BindingRevisionMoved { decided: 7, now: 8 }),
+            "grant_binding_revision_moved",
+        ),
+        (
+            ServerError::GrantStream(GrantStreamError::BindingDegraded {
+                refusal: detail.to_owned(),
+            }),
+            "grant_binding_degraded",
         ),
     ]
 }

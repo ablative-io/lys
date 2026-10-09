@@ -101,9 +101,29 @@ async fn seed(world: &World) -> Result<Seeded, Box<dyn std::error::Error>> {
             .get(&grant.holder)
             .ok_or_else(|| format!("{} is not seeded", grant.holder))?;
         let kind = grant.resource.kind.trim_start_matches("sample.");
-        let answer = world
-            .grant(holder, (kind, &grant.resource.id), relation(grant)?)
-            .await?;
+        let answer = match responsible_of(&vectors, &grant.holder) {
+            // A root is held by a person; an agent's grant is passed on to
+            // it from a grant its responsible person holds. No vector asks
+            // about that person on this resource.
+            Some(person) => {
+                let person = subjects
+                    .get(person)
+                    .ok_or_else(|| format!("{person} is not seeded"))?;
+                world
+                    .passed_to_agent(
+                        person,
+                        holder,
+                        (kind, &grant.resource.id),
+                        (relation(grant)?, &grant.actions),
+                    )
+                    .await?
+            }
+            None => {
+                world
+                    .grant(holder, (kind, &grant.resource.id), relation(grant)?)
+                    .await?
+            }
+        };
         let id = answer["grant"]
             .as_str()
             .ok_or("the issue names its grant")?;
@@ -116,6 +136,16 @@ async fn seed(world: &World) -> Result<Seeded, Box<dyn std::error::Error>> {
         }
     }
     Ok(Seeded { subjects, grants })
+}
+
+/// The label of the person responsible for the subject `label`, when it is
+/// an agent.
+fn responsible_of<'a>(vectors: &'a membership_conformance::World, label: &str) -> Option<&'a str> {
+    vectors
+        .subjects
+        .iter()
+        .find(|subject| subject.label == label)
+        .and_then(|subject| subject.responsible.as_deref())
 }
 
 /// The log a vector names, as the service serves it: the vectors' log is

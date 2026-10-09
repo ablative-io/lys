@@ -260,11 +260,9 @@ fn a_damaged_tail_leaf_refuses_the_open_and_the_directory_still_answers() -> Tes
         .join("segments")
         .join(format!("{:020}", 0));
     let mut bytes = std::fs::read(&segment)?;
-    // Inside the last record's leaf, before its flag, pin and checksum.
-    let at = bytes
-        .len()
-        .checked_sub(64)
-        .ok_or("the segment is too short")?;
+    // Inside a record before the last: the store cuts a damaged final
+    // record off as a torn append, and refuses damage anywhere before it.
+    let at = bytes.len() / 2;
     bytes[at] ^= 0xff;
     std::fs::write(&segment, bytes)?;
     let refused = world.reopen(MemoryRelationships::default());

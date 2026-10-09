@@ -369,8 +369,12 @@ pub(crate) fn judge(state: &AppState, asker: IdentityId, item: &Item) -> Result<
                 resource: Resource::new(kind, &item.goal.holder.id)?,
                 action: Action::new(action)?,
             };
-            held.grants.explain(held.directory, &request, now(), None)?;
-            Ok(true)
+            Ok(crate::grants::allowed(held.grants.explain(
+                held.directory,
+                &request,
+                now(),
+                None,
+            ))?)
         })?;
         if granted {
             return Ok(());

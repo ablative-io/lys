@@ -156,13 +156,18 @@ fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, 
             kept.expires_at,
         )
     };
-    if !state.sessions.is_live(&session_id)? {
-        held(&provider.tokens)?.revoke(&lookup)?;
-        return Err(ServerError::Provider(ProviderError::SessionEnded));
-    }
     let person = subject
         .parse::<lys_identity::PersonId>()
         .map_err(ServerError::Identity)?;
+    if !state.sessions.is_live(&session_id)? {
+        held(&provider.tokens)?.revoke(&lookup)?;
+        // Retiring or suspending a holder also ends its sign-ins: the
+        // holder's state is named first, the ended sign-in otherwise.
+        crate::grants::with_grants(state, |judged| {
+            super::rights_claim::holder_of(judged.directory, IdentityId::Person(person)).map(drop)
+        })?;
+        return Err(ServerError::Provider(ProviderError::SessionEnded));
+    }
     let issued: Pass = pass(
         state,
         provider,

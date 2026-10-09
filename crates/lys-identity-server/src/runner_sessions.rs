@@ -152,10 +152,12 @@ pub fn operator(
             resource: Resource::new("agent", agent)?,
             action: Action::new(OPERATE)?,
         };
-        judged
-            .grants
-            .explain(judged.directory, &request, now(), None)?;
-        Ok(true)
+        Ok(crate::grants::allowed(judged.grants.explain(
+            judged.directory,
+            &request,
+            now(),
+            None,
+        ))?)
     })?;
     if granted {
         return Ok(asker.to_string());

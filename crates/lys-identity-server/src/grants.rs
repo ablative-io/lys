@@ -189,6 +189,24 @@ impl From<&lys_identity::grants::ProjectionDegraded> for DegradedView {
     }
 }
 
+/// Whether a decision allowed, for a route that answers a refusal of its
+/// own: a grant's ordinary refusal (one the server answers 403: not held,
+/// revoked, expired and the like) is `false`, so the route keeps its own
+/// answer, a hidden 404 or its not-permitted; any other refusal (the log or
+/// the engine unavailable, an unresolved operation, a degraded reading) is
+/// carried as it is, never collapsed into a denial.
+pub(crate) fn allowed<T>(decided: Result<T, GrantError>) -> Result<bool, GrantError> {
+    match decided {
+        Ok(_) => Ok(true),
+        Err(error)
+            if crate::error_status::grant_status(&error) == axum::http::StatusCode::FORBIDDEN =>
+        {
+            Ok(false)
+        }
+        Err(error) => Err(error),
+    }
+}
+
 /// Decide a question through the same resource reach against one reading.
 pub(crate) fn decide_in<S: LeafStore>(
     judged: &Judged<'_, S>,

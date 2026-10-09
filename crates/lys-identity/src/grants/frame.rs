@@ -140,9 +140,19 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Settle the log and project the relationships, refusing a projection
     /// older than `at_least`, and name the revocation held unresolved.
     pub(super) fn settle(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
-        self.settle_log().inspect_err(|error| {
+        if let Err(error) = self.settle_log() {
             tracing::warn!(step = "reconcile", error = %error, "grant log settlement refused");
-        })?;
+            // A revocation the log could not record is what the reading is
+            // uncertain about: it is named, with its operation, before the
+            // log's own refusal, which the line above keeps.
+            if let Some((operation, grant)) = self.unresolved_revocation() {
+                return Err(GrantError::OperationUnresolved {
+                    operation: operation.to_string(),
+                    grant: grant.to_string(),
+                });
+            }
+            return Err(error);
+        }
         let reading = self.project_reading()?;
         let projected = reading.revision;
         if let Some(required) = at_least
@@ -153,18 +163,22 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 projected,
             });
         }
-        let unresolved = self
-            .ledger
-            .uncertain()
-            .and_then(|held| match held.event.change() {
-                GrantChange::Revoke { grant, .. } => Some((held.operation, *grant)),
-                GrantChange::Issue(_) | GrantChange::Use { .. } => None,
-            });
+        let unresolved = self.unresolved_revocation();
         Ok(Settled {
             projected,
             unresolved,
             degraded: reading.degraded,
         })
+    }
+
+    /// The revocation the ledger holds unresolved, with its operation.
+    fn unresolved_revocation(&self) -> Option<(OperationId, GrantId)> {
+        self.ledger
+            .uncertain()
+            .and_then(|held| match held.event.change() {
+                GrantChange::Revoke { grant, .. } => Some((held.operation, *grant)),
+                GrantChange::Issue(_) | GrantChange::Use { .. } => None,
+            })
     }
 
     /// The decision [`Grants::explain`] makes, against `frame`'s reading,

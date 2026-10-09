@@ -222,12 +222,21 @@ fn holder_index_answers_each_holder_and_rebuilds_from_the_snapshot() -> Result<(
     let agent = IdentityId::Agent(crate::AgentId::from_bytes([0xa7; 16]));
     let absent = IdentityId::Person(PersonId::from_bytes([0xee; 16]));
     let mut book = GrantBook::new();
-    for (index, (id, holder)) in [(5, person), (2, agent), (9, person), (7, agent)]
-        .into_iter()
-        .enumerate()
-    {
-        let event = issued(id, holder, Source::Root, PassOn::UseOnly)?;
-        book.apply(&event, u64::try_from(index)?)?;
+    // The person's two roots may pass reading to an agent; the agent's two
+    // grants derive from the first, as a grant an agent holds must.
+    let to_agents = PassOn::to(
+        [Action::new("read")?].into(),
+        [crate::grants::RecipientKind::Agent].into(),
+    )?;
+    let first = Source::Grant(GrantId::from_bytes([5; 16]));
+    let events = [
+        issued(5, person, Source::Root, to_agents.clone())?,
+        issued(9, person, Source::Root, to_agents)?,
+        issued(2, agent, first, PassOn::UseOnly)?,
+        issued(7, agent, first, PassOn::UseOnly)?,
+    ];
+    for (index, event) in events.iter().enumerate() {
+        book.apply(event, u64::try_from(index)?)?;
     }
     let held = |book: &GrantBook, holder| -> Vec<GrantId> {
         book.held_by(holder)

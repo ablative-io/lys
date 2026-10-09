@@ -117,8 +117,12 @@ pub(super) fn pass(
         rights,
         rights_truncated,
     };
-    let value = serde_json::to_value(&claims)
+    let mut value = serde_json::to_value(&claims)
         .map_err(|error| unavailable(format!("the pass could not be encoded: {error}")))?;
+    // Each pass is its own token: two issued to one holder in one second
+    // would otherwise be the same bytes, and the provider keeps each token
+    // once by its digest. A verifier reads past the id.
+    value["jti"] = serde_json::Value::String(super::random::<16>()?);
     let token = provider.signed(&value)?;
     let binding = match (decided, log) {
         (Some(revision), Some(log)) => Some(binding(
@@ -139,7 +143,7 @@ pub(super) fn pass(
 
 /// The holder assertion: its id and kind, and for any holder that is not a
 /// person, the person responsible for it as the directory records them now.
-fn holder_of(directory: &Projection, holder: IdentityId) -> Result<Holder, ServerError> {
+pub(super) fn holder_of(directory: &Projection, holder: IdentityId) -> Result<Holder, ServerError> {
     let record = directory
         .record(holder)
         .ok_or_else(|| unavailable(format!("the holder {holder} is not in the directory")))?;

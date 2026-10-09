@@ -49,7 +49,8 @@ async fn walk(
             Method::Put => reqwest::Method::PUT,
         };
         let body = (method != reqwest::Method::GET).then_some(&malformed);
-        let mount = if route.path == "/oauth/userinfo" {
+        // The provider's routes are served at the root, never under /api.
+        let mount = if route.path.starts_with("/oauth/") {
             ""
         } else {
             prefix

@@ -141,10 +141,12 @@ fn permitted(state: &AppState, added: &Changed) -> Result<bool, ServerError> {
             resource: Resource::new("agent", &added.member)?,
             action: Action::new(crate::runner_sessions::OPERATE)?,
         };
-        judged
-            .grants
-            .explain(judged.directory, &request, now(), None)?;
-        Ok(true)
+        Ok(crate::grants::allowed(judged.grants.explain(
+            judged.directory,
+            &request,
+            now(),
+            None,
+        ))?)
     })
 }
 

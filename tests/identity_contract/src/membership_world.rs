@@ -148,6 +148,37 @@ impl World {
         ok(root(&self.service, &self.admin, holder, (&kind, id), relation).await?)
     }
 
+    /// A grant of `relation` on the app's `kind` `id`, held by `agent`:
+    /// a root for `person` that may pass `actions` to agents, passed on to
+    /// the agent. Answers the passed-on grant's issue.
+    ///
+    /// # Errors
+    /// The service refusing either grant.
+    pub async fn passed_to_agent(
+        &self,
+        person: &str,
+        agent: &str,
+        (kind, id): (&str, &str),
+        (relation, actions): (&str, &[String]),
+    ) -> Result<Value, Box<dyn Error>> {
+        let resource = json!({"kind": self.kind(kind), "id": id});
+        let admin = Auth::Cookie(&self.admin);
+        let body = json!({
+            "operation": op()?, "route": "api", "holder": person,
+            "resource": resource, "relation": relation,
+            "pass_on": {"kind": "to", "actions": actions, "recipients": ["agent"]},
+            "window": {"starts_at": 0, "ends_at": null},
+        });
+        let source = ok(post(&self.service, "/grants/roots", admin, &body).await?)?;
+        let body = json!({
+            "operation": op()?, "route": "api", "source": source["grant"],
+            "recipient": agent, "responsible": person, "resource": resource,
+            "relation": relation, "pass_on": {"kind": "use_only"},
+            "window": {"starts_at": 0, "ends_at": null},
+        });
+        ok(post(&self.service, "/grants", admin, &body).await?)
+    }
+
     /// Revoke the grant `issued` names, answering the revocation.
     ///
     /// # Errors

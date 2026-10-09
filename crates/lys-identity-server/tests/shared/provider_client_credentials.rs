@@ -162,15 +162,16 @@ async fn an_issued_credential_signs_a_product_in_until_it_is_revoked_and_a_refre
     let (status, answer) = sign_in_with(&service, &cookie, &second_value, false).await?;
     assert_eq!(status, 200, "{answer}");
     // A refresh with the revoked credential is refused as the credential,
-    // before its grant is read; with the live one it is refused as a grant
-    // the provider does not serve.
+    // before its grant is read; with the live one, a refresh token the
+    // provider never issued is refused by name (ACCESS-002 R2 serves
+    // refresh).
     let refresh = [("grant_type", "refresh_token"), ("refresh_token", "any")];
     let (status, refused) = token(&service, PRODUCT, &first_value, true, &refresh).await?;
     assert_eq!(status, 401, "{refused}");
     assert_eq!(refused["refusal"], "credential_refused");
     let (status, refused) = token(&service, PRODUCT, &second_value, true, &refresh).await?;
     assert_eq!(status, 400, "{refused}");
-    assert_eq!(refused["refusal"], "RequestMalformed");
+    assert_eq!(refused["refusal"], "RefreshUnknown");
     Ok(())
 }
 

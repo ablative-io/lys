@@ -143,9 +143,11 @@ fn permits(state: &AppState, question: &GrantQuestion) -> Result<bool, ServerErr
             resource: Resource::new(&question.resource.kind, &question.resource.id)?,
             action: Action::new(&question.action)?,
         };
-        judged
-            .grants
-            .explain(judged.directory, &request, now(), None)?;
-        Ok(true)
+        Ok(crate::grants::allowed(judged.grants.explain(
+            judged.directory,
+            &request,
+            now(),
+            None,
+        ))?)
     })
 }
