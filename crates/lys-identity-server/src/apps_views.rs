@@ -369,6 +369,30 @@ pub struct SchemaVersionView {
     pub schema: Value,
 }
 
+/// An app bearer answered once, with a reference on every replay.
+#[derive(Clone, Serialize, utoipa::ToSchema)]
+pub struct AppBearerGiven {
+    /// The approved app.
+    pub app: String,
+    /// The sealed reference.
+    pub reference: String,
+    /// Present only on the first successful issue.
+    pub credential: Option<String>,
+}
+
+impl std::fmt::Debug for AppBearerGiven {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppBearerGiven")
+            .field("app", &self.app)
+            .field("reference", &self.reference)
+            .field(
+                "credential",
+                &self.credential.as_ref().map(|_value| "[redacted]"),
+            )
+            .finish()
+    }
+}
+
 #[cfg(test)]
 #[path = "apps_views_tests.rs"]
 mod tests;

@@ -22,6 +22,8 @@ pub struct IssuedAppClient {
     pub value: Secret,
     /// The identity that owns the app's sealed client entry.
     pub owner: String,
+    /// The confirmed current client-secret digest, used to settle missing custody.
+    pub client_secret_sha256: String,
 }
 
 /// The app id `app`, refused by name unless it is one.
@@ -51,6 +53,114 @@ fn same(left: &[u8], right: &[u8]) -> bool {
 }
 
 impl<P: PermissionCheck> Broker<P> {
+    /// Rotate custody under an operation, returning owner, bearer reference,
+    /// current digest and the value only on first creation. The sealed operation
+    /// value reconciles a partial rotation after reopening.
+    ///
+    /// # Errors
+    /// Refuses invalid names, stale custody and conflicting owners; propagates
+    /// random-source, store and audit failures.
+    pub fn issue_app_bearer(
+        &mut self,
+        app: &str,
+        by: &str,
+        operation: &str,
+        expected_digest: &str,
+    ) -> Result<(String, String, String, Option<Secret>), SecretsError> {
+        app_named(app)?;
+        operation.parse::<lys_identity::OperationId>()?;
+        if expected_digest.len() != 64
+            || !expected_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(SecretsError::InvalidName {
+                what: "digest",
+                name: expected_digest.to_owned(),
+                reason: "expected a SHA-256 hex digest",
+            });
+        }
+        let (client, owner) = match self.app_client_entry(app) {
+            Ok(entry) => entry,
+            Err(SecretsError::AppClient(AppClientRefusal::NoCustody { .. })) => {
+                (format!("lys-app-{by}-{app}-client"), by.to_owned())
+            }
+            Err(error) => return Err(error),
+        };
+        let prefix = format!("lys-app-{owner}-{app}");
+        let staged = format!("{prefix}-custody-{operation}");
+        let repeated = self.store.entry(&staged).is_some();
+        let value = if let Some(entry) = self.store.entry(&staged) {
+            if entry.owner != owner || entry.class != EntryClass::Key {
+                return Err(SecretsError::SecretExists { name: staged });
+            }
+            self.store
+                .open_for_use(&self.store_key, &staged, EntryClass::Key)?
+        } else {
+            Secret::new(hex(&random_bytes::<32>()?).into_bytes())
+        };
+        let digest = hex(&sha256(value.expose()));
+        if let Some(entry) = self.store.entry(&client) {
+            if entry.owner != owner || entry.class != EntryClass::Key {
+                return Err(SecretsError::SecretExists { name: client });
+            }
+            let held = self
+                .store
+                .open_for_use(&self.store_key, &client, EntryClass::Key)?;
+            let current = hex(&sha256(held.expose()));
+            if !same(current.as_bytes(), expected_digest.as_bytes())
+                && !same(current.as_bytes(), digest.as_bytes())
+            {
+                return Err(AppClientRefusal::CustodyMismatch {
+                    app: app.to_owned(),
+                }
+                .into());
+            }
+        }
+        self.seal_once(&staged, EntryClass::Key, &owner, &value)?;
+        let mut bytes = zeroize::Zeroizing::new(format!("lys-app.{app}.").into_bytes());
+        bytes.extend_from_slice(value.expose());
+        let credential = Secret::from_slice(&bytes);
+        let reference = format!("{prefix}-api-{operation}");
+        self.seal_once(&reference, EntryClass::Credential, &owner, &credential)?;
+        let api = format!("{prefix}-api");
+        if let Some(entry) = self.store.entry(&api) {
+            if entry.owner != owner || entry.class != EntryClass::Credential {
+                return Err(SecretsError::SecretExists { name: api });
+            }
+            let held = self
+                .store
+                .open_for_use(&self.store_key, &api, EntryClass::Credential)?;
+            if !same(held.expose(), credential.expose()) {
+                self.store.replace(&self.store_key, &api, &credential)?;
+            }
+        } else {
+            self.seal_once(&api, EntryClass::Credential, &owner, &credential)?;
+        }
+        if self.store.entry(&client).is_some() {
+            let held = self
+                .store
+                .open_for_use(&self.store_key, &client, EntryClass::Key)?;
+            if !same(held.expose(), value.expose()) {
+                self.store.replace(&self.store_key, &client, &value)?;
+            }
+            self.store.confirm_index()?;
+        } else {
+            self.seal_once(&client, EntryClass::Key, &owner, &value)?;
+        }
+        self.record(
+            AuditKind::Issue,
+            (None, Some(by), Some(&reference)),
+            None,
+            None,
+            "app custody confirmed",
+        )?;
+        Ok((
+            owner,
+            reference,
+            digest,
+            if repeated { None } else { Some(credential) },
+        ))
+    }
+
     /// The app's sealed client entry, by name, with its owner. App ids hold
     /// no hyphen, so the entry ending `-{app}-client` is this app's alone.
     fn app_client_entry(&self, app: &str) -> Result<(String, String), SecretsError> {
@@ -85,6 +195,10 @@ impl<P: PermissionCheck> Broker<P> {
     ) -> Result<IssuedAppClient, SecretsError> {
         app_named(app)?;
         let (client, owner) = self.app_client_entry(app)?;
+        let sealed_client = self
+            .store
+            .open_for_use(&self.store_key, &client, EntryClass::Key)?;
+        let client_secret_sha256 = hex(&sha256(sealed_client.expose()));
         let credential_id = hex(&random_bytes::<8>()?);
         let value = Secret::new(
             format!("{APP_CLIENT_PREFIX}{app}.{}", hex(&random_bytes::<32>()?)).into_bytes(),
@@ -103,6 +217,7 @@ impl<P: PermissionCheck> Broker<P> {
             credential_id,
             value,
             owner,
+            client_secret_sha256,
         })
     }
 

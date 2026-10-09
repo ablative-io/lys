@@ -53,8 +53,10 @@ function Providers() {
     return () => { live = false; };
   }, []);
   if (offered.length === 0) return null;
+  const next = continuation();
+  const query = next ? '?continue=' + encodeURIComponent(next) : '';
   return <div className="sign-in-providers" aria-label="Sign in with a provider">
-    {offered.map((entry) => <a key={entry.id} className="btn" href={API + '/sign-in/providers/' + encodeURIComponent(entry.id)}>
+    {offered.map((entry) => <a key={entry.id} className="btn" href={API + '/sign-in/providers/' + encodeURIComponent(entry.id) + query}>
       Sign in with {entry.name}
     </a>)}
   </div>;

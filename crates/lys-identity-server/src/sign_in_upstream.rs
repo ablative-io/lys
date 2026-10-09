@@ -56,6 +56,7 @@ pub(super) struct Upstream {
     verifier: String,
     state: String,
     browser: [u8; 32],
+    continuation: Option<String>,
 }
 
 /// A PKCE verifier: 32 bytes from the secure random source, base64url.
@@ -78,12 +79,31 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<String, ServerError> {
+        self.begin_provider_to(oidc, provider, address, browser, None)
+            .await
+    }
+
+    async fn begin_provider_to(
+        &self,
+        oidc: &Oidc,
+        provider: &str,
+        address: IpAddr,
+        browser: [u8; 32],
+        continuation: Option<String>,
+    ) -> Result<String, ServerError> {
         let begun = reqwest::Url::parse(&oidc.begin_provider(address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;
         match self
-            .start_upstream(&begun, provider, address, state.clone(), browser)
+            .start_upstream(
+                &begun,
+                provider,
+                address,
+                state.clone(),
+                browser,
+                continuation,
+            )
             .await
         {
             Ok(location) => Ok(location),
@@ -101,6 +121,7 @@ impl IssuerSignIn {
         address: IpAddr,
         state: String,
         browser: [u8; 32],
+        continuation: Option<String>,
     ) -> Result<String, ServerError> {
         let client_address = address;
         let started_at = Instant::now();
@@ -166,6 +187,7 @@ impl IssuerSignIn {
                 verifier,
                 state,
                 browser,
+                continuation,
             },
             client_address,
             started_at,
@@ -183,6 +205,19 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<Actor, ServerError> {
+        self.finish_provider_to(oidc, code, upstream, address, browser)
+            .await
+            .map(|(actor, _)| actor)
+    }
+
+    async fn finish_provider_to(
+        &self,
+        oidc: &Oidc,
+        code: &str,
+        upstream: &str,
+        address: IpAddr,
+        browser: [u8; 32],
+    ) -> Result<(Actor, Option<String>), ServerError> {
         let held = self
             .upstream
             .lock()
@@ -208,7 +243,7 @@ impl IssuerSignIn {
             .await
         {
             Ok(answer) if answer.status().is_client_error() && answer.status() != 429 => {
-                Err(failed("the sign-in through the provider was not accepted"))
+                Err(callback_refusal(answer).await)
             }
             Ok(answer) => match unix_second() {
                 Ok(checked_at) => accepted(answer, None, checked_at).await,
@@ -217,7 +252,10 @@ impl IssuerSignIn {
             Err(error) => Err(error),
         };
         match outcome {
-            Ok((code, answered)) if answered == held.state => oidc.finish(code, &held.state).await,
+            Ok((code, answered)) if answered == held.state => {
+                let actor = oidc.finish(code, &held.state).await?;
+                Ok((actor, held.continuation))
+            }
             Ok(_) => {
                 oidc.abandon(&held.state)?;
                 Err(ServerError::SignInStateUnknown)
@@ -228,6 +266,112 @@ impl IssuerSignIn {
             }
         }
     }
+}
+
+/// Only recognized refusal words enter the log; upstream bodies can carry
+/// credentials, personal details and text that would forge another log line.
+fn callback_summary(body: &[u8]) -> String {
+    let Ok(value) = serde_json::from_slice::<Value>(body) else {
+        return format!("body is not a JSON refusal ({} bytes)", body.len());
+    };
+    let error = match value.get("error").and_then(Value::as_str) {
+        Some(word)
+            if matches!(
+                word,
+                "BadRequest"
+                    | "Blocked"
+                    | "Connection"
+                    | "CSRFTokenError"
+                    | "Database"
+                    | "DatabaseIo"
+                    | "Disabled"
+                    | "Encryption"
+                    | "Forbidden"
+                    | "Internal"
+                    | "invalid_grant"
+                    | "invalid_target"
+                    | "JwtToken"
+                    | "JoseError"
+                    | "MfaRequired"
+                    | "NoSession"
+                    | "NotFound"
+                    | "PasswordExpired"
+                    | "PasswordRefresh"
+                    | "PreconditionRequired"
+                    | "Scim"
+                    | "SessionExpired"
+                    | "SessionTimeout"
+                    | "Timeout"
+                    | "Unauthorized"
+                    | "NotAccepted"
+            ) =>
+        {
+            word
+        }
+        _ => "unrecognized",
+    };
+    let message = match value.get("message").and_then(Value::as_str) {
+        Some(text)
+            if text.starts_with("User with email '")
+                && text.ends_with("' already exists but is not linked to this provider.") =>
+        {
+            "existing account is not linked to this provider"
+        }
+        Some(
+            text @ ("User not found"
+            | "Invalid value for the Upstream User ID"
+            | "Cannot find any user id in the response"
+            | "bad provider_id in link cookie"
+            | "bad user_id in link cookie"
+            | "Invalid E-Mail"
+            | "No `email` in ID token claims. This is a mandatory claim"
+            | "Callback Code not found - timeout reached?"
+            | "Neither `access_token` nor `id_token` existed"),
+        ) => text,
+        Some(text)
+            if text.starts_with("HTTP ")
+                && text.contains(" during POST ")
+                && text.contains(" for upstream auth provider '") =>
+        {
+            "upstream token endpoint refused"
+        }
+        Some(_) => "unrecognized message redacted",
+        None => "no string message",
+    };
+    format!(
+        "body error={error}; message={message} ({} bytes)",
+        body.len()
+    )
+}
+
+/// A callback refusal keeps its status even when its body cannot be read.
+async fn callback_refusal(mut answer: reqwest::Response) -> ServerError {
+    const MOST: usize = 4096;
+    let status = answer.status().as_u16();
+    let mut body = Vec::new();
+    loop {
+        match answer.chunk().await {
+            Ok(Some(chunk)) => {
+                if chunk.len() > MOST - body.len() {
+                    return failed(format!(
+                        "the provider callback answered {status}; body exceeds {MOST} bytes"
+                    ));
+                }
+                body.extend_from_slice(&chunk);
+            }
+            Ok(None) => break,
+            Err(error) => {
+                return failed(format!(
+                    "the provider callback answered {status}; body read failed: {}",
+                    super::unreached(error)
+                ));
+            }
+        }
+    }
+    failed(format!(
+        "the provider callback answered {status}; {}",
+        callback_summary(&body)
+    ))
 }
 
 /// Send the browser to Lys's sign-in screen naming the refusal.
@@ -282,6 +426,7 @@ async fn begin(
     extensions: &Extensions,
     id: &str,
     headers: &HeaderMap,
+    continuation: Option<String>,
 ) -> Result<(String, String), ServerError> {
     if id.is_empty()
         || !id
@@ -295,7 +440,7 @@ async fn begin(
         crate::provider_browser::begin(state.sign_in.callback().starts_with("https://"))?;
     let location = state
         .sign_in
-        .begin_provider(&state.oidc, id, address, digest)
+        .begin_provider_to(&state.oidc, id, address, digest, continuation)
         .await?;
     Ok((location, cookie))
 }
@@ -305,8 +450,21 @@ async fn start(
     extensions: Extensions,
     Path(id): Path<String>,
     headers: HeaderMap,
+    asked: Result<Query<Continue>, axum::extract::rejection::QueryRejection>,
 ) -> Response {
-    match begin(&state, &extensions, &id, &headers).await {
+    let target = asked
+        .map_err(|error| {
+            failed(format!(
+                "the provider continuation is malformed: {}",
+                error.body_text()
+            ))
+        })
+        .and_then(|Query(asked)| continuation_target(asked.continuation));
+    let target = match target {
+        Ok(target) => target,
+        Err(error) => return to_sign_in(&error),
+    };
+    match begin(&state, &extensions, &id, &headers, target).await {
         Ok((location, cookie)) => (
             StatusCode::SEE_OTHER,
             [(header::LOCATION, location), (header::SET_COOKIE, cookie)],
@@ -314,6 +472,35 @@ async fn start(
             .into_response(),
         Err(error) => to_sign_in(&error),
     }
+}
+
+#[derive(Deserialize)]
+struct Continue {
+    #[serde(rename = "continue")]
+    continuation: Option<String>,
+}
+
+/// A continuation is a bounded request on the same origin, held in the
+/// one-use flight rather than trusted from a callback's query or referrer.
+fn continuation_target(target: Option<String>) -> Result<Option<String>, ServerError> {
+    let Some(target) = target else {
+        return Ok(None);
+    };
+    if target.len() > 8192
+        || !["/oauth/authorize?", "/oauth/mcp/authorize?"]
+            .iter()
+            .any(|path| target.starts_with(path))
+        || !target.is_ascii()
+        || target
+            .bytes()
+            .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+        || target.contains(['#', '\\'])
+    {
+        return Err(failed(
+            "the provider continuation is not a bounded authorize request on this origin",
+        ));
+    }
+    Ok(Some(target))
 }
 
 /// What a provider sends the person back with.
@@ -328,14 +515,14 @@ async fn finish(
     extensions: &Extensions,
     back: Back,
     headers: &HeaderMap,
-) -> Result<String, ServerError> {
+) -> Result<(String, Option<String>), ServerError> {
     let (Some(code), Some(upstream)) = (back.code, back.state) else {
         return Err(failed("the provider did not sign the person in"));
     };
     let address = state.sign_in.address(extensions, headers)?;
-    let actor = state
+    let (actor, continuation) = state
         .sign_in
-        .finish_provider(
+        .finish_provider_to(
             &state.oidc,
             &code,
             &upstream,
@@ -343,7 +530,8 @@ async fn finish(
             crate::provider_browser::digest(headers)?,
         )
         .await?;
-    crate::session_admission::begin(state, actor).await
+    let cookie = crate::session_admission::begin(state, actor).await?;
+    Ok((cookie, continuation))
 }
 
 async fn callback(
@@ -353,14 +541,101 @@ async fn callback(
     headers: HeaderMap,
 ) -> Response {
     match finish(&state, &extensions, back, &headers).await {
-        Ok(cookie) => (
+        Ok((cookie, continuation)) => (
             StatusCode::SEE_OTHER,
             [
                 (header::SET_COOKIE, cookie),
-                (header::LOCATION, SIGNED_IN.to_owned()),
+                (
+                    header::LOCATION,
+                    match continuation {
+                        Some(target) => target,
+                        None => SIGNED_IN.to_owned(),
+                    },
+                ),
             ],
         )
             .into_response(),
         Err(error) => to_sign_in(&error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+
+    use super::callback_refusal;
+
+    fn answer(status: u16, body: String) -> Result<reqwest::Response, axum::http::Error> {
+        Ok(reqwest::Response::from(
+            axum::http::Response::builder()
+                .status(status)
+                .body(reqwest::Body::from(body))?,
+        ))
+    }
+
+    #[tokio::test]
+    async fn an_existing_unlinked_account_keeps_the_status_and_safe_cause()
+    -> Result<(), Box<dyn Error>> {
+        let body = serde_json::json!({
+            "error": "Forbidden",
+            "message": "User with email 'private-address' already exists but is not linked to this provider.",
+            "access_token": "private-token",
+        }).to_string();
+        let error = callback_refusal(answer(403, body)?).await;
+        assert_eq!(error.name(), "SignInFailed");
+        let words = error.to_string();
+        assert!(words.contains("403"), "{words}");
+        assert!(words.contains("Forbidden"), "{words}");
+        assert!(
+            words.contains("existing account is not linked to this provider"),
+            "{words}"
+        );
+        assert!(!words.contains("private-address"), "{words}");
+        assert!(!words.contains("private-token"), "{words}");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn unknown_messages_and_error_values_never_reach_the_log() -> Result<(), Box<dyn Error>> {
+        for body in [
+            r#"{"error":"private-token","message":"private-token\nforged log line"}"#,
+            r#"{"error":"Forbidden","message":"private-token"}"#,
+            r#"{"error":{"Forbidden":"private-token"},"message":"private-token"}"#,
+            "private-token\nforged log line",
+        ] {
+            let error = callback_refusal(answer(400, body.to_owned())?).await;
+            let words = error.to_string();
+            assert!(words.contains("400"), "{words}");
+            assert!(!words.contains("private-token"), "{words}");
+            assert!(!words.contains('\n'), "{words}");
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn each_callback_refusal_keeps_its_actual_status() -> Result<(), Box<dyn Error>> {
+        for status in [400, 401, 403, 404, 409, 422] {
+            let error = callback_refusal(answer(
+                status,
+                r#"{"error":"Forbidden","message":"User not found"}"#.to_owned(),
+            )?)
+            .await;
+            let words = error.to_string();
+            assert_eq!(error.name(), "SignInFailed");
+            assert!(words.contains(&status.to_string()), "{words}");
+            assert!(words.contains("User not found"), "{words}");
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn oversized_callback_bodies_are_named_without_logging_their_bytes()
+    -> Result<(), Box<dyn Error>> {
+        let error = callback_refusal(answer(403, "private-token".repeat(1024))?).await;
+        let words = error.to_string();
+        assert!(words.contains("403"), "{words}");
+        assert!(words.contains("body exceeds 4096 bytes"), "{words}");
+        assert!(!words.contains("private-token"), "{words}");
+        Ok(())
     }
 }

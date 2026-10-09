@@ -100,11 +100,36 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
         | Line::Connector(_)
         | Line::ClientCredentialIssued(_)
         | Line::ClientCredentialRevoked(_)
+        | Line::CustodyPrepared(_)
             if standing != Standing::Approved =>
         {
             Err(Refused::Standing(standing))
         }
         Line::Connector(_) if app.connector.is_some() => Err(Refused::Exists),
+        Line::CustodyPrepared(prepared)
+            if app.approved.is_none()
+                || prepared.client.client_id != prepared.app
+                || prepared.client.secret_sha256.len() != 64
+                || !prepared
+                    .client
+                    .secret_sha256
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
+                || prepared.owner.parse::<lys_identity::PersonId>().is_err()
+                || prepared.client_secret_ref
+                    != format!("lys-app-{}-{}-client", prepared.owner, prepared.app)
+                || prepared.api_credential_ref
+                    != if prepared.bearer_issued {
+                        format!(
+                            "lys-app-{}-{}-api-{}",
+                            prepared.owner, prepared.app, prepared.operation
+                        )
+                    } else {
+                        format!("lys-app-{}-{}-api", prepared.owner, prepared.app)
+                    } =>
+        {
+            Err(Refused::Credential)
+        }
         Line::Proposed(_) if app.pending.is_some() => Err(Refused::Pending),
         Line::Proposed(proposed) if proposed.replaces != current => Err(Refused::Moved(current)),
         Line::Applied(applied) if applied.version != current + 1 => Err(Refused::Moved(current)),
@@ -143,6 +168,11 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
 /// Apply `line`, already allowed, to `app`.
 pub(super) fn apply(app: &mut App, line: &Line) {
     match line {
+        Line::CustodyPrepared(prepared) => {
+            if let Some(approved) = &mut app.approved {
+                approved.client = prepared.client.clone();
+            }
+        }
         Line::Approved(approved) => {
             app.versions.push(Version {
                 version: 1,

@@ -15,6 +15,9 @@ use crate::routes::{AppState, Say, Shared, door_handles, open_directory, start};
 use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::Sessions;
 
+#[path = "issuer_admin.rs"]
+mod issuer_admin;
+
 pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
     let kept_responsibilities = crate::kept_responsibilities::Kept::load(
         &config.log_dir.with_file_name("kept-responsibilities.json"),
@@ -264,6 +267,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     };
     Ok(served
         .merge(guarded(provider_callback))
+        .merge(issuer_admin::routes(config)?)
         .layer(axum::middleware::from_fn_with_state(
             state,
             crate::operator::guard,

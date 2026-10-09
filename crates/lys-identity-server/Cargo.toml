@@ -22,7 +22,7 @@ lys-openapi.workspace = true
 lys-runner.workspace = true
 openidconnect.workspace = true
 rand.workspace = true
-reqwest = { workspace = true, features = ["json", "rustls-tls"] }
+reqwest = { workspace = true, features = ["json", "rustls-tls", "stream"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

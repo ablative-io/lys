@@ -22,6 +22,47 @@ struct Prepare {
     upstream: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IssueBearer {
+    app: String,
+    operation: String,
+    expected_digest: String,
+    upstream: String,
+}
+
+/// Issue the bearer only on the operation's first durable preparation.
+pub async fn issue_bearer(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
+    let (who, asked): (_, IssueBearer) = crate::app_client::asked(&shared, request).await?;
+    let url = reqwest::Url::parse(&asked.upstream).map_err(|_error| {
+        (
+            StatusCode::BAD_REQUEST,
+            "RequestMalformed: invalid identity upstream".to_owned(),
+        )
+    })?;
+    if url.scheme() != "http"
+        || !matches!(url.host_str(), Some("127.0.0.1" | "[::1]"))
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "RequestMalformed: identity upstream must be loopback".to_owned(),
+        ));
+    }
+    let layout = shared.layout.clone();
+    on_broker(&shared, move |broker| {
+        let (owner, reference, digest, value) = broker.issue_app_bearer(&asked.app, &who.identity, &asked.operation, &asked.expected_digest)?;
+        layout.add_route(&reference, Route { upstream: asked.upstream, header: "authorization".to_owned(), prefix: "Bearer ".to_owned(), spend_header: None })?;
+        let credential = value.map(|value| String::from_utf8(value.expose().to_vec())).transpose().map_err(|error| SecretsError::Encoding { context: "app bearer credential", reason: error.to_string() })?;
+        Ok::<_, SecretsError>(Json(json!({"app": asked.app, "owner": owner,
+            "client_secret_ref": format!("lys-app-{owner}-{}-client", asked.app),
+            "api_credential_ref": reference, "client_secret_sha256": digest, "credential": credential})))
+    }).await.map_err(|error| refused(&error))?.map_err(|error| refused(&error))
+}
+
 type Answer = Result<Json<Value>, (StatusCode, String)>;
 
 /// Prepare is available only through a trusted screen service for a person.
