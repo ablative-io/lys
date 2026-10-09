@@ -132,8 +132,8 @@ fn differences(current: &Rights, wanted: &Rights) -> (Vec<String>, Vec<String>) 
         .flat_map(|(group, rights)| {
             rights
                 .iter()
-                .filter(|right| !current.get(group).is_some_and(|held| held.contains(*right)))
-                .map(|right| format!("{group}/{right}"))
+                .filter(move |right| !current.get(group).is_some_and(|held| held.contains(*right)))
+                .map(move |right| format!("{group}/{right}"))
         })
         .collect();
     let extra = current
@@ -141,8 +141,8 @@ fn differences(current: &Rights, wanted: &Rights) -> (Vec<String>, Vec<String>) 
         .flat_map(|(group, rights)| {
             rights
                 .iter()
-                .filter(|right| !wanted.get(group).is_some_and(|held| held.contains(*right)))
-                .map(|right| format!("{group}/{right}"))
+                .filter(move |right| !wanted.get(group).is_some_and(|held| held.contains(*right)))
+                .map(move |right| format!("{group}/{right}"))
         })
         .collect();
     (missing, extra)

@@ -118,7 +118,7 @@ fn response_headers(
 
 fn end_to_end(headers: &HeaderMap) -> Result<HeaderMap, ServerError> {
     let mut carried = headers.clone();
-    for connection in headers.get_all(header::CONNECTION).iter() {
+    for connection in &headers.get_all(header::CONNECTION) {
         for name in connection
             .to_str()
             .map_err(|error| refused(&format!("invalid connection header: {error}")))?
