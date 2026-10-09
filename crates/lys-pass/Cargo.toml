@@ -12,7 +12,7 @@ publish = false
 [dependencies]
 base64.workspace = true
 ed25519-dalek.workspace = true
-reqwest = { workspace = true, features = ["json", "rustls-tls"] }
+reqwest = { workspace = true, features = ["json", "rustls-tls"], optional = true }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
@@ -24,8 +24,15 @@ utoipa = { workspace = true, optional = true }
 # Derive the OpenAPI schemas of the shared contracts, for the Lys server
 # that serves them; products need not take utoipa.
 openapi = ["dep:utoipa"]
+# The live client (keyset fetch, token exchange, deliberate checks, drafts) and
+# the sign-in flow ask Lys over HTTP through reqwest, so hyper. Off by default:
+# a product that verifies passes against keys from its configuration takes
+# lys-pass without an HTTP stack in its graph.
+http = ["dep:reqwest"]
 
 [dev-dependencies]
+# The crate's own tests exercise the live client, so they build it with HTTP.
+lys-pass = { path = ".", features = ["http"] }
 tokio = { workspace = true, features = ["io-util"] }
 
 [lints]

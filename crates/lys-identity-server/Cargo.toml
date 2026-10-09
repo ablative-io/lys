@@ -36,6 +36,8 @@ tracing.workspace = true
 utoipa.workspace = true
 
 [dev-dependencies]
+# product_drafts drives lys-pass's live client against this server.
+lys-pass = { workspace = true, features = ["openapi", "http"] }
 allocation-counter = "=0.8.1"
 lys-identity = { workspace = true, features = ["test-support"] }
 lys-log-store = { workspace = true, features = ["flush-counts"] }

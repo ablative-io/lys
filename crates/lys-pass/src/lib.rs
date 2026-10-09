@@ -10,6 +10,7 @@ pub mod membership_conformance;
 pub mod membership_pages;
 pub mod refusal;
 pub mod rights;
+#[cfg(feature = "http")]
 pub mod signin;
 pub mod verify;
 
@@ -18,8 +19,10 @@ pub use refusal::Refusal;
 pub use rights::{Claims, Decision, Holder, Mode, Right, Target};
 pub use verify::{KeySet, VerifiedPass};
 
+#[cfg(feature = "http")]
 use reqwest::Client as Http;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "http")]
 use url::Url;
 
 /// A named refusal at a token, key or live-contract boundary.
@@ -58,9 +61,11 @@ pub enum Error {
     /// A boundary value violates the published contract.
     #[error("contract_refused: {0}")]
     Invalid(&'static str),
-    /// A live request failed before a contract answer was received.
+    /// A live request failed before a contract answer was received. The
+    /// transport's own error, typed by no HTTP stack, so the variant stands
+    /// whether or not the `http` feature is on.
     #[error("Lys could not be asked")]
-    Transport(#[source] Box<reqwest::Error>),
+    Transport(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// A live response is outside the permission contract.
     #[error("Lys could not be asked: {0}")]
     CannotAsk(&'static str),
@@ -110,12 +115,14 @@ impl Error {
 }
 
 /// A transport supplied by the product, holding no token or credential.
+#[cfg(feature = "http")]
 #[derive(Clone, Debug)]
 pub struct Client {
     http: Http,
     issuer: Url,
 }
 
+#[cfg(feature = "http")]
 impl Client {
     /// Use the product's configured transport and trusted Lys issuer.
     pub fn new(http: Http, mut issuer: Url) -> Result<Self, Error> {
@@ -226,6 +233,7 @@ impl Client {
 }
 
 /// The authorization-code exchange form of `request`.
+#[cfg(feature = "http")]
 fn code_form<'a>(request: &TokenRequest<'a>) -> Result<[(&'static str, &'a str); 6], Error> {
     if request.client_id.is_empty()
         || request.client_secret.is_empty()
@@ -246,6 +254,7 @@ fn code_form<'a>(request: &TokenRequest<'a>) -> Result<[(&'static str, &'a str);
 }
 
 /// `answer`, refused by name when it carries no grant binding.
+#[cfg(feature = "http")]
 fn bound(answer: TokenResponse) -> Result<TokenResponse, Error> {
     binding::required(answer.grant_binding.as_deref())?;
     Ok(answer)
@@ -254,6 +263,7 @@ fn bound(answer: TokenResponse) -> Result<TokenResponse, Error> {
 /// A token endpoint's answer: the pass, or the issuer's refusal by name. A
 /// refusal without a name is not a contract answer, and neither carries the
 /// response body into an error.
+#[cfg(feature = "http")]
 pub(crate) async fn read_token(response: reqwest::Response) -> Result<TokenResponse, Error> {
     if !response.status().is_success() {
         let refused: TokenRefusal = response
