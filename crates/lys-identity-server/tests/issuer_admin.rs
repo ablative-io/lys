@@ -26,8 +26,35 @@ struct Observed {
     authorization: Option<HeaderValue>,
 }
 
-async fn issuer(State(seen): State<Seen>, request: Request) -> Response {
+struct Fixture {
+    seen: Seen,
+    discovery_api: Mutex<Option<String>>,
+    http: reqwest::Client,
+}
+
+fn failed(message: String) -> Response {
+    let mut answer = Response::new(Body::from(message));
+    *answer.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+    answer
+}
+
+async fn issuer(State(fixture): State<Arc<Fixture>>, request: Request) -> Response {
     let path = request.uri().to_string();
+    if matches!(request.uri().path(), "/auth/v1/.well-known/openid-configuration" | "/auth/v1/jwks") {
+        let native = match fixture.discovery_api.lock() {
+            Ok(held) => held.clone(),
+            Err(error) => return failed(format!("discovery_lock_failed: {error}")),
+        };
+        let Some(native) = native else { return failed("discovery_api_absent".to_owned()); };
+        let Some(suffix) = path.strip_prefix("/auth/v1") else { return failed("discovery_path_invalid".to_owned()); };
+        return match fixture.http.get(format!("{native}{suffix}")).send().await {
+            Ok(answer) => {
+                let answer: axum::http::Response<reqwest::Body> = answer.into();
+                answer.map(Body::new)
+            }
+            Err(error) => failed(format!("discovery_forward_failed: {}", error.without_url())),
+        };
+    }
     let cookie = request.headers().get(header::COOKIE)
         .and_then(|value| value.to_str().ok()).unwrap_or_default().to_owned();
     let text = |name: &str| request.headers().get(name)
@@ -38,7 +65,7 @@ async fn issuer(State(seen): State<Seen>, request: Request) -> Response {
         forwarded_address: text("x-forwarded-for"),
         authorization: request.headers().get(header::AUTHORIZATION).cloned(),
     };
-    match seen.lock() {
+    match fixture.seen.lock() {
         Ok(mut held) => held.push(observed),
         Err(_) => {
             let mut answer = Response::new(Body::from("observer lock failed"));
@@ -66,16 +93,27 @@ async fn administrator_pages_and_native_callback_keep_issuer_authentication() ->
     let seen = Seen::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let address = format!("http://{}/auth/v1", listener.local_addr()?);
+    let fixture = Arc::new(Fixture {
+        seen: Arc::clone(&seen), discovery_api: Mutex::new(None),
+        http: reqwest::Client::builder().no_proxy().build()?,
+    });
+    let configuring = Arc::clone(&fixture);
     let (stop, stopped) = oneshot::channel::<()>();
     let task = tokio::spawn(axum::serve(listener, axum::Router::new()
-        .route("/auth/v1/{*path}", any(issuer)).with_state(Arc::clone(&seen)))
+        .route("/auth/v1/{*path}", any(issuer)).with_state(fixture))
         .with_graceful_shutdown(async move {
             if let Err(error) = stopped.await {
                 panic!("issuer_shutdown_signal_failed: {error}");
             }
         }).into_future());
     let started = Service::start_adjusted(GRANT_MODEL, None, None, None,
-        move |config| config.sign_in_api = Some(address), |_| Ok(())).await;
+        move |config| {
+            match configuring.discovery_api.lock() {
+                Ok(mut held) => *held = Some(config.sign_in_api()),
+                Err(error) => panic!("discovery_configuration_lock_failed: {error}"),
+            }
+            config.sign_in_api = Some(address);
+        }, |_| Ok(())).await;
     let (mut service, ()) = match started {
         Ok(service) => service,
         Err(error) => {

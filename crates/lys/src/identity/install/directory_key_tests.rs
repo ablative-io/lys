@@ -134,6 +134,7 @@ fn deployment(root: &std::path::Path, api: &str, token: &[u8]) -> TestResult<Dep
     let text = include_str!("../../../../../deploy/identity/config.example.toml");
     let mut config = DeploymentConfig::parse(text, root.to_path_buf())?;
     config.issuer.admin_url = api.to_owned();
+    private_files::ensure_dir(&config.state_dir())?;
     private_files::write(&config.state_dir().join(API_KEY_SECRET.file), &[b'A'; 64])?;
     private_files::write(&config.state_dir().join(server_config::PROVIDERS_KEY_FILE), token)?;
     Ok(config)
