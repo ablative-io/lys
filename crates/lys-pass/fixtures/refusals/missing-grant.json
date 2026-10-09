@@ -1,0 +1,1 @@
+{"refused":{"resource":"sample.file:restricted","action":"read","needed":{"app":"sample","kind":"sample.file","id":"restricted","action":"read"},"request":"https://issuer.example/#/requests"}}

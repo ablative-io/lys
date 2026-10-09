@@ -1,0 +1,1 @@
+{"refused":{"resource":"sample.file:held","action":"write","needed":{"app":"sample","kind":"sample.file","id":"held","action":"write"},"request":"https://issuer.example/#/requests"}}
