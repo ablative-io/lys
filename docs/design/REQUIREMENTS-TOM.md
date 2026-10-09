@@ -36,3 +36,4 @@ in use, forever basically."
 |---|---|---|---|---|
 | I1 | "Lys identity comes first" | 25 Sep 22:37 | DIRECTORY cluster | landed in part |
 | I2 | Other people and their AIs sign in to Cambium through Lys (see Cambium register P1–P3) | 8 Oct ~12:58 | Chippy readiness box (post 667aaee4) | in a box |
+| I3 | "This time next [week] we have to have onboarded the entire human team and their agents to lys, cambium, liminal, aion, and haematite, all working on different devices" (deadline Friday 16 Oct 2026, mid-afternoon AEDT) | 9 Oct 14:5x, by voice | ACCESS-001 to ACCESS-005, DEPLOY-001, the proxy; ledger ablative/docs/tracking/HANDOVER-2026-10-09.md | open |
