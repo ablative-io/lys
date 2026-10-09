@@ -69,6 +69,18 @@
 //! recover from by retrying — retrying is how two writers take turns
 //! overwriting each other's idea of the log. Reopen instead, and the position
 //! that writer took will be part of the tree.
+//!
+//! # A tail witness is not a store's business
+//!
+//! A [`LeafStore`] holds opaque bytes; it does not certify that a tail it
+//! served is every leaf any writer has appended. That evidence is a separate
+//! capability, [`TailWitnessProvider`](crate::witness::TailWitnessProvider),
+//! supplied explicitly by whoever builds the log's owner. There is no default
+//! method here that answers a witness and no downcast that discovers one: a
+//! store offered without the capability cannot produce a witness, and an
+//! owner asked for one names the capability's absence instead of inventing an
+//! empty tail. A per-act head lock is not that capability either; it is held
+//! for one act and says nothing about the writer after it.
 
 use crate::error::{StoreError, StoreResult};
 

@@ -137,12 +137,19 @@ impl GrantSetup {
             }
             None => Relationships::Memory(MemoryRelationships::default()),
         };
-        let mut grants = Grants::open(
+        // The tail capability is supplied explicitly: each acquisition opens
+        // the log read-only, after the owner's own open has migrated it, and
+        // certifies its current head, whichever writer moved it. No
+        // permission read uses it (DIRECTORY-090 R6).
+        let tail = lys_log_store::witness::FileTailProvider::at(&self.log_dir);
+        let mut grants = Grants::open_with_tail_provider(
             Box::new(move || FileLeafStore::open(&log_dir)),
             load_service_key(&self.key_file)?,
             relationships,
             model,
             root_authority,
+            lys_identity::restart::SNAPSHOT_EVERY,
+            Some(Arc::new(tail)),
         )?;
         report_startup(&mut grants, say);
         Ok(grants)

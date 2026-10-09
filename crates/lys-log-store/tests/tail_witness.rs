@@ -3,7 +3,9 @@
 use std::error::Error;
 use std::sync::{Arc, Barrier};
 
-use lys_log_store::witness::{FileTailProvider, TailWitnessProvider};
+use lys_log_store::witness::{
+    FaultTailProvider, FileTailProvider, TailFaultStep, TailWitnessProvider,
+};
 use lys_log_store::{FileLeafStore, LeafStore, Log, StoreError, StoreResult};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -208,7 +210,7 @@ fn a_tail_contains_every_index_and_rejects_each_changed_bound_or_leaf() -> TestR
     assert_eq!(witness.leaves[1].bytes, b"second tail event");
     assert_eq!(refused.len(), 9);
     for (result, called) in refused {
-        assert!(matches!(result, Err(StoreError::Corrupt { .. })));
+        assert!(matches!(result, Err(StoreError::TailWitnessRefused { .. })));
         assert!(!called);
     }
     Ok(())
@@ -277,7 +279,13 @@ fn a_reopened_provider_refuses_the_previous_owners_witness() -> TestResult {
         Ok((refused, called, accepted))
     })();
     let (refused, called, accepted) = finish(dir, result)?;
-    assert!(matches!(refused, Err(StoreError::Corrupt { .. })));
+    assert!(matches!(
+        refused,
+        Err(StoreError::TailWitnessRefused {
+            reason: "tail witness belongs to a different reading owner",
+            ..
+        })
+    ));
     assert!(!called);
     accepted?;
     Ok(())
@@ -328,4 +336,161 @@ fn current_head_reading_performs_no_physical_flush() -> TestResult {
     assert_eq!(read?, (0, None));
     assert_eq!(after, before);
     Ok(())
+}
+
+fn sentinel(context: &str) -> StoreError {
+    StoreError::Io {
+        context: context.to_owned(),
+        source: std::io::Error::other("tail-fixture-sentinel"),
+    }
+}
+
+#[test]
+fn a_provider_made_before_the_store_and_two_writers_certifies_their_current_head() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let path = dir.path().join("log");
+        let provider = FileTailProvider::at(&path);
+        drop(FileLeafStore::create(&path, "example.test/tail-current")?);
+        let settled = lys_log_store::Frontier::new();
+        let mut first = Log::open(FileLeafStore::open(&path)?)?;
+        first.append(b"first handle")?;
+        drop(first);
+        let mut second = Log::open(FileLeafStore::open(&path)?)?;
+        second.append(b"second handle")?;
+        drop(second);
+        let witness = provider.acquire(&settled)?;
+        let mut seen = Vec::new();
+        provider.verify(&witness, &settled, &mut |certified| {
+            seen.extend(certified.leaves.iter().map(|leaf| leaf.bytes.clone()));
+            Ok(())
+        })?;
+        drop(provider);
+        Ok((witness, seen))
+    })();
+    let (witness, seen) = finish(dir, result)?;
+    assert_eq!(witness.upper.tree_size, 2);
+    assert_eq!(
+        witness
+            .leaves
+            .iter()
+            .map(|leaf| leaf.index)
+            .collect::<Vec<_>>(),
+        [0, 1]
+    );
+    assert_eq!(seen, [b"first handle".to_vec(), b"second handle".to_vec()]);
+    Ok(())
+}
+
+#[test]
+fn a_faulted_acquisition_keeps_its_original_error_and_invents_no_tail() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let mut log = Log::open(FileLeafStore::create(
+            dir.path(),
+            "example.test/tail-fault-acquire",
+        )?)?;
+        log.append(b"committed")?;
+        drop(log);
+        let (provider, faults) = FaultTailProvider::new(FileTailProvider::new(
+            FileLeafStore::open_read_only(dir.path())?,
+        ));
+        let settled = lys_log_store::Frontier::new();
+        faults.refuse(TailFaultStep::Acquire, || sentinel("tail acquisition"));
+        let refused = provider.acquire(&settled);
+        faults.clear(TailFaultStep::Acquire);
+        let witness = provider.acquire(&settled)?;
+        let mut readings = 0;
+        provider.verify(&witness, &settled, &mut |_| {
+            readings += 1;
+            Ok(())
+        })?;
+        let counts = (
+            faults.acquisitions(),
+            faults.verifications(),
+            faults.readings(),
+        );
+        drop(provider);
+        Ok((refused, witness, readings, counts))
+    })();
+    let (refused, witness, readings, counts) = finish(dir, result)?;
+    assert!(matches!(
+        refused,
+        Err(StoreError::Io { ref context, .. }) if context == "tail acquisition"
+    ));
+    assert_eq!(witness.leaves.len(), 1);
+    assert_eq!(readings, 1);
+    assert_eq!(counts, (2, 1, 1));
+    Ok(())
+}
+
+#[test]
+fn a_faulted_verification_never_reaches_its_reading() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let mut log = Log::open(FileLeafStore::create(
+            dir.path(),
+            "example.test/tail-fault-verify",
+        )?)?;
+        log.append(b"committed")?;
+        drop(log);
+        let (provider, faults) = FaultTailProvider::new(FileTailProvider::new(
+            FileLeafStore::open_read_only(dir.path())?,
+        ));
+        let settled = lys_log_store::Frontier::new();
+        let witness = provider.acquire(&settled)?;
+        faults.refuse(TailFaultStep::Verify, || sentinel("tail verification"));
+        let mut called = false;
+        let refused = provider.verify(&witness, &settled, &mut |_| {
+            called = true;
+            Ok(())
+        });
+        faults.clear(TailFaultStep::Verify);
+        let accepted = provider.verify(&witness, &settled, &mut |_| Ok(()));
+        let readings = faults.readings();
+        drop(provider);
+        Ok((refused, called, accepted, readings))
+    })();
+    let (refused, called, accepted, readings) = finish(dir, result)?;
+    assert!(matches!(
+        refused,
+        Err(StoreError::Io { ref context, .. }) if context == "tail verification"
+    ));
+    assert!(!called);
+    accepted?;
+    assert_eq!(readings, 1);
+    Ok(())
+}
+
+#[test]
+fn a_failed_real_tail_read_returns_the_store_refusal_not_an_empty_tail() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let result = (|| -> TestResult<_> {
+        let mut log = Log::open(FileLeafStore::create(
+            dir.path(),
+            "example.test/tail-read-failure",
+        )?)?;
+        log.append(b"committed")?;
+        drop(log);
+        let provider = FileTailProvider::new(FileLeafStore::open_read_only(dir.path())?);
+        std::fs::remove_file(
+            dir.path()
+                .join("leaves")
+                .join("segments")
+                .join(format!("{:020}", 0)),
+        )?;
+        let refused = provider.acquire(&lys_log_store::Frontier::new());
+        let direct = FileLeafStore::open_read_only(dir.path()).err();
+        drop(provider);
+        Ok((refused, direct))
+    })();
+    let (refused, direct) = finish(dir, result)?;
+    let direct = direct.ok_or("the damaged store still opened")?;
+    match refused {
+        Ok(witness) => Err(format!("a damaged store produced a tail: {witness:?}").into()),
+        Err(error) => {
+            assert_eq!(error.to_string(), direct.to_string());
+            Ok(())
+        }
+    }
 }

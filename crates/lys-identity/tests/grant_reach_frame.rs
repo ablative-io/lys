@@ -13,7 +13,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use lys_identity::grants::{
     Action, DelegateRequest, ExerciseRequest, GrantError, GrantId, MemoryRelationships, PassOn,
-    RecipientKind, Relation, Relationship, RelationshipStore, Resource, RootRequest, Route, Window,
+    RecipientKind, Relation, Relationship, RelationshipStore, Resource, RevokeRequest, RootRequest,
+    Route, Window,
 };
 use lys_identity::log::Reopen;
 use lys_identity::{IdentityId, OperationId};
@@ -22,11 +23,13 @@ use support::{T0, World, actions, alpha, pass};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-/// An engine that counts relationship reads and names an injected read failure.
+/// An engine that counts relationship reads and names an injected read
+/// failure, and while `paused` refuses every write by name.
 #[derive(Debug, Clone, Default)]
 struct Measured {
     inner: MemoryRelationships,
     broken: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
     reads: Arc<AtomicUsize>,
 }
 
@@ -45,6 +48,11 @@ impl RelationshipStore for Measured {
         touch: &[Relationship],
         delete: &[Relationship],
     ) -> Result<(), GrantError> {
+        if self.paused.load(Ordering::SeqCst) {
+            return Err(GrantError::PermissionEngineUnavailable {
+                reason: "projection paused".to_owned(),
+            });
+        }
         self.inner.write(revision, touch, delete)
     }
 
@@ -377,5 +385,110 @@ fn an_engine_whose_revision_stands_still_after_a_write_is_named_after_one_write(
     engine.standing.store(false, Ordering::SeqCst);
     let projected = world.grants.project()?;
     assert!(projected > 0, "an engine that moves again is caught up");
+    Ok(())
+}
+
+#[test]
+fn control_1_a_degraded_frame_refuses_a_revoked_ancestor_and_a_spent_hop_and_keeps_a_proved_chain()
+-> TestResult {
+    let engine = Measured::default();
+    let mut world = World::with(
+        Box::new(|path: &Path| -> Reopen<FileLeafStore> {
+            let path = path.to_owned();
+            Box::new(move || FileLeafStore::open(&path))
+        }),
+        engine.clone(),
+    )?;
+    let (dana, tom, tom_agent, lee) = (
+        IdentityId::Person(world.dana),
+        IdentityId::Person(world.tom),
+        IdentityId::Agent(world.tom_agent),
+        IdentityId::Person(world.lee),
+    );
+    let root = world.root(
+        world.dana,
+        "kite",
+        pass(&["read"], &[RecipientKind::Person, RecipientKind::Agent])?,
+        None,
+    )?;
+    let first = world.request(
+        dana,
+        root,
+        tom,
+        "tern",
+        pass(&["read"], &[RecipientKind::Agent])?,
+        None,
+    )?;
+    let first = world.delegate(&first)?.event.grant();
+    let second = world.request(tom, first, tom_agent, "tern", PassOn::UseOnly, None)?;
+    world.delegate(&second)?;
+    let once_root = world.root(
+        world.lee,
+        "kite",
+        pass(&["read"], &[RecipientKind::Person])?,
+        None,
+    )?;
+    let admin = IdentityId::Person(world.admin);
+    let once = world.request(lee, once_root, admin, "tern", PassOn::UseOnly, None)?;
+    let directory = world.directory.projection()?;
+    let now = world.now;
+    let once = world
+        .grants
+        .delegate_once(directory, &once, now)?
+        .event
+        .grant();
+    let independent = world.root(world.tom, "heron", PassOn::UseOnly, None)?;
+    engine.paused.store(true, Ordering::SeqCst);
+    let revoked = RevokeRequest {
+        operation: OperationId::generate()?,
+        caller: IdentityId::Person(world.admin),
+        route: Route::Api,
+        grant: root,
+        reason: "the root authority withdrew it".to_owned(),
+    };
+    let Err(GrantError::ProjectionPending { .. }) = world.grants.revoke(&revoked, now) else {
+        return Err("the ancestor revoke commits while its projection fails".into());
+    };
+    let read = |caller| -> Result<ExerciseRequest, GrantError> {
+        Ok(ExerciseRequest {
+            caller,
+            route: Route::Browser,
+            resource: alpha()?,
+            action: Action::new("read")?,
+        })
+    };
+    let spent = world.exercise(admin, "read", Route::Api)?;
+    assert_eq!(spent.grant, once, "the one-time hop is spent by its use");
+    let events = world.events();
+    let directory = world.directory.projection()?;
+    let frame = world.grants.frame(directory, None)?;
+    let shared = frame
+        .degradation()
+        .ok_or("the paused projection degrades the frame")?;
+    assert_eq!(shared.revision(), frame.revision());
+    assert_eq!(
+        world.grants.explain_in(&frame, &read(tom_agent)?, now),
+        Err(GrantError::Revoked {
+            grant: root.to_string()
+        }),
+        "the revoked ancestor refuses through the degraded frame"
+    );
+    assert_eq!(
+        world.grants.explain_in(&frame, &read(admin)?, now),
+        Err(GrantError::Revoked {
+            grant: once.to_string()
+        }),
+        "the spent hop refuses through the degraded frame"
+    );
+    let proved = world.grants.explain_in(&frame, &read(tom)?, now)?;
+    assert_eq!(proved.grant, independent, "the independent chain is proved");
+    assert!(
+        proved
+            .degraded
+            .as_ref()
+            .is_some_and(|marker| Arc::ptr_eq(marker, shared)),
+        "the permit carries the frame's one shared marker"
+    );
+    assert_eq!(world.events(), events, "the frame records nothing");
     Ok(())
 }

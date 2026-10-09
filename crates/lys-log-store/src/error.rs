@@ -418,6 +418,18 @@ pub enum StoreError {
         /// What did not hold.
         reason: String,
     },
+    /// A tail witness offered for verification is not the reading its
+    /// provider certified: it names another log or reading owner, does not
+    /// begin at the trusted frontier, does not end at the certified head, or
+    /// its leaves do not run contiguously from the one to the other. The
+    /// store itself is not judged: the refused value is the witness.
+    #[error("tail witness refused by the log store at {}: {reason}", path.display())]
+    TailWitnessRefused {
+        /// The store whose provider refused the witness.
+        path: PathBuf,
+        /// The bound, owner or leaf that did not hold.
+        reason: &'static str,
+    },
 }
 
 /// Convenience alias for `Result<T, StoreError>`.

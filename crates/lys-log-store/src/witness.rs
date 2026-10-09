@@ -1,7 +1,8 @@
 //! Ephemeral, bounded tail evidence supplied by an explicit coherent provider.
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use crate::{Frontier, PinnedRoot, StoreError, StoreResult};
 
@@ -96,24 +97,24 @@ pub(super) fn validate(
     upper: PinnedRoot,
     path: &Path,
 ) -> StoreResult<()> {
-    let corrupt = |reason: &str| StoreError::Corrupt {
+    let refused = |reason: &'static str| StoreError::TailWitnessRefused {
         path: path.to_path_buf(),
-        reason: reason.to_owned(),
+        reason,
     };
     let lower = PinnedRoot {
         tree_size: settled.size(),
         root: settled.root(),
     };
     if witness.origin != origin {
-        return Err(corrupt("tail witness names a different log origin"));
+        return Err(refused("tail witness names a different log origin"));
     }
     if witness.lower != lower {
-        return Err(corrupt(
+        return Err(refused(
             "tail witness does not begin at the trusted settled frontier",
         ));
     }
     if witness.upper != upper || upper.tree_size < lower.tree_size {
-        return Err(corrupt(
+        return Err(refused(
             "tail witness does not end at the certified current frontier",
         ));
     }
@@ -124,23 +125,160 @@ pub(super) fn validate(
         }
     })?;
     if count != upper.tree_size - lower.tree_size {
-        return Err(corrupt(
+        return Err(refused(
             "tail witness does not contain the entire contiguous range",
         ));
     }
     let mut extended = settled.clone();
     for (index, leaf) in (lower.tree_size..upper.tree_size).zip(&witness.leaves) {
         if leaf.index != index {
-            return Err(corrupt(
+            return Err(refused(
                 "tail witness indexes are omitted, duplicated or reordered",
             ));
         }
         extended.push(&leaf.bytes);
     }
     if extended.size() != upper.tree_size || extended.root() != upper.root {
-        return Err(corrupt(
+        return Err(refused(
             "tail witness leaves do not extend to the certified root",
         ));
     }
     Ok(())
+}
+
+/// The provider step an instance-private fault refuses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TailFaultStep {
+    /// [`TailWitnessProvider::acquire`].
+    Acquire,
+    /// [`TailWitnessProvider::verify`], before its reading is called.
+    Verify,
+}
+
+type MakeError = Box<dyn Fn() -> StoreError + Send + Sync>;
+
+/// The faults and counts of one [`FaultTailProvider`], shared only with the
+/// party that made it: no process-wide switch reaches another instance.
+#[derive(Default)]
+pub struct TailFaults {
+    acquire: Mutex<Option<MakeError>>,
+    verify: Mutex<Option<MakeError>>,
+    acquisitions: AtomicU64,
+    verifications: AtomicU64,
+    readings: AtomicU64,
+}
+
+impl std::fmt::Debug for TailFaults {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TailFaults")
+            .field("acquisitions", &self.acquisitions())
+            .field("verifications", &self.verifications())
+            .field("readings", &self.readings())
+            .finish_non_exhaustive()
+    }
+}
+
+impl TailFaults {
+    fn slot(&self, step: TailFaultStep) -> &Mutex<Option<MakeError>> {
+        match step {
+            TailFaultStep::Acquire => &self.acquire,
+            TailFaultStep::Verify => &self.verify,
+        }
+    }
+
+    /// Refuse every later call of `step` with the error `make` builds, until
+    /// [`TailFaults::clear`]. The refusal is returned as built, unchanged.
+    pub fn refuse(
+        &self,
+        step: TailFaultStep,
+        make: impl Fn() -> StoreError + Send + Sync + 'static,
+    ) {
+        *self
+            .slot(step)
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(Box::new(make));
+    }
+
+    /// Let `step` reach the wrapped provider again.
+    pub fn clear(&self, step: TailFaultStep) {
+        *self
+            .slot(step)
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = None;
+    }
+
+    fn armed(&self, step: TailFaultStep) -> Option<StoreError> {
+        self.slot(step)
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .as_ref()
+            .map(|make| make())
+    }
+
+    /// Acquisitions asked of the provider, refused or not.
+    #[must_use]
+    pub fn acquisitions(&self) -> u64 {
+        self.acquisitions.load(Ordering::SeqCst)
+    }
+
+    /// Verifications asked of the provider, refused or not.
+    #[must_use]
+    pub fn verifications(&self) -> u64 {
+        self.verifications.load(Ordering::SeqCst)
+    }
+
+    /// Readings the wrapped provider certified and handed on.
+    #[must_use]
+    pub fn readings(&self) -> u64 {
+        self.readings.load(Ordering::SeqCst)
+    }
+}
+
+/// A complete tail capability whose every step can be refused by its own
+/// instance's faults. Unrefused, each step is the wrapped provider's own.
+pub struct FaultTailProvider<P> {
+    inner: P,
+    faults: Arc<TailFaults>,
+}
+
+impl<P: TailWitnessProvider> FaultTailProvider<P> {
+    /// Wrap `inner`, answering the faults only this instance obeys.
+    #[must_use]
+    pub fn new(inner: P) -> (Self, Arc<TailFaults>) {
+        let faults = Arc::new(TailFaults::default());
+        (
+            Self {
+                inner,
+                faults: Arc::clone(&faults),
+            },
+            faults,
+        )
+    }
+}
+
+impl<P: TailWitnessProvider> TailWitnessProvider for FaultTailProvider<P> {
+    fn acquire(&self, settled: &Frontier) -> StoreResult<TailWitness> {
+        self.faults.acquisitions.fetch_add(1, Ordering::SeqCst);
+        if let Some(error) = self.faults.armed(TailFaultStep::Acquire) {
+            return Err(error);
+        }
+        self.inner.acquire(settled)
+    }
+
+    fn verify(
+        &self,
+        witness: &TailWitness,
+        settled: &Frontier,
+        reading: &mut dyn FnMut(&TailWitness) -> StoreResult<()>,
+    ) -> StoreResult<()> {
+        self.faults.verifications.fetch_add(1, Ordering::SeqCst);
+        if let Some(error) = self.faults.armed(TailFaultStep::Verify) {
+            return Err(error);
+        }
+        self.inner.verify(witness, settled, &mut |certified| {
+            self.faults.readings.fetch_add(1, Ordering::SeqCst);
+            reading(certified)
+        })
+    }
 }

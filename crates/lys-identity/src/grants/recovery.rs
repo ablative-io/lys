@@ -119,8 +119,34 @@ impl<S: LeafStore> GrantLedger<S> {
             })
     }
 
+    /// Authenticate `witness` from owned in-memory inputs alone: this owner's
+    /// trusted frontier, log origin and service key, every index, every
+    /// event's signature and the certified root. It does not certify that the
+    /// upper bound is still the current head; [`GrantLedger::with_verified_tail`]
+    /// does that.
+    ///
+    /// # Errors
+    /// Names the bound, index, signature or root that does not hold.
+    pub fn authenticate_tail(
+        &self,
+        witness: &TailWitness,
+    ) -> Result<Vec<SignedGrantEvent>, GrantError> {
+        super::tail_witness::authenticate(
+            witness,
+            self.ledger.trusted_frontier(),
+            self.ledger.origin(),
+            &self.service_key,
+        )
+    }
+
+    /// The size of the frontier this owner has verified and handed on.
+    pub(super) fn trusted_size(&self) -> u64 {
+        self.ledger.trusted_frontier().size()
+    }
+
     /// Authenticate every tail event and read it within a fresh provider callback.
-    /// This supplies signed events, without asserting their authority effects.
+    /// This supplies the signed events; their authority effects are named by
+    /// [`Grants::tail_authority`](super::Grants::tail_authority).
     /// The callback must not append through the same provider's head lock.
     ///
     /// # Errors

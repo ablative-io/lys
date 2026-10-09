@@ -63,6 +63,7 @@ pub use settlement::ProjectionDegraded;
 pub use shipped::{
     SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, machine_may_hold, shipped_model,
 };
+pub use tail_witness::{TailAuthority, TailBearing, TailEffect, TailEffectAt};
 pub use types::{
     Action, Grant, GrantId, GrantParts, Mode, PassOn, RecipientKind, Relation, Resource, Source,
     Window,
