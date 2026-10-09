@@ -11,6 +11,7 @@ fn target(out: &mut Vec<u8>, value: IdentityId) {
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
         IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
         IdentityId::Connector(id) => (wire::CONNECTOR, *id.as_bytes()),
+        IdentityId::Machine(id) => (wire::MACHINE, *id.as_bytes()),
     };
     map(out, 2);
     uint(out, 1);

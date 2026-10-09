@@ -129,6 +129,7 @@ pub(crate) fn identity(value: IdentityId) -> Value {
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
         IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
         IdentityId::Connector(id) => (wire::CONNECTOR, *id.as_bytes()),
+        IdentityId::Machine(id) => (wire::MACHINE, *id.as_bytes()),
     };
     array(vec![uint(kind), bytes(&id)])
 }
@@ -144,8 +145,9 @@ pub(crate) fn read_identity(value: Value) -> Result<IdentityId, Unreadable> {
             crate::ServiceAccountId::from_bytes(id),
         )),
         wire::CONNECTOR => Ok(IdentityId::Connector(crate::ConnectorId::from_bytes(id))),
+        wire::MACHINE => Ok(IdentityId::Machine(crate::MachineId::from_bytes(id))),
         code => Err(format!(
-            "identity kind {code} is not a person, an agent, a service account or a connector"
+            "identity kind {code} is not a person, an agent, a service account, a connector or a machine"
         )),
     }
 }
@@ -213,11 +215,20 @@ mod tests {
             "connector-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
         );
         assert_eq!(super::identity(read), written);
-        let refused = super::read_identity(super::array(vec![uint(5), bytes(&[0x5a; 16])]));
+        Ok(())
+    }
+
+    #[test]
+    fn a_machine_identity_is_kind_five_and_an_unknown_kind_is_named_truly() -> Result<(), String> {
+        let written = super::array(vec![uint(5), bytes(&[0x5a; 16])]);
+        let read = super::read_identity(written.clone())?;
+        assert_eq!(read.to_string(), "machine-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a");
+        assert_eq!(super::identity(read), written);
+        let refused = super::read_identity(super::array(vec![uint(6), bytes(&[0x5a; 16])]));
         assert_eq!(
             refused,
             Err(
-                "identity kind 5 is not a person, an agent, a service account or a connector"
+                "identity kind 6 is not a person, an agent, a service account, a connector or a machine"
                     .to_owned()
             )
         );

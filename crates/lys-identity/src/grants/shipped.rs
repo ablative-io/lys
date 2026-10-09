@@ -199,6 +199,16 @@ pub fn agent_may_hold(kind: &str, action: &str) -> bool {
     !kind.contains('.') && AGENT_MAY_HOLD.contains(&action)
 }
 
+/// Whether a machine may hold `action` on an object of `kind` (ACCESS-005
+/// R1). A machine never holds a responsibility a person keeps: on Lys's own
+/// kinds, every act in [`WITHHELD_FROM_AGENTS`]. An approved app's kind,
+/// `{app}.{kind}`, is the app's own, and its acts, such as a liminal link's
+/// export and import, are a machine's to hold when granted.
+#[must_use]
+pub fn machine_may_hold(kind: &str, action: &str) -> bool {
+    kind.contains('.') || !WITHHELD_FROM_AGENTS.contains(&action)
+}
+
 /// Plain sentences for shipped actions, served separately from the stored model.
 pub const ACTION_SENTENCES: &[(&str, &str)] = &[
     ("view", "View this resource"),

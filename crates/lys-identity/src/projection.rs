@@ -247,7 +247,8 @@ impl Projection {
                     IdentityId::Agent(_) => true,
                     IdentityId::Person(_)
                     | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_) => false,
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_) => false,
                 };
                 if !agent || held.1.responsible != Some(person) {
                     return Err(IdentityError::LogUnavailable {
@@ -398,7 +399,8 @@ impl Projection {
                     IdentityId::Person(person) => person,
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_) => {
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_) => {
                         return Err(IdentityError::ChangeMismatch {
                             reason: "setup names a person",
                         });
@@ -458,6 +460,11 @@ impl Projection {
                             reason: "a connector never acquires a sign-in binding",
                         });
                     }
+                    IdentityId::Machine(_) => {
+                        return Err(IdentityError::ChangeMismatch {
+                            reason: "a machine never acquires a sign-in binding",
+                        });
+                    }
                 }
             }
             Change::Transition { to, .. } => {
@@ -478,7 +485,10 @@ impl Projection {
                 Arc::make_mut(&mut self.people).insert(identity.to_string(), person);
             }
             // Only a person is indexed by name.
-            IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {}
+            IdentityId::Agent(_)
+            | IdentityId::ServiceAccount(_)
+            | IdentityId::Connector(_)
+            | IdentityId::Machine(_) => {}
         }
         Ok(())
     }

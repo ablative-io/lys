@@ -134,6 +134,9 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
                 IdentityId::Connector(_) => {
                     return Err("a connector cannot hold login bindings".to_owned());
                 }
+                IdentityId::Machine(_) => {
+                    return Err("a machine cannot hold login bindings".to_owned());
+                }
             };
             if taken {
                 return Err(format!("a login is bound twice, the second time to {id}"));
@@ -145,7 +148,10 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
             }
             // Only a person is indexed by name; the reporting rebuild below
             // refuses a kind the directory never stores.
-            IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {}
+            IdentityId::Agent(_)
+            | IdentityId::ServiceAccount(_)
+            | IdentityId::Connector(_)
+            | IdentityId::Machine(_) => {}
         }
         if Arc::make_mut(&mut projection.records)
             .insert(id, record)
@@ -194,6 +200,9 @@ pub(crate) fn migrate_v2(value: Value) -> Result<Projection, Unreadable> {
             }
             IdentityId::Connector(_) => {
                 return Err("a connector is not a stored directory identity".to_owned());
+            }
+            IdentityId::Machine(_) => {
+                return Err("a machine is not a stored directory identity".to_owned());
             }
         };
         let mut fields = Vec::from(fields);

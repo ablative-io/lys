@@ -11,8 +11,9 @@
 //! the protected header; an event naming a service account is version 2 under
 //! [`SERVICE_ACCOUNT_ENVELOPE`], and one naming a connector version 3 under
 //! [`CONNECTOR_ENVELOPE`]; one issuing a held grant is version 4 under
-//! [`HELD_MODE_ENVELOPE`], and one issuing a grant that names a role version
-//! 5 under [`ROLE_ENVELOPE`], so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
+//! [`HELD_MODE_ENVELOPE`], one issuing a grant that names a role version
+//! 5 under [`ROLE_ENVELOPE`], and one naming a machine version 6 under
+//! [`MACHINE_ENVELOPE`] (ACCESS-005 R1), so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
 //! operation id, `3` caller, `4` recorded-at, `5` change kind (`1` issue, `2`
 //! revoke, `3` use) and `6` the change: the grant's own map; for a revocation
 //! `1` grant id and `2` reason; for a use `1` grant id and `2` route (`1`
@@ -48,6 +49,9 @@ pub const HELD_MODE_ENVELOPE: &str = "application/vnd.lys.grant-event.v4+cbor";
 /// Separate signed envelope for events issuing a grant that names a role
 /// (ACCESS-004 R1).
 pub const ROLE_ENVELOPE: &str = "application/vnd.lys.grant-event.v5+cbor";
+/// Separate signed envelope for grant events that name a machine, as
+/// caller, holder, issuer or a kind a grant may be passed on to.
+pub const MACHINE_ENVELOPE: &str = "application/vnd.lys.grant-event.v6+cbor";
 
 const COSE_SIGN1_TAG: u64 = 18;
 const SIGNATURE_LEN: usize = 64;
@@ -61,12 +65,13 @@ fn kind_envelope(kind: super::types::RecipientKind) -> (u64, &'static str) {
         RecipientKind::Person | RecipientKind::Agent => (GRANT_EVENT_VERSION, GRANT_ENVELOPE),
         RecipientKind::ServiceAccount => (2, SERVICE_ACCOUNT_ENVELOPE),
         RecipientKind::Connector => (3, CONNECTOR_ENVELOPE),
+        RecipientKind::Machine => (6, MACHINE_ENVELOPE),
     }
 }
 
 /// Whether the grants read events of `version`.
 fn version_read(version: u64) -> bool {
-    matches!(version, GRANT_EVENT_VERSION | 2 | 3 | 4 | 5)
+    matches!(version, GRANT_EVENT_VERSION | 2 | 3 | 4 | 5 | 6)
 }
 
 /// One change to the grants.
@@ -102,9 +107,9 @@ pub struct GrantEvent {
 impl GrantEvent {
     /// Version two adds service-account principals. Events using only the
     /// original principal and recipient kinds retain their original bytes.
-    /// Version three adds the connector, four a held mode and five a grant
-    /// naming a role. Each event
-    /// takes the version of the newest kind or mode it names.
+    /// Version three adds the connector, four a held mode, five a grant
+    /// naming a role and six the machine. Each event takes the version of
+    /// the newest kind or mode it names.
     pub fn version(&self) -> u64 {
         self.newest().0
     }
@@ -462,6 +467,7 @@ pub fn verify_grant_event(
         CONNECTOR_ENVELOPE,
         HELD_MODE_ENVELOPE,
         ROLE_ENVELOPE,
+        MACHINE_ENVELOPE,
     ]
     .contains(&content_type.as_str())
     {

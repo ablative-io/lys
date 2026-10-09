@@ -1,4 +1,5 @@
-//! Enduring identifiers for people, agents, service accounts and connectors.
+//! Enduring identifiers for people, agents, service accounts, connectors and
+//! machines.
 //!
 //! An identifier is sixteen bytes drawn from the operating system's secure
 //! random source when the identity is registered, and it never changes. It is
@@ -150,6 +151,48 @@ impl FromStr for ConnectorId {
     }
 }
 
+/// A machine's identity (ACCESS-005 R1, ADR-136): a computer that joined
+/// with a one-use connection code and its own key. Its id is made once, from
+/// the secure random source, when the join is admitted, and stored with the
+/// join; its text form is `machine-` and 32 hex digits. It answers to the
+/// administrator who asked for the code, and is never a person, an agent, a
+/// service account or a connector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MachineId([u8; ID_LEN]);
+
+impl MachineId {
+    const PREFIX: &'static str = "machine-";
+
+    /// A new identifier from the secure random source.
+    pub fn generate() -> Result<Self, IdentityError> {
+        random_bytes().map(Self)
+    }
+
+    /// The identifier these bytes are, as read back from a signed event.
+    pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
+        Self(bytes)
+    }
+
+    /// The identifier's bytes, as a signed event carries them.
+    pub fn as_bytes(&self) -> &[u8; ID_LEN] {
+        &self.0
+    }
+}
+
+impl fmt::Display for MachineId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", Self::PREFIX, to_hex(&self.0))
+    }
+}
+
+impl FromStr for MachineId {
+    type Err = IdentityError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        parse_prefixed(text, Self::PREFIX, "machine").map(Self)
+    }
+}
+
 impl PersonId {
     const PREFIX: &'static str = "person-";
 
@@ -216,8 +259,8 @@ impl FromStr for AgentId {
     }
 }
 
-/// An identity Lys knows: a person, an agent, a service account or an
-/// approved app's connector.
+/// An identity Lys knows: a person, an agent, a service account, an
+/// approved app's connector or a machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum IdentityId {
     /// A person.
@@ -229,6 +272,9 @@ pub enum IdentityId {
     /// An approved app's connector, answering to the administrator who
     /// approved the app.
     Connector(ConnectorId),
+    /// A machine that joined with a connection code, answering to the
+    /// administrator who asked for the code.
+    Machine(MachineId),
 }
 
 impl fmt::Display for IdentityId {
@@ -238,6 +284,7 @@ impl fmt::Display for IdentityId {
             Self::Agent(id) => id.fmt(f),
             Self::ServiceAccount(id) => id.fmt(f),
             Self::Connector(id) => id.fmt(f),
+            Self::Machine(id) => id.fmt(f),
         }
     }
 }

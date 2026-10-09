@@ -223,6 +223,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
         IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
         IdentityId::Connector(id) => (wire::CONNECTOR, *id.as_bytes()),
+        IdentityId::Machine(id) => (wire::MACHINE, *id.as_bytes()),
     };
     uint(&mut out, kind);
     uint(&mut out, 2);

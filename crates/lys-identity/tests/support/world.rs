@@ -237,7 +237,10 @@ impl<S: LeafStore, R: RelationshipStore> World<S, R> {
     ) -> Result<DelegateRequest, Box<dyn Error>> {
         let responsible = match recipient {
             IdentityId::Person(person) => person,
-            IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => self
+            IdentityId::Agent(_)
+            | IdentityId::ServiceAccount(_)
+            | IdentityId::Connector(_)
+            | IdentityId::Machine(_) => self
                 .directory
                 .record(recipient)?
                 .and_then(|record| record.responsible())

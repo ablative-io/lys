@@ -208,6 +208,16 @@ pub enum GrantError {
         /// Its state.
         state: LifecycleState,
     },
+    /// A machine was to issue, pass on or approve, or to be given a
+    /// responsibility a person keeps (ACCESS-005 R1). A machine exercises
+    /// what it is given and never gives it on.
+    #[error("MachineRefused: {machine}: a machine never {act}")]
+    MachineRefused {
+        /// The machine, or the grant whose recipients name the machine kind.
+        machine: String,
+        /// What it may never do, in words.
+        act: String,
+    },
     /// A grant on the path was revoked.
     #[error("Revoked: {grant} was revoked, and nothing derived from it is effective")]
     Revoked {

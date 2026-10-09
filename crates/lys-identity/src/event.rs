@@ -182,7 +182,7 @@ pub struct IdentityEvent {
 fn reporting_target(target: IdentityId) -> bool {
     match target {
         IdentityId::Person(_) | IdentityId::Agent(_) => true,
-        IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => false,
+        IdentityId::ServiceAccount(_) | IdentityId::Connector(_) | IdentityId::Machine(_) => false,
     }
 }
 
@@ -210,6 +210,11 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
         IdentityId::Connector(_) => {
             return Err(IdentityError::ChangeMismatch {
                 reason: "a connector is recorded with its app's approval in the apps log",
+            });
+        }
+        IdentityId::Machine(_) => {
+            return Err(IdentityError::ChangeMismatch {
+                reason: "a machine is recorded with its join in the connection codes",
             });
         }
     }
@@ -329,6 +334,9 @@ pub(crate) mod wire {
     pub(crate) const SERVICE_ACCOUNT: u64 = 3;
     /// An approved app's connector, recorded in the apps log.
     pub(crate) const CONNECTOR: u64 = 4;
+    /// A computer that joined with a connection code (ACCESS-005 R1),
+    /// recorded with its join.
+    pub(crate) const MACHINE: u64 = 5;
 
     /// A person is registered.
     pub(crate) const REGISTER_PERSON: u64 = 1;

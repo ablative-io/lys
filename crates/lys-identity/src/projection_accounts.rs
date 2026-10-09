@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 use super::{Projection, Record};
 use crate::{
-    ConnectorId, IdentityId, LifecycleState, LoginBinding, PersonId, Profile, ServiceAccountId,
+    ConnectorId, IdentityId, LifecycleState, LoginBinding, MachineId, PersonId, Profile,
+    ServiceAccountId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,8 +16,8 @@ struct Account {
     states: [Record; 4],
 }
 
-/// The separately folded service-account and connector records used for
-/// grant decisions.
+/// The separately folded service-account, connector and machine records used
+/// for grant decisions.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Accounts {
     records: BTreeMap<IdentityId, Arc<Account>>,
@@ -60,6 +61,23 @@ impl Accounts {
             retired,
             approved_by,
         );
+    }
+
+    /// Insert or update a machine, read from the connection codes, answering
+    /// to `issuer`, the administrator who asked for the code it joined with
+    /// (ACCESS-005 R1). The machine is active while its issuer is and stops
+    /// when they do; a machine `retired`, because a later join of the same
+    /// computer replaced it or the computer was retired, is retired whatever
+    /// its issuer's state. `issued_by` is the issuer's login.
+    pub fn put_machine(
+        &mut self,
+        id: MachineId,
+        issuer: PersonId,
+        profile: &Profile,
+        retired: bool,
+        issued_by: &LoginBinding,
+    ) {
+        self.insert(IdentityId::Machine(id), issuer, profile, retired, issued_by);
     }
 
     fn insert(

@@ -31,7 +31,10 @@ pub struct Lineage {
 pub(super) fn is_agent(identity: IdentityId) -> bool {
     match identity {
         IdentityId::Agent(_) => true,
-        IdentityId::Person(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => false,
+        IdentityId::Person(_)
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_) => false,
     }
 }
 
@@ -131,7 +134,8 @@ pub fn resolve<'a>(
                     IdentityId::Person(person) => person,
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_) => {
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_) => {
                         return Err(GrantError::LineageMalformed {
                             reason: "a root grant is held by its responsible person",
                         });

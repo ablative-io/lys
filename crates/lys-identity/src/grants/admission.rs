@@ -8,7 +8,8 @@
 //! agent is no permit, and pass-on is established only by an affirmative
 //! pass-on member of the source grant. An agent is never given, nor let
 //! pass on, an act withheld from agents, and no root lets an agent be
-//! passed one.
+//! passed one. A machine never issues, passes on or approves, and is never
+//! given a responsibility a person keeps (ACCESS-005 R1).
 
 use std::collections::BTreeSet;
 
@@ -94,14 +95,16 @@ fn answered_for_by(directory: &Projection, identity: IdentityId) -> Result<Perso
         })?;
     match identity {
         IdentityId::Person(person) => Ok(person),
-        // A connector's record names the administrator who approved its app.
-        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
-            record.responsible().ok_or_else(|| {
-                GrantError::from(IdentityError::IdentityUnknown {
-                    identity: identity.to_string(),
-                })
+        // A connector's record names the administrator who approved its app,
+        // and a machine's the administrator who asked for its code.
+        IdentityId::Agent(_)
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_) => record.responsible().ok_or_else(|| {
+            GrantError::from(IdentityError::IdentityUnknown {
+                identity: identity.to_string(),
             })
-        }
+        }),
     }
 }
 
@@ -146,6 +149,14 @@ pub fn delegation_authority(
     caller: IdentityId,
     recipient: IdentityId,
 ) -> Result<(), GrantError> {
+    // Holding a grant that may be passed on admits a holder, but never a
+    // machine: a machine issues nothing, so no grant is ever its gift.
+    if let IdentityId::Machine(_) = caller {
+        return Err(GrantError::MachineRefused {
+            machine: caller.to_string(),
+            act: "issues or passes on a grant".to_owned(),
+        });
+    }
     if source.holder() == caller {
         return Ok(());
     }
@@ -155,7 +166,10 @@ pub fn delegation_authority(
     };
     let person = match caller {
         IdentityId::Person(person) => person,
-        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+        IdentityId::Agent(_)
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_) => {
             return Err(refused());
         }
     };
@@ -233,6 +247,14 @@ pub fn judge_root(
     {
         refuse_withheld(&request.relation, kind, onward)?;
     }
+    if let PassOn::To {
+        actions: onward,
+        recipients,
+    } = &request.pass_on
+        && recipients.contains(&RecipientKind::Machine)
+    {
+        refuse_kept_from_machines("a grant passed on to machines", kind, onward)?;
+    }
     // A relation the kind does not hold may be one of its roles (ACCESS-004
     // R1): the grant then names the role, and is judged as its actions.
     let (actions, role) = match model.actions_on(kind, &request.relation) {
@@ -277,6 +299,30 @@ fn refuse_withheld<'a>(
     Err(GrantError::WithheldFromAgents {
         relation: relation.to_string(),
         withheld: withheld.into_iter().collect::<Vec<_>>().join(", "),
+    })
+}
+
+/// Refuse, by name, any of `actions` on an object of `kind` that is a
+/// responsibility a person keeps, for `machine` (ACCESS-005 R1).
+fn refuse_kept_from_machines<'a>(
+    machine: &str,
+    kind: &str,
+    actions: impl IntoIterator<Item = &'a Action>,
+) -> Result<(), GrantError> {
+    let kept: BTreeSet<&str> = actions
+        .into_iter()
+        .map(Action::as_str)
+        .filter(|action| !super::machine_may_hold(kind, action))
+        .collect();
+    if kept.is_empty() {
+        return Ok(());
+    }
+    Err(GrantError::MachineRefused {
+        machine: machine.to_owned(),
+        act: format!(
+            "holds {}, which a person keeps",
+            kept.into_iter().collect::<Vec<_>>().join(", ")
+        ),
     })
 }
 
@@ -342,6 +388,25 @@ pub fn judge_delegation(
     let within = model.within_on(request.resource.kind(), &request.relation, passable)?;
     if kind == RecipientKind::Agent {
         withheld_from_agents(request, &within.actions)?;
+    }
+    if kind == RecipientKind::Machine {
+        refuse_kept_from_machines(
+            &request.recipient.to_string(),
+            request.resource.kind(),
+            &within.actions,
+        )?;
+    }
+    if let PassOn::To {
+        actions: onward,
+        recipients: onward_to,
+    } = &request.pass_on
+        && onward_to.contains(&RecipientKind::Machine)
+    {
+        refuse_kept_from_machines(
+            "a grant passed on to machines",
+            request.resource.kind(),
+            onward,
+        )?;
     }
     if let PassOn::To {
         actions: onward,

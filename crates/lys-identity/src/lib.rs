@@ -40,7 +40,7 @@ pub use binding::LoginBinding;
 pub use directory::Directory;
 pub use error::IdentityError;
 pub use event::{Change, IdentityEvent, LinkChange, LinkObservation};
-pub use id::{AgentId, ConnectorId, IdentityId, PersonId, ServiceAccountId};
+pub use id::{AgentId, ConnectorId, IdentityId, MachineId, PersonId, ServiceAccountId};
 pub use install_event::{InstallChange, InstallEvent};
 pub use lifecycle::{LifecycleState, Transition};
 pub use operation::OperationId;

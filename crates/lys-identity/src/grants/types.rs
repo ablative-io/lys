@@ -173,6 +173,8 @@ pub enum RecipientKind {
     ServiceAccount,
     /// An approved app's connector.
     Connector,
+    /// A machine that joined with a connection code (ACCESS-005 R1).
+    Machine,
 }
 
 impl RecipientKind {
@@ -183,6 +185,7 @@ impl RecipientKind {
             IdentityId::Agent(_) => Self::Agent,
             IdentityId::ServiceAccount(_) => Self::ServiceAccount,
             IdentityId::Connector(_) => Self::Connector,
+            IdentityId::Machine(_) => Self::Machine,
         }
     }
 }
@@ -194,6 +197,7 @@ impl fmt::Display for RecipientKind {
             Self::Agent => "agent",
             Self::ServiceAccount => "service_account",
             Self::Connector => "connector",
+            Self::Machine => "machine",
         })
     }
 }

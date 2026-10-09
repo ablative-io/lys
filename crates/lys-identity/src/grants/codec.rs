@@ -24,7 +24,7 @@ use super::types::{
     Window,
 };
 use crate::encoding::{MAJOR_ARRAY, bytes, head, map, text, uint};
-use crate::id::{AgentId, ConnectorId, ID_LEN, IdentityId, PersonId, ServiceAccountId};
+use crate::id::{AgentId, ConnectorId, ID_LEN, IdentityId, MachineId, PersonId, ServiceAccountId};
 use crate::operation::OperationId;
 
 /// The application-envelope identifier a signed grant event names in its
@@ -58,6 +58,7 @@ pub(crate) fn write_identity(out: &mut Vec<u8>, identity: IdentityId) {
         IdentityId::Agent(id) => (2, *id.as_bytes()),
         IdentityId::ServiceAccount(id) => (3, *id.as_bytes()),
         IdentityId::Connector(id) => (4, *id.as_bytes()),
+        IdentityId::Machine(id) => (5, *id.as_bytes()),
     };
     map(out, 2);
     uint(out, 1);
@@ -80,6 +81,7 @@ pub(crate) fn recipient_code(kind: RecipientKind) -> u64 {
         RecipientKind::Agent => 2,
         RecipientKind::ServiceAccount => 3,
         RecipientKind::Connector => 4,
+        RecipientKind::Machine => 5,
     }
 }
 
@@ -232,8 +234,9 @@ pub(crate) fn read_identity(value: Value) -> Result<IdentityId, GrantError> {
         2 => Ok(IdentityId::Agent(AgentId::from_bytes(id))),
         3 => Ok(IdentityId::ServiceAccount(ServiceAccountId::from_bytes(id))),
         4 => Ok(IdentityId::Connector(ConnectorId::from_bytes(id))),
+        5 => Ok(IdentityId::Machine(MachineId::from_bytes(id))),
         _ => Err(malformed(
-            "an identity kind code is 1 for a person, 2 for an agent, 3 for a service account or 4 for a connector",
+            "an identity kind code is 1 for a person, 2 for an agent, 3 for a service account, 4 for a connector or 5 for a machine",
         )),
     }
 }
@@ -268,6 +271,7 @@ fn read_pass_on(value: Value) -> Result<PassOn, GrantError> {
             2 => Ok(RecipientKind::Agent),
             3 => Ok(RecipientKind::ServiceAccount),
             4 => Ok(RecipientKind::Connector),
+            5 => Ok(RecipientKind::Machine),
             code => Err(GrantError::RecipientKindUnknown { code }),
         })
         .collect::<Result<_, _>>()?;

@@ -303,7 +303,8 @@ impl<S: LeafStore> Directory<S> {
                     IdentityId::Person(person) => return Ok((person, receipt)),
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_) => {}
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_) => {}
                 }
             }
             return Err(IdentityError::OperationReused {

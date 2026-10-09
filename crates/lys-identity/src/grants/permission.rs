@@ -32,8 +32,10 @@ definition service_account {}
 
 definition connector {}
 
+definition machine {}
+
 definition grant {
-  relation holder: person | person with unexpired | agent | agent with unexpired | service_account | service_account with unexpired | connector | connector with unexpired
+  relation holder: person | person with unexpired | agent | agent with unexpired | service_account | service_account with unexpired | machine | machine with unexpired | connector | connector with unexpired
   relation source: grant | person
 }
 ";
@@ -63,6 +65,7 @@ impl ObjectRef {
             IdentityId::Agent(_) => "agent",
             IdentityId::ServiceAccount(_) => "service_account",
             IdentityId::Connector(_) => "connector",
+            IdentityId::Machine(_) => "machine",
         };
         Self {
             kind: kind.to_owned(),

@@ -61,7 +61,9 @@ impl Projection {
                             chain: chain.clone(),
                         })?;
                 }
-                IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+                IdentityId::ServiceAccount(_)
+                | IdentityId::Connector(_)
+                | IdentityId::Machine(_) => {
                     return Err(IdentityError::AnswersToUnknown {
                         identity: next.to_string(),
                     });
@@ -82,7 +84,10 @@ impl Projection {
         let record = self.record(identity).ok_or_else(|| unknown(identity))?;
         let agent = match identity {
             IdentityId::Agent(agent) => agent,
-            IdentityId::Person(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => {
+            IdentityId::Person(_)
+            | IdentityId::ServiceAccount(_)
+            | IdentityId::Connector(_)
+            | IdentityId::Machine(_) => {
                 return Err(IdentityError::ChangeMismatch {
                     reason: "a reporting change names an agent",
                 });
@@ -119,6 +124,11 @@ impl Projection {
             IdentityId::Connector(_) => {
                 return Err(IdentityError::ChangeMismatch {
                     reason: "a connector is not a reporting target",
+                });
+            }
+            IdentityId::Machine(_) => {
+                return Err(IdentityError::ChangeMismatch {
+                    reason: "a machine is not a reporting target",
                 });
             }
         };
@@ -301,6 +311,11 @@ impl Projection {
                 IdentityId::Connector(_) => {
                     return Err(IdentityError::ChangeMismatch {
                         reason: "a connector is not a stored directory identity",
+                    });
+                }
+                IdentityId::Machine(_) => {
+                    return Err(IdentityError::ChangeMismatch {
+                        reason: "a machine is not a stored directory identity",
                     });
                 }
             }
