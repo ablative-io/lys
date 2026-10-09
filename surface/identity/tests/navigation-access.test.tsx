@@ -5,16 +5,17 @@ import { SERVICE, ok, refused } from './fixtures';
 const ANSWERS = {
   ...SERVICE,
   '/network': ok({ machines: [], total: 0, next: null }),
-  '/secrets': ok({ entries: [] }),
+  '/secrets': ok({ secrets: [] }),
   '/configuration': ok({}),
 };
 const NAVS = ['canvas', 'people', 'roles', 'access', 'graph', 'secrets', 'network', 'settings'];
+const DENIALS: [string, string[]][] = [
+  ['/runtime/live', ['canvas']], ['/roles', ['roles']], ['/grants', ['access', 'graph']],
+  ['/secrets', ['secrets']], ['/network', ['network']], ['/configuration', ['settings']],
+];
 
 describe('navigation follows the answering API', () => {
-  it.each([
-    ['/runtime/live', ['canvas']], ['/roles', ['roles']], ['/grants', ['access', 'graph']],
-    ['/secrets', ['secrets']], ['/network', ['network']], ['/configuration', ['settings']],
-  ])('hides only the entries refused by %s, in the rail, palette and keys', async (path, hidden) => {
+  it.each(DENIALS)('hides only the entries refused by %s, in the rail, palette and keys', async (path, hidden) => {
     await mount('#/me', { ...ANSWERS, [path]: refused(403, 'NotAdmitted', 'this read is not admitted') });
     expect($$('#rail a[data-nav]').map((entry) => entry.dataset.nav)).toEqual(expect.arrayContaining(NAVS.filter((nav) => !hidden.includes(nav))));
     for (const nav of hidden) expect($('#rail a[data-nav="' + nav + '"]')).toBeNull();
@@ -51,5 +52,17 @@ describe('navigation follows the answering API', () => {
   it('does not infer access from the directory scope or an empty list', async () => {
     await mount('#/me', { ...ANSWERS, '/directory/people': refused(403, 'NotAdmitted', 'directory access refused') });
     for (const nav of NAVS) expect($('#rail a[data-nav="' + nav + '"]')).not.toBeNull();
+  });
+
+  it('reads a formerly allowed entry again before mounting its controls', async () => {
+    let admitted = true;
+    await mount('#/me', { ...ANSWERS, '/roles': () => admitted ? ok({ roles: [] }) : refused(403, 'NotAdmitted', 'role access was removed') });
+    expect($('#rail a[data-nav="roles"]')).not.toBeNull();
+    admitted = false;
+    await press('g', {}, document.body);
+    await press('o', {}, document.body);
+    expect(text()).toContain('NotAdmitted');
+    expect(text()).toContain('role access was removed');
+    expect($('.page h1')?.textContent).not.toBe('Roles');
   });
 });

@@ -7,6 +7,7 @@ import type { Entry } from '../features/people/directory';
 import { keyable } from './keyable';
 import { useShell } from './ShellContext';
 import { GO } from './keys';
+import { useNavigationAccess } from './NavigationAccess';
 
 interface Item {
   g: string;
@@ -33,6 +34,7 @@ export const PAGES: [string, string][] = [
 
 export function Palette() {
   const shell = useShell();
+  const mayOpen = useNavigationAccess();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
@@ -74,7 +76,7 @@ export function Palette() {
     { g: 'Acts', t: 'Add an agent', d: '', go: () => go('#/agents/new') },
     { g: 'Acts', t: 'Move Help to the other side', d: '\\', go: shell.toggleDockSide },
     { g: 'Acts', t: 'Show or hide menu labels', d: '[', go: shell.toggleLabels },
-    ...PAGES.map(([t, h]) => ({ g: 'Go to', t, d: keyFor(h), to: h, go: () => go(h) })),
+    ...PAGES.filter(([, h]) => mayOpen(h.slice(1))).map(([t, h]) => ({ g: 'Go to', t, d: keyFor(h), to: h, go: () => go(h) })),
   ];
   const q = query.toLowerCase();
   const items = source.filter((i) => (i.t + ' ' + i.d + ' ' + i.g).toLowerCase().includes(q));

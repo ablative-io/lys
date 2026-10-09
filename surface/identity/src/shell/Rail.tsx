@@ -3,6 +3,7 @@ import { api, request, useLoad } from '../api';
 import { readTogether } from '../reads';
 import { RAIL } from './railItems';
 import { useShell } from './ShellContext';
+import { useNavigationAccess } from './NavigationAccess';
 
 /** The view a hash path belongs to, as the rail marks it. */
 export function railView(pathname: string): string {
@@ -28,6 +29,7 @@ function useWaiting(): { count: number; words: string } | { problem: string } | 
 
 export function Rail() {
   const shell = useShell();
+  const mayOpen = useNavigationAccess();
   const waiting = useWaiting();
   const { pathname } = useLocation();
   const on = railView(pathname);
@@ -46,6 +48,7 @@ export function Rail() {
       {RAIL.map((item, index) => {
         if (item.t === 'sep') return <div className="sep" key={index} />;
         if (item.t === 'grow') return <div className="grow" key={index} />;
+        if (item.t === 'a' && item.href && !mayOpen(item.href.slice(1))) return null;
         const inner = (
           <>
             <svg viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: item.svg }} />

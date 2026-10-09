@@ -9,6 +9,7 @@ import './features/runtime/session-canvas.css';
 import { AppRoutes } from './routes';
 import { Shell } from './shell/Shell';
 import { ShellProvider } from './shell/ShellContext';
+import { NavigationGate, NavigationProvider } from './shell/NavigationAccess';
 
 /** Lys's own sign-in page, outside the signed-in shell. */
 function SignInScreen() {
@@ -33,9 +34,11 @@ export function App() {
         <Route path="/window/:session" element={<TerminalWindow />} />
         <Route path="*" element={
           <ShellProvider>
-            <Shell>
-              <SetupBoundary><AppRoutes /></SetupBoundary>
-            </Shell>
+            <NavigationProvider>
+              <Shell>
+                <SetupBoundary><NavigationGate><AppRoutes /></NavigationGate></SetupBoundary>
+              </Shell>
+            </NavigationProvider>
           </ShellProvider>
         } />
       </Routes>

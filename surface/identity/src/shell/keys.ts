@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useShell } from './ShellContext';
 import { tabsFor } from '../features/file/tabs';
+import { useNavigationAccess } from './NavigationAccess';
 
 /** g then a letter goes to a screen, as the mock-up's key registry has it. */
 export const GO: Record<string, string> = {
@@ -28,8 +29,9 @@ export function useShellKeys(): void {
   const shell = useShell();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const live = useRef({ shell, navigate, pathname });
-  live.current = { shell, navigate, pathname };
+  const mayOpen = useNavigationAccess();
+  const live = useRef({ shell, navigate, pathname, mayOpen });
+  live.current = { shell, navigate, pathname, mayOpen };
 
   useEffect(() => {
     let pendingG = false;
@@ -52,7 +54,7 @@ export function useShellKeys(): void {
     };
 
     const keys = (e: KeyboardEvent) => {
-      const { shell: s, navigate: go, pathname: path } = live.current;
+      const { shell: s, navigate: go, pathname: path, mayOpen: permitted } = live.current;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         if (s.paletteOpen) s.closeAll();
@@ -68,7 +70,7 @@ export function useShellKeys(): void {
       if (pendingG) {
         pendingG = false;
         const to = GO[e.key];
-        if (to) return go(to);
+        if (to && permitted(to)) return go(to);
       }
       if (e.key === 'g') {
         pendingG = true;
