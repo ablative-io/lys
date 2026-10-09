@@ -84,13 +84,9 @@ async fn issuer(State(fixture): State<Arc<Fixture>>, request: Request) -> Respon
         forwarded_address: text("x-forwarded-for"),
         authorization: request.headers().get(header::AUTHORIZATION).cloned(),
     };
-    match fixture.seen.lock() {
-        Ok(mut held) => held.push(observed),
-        Err(_) => {
-            let mut answer = Response::new(Body::from("observer lock failed"));
-            *answer.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-            return answer;
-        }
+    let recorded = fixture.seen.lock().map(|mut held| held.push(observed));
+    if let Err(error) = recorded {
+        return failed(format!("observer lock failed: {error}"));
     }
     let mut answer = Response::new(if path == "/auth/v1/users/import" {
         request.into_body()
@@ -227,7 +223,7 @@ async fn administrator_pages_and_native_callback_keep_issuer_authentication() ->
                 .to_str()?
                 .contains("SignInStateUnknown")
         );
-        let held = seen.lock().map_err(|_| "observer lock failed")?;
+        let held = seen.lock().map_err(|error| format!("observer lock failed: {error}"))?;
         assert_eq!(
             held.len(),
             6,
