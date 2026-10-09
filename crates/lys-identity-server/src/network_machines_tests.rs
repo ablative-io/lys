@@ -9,7 +9,7 @@ use lys_identity::projection::Projection;
 use lys_identity::{IdentityId, MachineId};
 use serde_json::json;
 
-use super::{joined, with_machines};
+use super::{joined, retired_with, with_machines};
 use crate::network_join::{JoinStanding, JoinStore};
 
 const ISSUER: &str = "person-d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1";
@@ -104,5 +104,27 @@ fn a_machine_whose_issuer_the_directory_does_not_hold_answers_for_nothing()
     let view = directory.with_accounts(accounts);
     let machine = IdentityId::Machine(FIRST.parse::<MachineId>()?);
     assert!(view.record(machine).is_none());
+    Ok(())
+}
+
+#[test]
+fn a_retired_computers_machine_is_retired_and_its_neighbours_are_not() -> Result<(), Box<dyn Error>>
+{
+    let (_dir, store) = kept(&json!([
+        used("op-one", "ward", 10, Some(FIRST)),
+        used("op-two", "desk", 20, Some(SECOND)),
+    ]))?;
+    let fresh = joined(&store)?;
+    assert!(
+        fresh.iter().all(|machine| !machine.is_retired()),
+        "{fresh:?}"
+    );
+    let retired = std::collections::BTreeSet::from(["ward".to_owned()]);
+    let machines = retired_with(fresh, &retired);
+    let [ward, desk] = machines.as_slice() else {
+        return Err(format!("two machines: {machines:?}").into());
+    };
+    assert!(ward.retired && !ward.replaced && ward.is_retired());
+    assert!(!desk.retired && !desk.is_retired());
     Ok(())
 }

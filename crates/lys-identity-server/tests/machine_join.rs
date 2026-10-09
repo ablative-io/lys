@@ -236,3 +236,64 @@ async fn a_second_join_replaces_the_machine_and_a_kept_act_is_never_a_machines()
     assert_eq!(refused.1["refusal"], "MachineRefused", "{}", refused.1);
     Ok(())
 }
+
+/// ACCESS-005: retiring a computer on the Network page retires the machine
+/// its join made, in the same act, so the machine stops counting: it reads
+/// `retired` and a grant it holds is no longer admitted.
+#[tokio::test]
+async fn retiring_the_computer_retires_its_machine_and_its_grants_stop_counting() -> TestResult {
+    let (service, seeded) = reachable().await?;
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let keys = tempfile::tempdir()?;
+    let computer = join(&service, &ada, None, &key(keys.path(), "computer.key")?).await?;
+    let device = machines(&service, &ada).await?[0]["identity"]
+        .as_str()
+        .ok_or("no identity")?
+        .to_owned();
+    let person = seeded.people[0].id.to_string();
+    let resource = json!({"kind": "link", "id": "hermes-to-liminal"});
+    let window = json!({"starts_at": 0, "ends_at": null});
+    let pass = json!({"kind": "to", "actions": ["read"], "recipients": ["machine"]});
+    let (status, root) = service
+        .post(
+            "/grants/roots",
+            Some(&ada),
+            &json!({"operation": op()?, "route": "api", "holder": person, "resource": resource, "relation": "beta", "pass_on": pass, "window": window}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{root}");
+    let (status, given) = service
+        .post(
+            "/grants",
+            Some(&ada),
+            &json!({"operation": op()?, "route": "api", "source": root["grant"], "recipient": device, "responsible": person, "resource": resource, "relation": "beta", "pass_on": {"kind": "use_only"}, "window": window}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{given}");
+    let before = machines(&service, &ada).await?;
+    assert_eq!(before[0]["state"], "active");
+    assert_eq!(before[0]["grants"][0]["admitted"], true, "{before:?}");
+
+    let (status, retired) = service
+        .post(
+            &format!("/network/machines/{computer}/retire"),
+            Some(&ada),
+            &json!({}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{retired}");
+    assert_eq!(retired["state"], "retired");
+    let after = machines(&service, &ada).await?;
+    let [shown] = after.as_slice() else {
+        return Err(format!("one machine: {after:?}").into());
+    };
+    assert_eq!(shown["identity"], device.as_str());
+    assert_eq!(shown["state"], "retired", "the machine is retired with it");
+    assert_eq!(shown["replaced"], false, "retired, not replaced");
+    let grants = shown["grants"].as_array().ok_or("no grants")?;
+    assert!(
+        grants.iter().all(|grant| grant["admitted"] == false),
+        "a retired machine's grant no longer counts: {grants:?}"
+    );
+    Ok(())
+}

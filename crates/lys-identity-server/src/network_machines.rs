@@ -5,14 +5,18 @@
 //! that join recorded, and kept on the spent code (`network_join.rs`). It
 //! answers to the administrator who asked for the code, is active while
 //! they are, and is retired once a later join of the same computer replaces
-//! it. The grant engine judges it beside the service accounts and the
-//! connectors, so a grant may be passed on to it as to any holder.
+//! it or once the computer itself is retired on the Network page: retiring
+//! the computer is the act that retires its machine (ACCESS-005), read from
+//! the network store beside the spent codes, never recorded twice. The
+//! grant engine judges it beside the service accounts and the connectors,
+//! so a grant may be passed on to it as to any holder.
 //!
 //! - `GET /network/machine-identities`: the administrator reads every
 //!   machine, newest join last: its id, the computer it is, its key, the
 //!   person answering for it, its state, and every grant it holds that is
 //!   not revoked, expired or yet to start, with the resource each is on.
 
+use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -30,6 +34,7 @@ use serde::Serialize;
 use crate::error::ServerError;
 use crate::grant_contract::{ResourceView, WindowView};
 use crate::grants::{Judged, with_grants};
+use crate::network_api::with_network;
 use crate::network_join::{JoinStanding, JoinStore, with_joins};
 use crate::routes::{AppState, signed_in};
 
@@ -48,6 +53,16 @@ pub(crate) struct Joined {
     pub(crate) at: u64,
     /// Whether a later join of the same computer replaced it.
     pub(crate) replaced: bool,
+    /// Whether the computer it is was retired on the Network page.
+    pub(crate) retired: bool,
+}
+
+impl Joined {
+    /// Whether the machine is retired: replaced by a later join, or its
+    /// computer retired.
+    pub(crate) fn is_retired(&self) -> bool {
+        self.replaced || self.retired
+    }
 }
 
 /// Every machine the spent codes in `joins` made, in the order they joined.
@@ -75,24 +90,49 @@ pub(crate) fn joined(joins: &JoinStore) -> Result<Vec<Joined>, ServerError> {
             issuer: PersonId::from_str(&record.issued_by)?,
             at: *at,
             replaced,
+            retired: false,
         });
     }
     Ok(machines)
 }
 
-/// Every machine joined so far, or none when no connection codes are kept.
+/// Every machine joined so far, each marked retired when its computer is,
+/// or none when no connection codes are kept. The codes are read and let go
+/// before the network is read, so the network lock is taken last, as every
+/// route that holds the directory takes it (`network_api.rs`), and never
+/// while the codes are held.
 pub(crate) fn joined_now(state: &AppState) -> Result<Vec<Joined>, ServerError> {
     if state.joins.is_none() {
         return Ok(Vec::new());
     }
-    with_joins(state, |joins| joined(joins))
+    let machines = with_joins(state, |joins| joined(joins))?;
+    if machines.is_empty() || state.network.is_none() {
+        return Ok(machines);
+    }
+    let retired: BTreeSet<String> = with_network(state, |store| {
+        Ok(store
+            .machines()
+            .iter()
+            .filter(|computer| computer.retired.is_some())
+            .map(|computer| computer.id.clone())
+            .collect())
+    })?;
+    Ok(retired_with(machines, &retired))
+}
+
+/// `machines`, each marked retired when its computer is among `retired`.
+pub(crate) fn retired_with(mut machines: Vec<Joined>, retired: &BTreeSet<String>) -> Vec<Joined> {
+    for machine in &mut machines {
+        machine.retired = retired.contains(&machine.machine);
+    }
+    machines
 }
 
 /// `accounts` with every machine in `machines` beside them, as the engine
 /// judges them: each answers to its issuer, recorded under the issuer's own
-/// login, and is retired once replaced. A machine whose issuer the
-/// directory does not hold is left out, as the engine would find no one
-/// answering for it. Its profile is the computer's id.
+/// login, and is retired once replaced or once its computer is. A machine
+/// whose issuer the directory does not hold is left out, as the engine
+/// would find no one answering for it. Its profile is the computer's id.
 pub(crate) fn with_machines(
     mut accounts: Arc<Accounts>,
     machines: &[Joined],
@@ -111,7 +151,7 @@ pub(crate) fn with_machines(
             machine.identity,
             machine.issuer,
             &Profile::new(&machine.machine)?,
-            machine.replaced,
+            machine.is_retired(),
             &login,
         );
     }
