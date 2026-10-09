@@ -107,6 +107,7 @@ async fn read(
 ) -> Result<(Vec<String>, Vec<String>, Value), Box<dyn std::error::Error>> {
     let (bea, ada) = people(world);
     let before = world.counts().await?;
+    let reads = lys_log_store::process_read_count();
     let recipients = world
         .ask(
             "/recipients",
@@ -119,6 +120,8 @@ async fn read(
             &world.resources("ward", (&bea, "person"), 8, &Value::Null),
         )
         .await?;
+    let read = lys_log_store::process_read_count() - reads;
+    assert_eq!(read, 0, "the pages read no leaf of the grant history");
     let after = world.counts().await?;
     let named = ids(&recipients, "subject")
         .into_iter()
@@ -134,7 +137,7 @@ async fn read(
         .collect();
     let work = delta(&before, &after)?
         .into_iter()
-        .filter(|(name, _)| !name.starts_with("live_"))
+        .filter(|(name, _)| !name.starts_with("live_") && name != "physical_reads")
         .map(|(name, n)| (name, Value::from(i64::try_from(n).unwrap_or(i64::MAX))))
         .collect::<serde_json::Map<String, Value>>();
     let live = serde_json::json!({

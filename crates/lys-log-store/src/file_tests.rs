@@ -473,3 +473,24 @@ fn a_second_writers_act_behind_another_writers_roll_is_refused_with_nothing_writ
         assert_eq!(reopened.pinned().root, frontier.root());
     }
 }
+
+/// ACCESS-006 R5, R6: each leaf read and each snapshot read that goes to the
+/// files is counted once; a leaf beyond the extent and every answer held in
+/// memory are not.
+#[test]
+fn every_physical_read_is_counted_and_nothing_held_in_memory_is() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("store");
+    let mut store = create(&dir);
+    let mut frontier = Frontier::new();
+    fill(&mut store, &mut frontier, 3, 3);
+    let before = crate::process_read_count();
+    assert_eq!(store.leaf(1).unwrap(), Some(leaf(1)));
+    assert_eq!(store.leaf(2).unwrap(), Some(leaf(2)));
+    assert_eq!(store.leaf(3).unwrap(), None, "beyond the extent");
+    assert_eq!(crate::process_read_count() - before, 2);
+    let _ = (store.extent(), store.pinned(), store.origin());
+    assert_eq!(crate::process_read_count() - before, 2, "memory is no read");
+    let _ = store.snapshot().unwrap();
+    assert_eq!(crate::process_read_count() - before, 3);
+}

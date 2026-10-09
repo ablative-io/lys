@@ -402,6 +402,7 @@ impl LeafStore for FileLeafStore {
         if index >= self.extent {
             return Ok(None);
         }
+        crate::reads::count_read();
         if self.legacy.is_some() {
             return v1::leaf(&self.dir, index);
         }
@@ -521,6 +522,7 @@ impl LeafStore for FileLeafStore {
     }
 
     fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+        crate::reads::count_read();
         snapshot_slot::read(&self.dir)
     }
 

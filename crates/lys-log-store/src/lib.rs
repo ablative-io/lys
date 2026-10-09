@@ -60,6 +60,9 @@ mod durability;
 #[cfg(feature = "flush-counts")]
 pub use durability::{flush_count, process_flush_count};
 
+mod reads;
+pub use reads::process_read_count;
+
 pub mod error;
 pub mod file;
 pub mod frontier;

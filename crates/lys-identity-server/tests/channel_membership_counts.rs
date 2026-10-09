@@ -3,12 +3,14 @@
 //! page matrices, normal, degraded and revoked, measured at three sizes of
 //! unrelated roster and retired history. Every count of every case,
 //! including the zeros, is kept and must be the same at every size; no
-//! question flushes anything durable; and a revocation reaches only the
-//! revoked subject, the correct subject still answered and counted.
+//! question flushes anything durable or reads a single leaf of the log; a
+//! revocation reaches only the revoked subject, the correct subject still
+//! answered and counted; and an idle service holds no registered readiness
+//! wait, a waiting reader holding one only until the commit wakes it.
 
 use identity_contract::apps::TestResult;
 use identity_contract::membership_world::{World, delta, ids, ward_schema};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 const APP: &str = "fixture_wards";
 
@@ -67,17 +69,23 @@ async fn measured(
 ) -> Result<(Value, Work), Box<dyn std::error::Error>> {
     let before = world.counts().await?;
     let flushes = lys_log_store::process_flush_count();
+    let reads = lys_log_store::process_read_count();
     let answer = world.ask(path, body).await?;
+    let read = lys_log_store::process_read_count() - reads;
     let flushed = lys_log_store::process_flush_count() - flushes;
     let after = world.counts().await?;
     assert_eq!(
         flushed, 0,
         "{path} flushed: a question writes nothing durable"
     );
-    let work = delta(&before, &after)?
+    // The answer is made from the folded book and its indexes: not one leaf
+    // of the log, history or tail, is read for it.
+    assert_eq!(read, 0, "{path} read {read} leaves or snapshots");
+    let mut work: Work = delta(&before, &after)?
         .into_iter()
-        .filter(|(name, _)| !name.starts_with("live_"))
+        .filter(|(name, _)| !name.starts_with("live_") && name != "physical_reads")
         .collect();
+    work.push(("physical_reads".to_owned(), i128::from(read)));
     Ok((answer, work))
 }
 
@@ -220,5 +228,56 @@ async fn a_revocation_reaches_only_the_revoked_subject() -> TestResult {
     let (answer, _) = measured(&world, "/resources", &own).await?;
     assert!(ids(&answer, "resource").is_empty(), "{answer}");
     assert_eq!(answer["outcome"]["skipped"], 0, "nothing of it is read");
+    Ok(())
+}
+
+/// ACCESS-006 R6: idle consumers have zero registered readiness waits. No
+/// membership answer registers one; a change-stream reader that asks to wait
+/// holds one place only while it waits, the next grant commit wakes it with
+/// that commit, and its place is given back.
+#[tokio::test]
+async fn an_idle_service_holds_no_readiness_wait() -> TestResult {
+    let (world, former) = wards().await?;
+    let bea = world.seeded.people[1].id.to_string();
+    let idle = world.counts().await?;
+    assert_eq!(idle["readiness_waiting"], 0, "{idle}");
+    for (case, work) in matrix(&world, &former).await? {
+        assert_eq!(
+            count(&work, "readiness_waiting"),
+            Some(0),
+            "{case} registers no wait: {work:?}"
+        );
+    }
+
+    let head = world.grant(&bea, ("channel", "ward-b"), "reader").await?;
+    let after = head["receipt"]["revision"]
+        .as_u64()
+        .ok_or("the issue names its revision")?;
+    let wait = json!({"log": world.log, "after": after, "limit": 16, "wait": true});
+    let path = "/grants/changes";
+    let (woken, committed) = tokio::join!(
+        identity_contract::apps::post(
+            &world.service,
+            path,
+            identity_contract::apps::Auth::Bearer(&world.credential),
+            &wait,
+        ),
+        world.grant(&bea, ("channel", "ward-a"), "poster"),
+    );
+    let woken = identity_contract::apps::ok(woken?)?;
+    let committed = committed?;
+    let revision = committed["receipt"]["revision"].clone();
+    let frames = woken["frames"].as_array().ok_or("a page has frames")?;
+    assert!(
+        frames
+            .iter()
+            .any(|frame| frame["frame"] == "change" && frame["revision"] == revision),
+        "the woken read carries the commit that woke it: {woken}"
+    );
+    let rested = world.counts().await?;
+    assert_eq!(
+        rested["readiness_waiting"], 0,
+        "the place is given back when the read ends: {rested}"
+    );
     Ok(())
 }

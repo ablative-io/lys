@@ -12,6 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use tokio::sync::{Semaphore, watch};
 
+/// How many readers may wait on a change signal at once.
+const PLACES: usize = 128;
+
 pub(crate) struct Changes {
     generation: watch::Sender<OperationId>,
     waiting: Semaphore,
@@ -28,7 +31,7 @@ impl Changes {
         let (generation, _) = watch::channel(OperationId::generate()?);
         Ok(Self {
             generation,
-            waiting: Semaphore::new(128),
+            waiting: Semaphore::new(PLACES),
         })
     }
 
@@ -51,6 +54,12 @@ impl Changes {
         self.waiting
             .try_acquire()
             .map_err(|error| unavailable(format!("change subscriptions are at capacity: {error}")))
+    }
+
+    /// How many readers are registered waiting on a change signal now: a
+    /// reader registers only while it waits, and an idle service has none.
+    pub(crate) fn waiting(&self) -> usize {
+        PLACES.saturating_sub(self.waiting.available_permits())
     }
 
     async fn checked_after(

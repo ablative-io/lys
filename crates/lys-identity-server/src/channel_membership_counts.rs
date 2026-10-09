@@ -8,8 +8,12 @@
 //! the cursor book's lock, and what is retained: the cursors kept and
 //! released, and the entries of the grant book's live indexes. A count is
 //! never reset while the service runs; a test reads it before and after the
-//! work it measures. Durable flushes are counted by the log store itself
-//! (`lys_log_store::process_flush_count`), at the real backend.
+//! work it measures. Physical store reads are counted by the log store
+//! where it reads (`lys_log_store::process_read_count`) and shown here as a
+//! process-wide reading; durable flushes are counted by the log store too
+//! (`lys_log_store::process_flush_count`), at the real backend. The readers
+//! registered waiting on a change signal are shown as they stand, so an idle
+//! service is seen to hold none.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -146,6 +150,14 @@ pub struct MembershipCounts {
     pub live_holder_entries: u64,
     /// (resource, grant) entries the live index keeps now.
     pub live_resource_entries: u64,
+    /// Physical leaf and snapshot reads every log store in this process has
+    /// made (`lys_log_store::process_read_count`): a reading to take the
+    /// difference of across work while nothing else reads.
+    pub physical_reads: u64,
+    /// Readers registered waiting on a change signal now, the change
+    /// stream's readiness waits among them. An idle service has none: no
+    /// membership answer registers a wait, a timer or a poll.
+    pub readiness_waiting: u64,
 }
 
 fn wide(value: usize) -> u64 {
@@ -163,6 +175,9 @@ pub async fn counts(
             reason: "only the administrator reads the membership counts",
         });
     }
+    // Read before the grants are held, so this reading's own work is never
+    // in it.
+    let physical_reads = lys_log_store::process_read_count();
     let (holders, resources) =
         with_grants(&state, |judged| Ok(judged.grants.book().live_entries()))?;
     // Read uncounted, so reading the counts never moves them; a poisoned
@@ -190,5 +205,7 @@ pub async fn counts(
         cursors_released: released,
         live_holder_entries: wide(holders),
         live_resource_entries: wide(resources),
+        physical_reads,
+        readiness_waiting: wide(state.changes.waiting()),
     }))
 }
