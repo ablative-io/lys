@@ -3,9 +3,9 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { ADA, BEA, RECEIPTS, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
-import { serve, type } from './harness';
+import { choose, serve, type } from './harness';
 
 let root: Root | null = null;
 beforeEach(() => sessionStorage.clear());
@@ -25,25 +25,36 @@ async function form(routes: Record<string, Route>) {
 async function submit(entry: HTMLFormElement) {
   await act(async () => { entry.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
 }
-function receipt(body: unknown) {
+async function fill(entry: HTMLFormElement) {
+  await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
+  await type(entry.querySelector('input[name="email"]'), 'helper@example.test');
+  await type(entry.querySelector('input[name="kind"]'), 'workspace');
+  await type(entry.querySelector('input[name="resource"]'), 'ward-7');
+  await choose(entry.querySelector('select[name="relation"]'), 'editor');
+}
+function admitted(body: unknown) {
   if (!body || typeof body !== 'object' || !('operation' in body) || typeof body.operation !== 'string') throw new Error('Missing operation');
-  return { ...RECEIPTS[4].receipt, identity: BEA, operation: body.operation, change_kind: 1 };
+  return { person: BEA, subject: 'subject-helper', grant: 'grant-' + 'b'.repeat(32), receipt: {
+    operation: body.operation, person: BEA, failed: null, completed: ['register', 'account', 'bind', 'activate', 'grant'],
+    logged: [{ step: 'register', log: 'directory', index: 12 }, { step: 'bind', log: 'directory', index: 13 },
+      { step: 'activate', log: 'directory', index: 14 }, { step: 'grant', log: 'grants', index: 7 }],
+  } };
 }
 
 describe('Add a person', () => {
-  it('is one row: the name field and its button beside it', async () => {
+  it('has the name, the email and the first grant, and one Add button', async () => {
     const { entry } = await form({});
-    const row = entry.querySelector('.add-person-row');
-    expect(row?.querySelector('input[name="display_name"]')).not.toBeNull();
-    const add = row?.querySelector('button[type="submit"]');
+    for (const name of ['display_name', 'email', 'kind', 'resource']) expect(entry.querySelector(`input[name="${name}"]`)).not.toBeNull();
+    expect(entry.querySelector('select[name="relation"]')).not.toBeNull();
+    const add = entry.querySelector('button[type="submit"]');
     expect([add?.getAttribute('aria-label'), add?.textContent]).toEqual(['Add person', 'Add']);
   });
 });
 
 describe('Add-person retry safety', () => {
   it('retains the exact registration across reload after an uncertain response', async () => {
-    const first = await form({ 'POST /people': refused(503, 'StorageUncertain', 'The outcome is not known') });
-    await type(first.entry.querySelector('input[name="display_name"]'), 'Care helper');
+    const first = await form({ 'POST /people/admit': refused(503, 'StorageUncertain', 'The outcome is not known') });
+    await fill(first.entry);
     await submit(first.entry);
     expect(first.posted).toHaveLength(1);
     expect(sessionStorage.length).toBeGreaterThan(0);
@@ -51,33 +62,33 @@ describe('Add-person retry safety', () => {
     const mounted = root;
     if (!mounted) throw new Error('Missing mounted form');
     act(() => mounted.unmount()); root = null;
-    const second = await form({ 'POST /people': refused(503, 'StorageUncertain', 'The outcome is not known') });
+    const second = await form({ 'POST /people/admit': refused(503, 'StorageUncertain', 'The outcome is not known') });
     expect(second.posted).toHaveLength(0);
     await submit(second.entry);
     expect(second.posted).toEqual(first.posted);
   });
 
   it('refuses an unconfirmed receipt without navigating', async () => {
-    const { entry, posted } = await form({ 'POST /people': ok({ person: BEA }) });
-    await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
+    const { entry, posted } = await form({ 'POST /people/admit': ok({ person: BEA }) });
+    await fill(entry);
     await submit(entry);
-    expect(posted.map((call) => call.path)).toEqual(['/people']);
+    expect(posted.map((call) => call.path)).toEqual(['/people/admit']);
     expect(location.hash).toBe('#/people/new');
     expect(sessionStorage.length).toBeGreaterThan(0);
-    expect(entry.textContent).toContain('The answer did not confirm this change');
+    expect(entry.textContent).toContain('did not confirm');
   });
 
   it('sends one registration for two simultaneous submits', async () => {
     const { entry, posted } = await form({
-      'POST /people': (body) => ok({ person: BEA, receipt: receipt(body) }),
+      'POST /people/admit': (body) => ok(admitted(body)),
     });
-    await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
+    await fill(entry);
     await act(async () => {
       entry.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       entry.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
-    expect(posted.map((call) => call.path)).toEqual(['/people']);
-    expect(location.hash).toBe('#/file/' + BEA);
+    expect(posted.map((call) => call.path)).toEqual(['/people/admit']);
+    expect(document.querySelector('[aria-label="Receipt"]')).not.toBeNull();
     expect(sessionStorage.getItem('lys.add-person.' + ADA)).toBeNull();
   });
 });

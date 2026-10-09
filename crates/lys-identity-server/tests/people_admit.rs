@@ -155,6 +155,33 @@ async fn one_act_registers_makes_the_account_binds_activates_and_grants() -> Tes
     assert_eq!(receipt["operation"], operation);
     assert_eq!(receipt["completed"], json!(STEPS));
     assert!(receipt["failed"].is_null(), "{receipt}");
+    // Every step that writes a log names its leaf: the directory's three and
+    // the grant's. The issuer account is written at the issuer, not a log.
+    let logged: Vec<(Value, Value)> = receipt["logged"]
+        .as_array()
+        .ok_or("the receipt names its log leaves")?
+        .iter()
+        .map(|leaf| (leaf["step"].clone(), leaf["log"].clone()))
+        .collect();
+    assert_eq!(
+        logged,
+        [
+            (json!("register"), json!("directory")),
+            (json!("bind"), json!("directory")),
+            (json!("activate"), json!("directory")),
+            (json!("grant"), json!("grants")),
+        ],
+        "{receipt}"
+    );
+    let directory: Vec<u64> = receipt["logged"]
+        .as_array()
+        .ok_or("leaves")?
+        .iter()
+        .filter(|leaf| leaf["log"] == "directory")
+        .filter_map(|leaf| leaf["index"].as_u64())
+        .collect();
+    assert_eq!(directory.len(), 3, "{receipt}");
+    assert!(directory.windows(2).all(|pair| pair[0] < pair[1]), "{receipt}");
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
     let (status, read) = service
         .get(&format!("/identities/{person}"), Some(&ada))
@@ -179,6 +206,8 @@ async fn asking_again_answers_the_same_person_and_makes_nothing_twice() -> TestR
     for member in ["person", "subject", "grant"] {
         assert_eq!(first[member], again[member], "{member}");
     }
+    // The receipt is the logs' own: asking again answers the same leaves.
+    assert_eq!(first["receipt"]["logged"], again["receipt"]["logged"]);
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
     assert_eq!(people(&service, &ada).await?, before + 1);
     Ok(())

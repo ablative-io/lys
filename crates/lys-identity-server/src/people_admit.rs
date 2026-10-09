@@ -8,8 +8,10 @@
 //! steps already done and finishes what is left; nothing is made twice. The
 //! issuer account is found by email before one is made. A failed step is
 //! answered with its own refusal and a receipt naming it and the steps that
-//! completed before it. Nothing here calls a product or holds a lock across
-//! the issuer's answer.
+//! completed before it. The receipt names the log leaf each written step was
+//! recorded at, the directory's three and the grant's, so it is the logs'
+//! own record: asking again with the same operation answers the same leaves.
+//! Nothing here calls a product or holds a lock across the issuer's answer.
 
 use axum::Json;
 use axum::body::to_bytes;
@@ -79,6 +81,35 @@ pub struct AdmitReceipt {
     pub completed: Vec<String>,
     /// The step that failed, if one did.
     pub failed: Option<String>,
+    /// The log leaf each completed step was recorded at, in order. The
+    /// issuer account is written at the issuer, and has none.
+    pub logged: Vec<Logged>,
+}
+
+/// Where one step was recorded.
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = PeopleAdmitLogged)]
+pub struct Logged {
+    /// The step.
+    pub step: String,
+    /// The log: `directory` or `grants`.
+    pub log: String,
+    /// The leaf's index in that log.
+    pub index: u64,
+}
+
+impl AdmitReceipt {
+    /// Record `step` as completed, at `index` of `log` if it wrote one.
+    fn done(&mut self, step: &str, leaf: Option<(&str, u64)>) {
+        self.completed.push(step.to_owned());
+        if let Some((log, index)) = leaf {
+            self.logged.push(Logged {
+                step: step.to_owned(),
+                log: log.to_owned(),
+                index,
+            });
+        }
+    }
 }
 
 /// The person admitted.
@@ -229,15 +260,15 @@ async fn steps(
     .map_err(at(register))?;
     let person = registered.0.person.clone();
     receipt.person = Some(person.clone());
-    receipt.completed.push(register.to_owned());
+    receipt.done(register, Some(("directory", registered.0.receipt.log.index)));
 
     let api = crate::sign_in_providers::api(state).map_err(at(account))?;
     let (subject, _made) = crate::accounts::make(api, email, &asked.display_name)
         .await
         .map_err(at(account))?;
-    receipt.completed.push(account.to_owned());
+    receipt.done(account, None);
 
-    crate::routes::bind_login(
+    let bound = crate::routes::bind_login(
         State(state.clone()),
         headers.clone(),
         Path(person.clone()),
@@ -250,9 +281,9 @@ async fn steps(
     )
     .await
     .map_err(at(bind))?;
-    receipt.completed.push(bind.to_owned());
+    receipt.done(bind, Some(("directory", bound.0.receipt.log.index)));
 
-    crate::routes::transition(
+    let activated = crate::routes::transition(
         State(state.clone()),
         headers.clone(),
         Path(person.clone()),
@@ -265,7 +296,7 @@ async fn steps(
     )
     .await
     .map_err(at(activate))?;
-    receipt.completed.push(activate.to_owned());
+    receipt.done(activate, Some(("directory", activated.0.receipt.log.index)));
 
     let issued = crate::grants::issue_root(
         State(state.clone()),
@@ -283,7 +314,7 @@ async fn steps(
     )
     .await
     .map_err(at(grant))?;
-    receipt.completed.push(grant.to_owned());
+    receipt.done(grant, Some(("grants", issued.0.index)));
     Ok((person, subject, issued.0.grant.clone()))
 }
 
