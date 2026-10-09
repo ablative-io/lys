@@ -5,6 +5,7 @@
 pub mod admission;
 pub mod authority;
 pub mod cannot_give;
+pub mod channel_membership;
 pub mod codec;
 mod commit;
 pub mod error;
@@ -37,6 +38,7 @@ pub use cannot_give::{
     CannotGiveItem, CannotGiveList, CannotGiveReason, CannotGiveRequest, CannotGiveSubject,
     SERVICE_ACCOUNT,
 };
+pub use channel_membership::{identity_kind, placed_within};
 pub use codec::{GRANT_ENVELOPE, MEMBERS, decode_grant, encode_grant};
 pub use error::GrantError;
 pub use events::{
