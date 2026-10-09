@@ -128,7 +128,8 @@ impl Client {
 
     /// Exchange an authorization code using credentials owned by the caller.
     pub async fn fetch_token(&self, request: &TokenRequest<'_>) -> Result<TokenResponse, Error> {
-        if request.client_id.is_empty() || request.code.is_empty() || request.code_verifier.is_empty() {
+        if request.client_id.is_empty() || request.client_secret.is_empty() || request.code.is_empty()
+            || request.redirect_uri.is_empty() || request.code_verifier.is_empty() {
             return Err(Error::Invalid("token request is incomplete"));
         }
         self.token(&[
@@ -140,7 +141,7 @@ impl Client {
 
     /// Ask Lys to refresh from live grants; no timer or cached authority is used.
     pub async fn refresh_token(&self, client_id: &str, client_secret: &str, refresh_token: &str) -> Result<TokenResponse, Error> {
-        if client_id.is_empty() || refresh_token.is_empty() {
+        if client_id.is_empty() || client_secret.is_empty() || refresh_token.is_empty() {
             return Err(Error::Invalid("refresh request is incomplete"));
         }
         self.token(&[("grant_type", "refresh_token"), ("client_id", client_id),

@@ -48,7 +48,7 @@ impl KeySet {
         let published: Jwks = serde_json::from_str(json)?;
         let mut keys = BTreeMap::new();
         for key in published.keys {
-            if key.kty != "OKP" || key.crv != "Ed25519" || key.kid.is_empty()
+            if key.kty != "OKP" || key.crv != "Ed25519" || key.kid.is_empty() || key.kid.chars().any(char::is_control)
                 || key.alg.as_deref().is_some_and(|alg| alg != "EdDSA")
                 || key.usage.as_deref().is_some_and(|usage| usage != "sig")
                 || key.key_ops.as_ref().is_some_and(|ops| !ops.iter().any(|op| op == "verify")) {
@@ -88,7 +88,7 @@ impl VerifiedPass {
         let signature = parts.next().ok_or(Error::Invalid("missing signature"))?;
         if parts.next().is_some() { return Err(Error::Invalid("too many token segments")); }
         let decoded: Header = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(header)?)?;
-        if decoded.alg != "EdDSA" || decoded.typ != "JWT" || decoded.kid.is_empty()
+        if decoded.alg != "EdDSA" || decoded.typ != "JWT" || decoded.kid.is_empty() || decoded.kid.chars().any(char::is_control)
             || decoded.crit.as_ref().is_some_and(|values| !values.is_empty())
             || decoded.b64 == Some(false) {
             return Err(Error::Invalid("unsupported signed token header"));
