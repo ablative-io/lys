@@ -9,6 +9,7 @@ members = [
     "crates/lys-identity-server",
     "crates/lys-log-store",
     "crates/lys-openapi",
+    "crates/lys-pass",
     "crates/lys-runner",
     "crates/lys-secrets",
     "tests/identity_contract",
@@ -31,6 +32,7 @@ lys-identity = { version = "0.3.0", path = "crates/lys-identity" }
 lys-identity-server = { version = "0.3.0", path = "crates/lys-identity-server" }
 lys-log-store = { version = "0.3.0", path = "crates/lys-log-store" }
 lys-openapi = { version = "0.3.0", path = "crates/lys-openapi" }
+lys-pass = { version = "0.3.0", path = "crates/lys-pass" }
 lys-runner = { version = "0.3.0", path = "crates/lys-runner" }
 
 # Cryptographic primitives — pinned at the versions hardened in meridian-trust.
