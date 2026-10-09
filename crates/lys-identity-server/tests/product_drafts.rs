@@ -288,6 +288,66 @@ async fn executed_and_refused_on_execution_close_the_draft_and_the_dashboard_cou
     Ok(())
 }
 
+/// The ids of a page's drafts, and its `next` and `total`.
+fn paged(page: &Value) -> Result<(Vec<String>, Option<String>, u64), Box<dyn std::error::Error>> {
+    let ids = page["drafts"].as_array().ok_or("a list")?.iter();
+    let ids = ids.filter_map(|draft| draft["id"].as_str().map(str::to_owned));
+    let next = page["next"].as_str().map(str::to_owned);
+    Ok((
+        ids.collect(),
+        next,
+        page["total"].as_u64().ok_or("a total")?,
+    ))
+}
+
+/// Both views of `GET /product-drafts` are paged as every list is: the
+/// caller's `limit` rows in draft id order, a `next` cursor while more
+/// remain, and zero refused. lys-pass follows the connector's cursor.
+#[tokio::test]
+async fn both_views_answer_the_callers_page_and_a_next_cursor() -> TestResult {
+    let table = Table::set().await?;
+    let mut made = Vec::new();
+    for words in [WORDS, "{\"stop\":\"seat-8\"}", "{\"stop\":\"seat-9\"}"] {
+        let draft = drafted(&table, "by_draft", words).await?;
+        ok(decide(&table, &table.admin, &draft, "approve", &decision(words)?).await?)?;
+        made.push(draft);
+    }
+    made.sort();
+    let bea = Auth::Cookie(&table.bea);
+    let page = get(&table.service, "/product-drafts?limit=2", bea).await?;
+    let (ids, next, total) = paged(&ok(page)?)?;
+    assert_eq!((ids.len(), total), (2, 3), "a first page of two of three");
+    let next = next.ok_or("a cursor while more remain")?;
+    let path = format!("/product-drafts?limit=2&after={next}");
+    let last = paged(&ok(
+        get(&table.service, &path, Auth::Cookie(&table.bea)).await?
+    )?)?;
+    assert_eq!((last.0.len(), last.1, last.2), (1, None, 3), "{last:?}");
+    assert_eq!([ids, last.0].concat(), made, "in draft id order, each once");
+    let zero = get(
+        &table.service,
+        "/product-drafts?limit=0",
+        Auth::Cookie(&table.bea),
+    );
+    refused_as(&zero.await?, "RequestMalformed")?;
+
+    let connector = format!("/product-drafts?app={NOTES}&state=approved&limit=1");
+    let one = get(&table.service, &connector, Auth::Bearer(&table.notes)).await?;
+    let (ids, next, total) = paged(&ok(one)?)?;
+    assert_eq!((ids.as_slice(), total), (&made[..1], 3), "one of three");
+    let next = next.ok_or("a cursor while more remain")?;
+    let client = lys_pass::Client::new(
+        reqwest::Client::new(),
+        reqwest::Url::parse(&table.service.base)?,
+    )?;
+    let rest = client
+        .approved_drafts(&table.notes, NOTES, Some(&next))
+        .await?;
+    let rest: Vec<String> = rest.drafts.into_iter().map(|draft| draft.id).collect();
+    assert_eq!(rest, &made[1..], "lys-pass follows the connector's cursor");
+    Ok(())
+}
+
 /// A product's durable ledger: it executes each draft once.
 #[derive(Default)]
 struct Ledger {

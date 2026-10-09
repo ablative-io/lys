@@ -54,6 +54,11 @@ struct Cursor {
 
 pub(crate) type Input = Result<Query<ListQuery>, QueryRejection>;
 
+/// The page size of a list whose caller names none.
+pub(crate) const LIMIT_DEFAULT: usize = 50;
+/// The most rows one page of any list carries; a larger `limit` is capped.
+pub(crate) const LIMIT_MAX: usize = 200;
+
 pub(crate) struct Page {
     route: &'static str,
     query: ListQuery,
@@ -114,6 +119,22 @@ impl Page {
         Ok(Some(Self { route, query, last }))
     }
 
+    /// The page `after` and `limit` ask of `route`, for a list that is
+    /// always paged: no `limit` is [`LIMIT_DEFAULT`] rows, never the whole.
+    pub(crate) fn always(
+        after: Option<String>,
+        limit: Option<usize>,
+        route: &'static str,
+    ) -> Result<Self, ServerError> {
+        let query = ListQuery {
+            q: None,
+            team: None,
+            after,
+            limit: Some(limit.unwrap_or(LIMIT_DEFAULT)),
+        };
+        Self::of(query, route)?.ok_or_else(|| malformed("a paged list answers a page"))
+    }
+
     pub(crate) fn matches<'a>(&self, words: impl IntoIterator<Item = &'a str>) -> bool {
         self.query.q.as_ref().is_none_or(|query| {
             words
@@ -167,7 +188,7 @@ impl Page {
         id: impl Fn(&T) -> &str,
         view: impl Fn(&T) -> Result<V, ServerError>,
     ) -> Result<(Vec<V>, Totals), ServerError> {
-        let limit = self.query.limit.unwrap_or(50).min(200);
+        let limit = self.query.limit.unwrap_or(LIMIT_DEFAULT).min(LIMIT_MAX);
         let mut selected = Vec::with_capacity(limit + 1);
         let mut counted = 0;
         for row in rows {

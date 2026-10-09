@@ -55,9 +55,14 @@ pub struct ApprovedQuery {
     /// `approved` for a connector; absent for a person.
     #[serde(default)]
     pub state: Option<String>,
-    /// The last draft id already read; absent for the first page.
+    /// The opaque cursor the preceding page answered as `next`; absent for
+    /// the first page.
     #[serde(default)]
     pub after: Option<String>,
+    /// Page size, defaulting to 50 and capped at 200 as every list's is;
+    /// zero is refused.
+    #[serde(default)]
+    pub limit: Option<usize>,
 }
 
 /// lys-pass's `ApprovedDraft`.

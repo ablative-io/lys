@@ -7,7 +7,7 @@ use std::ops::Bound;
 
 use axum::extract::Query;
 
-use super::{ListQuery, Page};
+use super::{LIMIT_DEFAULT, LIMIT_MAX, ListQuery, Page};
 use crate::folded_work::{Work, count, reset};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -134,5 +134,43 @@ fn subtree_visits_each_descendant_once_without_unrelated_teams() -> TestResult {
         64
     );
     assert!(count(Work::Team) <= 64);
+    Ok(())
+}
+
+#[test]
+fn an_always_paged_list_answers_the_default_page_and_caps_the_callers() -> TestResult {
+    let rows: Vec<String> = (0..LIMIT_MAX + 7).map(|n| format!("id-{n:04}")).collect();
+    for (limit, shown) in [
+        (None, LIMIT_DEFAULT),
+        (Some(3), 3),
+        (Some(LIMIT_MAX + 1), LIMIT_MAX),
+    ] {
+        let page = Page::always(None, limit, "/product-drafts")?;
+        let (selected, totals) = page.select(
+            rows.iter(),
+            None,
+            |_| Ok(true),
+            |row| row.as_str(),
+            |row| Ok((*row).clone()),
+        )?;
+        assert_eq!((selected.len(), totals.total), (shown, rows.len()));
+        let next = Page::always(totals.next, limit, "/product-drafts")?;
+        let (following, _) = next.select(
+            rows.iter(),
+            None,
+            |_| Ok(true),
+            |row| row.as_str(),
+            |row| Ok((*row).clone()),
+        )?;
+        assert_eq!(
+            following.first(),
+            rows.get(shown),
+            "the cursor resumes after the page"
+        );
+    }
+    assert!(
+        Page::always(None, Some(0), "/product-drafts").is_err(),
+        "zero is refused"
+    );
     Ok(())
 }

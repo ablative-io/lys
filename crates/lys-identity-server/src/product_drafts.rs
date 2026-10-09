@@ -29,6 +29,7 @@ use crate::apps_error::AppError;
 use crate::error::ServerError;
 use crate::error_product_draft::ProductDraftError;
 use crate::grants::{Judged, with_directory_grants};
+use crate::list_page::Page;
 use crate::routes::{AppState, hex, with_directory};
 use crate::session::now;
 
@@ -299,11 +300,11 @@ pub(crate) fn approved_view(record: &ProductDraftRecord) -> ApprovedDraftView {
 }
 
 /// `GET /product-drafts`: a connector, carrying its app's credential,
-/// reads the approved drafts of its own app that it has not closed, in
-/// draft id order after `after`; a signed-in person reads every draft they
-/// may see. The page is the whole population after the cursor: no page
-/// size is configured for this route, so none is invented, and `next` is
-/// always the end.
+/// reads the approved drafts of its own app that it has not closed; a
+/// signed-in person reads every draft they may see. Both are paged as
+/// every list is, in draft id order: the caller's `limit` rows (50 when
+/// none is named, at most 200) after the cursor `after`, with `next`
+/// naming the page after this one until the end.
 async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -317,7 +318,8 @@ async fn list(
                 "a person reads every draft they may see, by no state",
             ));
         }
-        let listed = listing::person_list(&state, &headers, query.after.as_deref())?;
+        let page = Page::always(query.after, query.limit, "/product-drafts")?;
+        let listed = listing::person_list(&state, &headers, &page)?;
         return Ok(Json(listed).into_response());
     }
     let (Some(asked), Some("approved")) = (query.app.as_deref(), query.state.as_deref()) else {
@@ -325,7 +327,8 @@ async fn list(
             "a connector reads its own app's drafts by app and state=approved",
         ));
     };
-    let page = with_connector(&state, &headers, |app, directory| {
+    let page = Page::always(query.after, query.limit, "/product-drafts?state=approved")?;
+    let answer = with_connector(&state, &headers, |app, directory| {
         if app != asked {
             return Err(ProductDraftError::NotYourApp {
                 caller: app.to_owned(),
@@ -334,39 +337,35 @@ async fn list(
             .into());
         }
         let projection = directory.projection()?;
-        let waiting: Vec<&ProductDraftRecord> = projection
+        let waiting = projection
             .product_drafts()
             .filter(|record| {
                 record.created.app == app && record.is_approved() && record.closed.is_none()
             })
-            .collect();
-        let total = waiting.len();
-        let drafts = waiting
-            .into_iter()
-            .filter(|record| {
-                query
-                    .after
-                    .as_deref()
-                    .is_none_or(|after| record.created.operation.to_string().as_str() > after)
-            })
-            .map(approved_view)
-            .collect();
+            .map(|record| (record.created.operation.to_string(), record));
+        let (drafts, totals) = page.select(
+            waiting,
+            None,
+            |_| Ok(true),
+            |(id, _)| id,
+            |(_, record)| Ok(approved_view(record)),
+        )?;
         Ok(ApprovedPage {
             drafts,
-            next: None,
-            total,
+            next: totals.next,
+            total: totals.total,
         })
     })?;
-    Ok(Json(page).into_response())
+    Ok(Json(answer).into_response())
 }
 
 /// How many product drafts the signed-in person may see that still wait on
 /// someone, approved and unexecuted ones included: counted from the
-/// person's own answer of `GET /product-drafts`, beside the operator drafts.
+/// drafts the person's `GET /product-drafts` pages through, beside the
+/// operator drafts.
 pub(crate) fn open_count(state: &AppState, headers: &HeaderMap) -> Result<usize, ServerError> {
-    Ok(listing::person_list(state, headers, None)?
-        .drafts
+    Ok(listing::seen(state, headers)?
         .iter()
-        .filter(|draft| matches!(draft.state.as_str(), "waiting" | "approved"))
+        .filter(|record| record.closed.is_none() && record.refused.is_none())
         .count())
 }

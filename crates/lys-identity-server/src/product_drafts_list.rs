@@ -8,6 +8,7 @@ use lys_identity::projection::product_draft::{Closed, ProductDraftRecord};
 
 use super::wire::{ApprovalView, ExecutionView, ProductDraftList, ProductDraftView, ProductTarget};
 use crate::error::ServerError;
+use crate::list_page::Page;
 use crate::routes::{AppState, hex};
 use axum::http::HeaderMap;
 
@@ -62,13 +63,11 @@ fn view(record: &ProductDraftRecord) -> ProductDraftView {
     }
 }
 
-/// Every product draft the signed-in caller may see, in draft id order
-/// after `after`, whole: no page size is configured, so none is invented.
-pub(super) fn person_list(
+/// Every product draft the signed-in caller may see, in draft id order.
+pub(super) fn seen(
     state: &AppState,
     headers: &HeaderMap,
-    after: Option<&str>,
-) -> Result<ProductDraftList, ServerError> {
+) -> Result<Vec<ProductDraftRecord>, ServerError> {
     let actor = crate::routes::signed_in(state, headers)?;
     crate::grants::with_grants(state, |mut judged| {
         let person = crate::read_api::own_person(judged.directory, &actor)?;
@@ -84,18 +83,31 @@ pub(super) fn person_list(
                 seen.push(record);
             }
         }
-        let total = seen.len();
-        let drafts = seen
-            .iter()
-            .filter(|record| {
-                after.is_none_or(|after| record.created.operation.to_string().as_str() > after)
-            })
-            .map(view)
-            .collect();
-        Ok(ProductDraftList {
-            drafts,
-            next: None,
-            total,
-        })
+        Ok(seen)
+    })
+}
+
+/// One `page` of the product drafts the signed-in caller may see, with
+/// how many they may see in all and the cursor of the page after it.
+pub(super) fn person_list(
+    state: &AppState,
+    headers: &HeaderMap,
+    page: &Page,
+) -> Result<ProductDraftList, ServerError> {
+    let seen = seen(state, headers)?;
+    let rows = seen
+        .iter()
+        .map(|record| (record.created.operation.to_string(), record));
+    let (drafts, totals) = page.select(
+        rows,
+        None,
+        |_| Ok(true),
+        |(id, _)| id,
+        |(_, record)| Ok(view(record)),
+    )?;
+    Ok(ProductDraftList {
+        drafts,
+        next: totals.next,
+        total: totals.total,
     })
 }
