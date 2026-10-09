@@ -191,9 +191,11 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "write",
 ];
 
-/// Whether an agent may hold `action` on an object of `kind`. An approved
-/// app's kind, `{app}.{kind}`, marks none of its acts as an agent's, so none
-/// is; a Lys act is an agent's only when [`AGENT_MAY_HOLD`] names it.
+/// Whether an agent may hold `action` on an object of `kind`, without an
+/// app's schema: a Lys act is an agent's only when [`AGENT_MAY_HOLD`] names
+/// it, and an approved app's kind, `{app}.{kind}`, gives an agent none. An
+/// app's schema names the acts of its own kinds an agent may hold under
+/// `agents`, which [`super::Model::agent_may_hold`] reads.
 #[must_use]
 pub fn agent_may_hold(kind: &str, action: &str) -> bool {
     !kind.contains('.') && AGENT_MAY_HOLD.contains(&action)

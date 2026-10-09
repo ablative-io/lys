@@ -40,6 +40,8 @@ pub struct KindModel {
     pub relations: BTreeMap<Relation, BTreeSet<Action>>,
     /// The kinds whose relations flow down to this one.
     pub parents: BTreeSet<String>,
+    /// The actions an agent may hold, as the app's schema names them.
+    pub agents: BTreeSet<Action>,
     /// Each role of the kind, with the actions it carries (ACCESS-004 R1).
     pub roles: BTreeMap<Relation, BTreeSet<Action>>,
 }
@@ -109,6 +111,21 @@ impl Model {
         self.kinds
             .get(kind)
             .map(|model| (model.version, &model.relations))
+    }
+
+    /// Whether an agent may hold `action` on an object of `kind`. On Lys's
+    /// own kinds, the shipped list answers ([`super::agent_may_hold`]); on an
+    /// app's kind, only the actions its schema names under `agents`, so a
+    /// kind that names none gives an agent none.
+    #[must_use]
+    pub fn agent_may_hold(&self, kind: &str, action: &Action) -> bool {
+        if kind.contains('.') {
+            self.kinds
+                .get(kind)
+                .is_some_and(|model| model.agents.contains(action))
+        } else {
+            super::agent_may_hold(kind, action.as_str())
+        }
     }
 
     /// The version a resource of `kind` is judged under: its app schema's,

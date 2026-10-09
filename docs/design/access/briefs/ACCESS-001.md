@@ -62,19 +62,25 @@ Behavioural. WHEN a grant is issued, THE SYSTEM SHALL carry one of outright, by_
 
 ### R2: A schema action is hot or deliberate, and a held mode is refused on a hot action
 
-Behavioural. WHEN an app schema version names an action, THE SYSTEM SHALL take a class for it, hot or deliberate, defaulting every existing action to deliberate; WHEN a grant with mode by_draft or by_two names an action whose class is hot, THE SYSTEM SHALL refuse it as grant_mode_on_hot_action naming the app, action and class, and write nothing; a schema change that moves an action from deliberate to hot while a standing by_draft or by_two grant names it SHALL be refused as schema_change_strands_grants as a stranding is today.
+Behavioural. WHEN an app schema version names an action, THE SYSTEM SHALL take a class for it, hot or deliberate, defaulting every existing action to deliberate; WHEN a grant with mode by_draft or by_two names an action whose class is hot, THE SYSTEM SHALL refuse it as grant_mode_on_hot_action naming the app, action and class, and write nothing; a schema change that moves an action from deliberate to hot while a standing by_draft or by_two grant names it SHALL be refused as schema_change_strands_grants as a stranding is today. An app schema names, per kind, the actions an agent may hold under `agents`, each one the kind declares and named once; a kind that names none gives an agent none of its actions, so an agent holds an app's act only where its schema opts in, act by act, and Lys's own kinds keep the shipped rule.
 
 **Acceptance:**
 - PUT /apps/{app}/schema with an action class round-trips at every version.
 - Issuing a by_draft grant on a hot action is refused by name with nothing written.
 - Moving an action to hot with a standing by_draft grant is refused naming the grant count.
+- A kind naming `agents: ["read"]` lets a grant passed to an agent carry read and refuses post as WithheldFromAgents; a kind naming no `agents` refuses every act to an agent; an `agents` action the kind does not declare, or named twice, is refused at its pointer.
 
 **Files:**
+- create: crates/lys-identity/tests/schema_agents.rs
 - modify: crates/lys-identity-server/src/apps_schema_api.rs
 - modify: crates/lys-identity-server/src/apps_schema.rs
 - modify: crates/lys-identity-server/src/grants/handlers.rs
 - modify: crates/lys-identity-server/src/openapi_typed.rs
 - modify: crates/lys-identity-server/tests/apps_schema.rs
+- modify: crates/lys-identity/src/grants/schema.rs
+- modify: crates/lys-identity/src/grants/schema_class.rs
+- modify: crates/lys-identity/src/grants/model.rs
+- modify: crates/lys-identity/src/grants/admission.rs
 
 **Checklist:**
 - C602 — An app schema marks each action hot or deliberate; Lys refuses a by_draft or by_two grant on a hot action by name (ACCESS-001 R2).
@@ -137,3 +143,12 @@ Behavioural. WHEN a grant is shown anywhere on the Access screens, THE SYSTEM SH
 - This handwritten brief passes the design gate (scripts/design/gate.sh), judged by its parsed failures, never by its exit code; the rendered markdown matches what render-cluster.py writes.
 - Written whole, read whole by the lead, then one battery on the Mac (every leg green) and the whole gate on Dean through aion at the same sha; then one install and a browser walk with pictures of every screen the brief touches.
 - Every handback has four headings (BLOCKED ON, CHANGED, FOUND, NOT CONFIRMED) and the hospital sentence; no test proves less than before; file-length gate 500 code lines; clippy --workspace --all-targets -- -D warnings; only cargo nextest.
+
+## Amendments
+
+### Amendment 1: the schema's agents field
+
+- **Date:** 2026-10-09
+- **By:** Waffles (ruling relayed by Gaia)
+
+An app's schema marks, per kind and per act, which acts an agent may hold, under `agents`; the default stays none, so agent_may_hold's rule (no act of an app's kind is an agent's) is the default an app opts out of act by act, never a silent widening. The shared membership vector world's schema marks read on the channel kind and nothing else, and the vectors pass as written. Cambium's own schema marks its acts on Monday 12 October 2026 through Artemis, in the permissions story.

@@ -14,6 +14,9 @@
 //!   to the kind it started from.
 //! - A hot action, named under a kind's `hot`, is one the kind declares; every
 //!   other action is deliberate (ACCESS-001 R2, in `schema_class.rs`).
+//! - An action an agent may hold, named under a kind's `agents`, is one the
+//!   kind declares; no other action of an app's kind is an agent's
+//!   (ACCESS-001 schema, in `schema_class.rs`).
 //! - A role, named under a kind's `roles`, carries actions its kind declares
 //!   and is named as none of the kind's relations or actions (ACCESS-004 R1,
 //!   in `schema_roles.rs`).
@@ -158,6 +161,8 @@ pub struct KindSchema {
     pub parents: BTreeSet<String>,
     /// The actions decided from the pass alone; every other one is deliberate.
     pub hot: BTreeSet<Action>,
+    /// The actions an agent may hold; none unless the schema names them.
+    pub agents: BTreeSet<Action>,
     /// Each role, with the actions it carries (ACCESS-004 R1).
     pub roles: BTreeMap<Relation, BTreeSet<Action>>,
 }
@@ -178,6 +183,7 @@ struct Raw {
     relations: Vec<(String, Relation, Pointed)>,
     parents: Pointed,
     hot: BTreeSet<Action>,
+    agents: BTreeSet<Action>,
     roles: BTreeMap<Relation, BTreeSet<Action>>,
 }
 
@@ -244,7 +250,7 @@ fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
     only(
         body,
         pointer,
-        &["actions", "relations", "parents", "hot", "roles"],
+        &["actions", "relations", "parents", "hot", "agents", "roles"],
     )?;
     let actions_at = format!("{pointer}/actions");
     let listed = body
@@ -263,6 +269,7 @@ fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
         return Err(invalid(&actions_at, "a kind declares at least one action"));
     }
     let hot = class::hot(body, pointer, &actions)?;
+    let agents = class::agents(body, pointer, &actions)?;
     let mut relations = Vec::new();
     if let Some(value) = body.get("relations") {
         let relations_at = format!("{pointer}/relations");
@@ -307,6 +314,7 @@ fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
         relations,
         parents,
         hot,
+        agents,
         roles,
     })
 }
@@ -449,6 +457,7 @@ impl AppSchema {
                         relations,
                         parents,
                         hot: kind.hot,
+                        agents: kind.agents,
                         roles: kind.roles,
                     },
                 )
@@ -502,6 +511,7 @@ impl AppSchema {
             relations,
             parents: BTreeSet::new(),
             hot: BTreeSet::new(),
+            agents: BTreeSet::new(),
             roles: BTreeMap::new(),
         };
         Self {
@@ -548,6 +558,7 @@ impl AppSchema {
                     actions: kind.actions.clone(),
                     relations: kind.relations.clone(),
                     parents: kind.parents.clone(),
+                    agents: kind.agents.clone(),
                     roles: kind.roles.clone(),
                 };
                 (name.clone(), model)

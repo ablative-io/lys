@@ -245,7 +245,7 @@ pub fn judge_root(
     } = &request.pass_on
         && recipients.contains(&RecipientKind::Agent)
     {
-        refuse_withheld(&request.relation, kind, onward)?;
+        refuse_withheld(model, &request.relation, kind, onward)?;
     }
     if let PassOn::To {
         actions: onward,
@@ -284,14 +284,15 @@ pub fn judge_root(
 /// Refuse, by name, `relation` when any of `actions` on an object of `kind`
 /// is one no agent may hold.
 fn refuse_withheld<'a>(
+    model: &Model,
     relation: &Relation,
     kind: &str,
     actions: impl IntoIterator<Item = &'a Action>,
 ) -> Result<(), GrantError> {
     let withheld: BTreeSet<&str> = actions
         .into_iter()
+        .filter(|action| !model.agent_may_hold(kind, action))
         .map(Action::as_str)
-        .filter(|action| !super::agent_may_hold(kind, action))
         .collect();
     if withheld.is_empty() {
         return Ok(());
@@ -329,6 +330,7 @@ fn refuse_kept_from_machines<'a>(
 /// Refuse, by name, an agent's grant that carries, or would let the agent
 /// pass on, an act no agent may hold, whatever its source.
 fn withheld_from_agents(
+    model: &Model,
     request: &DelegateRequest,
     actions: &BTreeSet<Action>,
 ) -> Result<(), GrantError> {
@@ -339,6 +341,7 @@ fn withheld_from_agents(
         PassOn::UseOnly => None,
     };
     refuse_withheld(
+        model,
         &request.relation,
         request.resource.kind(),
         actions.iter().chain(onward.into_iter().flatten()),
@@ -387,7 +390,7 @@ pub fn judge_delegation(
     }
     let within = model.within_on(request.resource.kind(), &request.relation, passable)?;
     if kind == RecipientKind::Agent {
-        withheld_from_agents(request, &within.actions)?;
+        withheld_from_agents(model, request, &within.actions)?;
     }
     if kind == RecipientKind::Machine {
         refuse_kept_from_machines(

@@ -28,7 +28,7 @@ fn relation(grant: &WorldGrant) -> Result<&'static str, String> {
 }
 
 /// The vector world's schema: its kinds and actions, each action held by
-/// its own relation.
+/// its own relation, and reading a channel the one act an agent may hold.
 fn schema() -> Value {
     json!({"kinds": {
         "sample.workspace": {
@@ -39,7 +39,8 @@ fn schema() -> Value {
         "sample.channel": {
             "actions": ["read", "post"],
             "relations": {"reader": ["read"], "poster": ["post"]},
-            "parents": ["sample.workspace"]
+            "parents": ["sample.workspace"],
+            "agents": ["read"]
         }
     }})
 }

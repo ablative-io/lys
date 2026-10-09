@@ -22,26 +22,49 @@ pub(super) fn hot(
     pointer: &str,
     actions: &BTreeSet<Action>,
 ) -> Result<BTreeSet<Action>, SchemaError> {
-    let Some(listed) = body.get("hot") else {
+    marked(body, pointer, actions, ("hot", "hot actions", "hot action"))
+}
+
+/// The actions an agent may hold that a kind's `body` names under `agents`,
+/// each one of `actions`. A kind that names none gives an agent none: the
+/// default is no agent act, and an app opts in act by act.
+pub(super) fn agents(
+    body: &Map<String, Value>,
+    pointer: &str,
+    actions: &BTreeSet<Action>,
+) -> Result<BTreeSet<Action>, SchemaError> {
+    marked(
+        body,
+        pointer,
+        actions,
+        ("agents", "an agent's actions", "agent's action"),
+    )
+}
+
+/// The actions `body` names under `key`, each one of `actions`, named once.
+fn marked(
+    body: &Map<String, Value>,
+    pointer: &str,
+    actions: &BTreeSet<Action>,
+    (key, what, one): (&str, &str, &str),
+) -> Result<BTreeSet<Action>, SchemaError> {
+    let Some(listed) = body.get(key) else {
         return Ok(BTreeSet::new());
     };
-    let mut hot = BTreeSet::new();
-    for (at, name) in strings(listed, &format!("{pointer}/hot"), "hot actions")? {
+    let mut marked = BTreeSet::new();
+    for (at, name) in strings(listed, &format!("{pointer}/{key}"), what)? {
         let named = action(&at, &name)?;
         if !actions.contains(&named) {
             return Err(invalid(
                 &at,
-                format!("the hot action `{name}` is not an action of its kind"),
+                format!("the {one} `{name}` is not an action of its kind"),
             ));
         }
-        if !hot.insert(named) {
-            return Err(invalid(
-                &at,
-                format!("the hot action `{name}` is named twice"),
-            ));
+        if !marked.insert(named) {
+            return Err(invalid(&at, format!("the {one} `{name}` is named twice")));
         }
     }
-    Ok(hot)
+    Ok(marked)
 }
 
 impl KindSchema {
@@ -91,6 +114,9 @@ impl AppSchema {
                 });
                 if !kind.hot.is_empty() {
                     body["hot"] = json!(names(&kind.hot));
+                }
+                if !kind.agents.is_empty() {
+                    body["agents"] = json!(names(&kind.agents));
                 }
                 if !kind.roles.is_empty() {
                     body["roles"] = super::roles::to_json(&kind.roles);
