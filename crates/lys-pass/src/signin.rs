@@ -335,7 +335,9 @@ fn cookie(name: &str, value: &str, same_site: &str, max_age: u64) -> Result<Stri
 fn http_address(text: &str) -> Result<Url, Error> {
     let url = Url::parse(text)?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err(Error::Invalid("discovery names an address that is not HTTP"));
+        return Err(Error::Invalid(
+            "discovery names an address that is not HTTP",
+        ));
     }
     Ok(url)
 }

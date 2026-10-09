@@ -26,8 +26,7 @@ async fn ask(world: &World, body: &Value) -> Result<(u16, Value), Box<dyn std::e
 }
 
 #[tokio::test]
-async fn a_refused_checkpoint_holds_the_grants_until_the_administrator_resets_them() -> TestResult
-{
+async fn a_refused_checkpoint_holds_the_grants_until_the_administrator_resets_them() -> TestResult {
     let mut world = World::open(APP, &ward_schema(APP)).await?;
     world
         .place(("workspace", "ward"), ("estate", "trust"), false)
@@ -42,9 +41,17 @@ async fn a_refused_checkpoint_holds_the_grants_until_the_administrator_resets_th
     assert_eq!(before["verdict"]["outcome"], "allowed", "{before}");
     let counted = world.counts().await?;
 
-    let snapshot = world.service.dir.path().join("grant-log").join("snapshot.bin");
+    let snapshot = world
+        .service
+        .dir
+        .path()
+        .join("grant-log")
+        .join("snapshot.bin");
     let mut bytes = std::fs::read(&snapshot)?;
-    let last = bytes.len().checked_sub(1).ok_or("the checkpoint is empty")?;
+    let last = bytes
+        .len()
+        .checked_sub(1)
+        .ok_or("the checkpoint is empty")?;
     bytes[last] ^= 0xff;
     std::fs::write(&snapshot, bytes)?;
     world.service.restart().await?;

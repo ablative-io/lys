@@ -96,13 +96,13 @@ pub mod error_budget;
 pub mod error_call;
 pub mod error_canvas;
 pub mod error_cord;
+pub mod error_grant_stream;
 pub mod error_holding;
 pub mod error_machine;
 mod error_names;
 #[cfg(test)]
 mod error_names_tests;
 pub mod error_product_draft;
-pub mod error_grant_stream;
 pub mod error_provider;
 mod error_status;
 pub mod error_team;

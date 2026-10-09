@@ -157,8 +157,14 @@ async fn a_start_sends_the_browser_to_the_discovered_address_with_s256() -> Resu
         asked["code_challenge"],
         URL_SAFE_NO_PAD.encode(Sha256::digest(started.verifier.as_bytes()))
     );
-    assert!(!started.url.contains(&started.verifier), "the verifier left the server");
-    assert!(!started.url.contains(SECRET), "the credential left the server");
+    assert!(
+        !started.url.contains(&started.verifier),
+        "the verifier left the server"
+    );
+    assert!(
+        !started.url.contains(SECRET),
+        "the credential left the server"
+    );
     for value in [&started.state, &started.verifier, &started.browser] {
         assert_eq!(value.len(), 43);
     }
@@ -215,7 +221,10 @@ async fn another_browsers_state_is_refused_before_lys_is_asked() -> Result {
         assert_eq!(refused.name(), "sign_in_state_refused");
     }
     assert!(
-        seen.lock().unwrap().iter().all(|(path, _)| path != "/oauth/token"),
+        seen.lock()
+            .unwrap()
+            .iter()
+            .all(|(path, _)| path != "/oauth/token"),
         "the code was sent for a state that was not this browser's"
     );
     Ok(())
@@ -245,7 +254,11 @@ async fn an_issuer_refusal_is_named_and_carries_no_credential() -> Result {
         .err()
         .ok_or("a refused exchange answered a pass")?;
     assert_eq!(refused.name(), "code_used");
-    for shown in [refused.to_string(), format!("{refused:?}"), format!("{door:?}")] {
+    for shown in [
+        refused.to_string(),
+        format!("{refused:?}"),
+        format!("{door:?}"),
+    ] {
         assert!(!shown.contains(SECRET), "the credential was shown: {shown}");
     }
     Ok(())
@@ -259,7 +272,10 @@ async fn a_refresh_is_verified_and_an_unreachable_lys_is_named() -> Result {
     let port = listener.local_addr()?.port();
     drop(listener);
     let closed = Url::parse(&format!("http://127.0.0.1:{port}/"))?;
-    let unreachable = sign_in(&closed).await.err().ok_or("a closed port answered")?;
+    let unreachable = sign_in(&closed)
+        .await
+        .err()
+        .ok_or("a closed port answered")?;
     assert_eq!(unreachable.name(), "lys_could_not_be_asked");
     let refreshed = door.refresh("refresh-1", NOW).await?;
     assert_eq!(refreshed.holder, "holder");
@@ -277,7 +293,10 @@ fn cookies_are_http_only_and_secure_and_refuse_what_is_not_a_token() -> Result {
         "haem_state=x_y-z; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600"
     );
     for (name, value) in [("haem_session", "a;b"), ("", "a"), ("a b", "c"), ("n", "")] {
-        assert!(session_cookie(name, value, 1).is_err(), "{name:?}={value:?} was set");
+        assert!(
+            session_cookie(name, value, 1).is_err(),
+            "{name:?}={value:?} was set"
+        );
     }
     Ok(())
 }
