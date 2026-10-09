@@ -21,7 +21,7 @@ export function breakable(text: string): ReactNode {
   return parts.length < 2 ? text : parts.map((part, i) => <Fragment key={i}>{i ? <wbr /> : null}{part}</Fragment>);
 }
 
-/** The columns of a grant, the same on every screen that lists one. Grant and Relation never wrap; On and the path take the room. */
+/** The columns of a grant, the same on every screen that lists one. Grant and Relation never wrap; On and the path take the room. Stands comes last, so a void grant's row ends on why it is void. */
 export function grantColumns(w: GrantWorld): Column<Grant>[] {
   return [
     { head: 'Grant', cell: (g) => <span className="mono g-tight">{grantNo(g.id)}</span> },
@@ -33,12 +33,12 @@ export function grantColumns(w: GrantWorld): Column<Grant>[] {
     { head: 'May pass on', cell: (g) => <span className="sec">{passText(g.pass_on)}</span> },
     { head: 'Window', cell: (g) => <span className="sec">{windowText(g)}</span> },
     { head: 'Last used', cell: (g) => <span className="sec">{g.last_use.seen ? lastUsedText(g) : <span className="dim">{lastUsedText(g)}</span>}</span> },
+    { head: 'Mode', cell: (g) => <span className="sec" data-mode={g.mode}>{modeWords(g.mode)}</span> },
     { head: 'Stands', cell: (g) => {
       const v = voidOf(w, g);
       if (v === null) return <><span className="dot s-active" />yes</>;
       return <span className="danger" title={v.title}><span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>void</span> {breakable(v.why)}</span>;
     } },
-    { head: 'Mode', cell: (g) => <span className="sec" data-mode={g.mode}>{modeWords(g.mode)}</span> },
   ];
 }
 

@@ -83,7 +83,7 @@ export function Listing<T>(props: ListingProps<T>) {
         return <tr key={fold + depth} data-href={href(item)} data-pick={visible.indexOf(href(item))} className={key === selected ? 'cursor' : ''} {...keyable(() => open?.(item))}
           onFocus={() => key !== selected && select(item)}>
           {columns.map((column, index) => [
-            <td key={column.head} style={index === 0 && depth ? { paddingLeft: 28 } : undefined}>{column.cell(item)}</td>,
+            <td key={column.head} data-col={column.head} style={index === 0 && depth ? { paddingLeft: 28 } : undefined}>{column.cell(item)}</td>,
             index === 0 && under ? <td key="under">{children.length && !needle ? <button className="btn under" aria-expanded={isOpen(item)} onClick={(event) => { event.stopPropagation(); setOpened((set) => toggle(set, fold)); }}>{underNoun?.(children.length) ?? count(children.length)}</button> : null}</td> : null,
           ])}
         </tr>;
