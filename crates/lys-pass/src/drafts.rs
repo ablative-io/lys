@@ -185,7 +185,7 @@ fn validate(grant: &str, target: &Target, digest: &str, words: &str) -> Result<(
 
 impl Client {
     /// Pull one approved page, invoke the durable executor once per draft, and close each outcome.
-    pub async fn run_approved<E: Executor>(&self, connector_pass: &str, app: &str, after: Option<&str>, executor: &mut E) -> Result<RunReport, RunError<E::Error>> {
+    pub async fn run_approved<E: Executor + Send>(&self, connector_pass: &str, app: &str, after: Option<&str>, executor: &mut E) -> Result<RunReport, RunError<E::Error>> {
         let page = self.approved_drafts(connector_pass, app, after).await.map_err(RunError::Pull)?;
         let mut report = RunReport { acknowledged: 0, next: page.next };
         for draft in &page.drafts {
