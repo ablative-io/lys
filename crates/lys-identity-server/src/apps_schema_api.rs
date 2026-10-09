@@ -14,9 +14,17 @@
 //! The app `lys`'s schema changes only by the administrator. Every version
 //! stays readable at `GET /apps/{app}/schema?version=N`.
 //!
+//! A change naming roles (ACCESS-004 R1) is judged the same way: one an app
+//! makes that widens a role waits for the administrator like any app-made
+//! change, its diff naming each widening in words, and one that narrows or
+//! removes a role is refused `schema_change_strands_grants` while a standing
+//! grant names that role.
+//!
 //! `POST /apps/{app}/placements` records that a resource of an app kind is
 //! in a parent its kind's schema lists, so the relations held on the parent
-//! flow to it.
+//! flow to it; unless it is `restricted` (ACCESS-004 R2), when nothing held
+//! on the parent reaches the child and the engine is given no parent
+//! relationship for it, so only a grant on the child itself reaches it.
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -89,6 +97,10 @@ pub(crate) struct PlaceBody {
     operation: String,
     child: ResourceBody,
     parent: ResourceBody,
+    /// Whether the parent's relations stop at the child (ACCESS-004 R2);
+    /// absent, they flow to it as before.
+    #[serde(default)]
+    restricted: bool,
 }
 
 /// The schema routes.
@@ -152,6 +164,7 @@ fn strands(book: &GrantBook, old: &AppSchema, new: &AppSchema, at: u64) -> Vec<S
             relation: &grant.parts().relation,
             actions: grant.actions(),
             held: grant.mode().is_held(),
+            role: grant.names_role(),
         });
     stranded(old, new, standing)
         .into_iter()
@@ -436,6 +449,7 @@ async fn place(
             child_id: child.id().to_owned(),
             parent_kind: parent.kind().to_owned(),
             parent_id: parent.id().to_owned(),
+            restricted: body.restricted,
             by: who.by(),
             at: now(),
         }))?;
@@ -444,13 +458,20 @@ async fn place(
                 reason: format!("the grants lock is poisoned: {error}"),
             }
         })?;
-        if let Some(grants) = &*slot
+        // A restricted child is given no parent relationship, so the
+        // engine's permissions on the parent never flow to it.
+        if !body.restricted
+            && let Some(grants) = &*slot
             && let Relationships::SpiceDb(engine) = grants.relationships()
         {
             engine.place(&child, &parent)?;
         }
         Ok(serde_json::json!({
-            "placed": {"child": child.to_string(), "parent": parent.to_string()},
+            "placed": {
+                "child": child.to_string(),
+                "parent": parent.to_string(),
+                "restricted": body.restricted,
+            },
             "operation": kept.operation(),
         }))
     })

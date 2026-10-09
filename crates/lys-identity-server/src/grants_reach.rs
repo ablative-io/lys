@@ -9,6 +9,11 @@
 //! read rather than one per holder, action and resource. Each action is
 //! answered with the mode of the grant it rests on, so a screen names a held
 //! right as held (ACCESS-001 R4). It is a question: nothing is recorded.
+//!
+//! A grant naming a role is counted as the role's actions under the schema
+//! version current now (ACCESS-004 R1). A resource placed restricted
+//! (ACCESS-004 R2) is answered with `restricted` true, so the reach view
+//! shows it apart: nothing held on its parent reaches it.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
@@ -70,6 +75,9 @@ pub struct ReachView {
     pub id: String,
     /// Every holder the caller may see that may take an action asked about.
     pub holders: Vec<ReachHolder>,
+    /// Whether the resource is placed in its parent restricted, so only a
+    /// grant on it reaches it (ACCESS-004 R2).
+    pub restricted: bool,
 }
 
 /// The reach answer.
@@ -119,8 +127,9 @@ pub(crate) async fn reach(
                 let entry = holders
                     .entry(holder.to_string())
                     .or_insert_with(|| (holder, Vec::new()));
+                let held = judged.grants.model().actions_of(record.grant());
                 for action in &actions {
-                    if record.grant().actions().contains(action) && !entry.1.contains(&action) {
+                    if held.contains(action) && !entry.1.contains(&action) {
                         entry.1.push(action);
                     }
                 }
@@ -161,6 +170,7 @@ pub(crate) async fn reach(
                 kind: wire.kind.clone(),
                 id: wire.id.clone(),
                 holders: permitted,
+                restricted: judged.apps.is_restricted(&resource),
             });
         }
         Ok(Json(ReachAnswer {

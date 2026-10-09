@@ -1,10 +1,12 @@
 //! An approved app's kinds in the permission engine's schema language.
 //!
 //! The kind `{app}.{kind}` is the definition `{app}/{kind}`, under the app's
-//! own prefix and no other. It holds the kind's relations, each of subject
-//! `grant#holder`; a `parent_` relation to each parent kind; and one
-//! permission per declared action, carried by the relations that carry the
-//! action and by the same permission on each parent that declares it, so a
+//! own prefix and no other. It holds the kind's relations and its roles,
+//! each of subject `grant#holder`; a `parent_` relation to each parent kind;
+//! and one permission per declared action, carried by the relations and the
+//! roles that carry the action and by the same permission on each parent
+//! that declares it, so a grant naming a role gives the role's actions under
+//! the definition written now (ACCESS-004 R1), and a
 //! relation held on a parent flows to the children placed in it. A kind with
 //! no term for an action names `nil`, which the engine takes as nothing.
 
@@ -60,6 +62,7 @@ pub(crate) fn app_definition(
     let mut lines: Vec<String> = model
         .relations
         .keys()
+        .chain(model.roles.keys())
         .map(|relation| format!("  relation {relation}: grant#holder\n"))
         .collect();
     lines.extend(model.parents.iter().map(|parent| {
@@ -73,6 +76,7 @@ pub(crate) fn app_definition(
         let carried = model
             .relations
             .iter()
+            .chain(model.roles.iter())
             .filter(|(_, actions)| actions.contains(action))
             .map(|(relation, _)| relation.to_string());
         let flowed = model

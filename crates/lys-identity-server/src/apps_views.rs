@@ -312,6 +312,29 @@ pub struct DiffView {
     pub parents_added: Vec<NamedView>,
     /// Parents removed.
     pub parents_removed: Vec<NamedView>,
+    /// Roles added (ACCESS-004 R1).
+    pub roles_added: Vec<NamedView>,
+    /// Roles removed.
+    pub roles_removed: Vec<NamedView>,
+    /// Each role whose actions change, in words the Apps screen shows: "adds
+    /// `seat_retire` to administrator". A widening an app makes waits for the
+    /// administrator.
+    pub roles_changed: Vec<RoleChangeView>,
+}
+
+/// A role a change widens, narrows, or both.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct RoleChangeView {
+    /// The kind.
+    pub kind: String,
+    /// The role.
+    pub role: String,
+    /// The actions it gains.
+    pub added: Vec<String>,
+    /// The actions it loses.
+    pub removed: Vec<String>,
+    /// The change in words, one sentence for each action.
+    pub words: Vec<String>,
 }
 
 impl From<&SchemaDiff> for DiffView {
@@ -325,6 +348,19 @@ impl From<&SchemaDiff> for DiffView {
             actions_removed: named(&diff.actions_removed),
             parents_added: named(&diff.parents_added),
             parents_removed: named(&diff.parents_removed),
+            roles_added: named(&diff.roles_added),
+            roles_removed: named(&diff.roles_removed),
+            roles_changed: diff
+                .roles_changed
+                .iter()
+                .map(|change| RoleChangeView {
+                    kind: change.role.kind.clone(),
+                    role: change.role.name.clone(),
+                    added: change.added.clone(),
+                    removed: change.removed.clone(),
+                    words: change.words(),
+                })
+                .collect(),
         }
     }
 }

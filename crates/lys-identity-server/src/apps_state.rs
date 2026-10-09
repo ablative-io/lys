@@ -218,6 +218,12 @@ pub struct Placed {
     pub parent_kind: String,
     /// The parent's id.
     pub parent_id: String,
+    /// Whether the placement is restricted (ACCESS-004 R2): the parent's
+    /// relations do not flow to the child, and only a grant on the child
+    /// reaches it. Absent from a line kept before restriction existed, which
+    /// keeps its bytes, and from every unrestricted placement.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub restricted: bool,
     /// Who placed it.
     pub by: By,
     /// When.

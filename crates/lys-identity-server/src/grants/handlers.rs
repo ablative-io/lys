@@ -264,7 +264,12 @@ pub(super) async fn who(
             .book()
             .on_resource(&resource)
             .filter(|record| {
-                record.grant().actions().contains(&action)
+                // A grant naming a role is judged as the role's actions now.
+                judged
+                    .grants
+                    .model()
+                    .actions_of(record.grant())
+                    .contains(&action)
                     && sees_with(&judged, caller, record, &mut known)
             })
             .map(|record| {

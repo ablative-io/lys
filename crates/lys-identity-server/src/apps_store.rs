@@ -413,7 +413,9 @@ impl<S: LeafStore> AppStore<S> {
     }
 
     /// The resources whose grants reach `resource`: itself, then each parent
-    /// it is placed in that its kind's schema lists, nearest first.
+    /// it is placed in that its kind's schema lists, nearest first. A
+    /// restricted placement ends the walk (ACCESS-004 R2): nothing held on
+    /// the parent, or above it, reaches the child.
     pub fn reach(&self, resource: &Resource) -> Vec<Resource> {
         let Some(schema) = self.schemas.get(owner_of(resource.kind())) else {
             return vec![resource.clone()];
@@ -421,8 +423,16 @@ impl<S: LeafStore> AppStore<S> {
         schema.reach(resource, |child| {
             self.held
                 .parent(child.kind(), child.id())
+                .filter(|placed| !placed.restricted)
                 .and_then(|placed| Resource::new(&placed.parent_kind, &placed.parent_id).ok())
         })
+    }
+
+    /// Whether `resource` is placed in its parent restricted (ACCESS-004 R2).
+    pub fn is_restricted(&self, resource: &Resource) -> bool {
+        self.held
+            .parent(resource.kind(), resource.id())
+            .is_some_and(|placed| placed.restricted)
     }
 }
 

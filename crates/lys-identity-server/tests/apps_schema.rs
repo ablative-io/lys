@@ -375,6 +375,7 @@ fn placed(operation: &str, id: &str) -> Line {
         child_id: id.to_owned(),
         parent_kind: format!("{NOTES}.workspace"),
         parent_id: "team".to_owned(),
+        restricted: false,
         by: By::Start,
         at: 5,
     })
