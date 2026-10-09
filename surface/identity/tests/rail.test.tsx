@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Settings } from '../src/features/settings/Settings';
 import { Shell } from '../src/shell/Shell';
 import { ShellProvider } from '../src/shell/ShellContext';
+import { NavigationProvider } from '../src/shell/NavigationAccess';
 import { SERVICE } from './fixtures';
 import { $, $$, click, mount, press, serve, settle, unmountAll } from './harness';
 
@@ -99,11 +100,13 @@ describe('rail and dock side (conformance 9.1)', () => {
         root.render(
           <HashRouter>
             <ShellProvider>
-              <Shell>
-                <Routes>
-                  <Route path="/settings/:sec?" element={<Settings />} />
-                </Routes>
-              </Shell>
+              <NavigationProvider>
+                <Shell>
+                  <Routes>
+                    <Route path="/settings/:sec?" element={<Settings />} />
+                  </Routes>
+                </Shell>
+              </NavigationProvider>
             </ShellProvider>
           </HashRouter>,
         );

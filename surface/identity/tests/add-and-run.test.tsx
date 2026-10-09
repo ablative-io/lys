@@ -144,7 +144,8 @@ describe('Add and run on the first computer', () => {
     expect([button.getAttribute('aria-label'), button.textContent]).toEqual(['Add Clover and run it on this computer', 'Add and run']);
     expect(document.querySelectorAll('form button[type="submit"]')).toHaveLength(1);
     expect(posted).toEqual([]);
-    expect(requests.filter((path) => path === '/network')).toHaveLength(1);
+    // The flow reads the computers once; the rail's Network decision is the other read (navigation follows the answering API).
+    expect(requests.filter((path) => path === '/network')).toHaveLength(2);
   });
 
   it('names the served repair steps instead of adding a second roleless computer', async () => {
@@ -363,9 +364,10 @@ describe('Add and run on an existing computer', () => {
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(location.hash).toBe('#/file/' + agent);
     expect(posted[5].path).toBe(prefix + '/start-command');
-    expect(readsAtStart.filter((path) => path === '/network')).toHaveLength(1);
-    // The add reads the computers once, and the agent's own page it lands on reads them once for all its parts.
-    expect(requests.filter((path) => path === '/network')).toHaveLength(2);
+    // The flow reads the computers once; the rail's Network decision is the other read (navigation follows the answering API).
+    expect(readsAtStart.filter((path) => path === '/network')).toHaveLength(2);
+    // The add reads the computers once, the agent's own page it lands on reads them once for all its parts, and the rail's Network decision once.
+    expect(requests.filter((path) => path === '/network')).toHaveLength(3);
   });
 
   it.each(['admission', 'start'] as const)('replays the exact saved %s on the original computer after remount', async (stage) => {

@@ -67,7 +67,8 @@ describe('Choosing where an agent can run', () => {
     expect(tick('op-' + '2'.repeat(32)).checked).toBe(true);
     expect(tick('op-' + '3'.repeat(32)).disabled).toBe(true);
     expect($('[aria-label="Where can Scribe run?"]')?.textContent).not.toContain('Retired computer');
-    expect(requests.filter((request) => request === '/network')).toHaveLength(1);
+    // The flow reads the computers once; the rail's Network decision is the other read (navigation follows the answering API).
+    expect(requests.filter((request) => request === '/network')).toHaveLength(2);
     expect(requests.filter((request) => request === '/surface-contract')).toHaveLength(1);
     expect(posted).toEqual([]);
   });
