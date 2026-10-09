@@ -84,3 +84,11 @@ fn malformed_keysets_and_unsigned_headers_are_refused() -> Result {
     assert!(VerifiedPass::verify("one.two.three.four", &keys, "https://issuer.example", "sample", 100).is_err());
     Ok(())
 }
+
+#[test]
+fn wrong_issuer_never_trusts_a_pass_from_another_authority() -> Result {
+    let token = fixture("valid")?;
+    let keys = keys()?;
+    assert_eq!(VerifiedPass::verify(&token, &keys, "https://other.example", "sample", 100).err().ok_or("wrong issuer accepted")?.name(), "wrong_issuer");
+    Ok(())
+}

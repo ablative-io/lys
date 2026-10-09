@@ -5,6 +5,10 @@ use reqwest::Client as Http;
 use url::Url;
 
 async fn serve(listener: tokio::net::TcpListener, body: &'static str) -> Result<String, std::io::Error> {
+    serve_status(listener, body, "200 OK").await
+}
+
+async fn serve_status(listener: tokio::net::TcpListener, body: &'static str, status: &'static str) -> Result<String, std::io::Error> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let (mut stream, _) = listener.accept().await?;
     let mut bytes = Vec::new();
@@ -26,7 +30,7 @@ async fn serve(listener: tokio::net::TcpListener, body: &'static str) -> Result<
             if bytes.len() >= split + 4 + length { break; }
         }
     }
-    let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+    let response = format!("HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
     stream.write_all(response.as_bytes()).await?;
     stream.shutdown().await?;
     String::from_utf8(bytes).map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
@@ -90,5 +94,17 @@ async fn token_fetch_and_refresh_send_their_distinct_grants() -> Result<(), Box<
         assert!(request.contains(if refresh { "grant_type=refresh_token" } else { "grant_type=authorization_code" }));
         assert_eq!(answer.refresh_token.as_deref(), Some("refresh"));
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn ended_holder_refresh_preserves_the_issuer_refusal_name() -> Result<(), Box<dyn std::error::Error>> {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?;
+    let server = tokio::spawn(serve_status(listener, "{\"error\":\"invalid_grant\",\"error_description\":\"holder ended\",\"refusal\":\"HolderRetired\",\"reason\":\"holder ended\"}", "400 Bad Request"));
+    let client = Client::new(Http::builder().no_proxy().build()?, Url::parse(&format!("http://{address}"))?)?;
+    let error = client.refresh_token("sample", "synthetic", "refresh").await.err().ok_or("retired holder refresh accepted")?;
+    assert_eq!(error.name(), "HolderRetired");
+    server.await??;
     Ok(())
 }
