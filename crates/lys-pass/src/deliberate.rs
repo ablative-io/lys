@@ -2,8 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Client, Error, Mode, Target};
+use crate::Mode;
+#[cfg(feature = "http")]
+use crate::{Client, Error, Target};
 
+#[cfg(feature = "http")]
 #[derive(Serialize)]
 struct Check<'a> {
     subject: &'a str,
@@ -11,6 +14,7 @@ struct Check<'a> {
     target: &'a Target,
 }
 
+#[cfg(feature = "http")]
 #[derive(Serialize)]
 struct Batch<'a> {
     checks: Vec<Check<'a>>,
@@ -53,6 +57,7 @@ pub struct CheckAnswer {
 }
 
 impl CheckAnswer {
+    #[cfg(feature = "http")]
     fn validate(&self) -> Result<(), Error> {
         let grant = self.grant.as_deref().is_some_and(|grant| !grant.is_empty());
         match (self.allowed, self.mode) {
@@ -83,6 +88,7 @@ pub struct BatchAnswer {
     pub degraded: Option<Degraded>,
 }
 
+#[cfg(feature = "http")]
 impl Client {
     /// Ask the live batch route using the caller's pass; never try offline rights on failure.
     pub async fn check_batch(

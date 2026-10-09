@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{Client, Error, Target};
+#[cfg(feature = "http")]
+use crate::Client;
+use crate::{Error, Target};
 
 /// A held act, whose words are immutable bytes rather than reserialized JSON.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -215,6 +217,7 @@ fn validate(grant: &str, target: &Target, digest: &str, words: &str) -> Result<(
     Ok(())
 }
 
+#[cfg(feature = "http")]
 impl Client {
     /// Pull one approved page, invoke the durable executor once per draft, and close each outcome.
     pub async fn run_approved<E: Executor + Send>(
