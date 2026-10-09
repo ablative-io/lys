@@ -1,0 +1,31 @@
+{
+  "log": { "identity": "lys-membership-vectors", "epoch": 1 },
+  "kinds": [
+    { "kind": "sample.workspace", "actions": ["read", "post"], "parents": [] },
+    { "kind": "sample.channel", "actions": ["read", "post"], "parents": ["sample.workspace"] },
+    { "kind": "sample.restricted", "actions": ["read", "post"], "parents": [] }
+  ],
+  "subjects": [
+    { "label": "reader", "kind": "person", "responsible": null },
+    { "label": "poster", "kind": "person", "responsible": null },
+    { "label": "steward", "kind": "person", "responsible": null },
+    { "label": "responsible", "kind": "person", "responsible": null },
+    { "label": "ai", "kind": "agent", "responsible": "responsible" },
+    { "label": "former", "kind": "person", "responsible": null }
+  ],
+  "placements": [
+    { "child": { "kind": "sample.channel", "id": "ward-a" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
+    { "child": { "kind": "sample.channel", "id": "ward-b" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
+    { "child": { "kind": "sample.channel", "id": "ward-c" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
+    { "child": { "kind": "sample.restricted", "id": "ward-secret" }, "parent": { "kind": "sample.workspace", "id": "ward" } },
+    { "child": { "kind": "sample.channel", "id": "elsewhere-a" }, "parent": { "kind": "sample.workspace", "id": "elsewhere" } }
+  ],
+  "grants": [
+    { "label": "reader-grant", "holder": "reader", "resource": { "kind": "sample.channel", "id": "ward-a" }, "actions": ["read"], "mode": "outright", "revoked": false },
+    { "label": "poster-grant", "holder": "poster", "resource": { "kind": "sample.channel", "id": "ward-a" }, "actions": ["post"], "mode": "outright", "revoked": false },
+    { "label": "steward-grant", "holder": "steward", "resource": { "kind": "sample.workspace", "id": "ward" }, "actions": ["read"], "mode": "outright", "revoked": false },
+    { "label": "responsible-grant", "holder": "responsible", "resource": { "kind": "sample.channel", "id": "ward-a" }, "actions": ["read"], "mode": "outright", "revoked": false },
+    { "label": "ai-grant", "holder": "ai", "resource": { "kind": "sample.channel", "id": "ward-c" }, "actions": ["read"], "mode": "outright", "revoked": false },
+    { "label": "former-grant", "holder": "former", "resource": { "kind": "sample.channel", "id": "ward-a" }, "actions": ["read"], "mode": "outright", "revoked": true }
+  ]
+}

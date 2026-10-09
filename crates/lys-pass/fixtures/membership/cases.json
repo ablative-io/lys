@@ -1,0 +1,594 @@
+[
+  {
+    "name": "reader-reads-own-channel",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "allowed",
+      "grant": "reader-grant",
+      "scope": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      }
+    }
+  },
+  {
+    "name": "reader-cannot-post",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "post",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "NotHeld",
+      "decided": true
+    }
+  },
+  {
+    "name": "reader-cannot-read-sibling",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-b"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "NotHeld",
+      "decided": true
+    }
+  },
+  {
+    "name": "poster-posts-own-channel",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "poster",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "post",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "allowed",
+      "grant": "poster-grant",
+      "scope": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      }
+    }
+  },
+  {
+    "name": "poster-cannot-read",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "poster",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "NotHeld",
+      "decided": true
+    }
+  },
+  {
+    "name": "poster-cannot-post-sibling",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "poster",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-b"
+      },
+      "action": "post",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "NotHeld",
+      "decided": true
+    }
+  },
+  {
+    "name": "steward-reaches-child-through-workspace",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "steward",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-b"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "allowed",
+      "grant": "steward-grant",
+      "scope": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      }
+    }
+  },
+  {
+    "name": "steward-cannot-post-through-workspace",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "steward",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-b"
+      },
+      "action": "post",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "NotHeld",
+      "decided": true
+    }
+  },
+  {
+    "name": "steward-not-into-restricted-child",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "steward",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.restricted",
+        "id": "ward-secret"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "NotHeld",
+      "decided": true
+    }
+  },
+  {
+    "name": "responsible-person-gives-ai-nothing",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "ai",
+        "kind": "agent"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "NotHeld",
+      "decided": true
+    }
+  },
+  {
+    "name": "ai-reads-own-channel",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "ai",
+        "kind": "agent"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-c"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "allowed",
+      "grant": "ai-grant",
+      "scope": {
+        "kind": "sample.channel",
+        "id": "ward-c"
+      }
+    }
+  },
+  {
+    "name": "revoked-grant-refused",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "former",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "Revoked",
+      "decided": true
+    }
+  },
+  {
+    "name": "unknown-contract",
+    "request": {
+      "contract": 2,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "membership_contract_unsupported",
+      "decided": false
+    }
+  },
+  {
+    "name": "foreign-log",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "another-log",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "membership_log_mismatch",
+      "decided": false
+    }
+  },
+  {
+    "name": "reset-epoch",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 2
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "membership_log_mismatch",
+      "decided": false
+    }
+  },
+  {
+    "name": "malformed-action",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "membership_request_malformed",
+      "decided": false
+    }
+  },
+  {
+    "name": "subject-kind-forged",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "agent"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "membership_subject_kind_mismatch",
+      "decided": false
+    }
+  },
+  {
+    "name": "forged-workspace",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "elsewhere"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "membership_outside_workspace",
+      "decided": false
+    }
+  },
+  {
+    "name": "guessed-channel",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-z"
+      },
+      "action": "read",
+      "at_least": 0
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "membership_outside_workspace",
+      "decided": false
+    }
+  },
+  {
+    "name": "minimum-revision-ahead",
+    "request": {
+      "contract": 1,
+      "log": {
+        "identity": "lys-membership-vectors",
+        "epoch": 1
+      },
+      "workspace": {
+        "kind": "sample.workspace",
+        "id": "ward"
+      },
+      "subject": {
+        "id": "reader",
+        "kind": "person"
+      },
+      "resource": {
+        "kind": "sample.channel",
+        "id": "ward-a"
+      },
+      "action": "read",
+      "at_least": 18446744073709551615
+    },
+    "expected": {
+      "outcome": "refused",
+      "refusal": "StaleDecision",
+      "decided": false
+    }
+  }
+]

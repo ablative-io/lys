@@ -3,10 +3,13 @@
 pub mod conformance;
 pub mod deliberate;
 pub mod drafts;
+pub mod membership;
+pub mod membership_conformance;
 pub mod refusal;
 pub mod rights;
 pub mod verify;
 
+pub use membership::{GrantLog, MembershipDecision, MembershipRequest, Subject, Verdict};
 pub use refusal::Refusal;
 pub use rights::{Claims, Decision, Holder, Mode, Right, Target};
 pub use verify::{KeySet, VerifiedPass};
