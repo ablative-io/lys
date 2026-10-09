@@ -46,6 +46,18 @@ describe('Product drafts on the Drafts screen', () => {
     expect(cells(EXECUTED)[4]).toBe('Executed');
   });
 
+  it('reads on through `next` until it is null: the second page shows, and nothing is asked after the last', async () => {
+    const [first, ...rest] = PAGE.drafts;
+    const { requests } = await mount('#/access/drafts', {
+      ...SERVICE,
+      '/product-drafts': ok({ drafts: [first], next: 'page-2', total: 4 }),
+      '/product-drafts?after=page-2': ok({ drafts: rest, next: null, total: 4 }),
+    });
+    expect(requests.filter((path) => path.startsWith('/product-drafts'))).toEqual(['/product-drafts', '/product-drafts?after=page-2']);
+    for (const id of [WAITING, APPROVED, EXECUTED, REFUSED]) expect(row(id)).not.toBeNull();
+    expect(cells(REFUSED)[4]).toContain('the roadmap is locked for the release');
+  });
+
   it("shows a refusal on execution in the product's own name and words", async () => {
     await mount('#/access/drafts', routes);
     expect(row(REFUSED)?.querySelector('.refusal-name')?.textContent).toBe('roadmap_locked');
