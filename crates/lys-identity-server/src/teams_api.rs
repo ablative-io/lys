@@ -46,6 +46,86 @@ pub(crate) mod giving;
 #[path = "teams_giving_tests.rs"]
 mod giving_tests;
 
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::error::Error;
+    use std::sync::Arc;
+
+    use identity_contract::fake_issuer::Login;
+    use identity_contract::harness::{ADMINISTRATOR, Service};
+    use lys_core::Ed25519Identity;
+    use serde_json::Value;
+
+    use crate::config::Config;
+    use crate::dev_seed::seed_configured;
+    use crate::teams_state::{Changed, Created, Hold, Line};
+    use crate::teams_store::TeamStore;
+
+    type Outcome = Result<(), Box<dyn Error>>;
+
+    fn login(subject: &str) -> Login {
+        Login { subject: subject.to_owned(), email: "scope@example.test".to_owned() }
+    }
+
+    fn fixture(config: &Config) -> Result<BTreeSet<String>, Box<dyn Error>> {
+        let seeded = seed_configured(config, [ADMINISTRATOR, "member"])?;
+        let administrator = seeded.people[0].id.to_string();
+        let person = seeded.people[1].id.to_string();
+        let by = crate::read_views::Login { provider: config.issuer.clone(), subject: ADMINISTRATOR.to_owned() };
+        let mut store = TeamStore::open(config.teams_dir.as_deref().ok_or("teams disabled")?,
+            Arc::new(Ed25519Identity::load(&config.event_key_file)?))?;
+        let mut expected = BTreeSet::new();
+        for index in 1..=4 {
+            let id = format!("op-{index:032x}");
+            store.keep(Line::Created(Created { id: id.clone(), name: id.clone(),
+                owner: if index == 1 { person.clone() } else { administrator.clone() },
+                description: String::new(), by: by.clone(), at: 1 }))?;
+            if matches!(index, 2 | 4) {
+                store.keep(Line::Added(Changed { operation: format!("op-{:032x}", index + 10), team: id.clone(),
+                    member: person.clone(), by: by.clone(), at: 2 }))?;
+            }
+            if index == 4 {
+                store.keep(Line::Held(Hold { operation: format!("op-{:032x}", 20), team: id.clone(),
+                    member: person.clone(), reason: "membership awaits admission".to_owned(), at: 3 }))?;
+            }
+            if index <= 2 { expected.insert(id); }
+        }
+        Ok(expected)
+    }
+
+    #[tokio::test]
+    async fn personal_teams_include_only_owned_or_effective_memberships() -> Outcome {
+        let (service, expected) = Service::start_with(fixture).await?;
+        let member = service.sign_in(login("member")).await?;
+        let administrator = service.sign_in(login(ADMINISTRATOR)).await?;
+        let (status, personal) = service.get("/teams", Some(&member)).await?;
+        assert_eq!(status, 200, "{personal}");
+        let ids = personal["teams"].as_array().ok_or("teams missing")?.iter()
+            .map(|team| team["id"].as_str().map(str::to_owned).ok_or("team id missing"))
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        assert_eq!(ids, expected, "another person's and held memberships must not leak");
+        for index in 1..=4 {
+            let (status, one) = service.get(&format!("/teams/op-{index:032x}"), Some(&member)).await?;
+            if index <= 2 {
+                assert_eq!(status, 200, "{one}");
+                assert_eq!(one["id"], format!("op-{index:032x}"));
+            } else {
+                assert_eq!(status, 404, "{one}");
+                assert_eq!(one["refusal"], "TeamUnknown");
+            }
+        }
+        let (status, all) = service.get("/teams", Some(&administrator)).await?;
+        assert_eq!(status, 200, "{all}");
+        assert_eq!(all["teams"].as_array().ok_or("teams missing")?.len(), 4);
+        let unbound = service.sign_in(login("unbound")).await?;
+        let (status, refused) = service.get("/teams", Some(&unbound)).await?;
+        assert_eq!(status, 403, "{refused}");
+        assert_eq!(refused["refusal"], "NoPerson");
+        Ok(())
+    }
+}
+
 /// A team as the routes answer it.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct TeamView {
