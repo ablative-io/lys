@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::apps_binding::{Acting, acting};
 use crate::error::ServerError;
-use crate::grants::{Decision, Judged, decide, with_grants};
+use crate::grants::{Decision, Judged, decide, decide_in, with_grants};
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
 
@@ -85,6 +85,9 @@ pub struct CheckAnswer {
     /// so a product holds the act for a draft rather than refusing it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
+    /// The redacted failure of the reading that allowed this check.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 /// A batch's answers.
@@ -94,6 +97,9 @@ pub struct BatchAnswer {
     pub revision: u64,
     /// Each check's answer, in the order sent.
     pub results: Vec<CheckAnswer>,
+    /// A degraded reading used by an answer; each result retains its own marker.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 /// The question of which ids a subject may act on.
@@ -128,6 +134,9 @@ pub struct WhichPage {
     pub next: Option<String>,
     /// The permission revision every answer was decided at.
     pub revision: u64,
+    /// The reading's degradation, including when no id is permitted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -191,6 +200,7 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
         refusal: Some(error.name()),
         reason: Some(error.to_string()),
         mode: None,
+        degraded: None,
     };
     let asked = (|| -> Result<ExerciseRequest, ServerError> {
         judged.apps.admit_kind(acting_for, &check.kind)?;
@@ -215,6 +225,10 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
             via: Some(via.to_string()),
             refusal: None,
             reason: None,
+            degraded: permit
+                .degraded
+                .as_deref()
+                .map(crate::grants::DegradedView::from),
         },
         Err(error) => refused(error.into()),
     }
@@ -230,13 +244,14 @@ pub async fn batch(
     let acting_for = asker(&state, &headers)?;
     let at = now();
     with_grants(&state, |mut judged| {
-        let results = body
+        let results: Vec<CheckAnswer> = body
             .checks
             .iter()
             .map(|check| one(&mut judged, acting_for.as_deref(), check, at, body.at_least))
             .collect();
         Ok(Json(BatchAnswer {
             revision: judged.grants.revision(),
+            degraded: results.iter().find_map(|answer| answer.degraded.clone()),
             results,
         }))
     })
@@ -256,9 +271,10 @@ pub async fn which(
     let subject: IdentityId = identity_id(&body.subject)?;
     let action = Action::new(&body.action)?;
     let at = now();
-    with_grants(&state, |mut judged| {
+    with_grants(&state, |judged| {
         judged.apps.admit_kind(acting_for.as_deref(), &body.kind)?;
         judged.apps.admit_action(&body.kind, action.as_str())?;
+        let frame = judged.grants.frame(judged.directory, body.at_least)?;
         let mut candidates: BTreeSet<String> = judged
             .grants
             .book()
@@ -290,7 +306,7 @@ pub async fn which(
                 resource: Resource::new(&body.kind, &id)?,
                 action: action.clone(),
             };
-            let right = match decide(&mut judged, &request, at, body.at_least, Decision::Explain) {
+            let right = match decide_in(&judged, &frame, &request, at) {
                 Ok((permit, _)) => match mode_of(&judged, permit.grant) {
                     Some(held) => held,
                     None => continue,
@@ -310,7 +326,10 @@ pub async fn which(
             ids,
             modes,
             next,
-            revision: judged.grants.revision(),
+            revision: frame.revision(),
+            degraded: frame
+                .degradation()
+                .map(|held| crate::grants::DegradedView::from(held.as_ref())),
         }))
     })
 }

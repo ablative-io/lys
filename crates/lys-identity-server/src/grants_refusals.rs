@@ -143,9 +143,9 @@ fn permits(state: &AppState, question: &GrantQuestion) -> Result<bool, ServerErr
             resource: Resource::new(&question.resource.kind, &question.resource.id)?,
             action: Action::new(&question.action)?,
         };
-        Ok(judged
+        judged
             .grants
-            .explain(judged.directory, &request, now(), None)
-            .is_ok())
+            .explain(judged.directory, &request, now(), None)?;
+        Ok(true)
     })
 }

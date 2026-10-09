@@ -124,6 +124,7 @@ export interface Recorded {
   operation: string;
   grant: string;
   index: number;
+  degraded?: Degraded;
   receipt: {
     version: number;
     caller: IdentityId;
@@ -137,6 +138,13 @@ export interface Recorded {
 
 /** `UseEventView`: whether a check's use was recorded, and why not when it was not. */
 export type UseEvent = { recorded: true; index: number } | { recorded: false; reason: string };
+
+/** A selected reading whose projection failed; private causes are omitted. */
+export interface Degraded {
+  step: 'project';
+  refusal: string;
+  revision: number;
+}
 
 /**
  * `PermitView`: a permitted decision and the authority path it rests on. POST
@@ -152,6 +160,7 @@ export interface Permit {
   model_version: number;
   revision: number;
   use_event?: UseEvent;
+  degraded?: Degraded;
 }
 
 /** GET /grants/model: `ModelView`, each relation with the actions it carries. */
@@ -169,6 +178,7 @@ export interface WhoAnswer {
   revision: number;
   complete: boolean;
   next: string | null;
+  degraded?: Degraded;
 }
 
 /** `PAGE_MAX`. */
@@ -186,6 +196,35 @@ export interface ReachAnswer {
   /** Each holder's `modes` stand beside its `actions`: the mode of the grant each action rests on. */
   /** `restricted`: the resource is placed in its parent restricted, so only a grant on it reaches it (ACCESS-004 R2). */
   resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[]; modes: GrantMode[] }[]; restricted?: boolean })[];
+  degraded?: Degraded;
+}
+
+/** One result from the batch, retaining the reading used for its proof. */
+export interface CheckAnswer {
+  allowed: boolean;
+  grant?: string;
+  path?: string[];
+  via?: string;
+  refusal?: string;
+  reason?: string;
+  /** How the right is exercised (ACCESS-001 R1); a held right answers allowed false with its grant. */
+  mode?: GrantMode;
+  degraded?: Degraded;
+}
+
+export interface BatchAnswer {
+  revision: number;
+  results: CheckAnswer[];
+  degraded?: Degraded;
+}
+
+export interface WhichPage {
+  ids: string[];
+  /** Each id's mode, beside it. */
+  modes: GrantMode[];
+  next?: string;
+  revision: number;
+  degraded?: Degraded;
 }
 
 

@@ -44,6 +44,10 @@ use crate::store::{LeafStore, PinnedRoot, batch_end};
 
 mod crc32c;
 mod head;
+mod legacy;
+mod legacy_leaves;
+#[cfg(test)]
+mod legacy_tests;
 mod open;
 mod segment;
 mod snapshot_slot;
@@ -83,12 +87,12 @@ pub struct UnfinishedTail {
     pub reason: String,
 }
 
-/// A directory-backed [`LeafStore`].
-///
-/// Holds no leaf bytes in memory: the segments' first indices, the extent and
-/// the pin are established when the store opens, and leaves are read on
-/// demand through their offsets file.
+/// A bounded commit-point check, consulted only while a legacy writer is held.
+pub type MigrationReady = std::sync::Arc<dyn Fn() -> StoreResult<bool> + Send + Sync>;
+
+/// A directory-backed [`LeafStore`] that reads leaves on demand.
 pub struct FileLeafStore {
+    legacy: Option<MigrationReady>,
     dir: PathBuf,
     origin: String,
     extent: u64,
@@ -174,6 +178,7 @@ impl FileLeafStore {
         // possible root, so computing it here cannot go wrong, whereas taking
         // it from the caller invites being handed a different one.
         Ok(Self {
+            legacy: None,
             dir: dir.to_path_buf(),
             origin: config.origin,
             extent: 0,
@@ -277,6 +282,9 @@ impl FileLeafStore {
     /// [`StoreError::Corrupt`] for a count or a segment boundary that does
     /// not agree, and [`StoreError::Io`] on filesystem failure.
     pub fn audit_leaves(&self) -> StoreResult<()> {
+        if self.legacy.is_some() {
+            return legacy::audit(self);
+        }
         let mut counted = 0;
         for (position, &first) in self.segments.iter().enumerate() {
             if first != counted {
@@ -394,6 +402,9 @@ impl LeafStore for FileLeafStore {
         if index >= self.extent {
             return Ok(None);
         }
+        if self.legacy.is_some() {
+            return v1::leaf(&self.dir, index);
+        }
         let position = self.segments.partition_point(|&first| first <= index);
         let first = self.segments[position.saturating_sub(1)];
         let path = segment_path(&self.dir, first);
@@ -454,6 +465,10 @@ impl LeafStore for FileLeafStore {
         if leaves.is_empty() {
             return self.pin(pin);
         }
+        self.migrate_if_ready()?;
+        if self.legacy.is_some() {
+            return legacy::append(self, index, leaves, pin);
+        }
         self.roll_if_due(index)?;
         let mut buffer = Vec::new();
         let mut offsets = Vec::with_capacity(leaves.len());
@@ -484,6 +499,18 @@ impl LeafStore for FileLeafStore {
             return Err(StoreError::ReopenRequired { index });
         }
         self.check_pin(pin)?;
+        if self.legacy.is_some() {
+            if pin.tree_size != self.extent {
+                return Err(StoreError::PinNotOfAppend {
+                    end: self.extent,
+                    tree_size: pin.tree_size,
+                });
+            }
+            self.durability_uncertain = Some(self.extent);
+            legacy::pin(self, pin)?;
+            self.durability_uncertain = None;
+            return Ok(());
+        }
         if pin == self.pinned {
             return Ok(());
         }
@@ -499,6 +526,7 @@ impl LeafStore for FileLeafStore {
 
     fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
         self.refuse_if_read_only("write a snapshot")?;
+        self.migrate_if_ready()?;
         let digest: [u8; 32] = Sha256::digest(bytes).into();
         if self.durable_snapshot == Some(digest) {
             return Ok(());

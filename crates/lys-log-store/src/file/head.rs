@@ -11,6 +11,33 @@ use super::{FileLeafStore, fsync_dir, write_durably};
 use crate::error::{StoreError, StoreResult};
 
 impl FileLeafStore {
+    /// Certify this handle's head under the append lock for one reading.
+    /// The lock is released when the callback returns, including a refusal.
+    /// A later reading must certify its head again; this is no writer lease.
+    ///
+    /// # Errors
+    /// Returns [`StoreError::MigrationPending`] for a deferred legacy store,
+    /// [`StoreError::ReopenRequired`] for an uncertain append, and the original
+    /// head-lock, corruption or conflicting-writer refusal before the callback.
+    /// The callback's error is returned unchanged.
+    pub fn with_current_head<T>(
+        &self,
+        reading: impl FnOnce(&Self) -> StoreResult<T>,
+    ) -> StoreResult<T> {
+        if self.legacy.is_some() {
+            return Err(StoreError::MigrationPending {
+                path: self.dir.clone(),
+            });
+        }
+        if let Some(index) = self.durability_uncertain {
+            return Err(StoreError::ReopenRequired { index });
+        }
+        let head = self.hold_head(self.extent)?;
+        let result = reading(self);
+        drop(head);
+        result
+    }
+
     /// Begin a new segment at `first` when the last one is past the roll
     /// size: seal the last offsets file, create the new files, flush the
     /// directory. The act that follows goes into the new segment.
@@ -134,4 +161,53 @@ fn create_durably(path: &Path, first: u64) -> StoreResult<()> {
         context: format!("failed to flush {} to disk", path.display()),
         source,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+    use std::sync::Arc;
+
+    use super::FileLeafStore;
+    use crate::StoreError;
+
+    #[test]
+    fn deferred_migration_and_uncertain_durability_refuse_before_reading()
+    -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::TempDir::new()?;
+        let readings = (|| -> Result<_, Box<dyn Error>> {
+            let mut store = FileLeafStore::create(dir.path(), "example.test/head-refusals")?;
+            let mut calls = 0;
+            store.legacy = Some(Arc::new(|| Ok(false)));
+            let legacy = store.with_current_head(|_| {
+                calls += 1;
+                Ok(())
+            });
+            store.legacy = None;
+            store.durability_uncertain = Some(3);
+            let uncertain = store.with_current_head(|_| {
+                calls += 1;
+                Ok(())
+            });
+            drop(store);
+            Ok((legacy, uncertain, calls))
+        })();
+        let (legacy, uncertain, calls) = match (readings, dir.close()) {
+            (Ok(value), Ok(())) => value,
+            (Err(error), Ok(())) => return Err(error),
+            (Ok(_), Err(error)) => return Err(error.into()),
+            (Err(error), Err(cleanup)) => {
+                return Err(
+                    format!("head fixture failed: {error}; cleanup failed: {cleanup}").into(),
+                );
+            }
+        };
+        assert!(matches!(legacy, Err(StoreError::MigrationPending { .. })));
+        assert!(matches!(
+            uncertain,
+            Err(StoreError::ReopenRequired { index: 3 })
+        ));
+        assert_eq!(calls, 0);
+        Ok(())
+    }
 }

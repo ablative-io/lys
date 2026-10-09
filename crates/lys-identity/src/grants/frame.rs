@@ -10,6 +10,7 @@
 //! grants have moved on is refused `StaleDecision`, never mixed with them.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use lys_log_store::LeafStore;
 
@@ -18,6 +19,7 @@ use super::authority::{ExerciseRequest, Grants, Permit};
 use super::error::GrantError;
 use super::events::GrantChange;
 use super::permission::{Relationship, RelationshipStore, confirm};
+use super::settlement::ProjectionDegraded;
 use super::types::GrantId;
 use crate::operation::OperationId;
 use crate::projection::Projection;
@@ -31,13 +33,15 @@ pub struct Frame<'d> {
     projected: u64,
     held: BTreeSet<Relationship>,
     unresolved: Option<(OperationId, GrantId)>,
+    degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 /// A frame's log settled and relationships projected, before they are read.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(super) struct Settled {
     pub(super) projected: u64,
     pub(super) unresolved: Option<(OperationId, GrantId)>,
+    pub(super) degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 impl<'d> Frame<'d> {
@@ -47,19 +51,55 @@ impl<'d> Frame<'d> {
         directory: &'d Projection,
         settled: Settled,
     ) -> Result<Self, GrantError> {
-        Ok(Frame {
+        let frame = Frame {
             directory,
             folded: grants.folded,
             projected: settled.projected,
             held: grants.relationships.read()?,
             unresolved: settled.unresolved,
-        })
+            degraded: settled.degraded,
+        };
+        frame.current_degraded_revision(grants)?;
+        Ok(frame)
     }
 
     /// The revision every decision in this frame is made at.
     #[must_use]
     pub fn revision(&self) -> u64 {
         self.projected
+    }
+
+    /// The original projection failure shared by this reading, when degraded.
+    #[must_use]
+    pub fn degradation(&self) -> Option<&Arc<ProjectionDegraded>> {
+        self.degraded.as_ref()
+    }
+
+    fn current_degraded_revision<S: LeafStore, R: RelationshipStore>(
+        &self,
+        grants: &Grants<S, R>,
+    ) -> Result<(), GrantError> {
+        if self.degraded.is_none() {
+            return Ok(());
+        }
+        let actual = grants.relationships.revision().inspect_err(|error| {
+            tracing::warn!(step = "revision", error = %error, "degraded reading could not be certified");
+        })?;
+        if actual > self.projected {
+            return Err(GrantError::StaleDecision {
+                required: actual,
+                projected: self.projected,
+            });
+        }
+        if actual < self.projected {
+            return Err(GrantError::PermissionEngineUnavailable {
+                reason: format!(
+                    "the relationship revision decreased from {} to {actual}",
+                    self.projected
+                ),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -79,11 +119,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Settle the log and project the relationships, refusing a projection
     /// older than `at_least`, and name the revocation held unresolved.
     pub(super) fn settle(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
-        self.settle_log().ok();
-        let projected = match self.project() {
-            Ok(projected) => projected,
-            Err(_) => self.relationships.revision()?,
-        };
+        self.settle_log().inspect_err(|error| {
+            tracing::warn!(step = "reconcile", error = %error, "grant log settlement refused");
+        })?;
+        let reading = self.project_reading()?;
+        let projected = reading.revision;
         if let Some(required) = at_least
             && projected < required
         {
@@ -102,6 +142,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         Ok(Settled {
             projected,
             unresolved,
+            degraded: reading.degraded,
         })
     }
 
@@ -114,6 +155,20 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
     ) -> Result<Permit, GrantError> {
         self.explain_only(frame, request, None, at)
+    }
+
+    /// Explain from one reading while restricting authority to the named grant.
+    ///
+    /// # Errors
+    /// Returns the original refusal when the reading or selected lineage is invalid.
+    pub fn explain_in_by(
+        &self,
+        frame: &Frame<'_>,
+        request: &ExerciseRequest,
+        only: Option<GrantId>,
+        at: u64,
+    ) -> Result<Permit, GrantError> {
+        self.explain_only(frame, request, only, at)
     }
 
     /// [`Grants::explain_in`] resting only on `only` when it names a grant.
@@ -130,6 +185,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 projected: frame.projected,
             });
         }
+        frame.current_degraded_revision(self)?;
         self.unresolved_issue(request)?;
         self.decide_in(frame, request, only, at)
     }
@@ -197,6 +253,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                         },
                         revision: frame.projected,
                         use_event: None,
+                        degraded: frame.degraded.as_ref().map(Arc::clone),
                     });
                 }
                 Err(error) => {

@@ -11,9 +11,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
+use lys_log_store::witness::TailWitnessProvider;
 
 use super::admission::{DelegateRequest, RootRequest, Route, judge_delegation, judge_root};
 use super::error::GrantError;
@@ -25,6 +27,7 @@ use super::projection::GrantBook;
 use super::receipt::GrantReceipt;
 use super::recovery::GrantLedger;
 use super::revocation::judge_revoke;
+use super::settlement::ProjectionDegraded;
 use super::state;
 use super::types::{Action, Grant, GrantId, Mode, Resource, Source};
 use super::usage::{self, Unreported};
@@ -84,6 +87,8 @@ pub struct Permit {
     /// or why it could not be recorded. None for an explanation, which
     /// records no use.
     pub use_event: Option<Result<u64, GrantError>>,
+    /// The shared original failure of the selected relationship reading.
+    pub degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 /// A recorded grant change and where it stands.
@@ -95,6 +100,8 @@ pub struct Recorded {
     pub index: u64,
     /// Its receipt.
     pub receipt: GrantReceipt,
+    /// The shared original projection failure of this acknowledgement's reading.
+    pub degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 /// The grants: their log, book and permission relationships, and the model
@@ -108,6 +115,7 @@ pub struct Grants<S: LeafStore, R: RelationshipStore> {
     pub(super) folded: u64,
     pub(super) relationships: R,
     pub(super) unreported: BTreeMap<GrantId, Unreported>,
+    pub(super) startup_degraded: Option<Arc<ProjectionDegraded>>,
 }
 
 pub(super) fn root_matches(request: &RootRequest, grant: &Grant, mode: Mode) -> bool {
@@ -165,7 +173,33 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         root_authority: PersonId,
         every: NonZeroU64,
     ) -> Result<Self, GrantError> {
-        let (mut ledger, opening) = GrantLedger::open(reopen, &key, every)?;
+        Self::open_with_tail_provider(
+            reopen,
+            key,
+            relationships,
+            model,
+            root_authority,
+            every,
+            None,
+        )
+    }
+
+    /// Open with an explicit optional capability for authenticated tail readings.
+    /// Ordinary permission reads do not acquire or verify tail evidence.
+    ///
+    /// # Errors
+    /// Retains the original opening, state and projection failures.
+    pub fn open_with_tail_provider(
+        reopen: Reopen<S>,
+        key: Ed25519Identity,
+        relationships: R,
+        model: Model,
+        root_authority: PersonId,
+        every: NonZeroU64,
+        tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
+    ) -> Result<Self, GrantError> {
+        let (mut ledger, opening) =
+            GrantLedger::open_with_tail_provider(reopen, &key, every, tail_provider)?;
         let read = opening
             .state
             .as_deref()
@@ -184,13 +218,20 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             folded,
             relationships,
             unreported: BTreeMap::new(),
+            startup_degraded: None,
         };
         for (signed, coordinate) in events {
             grants.record_committed(&signed, coordinate)?;
         }
         grants.snapshot();
-        grants.project().ok();
+        grants.startup_degraded = grants.project_reading()?.degraded;
         Ok(grants)
+    }
+
+    /// Take the opening projection failure for its operator report.
+    #[must_use]
+    pub fn take_startup_degradation(&mut self) -> Option<Arc<ProjectionDegraded>> {
+        self.startup_degraded.take()
     }
 
     /// The model new requests are judged against.

@@ -315,6 +315,9 @@ pub struct RecordedView {
     pub index: u64,
     /// Its receipt.
     pub receipt: ReceiptView,
+    /// The redacted failure of the revision selected for this acknowledgement.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 impl From<&Recorded> for RecordedView {
@@ -325,6 +328,10 @@ impl From<&Recorded> for RecordedView {
             operation: receipt.operation.to_string(),
             grant: receipt.grant.to_string(),
             index: recorded.index,
+            degraded: recorded
+                .degraded
+                .as_deref()
+                .map(crate::grants::DegradedView::from),
             receipt: ReceiptView {
                 version: receipt.version,
                 caller: receipt.caller.to_string(),
@@ -378,6 +385,9 @@ pub struct PermitView {
     /// For a check, whether its use was recorded. Absent for an explanation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub use_event: Option<UseEventView>,
+    /// The redacted failure of the reading used for this permit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 impl From<&Permit> for PermitView {
@@ -390,6 +400,10 @@ impl From<&Permit> for PermitView {
             scope: names(&permit.actions),
             model_version: permit.model_version,
             revision: permit.revision,
+            degraded: permit
+                .degraded
+                .as_deref()
+                .map(crate::grants::DegradedView::from),
             use_event: permit.use_event.as_ref().map(|used| match used {
                 Ok(index) => UseEventView {
                     recorded: true,
@@ -427,6 +441,9 @@ pub struct WhoPage {
     pub complete: bool,
     /// The last holder of this page to continue after, or null when complete.
     pub next: Option<String>,
+    /// The reading's degradation, including when the page is empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded: Option<crate::grants::DegradedView>,
 }
 
 /// The permission model grants are judged against.

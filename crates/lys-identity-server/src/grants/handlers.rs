@@ -317,6 +317,9 @@ pub(super) async fn who(
             revision: frame.revision(),
             complete: next.is_none(),
             next,
+            degraded: frame
+                .degradation()
+                .map(|held| crate::grants::DegradedView::from(held.as_ref())),
         }))
     })
 }

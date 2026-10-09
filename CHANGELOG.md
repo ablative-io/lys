@@ -11,6 +11,20 @@ unreleased things cannot be used to tell what a published version contains.
 
 ## [Unreleased]
 
+### Changed — `lys-identity` and grant answers
+
+- `Permit` adds the public `degraded` field, an optional shared original
+  projection failure and actual selected relationship revision. Rust struct
+  literals must include the field; this is an explicit source API change.
+- Grant permit, batch, who, reach and which responses optionally include
+  `degraded: {step, refusal, revision}`. Healthy responses omit it. Private
+  causes are reported through operator observation and are absent from this
+  extension. OpenAPI and generated client types describe the same extension.
+- `Recorded` also adds the optional shared `degraded` field. Its JSON result
+  uses the same optional marker when a failed projection still has a readable
+  revision covering the original receipt. A failed revision read returns its
+  original refusal and produces no acknowledgement or invented revision.
+
 ## [0.3.0] — 2026-10-08
 
 ### Breaking

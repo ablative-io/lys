@@ -345,14 +345,19 @@ fn row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unres
                     return Err(format!("{name}: {unresolved:?}").into());
                 };
                 assert_eq!(operation, &request.operation.to_string());
+                let before = world.events();
+                let dependent = world.exercise(tom, "read", Route::Api);
+                let unrelated = control(&mut world);
                 assert!(
-                    matches!(
-                        world.exercise(tom, "read", Route::Api),
-                        Err(GrantError::OperationUnresolved { .. })
-                    ),
-                    "{name}: a read that depends on it names it"
+                    matches!(&dependent, Err(GrantError::LogUnavailable { .. })),
+                    "{name}: a reconciliation failure keeps its original name"
                 );
-                control(&mut world)?;
+                assert_eq!(unrelated.err(), dependent.err());
+                assert_eq!(
+                    world.events(),
+                    before,
+                    "{name}: failed settlement records no use"
+                );
                 set(&plan, LogFault::None);
                 assert_eq!(
                     world.delegate(&request)?.index,

@@ -114,6 +114,8 @@ pub mod goals_store;
 pub mod goals_types;
 pub mod goals_views;
 pub mod grant_contract;
+#[cfg(test)]
+mod grant_settlement_tests;
 mod grant_sight;
 mod grant_token_store;
 #[cfg(test)]
