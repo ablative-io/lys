@@ -40,8 +40,8 @@ fn build_box(operation: &str) -> Value {
 }
 
 #[tokio::test]
-async fn the_administrator_names_and_retires_machines_and_admitted_people_read_them()
--> TestResult {
+async fn the_administrator_names_and_retires_machines_and_admitted_people_read_them() -> TestResult
+{
     let (service, seeded) =
         Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -55,7 +55,9 @@ async fn the_administrator_names_and_retires_machines_and_admitted_people_read_t
     assert_eq!(empty, json!({ "machines": [], "reports_served": true }));
 
     let mut body = build_box(&operation);
-    let admitted = seeded.people[1].agents.iter()
+    let admitted = seeded.people[1]
+        .agents
+        .iter()
         .find(|agent| agent.state == lys_identity::LifecycleState::Active)
         .ok_or("active agent missing")?;
     body["may_run"] = json!([admitted.id.to_string()]);

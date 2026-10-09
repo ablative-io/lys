@@ -75,30 +75,63 @@ mod tests {
     type Outcome = Result<(), Box<dyn Error>>;
 
     fn login(subject: &str) -> Login {
-        Login { subject: subject.to_owned(), email: "scope@example.test".to_owned() }
+        Login {
+            subject: subject.to_owned(),
+            email: "scope@example.test".to_owned(),
+        }
     }
 
     fn fixture(config: &Config) -> Result<(), Box<dyn Error>> {
         seed_configured(config, [ADMINISTRATOR, "member"])?;
-        let mut apps = AppStore::open(&config.apps_dir(), Arc::new(Ed25519Identity::load(&config.event_key_file)?))?;
+        let mut apps = AppStore::open(
+            &config.apps_dir(),
+            Arc::new(Ed25519Identity::load(&config.event_key_file)?),
+        )?;
         for id in ["ready", "no_settings", "retired", "pending"] {
-            apps.keep(Line::Registered(Registered { operation: format!("register-{id}"), app: id.to_owned(),
-                name: id.to_owned(), redirects: vec!["https://app.example.test/callback".to_owned()],
+            apps.keep(Line::Registered(Registered {
+                operation: format!("register-{id}"),
+                app: id.to_owned(),
+                name: id.to_owned(),
+                redirects: vec!["https://app.example.test/callback".to_owned()],
                 // The smallest schema Lys reads back: one kind, one action, one relation.
                 schema: json!({"kinds": {format!("{id}.doc"): {
                     "actions": ["read"], "relations": {"reader": ["read"]}, "parents": []}}}),
-                service_account: None, by: By::Start, at: 1 }))?;
-            if id == "pending" { continue; }
-            apps.keep(Line::Approved(Approved { operation: format!("approve-{id}"), app: id.to_owned(),
-                client: Client { client_id: id.to_owned(), secret_sha256: sha256_hex("fixture-client-secret") },
-                binding: None, by: By::Start, at: 2 }))?;
+                service_account: None,
+                by: By::Start,
+                at: 1,
+            }))?;
+            if id == "pending" {
+                continue;
+            }
+            apps.keep(Line::Approved(Approved {
+                operation: format!("approve-{id}"),
+                app: id.to_owned(),
+                client: Client {
+                    client_id: id.to_owned(),
+                    secret_sha256: sha256_hex("fixture-client-secret"),
+                },
+                binding: None,
+                by: By::Start,
+                at: 2,
+            }))?;
             if id != "no_settings" {
-                apps.keep(Line::SignInSet(SignInSet { operation: format!("approve-{id}"), app: id.to_owned(),
-                    redirects: vec!["https://app.example.test/callback".to_owned()], profile: false, by: By::Start, at: 2 }))?;
+                apps.keep(Line::SignInSet(SignInSet {
+                    operation: format!("approve-{id}"),
+                    app: id.to_owned(),
+                    redirects: vec!["https://app.example.test/callback".to_owned()],
+                    profile: false,
+                    by: By::Start,
+                    at: 2,
+                }))?;
             }
             if id == "retired" {
-                apps.keep(Line::Retired(Decided { operation: "retire".to_owned(), app: id.to_owned(),
-                    reason: "withdrawn".to_owned(), by: By::Start, at: 3 }))?;
+                apps.keep(Line::Retired(Decided {
+                    operation: "retire".to_owned(),
+                    app: id.to_owned(),
+                    reason: "withdrawn".to_owned(),
+                    by: By::Start,
+                    at: 3,
+                }))?;
             }
         }
         Ok(())
@@ -111,7 +144,10 @@ mod tests {
         let administrator = service.sign_in(login(ADMINISTRATOR)).await?;
         let (status, personal) = service.get("/apps", Some(&member)).await?;
         assert_eq!(status, 200, "{personal}");
-        assert_eq!(personal, json!({"apps": [{"id": "ready", "name": "ready", "state": "approved"}]}));
+        assert_eq!(
+            personal,
+            json!({"apps": [{"id": "ready", "name": "ready", "state": "approved"}]})
+        );
         let (status, one) = service.get("/apps/ready", Some(&member)).await?;
         assert_eq!(status, 200, "{one}");
         assert_eq!(one, personal["apps"][0]);
@@ -124,7 +160,10 @@ mod tests {
         assert_eq!(status, 200, "{all}");
         let apps = all["apps"].as_array().ok_or("apps missing")?;
         assert_eq!(apps.len(), 5);
-        assert!(apps.iter().all(|app| app.get("schema").is_some() && app.get("redirects").is_some()));
+        assert!(
+            apps.iter()
+                .all(|app| app.get("schema").is_some() && app.get("redirects").is_some())
+        );
         Ok(())
     }
 }
@@ -406,16 +445,28 @@ fn sees(who: &Acting, app: &crate::apps_state::App) -> bool {
                     id: service_account.clone(),
                 }
         }
-        Acting::Person(_) => app.standing() == Standing::Approved
-            && app.approved.as_ref().is_some_and(|approved| approved.client.client_id == app.registered.app)
-            && app.sign_in.as_ref().is_some_and(|settings| !settings.redirects.is_empty()),
+        Acting::Person(_) => {
+            app.standing() == Standing::Approved
+                && app
+                    .approved
+                    .as_ref()
+                    .is_some_and(|approved| approved.client.client_id == app.registered.app)
+                && app
+                    .sign_in
+                    .as_ref()
+                    .is_some_and(|settings| !settings.redirects.is_empty())
+        }
     }
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
 enum AppRead {
-    Personal { id: String, name: String, state: Standing },
+    Personal {
+        id: String,
+        name: String,
+        state: Standing,
+    },
     Registry(Box<AppView>),
 }
 
@@ -426,7 +477,11 @@ struct AppsRead {
 
 fn read_view(who: &Acting, app: &crate::apps_state::App) -> AppRead {
     if matches!(who, Acting::Person(_)) {
-        AppRead::Personal { id: app.registered.app.clone(), name: app.registered.name.clone(), state: app.standing() }
+        AppRead::Personal {
+            id: app.registered.app.clone(),
+            name: app.registered.name.clone(),
+            state: app.standing(),
+        }
     } else {
         AppRead::Registry(Box::new(AppView::from(app)))
     }

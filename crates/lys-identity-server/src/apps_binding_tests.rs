@@ -23,12 +23,20 @@ async fn unbound_login_cannot_act_as_a_person_on_app_routes() -> Outcome {
     use identity_contract::harness::{ADMINISTRATOR, Service};
 
     let (service, _) = Service::start_with(|config| {
-        Ok(identity_contract::lys_identity_server::dev_seed::seed_configured(
-            config,
-            [ADMINISTRATOR, "member"],
-        )?)
-    }).await?;
-    let cookie = service.sign_in(Login { subject: "unbound".to_owned(), email: "scope@example.test".to_owned() }).await?;
+        Ok(
+            identity_contract::lys_identity_server::dev_seed::seed_configured(
+                config,
+                [ADMINISTRATOR, "member"],
+            )?,
+        )
+    })
+    .await?;
+    let cookie = service
+        .sign_in(Login {
+            subject: "unbound".to_owned(),
+            email: "scope@example.test".to_owned(),
+        })
+        .await?;
     let (status, answer) = service.get("/apps", Some(&cookie)).await?;
     assert_eq!(status, 403, "{answer}");
     assert_eq!(answer["refusal"], "NoPerson");

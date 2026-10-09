@@ -52,44 +52,73 @@ mod tests {
     use std::error::Error;
     use std::sync::Arc;
 
-    use identity_contract::fake_issuer::Login;
-    use identity_contract::harness::{ADMINISTRATOR, Service};
-    use lys_core::Ed25519Identity;
-    use identity_contract::lys_identity_server::Config;
-    use identity_contract::lys_identity_server::dev_seed::seed_configured;
     use crate::teams_state::{Changed, Checked, Created, Hold, Line};
     use crate::teams_store::TeamStore;
+    use identity_contract::fake_issuer::Login;
+    use identity_contract::harness::{ADMINISTRATOR, Service};
+    use identity_contract::lys_identity_server::Config;
+    use identity_contract::lys_identity_server::dev_seed::seed_configured;
+    use lys_core::Ed25519Identity;
 
     type Outcome = Result<(), Box<dyn Error>>;
 
     fn login(subject: &str) -> Login {
-        Login { subject: subject.to_owned(), email: "scope@example.test".to_owned() }
+        Login {
+            subject: subject.to_owned(),
+            email: "scope@example.test".to_owned(),
+        }
     }
 
     fn fixture(config: &Config) -> Result<BTreeSet<String>, Box<dyn Error>> {
         let seeded = seed_configured(config, [ADMINISTRATOR, "member"])?;
         let administrator = seeded.people[0].id.to_string();
         let person = seeded.people[1].id.to_string();
-        let by = crate::read_views::Login { provider: config.issuer.clone(), subject: ADMINISTRATOR.to_owned() };
-        let mut store = TeamStore::open(config.teams_dir.as_deref().ok_or("teams disabled")?,
-            Arc::new(Ed25519Identity::load(&config.event_key_file)?))?;
+        let by = crate::read_views::Login {
+            provider: config.issuer.clone(),
+            subject: ADMINISTRATOR.to_owned(),
+        };
+        let mut store = TeamStore::open(
+            config.teams_dir.as_deref().ok_or("teams disabled")?,
+            Arc::new(Ed25519Identity::load(&config.event_key_file)?),
+        )?;
         let mut expected = BTreeSet::new();
         let mut migrated = Vec::new();
         for index in 1..=4 {
             let id = format!("op-{index:032x}");
-            store.keep(Line::Created(Created { id: id.clone(), name: id.clone(),
-                owner: if index == 1 { person.clone() } else { administrator.clone() },
-                description: String::new(), by: by.clone(), at: 1 }))?;
+            store.keep(Line::Created(Created {
+                id: id.clone(),
+                name: id.clone(),
+                owner: if index == 1 {
+                    person.clone()
+                } else {
+                    administrator.clone()
+                },
+                description: String::new(),
+                by: by.clone(),
+                at: 1,
+            }))?;
             if matches!(index, 2 | 4) {
-                store.keep(Line::Added(Changed { operation: format!("op-{:032x}", index + 10), team: id.clone(),
-                    member: person.clone(), by: by.clone(), at: 2 }))?;
+                store.keep(Line::Added(Changed {
+                    operation: format!("op-{:032x}", index + 10),
+                    team: id.clone(),
+                    member: person.clone(),
+                    by: by.clone(),
+                    at: 2,
+                }))?;
             }
             if index == 4 {
                 // A hold is a migration line: it goes through the migration writer.
-                migrated.push(Line::Held(Hold { operation: format!("op-{:032x}", 20), team: id.clone(),
-                    member: person.clone(), reason: "membership awaits admission".to_owned(), at: 3 }));
+                migrated.push(Line::Held(Hold {
+                    operation: format!("op-{:032x}", 20),
+                    team: id.clone(),
+                    member: person.clone(),
+                    reason: "membership awaits admission".to_owned(),
+                    at: 3,
+                }));
             }
-            if index <= 2 { expected.insert(id); }
+            if index <= 2 {
+                expected.insert(id);
+            }
         }
         migrated.push(Line::Checked(Checked {
             operation: "lys/teams/legacy-membership/v1/checked".to_owned(),
@@ -107,12 +136,25 @@ mod tests {
         let administrator = service.sign_in(login(ADMINISTRATOR)).await?;
         let (status, personal) = service.get("/teams", Some(&member)).await?;
         assert_eq!(status, 200, "{personal}");
-        let ids = personal["teams"].as_array().ok_or("teams missing")?.iter()
-            .map(|team| team["id"].as_str().map(str::to_owned).ok_or("team id missing"))
+        let ids = personal["teams"]
+            .as_array()
+            .ok_or("teams missing")?
+            .iter()
+            .map(|team| {
+                team["id"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or("team id missing")
+            })
             .collect::<Result<BTreeSet<_>, _>>()?;
-        assert_eq!(ids, expected, "another person's and held memberships must not leak");
+        assert_eq!(
+            ids, expected,
+            "another person's and held memberships must not leak"
+        );
         for index in 1..=4 {
-            let (status, one) = service.get(&format!("/teams/op-{index:032x}"), Some(&member)).await?;
+            let (status, one) = service
+                .get(&format!("/teams/op-{index:032x}"), Some(&member))
+                .await?;
             if index <= 2 {
                 assert_eq!(status, 200, "{one}");
                 assert_eq!(one["id"], format!("op-{index:032x}"));
@@ -510,7 +552,11 @@ async fn list(
     let actor = signed_in(&state, &headers)?;
     with_readable_teams(&state, &actor, |store, person| {
         Ok(TeamsView {
-            teams: store.teams_iter().filter(|team| visible_to(team, person)).map(view).collect(),
+            teams: store
+                .teams_iter()
+                .filter(|team| visible_to(team, person))
+                .map(view)
+                .collect(),
         })
     })
     .map(Json)
@@ -534,9 +580,11 @@ async fn one(
 }
 
 fn visible_to(team: &Team, person: Option<&str>) -> bool {
-    person.is_none_or(|person| team.created.owner == person
-        || (team.members.iter().any(|member| member == person)
-            && !team.held.iter().any(|held| held.member == person)))
+    person.is_none_or(|person| {
+        team.created.owner == person
+            || (team.members.iter().any(|member| member == person)
+                && !team.held.iter().any(|held| held.member == person))
+    })
 }
 
 fn with_readable_teams<T>(
