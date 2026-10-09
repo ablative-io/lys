@@ -76,6 +76,17 @@ pub(crate) fn typed(api: &mut Api) {
         route(
             (
                 POST,
+                "/apps/{app}/bearer/issue",
+                "Issue or rotate an approved app's bearer, answered once",
+            ),
+            S,
+            Some(api.schema::<crate::apps_client_credentials::ClientCredentialIssueBody>()),
+            Some(api.schema::<crate::apps_views::AppBearerGiven>()),
+            &[ADMIN_BODY, CREDENTIAL, &["NoPerson", "SecretsUnavailable"]],
+        ),
+        route(
+            (
+                POST,
                 "/apps/{app}/credentials/{credential}/revoke",
                 "Revoke one of an app's client credentials",
             ),

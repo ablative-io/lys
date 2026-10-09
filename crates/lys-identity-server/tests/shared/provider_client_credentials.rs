@@ -344,6 +344,15 @@ async fn missing_approved_client_custody_is_prepared_and_the_issue_is_replayed_w
 -> TestResult {
     let (service, cookie, _person, custody) = table_kept(CODE_SECONDS).await?;
     custody.lose(PRODUCT)?;
+    let missing = reqwest::Client::new()
+        .post(format!("{}/_lys/apps/client/issue", custody.base))
+        .json(&json!({ "app": PRODUCT }))
+        .send()
+        .await?;
+    assert_eq!(missing.status(), reqwest::StatusCode::FORBIDDEN);
+    let reason = missing.text().await?;
+    assert_eq!(reason.split(':').next(), Some("AppClientNoCustody"));
+    assert!(reason.contains(PRODUCT));
     let operation = OperationId::generate()?.to_string();
     let body = json!({ "operation": operation });
     let answer = post(
