@@ -556,3 +556,117 @@ async fn recipients_are_each_listed_once_whatever_their_chains() -> TestResult {
     );
     Ok(())
 }
+
+/// ACCESS-006 R4: whether a subject holds a current grant within the ward.
+fn admission(rooms: &Rooms, subject: (&str, &str)) -> Value {
+    json!({
+        "contract": 1,
+        "log": rooms.log,
+        "workspace": {"kind": kind("workspace"), "id": "ward"},
+        "subject": {"id": subject.0, "kind": subject.1},
+        "at_least": 0,
+    })
+}
+
+async fn admit(rooms: &Rooms, request: &Value) -> Result<Value, Box<dyn std::error::Error>> {
+    let answer = ok(post(
+        &rooms.service,
+        "/grants/membership/admission",
+        Auth::Bearer(&rooms.credential),
+        request,
+    )
+    .await?)?;
+    assert_eq!(&answer["request"], request, "the answer echoes its request");
+    Ok(answer)
+}
+
+#[tokio::test]
+async fn one_channel_grant_admits_a_guest_and_nothing_wider() -> TestResult {
+    let rooms = rooms().await?;
+    let reader = grant(&rooms, &rooms.bea, ("channel", "ward-a"), "reader").await?;
+    let bea = (rooms.bea.as_str(), "person");
+    let admitted = admit(&rooms, &admission(&rooms, bea)).await?;
+    assert_eq!(admitted["verdict"]["outcome"], "allowed", "{admitted}");
+    assert_eq!(admitted["verdict"]["grant"], reader["grant"]);
+    assert_eq!(
+        admitted["verdict"]["scope"],
+        json!({"kind": kind("channel"), "id": "ward-a"})
+    );
+    for (channel, action) in [("ward-b", "read"), ("ward-a", "post")] {
+        let refused = decide(&rooms, &ask(&rooms, bea, channel, action)).await?;
+        assert_eq!(refused["verdict"]["refusal"], "NotHeld", "{refused}");
+    }
+    let roster = page(
+        &rooms,
+        "resources",
+        &resources_page(&rooms, bea, 10, Value::Null),
+    )
+    .await?;
+    assert_eq!(
+        ids(&roster, "resource"),
+        ["ward-a"],
+        "admission widened nothing"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn no_current_grant_refuses_and_the_last_revocation_closes_the_door() -> TestResult {
+    let rooms = rooms().await?;
+    let ada = (rooms.ada.as_str(), "person");
+    let none = admit(&rooms, &admission(&rooms, ada)).await?;
+    assert_eq!(
+        none["verdict"]["refusal"], "membership_no_current_grant",
+        "{none}"
+    );
+    assert!(none["revision"].is_u64(), "decided at a revision: {none}");
+    grant(&rooms, &rooms.ada, ("channel", "elsewhere-a"), "reader").await?;
+    let elsewhere = admit(&rooms, &admission(&rooms, ada)).await?;
+    assert_eq!(
+        elsewhere["verdict"]["refusal"], "membership_no_current_grant",
+        "a grant in another workspace admits nothing here: {elsewhere}"
+    );
+
+    let only = grant(&rooms, &rooms.ada, ("channel", "ward-b"), "reader").await?;
+    let admitted = admit(&rooms, &admission(&rooms, ada)).await?;
+    assert_eq!(admitted["verdict"]["outcome"], "allowed", "{admitted}");
+    let grant_id = only["grant"].as_str().ok_or("the issue names its grant")?;
+    let revoke = json!({"operation": op()?, "route": "api", "reason": "visit over"});
+    let revoked = ok(post(
+        &rooms.service,
+        &format!("/grants/{grant_id}/revoke"),
+        Auth::Cookie(&rooms.admin),
+        &revoke,
+    )
+    .await?)?;
+    let mut request = admission(&rooms, ada);
+    request["at_least"] = revoked["receipt"]["revision"].clone();
+    let closed = admit(&rooms, &request).await?;
+    assert_eq!(
+        closed["verdict"]["refusal"], "membership_no_current_grant",
+        "{closed}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_agent_is_admitted_only_by_its_own_grants() -> TestResult {
+    let rooms = rooms().await?;
+    grant(&rooms, &rooms.ada, ("workspace", "ward"), "member").await?;
+    let scribe = (rooms.scribe.as_str(), "agent");
+    let refused = admit(&rooms, &admission(&rooms, scribe)).await?;
+    assert_eq!(
+        refused["verdict"]["refusal"], "membership_no_current_grant",
+        "{refused}"
+    );
+    let forged = admit(
+        &rooms,
+        &admission(&rooms, (rooms.scribe.as_str(), "person")),
+    )
+    .await?;
+    assert_eq!(
+        forged["verdict"]["refusal"], "membership_subject_kind_mismatch",
+        "{forged}"
+    );
+    Ok(())
+}

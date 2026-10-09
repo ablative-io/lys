@@ -407,6 +407,17 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<lys_pass::membership_pages::MembershipPage>()),
             &[BATCH],
         ),
+        route(
+            (
+                POST,
+                "/grants/membership/admission",
+                "Whether a subject holds a current grant within a workspace",
+            ),
+            A,
+            Some(api.schema::<lys_pass::membership_admission::AdmissionRequest>()),
+            Some(api.schema::<lys_pass::membership_admission::AdmissionDecision>()),
+            &[BATCH],
+        ),
     ];
     for route in routes {
         api.route(route);
