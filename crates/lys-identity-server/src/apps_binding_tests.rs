@@ -17,6 +17,21 @@ const APP: &str = "fixture_notes";
 const SECRET: &str = "a-fixture-client-secret";
 const BACK: &str = "https://app.example.test/signed-in";
 
+#[tokio::test]
+async fn unbound_login_cannot_act_as_a_person_on_app_routes() -> Outcome {
+    use identity_contract::fake_issuer::Login;
+    use identity_contract::harness::{ADMINISTRATOR, Service};
+
+    let (service, _) = Service::start_with(|config| {
+        Ok(crate::dev_seed::seed_configured(config, [ADMINISTRATOR])?)
+    }).await?;
+    let cookie = service.sign_in(Login { subject: "unbound".to_owned(), email: "scope@example.test".to_owned() }).await?;
+    let (status, answer) = service.get("/apps", Some(&cookie)).await?;
+    assert_eq!(status, 403, "{answer}");
+    assert_eq!(answer["refusal"], "NoPerson");
+    Ok(())
+}
+
 fn registered() -> Result<Held, Box<dyn Error>> {
     let mut held = Held::default();
     held.hold(Line::Registered(Registered {
