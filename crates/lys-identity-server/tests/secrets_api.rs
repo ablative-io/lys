@@ -96,6 +96,7 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
         }
         "/_lys/apps/client/issue" => axum::Json(json!({
             "app": app, "credential_id": CREDENTIAL_ID, "owner": owner,
+            "client_secret_sha256": format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())),
             "value": format!("lys-client.{app}.{}", "cd".repeat(32)),
         }))
         .into_response(),

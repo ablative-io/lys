@@ -181,6 +181,7 @@ fn shape(line: &Line) -> &'static str {
         Line::ClientCredentialIssued(_) => "client_credential_issued",
         Line::ClientCredentialRevoked(_) => "client_credential_revoked",
         Line::ClientCredentialsEnded(_) => "client_credentials_ended",
+        Line::CustodyPrepared(_) => "custody_prepared",
     }
 }
 

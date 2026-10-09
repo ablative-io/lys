@@ -245,6 +245,28 @@ describe('Sign-in providers on the sign-in page', () => {
 });
 
 describe('A product signing in through Lys', () => {
+  it('carries the pending authorize request on each provider link', async () => {
+    for (const target of [
+      '/oauth/authorize?client_id=cambium&state=a%26b&scope=openid%20profile',
+      '/oauth/mcp/authorize?client_id=connector&state=original',
+    ]) {
+      const { container } = await mount('#/sign-in?continue=' + encodeURIComponent(target), {
+        ...SERVICE,
+        '/sign-in/providers': ok({ providers: [{ id: 'provider-1', name: 'Google', provider: 'google' }] }),
+      });
+      expect(container.querySelector('.sign-in-providers a')?.getAttribute('href'))
+        .toBe('/api/sign-in/providers/provider-1?continue=' + encodeURIComponent(target));
+    }
+  });
+
+  it('never forwards a foreign continue target to a provider', async () => {
+    await mount('#/sign-in?continue=' + encodeURIComponent('https://elsewhere.example.test/'), {
+      ...SERVICE,
+      '/sign-in/providers': ok({ providers: [{ id: 'provider-1', name: 'Google', provider: 'google' }] }),
+    });
+    expect($('.sign-in-providers a')?.getAttribute('href')).toBe('/api/sign-in/providers/provider-1');
+  });
+
   it('continues only to Lys own authorize address', async () => {
     const { continuation } = await import('../src/features/sign-in/SignIn');
     history.replaceState(null, '', '/#/sign-in?continue=' + encodeURIComponent('/oauth/authorize?client_id=p&state=s'));

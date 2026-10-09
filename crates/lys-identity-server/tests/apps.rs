@@ -39,6 +39,48 @@ fn action(kind: &str, id: &str, action: &str) -> Value {
 }
 
 #[tokio::test]
+async fn an_app_bearer_issue_answers_once_and_rotation_ends_the_old_value() -> TestResult {
+    let (mut service, _) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    register(&service, &admin, NOTES).await?;
+    approve(&service, &admin, NOTES).await?;
+    let path = format!("/apps/{NOTES}/bearer/issue");
+    let body = json!({"operation": op()?});
+    let first = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
+    let credential = first["credential"].as_str().ok_or("no issued bearer")?;
+    assert!(credential.starts_with(&format!("lys-app.{NOTES}.")));
+    let reference = first["reference"].as_str().ok_or("no issued reference")?;
+    let repeated = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
+    assert_eq!(repeated["reference"], reference);
+    assert!(repeated["credential"].is_null());
+    ok(get(&service, "/apps/me", Auth::Bearer(credential)).await?)?;
+    let rotation = json!({"operation": op()?});
+    let second = ok(post(&service, &path, Auth::Cookie(&admin), &rotation).await?)?;
+    let rotated = second["credential"].as_str().ok_or("no rotated bearer")?;
+    assert_ne!(rotated, credential);
+    refused(
+        &get(&service, "/apps/me", Auth::Bearer(credential)).await?,
+        401,
+        "credential_refused",
+    )?;
+    ok(get(&service, "/apps/me", Auth::Bearer(rotated)).await?)?;
+    assert!(!held_anywhere(service.dir.path(), credential.as_bytes())?);
+    assert!(!held_anywhere(service.dir.path(), rotated.as_bytes())?);
+    service.restart().await?;
+    refused(
+        &get(&service, "/apps/me", Auth::Bearer(credential)).await?,
+        401,
+        "credential_refused",
+    )?;
+    ok(get(&service, "/apps/me", Auth::Bearer(rotated)).await?)?;
+    let replayed = ok(post(&service, &path, Auth::Cookie(&admin), &rotation).await?)?;
+    assert_eq!(replayed["reference"], second["reference"]);
+    assert!(replayed["credential"].is_null());
+    assert!(!held_anywhere(service.dir.path(), rotated.as_bytes())?);
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_pending_app_has_no_client_and_its_kinds_answer_app_not_approved() -> TestResult {
     let (service, seeded) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;

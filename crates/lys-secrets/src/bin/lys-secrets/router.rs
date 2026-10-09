@@ -15,6 +15,10 @@ use crate::serve::Shared;
 pub fn routes(shared: Arc<Shared>) -> Router {
     Router::new()
         .route("/_lys/apps/prepare", post(crate::save_app::prepare))
+        .route(
+            "/_lys/apps/bearer/issue",
+            post(crate::save_app::issue_bearer),
+        )
         .route("/_lys/apps/client", post(crate::app_client::authenticate))
         .route("/_lys/apps/client/issue", post(crate::app_client::issue))
         .route("/_lys/apps/client/end", post(crate::app_client::end))
