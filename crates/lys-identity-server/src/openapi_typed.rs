@@ -27,6 +27,24 @@ pub(crate) fn typed(api: &mut Api) {
     let routes = [
         route(
             (
+                POST,
+                "/oauth/jwks/rotate",
+                "Rotate the key passes are signed with; the old key stays published one lifetime",
+            ),
+            S,
+            Some(api.schema::<crate::provider::RotateBody>()),
+            Some(api.schema::<crate::provider::RotateAnswer>()),
+            &[
+                ADMIN_BODY,
+                &[
+                    "ProviderUnavailable",
+                    "SessionsUnavailable",
+                    "DirectoryUnavailable",
+                ],
+            ],
+        ),
+        route(
+            (
                 GET,
                 "/identity/estate-plan",
                 "Read the installed estate plan",

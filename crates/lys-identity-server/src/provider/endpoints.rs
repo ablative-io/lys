@@ -8,7 +8,8 @@
 //! own, and never under a provider guard. No lock is held while the token
 //! exchange waits on the secrets broker (`client_auth`).
 
-use super::{Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, random, unavailable};
+use super::refusal::oauth_refusal;
+use super::{Grant, Kind, OpenIdProvider, encoded, held, random, unavailable};
 use crate::apps_binding::sign_in_redirect;
 use crate::apps_error::AppError;
 use crate::error::ServerError;
@@ -37,6 +38,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/oauth/token", post(token))
         .route("/oauth/userinfo", get(userinfo))
         .route("/oauth/jwks", get(jwks))
+        .route("/oauth/jwks/rotate", post(super::keys::rotate))
         .with_state(state)
 }
 
@@ -54,7 +56,7 @@ pub(super) async fn discovery(
 }
 
 pub(super) async fn jwks(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ServerError> {
-    Ok(Json(provider(&state)?.keys()))
+    Ok(Json(provider(&state)?.keys(now())?))
 }
 
 /// What a product sends a person to Lys with.
@@ -78,9 +80,9 @@ pub(super) fn malformed(reason: &str) -> ServerError {
 
 /// An approved app admitted as a client at one request: its id, and whether
 /// its sign-in settings give it the person's name.
-struct Admitted {
-    app: String,
-    profile: bool,
+pub(super) struct Admitted {
+    pub(super) app: String,
+    pub(super) profile: bool,
 }
 
 /// The approved app `client_id` names, judged from the apps' record as it
@@ -90,7 +92,7 @@ struct Admitted {
 /// Nothing is kept between requests, so an approval, a retirement or a
 /// changed setting is in force at the next one. The apps lock is taken and
 /// released here, before any provider lock.
-fn admitted_client(
+pub(super) fn admitted_client(
     state: &AppState,
     client_id: &str,
     redirect: &str,
@@ -161,7 +163,10 @@ fn scopes(asked: Option<&str>, app: &str, profile: bool) -> Result<bool, ServerE
 
 /// The person's display name as the directory holds it now, when it holds
 /// one that is not blank.
-fn display_name(state: &AppState, person: PersonId) -> Result<Option<String>, ServerError> {
+pub(super) fn display_name(
+    state: &AppState,
+    person: PersonId,
+) -> Result<Option<String>, ServerError> {
     with_directory(state, |directory| {
         Ok(directory
             .projection()?
@@ -230,6 +235,7 @@ pub(super) async fn authorize(
                 used: false,
                 replayed: false,
                 issued_access: None,
+                issued_refresh: None,
             },
         );
     }
@@ -256,6 +262,9 @@ pub(super) struct Exchange {
     pub(super) redirect_uri: String,
     #[serde(default)]
     pub(super) code_verifier: String,
+    /// The refresh token a `refresh_token` grant presents (ACCESS-002 R2).
+    #[serde(default)]
+    pub(super) refresh_token: String,
     pub(super) client_id: Option<String>,
     pub(super) client_secret: Option<String>,
 }
@@ -276,161 +285,6 @@ pub(super) fn presented(headers: &HeaderMap, form: &Exchange) -> Option<(String,
     basic.or_else(|| form.client_id.clone().zip(form.client_secret.clone()))
 }
 
-/// An OAuth error answer carrying the refusal by name.
-pub(super) fn oauth_refusal(error: &ServerError) -> Response {
-    let code = match error {
-        ServerError::Provider(ProviderError::ClientUnknown)
-        | ServerError::App(
-            AppError::CredentialRefused { .. }
-            | AppError::AppNotApproved { .. }
-            | AppError::AppRetired { .. },
-        ) => "invalid_client",
-        ServerError::App(AppError::RedirectInvalid { .. })
-        | ServerError::Provider(
-            ProviderError::CodeUsed
-            | ProviderError::CodeExpired
-            | ProviderError::CodeUnknown
-            | ProviderError::VerifierWrong
-            | ProviderError::RedirectUnregistered,
-        ) => "invalid_grant",
-        ServerError::Provider(
-            ProviderError::ScopeUnknown { .. } | ProviderError::ScopeNotGranted { .. },
-        ) => "invalid_scope",
-        ServerError::RequestMalformed { .. }
-        | ServerError::BodyTooLarge
-        | ServerError::Holding(..) => "invalid_request",
-        ServerError::Team(..)
-        | ServerError::Budget(..)
-        | ServerError::HarnessCatalogueUnreadable { .. }
-        | ServerError::Identity(..)
-        | ServerError::Grant(..)
-        | ServerError::App(..)
-        | ServerError::Goal(..)
-        | ServerError::Inactive { .. }
-        | ServerError::NotSignedIn
-        | ServerError::NotAdmitted { .. }
-        | ServerError::NoPerson
-        | ServerError::SetupRequired
-        | ServerError::AgentNotVisible
-        | ServerError::Call(..)
-        | ServerError::GrantNotVisible
-        | ServerError::Withheld { .. }
-        | ServerError::SessionUnknown
-        | ServerError::SignInStateUnknown
-        | ServerError::SignInRefused
-        | ServerError::SignInThrottled
-        | ServerError::RegistrationThrottled
-        | ServerError::SecondFactorUnsupported
-        | ServerError::SetupClosed
-        | ServerError::SetupCodeRefused
-        | ServerError::SetupUnavailable { .. }
-        | ServerError::AccountRefused { .. }
-        | ServerError::SignInFailed { .. }
-        | ServerError::ConfigInvalid { .. }
-        | ServerError::BootstrapInterrupted { .. }
-        | ServerError::SecretsUnavailable { .. }
-        | ServerError::SecretsRefused { .. }
-        | ServerError::RequestsUnavailable { .. }
-        | ServerError::McpRequestsUnavailable { .. }
-        | ServerError::McpServerUnknown { .. }
-        | ServerError::McpServerHeld { .. }
-        | ServerError::McpBeyondRemit { .. }
-        | ServerError::RequestUnknown
-        | ServerError::RequestDecided { .. }
-        | ServerError::RequestHeld { .. }
-        | ServerError::RequestReused { .. }
-        | ServerError::NetworkUnavailable { .. }
-        | ServerError::LoginUnbound
-        | ServerError::MachineUnknown
-        | ServerError::Machine(..)
-        | ServerError::Cord(..)
-        | ServerError::Canvas(..)
-        | ServerError::ProductDraft(..)
-        | ServerError::SessionsUnavailable { .. }
-        | ServerError::MemoryUnavailable { .. }
-        | ServerError::ProvisioningUnavailable { .. }
-        | ServerError::ProvisioningChanged { .. }
-        | ServerError::ProvisioningReused { .. }
-        | ServerError::ProfileVersionUnknown { .. }
-        | ServerError::ProfileVersionReplaced { .. }
-        | ServerError::ProfileNotReviewed { .. }
-        | ServerError::CertificatesUnavailable { .. }
-        | ServerError::CertificateUnknown { .. }
-        | ServerError::CertificateReused { .. }
-        | ServerError::CertificateWithdrawn { .. }
-        | ServerError::RolesUnavailable { .. }
-        | ServerError::RoleUnknown
-        | ServerError::RoleVersionUnknown
-        | ServerError::HolderUnknown
-        | ServerError::RoleReused { .. }
-        | ServerError::RoleHeld { .. }
-        | ServerError::HoldingOver { .. }
-        | ServerError::HoldingChanged
-        | ServerError::LaunchRecordMissing
-        | ServerError::OperatorRefused { .. }
-        | ServerError::AgentPassRefused { .. }
-        | ServerError::AgentSignatureRefused { .. }
-        | ServerError::AgentNotActive { .. }
-        | ServerError::MachineCannotReach { .. }
-        | ServerError::MachineRetired
-        | ServerError::MachineNotForAgent
-        | ServerError::MachineWithoutRuntime
-        | ServerError::MachineWithoutRunner
-        | ServerError::SkillUnknown { .. }
-        | ServerError::PolicyUnrepresentable { .. }
-        | ServerError::ModelUnrepresentable { .. }
-        | ServerError::HarnessUndeclared { .. }
-        | ServerError::LaunchUnrenderable { .. }
-        | ServerError::WorkingFolderUnnamed
-        | ServerError::McpCredentialInline { .. }
-        | ServerError::McpSettingUnrepresentable { .. }
-        | ServerError::McpHandleUnsupported { .. }
-        | ServerError::RuntimeUnavailable { .. }
-        | ServerError::RuntimeSessionUnknown
-        | ServerError::RuntimeSessionStarted { .. }
-        | ServerError::RuntimeSessionStopped { .. }
-        | ServerError::RuntimeReportReused { .. }
-        | ServerError::ServiceAccountsUnavailable { .. }
-        | ServerError::ServiceAccountUnknown
-        | ServerError::ServiceAccountReused { .. }
-        | ServerError::ServiceAccountRetired { .. }
-        | ServerError::ServiceAccountOwnerRetired { .. }
-        | ServerError::PolicyUnavailable { .. }
-        | ServerError::AgentHasNoPolicy { .. }
-        | ServerError::PolicyVersionConflict { .. }
-        | ServerError::PolicyRefused { .. }
-        | ServerError::StopsUnavailable { .. }
-        | ServerError::StopReused { .. }
-        | ServerError::ReviewsUnavailable { .. }
-        | ServerError::ReviewerOnly
-        | ServerError::GrantNotDue { .. }
-        | ServerError::ReviewReused { .. }
-        | ServerError::DirectoryUnavailable { .. }
-        | ServerError::SignInProvidersUnavailable { .. }
-        | ServerError::Provider(ProviderError::Unavailable { .. } | ProviderError::TokenUnknown)
-        | ServerError::ProviderRefused { .. }
-        | ServerError::SignInProvidersRefused { .. }
-        | ServerError::NotPermitted { .. }
-        | ServerError::NoLiveSession { .. }
-        | ServerError::RunnerAbsent { .. }
-        | ServerError::IssuerChallengeExpired
-        | ServerError::IssuerRefused { .. }
-        | ServerError::Runner { .. } => "server_error",
-    };
-    let body = json!({
-        "error": code,
-        "error_description": error.to_string(),
-        "refusal": error.name(),
-        "reason": error.to_string(),
-    });
-    (
-        error.status(),
-        [(header::CACHE_CONTROL, "no-store")],
-        Json(body),
-    )
-        .into_response()
-}
-
 pub(super) async fn token(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -438,7 +292,7 @@ pub(super) async fn token(
 ) -> Response {
     let answer = match form {
         Ok(Form(form)) => match super::client_auth::authenticated(&state, &headers, &form).await {
-            Ok(client) => exchange(&state, &form, &client),
+            Ok(client) => super::issue::exchange(&state, &form, &client),
             Err(error) => Err(error),
         },
         Err(refused) => Err(ServerError::RequestMalformed {
@@ -456,78 +310,6 @@ pub(super) async fn token(
     }
 }
 
-/// The exchange of a code for a token by the app `client`, whose client
-/// authentication was judged first (`client_auth`), so a request with a
-/// refused credential is refused as that whatever grant it asks for. The
-/// app and its return address are judged again here, at this request.
-fn exchange(state: &AppState, form: &Exchange, client: &str) -> Result<Value, ServerError> {
-    let provider = provider(state)?;
-    if form.grant_type != "authorization_code" {
-        return Err(malformed("a product exchanges an authorization code"));
-    }
-    let admitted = admitted_client(state, client, &form.redirect_uri)?;
-    let client_id = admitted.app;
-    let at = now();
-    // The first act on the provider's state: the code verified and marked used.
-    let taken = provider.take_grant(
-        &form.code,
-        &client_id,
-        &form.redirect_uri,
-        &form.code_verifier,
-        at,
-    )?;
-    // Between the two acts, with no provider guard held: the session, the
-    // setting and the name. The name goes into the token only when the
-    // authorization asked for it and the app's setting still grants it at
-    // this exchange; it is read from the directory now and kept nowhere.
-    if !state.sessions.is_live(&taken.session_id)? {
-        return Err(ServerError::Provider(ProviderError::CodeExpired));
-    }
-    let profile = taken.profile && admitted.profile;
-    let name = if profile {
-        display_name(state, taken.person)?
-    } else {
-        None
-    };
-    let expires_at = taken.expires_at;
-    let mut claims = json!({
-        "iss": provider.issuer,
-        "sub": taken.subject,
-        "aud": client_id,
-        "iat": at,
-        "exp": expires_at.min(at.saturating_add(ID_TOKEN_SECONDS)),
-        "auth_time": taken.authenticated_at,
-    });
-    if let Some(nonce) = taken.nonce {
-        claims["nonce"] = Value::String(nonce);
-    }
-    if let Some(name) = name {
-        claims["name"] = Value::String(name);
-    }
-    let access = random::<32>()?;
-    let lookup = hex(&Sha256::digest(access.as_bytes()));
-    // The second act: the token kept and remembered by its code, or refused
-    // when the code was replayed in between.
-    provider.issue(
-        &form.code,
-        lookup,
-        Access {
-            session_id: taken.session_id,
-            subject: taken.subject,
-            app: client_id,
-            profile,
-            expires_at,
-        },
-        at,
-    )?;
-    Ok(json!({
-        "access_token": access,
-        "token_type": "Bearer",
-        "expires_in": expires_at.saturating_sub(at),
-        "id_token": provider.signed(&claims),
-    }))
-}
-
 pub(super) async fn userinfo(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -541,6 +323,10 @@ pub(super) async fn userinfo(
     let (subject, session_id, app, profile) = {
         let tokens = held(&provider.tokens)?;
         let access = tokens.get(&hex(&Sha256::digest(bearer.trim().as_bytes())), now())?;
+        // A refresh token is no access token: it answers only the token route.
+        if access.kind == Some(Kind::Refresh) {
+            return Err(ServerError::Provider(ProviderError::TokenUnknown));
+        }
         (
             access.subject.clone(),
             access.session_id.clone(),

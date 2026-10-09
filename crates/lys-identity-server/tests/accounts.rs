@@ -230,6 +230,8 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
             config.provider = Some(ProviderSettings {
                 key_file: config.log_dir.with_file_name("provider.key"),
                 code_seconds: 60,
+                pass_seconds: lys_identity_server::provider::PASS_SECONDS,
+                rights_bytes: None,
             });
             config.administrator = None;
             config.setup = Some(SetupSettings {

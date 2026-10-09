@@ -60,6 +60,7 @@ fn exchange(client_id: Option<&str>, client_secret: Option<&str>) -> Exchange {
         code: "code".to_owned(),
         redirect_uri: "https://product.example.test/callback".to_owned(),
         code_verifier: "verifier".to_owned(),
+        refresh_token: String::new(),
         client_id: client_id.map(str::to_owned),
         client_secret: client_secret.map(str::to_owned),
     }
@@ -97,14 +98,16 @@ fn an_id_token_verifies_under_the_key_its_jwks_names() -> Result<(), Box<dyn Err
     let settings = ProviderSettings {
         key_file: key_file.clone(),
         code_seconds: 60,
+        pass_seconds: super::PASS_SECONDS,
+        rights_bytes: None,
     };
     let provider = OpenIdProvider::open(&settings, "http://localhost:8490".to_owned())?;
-    let token = provider.signed(&json!({ "iss": "http://localhost:8490", "sub": "person-1" }));
+    let token = provider.signed(&json!({ "iss": "http://localhost:8490", "sub": "person-1" }))?;
     let parts: Vec<&str> = token.split('.').collect();
     assert_eq!(parts.len(), 3);
     let header: serde_json::Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(parts[0])?)?;
     assert_eq!(header["alg"], "EdDSA");
-    let keys = provider.keys();
+    let keys = provider.keys(0)?;
     assert_eq!(header["kid"], keys["keys"][0]["kid"]);
     let x = URL_SAFE_NO_PAD.decode(keys["keys"][0]["x"].as_str().ok_or("x")?)?;
     let public: [u8; 32] = x.as_slice().try_into()?;
@@ -131,6 +134,7 @@ fn the_access_table_keeps_whether_the_name_was_asked_for_and_never_the_name()
         app: "notes".to_owned(),
         profile: true,
         expires_at: 7,
+        kind: None,
     };
     let written = serde_json::to_value(&access)?;
     let mut keys: Vec<&str> = written
@@ -160,6 +164,8 @@ fn discovery_lists_the_openid_and_profile_scopes_and_the_name_claim() -> Result<
     let settings = ProviderSettings {
         key_file,
         code_seconds: 60,
+        pass_seconds: super::PASS_SECONDS,
+        rights_bytes: None,
     };
     let provider = OpenIdProvider::open(&settings, "http://localhost:8490".to_owned())?;
     let discovery = provider.discovery();
@@ -189,6 +195,8 @@ fn provider_with_code(code: &str) -> Result<(tempfile::TempDir, OpenIdProvider),
     let settings = ProviderSettings {
         key_file,
         code_seconds: 60,
+        pass_seconds: super::PASS_SECONDS,
+        rights_bytes: None,
     };
     let provider = OpenIdProvider::open(&settings, "http://localhost:8490".to_owned())?;
     held(&provider.codes)?.insert(
@@ -208,6 +216,7 @@ fn provider_with_code(code: &str) -> Result<(tempfile::TempDir, OpenIdProvider),
             used: false,
             replayed: false,
             issued_access: None,
+            issued_refresh: None,
         },
     );
     // The table of tokens lives beside the key, so the directory stays.
@@ -221,6 +230,7 @@ fn access() -> Access {
         app: "notes".to_owned(),
         profile: false,
         expires_at: 1000,
+        kind: None,
     }
 }
 
@@ -250,7 +260,7 @@ fn a_code_replayed_between_the_two_acts_of_an_exchange_leaves_no_live_token()
         Err(ServerError::Provider(ProviderError::CodeUsed))
     ));
     assert!(matches!(
-        provider.issue("code-1", lookup.clone(), access(), 12),
+        provider.issue("code-1", lookup.clone(), access(), None, 12),
         Err(ServerError::Provider(ProviderError::CodeUsed))
     ));
     assert!(matches!(
@@ -273,7 +283,7 @@ fn a_code_replayed_after_its_exchange_revokes_the_token_it_issued() -> Result<()
         "v",
         10,
     )?;
-    provider.issue("code-2", lookup.clone(), access(), 10)?;
+    provider.issue("code-2", lookup.clone(), access(), None, 10)?;
     assert_eq!(held(&provider.tokens)?.get(&lookup, 11)?.app, "notes");
     assert!(matches!(
         provider.take_grant(
@@ -302,7 +312,7 @@ async fn issuer_challenge_and_refusal_are_oauth_server_errors() -> Result<(), Bo
             error: "Forbidden".to_owned(),
         },
     ] {
-        let response = super::endpoints::oauth_refusal(&refusal);
+        let response = super::refusal::oauth_refusal(&refusal);
         let body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
         let body: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(body["error"], "server_error");

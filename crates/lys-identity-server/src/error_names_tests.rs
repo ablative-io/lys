@@ -625,6 +625,21 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "TokenUnknown",
         ),
         (
+            ServerError::Provider(ProviderError::RefreshUnknown),
+            "RefreshUnknown",
+        ),
+        (
+            ServerError::Provider(ProviderError::SessionEnded),
+            "SessionEnded",
+        ),
+        (
+            ServerError::Provider(ProviderError::HolderRetired {
+                holder: detail.to_owned(),
+                state: lys_identity::LifecycleState::Retired,
+            }),
+            "HolderRetired",
+        ),
+        (
             ServerError::ProviderRefused {
                 provider: detail,
                 status: 7,

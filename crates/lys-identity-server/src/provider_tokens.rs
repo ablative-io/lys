@@ -104,7 +104,7 @@ impl Tokens {
             dropped,
         };
         if dropped > 0 {
-            tokens.change(None, None)?;
+            tokens.change(&[], None)?;
         }
         Ok(tokens)
     }
@@ -144,21 +144,43 @@ impl Tokens {
         access: Access,
         at: u64,
     ) -> Result<(), ServerError> {
+        self.insert_all(vec![(key, access)], at)
+    }
+
+    /// Keep every token of `issued` as one durable write, so an access token
+    /// and the refresh token issued with it are kept together or not at all.
+    pub(super) fn insert_all(
+        &mut self,
+        issued: Vec<(String, Access)>,
+        at: u64,
+    ) -> Result<(), ServerError> {
         self.ready()?;
-        validate(&key, &access)?;
+        for (index, (key, access)) in issued.iter().enumerate() {
+            validate(key, access)?;
+            let repeated = issued
+                .get(..index)
+                .is_some_and(|before| before.iter().any(|(earlier, _)| earlier == key));
+            if repeated {
+                return Err(unavailable("the token digest is already issued"));
+            }
+        }
         self.live.retain(|_, access| access.expires_at > at);
-        if self.live.contains_key(&key) {
+        if issued.iter().any(|(key, _)| self.live.contains_key(key)) {
             return Err(unavailable("the token digest is already issued"));
         }
-        self.change(Some((&key, &access)), None)?;
-        self.live.insert(key, access);
+        let added: Vec<(&str, &Access)> = issued
+            .iter()
+            .map(|(key, access)| (key.as_str(), access))
+            .collect();
+        self.change(&added, None)?;
+        self.live.extend(issued);
         Ok(())
     }
 
     pub(super) fn revoke(&mut self, key: &str) -> Result<(), ServerError> {
         self.ready()?;
         if self.live.contains_key(key) {
-            self.change(None, Some(key))?;
+            self.change(&[], Some(key))?;
             self.live.remove(key);
         }
         Ok(())
@@ -169,14 +191,14 @@ impl Tokens {
         let before = self.live.len();
         self.live.retain(|_, access| access.subject != subject);
         if self.live.len() != before {
-            self.change(None, None)?;
+            self.change(&[], None)?;
         }
         Ok(())
     }
 
     fn change(
         &mut self,
-        added: Option<(&str, &Access)>,
+        added: &[(&str, &Access)],
         removed: Option<&str>,
     ) -> Result<(), ServerError> {
         let mut tokens: Vec<WrittenToken<'_>> = self
@@ -185,9 +207,11 @@ impl Tokens {
             .filter(|(key, _)| removed != Some(key.as_str()))
             .map(|(key, access)| WrittenToken { key, access })
             .collect();
-        if let Some((key, access)) = added {
-            tokens.push(WrittenToken { key, access });
-        }
+        tokens.extend(
+            added
+                .iter()
+                .map(|&(key, access)| WrittenToken { key, access }),
+        );
         let written = Written {
             format: FORMAT,
             tokens,
@@ -195,7 +219,7 @@ impl Tokens {
         let bytes = serde_json::to_vec(&written).map_err(|error| {
             unavailable(format!("the access table could not be encoded: {error}"))
         })?;
-        let result = save(&self.file, &bytes);
+        let result = save("the access table", &self.file, &bytes);
         if result.is_err() {
             self.failed = true;
         }
@@ -222,10 +246,13 @@ fn validate(key: &str, access: &Access) -> Result<(), ServerError> {
     Ok(())
 }
 
-fn save(path: &Path, bytes: &[u8]) -> Result<(), ServerError> {
+/// Write `bytes` to `path` durably: a private temporary file, synced, renamed
+/// over it and the folder synced. The provider's signing keys' table is kept
+/// the same way (`keys`).
+pub(super) fn save(what: &str, path: &Path, bytes: &[u8]) -> Result<(), ServerError> {
     let mut name = path
         .file_name()
-        .ok_or_else(|| unavailable("the access table has no file name"))?
+        .ok_or_else(|| unavailable(format!("{what} has no file name")))?
         .to_os_string();
     name.push(format!(".{}.writing", super::random::<16>()?));
     let temporary = path.with_file_name(name);
@@ -236,7 +263,7 @@ fn save(path: &Path, bytes: &[u8]) -> Result<(), ServerError> {
         .open(&temporary)
         .map_err(|error| {
             unavailable(format!(
-                "the access table temporary file could not be created: {error}"
+                "{what} temporary file could not be created: {error}"
             ))
         })?;
     let result = (|| -> std::io::Result<()> {
@@ -256,13 +283,11 @@ fn save(path: &Path, bytes: &[u8]) -> Result<(), ServerError> {
             Err(cleanup) if cleanup.kind() == std::io::ErrorKind::NotFound => {}
             Err(cleanup) => {
                 return Err(unavailable(format!(
-                    "the access table write failed: {error}; its temporary file could not be removed: {cleanup}"
+                    "{what} write failed: {error}; its temporary file could not be removed: {cleanup}"
                 )));
             }
         }
-        return Err(unavailable(format!(
-            "the access table could not be written: {error}"
-        )));
+        return Err(unavailable(format!("{what} could not be written: {error}")));
     }
     Ok(())
 }

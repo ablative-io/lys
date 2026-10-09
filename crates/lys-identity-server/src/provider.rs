@@ -21,6 +21,15 @@
 //! another address (`RedirectUnregistered`), a code used twice (`CodeUsed`),
 //! a wrong PKCE verifier (`VerifierWrong`), a code past its instant
 //! (`CodeExpired`). An instant is data compared on use, never a wait.
+//!
+//! The access token is a pass (ACCESS-002): a JWS whose claims are exactly
+//! `lys_pass::Claims`, carrying the holder's rights on the audience app's
+//! kinds as the live grants give them at issue (`rights_claim`), living
+//! `pass_seconds` and never past the sign-in it stands on. A refresh token,
+//! kept beside it, issues a new pass from the grants live at that moment
+//! (`issue`). Passes and ID tokens are signed with the current key; a
+//! retired key stays published until every token it signed has ended
+//! (`keys`).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -28,13 +37,11 @@ use std::sync::{Mutex, MutexGuard};
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use lys_core::Ed25519Identity;
 use lys_identity::PersonId;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
 use crate::error_provider::ProviderError;
@@ -48,7 +55,12 @@ use token_store::Tokens;
 mod client_auth;
 mod endpoints;
 mod exchange;
+mod issue;
+mod keys;
+mod refusal;
+mod rights_claim;
 pub use endpoints::routes;
+pub use keys::{RotateAnswer, RotateBody};
 
 /// How long a code lives when the configuration says nothing, in seconds:
 /// the ten minutes RFC 6749 (section 4.1.2) recommends as a code's longest
@@ -57,6 +69,11 @@ pub const CODE_SECONDS: u64 = 600;
 
 /// Offline identity assertions must be renewed through a live sign-in.
 const ID_TOKEN_SECONDS: u64 = 300;
+
+/// How long a pass lives when the configuration says nothing, in seconds:
+/// the ten minutes ACCESS-002 R2 states as `identity.pass_lifetime`'s
+/// default, which the install writes into `provider.pass_seconds`.
+pub const PASS_SECONDS: u64 = 600;
 
 /// What the provider is started with. Its clients are the approved apps,
 /// read from the apps' record at each request, never from here.
@@ -68,10 +85,25 @@ pub struct ProviderSettings {
     /// How long a code lives, in seconds.
     #[serde(default = "code_seconds")]
     pub code_seconds: u64,
+    /// How long a pass lives, in seconds: the install's
+    /// `identity.pass_lifetime` (ACCESS-002 R2). Never zero: a pass always
+    /// has an expiry after its issue.
+    #[serde(default = "pass_seconds")]
+    pub pass_seconds: u64,
+    /// The most bytes a pass's rights may take, as JSON, before the pass
+    /// carries none and says `rights_truncated` instead (ACCESS-002 R1).
+    /// ACCESS-002 names no value, so none is invented here and the install
+    /// writes none: absent, the claim is not bounded.
+    #[serde(default)]
+    pub rights_bytes: Option<usize>,
 }
 
 fn code_seconds() -> u64 {
     CODE_SECONDS
+}
+
+fn pass_seconds() -> u64 {
+    PASS_SECONDS
 }
 
 /// A code Lys answered a product with.
@@ -97,9 +129,20 @@ struct Grant {
     /// kept a token: that first exchange then keeps none.
     replayed: bool,
     issued_access: Option<String>,
+    /// The refresh token issued with that access token, revoked with it.
+    issued_refresh: Option<String>,
 }
 
-/// An access token Lys issued, for the user information route.
+/// What a kept token is, when it is not an access token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum Kind {
+    /// A refresh token: it answers the token route alone, never userinfo.
+    Refresh,
+}
+
+/// A token Lys issued: an access token, for the user information route, or
+/// a refresh token, for the token route.
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Access {
@@ -112,14 +155,19 @@ struct Access {
     /// while the app's sign-in settings still grant it.
     profile: bool,
     expires_at: u64,
+    /// Absent for an access token, as every token kept before refresh
+    /// tokens existed was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kind: Option<Kind>,
 }
 
 /// Lys's `OpenID` provider.
 pub struct OpenIdProvider {
     issuer: String,
-    key: Ed25519Identity,
-    kid: String,
+    keys: Mutex<keys::SigningKeys>,
     code_seconds: u64,
+    pass_seconds: u64,
+    rights_bytes: Option<usize>,
     codes: Mutex<HashMap<String, Grant>>,
     tokens: Mutex<Tokens>,
 }
@@ -178,16 +226,13 @@ impl OpenIdProvider {
 
     /// The provider `settings` names, answering as `issuer`, Lys's origin.
     pub fn open(settings: &ProviderSettings, issuer: String) -> Result<Self, ServerError> {
-        let key = Ed25519Identity::load(&settings.key_file).map_err(|error| {
-            ServerError::ConfigInvalid {
-                reason: format!(
-                    "the provider's signing key {} cannot be read: {error}",
-                    settings.key_file.display()
-                ),
-            }
-        })?;
-        let digest = Sha256::digest(key.public_key_bytes());
-        let kid = hex(digest.get(..8).unwrap_or_default());
+        if settings.pass_seconds == 0 {
+            return Err(ServerError::ConfigInvalid {
+                reason: "provider.pass_seconds is zero: a pass always ends after its issue"
+                    .to_owned(),
+            });
+        }
+        let keys = keys::SigningKeys::open(&settings.key_file)?;
         let tokens = Tokens::open(settings.key_file.with_extension("tokens.json"), now())?;
         // Tokens the table could not read are dropped, each a sign-in asked
         // for again, and said once: the count and the file, never a key.
@@ -199,9 +244,10 @@ impl OpenIdProvider {
         }
         Ok(Self {
             issuer,
-            key,
-            kid,
+            keys: Mutex::new(keys),
             code_seconds: settings.code_seconds,
+            pass_seconds: settings.pass_seconds,
+            rights_bytes: settings.rights_bytes,
             codes: Mutex::new(HashMap::new()),
             tokens: Mutex::new(tokens),
         })
@@ -212,16 +258,16 @@ impl OpenIdProvider {
         &self.issuer
     }
 
-    /// Sign `claims` as a compact JWS with the provider's key.
-    fn signed(&self, claims: &Value) -> String {
-        let header = json!({ "alg": "EdDSA", "typ": "JWT", "kid": self.kid });
-        let input = format!(
-            "{}.{}",
-            URL_SAFE_NO_PAD.encode(header.to_string()),
-            URL_SAFE_NO_PAD.encode(claims.to_string())
-        );
-        let signature = URL_SAFE_NO_PAD.encode(self.key.sign(input.as_bytes()));
-        format!("{input}.{signature}")
+    /// Sign `claims` as a compact JWS with the provider's current key,
+    /// naming it by its key id.
+    fn signed(&self, claims: &Value) -> Result<String, ServerError> {
+        Ok(held(&self.keys)?.signed(claims))
+    }
+
+    /// How long a retired key stays published: until every token it signed
+    /// has ended, the longer of a pass's life and an ID token's.
+    fn published_seconds(&self) -> u64 {
+        self.pass_seconds.max(ID_TOKEN_SECONDS)
     }
 
     fn discovery(&self) -> Value {
@@ -233,7 +279,7 @@ impl OpenIdProvider {
             "userinfo_endpoint": format!("{issuer}/oauth/userinfo"),
             "jwks_uri": format!("{issuer}/oauth/jwks"),
             "response_types_supported": ["code"],
-            "grant_types_supported": ["authorization_code"],
+            "grant_types_supported": ["authorization_code", "refresh_token"],
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": ["EdDSA"],
             "code_challenge_methods_supported": ["S256"],
@@ -243,15 +289,10 @@ impl OpenIdProvider {
         })
     }
 
-    fn keys(&self) -> Value {
-        json!({ "keys": [{
-            "kty": "OKP",
-            "crv": "Ed25519",
-            "use": "sig",
-            "alg": "EdDSA",
-            "kid": self.kid,
-            "x": URL_SAFE_NO_PAD.encode(self.key.public_key_bytes()),
-        }]})
+    /// The keys a token may be verified with at `at`: the current one and
+    /// each retired one some unexpired token may still name.
+    fn keys(&self, at: u64) -> Result<Value, ServerError> {
+        Ok(held(&self.keys)?.published(at, self.published_seconds()))
     }
 }
 

@@ -48,6 +48,23 @@ pub enum ProviderError {
     /// The access token is not one Lys issued, or is past its instant.
     #[error("TokenUnknown: that access token is not one Lys issued, or it has ended")]
     TokenUnknown,
+    /// The refresh token is not one Lys gave this product, or it has ended
+    /// with the sign-in it stands on (ACCESS-002 R2).
+    #[error("RefreshUnknown: that refresh token is not one Lys gave this product, or it has ended")]
+    RefreshUnknown,
+    /// The Lys sign-in a refresh token stands on has ended, so no new pass is
+    /// issued from it (ACCESS-002 R2).
+    #[error("SessionEnded: the Lys sign-in this refresh token stands on has ended")]
+    SessionEnded,
+    /// The holder a pass would be issued to is retired or suspended, and is
+    /// given no pass (ACCESS-002 R2).
+    #[error("HolderRetired: {holder} is {state} and is given no pass")]
+    HolderRetired {
+        /// The holder refused.
+        holder: String,
+        /// Its recorded lifecycle state.
+        state: lys_identity::LifecycleState,
+    },
 }
 
 impl ProviderError {
@@ -65,6 +82,9 @@ impl ProviderError {
             Self::CodeExpired => "CodeExpired",
             Self::VerifierWrong => "VerifierWrong",
             Self::TokenUnknown => "TokenUnknown",
+            Self::RefreshUnknown => "RefreshUnknown",
+            Self::SessionEnded => "SessionEnded",
+            Self::HolderRetired { .. } => "HolderRetired",
         }
     }
 
@@ -80,7 +100,10 @@ impl ProviderError {
             | Self::CodeUnknown
             | Self::CodeUsed
             | Self::CodeExpired
-            | Self::VerifierWrong => StatusCode::BAD_REQUEST,
+            | Self::VerifierWrong
+            | Self::RefreshUnknown
+            | Self::SessionEnded
+            | Self::HolderRetired { .. } => StatusCode::BAD_REQUEST,
         }
     }
 }

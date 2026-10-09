@@ -95,6 +95,8 @@ async fn table_kept(
             config.provider = Some(ProviderSettings {
                 key_file: config.log_dir.with_file_name("provider.key"),
                 code_seconds,
+                pass_seconds: lys_identity_server::provider::PASS_SECONDS,
+                rights_bytes: None,
             });
         },
         |config| {
@@ -1025,3 +1027,74 @@ async fn a_renamed_person_is_named_anew_at_the_next_issue_and_request() -> TestR
 
 #[path = "shared/provider_client_credentials.rs"]
 mod client_credentials;
+
+/// The pass in `answer`, and the key id its header names.
+fn pass_and_kid(answer: &Value) -> Result<(String, String), Box<dyn Error>> {
+    let pass = answer["access_token"].as_str().ok_or("no pass")?.to_owned();
+    let header = pass.split('.').next().ok_or("no header")?;
+    let header: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(header)?)?;
+    let kid = header["kid"].as_str().ok_or("no key id")?.to_owned();
+    Ok((pass, kid))
+}
+
+/// ACCESS-002 R3 over HTTP: the administrator rotates the signing key; the
+/// key set then publishes both keys, a pass issued before the rotation still
+/// verifies with the published set alone, a pass issued after names the new
+/// key, and the same rotation sent again makes no second key. When the old
+/// key leaves the set, one lifetime on, is shown with instants as data in
+/// `provider/keys.rs`.
+#[tokio::test]
+async fn the_administrator_rotates_the_key_and_a_pass_from_before_still_verifies() -> TestResult {
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let first = code(&service, &cookie, &challenge_of("verifier")).await?;
+    let (status, answer) = exchange(&service, &first, "verifier").await?;
+    assert_eq!(status, 200, "{answer}");
+    let (before, old) = pass_and_kid(&answer)?;
+
+    let operation = OperationId::generate()?.to_string();
+    let body = json!({ "operation": operation });
+    let (status, rotated) = service
+        .post("/oauth/jwks/rotate", Some(&cookie), &body)
+        .await?;
+    assert_eq!(status, 200, "{rotated}");
+    let current = rotated["current"]
+        .as_str()
+        .ok_or("a current key")?
+        .to_owned();
+    assert_ne!(current, old);
+    assert_eq!(rotated["published"], json!([current, old]));
+
+    let text = reqwest::get(format!("{}/oauth/jwks", service.base))
+        .await?
+        .text()
+        .await?;
+    let keys = lys_pass::KeySet::from_json(&text)?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    lys_pass::VerifiedPass::verify(&before, &keys, &service.base, PRODUCT, now)?;
+
+    let second = code(&service, &cookie, &challenge_of("verifier")).await?;
+    let (status, answer) = exchange(&service, &second, "verifier").await?;
+    assert_eq!(status, 200, "{answer}");
+    let (after, kid) = pass_and_kid(&answer)?;
+    assert_eq!(kid, current);
+    lys_pass::VerifiedPass::verify(&after, &keys, &service.base, PRODUCT, now)?;
+
+    let (status, again) = service
+        .post("/oauth/jwks/rotate", Some(&cookie), &body)
+        .await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(
+        again["current"],
+        current.as_str(),
+        "the same rotation makes no second key"
+    );
+    let malformed = json!({ "operation": "not-an-operation" });
+    let (status, refused) = service
+        .post("/oauth/jwks/rotate", Some(&cookie), &malformed)
+        .await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "RequestMalformed");
+    Ok(())
+}

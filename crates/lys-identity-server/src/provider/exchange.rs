@@ -49,9 +49,15 @@ impl OpenIdProvider {
             return Err(ServerError::Provider(ProviderError::CodeUnknown));
         }
         if grant.used {
-            match &grant.issued_access {
-                Some(key) => held(&self.tokens)?.revoke(key)?,
-                None => grant.replayed = true,
+            match (&grant.issued_access, &grant.issued_refresh) {
+                (None, _) => grant.replayed = true,
+                (Some(key), refresh) => {
+                    let mut tokens = held(&self.tokens)?;
+                    tokens.revoke(key)?;
+                    if let Some(refresh) = refresh {
+                        tokens.revoke(refresh)?;
+                    }
+                }
             }
             return Err(ServerError::Provider(ProviderError::CodeUsed));
         }
@@ -77,28 +83,34 @@ impl OpenIdProvider {
         })
     }
 
-    /// The second act: keep the token under `lookup` and let `code` remember
-    /// it, so a later replay revokes it. A code replayed between the two acts
+    /// The second act: keep the token under `lookup`, and the refresh token
+    /// issued with it, in one durable write, and let `code` remember both,
+    /// so a later replay revokes both. A code replayed between the two acts
     /// gets no token and the exchange answers `CodeUsed`. A code retired
-    /// meanwhile as expired is unknown to any replay; its token is kept and
-    /// ends at its own instant.
+    /// meanwhile as expired is unknown to any replay; its tokens are kept
+    /// and end at their own instants.
     pub(super) fn issue(
         &self,
         code: &str,
         lookup: String,
         access: Access,
+        refresh: Option<(String, Access)>,
         at: u64,
     ) -> Result<(), ServerError> {
         let mut codes = held(&self.codes)?;
         let mut tokens = held(&self.tokens)?;
+        let refresh_key = refresh.as_ref().map(|(key, _)| key.clone());
+        let mut issued = vec![(lookup.clone(), access)];
+        issued.extend(refresh);
         match codes.get_mut(code) {
             Some(grant) if grant.replayed => Err(ServerError::Provider(ProviderError::CodeUsed)),
             Some(grant) => {
-                tokens.insert(lookup.clone(), access, at)?;
+                tokens.insert_all(issued, at)?;
                 grant.issued_access = Some(lookup);
+                grant.issued_refresh = refresh_key;
                 Ok(())
             }
-            None => tokens.insert(lookup, access, at),
+            None => tokens.insert_all(issued, at),
         }
     }
 }

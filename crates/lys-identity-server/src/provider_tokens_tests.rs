@@ -16,6 +16,7 @@ fn access(ends: u64) -> Access {
         app: "notes".to_owned(),
         profile: false,
         expires_at: ends,
+        kind: None,
     }
 }
 
