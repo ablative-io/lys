@@ -544,7 +544,11 @@ impl Held {
 
     /// The resources placed in the resource of `kind` and `id`, by their
     /// first placement, in the order kept, read from the index.
-    pub fn children<'a>(&'a self, kind: &str, id: &str) -> impl Iterator<Item = &'a Placed> + use<'a> {
+    pub fn children<'a>(
+        &'a self,
+        kind: &str,
+        id: &str,
+    ) -> impl Iterator<Item = &'a Placed> + use<'a> {
         self.index
             .children(kind, id)
             .iter()
