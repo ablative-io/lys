@@ -49,18 +49,32 @@ impl Refusal {
             return Err(Error::RightsOutsideAudience);
         }
         let mut base = Url::parse(issuer)?;
-        if !matches!(base.scheme(), "http" | "https") || base.host_str().is_none()
-            || !base.username().is_empty() || base.password().is_some()
-            || base.query().is_some() || base.fragment().is_some() {
+        if !matches!(base.scheme(), "http" | "https")
+            || base.host_str().is_none()
+            || !base.username().is_empty()
+            || base.password().is_some()
+            || base.query().is_some()
+            || base.fragment().is_some()
+        {
             return Err(Error::Invalid("grant request issuer is invalid"));
         }
-        if !base.path().ends_with('/') { base.set_path(&format!("{}/", base.path())); }
+        if !base.path().ends_with('/') {
+            base.set_path(&format!("{}/", base.path()));
+        }
         let mut request = base;
         request.set_fragment(Some("/requests"));
-        Ok(Self { refused: Refused {
-            resource: format!("{kind}:{id}"), action: target.action.clone(),
-            needed: Needed { app: app.to_owned(), kind: target.kind, id: target.id, action: target.action },
-            request: request.into(),
-        } })
+        Ok(Self {
+            refused: Refused {
+                resource: format!("{kind}:{id}"),
+                action: target.action.clone(),
+                needed: Needed {
+                    app: app.to_owned(),
+                    kind: target.kind,
+                    id: target.id,
+                    action: target.action,
+                },
+                request: request.into(),
+            },
+        })
     }
 }

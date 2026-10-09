@@ -64,7 +64,9 @@ fn to_agent() -> Result<Grant, GrantError> {
         actions: actions(&["read", "write"])?,
         pass_on: PassOn::to(
             actions(&["read"])?,
-            [RecipientKind::Person, RecipientKind::Agent].into_iter().collect(),
+            [RecipientKind::Person, RecipientKind::Agent]
+                .into_iter()
+                .collect(),
         )?,
         source: Source::Grant(GrantId::from_bytes(SOURCE)),
         window: Window::new(1_000, Some(2_000))?,
@@ -111,7 +113,11 @@ fn a_grant_written_before_the_mode_reads_as_outright_and_keeps_its_bytes() -> Te
     let old = fixture_bytes("grant_body_to_agent")?;
     let grant = decode_grant(&old)?;
     assert_eq!(grant.mode(), Mode::Outright);
-    assert_eq!(encode_grant(&grant), old, "outright is written by its absence");
+    assert_eq!(
+        encode_grant(&grant),
+        old,
+        "outright is written by its absence"
+    );
     assert!(!keys(&old)?.contains(&14));
     Ok(())
 }
@@ -135,7 +141,11 @@ fn a_held_mode_is_key_fourteen_and_round_trips() -> TestResult {
         let grant = to_agent()?.with_mode(mode);
         assert_eq!(grant.mode(), mode);
         let encoded = encode_grant(&grant);
-        assert_eq!(keys(&encoded)?.last(), Some(&14), "{mode:?}: key 14 is last");
+        assert_eq!(
+            keys(&encoded)?.last(),
+            Some(&14),
+            "{mode:?}: key 14 is last"
+        );
         let read = decode_grant(&encoded)?;
         assert_eq!(read.mode(), mode, "{mode:?}: read back");
         assert_eq!(read, grant);
@@ -182,7 +192,9 @@ fn a_mode_written_as_outright_or_unknown_is_refused_by_name() -> TestResult {
     let last = encoded.len() - 1;
     for code in [0_u8, 3] {
         encoded[last] = code;
-        let refused = decode_grant(&encoded).err().ok_or("a bad mode code was read")?;
+        let refused = decode_grant(&encoded)
+            .err()
+            .ok_or("a bad mode code was read")?;
         assert!(
             matches!(refused, GrantError::GrantMalformed { .. }),
             "code {code}: {refused:?}"

@@ -55,7 +55,11 @@ async fn an_action_class_round_trips_at_every_version() -> TestResult {
     assert_eq!(current["version"], 2, "{current}");
     assert_eq!(current["schema"], with_hot(&["read"]), "{current}");
     let first = ok(get(&service, &format!("{path}?version=1"), Auth::Cookie(&admin)).await?)?;
-    assert_eq!(first["schema"], workspace_schema(NOTES), "version 1 has no class");
+    assert_eq!(
+        first["schema"],
+        workspace_schema(NOTES),
+        "version 1 has no class"
+    );
     Ok(())
 }
 

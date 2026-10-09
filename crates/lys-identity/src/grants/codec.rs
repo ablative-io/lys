@@ -84,7 +84,10 @@ pub(crate) fn recipient_code(kind: RecipientKind) -> u64 {
 pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     let parts = grant.parts();
     let held = mode_code(grant.mode());
-    map(out, 12 + u64::from(grant.is_once()) + u64::from(held.is_some()));
+    map(
+        out,
+        12 + u64::from(grant.is_once()) + u64::from(held.is_some()),
+    );
     uint(out, 1);
     bytes(out, parts.id.as_bytes());
     uint(out, 2);

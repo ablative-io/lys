@@ -3,6 +3,8 @@
 
 #[path = "grant_delegation/connectors.rs"]
 mod connectors;
+#[path = "grant_delegation/mode.rs"]
+mod mode;
 #[path = "grant_delegation/service_accounts.rs"]
 mod service_accounts;
 mod support;

@@ -92,10 +92,19 @@ pub struct Target {
 impl Target {
     /// Validate the boundary without adding a length limit or default.
     pub fn new(kind: &str, id: &str, action: &str) -> Result<Self, Error> {
-        if [kind, id, action].iter().any(|value| value.is_empty() || value.chars().any(char::is_control)) {
-            return Err(Error::Invalid("permission target is empty or contains controls"));
+        if [kind, id, action]
+            .iter()
+            .any(|value| value.is_empty() || value.chars().any(char::is_control))
+        {
+            return Err(Error::Invalid(
+                "permission target is empty or contains controls",
+            ));
         }
-        Ok(Self { kind: kind.to_owned(), id: id.to_owned(), action: action.to_owned() })
+        Ok(Self {
+            kind: kind.to_owned(),
+            id: id.to_owned(),
+            action: action.to_owned(),
+        })
     }
 }
 
@@ -119,9 +128,13 @@ pub enum Decision<'a> {
 }
 
 pub(crate) fn in_prefix(kind: &str, prefix: &str) -> bool {
-    kind == prefix || kind.strip_prefix(prefix).is_some_and(|rest| rest.starts_with('.'))
+    kind == prefix
+        || kind
+            .strip_prefix(prefix)
+            .is_some_and(|rest| rest.starts_with('.'))
 }
 
 pub(crate) fn audience_owns(kind: &str, audience: &str) -> bool {
-    kind.split_once('.').map_or(audience == "lys", |(owner, _)| owner == audience)
+    kind.split_once('.')
+        .map_or(audience == "lys", |(owner, _)| owner == audience)
 }

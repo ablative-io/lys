@@ -69,8 +69,8 @@ mod tests {
     use crate::apps_binding::sha256_hex;
     use crate::apps_state::{Approved, By, Client, Decided, Line, Registered, SignInSet};
     use crate::apps_store::AppStore;
-    use lys_identity_server::Config;
-    use lys_identity_server::dev_seed::seed_configured;
+    use identity_contract::lys_identity_server::Config;
+    use identity_contract::lys_identity_server::dev_seed::seed_configured;
 
     type Outcome = Result<(), Box<dyn Error>>;
 

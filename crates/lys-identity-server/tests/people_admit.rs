@@ -181,7 +181,10 @@ async fn one_act_registers_makes_the_account_binds_activates_and_grants() -> Tes
         .filter_map(|leaf| leaf["index"].as_u64())
         .collect();
     assert_eq!(directory.len(), 3, "{receipt}");
-    assert!(directory.windows(2).all(|pair| pair[0] < pair[1]), "{receipt}");
+    assert!(
+        directory.windows(2).all(|pair| pair[0] < pair[1]),
+        "{receipt}"
+    );
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
     let (status, read) = service
         .get(&format!("/identities/{person}"), Some(&ada))
@@ -290,9 +293,11 @@ async fn a_malformed_email_or_missing_member_is_refused_before_any_step() -> Tes
         let (status, refused) = service.post("/people/admit", Some(&ada), &body).await?;
         assert_eq!(status, 400, "{refused}");
         assert_eq!(refused["refusal"], "RequestMalformed", "{refused}");
-        assert!(refused["receipt"]["completed"]
-            .as_array()
-            .is_none_or(Vec::is_empty));
+        assert!(
+            refused["receipt"]["completed"]
+                .as_array()
+                .is_none_or(Vec::is_empty)
+        );
     }
     assert_eq!(accounts_for(&rauthy, BEA)?, 0);
     assert_eq!(people(&service, &ada).await?, before);

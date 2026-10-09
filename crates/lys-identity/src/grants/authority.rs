@@ -424,7 +424,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at_least: Option<u64>,
     ) -> Result<Permit, GrantError> {
         let mut permit = self.explain_by(directory, request, only, at, at_least)?;
-        self.book.grant(permit.grant).map_or(Ok(()), Grant::exercisable)?;
+        self.book
+            .grant(permit.grant)
+            .map_or(Ok(()), Grant::exercisable)?;
         let used = self.record_use(request.caller, permit.grant, request.route, at);
         if let Err(error) = &used {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);

@@ -1858,6 +1858,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "lys-pass"
+version = "0.3.0"
+dependencies = [
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.19",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "lys-runner"
 version = "0.3.0"
 dependencies = [

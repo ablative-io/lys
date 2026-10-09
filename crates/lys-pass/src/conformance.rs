@@ -46,16 +46,90 @@ pub const REFUSAL: &str = include_str!("../fixtures/refusals/missing-grant.json"
 pub fn cases() -> Vec<Case> {
     let valid = include_str!("../fixtures/passes/valid.jwt").trim();
     vec![
-        Case { name: "valid", token: Some(valid), kind: "sample.file", id: "child", action: "read", expected: Outcome::Allowed("parent-grant".to_owned()) },
-        Case { name: "wrong-audience", token: Some(include_str!("../fixtures/passes/wrong-audience.jwt").trim()), kind: "sample.file", id: "child", action: "read", expected: Outcome::NamedRefusal("wrong_audience".to_owned()) },
-        Case { name: "expired", token: Some(include_str!("../fixtures/passes/expired.jwt").trim()), kind: "sample.file", id: "child", action: "read", expected: Outcome::NamedRefusal("pass_expired".to_owned()) },
-        Case { name: "unpublished-key", token: Some(include_str!("../fixtures/passes/unpublished-key.jwt").trim()), kind: "sample.file", id: "child", action: "read", expected: Outcome::NamedRefusal("unpublished_key".to_owned()) },
-        Case { name: "parent-reaches-child", token: Some(valid), kind: "sample.file", id: "child", action: "read", expected: Outcome::Allowed("parent-grant".to_owned()) },
-        Case { name: "restricted-child", token: Some(valid), kind: "sample.file", id: "restricted", action: "read", expected: Outcome::PermissionRefusal(REFUSAL.trim().to_owned()) },
-        Case { name: "held-mode-hot", token: Some(valid), kind: "sample.file", id: "held", action: "write", expected: Outcome::PermissionRefusal(include_str!("../fixtures/refusals/held-hot.json").trim().to_owned()) },
-        Case { name: "exact-refusal-bytes", token: Some(valid), kind: "sample.file", id: "restricted", action: "read", expected: Outcome::PermissionRefusal(REFUSAL.trim().to_owned()) },
-        Case { name: "deliberate-unreachable", token: None, kind: "sample.file", id: "child", action: "read", expected: Outcome::NamedRefusal("lys_could_not_be_asked".to_owned()) },
-        Case { name: "tampered", token: Some(include_str!("../fixtures/passes/tampered.jwt").trim()), kind: "sample.file", id: "child", action: "read", expected: Outcome::NamedRefusal("signature_refused".to_owned()) },
+        Case {
+            name: "valid",
+            token: Some(valid),
+            kind: "sample.file",
+            id: "child",
+            action: "read",
+            expected: Outcome::Allowed("parent-grant".to_owned()),
+        },
+        Case {
+            name: "wrong-audience",
+            token: Some(include_str!("../fixtures/passes/wrong-audience.jwt").trim()),
+            kind: "sample.file",
+            id: "child",
+            action: "read",
+            expected: Outcome::NamedRefusal("wrong_audience".to_owned()),
+        },
+        Case {
+            name: "expired",
+            token: Some(include_str!("../fixtures/passes/expired.jwt").trim()),
+            kind: "sample.file",
+            id: "child",
+            action: "read",
+            expected: Outcome::NamedRefusal("pass_expired".to_owned()),
+        },
+        Case {
+            name: "unpublished-key",
+            token: Some(include_str!("../fixtures/passes/unpublished-key.jwt").trim()),
+            kind: "sample.file",
+            id: "child",
+            action: "read",
+            expected: Outcome::NamedRefusal("unpublished_key".to_owned()),
+        },
+        Case {
+            name: "parent-reaches-child",
+            token: Some(valid),
+            kind: "sample.file",
+            id: "child",
+            action: "read",
+            expected: Outcome::Allowed("parent-grant".to_owned()),
+        },
+        Case {
+            name: "restricted-child",
+            token: Some(valid),
+            kind: "sample.file",
+            id: "restricted",
+            action: "read",
+            expected: Outcome::PermissionRefusal(REFUSAL.trim().to_owned()),
+        },
+        Case {
+            name: "held-mode-hot",
+            token: Some(valid),
+            kind: "sample.file",
+            id: "held",
+            action: "write",
+            expected: Outcome::PermissionRefusal(
+                include_str!("../fixtures/refusals/held-hot.json")
+                    .trim()
+                    .to_owned(),
+            ),
+        },
+        Case {
+            name: "exact-refusal-bytes",
+            token: Some(valid),
+            kind: "sample.file",
+            id: "restricted",
+            action: "read",
+            expected: Outcome::PermissionRefusal(REFUSAL.trim().to_owned()),
+        },
+        Case {
+            name: "deliberate-unreachable",
+            token: None,
+            kind: "sample.file",
+            id: "child",
+            action: "read",
+            expected: Outcome::NamedRefusal("lys_could_not_be_asked".to_owned()),
+        },
+        Case {
+            name: "tampered",
+            token: Some(include_str!("../fixtures/passes/tampered.jwt").trim()),
+            kind: "sample.file",
+            id: "child",
+            action: "read",
+            expected: Outcome::NamedRefusal("signature_refused".to_owned()),
+        },
     ]
 }
 
@@ -82,8 +156,14 @@ pub struct Report {
 impl Report {
     /// Refuse the consumer gate unless every shipped vector matched completely.
     pub fn require_conformant(&self) -> Result<(), Nonconformant> {
-        if self.passed == self.run && self.run == cases().len() && self.failures.is_empty() { Ok(()) }
-        else { Err(Nonconformant { run: self.run, passed: self.passed }) }
+        if self.passed == self.run && self.run == cases().len() && self.failures.is_empty() {
+            Ok(())
+        } else {
+            Err(Nonconformant {
+                run: self.run,
+                passed: self.passed,
+            })
+        }
     }
 }
 
@@ -100,12 +180,22 @@ pub struct Nonconformant {
 /// Run every vector through the product's actual route adapter, retaining all failures.
 pub fn run<E: std::fmt::Display>(mut observe: impl FnMut(&Case) -> Result<Outcome, E>) -> Report {
     let cases = cases();
-    let mut report = Report { run: cases.len(), passed: 0, failures: Vec::new() };
+    let mut report = Report {
+        run: cases.len(),
+        passed: 0,
+        failures: Vec::new(),
+    };
     for case in &cases {
         match observe(case) {
             Ok(actual) if actual == case.expected => report.passed += 1,
-            Ok(actual) => report.failures.push(Failure { case: case.name, reason: format!("expected {:?}, received {actual:?}", case.expected) }),
-            Err(error) => report.failures.push(Failure { case: case.name, reason: error.to_string() }),
+            Ok(actual) => report.failures.push(Failure {
+                case: case.name,
+                reason: format!("expected {:?}, received {actual:?}", case.expected),
+            }),
+            Err(error) => report.failures.push(Failure {
+                case: case.name,
+                reason: error.to_string(),
+            }),
         }
     }
     report

@@ -1,19 +1,17 @@
 //! A held grant is never exercised at once (ACCESS-001 R1): its act is taken
-//! through an approved draft, so an exercise of a by_draft or by_two grant is
+//! through an approved draft, so an exercise of a `by_draft` or `by_two` grant is
 //! refused `ModeHeld` by name, before any use is recorded; asking why is still
 //! answered, naming the held grant. A held root is issued under its mode,
 //! answers a retry of its operation, and refuses the same operation asked
 //! again in another mode.
 
-mod support;
-
 use std::error::Error;
 
+use crate::support::{T0, World, alpha};
 use lys_identity::grants::{
     Action, ExerciseRequest, GrantError, Mode, PassOn, Relation, RootRequest, Route, Window,
 };
 use lys_identity::{IdentityId, OperationId};
-use support::{T0, World, alpha};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -33,7 +31,9 @@ fn request(world: &World, operation: OperationId) -> Result<RootRequest, Box<dyn
 fn issue(world: &mut World, mode: Mode, operation: OperationId) -> Result<String, Box<dyn Error>> {
     let asked = request(world, operation)?;
     let directory = world.directory.projection()?;
-    let recorded = world.grants.issue_root_in(directory, &asked, mode, world.now)?;
+    let recorded = world
+        .grants
+        .issue_root_in(directory, &asked, mode, world.now)?;
     Ok(recorded.event.grant().to_string())
 }
 

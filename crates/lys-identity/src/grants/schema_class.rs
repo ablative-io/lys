@@ -34,7 +34,10 @@ pub(super) fn hot(
             ));
         }
         if !hot.insert(named) {
-            return Err(invalid(&at, format!("the hot action `{name}` is named twice")));
+            return Err(invalid(
+                &at,
+                format!("the hot action `{name}` is named twice"),
+            ));
         }
     }
     Ok(hot)

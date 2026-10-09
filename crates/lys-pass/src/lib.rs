@@ -102,9 +102,13 @@ pub struct Client {
 impl Client {
     /// Use the product's configured transport and trusted Lys issuer.
     pub fn new(http: Http, mut issuer: Url) -> Result<Self, Error> {
-        if !matches!(issuer.scheme(), "http" | "https") || issuer.host_str().is_none()
-            || !issuer.username().is_empty() || issuer.password().is_some()
-            || issuer.query().is_some() || issuer.fragment().is_some() {
+        if !matches!(issuer.scheme(), "http" | "https")
+            || issuer.host_str().is_none()
+            || !issuer.username().is_empty()
+            || issuer.password().is_some()
+            || issuer.query().is_some()
+            || issuer.fragment().is_some()
+        {
             return Err(Error::Invalid("issuer is not an HTTP origin"));
         }
         if !issuer.path().ends_with('/') {
@@ -119,47 +123,91 @@ impl Client {
 
     /// Fetch the issuer's current keyset explicitly; offline checks never fetch.
     pub async fn fetch_keys(&self) -> Result<KeySet, Error> {
-        let response = self.http.get(self.endpoint("oauth/jwks")?).send().await
+        let response = self
+            .http
+            .get(self.endpoint("oauth/jwks")?)
+            .send()
+            .await
             .map_err(|error| Error::Transport(Box::new(error)))?;
-        let text = response.error_for_status().map_err(|error| Error::Transport(Box::new(error)))?
-            .text().await.map_err(|error| Error::Transport(Box::new(error)))?;
+        let text = response
+            .error_for_status()
+            .map_err(|error| Error::Transport(Box::new(error)))?
+            .text()
+            .await
+            .map_err(|error| Error::Transport(Box::new(error)))?;
         KeySet::from_json(&text)
     }
 
     /// Exchange an authorization code using credentials owned by the caller.
     pub async fn fetch_token(&self, request: &TokenRequest<'_>) -> Result<TokenResponse, Error> {
-        if request.client_id.is_empty() || request.client_secret.is_empty() || request.code.is_empty()
-            || request.redirect_uri.is_empty() || request.code_verifier.is_empty() {
+        if request.client_id.is_empty()
+            || request.client_secret.is_empty()
+            || request.code.is_empty()
+            || request.redirect_uri.is_empty()
+            || request.code_verifier.is_empty()
+        {
             return Err(Error::Invalid("token request is incomplete"));
         }
         self.token(&[
-            ("grant_type", "authorization_code"), ("client_id", request.client_id),
-            ("client_secret", request.client_secret), ("code", request.code),
-            ("redirect_uri", request.redirect_uri), ("code_verifier", request.code_verifier),
-        ]).await
+            ("grant_type", "authorization_code"),
+            ("client_id", request.client_id),
+            ("client_secret", request.client_secret),
+            ("code", request.code),
+            ("redirect_uri", request.redirect_uri),
+            ("code_verifier", request.code_verifier),
+        ])
+        .await
     }
 
     /// Ask Lys to refresh from live grants; no timer or cached authority is used.
-    pub async fn refresh_token(&self, client_id: &str, client_secret: &str, refresh_token: &str) -> Result<TokenResponse, Error> {
+    pub async fn refresh_token(
+        &self,
+        client_id: &str,
+        client_secret: &str,
+        refresh_token: &str,
+    ) -> Result<TokenResponse, Error> {
         if client_id.is_empty() || client_secret.is_empty() || refresh_token.is_empty() {
             return Err(Error::Invalid("refresh request is incomplete"));
         }
-        self.token(&[("grant_type", "refresh_token"), ("client_id", client_id),
-            ("client_secret", client_secret), ("refresh_token", refresh_token)]).await
+        self.token(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", client_id),
+            ("client_secret", client_secret),
+            ("refresh_token", refresh_token),
+        ])
+        .await
     }
 
     async fn token(&self, form: &[(&str, &str)]) -> Result<TokenResponse, Error> {
-        let response = self.http.post(self.endpoint("oauth/token")?).form(form).send().await
+        let response = self
+            .http
+            .post(self.endpoint("oauth/token")?)
+            .form(form)
+            .send()
+            .await
             .map_err(|error| Error::Transport(Box::new(error)))?;
         if !response.status().is_success() {
-            let refused: TokenRefusal = response.json().await.map_err(|error| Error::Transport(Box::new(error)))?;
-            if refused.error.is_empty() || refused.refusal.is_empty() || refused.reason != refused.error_description {
+            let refused: TokenRefusal = response
+                .json()
+                .await
+                .map_err(|error| Error::Transport(Box::new(error)))?;
+            if refused.error.is_empty()
+                || refused.refusal.is_empty()
+                || refused.reason != refused.error_description
+            {
                 return Err(Error::CannotAsk("token refusal has no name"));
             }
-            return Err(Error::TokenRefused { name: refused.refusal, reason: refused.error_description });
+            return Err(Error::TokenRefused {
+                name: refused.refusal,
+                reason: refused.error_description,
+            });
         }
-        let answer: TokenResponse = response.json().await.map_err(|error| Error::Transport(Box::new(error)))?;
-        if answer.token_type != "Bearer" || answer.access_token.is_empty() || answer.expires_in == 0 {
+        let answer: TokenResponse = response
+            .json()
+            .await
+            .map_err(|error| Error::Transport(Box::new(error)))?;
+        if answer.token_type != "Bearer" || answer.access_token.is_empty() || answer.expires_in == 0
+        {
             return Err(Error::CannotAsk("invalid token response"));
         }
         Ok(answer)

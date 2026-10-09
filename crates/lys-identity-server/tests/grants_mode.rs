@@ -1,6 +1,6 @@
 #![cfg(test)]
 //! A grant's mode is answered beside each right (ACCESS-001 R1): check/batch
-//! on a by_draft right answers allowed false, mode by_draft and the grant's
+//! on a `by_draft` right answers allowed false, mode `by_draft` and the grant's
 //! id, so a product holds the act for a draft rather than refusing it; an
 //! outright right answers allowed true, mode outright; `which` names each
 //! id's mode beside it. A grant issued without a mode is outright.
@@ -40,7 +40,9 @@ async fn a_by_draft_right_is_answered_held_with_its_mode_and_grant() -> TestResu
     let credential = registered(&service, &admin, NOTES).await?;
     let doc = format!("{NOTES}.doc");
     let issued = held_root(&service, &admin, &bea, (&doc, "1"), "by_draft").await?;
-    let grant = issued["grant"].as_str().ok_or("the issue names its grant")?;
+    let grant = issued["grant"]
+        .as_str()
+        .ok_or("the issue names its grant")?;
     ok(root(&service, &admin, &bea, (&doc, "2"), "editor").await?)?;
     let checks = json!({"checks": [
         check(&bea, &doc, "1", "write"),
@@ -57,7 +59,10 @@ async fn a_by_draft_right_is_answered_held_with_its_mode_and_grant() -> TestResu
     assert_eq!(held["allowed"], json!(false), "{answer}");
     assert_eq!(held["mode"], "by_draft", "{answer}");
     assert_eq!(held["grant"], grant, "{answer}");
-    assert!(held["refusal"].is_null(), "a held right is not refused: {answer}");
+    assert!(
+        held["refusal"].is_null(),
+        "a held right is not refused: {answer}"
+    );
     let outright = &answer["results"][1];
     assert_eq!(outright["allowed"], json!(true), "{answer}");
     assert_eq!(outright["mode"], "outright", "{answer}");

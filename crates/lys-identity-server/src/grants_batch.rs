@@ -80,7 +80,7 @@ pub struct CheckAnswer {
     /// The refusal's words, when refused.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
-    /// How the right is exercised, beside it: outright, by_draft or by_two
+    /// How the right is exercised, beside it: outright, `by_draft` or `by_two`
     /// (ACCESS-001 R1). A held right answers allowed false with its grant,
     /// so a product holds the act for a draft rather than refusing it.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,7 +121,7 @@ pub struct WhichBody {
 pub struct WhichPage {
     /// The ids, in order.
     pub ids: Vec<String>,
-    /// Each id's mode, beside it: outright, by_draft or by_two.
+    /// Each id's mode, beside it: outright, `by_draft` or `by_two`.
     pub modes: Vec<String>,
     /// The cursor of the next page; absent on the last.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -168,10 +168,7 @@ fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, Server
 
 /// The mode of the grant a decision named, from the book it was decided on;
 /// none if the book no longer names it, which is answered as not allowed.
-fn mode_of<S: lys_log_store::LeafStore>(
-    judged: &Judged<'_, S>,
-    grant: GrantId,
-) -> Option<Mode> {
+fn mode_of<S: lys_log_store::LeafStore>(judged: &Judged<'_, S>, grant: GrantId) -> Option<Mode> {
     judged.grants.book().grant(grant).map(Grant::mode)
 }
 
@@ -290,9 +287,9 @@ pub async fn which(
                 resource: Resource::new(&body.kind, &id)?,
                 action: action.clone(),
             };
-            let mode = match decide(&mut judged, &request, at, body.at_least, Decision::Explain) {
+            let right = match decide(&mut judged, &request, at, body.at_least, Decision::Explain) {
                 Ok((permit, _)) => match mode_of(&judged, permit.grant) {
-                    Some(mode) => mode,
+                    Some(held) => held,
                     None => continue,
                 },
                 Err(error) if unanswered(&error) => return Err(error.into()),
@@ -303,7 +300,7 @@ pub async fn which(
                 break;
             }
             ids.push(id);
-            modes.push(mode.as_str().to_owned());
+            modes.push(right.as_str().to_owned());
         }
         let next = if more { ids.last().cloned() } else { None };
         Ok(Json(WhichPage {

@@ -56,9 +56,16 @@ impl CheckAnswer {
     fn validate(&self) -> Result<(), Error> {
         let grant = self.grant.as_deref().is_some_and(|grant| !grant.is_empty());
         match (self.allowed, self.mode) {
-            (true, Some(Mode::Outright)) if grant && self.refusal.is_none() => Ok(()),
-            (false, Some(Mode::ByDraft | Mode::ByTwo)) if grant && self.refusal.is_none() => Ok(()),
-            (false, None) if !grant && self.refusal.as_deref().is_some_and(|name| !name.is_empty()) => Ok(()),
+            (true, Some(Mode::Outright)) | (false, Some(Mode::ByDraft | Mode::ByTwo))
+                if grant && self.refusal.is_none() =>
+            {
+                Ok(())
+            }
+            (false, None)
+                if !grant && self.refusal.as_deref().is_some_and(|name| !name.is_empty()) =>
+            {
+                Ok(())
+            }
             _ => Err(Error::CannotAsk("inconsistent live permission answer")),
         }
     }
@@ -78,20 +85,52 @@ pub struct BatchAnswer {
 
 impl Client {
     /// Ask the live batch route using the caller's pass; never try offline rights on failure.
-    pub async fn check_batch(&self, pass: &str, holder: &str, targets: &[Target], at_least: Option<u64>) -> Result<BatchAnswer, Error> {
+    pub async fn check_batch(
+        &self,
+        pass: &str,
+        holder: &str,
+        targets: &[Target],
+        at_least: Option<u64>,
+    ) -> Result<BatchAnswer, Error> {
         if pass.is_empty() || holder.is_empty() || targets.is_empty() {
             return Err(Error::Invalid("live check is incomplete"));
         }
-        for target in targets { Target::new(&target.kind, &target.id, &target.action)?; }
-        let body = Batch { checks: targets.iter().map(|target| Check { subject: holder, target }).collect(), at_least };
-        let response = self.http.post(self.endpoint("grants/check/batch")?).bearer_auth(pass)
-            .json(&body).send().await.map_err(|error| Error::Transport(Box::new(error)))?;
-        if !response.status().is_success() { return Err(Error::CannotAsk("live check returned a refusal status")); }
-        let answer: BatchAnswer = response.json().await.map_err(|error| Error::Transport(Box::new(error)))?;
-        if answer.results.len() != targets.len() || at_least.is_some_and(|revision| answer.revision < revision) {
+        for target in targets {
+            Target::new(&target.kind, &target.id, &target.action)?;
+        }
+        let body = Batch {
+            checks: targets
+                .iter()
+                .map(|target| Check {
+                    subject: holder,
+                    target,
+                })
+                .collect(),
+            at_least,
+        };
+        let response = self
+            .http
+            .post(self.endpoint("grants/check/batch")?)
+            .bearer_auth(pass)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|error| Error::Transport(Box::new(error)))?;
+        if !response.status().is_success() {
+            return Err(Error::CannotAsk("live check returned a refusal status"));
+        }
+        let answer: BatchAnswer = response
+            .json()
+            .await
+            .map_err(|error| Error::Transport(Box::new(error)))?;
+        if answer.results.len() != targets.len()
+            || at_least.is_some_and(|revision| answer.revision < revision)
+        {
             return Err(Error::CannotAsk("batch population or revision differs"));
         }
-        for result in &answer.results { result.validate()?; }
+        for result in &answer.results {
+            result.validate()?;
+        }
         Ok(answer)
     }
 }

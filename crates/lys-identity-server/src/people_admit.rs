@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::error::ServerError;
 use crate::routes::{Shared, signed_in};
@@ -162,7 +163,10 @@ async fn refused(error: ServerError, receipt: &AdmitReceipt) -> Response {
     };
     answer.insert("receipt".to_owned(), json!(receipt));
     parts.headers.remove(axum::http::header::CONTENT_LENGTH);
-    Response::from_parts(parts, axum::body::Body::from(Value::Object(answer).to_string()))
+    Response::from_parts(
+        parts,
+        axum::body::Body::from(Value::Object(answer).to_string()),
+    )
 }
 
 fn parts_only(parts: axum::http::response::Parts) -> Response {
@@ -248,7 +252,7 @@ async fn steps(
     let [register, account, bind, activate, grant] = STEPS;
     let at = |step: &'static str| move |error: ServerError| (step, error);
     let registered = crate::routes::register_person(
-        State(state.clone()),
+        State(Arc::clone(state)),
         headers.clone(),
         body(json!({
             "operation": derived(operation, register),
@@ -260,7 +264,10 @@ async fn steps(
     .map_err(at(register))?;
     let person = registered.0.person.clone();
     receipt.person = Some(person.clone());
-    receipt.done(register, Some(("directory", registered.0.receipt.log.index)));
+    receipt.done(
+        register,
+        Some(("directory", registered.0.receipt.log.index)),
+    );
 
     let api = crate::sign_in_providers::api(state).map_err(at(account))?;
     let (subject, _made) = crate::accounts::make(api, email, &asked.display_name)
@@ -269,7 +276,7 @@ async fn steps(
     receipt.done(account, None);
 
     let bound = crate::routes::bind_login(
-        State(state.clone()),
+        State(Arc::clone(state)),
         headers.clone(),
         Path(person.clone()),
         body(json!({
@@ -284,7 +291,7 @@ async fn steps(
     receipt.done(bind, Some(("directory", bound.0.receipt.log.index)));
 
     let activated = crate::routes::transition(
-        State(state.clone()),
+        State(Arc::clone(state)),
         headers.clone(),
         Path(person.clone()),
         body(json!({
@@ -298,8 +305,8 @@ async fn steps(
     .map_err(at(activate))?;
     receipt.done(activate, Some(("directory", activated.0.receipt.log.index)));
 
-    let issued = crate::grants::issue_root(
-        State(state.clone()),
+    let granted = crate::grants::issue_root(
+        State(Arc::clone(state)),
         headers.clone(),
         body(json!({
             "operation": derived(operation, grant),
@@ -314,8 +321,8 @@ async fn steps(
     )
     .await
     .map_err(at(grant))?;
-    receipt.done(grant, Some(("grants", issued.0.index)));
-    Ok((person, subject, issued.0.grant.clone()))
+    receipt.done(grant, Some(("grants", granted.0.index)));
+    Ok((person, subject, granted.0.grant))
 }
 
 #[cfg(test)]

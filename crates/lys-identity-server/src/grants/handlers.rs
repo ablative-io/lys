@@ -78,7 +78,11 @@ fn refuse_held_on_hot(
     mode: Mode,
 ) -> Result<(), ServerError> {
     let kind = request.resource.kind();
-    let Some(schema) = judged.apps.schema(owner_of(kind)).filter(|_| mode.is_held()) else {
+    let Some(schema) = judged
+        .apps
+        .schema(owner_of(kind))
+        .filter(|_| mode.is_held())
+    else {
         return Ok(());
     };
     match schema.hot_action(kind, &request.relation) {
@@ -103,9 +107,10 @@ pub(crate) async fn issue_root(
         )?)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
         refuse_held_on_hot(&judged, &request, body.mode())?;
-        let recorded = judged
-            .grants
-            .issue_root_in(judged.directory, &request, body.mode(), now())?;
+        let recorded =
+            judged
+                .grants
+                .issue_root_in(judged.directory, &request, body.mode(), now())?;
         Ok(Json(RecordedView::from(&recorded)))
     })
 }

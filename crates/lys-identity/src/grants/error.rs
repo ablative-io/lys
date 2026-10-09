@@ -402,7 +402,7 @@ pub enum GrantError {
     ModeHeld {
         /// The grant.
         grant: String,
-        /// Its mode: by_draft or by_two.
+        /// Its mode: `by_draft` or `by_two`.
         mode: &'static str,
     },
     /// A directory refusal met while judging a grant.
