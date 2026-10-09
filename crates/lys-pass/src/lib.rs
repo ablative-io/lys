@@ -7,6 +7,7 @@ pub mod membership;
 pub mod membership_conformance;
 pub mod refusal;
 pub mod rights;
+pub mod signin;
 pub mod verify;
 
 pub use membership::{GrantLog, MembershipDecision, MembershipRequest, Subject, Verdict};
@@ -189,32 +190,38 @@ impl Client {
             .send()
             .await
             .map_err(|error| Error::Transport(Box::new(error)))?;
-        if !response.status().is_success() {
-            let refused: TokenRefusal = response
-                .json()
-                .await
-                .map_err(|error| Error::Transport(Box::new(error)))?;
-            if refused.error.is_empty()
-                || refused.refusal.is_empty()
-                || refused.reason != refused.error_description
-            {
-                return Err(Error::CannotAsk("token refusal has no name"));
-            }
-            return Err(Error::TokenRefused {
-                name: refused.refusal,
-                reason: refused.error_description,
-            });
-        }
-        let answer: TokenResponse = response
+        read_token(response).await
+    }
+}
+
+/// A token endpoint's answer: the pass, or the issuer's refusal by name. A
+/// refusal without a name is not a contract answer, and neither carries the
+/// response body into an error.
+pub(crate) async fn read_token(response: reqwest::Response) -> Result<TokenResponse, Error> {
+    if !response.status().is_success() {
+        let refused: TokenRefusal = response
             .json()
             .await
             .map_err(|error| Error::Transport(Box::new(error)))?;
-        if answer.token_type != "Bearer" || answer.access_token.is_empty() || answer.expires_in == 0
+        if refused.error.is_empty()
+            || refused.refusal.is_empty()
+            || refused.reason != refused.error_description
         {
-            return Err(Error::CannotAsk("invalid token response"));
+            return Err(Error::CannotAsk("token refusal has no name"));
         }
-        Ok(answer)
+        return Err(Error::TokenRefused {
+            name: refused.refusal,
+            reason: refused.error_description,
+        });
     }
+    let answer: TokenResponse = response
+        .json()
+        .await
+        .map_err(|error| Error::Transport(Box::new(error)))?;
+    if answer.token_type != "Bearer" || answer.access_token.is_empty() || answer.expires_in == 0 {
+        return Err(Error::CannotAsk("invalid token response"));
+    }
+    Ok(answer)
 }
 
 /// Borrowed authorization-code exchange inputs, never retained by the client.
