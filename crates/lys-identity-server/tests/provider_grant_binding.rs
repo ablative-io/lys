@@ -320,3 +320,186 @@ async fn an_unasked_binding_is_absent_and_an_unknown_version_is_refused() -> Tes
     assert_eq!(refused["refusal"], "grant_binding_unsupported");
     Ok(())
 }
+
+/// A two-hop chain over HTTP: the administrator's root, passed on to Bea.
+/// The binding names the whole ancestry, the stream names only the revoked
+/// root, and the index resolves the descendant from the binding's path.
+#[tokio::test]
+async fn a_delegated_right_is_lost_when_its_ancestor_is_revoked() -> TestResult {
+    let (service, seeded) = world().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let (ada, bea) = (
+        seeded.people[0].id.to_string(),
+        seeded.people[1].id.to_string(),
+    );
+    let credential = registered(&service, &admin, NOTES).await?;
+    let doc = format!("{NOTES}.doc");
+    let root_body = json!({
+        "operation": op()?, "route": "api", "holder": ada,
+        "resource": {"kind": doc, "id": "1"}, "relation": "reader",
+        "pass_on": {"kind": "to", "actions": ["read"], "recipients": ["person"]},
+        "window": {"starts_at": 0, "ends_at": null},
+    });
+    let root = ok(post(&service, "/grants/roots", Auth::Cookie(&admin), &root_body).await?)?;
+    let root = root["grant"].as_str().ok_or("a root grant")?.to_owned();
+    let passed_body = json!({
+        "operation": op()?, "route": "api", "source": root, "recipient": bea,
+        "responsible": bea, "resource": {"kind": doc, "id": "1"}, "relation": "reader",
+        "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null},
+    });
+    let passed = ok(post(&service, "/grants", Auth::Cookie(&admin), &passed_body).await?)?;
+    let passed = passed["grant"].as_str().ok_or("a passed grant")?.to_owned();
+
+    let bea_cookie = service.sign_in(login(BEA)).await?;
+    let (status, answer) = signed_in(&service, &bea_cookie, Some("1")).await?;
+    assert_eq!(status, 200, "{answer}");
+    let stream = changes(&service, &credential, &json!({"limit": 64})).await?;
+    let log = GrantLog {
+        identity: stream.log.identity.clone(),
+        epoch: stream.log.epoch,
+    };
+    let (_, binding) = bound(&service, &answer, &log).await?;
+    let path = binding
+        .dependency(&passed)
+        .ok_or("the passed right")?
+        .path
+        .clone();
+    assert_eq!(
+        path,
+        vec![passed.clone(), root.clone()],
+        "the whole ancestry"
+    );
+
+    let mut index = MembershipIndex::new(
+        stream.log.clone(),
+        lys_identity::signer::load_service_key(&service.dir.path().join("service.key"))?
+            .public_key_bytes(),
+        NonZeroUsize::new(16).ok_or("a window")?,
+    );
+    index.apply_page(&stream.log, &stream.frames)?;
+    index.admit(binding.revision(), &path)?;
+    let revoke = json!({"operation": op()?, "route": "api", "reason": "left"});
+    ok(post(
+        &service,
+        &format!("/grants/{root}/revoke"),
+        Auth::Cookie(&admin),
+        &revoke,
+    )
+    .await?)?;
+    let cursor = index.cursor().ok_or("a cursor")?;
+    let next = changes(
+        &service,
+        &credential,
+        &json!({"log": stream.log, "after": cursor, "limit": 64}),
+    )
+    .await?;
+    let revoked: Vec<&str> = next
+        .frames
+        .iter()
+        .filter_map(|frame| match frame {
+            lys_identity::grants::change_stream::ChangeFrame::Change {
+                grant,
+                change: lys_identity::grants::change_stream::ChangeKind::Revoke,
+                ..
+            } => Some(grant.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        revoked,
+        [root.as_str()],
+        "only the revoked ancestor is named"
+    );
+    index.apply_page(&next.log, &next.frames)?;
+    assert_eq!(
+        index
+            .admit(binding.revision(), &path)
+            .map_err(|refusal| refusal.name),
+        Err(DEPENDENCY_REVOKED)
+    );
+    Ok(())
+}
+
+/// The registry-side binding (`POST /grants/bindings`): a pass Lys did not
+/// issue is bound to the grants it names after Lys judges each; the same
+/// verifier reads it; a revoked or foreign grant refuses the whole binding.
+#[tokio::test]
+async fn a_registry_pass_is_bound_only_to_grants_lys_judges_live() -> TestResult {
+    let (service, seeded) = world().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let (ada, bea) = (
+        seeded.people[0].id.to_string(),
+        seeded.people[1].id.to_string(),
+    );
+    let credential = registered(&service, &admin, NOTES).await?;
+    let doc = format!("{NOTES}.doc");
+    let held = ok(root(&service, &admin, &bea, (&doc, "1"), "reader").await?)?;
+    let held = held["grant"].as_str().ok_or("a grant")?.to_owned();
+    let other = ok(root(&service, &admin, &ada, (&doc, "2"), "reader").await?)?;
+    let other = other["grant"].as_str().ok_or("a grant")?.to_owned();
+    let digest = lys_pass::binding::pass_digest("registry-issued pass bytes");
+    let ask = |grants: Vec<&str>| {
+        json!({
+            "binding": 1, "pass": digest, "iss": "https://registry.example.test",
+            "sub": bea, "aud": NOTES, "iat": 100, "exp": 200, "grants": grants,
+        })
+    };
+    let answer = ok(post(
+        &service,
+        "/grants/bindings",
+        Auth::Bearer(&credential),
+        &ask(vec![held.as_str()]),
+    )
+    .await?)?;
+    let stream = changes(&service, &credential, &json!({"limit": 64})).await?;
+    let log = GrantLog {
+        identity: stream.log.identity.clone(),
+        epoch: stream.log.epoch,
+    };
+    let grants = std::collections::BTreeSet::from([held.as_str()]);
+    let verified = VerifiedBinding::verify_bound(
+        answer["grant_binding"].as_str().ok_or("a binding")?,
+        &lys_pass::binding::Bound {
+            pass: &digest,
+            iss: "https://registry.example.test",
+            sub: &bea,
+            aud: NOTES,
+            iat: 100,
+            exp: 200,
+            grants: &grants,
+        },
+        &published(&service).await?,
+        &log,
+    )?;
+    assert_eq!(Some(verified.revision()), answer["revision"].as_u64());
+    assert_eq!(
+        verified.dependency(&held).ok_or("dep")?.path,
+        vec![held.clone()]
+    );
+
+    let foreign = post(
+        &service,
+        "/grants/bindings",
+        Auth::Bearer(&credential),
+        &ask(vec![other.as_str()]),
+    )
+    .await?;
+    assert_eq!(foreign.1["refusal"], "NotHolder", "{foreign:?}");
+    let revoke = json!({"operation": op()?, "route": "api", "reason": "left"});
+    ok(post(
+        &service,
+        &format!("/grants/{held}/revoke"),
+        Auth::Cookie(&admin),
+        &revoke,
+    )
+    .await?)?;
+    let revoked = post(
+        &service,
+        "/grants/bindings",
+        Auth::Bearer(&credential),
+        &ask(vec![held.as_str()]),
+    )
+    .await?;
+    assert_eq!(revoked.1["refusal"], "Revoked", "{revoked:?}");
+    Ok(())
+}

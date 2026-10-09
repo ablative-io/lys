@@ -15,6 +15,17 @@ const LOG_IDENTITY: &[&str] = &["grant_log_identity_unavailable"];
 /// A read of the grant change stream: its bounded wait, and a log position
 /// that is not a signed event.
 const STREAM: &[&str] = &["RuntimeUnavailable", "LeafNotAnEvent"];
+/// A registry pass's binding (DIRECTORY-089 R2): every named grant judged.
+const BINDING: &[&str] = &[
+    "grant_binding_unsupported",
+    "grant_binding_degraded",
+    "grant_binding_revision_moved",
+    "GrantUnknown",
+    "GrantIdMalformed",
+    "NotHolder",
+    "IdentifierMalformed",
+    "ProviderUnavailable",
+];
 
 /// The routes an app codes against, each with the types it takes and answers.
 pub(crate) fn typed(api: &mut Api) {
@@ -390,6 +401,17 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<crate::grant_changes::ChangesRequestSchema>()),
             Some(api.schema::<crate::grant_changes::ChangesPageSchema>()),
             &[BATCH, LOG_IDENTITY, STREAM],
+        ),
+        route(
+            (
+                POST,
+                "/grants/bindings",
+                "A Lys-judged grant binding for a pass a registry issued",
+            ),
+            A,
+            Some(api.schema::<crate::grant_bindings_api::BindRequest>()),
+            Some(api.schema::<crate::grant_bindings_api::BindAnswer>()),
+            &[BATCH, LOG_IDENTITY, BINDING],
         ),
         route(
             (

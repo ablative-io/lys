@@ -240,6 +240,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants/check", post(check))
         .route("/grants/check/batch", post(crate::grants_batch::batch))
         .route("/grants/changes", post(crate::grant_changes::changes))
+        .route("/grants/bindings", post(crate::grant_bindings_api::bind))
         .route("/grants/which", post(crate::grants_batch::which))
         .route(
             "/grants/membership",

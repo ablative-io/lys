@@ -5,8 +5,8 @@
 //! grants, the same serialization every commit takes, so its barrier, the
 //! log's head, is one revision no commit is half way through. The log is
 //! settled and projected first; replay then reads only the positions after
-//! the cursor, each from the log's nearest checkpoint, never the history
-//! before it. A change is shown when the asker may see it: the
+//! the cursor, in one pass from the checkpoint at or below it
+//! (`GrantLedger::entries_between`), never the history before it. A change is shown when the asker may see it: the
 //! administrator sees every one, an app each one on a grant of its own
 //! kinds or with a descendant on them. The rest are covered by watermarks.
 //! A baseline is read from the grant book, never from the log. No network
@@ -159,15 +159,20 @@ pub(super) fn page<S: LeafStore>(
     };
     let through = head.min(cursor.saturating_add(request.limit));
     let mut hidden = None;
-    for index in cursor..through {
-        let (signed, coordinate) =
-            judged
-                .grants
-                .ledger()
-                .entry(index)?
-                .ok_or_else(|| GrantError::LogUnavailable {
-                    reason: format!("grant log position {index} is missing below the head {head}"),
-                })?;
+    // One pass from the checkpoint at or below the cursor: the replay's
+    // cost is the checkpoint distance and the range, never the history.
+    let replayed = judged.grants.ledger().entries_between(cursor, through)?;
+    let expected = usize::try_from(through - cursor).ok();
+    if Some(replayed.len()) != expected {
+        return Err(GrantError::LogUnavailable {
+            reason: format!(
+                "grant log positions {cursor} to {through} are not all below the head {head}"
+            ),
+        }
+        .into());
+    }
+    for (signed, coordinate) in &replayed {
+        let index = coordinate.index;
         let revision = coordinate.index.saturating_add(1);
         let event = signed.event();
         match shown(judged.grants.book(), acting_for, event, index) {

@@ -62,6 +62,7 @@ mod keys;
 mod refusal;
 mod rights_claim;
 pub(crate) use bearer::{pass_holder, presented_pass};
+pub(crate) use grant_binding::signed_binding;
 pub use endpoints::routes;
 pub use keys::{RotateAnswer, RotateBody};
 

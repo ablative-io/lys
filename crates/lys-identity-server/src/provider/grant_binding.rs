@@ -90,6 +90,18 @@ pub(super) fn binding(
     provider.signed_as(&value, BINDING_TYPE)
 }
 
+/// `claims` signed as a grant binding with the provider's current key, for
+/// a pass Lys did not issue itself (`grant_bindings_api`).
+pub(crate) fn signed_binding(
+    state: &crate::routes::AppState,
+    claims: &BindingClaims,
+) -> Result<String, ServerError> {
+    let provider = super::endpoints::provider(state)?;
+    let value = serde_json::to_value(claims)
+        .map_err(|error| unavailable(format!("the grant binding could not be encoded: {error}")))?;
+    provider.signed_as(&value, BINDING_TYPE)
+}
+
 #[cfg(test)]
 mod tests {
     use super::asked;

@@ -264,7 +264,74 @@ mod tests {
         ChangeFrame, ChangeKind, ChangesPage, ChangesRequest, LogName, ResetReason,
     };
 
-    use super::{ChangesPageSchema, ChangesRequestSchema};
+    use super::{ChangesPageSchema, ChangesRequestSchema, GrantChanges};
+
+    use std::future::Future;
+    use std::pin::pin;
+    use std::task::{Context, Poll, Waker};
+
+    /// d089_r1_replay_live_race, signal half: the subscription is the owned
+    /// installation signal and `published` the owned commit signal, placed
+    /// exactly as the route places them (subscribe, then read the barrier
+    /// under the hold; commit, then publish under the hold). A commit
+    /// before the subscription is in the read; one between the read and the
+    /// wait, or during the wait, releases it; none is lost and none is
+    /// delivered twice, because the reread starts strictly after the cursor.
+    /// No clock, sleep or timeout is used: each poll is one owned step.
+    #[test]
+    fn a_commit_at_any_point_of_a_wait_is_seen_once() -> Result<(), Box<dyn std::error::Error>> {
+        let mut context = Context::from_waker(Waker::noop());
+        // Revoke before open: committed and published at r+1 before the
+        // subscription; the read under the hold already holds it, so the
+        // page is not idle and no wait is taken.
+        let changes = GrantChanges::default();
+        changes.published(5);
+        let mut before = changes.revision.subscribe();
+        assert_eq!(
+            *before.borrow_and_update(),
+            5,
+            "the read's barrier holds r+1"
+        );
+        assert!(matches!(
+            pin!(before.changed()).as_mut().poll(&mut context),
+            Poll::Pending
+        ));
+
+        // Revoke at the barrier: subscribed, the barrier read at r, then the
+        // commit publishes r+1 before the wait begins: the wait returns at once.
+        let changes = GrantChanges::default();
+        changes.published(4);
+        let mut at_barrier = changes.revision.subscribe();
+        let barrier = *at_barrier.borrow();
+        changes.published(5);
+        assert!(matches!(
+            pin!(at_barrier.changed()).as_mut().poll(&mut context),
+            Poll::Ready(Ok(()))
+        ));
+        assert_eq!(*at_barrier.borrow_and_update(), barrier + 1);
+
+        // Revoke after Ready: the wait is pending until the commit's
+        // signal, and is released by it alone.
+        let changes = GrantChanges::default();
+        changes.published(4);
+        let mut after = changes.revision.subscribe();
+        {
+            let mut waiting = pin!(after.changed());
+            assert!(matches!(waiting.as_mut().poll(&mut context), Poll::Pending));
+            changes.published(4);
+            assert!(
+                matches!(waiting.as_mut().poll(&mut context), Poll::Pending),
+                "a hold that committed nothing releases no wait"
+            );
+            changes.published(5);
+            assert!(matches!(
+                waiting.as_mut().poll(&mut context),
+                Poll::Ready(Ok(()))
+            ));
+        }
+        assert_eq!(*after.borrow_and_update(), 5);
+        Ok(())
+    }
 
     /// The published schema types and the wire types read the same JSON,
     /// both ways, every frame named.

@@ -393,6 +393,52 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)
     }
 
+    /// The recorded events from `from` up to, not including, `through`, with
+    /// the coordinates they completed, read in one pass from the checkpoint
+    /// at or below `from`: each leaf once, and never more than
+    /// [`CHECKPOINT_EVERY`](crate::checkpoints::CHECKPOINT_EVERY) leaves
+    /// before `from`, whatever the log's length (DIRECTORY-089 R1).
+    pub(crate) fn entries_between(
+        &self,
+        from: u64,
+        through: u64,
+        key: &[u8; 32],
+    ) -> Result<Events<K::Event>, K::Error> {
+        let through = through.min(self.len());
+        if from >= through {
+            return Ok(Vec::new());
+        }
+        let mut frontier =
+            self.checkpoints.before(from).cloned().ok_or_else(|| {
+                K::unavailable(format!("no checkpoint is held below leaf {from}"))
+            })?;
+        let mut found = Vec::new();
+        for at in frontier.size()..through {
+            let bytes = self
+                .log
+                .leaf_bytes(at)
+                .map_err(|error| store_down::<K>(&error))?
+                .ok_or_else(|| {
+                    K::not_an_event(at, "the leaf is missing inside the log".to_owned())
+                })?;
+            let leaf_hash = frontier.push(&bytes);
+            if at >= from {
+                let event = K::verify(&bytes, key)
+                    .map_err(|error| K::not_an_event(at, error.to_string()))?;
+                found.push((
+                    event,
+                    Coordinate {
+                        index: at,
+                        tree_size: frontier.size(),
+                        root: frontier.root(),
+                        leaf_hash,
+                    },
+                ));
+            }
+        }
+        Ok(found)
+    }
+
     /// An inclusion proof of the leaf at `index` in the recorded tree. The
     /// proof tree is built from the stored leaves the first time one is asked
     /// for, never at a start.

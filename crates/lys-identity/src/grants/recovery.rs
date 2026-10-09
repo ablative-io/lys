@@ -265,6 +265,20 @@ impl<S: LeafStore> GrantLedger<S> {
         self.certain()?.entries(&self.service_key)
     }
 
+    /// The events from `from` up to, not including, `through`, with their
+    /// coordinates, read in one pass from the checkpoint at or below `from`
+    /// and verified: a replay's cost is bounded by the checkpoint distance
+    /// and the range, never the history (DIRECTORY-089 R1). Refused while
+    /// an append is uncertain.
+    pub fn entries_between(
+        &self,
+        from: u64,
+        through: u64,
+    ) -> Result<Vec<(SignedGrantEvent, Coordinate)>, GrantError> {
+        self.certain()?
+            .entries_between(from, through, &self.service_key)
+    }
+
     /// An inclusion proof of the leaf at `index` in the log's current tree.
     pub fn inclusion_proof(&self, index: u64) -> Result<InclusionProof, GrantError> {
         self.certain()?.inclusion_proof(index)

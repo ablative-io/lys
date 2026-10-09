@@ -106,6 +106,26 @@ pub fn required(binding: Option<&str>) -> Result<&str, Error> {
         .ok_or_else(|| refused(BINDING_REQUIRED, "the pass carries no grant binding"))
 }
 
+/// What a binding must name of its pass: the pass's digest, issuer, holder,
+/// audience and lifetime, and exactly the grants its rights rest on.
+#[derive(Debug, Clone)]
+pub struct Bound<'a> {
+    /// The SHA-256, lowercase hex, of the pass's exact bytes.
+    pub pass: &'a str,
+    /// The pass's issuer.
+    pub iss: &'a str,
+    /// The pass's holder.
+    pub sub: &'a str,
+    /// The pass's audience.
+    pub aud: &'a str,
+    /// The pass's issue instant.
+    pub iat: u64,
+    /// The pass's first invalid instant.
+    pub exp: u64,
+    /// The grants the pass's rights rest on.
+    pub grants: &'a BTreeSet<&'a str>,
+}
+
 /// A binding whose signature, pass, issuer, holder, audience, lifetime,
 /// grant log and ancestry were checked against one verified pass.
 #[derive(Debug)]
@@ -124,6 +144,38 @@ impl VerifiedBinding {
         keys: &KeySet,
         log: &GrantLog,
     ) -> Result<Self, Error> {
+        let signed = pass.claims();
+        let digest = pass_digest(token);
+        let grants: BTreeSet<&str> = signed
+            .rights
+            .iter()
+            .map(|right| right.grant.as_str())
+            .collect();
+        Self::verify_bound(
+            binding,
+            &Bound {
+                pass: &digest,
+                iss: &signed.iss,
+                sub: &signed.sub,
+                aud: &signed.aud,
+                iat: signed.iat,
+                exp: signed.exp,
+                grants: &grants,
+            },
+            keys,
+            log,
+        )
+    }
+
+    /// Verify `binding` as the binding of a pass `bound` describes: one a
+    /// registry-owned producer issued and verified by its own contract,
+    /// whose binding Lys judged (`POST /grants/bindings`).
+    pub fn verify_bound(
+        binding: &str,
+        bound: &Bound<'_>,
+        keys: &KeySet,
+        log: &GrantLog,
+    ) -> Result<Self, Error> {
         let payload: serde_json::Value =
             serde_json::from_slice(&signed_payload(binding, keys, BINDING_TYPE)?)?;
         if payload.get("binding").and_then(serde_json::Value::as_u64)
@@ -135,23 +187,17 @@ impl VerifiedBinding {
             ));
         }
         let claims: BindingClaims = serde_json::from_value(payload)?;
-        let signed = pass.claims();
-        if claims.pass != pass_digest(token) {
+        if claims.pass != bound.pass {
             return Err(refused(BINDING_MISMATCH, "the binding names another pass"));
         }
         if (
-            &claims.iss,
-            &claims.sub,
-            &claims.aud,
+            claims.iss.as_str(),
+            claims.sub.as_str(),
+            claims.aud.as_str(),
             claims.iat,
             claims.exp,
-        ) != (
-            &signed.iss,
-            &signed.sub,
-            &signed.aud,
-            signed.iat,
-            signed.exp,
-        ) {
+        ) != (bound.iss, bound.sub, bound.aud, bound.iat, bound.exp)
+        {
             return Err(refused(
                 BINDING_MISMATCH,
                 "the binding names another issuer, holder, audience or lifetime",
@@ -189,9 +235,11 @@ impl VerifiedBinding {
                 return Err(refused(BINDING_ANCESTRY, "a grant has two dependencies"));
             }
         }
-        let rights: BTreeSet<&String> = signed.rights.iter().map(|right| &right.grant).collect();
-        if rights.len() != by_grant.len()
-            || rights.iter().any(|grant| !by_grant.contains_key(*grant))
+        if bound.grants.len() != by_grant.len()
+            || bound
+                .grants
+                .iter()
+                .any(|grant| !by_grant.contains_key(*grant))
         {
             return Err(refused(
                 BINDING_ANCESTRY,

@@ -23,6 +23,7 @@ struct World {
     admin: String,
     notes: String,
     files: String,
+    ada: String,
     bea: String,
 }
 
@@ -36,6 +37,7 @@ async fn world() -> Result<World, Box<dyn Error>> {
         admin,
         notes,
         files,
+        ada: seeded.people[0].id.to_string(),
         bea: seeded.people[1].id.to_string(),
     })
 }
@@ -345,6 +347,70 @@ async fn a_waiting_read_is_released_by_the_commit_and_sees_it_once() -> TestResu
     assert_eq!(
         page.frames.last(),
         Some(&ChangeFrame::Ready { revision: fence })
+    );
+    Ok(())
+}
+
+/// A two-hop chain on the stream: the root passed on to Bea is revoked; the
+/// app sees the issue of both grants and one revocation, of the root.
+#[tokio::test]
+async fn a_delegated_chain_is_streamed_issue_by_issue_and_revoked_at_its_root() -> TestResult {
+    let world = world().await?;
+    let doc = format!("{NOTES}.doc");
+    let ada = world.ada.clone();
+    let root_body = json!({
+        "operation": op()?, "route": "api", "holder": ada,
+        "resource": {"kind": doc, "id": "1"}, "relation": "reader",
+        "pass_on": {"kind": "to", "actions": ["read"], "recipients": ["person"]},
+        "window": {"starts_at": 0, "ends_at": null},
+    });
+    let first = read(&world, &world.notes, &json!({"limit": 64})).await?;
+    let Some(ChangeFrame::Ready { revision: start }) = first.frames.last().cloned() else {
+        return Err("a baseline ends ready".into());
+    };
+    let root = ok(post(
+        &world.service,
+        "/grants/roots",
+        Auth::Cookie(&world.admin),
+        &root_body,
+    )
+    .await?)?;
+    let root = root["grant"].as_str().ok_or("a root grant")?.to_owned();
+    let passed_body = json!({
+        "operation": op()?, "route": "api", "source": root, "recipient": world.bea,
+        "responsible": world.bea, "resource": {"kind": doc, "id": "1"}, "relation": "reader",
+        "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null},
+    });
+    let passed = ok(post(
+        &world.service,
+        "/grants",
+        Auth::Cookie(&world.admin),
+        &passed_body,
+    )
+    .await?)?;
+    let passed = passed["grant"].as_str().ok_or("a passed grant")?.to_owned();
+    revoke(&world, &root).await?;
+    let page = read(
+        &world,
+        &world.notes,
+        &json!({"log": first.log, "after": start, "limit": 64}),
+    )
+    .await?;
+    let changed: Vec<(String, ChangeKind)> = page
+        .frames
+        .iter()
+        .filter_map(|frame| match frame {
+            ChangeFrame::Change { grant, change, .. } => Some((grant.clone(), *change)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        changed,
+        [
+            (root.clone(), ChangeKind::Issue),
+            (passed, ChangeKind::Issue),
+            (root, ChangeKind::Revoke),
+        ]
     );
     Ok(())
 }
