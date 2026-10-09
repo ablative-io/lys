@@ -53,6 +53,25 @@ pub fn issuer(config: &DeploymentConfig) -> String {
     )
 }
 
+/// The address the issuer sends a person back to after the platform's
+/// sign-in, which must be one the platform's client registers
+/// (`clients.platform.redirect_uris`, from the deployment configuration).
+/// An origin a browser reaches through a fronting proxy is the address the
+/// registered callback names: an `https` public origin, which the
+/// configuration accepts for every host that is not loopback (plain `http`
+/// is refused for any other), gives `<public origin>/api/callback`. A
+/// loopback `http` origin is the service's own listener, as before.
+pub fn redirect_url(config: &DeploymentConfig, ports: Ports) -> String {
+    if config.public_tls() {
+        format!(
+            "{}/api/callback",
+            config.issuer.public_origin.trim_end_matches('/')
+        )
+    } else {
+        format!("{}/api/callback", ports.service_url())
+    }
+}
+
 /// What an earlier run's service configuration named that a run again keeps:
 /// the administrator, and the products registered as clients of Lys.
 #[derive(Debug, Default)]
@@ -116,7 +135,7 @@ pub fn render(
             .join(format!("{}-client-secret", config.clients.platform.id))
             .display()
             .to_string(),
-        "redirect_url": format!("{}/api/callback", carried.ports.service_url()),
+        "redirect_url": redirect_url(config, carried.ports),
         "sign_in_api": format!("{}/auth/v1", config.issuer.admin_url.trim_end_matches('/')),
         "setup": {
             "code_file": state.join(super::setup_code::CODE_FILE).display().to_string(),

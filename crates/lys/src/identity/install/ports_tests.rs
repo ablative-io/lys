@@ -215,3 +215,44 @@ fn a_new_install_takes_a_chosen_model_proxy_listener_and_refuses_a_shared_one()
     assert!(refusal.to_string().contains("proxy-port"), "{refusal}");
     Ok(())
 }
+
+/// The service's `redirect_url` is one the platform's client registers, for
+/// a loopback origin and for a public origin behind a fronting proxy, so a
+/// password sign-in is never refused `Invalid redirect uri` by the issuer.
+#[test]
+fn the_rendered_redirect_is_one_the_platform_client_registers()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = tempfile::tempdir()?;
+    let layout = Layout::at(root.path().to_path_buf());
+    let carried = server_config::Carried::default();
+    let loopback = crate::identity::install::layout::render_deployment_at(None, 8490);
+    let public = loopback
+        .replace(
+            "public_origin = \"http://localhost:8490\"",
+            "public_origin = \"https://lys.example.test\"",
+        )
+        .replace(
+            "redirect_uris = [\"http://localhost:8490/api/callback\"]",
+            "redirect_uris = [\"https://lys.example.test/api/callback\"]",
+        );
+    assert_ne!(public, loopback, "the public deployment names its origin");
+    for text in [loopback, public] {
+        let config =
+            crate::identity::config::DeploymentConfig::parse(&text, root.path().to_path_buf())?;
+        let rendered = server_config::render(&layout, &config, &carried, false);
+        let redirect = rendered["redirect_url"]
+            .as_str()
+            .ok_or("redirect_url is text")?;
+        assert!(
+            config
+                .clients
+                .platform
+                .redirect_uris
+                .iter()
+                .any(|registered| registered == redirect),
+            "{redirect} is not among {:?}",
+            config.clients.platform.redirect_uris
+        );
+    }
+    Ok(())
+}
