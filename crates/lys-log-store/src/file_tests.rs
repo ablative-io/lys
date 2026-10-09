@@ -489,8 +489,10 @@ fn every_physical_read_is_counted_and_nothing_held_in_memory_is() {
     assert_eq!(store.leaf(2).unwrap(), Some(leaf(2)));
     assert_eq!(store.leaf(3).unwrap(), None, "beyond the extent");
     assert_eq!(crate::process_read_count() - before, 2);
-    let _ = (store.extent(), store.pinned(), store.origin());
+    // What the store holds in memory: reading it is no read of the log.
+    let _held = (store.extent(), store.pinned(), store.origin());
     assert_eq!(crate::process_read_count() - before, 2, "memory is no read");
-    let _ = store.snapshot().unwrap();
+    // A snapshot is one read, whatever it holds.
+    let _snapshot = store.snapshot().unwrap();
     assert_eq!(crate::process_read_count() - before, 3);
 }

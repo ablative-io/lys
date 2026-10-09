@@ -355,6 +355,12 @@ pub enum ServerError {
         /// What failed.
         reason: String,
     },
+    /// The membership capability's own state cannot be read.
+    #[error("MembershipUnavailable: {reason}")]
+    MembershipUnavailable {
+        /// What failed.
+        reason: String,
+    },
     /// No role is kept by that id.
     #[error("RoleUnknown: no role is kept by that id")]
     RoleUnknown,

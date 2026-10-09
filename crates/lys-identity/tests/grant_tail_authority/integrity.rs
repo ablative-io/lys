@@ -177,22 +177,22 @@ fn a_fault_provider_refuses_by_its_original_error_and_is_complete_without_one() 
             source: std::io::Error::other("tail-authority-sentinel"),
         }
     };
-    faults.refuse(TailFaultStep::Acquire, sentinel("tail-authority-acquire"));
+    faults.refuse(TailFaultStep::Acquire, sentinel("tail-authority-acquire")).unwrap();
     let refused = world.grants.ledger().acquire_tail();
     assert!(
         matches!(&refused, Err(GrantError::LogUnavailable { reason }) if reason.contains("tail-authority-acquire")),
         "the provider's original failure, and no witness: {refused:?}"
     );
-    faults.clear(TailFaultStep::Acquire);
+    faults.clear(TailFaultStep::Acquire).unwrap();
     let witness = world.grants.ledger().acquire_tail()?;
-    faults.refuse(TailFaultStep::Verify, sentinel("tail-authority-verify"));
+    faults.refuse(TailFaultStep::Verify, sentinel("tail-authority-verify")).unwrap();
     let refused = world.grants.tail_authority(&witness, chain.second);
     assert!(
         matches!(&refused, Err(GrantError::LogUnavailable { reason }) if reason.contains("tail-authority-verify")),
         "the provider's original failure, and no classification: {refused:?}"
     );
     assert_eq!(faults.readings(), 0, "no reading reached the grant owner");
-    faults.clear(TailFaultStep::Verify);
+    faults.clear(TailFaultStep::Verify).unwrap();
     let authority = world.grants.tail_authority(&witness, chain.second)?;
     assert_eq!(
         authority.bearing,

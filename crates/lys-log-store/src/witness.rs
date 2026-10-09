@@ -2,7 +2,7 @@
 
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use crate::{Frontier, PinnedRoot, StoreError, StoreResult};
 
@@ -189,31 +189,36 @@ impl TailFaults {
 
     /// Refuse every later call of `step` with the error `make` builds, until
     /// [`TailFaults::clear`]. The refusal is returned as built, unchanged.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::LockPoisoned`] when the step's lock was poisoned.
     pub fn refuse(
         &self,
         step: TailFaultStep,
         make: impl Fn() -> StoreError + Send + Sync + 'static,
-    ) {
-        *self
-            .slot(step)
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Some(Box::new(make));
+    ) -> StoreResult<()> {
+        *self.slot(step).lock().map_err(|_| poisoned())? = Some(Box::new(make));
+        Ok(())
     }
 
     /// Let `step` reach the wrapped provider again.
-    pub fn clear(&self, step: TailFaultStep) {
-        *self
-            .slot(step)
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = None;
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::LockPoisoned`] when the step's lock was poisoned.
+    pub fn clear(&self, step: TailFaultStep) -> StoreResult<()> {
+        *self.slot(step).lock().map_err(|_| poisoned())? = None;
+        Ok(())
     }
 
-    fn armed(&self, step: TailFaultStep) -> Option<StoreError> {
-        self.slot(step)
+    fn armed(&self, step: TailFaultStep) -> StoreResult<Option<StoreError>> {
+        Ok(self
+            .slot(step)
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|_| poisoned())?
             .as_ref()
-            .map(|make| make())
+            .map(|make| make()))
     }
 
     /// Acquisitions asked of the provider, refused or not.
@@ -260,7 +265,7 @@ impl<P: TailWitnessProvider> FaultTailProvider<P> {
 impl<P: TailWitnessProvider> TailWitnessProvider for FaultTailProvider<P> {
     fn acquire(&self, settled: &Frontier) -> StoreResult<TailWitness> {
         self.faults.acquisitions.fetch_add(1, Ordering::SeqCst);
-        if let Some(error) = self.faults.armed(TailFaultStep::Acquire) {
+        if let Some(error) = self.faults.armed(TailFaultStep::Acquire)? {
             return Err(error);
         }
         self.inner.acquire(settled)
@@ -273,12 +278,19 @@ impl<P: TailWitnessProvider> TailWitnessProvider for FaultTailProvider<P> {
         reading: &mut dyn FnMut(&TailWitness) -> StoreResult<()>,
     ) -> StoreResult<()> {
         self.faults.verifications.fetch_add(1, Ordering::SeqCst);
-        if let Some(error) = self.faults.armed(TailFaultStep::Verify) {
+        if let Some(error) = self.faults.armed(TailFaultStep::Verify)? {
             return Err(error);
         }
         self.inner.verify(witness, settled, &mut |certified| {
             self.faults.readings.fetch_add(1, Ordering::SeqCst);
             reading(certified)
         })
+    }
+}
+
+/// A fault step's lock was poisoned: refused by name, never read past.
+fn poisoned() -> StoreError {
+    StoreError::LockPoisoned {
+        what: "tail fault step",
     }
 }

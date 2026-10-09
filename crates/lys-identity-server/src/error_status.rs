@@ -243,6 +243,7 @@ impl ServerError {
             | Self::McpRequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
+            | Self::MembershipUnavailable { .. }
             | Self::SessionsUnavailable { .. }
             | Self::MemoryUnavailable { .. }
             | Self::ProvisioningUnavailable { .. }

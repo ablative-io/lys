@@ -86,6 +86,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::CertificateReused { .. } => "CertificateReused",
         ServerError::CertificateWithdrawn { .. } => "CertificateWithdrawn",
         ServerError::RolesUnavailable { .. } => "RolesUnavailable",
+        ServerError::MembershipUnavailable { .. } => "MembershipUnavailable",
         ServerError::RoleUnknown => "RoleUnknown",
         ServerError::RoleVersionUnknown => "RoleVersionUnknown",
         ServerError::HolderUnknown => "HolderUnknown",

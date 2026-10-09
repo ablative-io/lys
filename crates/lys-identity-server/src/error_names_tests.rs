@@ -316,6 +316,12 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             },
             "RolesUnavailable",
         ),
+        (
+            ServerError::MembershipUnavailable {
+                reason: detail.to_owned(),
+            },
+            "MembershipUnavailable",
+        ),
         (ServerError::RoleUnknown, "RoleUnknown"),
         (ServerError::RoleVersionUnknown, "RoleVersionUnknown"),
         (ServerError::HolderUnknown, "HolderUnknown"),

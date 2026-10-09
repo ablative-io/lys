@@ -98,6 +98,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::CertificateReused { .. }
         | ServerError::CertificateWithdrawn { .. }
         | ServerError::RolesUnavailable { .. }
+        | ServerError::MembershipUnavailable { .. }
         | ServerError::RoleUnknown
         | ServerError::RoleVersionUnknown
         | ServerError::HolderUnknown

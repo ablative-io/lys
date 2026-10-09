@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Product draft events (ACCESS-001 R3): each kind reads back as written,
 //! a digest that is not the words' is refused, a retry is the same act, and
 //! the drafts a snapshot holds are the drafts the log made.

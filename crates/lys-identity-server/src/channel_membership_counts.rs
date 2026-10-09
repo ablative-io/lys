@@ -181,13 +181,13 @@ pub async fn counts(
     let (holders, resources) =
         with_grants(&state, |judged| Ok(judged.grants.book().live_entries()))?;
     // Read uncounted, so reading the counts never moves them; a poisoned
-    // book is still read, since reading changes nothing.
+    // book is refused by name, never read past.
     let (retained, released) = {
-        let book = state
-            .membership
-            .cursors
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let book = state.membership.cursors.lock().map_err(|error| {
+            ServerError::MembershipUnavailable {
+                reason: format!("the membership cursor lock is poisoned: {error}"),
+            }
+        })?;
         (book.retained(), book.released())
     };
     let counts = &state.membership.counts;

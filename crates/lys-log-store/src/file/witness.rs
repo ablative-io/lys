@@ -8,7 +8,7 @@
 //! called. Nothing is held between the two calls, and no lease is claimed.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use crate::witness::{TailLeaf, TailWitness, TailWitnessProvider, validate};
 use crate::{FileLeafStore, Frontier, LeafStore, PinnedRoot, StoreError, StoreResult};
@@ -51,12 +51,8 @@ impl FileTailProvider {
         }
     }
 
-    fn current(&self) -> Option<Arc<Reading>> {
-        self.reading
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .as_ref()
-            .map(Arc::clone)
+    fn current(&self) -> StoreResult<Option<Arc<Reading>>> {
+        Ok(self.reading.lock().map_err(|_| poisoned())?.as_ref().map(Arc::clone))
     }
 
     fn reopen(&self) -> StoreResult<Arc<Reading>> {
@@ -64,8 +60,15 @@ impl FileTailProvider {
             store: FileLeafStore::open_read_only(&self.dir)?,
             owner: Arc::new(()),
         });
-        *self.reading.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&fresh));
+        *self.reading.lock().map_err(|_| poisoned())? = Some(Arc::clone(&fresh));
         Ok(fresh)
+    }
+}
+
+/// The tail reading's lock was poisoned: refused by name, never read past.
+fn poisoned() -> StoreError {
+    StoreError::LockPoisoned {
+        what: "tail witness reading",
     }
 }
 
@@ -113,7 +116,7 @@ impl TailWitnessProvider for FileTailProvider {
         reading: &mut dyn FnMut(&TailWitness) -> StoreResult<()>,
     ) -> StoreResult<()> {
         let Some(certified) = self
-            .current()
+            .current()?
             .filter(|certified| Arc::ptr_eq(&witness.owner, &certified.owner))
         else {
             return Err(StoreError::TailWitnessRefused {

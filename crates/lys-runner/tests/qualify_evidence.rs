@@ -68,7 +68,7 @@ fn executable(path: &Path, text: &str) -> Result<(), Box<dyn Error>> {
 fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::new(), |mut out, byte| {
-        let _ = write!(out, "{byte:02x}");
+        write!(out, "{byte:02x}").expect("writing to a String cannot fail");
         out
     })
 }

@@ -430,6 +430,15 @@ pub enum StoreError {
         /// The bound, owner or leaf that did not hold.
         reason: &'static str,
     },
+
+    /// A lock this store's state sits behind was poisoned by a panic while
+    /// held, so what it guards may be half changed; it is refused, never read
+    /// past. Reopen the log.
+    #[error("refusing: the {what} lock was poisoned by a panic while held; reopen the log")]
+    LockPoisoned {
+        /// The state the poisoned lock guards.
+        what: &'static str,
+    },
 }
 
 /// Convenience alias for `Result<T, StoreError>`.
