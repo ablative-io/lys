@@ -221,6 +221,9 @@ fn a_key_that_keeps_other_rights_is_a_read_back_mismatch() -> TestResult {
         .err()
         .ok_or("a key with other rights was accepted")?;
     assert_eq!(error.kind(), ErrorKind::ReadBackMismatch);
+    assert!(error.to_string().contains("Secrets/update"), "{error}");
+    assert!(error.to_string().contains("ApiKeys/create"), "{error}");
+    assert!(error.to_string().contains("issuer administrator"), "{error}");
     Ok(())
 }
 
@@ -233,6 +236,9 @@ fn a_configure_key_without_key_rights_is_refused_naming_them() -> TestResult {
     let error = outcome.err().ok_or("a forbidden listing was accepted")?;
     assert_eq!(error.kind(), ErrorKind::RauthyForbidden);
     assert!(error.to_string().contains("API key rights"), "{error}");
+    assert!(error.to_string().contains("ApiKeys/read"), "{error}");
+    assert!(error.to_string().contains("issuer administrator"), "{error}");
+    assert!(!error.to_string().contains("upgrading the install grants"), "{error}");
     assert_eq!(seen.len(), 1, "nothing was asked after the refusal");
     assert!(bodies.is_empty(), "nothing was written");
     Ok(())
@@ -244,4 +250,39 @@ fn only_a_token_of_the_directory_key_is_held_as_one() {
     assert!(!holds_directory_token(b"lys_directory$"));
     assert!(!holds_directory_token(b"lys_directoryx$secret"));
     assert!(!holds_directory_token(b"lys_configure$secret"));
+}
+
+#[test]
+fn missing_directory_rights_name_each_right_and_the_administrator_repair() -> TestResult {
+    let access = json!([
+        {"group":"Clients","access_rights":["read","create","update"]},
+        {"group":"Secrets","access_rights":["read"]},
+        {"group":"Users","access_rights":["read"]},
+        {"group":"AuthProviders","access_rights":["read","create","update"]}
+    ]);
+    let (url, handle) = fake_keys(Some(access), OnUpdate::Ignore, false)?;
+    let outcome = reconcile(&RauthyApi::new(&url, None)?, Some(TOKEN.as_bytes()));
+    stop(&url, handle)?;
+    let error = outcome.err().ok_or("missing rights were accepted")?;
+    assert_eq!(error.kind(), ErrorKind::ReadBackMismatch);
+    for required in ["Users/create", "Users/update", "issuer administrator", "lys_directory"] {
+        assert!(error.to_string().contains(required), "{error}");
+    }
+    Ok(())
+}
+
+#[test]
+fn malformed_live_rights_refuse_before_any_key_write() -> TestResult {
+    for access in [json!({"group":"Users"}), json!([{"group":"Users","access_rights":["read", 1]}]), json!([
+        {"group":"Users","access_rights":["read"]},
+        {"group":"Users","access_rights":["update"]}
+    ])] {
+        let (url, handle) = fake_keys(Some(access), OnUpdate::Store, false)?;
+        let outcome = reconcile(&RauthyApi::new(&url, None)?, Some(TOKEN.as_bytes()));
+        let (seen, bodies) = stop(&url, handle)?;
+        assert_eq!(outcome.err().ok_or("malformed rights accepted")?.kind(), ErrorKind::RauthyUnexpected);
+        assert_eq!(seen, ["GET /auth/v1/api_keys HTTP/1.1"]);
+        assert!(bodies.is_empty());
+    }
+    Ok(())
 }
