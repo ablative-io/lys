@@ -16,7 +16,7 @@ const grants = GRANTS.map((grant) => ({ ...grant, resource, relation: grant.id =
   pass_on: grant.id === ROOT_G ? { kind: 'to', actions: ['agent.start', 'agent.stop'], recipients: ['agent'] } : grant.pass_on }));
 const routes = { ...SERVICE, '/grants/model': ok(model), '/grants': ok({ grants, revision: 7 }),
   [`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`]: ok({ source: ROOT_G, recipient: SCRIBE, items: [] }),
-  'POST /grants/reach': ok({ revision: 7, resources: [{ ...resource, holders: [{ holder: SCRIBE, actions: ['agent.stop'] }] }] }),
+  'POST /grants/reach': ok({ revision: 7, resources: [{ ...resource, holders: [{ holder: SCRIBE, actions: ['agent.stop'], modes: ['outright'] }] }] }),
 };
 
 describe('Walk words', () => {
@@ -61,7 +61,7 @@ describe('Walk words', () => {
 
   it('shows the served reach in plain words without claiming it is built in', async () => {
     await mount('#/access/reach/' + SCRIBE, routes);
-    expect($$('.check .card tr').map((row) => row.textContent)).toEqual(['the agents directoryStop this agent']);
+    expect($$('.check .card tr').map((row) => row.textContent)).toEqual(['the agents directoryStop this agentoutright']);
     expect($('.check .built-in')).toBeNull();
   });
 

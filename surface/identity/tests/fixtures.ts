@@ -100,7 +100,7 @@ const grant = (g: Partial<Grant> & Pick<Grant, 'id' | 'holder' | 'relation' | 'a
   const span = g.window ?? { starts_at: at(27, 9), ends_at: null };
   return {
     issuer: ADA, responsible: ADA, resource: { kind: 'project', id: 'identity' }, window: span,
-    model_version: 1, operation: 'op-' + hex(200), revoked: false, revoked_at: null, revoked_revision: null,
+    model_version: 1, mode: 'outright', operation: 'op-' + hex(200), revoked: false, revoked_at: null, revoked_revision: null,
     last_use: { seen: false, recorded: 0, source: 'reported' },
     standing: { stands: true }, effective_ends_at: span.ends_at, ...g,
   };
@@ -161,7 +161,7 @@ export const reach = (body: unknown): Answer => {
       const page = who({ route: 'browser', resource: { kind, id }, action, page_size: 100, after: null }).body as { holders: { holder: string }[] };
       for (const { holder } of page.holders) byHolder.set(holder, [...(byHolder.get(holder) ?? []), action]);
     }
-    return { kind, id, holders: [...byHolder].map(([holder, held]) => ({ holder, actions: held })) };
+    return { kind, id, holders: [...byHolder].map(([holder, held]) => ({ holder, actions: held, modes: held.map(() => 'outright') })) };
   });
   return ok({ revision: 7, resources });
 };

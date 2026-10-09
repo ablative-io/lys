@@ -40,6 +40,9 @@ export type LastUse = ({ seen: false } | { seen: true; at: number; route: RouteW
   | { source: 'missing'; unreported: Unreported }
 );
 
+/** `Mode` as the grant routes write it. */
+export type GrantMode = 'outright' | 'by_draft' | 'by_two';
+
 /** `GrantView`. */
 export interface Grant {
   id: string;
@@ -54,6 +57,8 @@ export interface Grant {
   source: string | null;
   window: GrantWindow;
   model_version: number;
+  /** How its actions may be exercised (ACCESS-001 R1): at once, or held for a draft one or two approvers approve. */
+  mode: GrantMode;
   operation: string;
   /** Whether it was revoked directly. */
   revoked: boolean;
@@ -178,7 +183,8 @@ export interface ReachBody {
 /** POST /grants/reach answers each resource, in the order asked, with every visible holder and the actions it may take. */
 export interface ReachAnswer {
   revision: number;
-  resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[] }[] })[];
+  /** Each holder's `modes` stand beside its `actions`: the mode of the grant each action rests on. */
+  resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[]; modes: GrantMode[] }[] })[];
 }
 
 

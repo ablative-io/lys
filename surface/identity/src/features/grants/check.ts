@@ -1,6 +1,6 @@
 import { Refused, api } from '../../api';
 import { PAGE_MAX, resourceText } from '../../generated/grants';
-import type { Permit, ResourceRef } from '../../generated/grants';
+import type { GrantMode, Permit, ResourceRef } from '../../generated/grants';
 import { clock } from '../file/time';
 
 export type Answer =
@@ -87,7 +87,32 @@ export async function whoAll(resource: ResourceRef, action: string): Promise<(Pe
  * rather than drawn as a partial graph.
  */
 export async function reachMap(resources: { resource: ResourceRef; actions: string[] }[]): Promise<Map<string, Map<string, string[]>>> {
-  const out = new Map<string, Map<string, string[]>>();
+  const answered = await reachAnswered(resources);
+  return new Map([...answered].map(([res, byHolder]) => [res, new Map([...byHolder].map(([holder, held]) => [holder, held.actions]))]));
+}
+
+/** One holder's reach on one resource: the actions, and beside each the mode of the grant it rests on. */
+export interface Reached { actions: string[]; modes: GrantMode[] }
+
+/**
+ * {@link reachMap} with each action's mode, as the service answers it beside
+ * the action. An answer whose modes do not stand one beside each action is
+ * refused, never padded.
+ */
+export async function reachWithModes(resources: { resource: ResourceRef; actions: string[] }[]): Promise<Map<string, Map<string, Reached>>> {
+  const answered = await reachAnswered(resources);
+  for (const [res, byHolder] of answered) {
+    for (const [holder, held] of byHolder) {
+      if (!Array.isArray(held.modes) || held.modes.length !== held.actions.length) {
+        throw new Refused(502, { refusal: 'PermissionAnswerIncomplete', reason: `The permission service did not answer the mode of each action ${holder} may take on ${res}.` });
+      }
+    }
+  }
+  return answered;
+}
+
+async function reachAnswered(resources: { resource: ResourceRef; actions: string[] }[]): Promise<Map<string, Map<string, Reached>>> {
+  const out = new Map<string, Map<string, Reached>>();
   if (!resources.length) return out;
   const answer = await api.reach({ route: 'browser', resources: resources.map(({ resource, actions }) => ({ ...resource, actions })) });
   resources.forEach(({ resource }, n) => {
@@ -95,7 +120,7 @@ export async function reachMap(resources: { resource: ResourceRef; actions: stri
     if (!answered || answered.kind !== resource.kind || answered.id !== resource.id) {
       throw new Refused(502, { refusal: 'PermissionAnswerIncomplete', reason: `The permission service did not answer for ${resourceText(resource)}.` });
     }
-    out.set(resourceText(resource), new Map(answered.holders.map(({ holder, actions }) => [holder, actions])));
+    out.set(resourceText(resource), new Map(answered.holders.map(({ holder, actions, modes }) => [holder, { actions, modes }])));
   });
   return out;
 }

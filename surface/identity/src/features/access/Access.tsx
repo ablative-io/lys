@@ -8,19 +8,21 @@ import { Listing } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
 import type { Held, OrgTeam } from '../../shell/org';
 import { useWhose, WhoseSelect } from '../../shell/Whose';
-import { DirectoryGate as Gate, problemWords } from '../people/Words';
+import { DirectoryGate as Gate, ErrorWords, problemWords } from '../people/Words';
 import { readTeams } from '../teams/Teams';
-import { reachMap } from '../grants/check';
+import { reachWithModes } from '../grants/check';
+import type { Reached } from '../grants/check';
 import { CheckBox, resourcesSeen, WhoChoice } from '../grants/CheckBox';
 import { ActForm, ActPanel, ChangeButtons, grantColumns } from '../grants/GrantTable';
 import type { Act } from '../grants/GrantTable';
-import { IssueRoot } from '../grants/IssueRoot';
+import { isRootAuthority, IssueRoot, NOT_ROOT } from '../grants/IssueRoot';
+import { modeWords } from '../grants/mode-words';
 import { grantNo, nameOf, readGrantWorld, resourceLabel, resourceName, voidOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import type { Grant } from '../../generated/grants';
 import { Pill } from '../people/Pill';
 
-type ReachMap = Map<string, Map<string, string[]>>;
+type ReachMap = Map<string, Map<string, Reached>>;
 
 /** /grants/who is asked only for the segment on screen, once per world: every resource for "reach", one for "who". */
 const reachOfAll = new WeakMap<GrantWorld, Promise<ReachMap>>();
@@ -29,7 +31,7 @@ const reachOfOne = new WeakMap<GrantWorld, Map<string, Promise<ReachMap>>>();
 function allReach(w: GrantWorld): Promise<ReachMap> {
   let p = reachOfAll.get(w);
   if (!p) {
-    p = reachMap([...resourcesSeen(w).values()]);
+    p = reachWithModes([...resourcesSeen(w).values()]);
     reachOfAll.set(w, p);
   }
   return p;
@@ -44,10 +46,25 @@ function oneReach(w: GrantWorld, res: string): Promise<ReachMap> {
   let p = byRes.get(res);
   if (!p) {
     const seen = resourcesSeen(w).get(res);
-    p = reachMap(seen ? [seen] : []);
+    p = reachWithModes(seen ? [seen] : []);
     byRes.set(res, p);
   }
   return p;
+}
+
+/**
+ * The modes of one holder's reach in words, as the service answered them beside
+ * each action: one word when every action rests on grants of one mode, else each
+ * mode with its actions.
+ */
+function modesOf(w: GrantWorld, res: string, held: Reached): string {
+  const byMode = new Map<string, string[]>();
+  held.actions.forEach((action, n) => {
+    const mode = held.modes[n];
+    byMode.set(mode, [...(byMode.get(mode) ?? []), action]);
+  });
+  if (byMode.size === 1) return [...byMode.keys()].map(modeWords).join('');
+  return [...byMode].map(([mode, acts]) => modeWords(mode) + ': ' + actionWords(w.model, resourceFromText(res), acts)).join('; ');
 }
 
 const person = (w: GrantWorld, id: string) => {
@@ -59,11 +76,11 @@ function Reach({ w, id }: { w: GrantWorld; id: string }) {
   const load = useLoad(() => allReach(w), 'reach');
   return (
     <Gate load={load} title="Access" ok={(reach) => {
-      const rows = [...reach].map(([res, byHolder]) => [res, byHolder.get(id) ?? []] as const).filter(([, acts]) => acts.length);
+      const rows = [...reach].map(([res, byHolder]) => [res, byHolder.get(id)] as const).filter((row): row is readonly [string, Reached] => !!row[1]?.actions.length);
       return rows.length ? (
         <table><tbody>
-          {rows.map(([res, acts]) => (
-            <tr key={res}><td>{resourceName(w, resourceFromText(res))}</td><td>{actionWords(w.model, resourceFromText(res), acts)}</td></tr>
+          {rows.map(([res, held]) => (
+            <tr key={res}><td>{resourceName(w, resourceFromText(res))}</td><td>{actionWords(w.model, resourceFromText(res), held.actions)}</td><td className="sec mode">{modesOf(w, res, held)}</td></tr>
           ))}
         </tbody></table>
       ) : <div className="dim">Nothing.</div>;
@@ -75,9 +92,9 @@ function WhoCan({ w, res }: { w: GrantWorld; res: string }) {
   const load = useLoad(() => oneReach(w, res), 'who:' + res);
   return (
     <Gate load={load} title="Access" ok={(reach) => {
-      const holders = [...(reach.get(res) ?? new Map<string, string[]>())];
-      return holders.length ? holders.map(([h, acts]) => (
-        <div className="row" key={h}><span><Pill x={person(w, h)} /></span><span className="mono">{actionWords(w.model, resourceFromText(res), acts)}</span></div>
+      const holders = [...(reach.get(res) ?? new Map<string, Reached>())];
+      return holders.length ? holders.map(([h, held]) => (
+        <div className="row" key={h}><span><Pill x={person(w, h)} /></span><span className="mono">{actionWords(w.model, resourceFromText(res), held.actions)}</span><span className="sec mode">{modesOf(w, res, held)}</span></div>
       )) : <div className="dim">Nobody.</div>;
     }} />
   );
@@ -121,12 +138,14 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => nameOf(w, id));
   const close = () => setActing(null);
   const columns = [...grantColumns(w), { head: 'Change', cell: (g: Grant) => <ChangeButtons w={w} g={g} give open={(act, opener) => setActing({ grant: g, act, opener })} /> }];
-  const panel = issuing ? <ActPanel className="issue-root" label="Issue root grant" opener={null} close={() => navigate('/access')}><IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /></ActPanel>
+  // Only the root authority is offered the root-grant form; anyone else who opens its address is told so by name, with no form.
+  const root = isRootAuthority(w.people);
+  const panel = issuing ? <ActPanel className="issue-root" label="Issue root grant" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /> : <ErrorWords problem={NOT_ROOT} />}</ActPanel>
     : acting ? <ActPanel label={acting.act === 'revoke' ? 'Revoke' : 'Give'} opener={acting.opener} close={close}><ActForm w={w} g={acting.grant} act={acting.act} done={reload} close={close} /></ActPanel> : null;
   return <div className="page fill">
     <div className="head">
       <div><h1>Access</h1><p className="sub">{asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}</p></div>
-      {asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : <a className="btn primary" href="#/access/issue">Issue root grant</a>}
+      {asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : root ? <a className="btn primary" href="#/access/issue">Issue root grant</a> : null}
     </div>
     <AccessTabs on={asking ? 'ask' : 'grants'} />
     {asking ? <div className="pane">

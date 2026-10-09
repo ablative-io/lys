@@ -8,6 +8,7 @@ import { Chain } from './Chain';
 import { chainOf, grantNo, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
+import { modeWords } from './mode-words';
 import './grants.css';
 import { Act } from '../../shell/Act';
 
@@ -37,6 +38,7 @@ export function grantColumns(w: GrantWorld): Column<Grant>[] {
       if (v === null) return <><span className="dot s-active" />yes</>;
       return <span className="danger" title={v.title}><span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>void</span> {breakable(v.why)}</span>;
     } },
+    { head: 'Mode', cell: (g) => <span className="sec" data-mode={g.mode}>{modeWords(g.mode)}</span> },
   ];
 }
 

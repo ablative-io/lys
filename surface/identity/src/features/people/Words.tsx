@@ -33,6 +33,8 @@ const REFUSALS: Record<string, string> = {
   app_exists: 'An app is already registered with that short name.',
   schema_version_moved: 'Someone saved a newer version of these permissions.',
   schema_change_strands_grants: 'These permissions are still in use and cannot be removed yet.',
+  RootAuthorityRefused: 'Only the directory\'s root authority issues a root grant. Ask the administrator to issue it.',
+  grant_mode_on_hot_action: 'This action is decided at once by the app, so it cannot be held for a draft. Issue it outright, or choose another action.',
 };
 
 export const refusalWords = (code: string): string | undefined => REFUSALS[code];

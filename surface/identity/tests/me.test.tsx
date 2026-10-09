@@ -99,7 +99,7 @@ describe('Personal scope', () => {
     // The account's sections sit in one row; under it the grant table has the full width, in its own scrolling box. It does not repeat on every row that the grant is yours and stands.
     expect(document.querySelector('.you-account.grid2')).toBeNull();
     expect(document.querySelector('.you-holds-scroll table[aria-label="Grants"]')).not.toBeNull();
-    expect([...document.querySelectorAll('.you-holds-scroll thead th')].map((th) => th.textContent)).toEqual(['Grant', 'Allows', 'Relation', 'On', 'Path to a person', 'May pass on', 'Window', 'Last used', 'Change']);
+    expect([...document.querySelectorAll('.you-holds-scroll thead th')].map((th) => th.textContent)).toEqual(['Grant', 'Allows', 'Relation', 'On', 'Path to a person', 'May pass on', 'Window', 'Last used', 'Mode', 'Change']);
     // Each change of the account is one row: what it changes, its fields, its button.
     expect([...document.querySelectorAll('#lys-account .account-row')].map((row) => row.querySelector('[role="rowheader"]')?.textContent + ': ' + row.querySelectorAll('input').length + ' fields, ' + row.querySelector('button')?.getAttribute('aria-label') + ', drawn ' + row.querySelector('button')?.textContent)).toEqual(['Email: 2 fields, Change email, drawn Save', 'Password: 3 fields, Change password, drawn Save']);
     expect(document.querySelector('.you-account-row #signin-identities')).not.toBeNull();

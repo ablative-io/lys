@@ -1,49 +1,94 @@
 /** Root grants are requested explicitly; the server alone decides who may issue one. */
 import { useState } from 'react';
-import { api, useLoad } from '../../api';
+import { api, Refused, request, useLoad } from '../../api';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import type { PeopleView } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { field, RecordedForm } from '../people/RecordedForm';
+import { ErrorWords } from '../people/Words';
 import { Picker } from '../../shell/Picker';
+import { MODE_HINTS, MODES, modeWords } from './mode-words';
 
-/** One row you put things into: holder, kind of thing, which one, relation, may pass on, expiry, Issue. */
-function Form({ people, model, resources, done }: { people: PeopleView; model: GrantModel; resources: ResourceRef[]; done: () => void }) {
+/** The kinds a resource may be: each approved app's schema kinds under its name, then Lys's own kinds already held. */
+export interface KindGroup { label: string; kinds: string[] }
+
+/**
+ * Whether the signed-in person is the root authority. The service answers the
+ * whole directory only to the administrator, and the person bound to the
+ * administrator's login is the root authority (GET /authority says so), so this
+ * reads the service's answer and judges nothing.
+ */
+export const isRootAuthority = (people: PeopleView): boolean => people.scope === 'directory';
+
+/** The refusal POST /grants/roots answers anyone but the root authority, said before any form is drawn. */
+export const NOT_ROOT = new Refused(403, { refusal: 'RootAuthorityRefused', reason: 'you are not the root authority, and only it issues a root grant' });
+
+/** One row you put things into: holder, kind of thing, which one, relation, mode, may pass on, expiry, Issue. */
+function Form({ people, model, kinds, resources, done }: { people: PeopleView; model: GrantModel; kinds: KindGroup[]; resources: ResourceRef[]; done: () => void }) {
   const [noExpiry, setNoExpiry] = useState(false);
   const [kind, setKind] = useState('');
+  const [mode, setMode] = useState<string>('outright');
   return <RecordedForm name="root-grant" title="Issue root grant" submitLabel="Issue" drawn={{ symbol: 'add', word: 'Issue' }} done={done} change={(data) => {
     const relation = field(data, 'relation');
     const actions = model.relations[relation];
     if (!actions) throw new Error('Select a relation from the permission model');
+    const chosen = field(data, 'kind');
+    if (!kinds.some((group) => group.kinds.includes(chosen))) throw new Error('Choose a kind of thing from the list');
     const expires = noExpiry ? null : Date.parse(field(data, 'expires')) / 1000;
     if (expires !== null && !Number.isFinite(expires)) throw new Error('Enter a valid expiry');
     return { path: '/grants/roots', body: {
       route: 'browser', holder: field(data, 'holder'),
-      resource: { kind: field(data, 'kind'), id: field(data, 'resource') }, relation,
+      resource: { kind: chosen, id: field(data, 'resource') }, relation,
       pass_on: data.get('delegate') === 'on' ? { kind: 'to', actions, recipients: ['agent'] } : { kind: 'use_only' },
       window: { starts_at: Math.floor(Date.now() / 1000), ends_at: expires },
+      mode: field(data, 'mode'),
     } };
   }}>
     <p className="note">Only the directory's root authority may issue this grant. It is given to a person, who may pass it to their agents only if you allow it here.</p>
     <div className="field">Holder<Picker name="holder" label="Find a person" options={people.people.map((p) => ({ id: p.id, name: p.display_name, detail: p.state }))} /></div>
-    <label className="field">Kind of thing<input name="kind" required list="root-kinds" autoComplete="off" onChange={(event) => setKind(event.target.value)} /></label>
-    <datalist id="root-kinds">{[...new Set(resources.map((resource) => resource.kind))].sort().map((each) => <option key={each} value={each} />)}</datalist>
+    <label className="field">Kind of thing<select name="kind" required value={kind} onChange={(event) => setKind(event.target.value)}>
+      <option value="" disabled>Choose a kind</option>
+      {kinds.map((group) => <optgroup key={group.label} label={group.label}>{group.kinds.map((each) => <option key={each} value={each}>{each}</option>)}</optgroup>)}
+    </select></label>
     <label className="field">Which one<input name="resource" required list="root-ids" autoComplete="off" /></label>
-    <datalist id="root-ids">{resources.filter((resource) => !kind || resource.kind === kind).map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} />)}</datalist>
+    <datalist id="root-ids">{resources.filter((resource) => resource.kind === kind).map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} />)}</datalist>
     <label className="field">Relation<select name="relation" required defaultValue=""><option value="" disabled>Choose a relation</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>
+    <label className="field">Mode<select name="mode" required value={mode} onChange={(event) => setMode(event.target.value)}>{MODES.map((each) => <option key={each} value={each}>{modeWords(each)}</option>)}</select>
+      <span className="hint">{MODE_HINTS[mode as keyof typeof MODE_HINTS] ?? ''}</span></label>
     <div className="field">May pass on<label className="tick"><input name="delegate" type="checkbox" /> to their agents</label></div>
     <div className="field">Expires (your local time)<div className="expires"><input name="expires" type="datetime-local" aria-label="Expires" required={!noExpiry} disabled={noExpiry} />
       <label className="tick"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> no expiry</label></div></div>
   </RecordedForm>;
 }
 
-async function read() {
-  const [people, model] = await Promise.all([api.people(), api.model()]);
-  return { people, model };
+type AppRow = { id: string; name: string; state: string };
+type SchemaAnswer = { app: string; version: number; schema: { kinds?: Record<string, unknown> } | null };
+
+/**
+ * The kinds the form offers: each approved app's schema kinds (GET /apps/{id}/schema),
+ * then the kinds of the resources Lys already holds grants on that no app's schema names.
+ * Lys never reads an app's own records, so the ids offered are the ones Lys already holds.
+ */
+export async function readKinds(resources: ResourceRef[]): Promise<KindGroup[]> {
+  const { apps } = await request<{ apps: AppRow[] }>('/apps');
+  const approved = apps.filter((app) => app.state === 'approved');
+  const schemas = await Promise.all(approved.map((app) => request<SchemaAnswer>('/apps/' + encodeURIComponent(app.id) + '/schema')));
+  const groups: KindGroup[] = approved.map((app, n) => ({ label: app.name, kinds: Object.keys(schemas[n]?.schema?.kinds ?? {}).sort() }))
+    .filter((group) => group.kinds.length);
+  const named = new Set(groups.flatMap((group) => group.kinds));
+  const held = [...new Set(resources.map((resource) => resource.kind))].filter((each) => !named.has(each)).sort();
+  return held.length ? [...groups, { label: 'Already granted in Lys', kinds: held }] : groups;
 }
 
-/** The form that issues a root grant, shown in the Access page above the grants. Kinds and names already known are offered; a new one may be typed. */
+async function read(resources: ResourceRef[]) {
+  const people = await api.people();
+  if (!isRootAuthority(people)) throw NOT_ROOT;
+  const [model, kinds] = await Promise.all([api.model(), readKinds(resources)]);
+  return { people, model, kinds };
+}
+
+/** The form that issues a root grant, shown in the Access page above the grants. Anyone but the root authority is told so by name and given no form. */
 export function IssueRoot({ resources, done = () => undefined }: { resources: ResourceRef[]; done?: () => void }) {
-  const load = useLoad(read, 'root-grant');
-  return <Gate load={load} title="Issue access" ok={(data) => <Form {...data} resources={resources} done={done} />} />;
+  const load = useLoad(() => read(resources), 'root-grant');
+  return <Gate load={load} title="Issue access" renderError={(problem) => <ErrorWords problem={problem} />} ok={(data) => <Form {...data} resources={resources} done={done} />} />;
 }

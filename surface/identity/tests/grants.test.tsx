@@ -455,15 +455,15 @@ describe('Who can reach this? (conformance 8.2)', () => {
   it('lists everyone with what they can do, from the same answers', async () => {
     await mount('#/access/who/project:identity');
     const rows = $$('#whoCan .row').map((r) => r.textContent);
-    expect(rows).toEqual(['Ada (test person)everything here', "ScribeView this resource"]);
+    expect(rows).toEqual(['Ada (test person)everything hereoutright', "ScribeView this resourceoutright"]);
     await choose($('select[aria-label="Resource"]'), 'project:ledger');
     expect(location.hash).toBe('#/access/who/project:ledger');
-    expect($$('#whoCan .row').map((r) => r.textContent)).toEqual(['Ada (test person)View this resource']);
+    expect($$('#whoCan .row').map((r) => r.textContent)).toEqual(['Ada (test person)View this resourceoutright']);
   });
 
   it('lists every grant, with where it derives from, and keeps every control reachable', async () => {
     await mount('#/access/reach/' + SCRIBE);
-    expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project identityView this resource']);
+    expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project identityView this resourceoutright']);
     // The grants themselves are the Grants tab of the same page.
     location.hash = '#/access';
     await settle();
@@ -827,7 +827,7 @@ describe('Issue root grant is one row (walk of 4 Oct)', () => {
     const form = $('.act-panel.issue-root form[aria-label="Issue root grant"]');
     expect(form?.querySelectorAll('.card, .act-panel')).toHaveLength(0);
     const fields = [...(form?.querySelector('fieldset')?.children ?? [])].filter((el) => el.classList.contains('field')).map((el) => el.firstChild?.textContent);
-    expect(fields).toEqual(['Holder', 'Kind of thing', 'Which one', 'Relation', 'May pass on', 'Expires (your local time)']);
+    expect(fields).toEqual(['Holder', 'Kind of thing', 'Which one', 'Relation', 'Mode', 'May pass on', 'Expires (your local time)']);
     expect(form?.querySelector('button[type="submit"]')?.textContent).toBe('Issue');
   });
 });
