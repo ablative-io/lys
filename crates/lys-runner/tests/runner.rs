@@ -500,16 +500,16 @@ fn a_usage_limit_moves_the_session_on_and_the_list_end_stops_it() -> TestResult 
     held.stop()
 }
 
-/// A program can drop one hang-up, as bash does when the signal lands while
-/// it runs a command. This stand-in drops exactly the first one, and prints
-/// after it: the output that follows the hang-up is what has it told again.
+/// The first hang-up prints and restores the default signal action before
+/// replacing the shell with a blocking input reader. That output must cause
+/// the repeated hang-up to end the program, without waiting on a clock.
 #[test]
 fn a_program_that_drops_one_hang_up_is_told_again_when_it_prints() -> TestResult {
     let mut held = Held::start(1 << 16)?;
     let client = held.client();
-    let script = "trap 'trap - HUP; echo still-on-$LYS_ACCOUNT_HANDLE' HUP; \
+    let script = "trap 'trap - HUP; echo still-on-$LYS_ACCOUNT_HANDLE; exec cat' HUP; \
                   echo \"at $LYS_ACCOUNT_HANDLE: usage limit reached\"; \
-                  while :; do sleep 1; done";
+                  read -r line";
     let limit = Limit::Words {
         words: vec!["usage limit reached".to_owned()],
     };
@@ -520,9 +520,12 @@ fn a_program_that_drops_one_hang_up_is_told_again_when_it_prints() -> TestResult
         "the first hang-up was dropped and the program printed: {output:?}"
     );
     assert!(output.text.contains("at h-account-two"), "{output:?}");
-    assert_eq!(
-        output.ended.ok_or("no end")?.how,
-        EndedHow::AccountsExhausted
+    let end = output.ended.ok_or("no end")?;
+    assert_eq!(end.how, EndedHow::AccountsExhausted);
+    assert_eq!(end.status, None, "the repeated hang-up must end the program");
+    assert!(
+        end.signal.is_some(),
+        "the program ended without a signal: {end:?}"
     );
     held.stop()
 }
