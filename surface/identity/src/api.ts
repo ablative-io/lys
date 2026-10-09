@@ -13,10 +13,13 @@ export type AuthorityAnswer = { authority: string; build: string };
 export class Refused extends Error {
   readonly status: number;
   readonly refusal: Refusal;
-  constructor(status: number, refusal: Refusal) {
+  /** The whole refusal answer as the service wrote it, for a route that carries more beside the name and reason (a receipt of the steps already written); undefined when there was none. */
+  readonly answer: unknown;
+  constructor(status: number, refusal: Refusal, answer?: unknown) {
     super(refusal.reason);
     this.status = status;
     this.refusal = refusal;
+    this.answer = answer;
   }
 }
 
@@ -24,7 +27,7 @@ async function refusalOf(response: Response): Promise<Refused> {
   try {
     const body = (await response.json()) as Partial<Refusal>;
     if (typeof body.refusal === 'string' && typeof body.reason === 'string') {
-      return new Refused(response.status, { refusal: body.refusal, reason: body.reason });
+      return new Refused(response.status, { refusal: body.refusal, reason: body.reason }, body);
     }
   } catch {
     // The body is not a refusal; it is named below by its status.

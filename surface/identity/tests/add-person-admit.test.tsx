@@ -97,4 +97,38 @@ describe('Add a person in one act', () => {
     expect(entry.textContent).toContain('gamma is not a relation');
     expect(document.querySelector('[aria-label="Receipt"]')).toBeNull();
   });
+
+  it('shows a refused receipt: the refusal by name and reason, the step it stopped at, and each written step\'s log leaf', async () => {
+    const stopped = (body: unknown) => {
+      const operation = (body as { operation: string }).operation;
+      return { status: 403, body: {
+        refusal: 'WithheldFromAgents', reason: 'WithheldFromAgents: editor carries grant.delegate, which no agent may hold',
+        receipt: { operation, person: BEA, completed: ['register', 'account', 'bind', 'activate'], failed: 'grant',
+          logged: [{ step: 'register', log: 'directory', index: 12 }, { step: 'bind', log: 'directory', index: 13 }, { step: 'activate', log: 'directory', index: 14 }] },
+      } };
+    };
+    const { entry } = await form({ 'POST /people/admit': stopped });
+    await fill(entry);
+    await submit(entry);
+    expect(document.querySelector('[aria-label="Receipt"]')).toBeNull();
+    const receipt = document.querySelector('[aria-label="Refused receipt"]');
+    expect(receipt).not.toBeNull();
+    expect(receipt?.querySelector('.refusal-name')?.textContent).toBe('WithheldFromAgents');
+    const text = receipt?.textContent ?? '';
+    expect(text).toContain('no agent may hold');
+    expect(text).toContain('the grant step');
+    expect([...(receipt?.querySelectorAll('li') ?? [])].map((leaf) => leaf.textContent)).toEqual([
+      'Registered: directory log leaf 12', 'Sign-in bound: directory log leaf 13', 'Activated: directory log leaf 14',
+    ]);
+  });
+
+  it('does not take a refused receipt for another operation as this act\'s', async () => {
+    const elsewhere = { status: 403, body: { refusal: 'IdentityNotActive', reason: 'not active',
+      receipt: { operation: 'op-' + '0'.repeat(32), person: null, completed: [], failed: 'register', logged: [] } } };
+    const { entry } = await form({ 'POST /people/admit': elsewhere });
+    await fill(entry);
+    await submit(entry);
+    expect(document.querySelector('[aria-label="Refused receipt"]')).toBeNull();
+    expect(entry.textContent).toContain('IdentityNotActive');
+  });
 });

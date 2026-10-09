@@ -44,6 +44,32 @@ function confirmed(answer: unknown, operation: string): Admitted {
   return { person: answer.person, logged: logged as Logged[] };
 }
 
+/** What a refused act had already written: the step that failed and each earlier step's log leaf (`AdmitReceipt`). */
+interface Stopped { refusal: string; reason: string; failed: string; completed: string[]; logged: Logged[] }
+
+/** The receipt a refusal of the act carries for `operation`, or null when it carries none this act can read as its own. */
+export function stoppedAt(error: unknown, operation: string | undefined): Stopped | null {
+  if (!(error instanceof Refused) || !object(error.answer) || !object(error.answer.receipt)) return null;
+  const receipt = error.answer.receipt;
+  const logged = receipt.logged;
+  if ((operation !== undefined && receipt.operation !== operation) || typeof receipt.failed !== 'string'
+    || !Array.isArray(receipt.completed) || !receipt.completed.every((step: unknown) => typeof step === 'string')
+    || !Array.isArray(logged) || !logged.every((leaf: unknown) => object(leaf) && typeof leaf.step === 'string' && typeof leaf.log === 'string'
+      && typeof leaf.index === 'number' && Number.isSafeInteger(leaf.index) && leaf.index >= 0)) return null;
+  return { refusal: error.refusal.refusal, reason: error.refusal.reason, failed: receipt.failed, completed: receipt.completed as string[], logged: logged as Logged[] };
+}
+
+/** A refused act said whole: its refusal by name and reason, the step it stopped at, and the leaf of each step already written. */
+function RefusedReceipt({ stopped }: { stopped: Stopped }) {
+  return <section aria-label="Refused receipt" className="why-not" role="alert">
+    <p>Not added. Lys refused the {stopped.failed} step: <small className="refusal-name">{stopped.refusal}</small> {stopped.reason}</p>
+    {stopped.logged.length
+      ? <><p>Already written, and kept; asking again finishes from here and makes none of these twice:</p>
+        <ul>{stopped.logged.map((leaf) => <li key={leaf.log + leaf.index} data-step={leaf.step}>{WORDS[leaf.step] ?? leaf.step}: {leaf.log} log leaf {leaf.index}</li>)}</ul></>
+      : <p>Nothing was written before it.</p>}
+  </section>;
+}
+
 function Receipt({ admitted }: { admitted: Admitted }) {
   return <section aria-label="Receipt" className="note">
     <p>Added. One act, recorded as:</p>
@@ -53,6 +79,12 @@ function Receipt({ admitted }: { admitted: Admitted }) {
     </ul>
     <a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a>
   </section>;
+}
+
+/** A failure said with its receipt when the refusal carries one, else by its name and words alone. */
+function Failure({ failure, operation }: { failure: unknown; operation: string | undefined }) {
+  const stopped = stoppedAt(failure, operation);
+  return stopped ? <RefusedReceipt stopped={stopped} /> : <ErrorWords problem={failure} />;
 }
 
 function PersonForm({ person, model }: { person: string; model: GrantModel }) {
@@ -101,7 +133,7 @@ function PersonForm({ person, model }: { person: string; model: GrantModel }) {
     </select></label>
     <Act symbol="add" name={busy ? 'Adding…' : pending ? 'Continue adding this person' : 'Add person'} word={busy ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={busy || !complete || Boolean(saved.error)} />
     {pending ? <p role="status">This request has no confirmed answer yet. Its original details are saved; trying again checks the same request.</p> : null}
-    {failure ? <ErrorWords problem={failure} /> : null}
+    {failure ? <Failure failure={failure} operation={pending?.operation} /> : null}
   </form>;
 }
 
