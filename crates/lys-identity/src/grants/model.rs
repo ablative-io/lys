@@ -18,7 +18,7 @@ use lys_log_store::LeafStore;
 use super::authority::Grants;
 use super::error::GrantError;
 use super::permission::RelationshipStore;
-use super::types::{Action, Relation};
+use super::types::{Action, Grant, Relation};
 
 /// A versioned model of relations and the actions each carries.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,7 +40,12 @@ pub struct KindModel {
     pub relations: BTreeMap<Relation, BTreeSet<Action>>,
     /// The kinds whose relations flow down to this one.
     pub parents: BTreeSet<String>,
+    /// Each role of the kind, with the actions it carries (ACCESS-004 R1).
+    pub roles: BTreeMap<Relation, BTreeSet<Action>>,
 }
+
+/// What a grant naming a role that has left its kind is judged as: nothing.
+static NO_ACTIONS: BTreeSet<Action> = BTreeSet::new();
 
 /// A relation the model placed within an authority, with what it resolved to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -159,6 +164,24 @@ impl Model {
             actions: actions.clone(),
             model_version,
         })
+    }
+
+    /// The actions the role `role` of the app kind `kind` carries under the
+    /// version current now, if the kind names it.
+    pub fn role_on(&self, kind: &str, role: &Relation) -> Option<&BTreeSet<Action>> {
+        self.kinds.get(kind)?.roles.get(role)
+    }
+
+    /// The actions `grant` lets its holder exercise now. A grant naming a
+    /// role is judged as the role's actions under the version current when
+    /// it is judged, and as none once the role has left its kind (ACCESS-004
+    /// R1); every other grant keeps the actions it was issued with.
+    pub fn actions_of<'a>(&'a self, grant: &'a Grant) -> &'a BTreeSet<Action> {
+        if !grant.names_role() {
+            return grant.actions();
+        }
+        self.role_on(grant.resource().kind(), &grant.parts().relation)
+            .unwrap_or(&NO_ACTIONS)
     }
 
     /// The model's version.

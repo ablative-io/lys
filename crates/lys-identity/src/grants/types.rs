@@ -358,6 +358,7 @@ pub struct Grant {
     parts: GrantParts,
     once: bool,
     mode: Mode,
+    role: bool,
 }
 
 impl Grant {
@@ -394,6 +395,7 @@ impl Grant {
                 parts,
                 once: false,
                 mode: Mode::Outright,
+                role: false,
             }),
         }
     }
@@ -426,6 +428,21 @@ impl Grant {
     /// How the grant's actions may be exercised.
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    /// The grant naming, as its relation, a role of its resource's kind
+    /// (ACCESS-004 R1): judged as the role's actions under the schema
+    /// version current when it is judged. Its own actions are the role's
+    /// when it was issued, kept as the record of what it first gave.
+    #[must_use]
+    pub fn as_role(mut self) -> Self {
+        self.role = true;
+        self
+    }
+
+    /// Whether the grant's relation names a role of its kind.
+    pub fn names_role(&self) -> bool {
+        self.role
     }
 
     /// Refused `ModeHeld` unless the grant is exercised at once: a held

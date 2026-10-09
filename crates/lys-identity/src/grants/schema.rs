@@ -14,6 +14,9 @@
 //!   to the kind it started from.
 //! - A hot action, named under a kind's `hot`, is one the kind declares; every
 //!   other action is deliberate (ACCESS-001 R2, in `schema_class.rs`).
+//! - A role, named under a kind's `roles`, carries actions its kind declares
+//!   and is named as none of the kind's relations or actions (ACCESS-004 R1,
+//!   in `schema_roles.rs`).
 //! - Every kind, relation and action name is one the permission engine takes:
 //!   three to sixty-four lowercase letters, digits and underscores, starting
 //!   with a letter and not ending with an underscore. A relation is never
@@ -34,6 +37,9 @@ use super::types::{Action, Relation, Resource};
 
 #[path = "schema_class.rs"]
 mod class;
+
+#[path = "schema_roles.rs"]
+mod roles;
 
 /// The app whose schema is Lys's own model.
 pub const LYS_APP: &str = "lys";
@@ -152,6 +158,8 @@ pub struct KindSchema {
     pub parents: BTreeSet<String>,
     /// The actions decided from the pass alone; every other one is deliberate.
     pub hot: BTreeSet<Action>,
+    /// Each role, with the actions it carries (ACCESS-004 R1).
+    pub roles: BTreeMap<Relation, BTreeSet<Action>>,
 }
 
 /// An app's schema, checked.
@@ -170,6 +178,7 @@ struct Raw {
     relations: Vec<(String, Relation, Pointed)>,
     parents: Pointed,
     hot: BTreeSet<Action>,
+    roles: BTreeMap<Relation, BTreeSet<Action>>,
 }
 
 fn object<'a>(
@@ -232,7 +241,11 @@ fn relation(pointer: &str, name: &str) -> Result<Relation, SchemaError> {
 
 fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
     let body = object(value, pointer, "a kind")?;
-    only(body, pointer, &["actions", "relations", "parents", "hot"])?;
+    only(
+        body,
+        pointer,
+        &["actions", "relations", "parents", "hot", "roles"],
+    )?;
     let actions_at = format!("{pointer}/actions");
     let listed = body
         .get("actions")
@@ -274,6 +287,11 @@ fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
             relations.push((at, parsed, carried));
         }
     }
+    let named: BTreeSet<&str> = relations
+        .iter()
+        .map(|(_, relation, _)| relation.as_str())
+        .collect();
+    let roles = roles::roles(body, pointer, &actions, &named)?;
     let parents = match body.get("parents") {
         Some(value) => strings(value, &format!("{pointer}/parents"), "parents")?,
         None => Vec::new(),
@@ -289,6 +307,7 @@ fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
         relations,
         parents,
         hot,
+        roles,
     })
 }
 
@@ -430,6 +449,7 @@ impl AppSchema {
                         relations,
                         parents,
                         hot: kind.hot,
+                        roles: kind.roles,
                     },
                 )
             })
@@ -482,6 +502,7 @@ impl AppSchema {
             relations,
             parents: BTreeSet::new(),
             hot: BTreeSet::new(),
+            roles: BTreeMap::new(),
         };
         Self {
             app: LYS_APP.to_owned(),
@@ -527,6 +548,7 @@ impl AppSchema {
                     actions: kind.actions.clone(),
                     relations: kind.relations.clone(),
                     parents: kind.parents.clone(),
+                    roles: kind.roles.clone(),
                 };
                 (name.clone(), model)
             })

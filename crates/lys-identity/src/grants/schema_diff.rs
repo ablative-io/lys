@@ -1,8 +1,12 @@
-//! What a schema change does: the kinds, relations, actions and parents it
-//! adds and removes, and the standing grants a removal would strand.
+//! What a schema change does: the kinds, relations, actions, parents and
+//! roles it adds and removes, each role it widens or narrows, and the
+//! standing grants a removal would strand.
 //!
 //! A grant is stranded when its kind leaves the schema, its relation leaves
-//! its kind, or its kind stops declaring an action the grant carries. A
+//! its kind, or its kind stops declaring an action the grant carries. A grant
+//! naming a role is stranded when the role leaves its kind or is narrowed,
+//! since it is judged as the role's actions under the current version
+//! (ACCESS-004 R1); a narrowing no standing grant names strands nothing. A
 //! grant keeps the actions it was issued with, so a relation that only
 //! carries fewer actions strands nothing. Both answers read and never write:
 //! the dry run and the refused change are the same computation, and neither
@@ -41,6 +45,41 @@ pub struct SchemaDiff {
     pub parents_added: Vec<Named>,
     /// Parents removed from a kind both declare.
     pub parents_removed: Vec<Named>,
+    /// Roles added to a kind both declare.
+    pub roles_added: Vec<Named>,
+    /// Roles removed from a kind both declare.
+    pub roles_removed: Vec<Named>,
+    /// Roles both declare whose actions change, in kind and role order.
+    pub roles_changed: Vec<RoleChange>,
+}
+
+/// A role whose actions a change widens, narrows, or both.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoleChange {
+    /// The kind and the role.
+    pub role: Named,
+    /// The actions it gains: a widening, which an app's change waits on the
+    /// administrator to take.
+    pub added: Vec<String>,
+    /// The actions it loses: a narrowing.
+    pub removed: Vec<String>,
+}
+
+impl RoleChange {
+    /// The change in words, as the Apps screen names it: "adds `seat_retire`
+    /// to administrator", "removes `post` from member".
+    pub fn words(&self) -> Vec<String> {
+        let role = &self.role.name;
+        self.added
+            .iter()
+            .map(|action| format!("adds {action} to {role}"))
+            .chain(
+                self.removed
+                    .iter()
+                    .map(|action| format!("removes {action} from {role}")),
+            )
+            .collect()
+    }
 }
 
 impl SchemaDiff {
@@ -71,6 +110,40 @@ fn parent_names(kind: &KindSchema) -> BTreeSet<&str> {
     kind.parents.iter().map(String::as_str).collect()
 }
 
+fn role_names(kind: &KindSchema) -> BTreeSet<&str> {
+    kind.roles.keys().map(Relation::as_str).collect()
+}
+
+/// Each role `was` and `now` both name whose actions differ.
+fn roles_changed(name: &str, was: &KindSchema, now: &KindSchema) -> Vec<RoleChange> {
+    let names = |actions: &BTreeSet<Action>| -> BTreeSet<&str> {
+        actions.iter().map(Action::as_str).collect()
+    };
+    was.roles
+        .iter()
+        .filter_map(|(role, before)| {
+            let after = now.roles.get(role)?;
+            let (before, after) = (names(before), names(after));
+            let added: Vec<String> = after
+                .difference(&before)
+                .map(|action| (*action).to_owned())
+                .collect();
+            let removed: Vec<String> = before
+                .difference(&after)
+                .map(|action| (*action).to_owned())
+                .collect();
+            (!added.is_empty() || !removed.is_empty()).then(|| RoleChange {
+                role: Named {
+                    kind: name.to_owned(),
+                    name: role.to_string(),
+                },
+                added,
+                removed,
+            })
+        })
+        .collect()
+}
+
 /// What changing `old` to `new` adds and removes, each list in name order.
 pub fn diff(old: &AppSchema, new: &AppSchema) -> SchemaDiff {
     let mut change = SchemaDiff::default();
@@ -98,6 +171,10 @@ pub fn diff(old: &AppSchema, new: &AppSchema) -> SchemaDiff {
         let (added, removed) = both_ways(name, &parent_names(was), &parent_names(now));
         change.parents_added.extend(added);
         change.parents_removed.extend(removed);
+        let (added, removed) = both_ways(name, &role_names(was), &role_names(now));
+        change.roles_added.extend(added);
+        change.roles_removed.extend(removed);
+        change.roles_changed.extend(roles_changed(name, was, now));
     }
     change
 }
@@ -122,11 +199,15 @@ pub struct Standing<'a> {
     /// Whether it is held by draft or by two, so a change making one of its
     /// actions hot strands it (ACCESS-001 R2).
     pub held: bool,
+    /// Whether its relation names a role of its kind, so a change removing
+    /// or narrowing that role strands it (ACCESS-004 R1).
+    pub role: bool,
 }
 
 /// The standing grants of `old`'s app that changing to `new` would strand,
 /// counted by the kind and relation they are held under: one whose relation
-/// or actions go, and one held by draft or by two whose action becomes hot.
+/// or actions go, one held by draft or by two whose action becomes hot, and
+/// one naming a role the change removes or narrows.
 pub fn stranded<'a>(
     old: &AppSchema,
     new: &AppSchema,
@@ -138,7 +219,12 @@ pub fn stranded<'a>(
             continue;
         }
         let strands = new.kind(grant.kind).is_none_or(|kind| {
-            !kind.relations.contains_key(grant.relation)
+            let named = if grant.role {
+                narrowed(old, kind, grant)
+            } else {
+                !kind.relations.contains_key(grant.relation)
+            };
+            named
                 || !grant.actions.is_subset(&kind.actions)
                 || (grant.held && grant.actions.iter().any(|action| kind.is_hot(action)))
         });
@@ -151,4 +237,14 @@ pub fn stranded<'a>(
         }
     }
     counted
+}
+
+/// Whether `kind` of the new schema drops or narrows the role `grant` names,
+/// against what `old` gave that role.
+fn narrowed(old: &AppSchema, kind: &KindSchema, grant: Standing<'_>) -> bool {
+    let Some(now) = kind.role(grant.relation) else {
+        return true;
+    };
+    old.role(grant.kind, grant.relation)
+        .is_some_and(|was| !was.is_subset(now))
 }

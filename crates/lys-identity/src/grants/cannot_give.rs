@@ -241,7 +241,7 @@ pub fn cannot_give(
             .held_by(source.holder())
             .map(GrantRecord::grant)
             .filter(|grant| grant.resource() == source.resource())
-            .any(|grant| actions.is_subset(grant.actions()));
+            .any(|grant| actions.is_subset(model.actions_of(grant)));
         if !covered {
             list.push(CannotGiveItem {
                 subject: CannotGiveSubject::Relation(relation.clone()),

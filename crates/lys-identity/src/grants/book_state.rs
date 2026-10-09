@@ -91,6 +91,15 @@ pub(crate) fn holds_a_held_mode(book: &GrantBook) -> bool {
         .any(|record| record.grant.mode().is_held())
 }
 
+/// Whether any grant in `book` names a role, so its state is written at
+/// version 5 (ACCESS-004 R1). Read from the map itself, as
+/// [`holds_a_held_mode`] is.
+pub(crate) fn holds_a_role(book: &GrantBook) -> bool {
+    book.records
+        .values()
+        .any(|record| record.grant.names_role())
+}
+
 pub(crate) fn encode(book: &GrantBook) -> Result<Value, Unreadable> {
     let refused = book
         .refused

@@ -14,24 +14,34 @@ use crate::state_value::{
 /// a held mode, its key 14 (ACCESS-001 R1), so a reader older than the mode
 /// refuses it by its version and not at the grant. A state is written at the
 /// version its content needs, as an event is: a book of outright grants is
-/// still version 3, byte for byte.
-const STATE_VERSION: u64 = 4;
+/// still version 3, byte for byte. Version 5 holds a grant naming a role, its
+/// key 15 (ACCESS-004 R1), refused the same way by a reader older than roles.
+const STATE_VERSION: u64 = 5;
+/// The state version a held mode needs.
+const HELD_MODE_VERSION: u64 = 4;
 /// The earliest state version read: a version 3 state is a version 4 state
-/// whose grants are all outright.
+/// whose grants are all outright, and a version 4 state a version 5 state
+/// whose grants name no role.
 const STATE_READ_FROM: u64 = 3;
 
 /// The state of `book`, the fold of the first `folded` leaves, or why a
 /// refusal it keeps has no stable form.
 pub(crate) fn encode(book: &GrantBook, folded: u64) -> Result<Vec<u8>, Unreadable> {
-    let held = state::holds_a_held_mode(book);
+    let version = if state::holds_a_role(book) {
+        STATE_VERSION
+    } else if state::holds_a_held_mode(book) {
+        HELD_MODE_VERSION
+    } else {
+        STATE_READ_FROM
+    };
     encode_value(&array(vec![
-        uint(if held { STATE_VERSION } else { STATE_READ_FROM }),
+        uint(version),
         uint(folded),
         state::encode(book)?,
     ]))
 }
 
-/// The book a state holds, refused unless it is version 3 or 4 and the fold
+/// The book a state holds, refused unless it is version 3 to 5 and the fold
 /// of exactly `size` leaves.
 pub(crate) fn decode(bytes: &[u8], size: u64) -> Result<GrantBook, Unreadable> {
     let [version, folded, book] = tuple::<3>(decode_value(bytes)?, "a grant state")?;

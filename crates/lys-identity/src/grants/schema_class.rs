@@ -6,7 +6,8 @@
 //! live. So a schema written before the class existed has every action
 //! deliberate, and its JSON is written as it was read: `hot` only when a kind
 //! names one. A hot action is one its kind declares, named once. A grant held
-//! by draft or by two never applies to a hot action.
+//! by draft or by two never applies to a hot action. Roles are written the
+//! same way: `roles` only when a kind names one (ACCESS-004 R1).
 
 use std::collections::BTreeSet;
 
@@ -52,12 +53,14 @@ impl KindSchema {
 }
 
 impl AppSchema {
-    /// The first hot action, in name order, that `relation` of `kind` carries:
-    /// a grant held by draft or by two under it is refused.
+    /// The first hot action, in name order, that `relation` of `kind` carries,
+    /// or the role of that name (ACCESS-004 R1): a grant held by draft or by
+    /// two under it is refused.
     pub fn hot_action(&self, kind: &str, relation: &Relation) -> Option<&Action> {
         let kind = self.kind(kind)?;
         kind.relations
-            .get(relation)?
+            .get(relation)
+            .or_else(|| kind.roles.get(relation))?
             .iter()
             .find(|action| kind.is_hot(action))
     }
@@ -88,6 +91,9 @@ impl AppSchema {
                 });
                 if !kind.hot.is_empty() {
                     body["hot"] = json!(names(&kind.hot));
+                }
+                if !kind.roles.is_empty() {
+                    body["roles"] = super::roles::to_json(&kind.roles);
                 }
                 (name.clone(), body)
             })

@@ -233,8 +233,16 @@ pub fn judge_root(
     {
         refuse_withheld(&request.relation, kind, onward)?;
     }
-    let actions = model.actions_on(kind, &request.relation)?.clone();
-    Grant::new(GrantParts {
+    // A relation the kind does not hold may be one of its roles (ACCESS-004
+    // R1): the grant then names the role, and is judged as its actions.
+    let (actions, role) = match model.actions_on(kind, &request.relation) {
+        Ok(actions) => (actions.clone(), false),
+        Err(unknown) => match model.role_on(kind, &request.relation) {
+            Some(actions) => (actions.clone(), true),
+            None => return Err(unknown),
+        },
+    };
+    let grant = Grant::new(GrantParts {
         id,
         issuer: request.caller,
         holder: IdentityId::Person(request.holder),
@@ -247,7 +255,8 @@ pub fn judge_root(
         window: request.window,
         model_version: model.version_on(kind),
         operation: request.operation,
-    })
+    })?;
+    Ok(if role { grant.as_role() } else { grant })
 }
 
 /// Refuse, by name, `relation` when any of `actions` on an object of `kind`

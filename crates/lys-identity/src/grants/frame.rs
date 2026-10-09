@@ -160,7 +160,10 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         let mut refusal = None;
         let candidates = self.book.on_resource(&request.resource).filter(|record| {
             record.grant().holder() == request.caller
-                && record.grant().actions().contains(&request.action)
+                && self
+                    .model
+                    .actions_of(record.grant())
+                    .contains(&request.action)
                 && only.is_none_or(|grant| record.grant().id() == grant)
         });
         for record in candidates {
@@ -185,8 +188,13 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                         grant: grant.id(),
                         path: lineage.path,
                         root_person: lineage.root_person,
-                        actions: grant.actions().clone(),
-                        model_version: grant.parts().model_version,
+                        actions: self.model.actions_of(grant).clone(),
+                        // A role is judged under the version current now.
+                        model_version: if grant.names_role() {
+                            self.model.version_on(grant.resource().kind())
+                        } else {
+                            grant.parts().model_version
+                        },
                         revision: frame.projected,
                         use_event: None,
                     });
