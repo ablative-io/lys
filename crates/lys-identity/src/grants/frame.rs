@@ -133,26 +133,36 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         directory: &'d Projection,
         at_least: Option<u64>,
     ) -> Result<Frame<'d>, GrantError> {
-        let settled = self.settle(at_least)?;
+        if let Err(error) = self.settle_log() {
+            tracing::warn!(step = "reconcile", error = %error, "grant log settlement refused");
+            // A reading for many decisions (reach, who, a batch) names the
+            // revocation the log could not record, with its operation, before
+            // the log's own refusal, which the line above keeps. A single
+            // decision answers the log's refusal ([`Grants::settle`]).
+            return Err(match self.unresolved_revocation() {
+                Some((operation, grant)) => GrantError::OperationUnresolved {
+                    operation: operation.to_string(),
+                    grant: grant.to_string(),
+                },
+                None => error,
+            });
+        }
+        let settled = self.settled(at_least)?;
         Frame::read(self, directory, settled)
     }
 
     /// Settle the log and project the relationships, refusing a projection
     /// older than `at_least`, and name the revocation held unresolved.
     pub(super) fn settle(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
-        if let Err(error) = self.settle_log() {
+        self.settle_log().inspect_err(|error| {
             tracing::warn!(step = "reconcile", error = %error, "grant log settlement refused");
-            // A revocation the log could not record is what the reading is
-            // uncertain about: it is named, with its operation, before the
-            // log's own refusal, which the line above keeps.
-            if let Some((operation, grant)) = self.unresolved_revocation() {
-                return Err(GrantError::OperationUnresolved {
-                    operation: operation.to_string(),
-                    grant: grant.to_string(),
-                });
-            }
-            return Err(error);
-        }
+        })?;
+        self.settled(at_least)
+    }
+
+    /// Project the settled log's relationships, refusing a projection older
+    /// than `at_least`, and name the revocation held unresolved.
+    fn settled(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
         let reading = self.project_reading()?;
         let projected = reading.revision;
         if let Some(required) = at_least
