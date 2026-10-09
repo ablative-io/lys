@@ -202,5 +202,13 @@ fn a_held_mode_survives_the_snapshot() -> Result<(), Box<dyn Error>> {
         .grant(GrantId::from_bytes([9; 16]))
         .ok_or("the snapshot keeps the grant")?;
     assert_eq!(kept.mode(), crate::grants::Mode::ByTwo);
+    // The whole state names version 4 for it, and reopens to the same book.
+    let state = crate::grants::state::encode(&book, 1)?;
+    let ciborium::Value::Array(members) = ciborium::from_reader(state.as_slice())? else {
+        return Err("a grant state is an array".into());
+    };
+    assert_eq!(members.first(), Some(&ciborium::Value::from(4_u64)));
+    let reopened = crate::grants::state::decode(&state, 1)?;
+    assert_eq!(reopened, book);
     Ok(())
 }

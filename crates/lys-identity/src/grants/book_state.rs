@@ -82,6 +82,15 @@ fn read_record(value: Value) -> Result<GrantRecord, Unreadable> {
 }
 
 /// The book as a state value, or why a refusal it keeps has no stable form.
+/// Whether any grant in `book` is held by draft or by two, so its state is
+/// written at version 4. Read from the map itself, not through
+/// [`GrantBook::records`], so a snapshot is not counted as a record visit.
+pub(crate) fn holds_a_held_mode(book: &GrantBook) -> bool {
+    book.records
+        .values()
+        .any(|record| record.grant.mode().is_held())
+}
+
 pub(crate) fn encode(book: &GrantBook) -> Result<Value, Unreadable> {
     let refused = book
         .refused
