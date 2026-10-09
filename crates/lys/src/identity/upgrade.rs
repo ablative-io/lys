@@ -492,7 +492,14 @@ pub fn upgrade(
     ))
 }
 
-/// Runs `lys identity upgrade`.
+/// Reads deployment configuration and verifies the live issuer authority.
+pub(super) fn verified_config(layout: &Layout) -> IdentityResult<DeploymentConfig> {
+    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
+    install::directory_key::verify(&config)?;
+    Ok(config)
+}
+
+/// Runs `lys identity upgrade` after checking the live issuer authority.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let layout = match &options.root {
         Some(root) => Layout::at(root.clone()),
@@ -502,7 +509,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     emitter.field("root", "root", layout.root.display().to_string());
     let units = units(&layout)?;
     require_install(&layout)?;
-    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
+    let config = verified_config(&layout)?;
     install::server_keys(&layout, &config)?;
     let templates = render::Templates {
         messages: options

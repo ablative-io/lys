@@ -134,7 +134,7 @@ fn deployment(root: &std::path::Path, api: &str, token: &[u8]) -> TestResult<Dep
     let text = include_str!("../../../../../deploy/identity/config.example.toml");
     let mut config = DeploymentConfig::parse(text, root.to_path_buf())?;
     config.issuer.admin_url = api.to_owned();
-    private_files::write(&config.state_dir().join(API_KEY_SECRET.file), &vec![b'A'; 64])?;
+    private_files::write(&config.state_dir().join(API_KEY_SECRET.file), &[b'A'; 64])?;
     private_files::write(&config.state_dir().join(server_config::PROVIDERS_KEY_FILE), token)?;
     Ok(config)
 }
@@ -167,7 +167,9 @@ fn upgrade_preflight_checks_live_rights_and_never_mutates_a_key() -> TestResult 
         let (url, handle) = fake_keys_with_configure(Some(directory), OnUpdate::Store, false, Some(configure))?;
         let config = deployment(root.path(), &url, token)?;
         let layout = crate::identity::install::layout::Layout::at(root.path().to_path_buf());
-        std::fs::write(layout.deployment_config(), toml::to_string(&config)?)?;
+        let text = include_str!("../../../../../deploy/identity/config.example.toml")
+            .replace("admin_url = \"http://127.0.0.1:8480\"", &format!("admin_url = \"{url}\""));
+        std::fs::write(layout.deployment_config(), text)?;
         let before = std::fs::read(layout.deployment_config())?;
         let outcome = crate::identity::upgrade::verified_config(&layout);
         let (seen, bodies) = stop(&url, handle)?;
