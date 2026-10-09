@@ -61,10 +61,10 @@ async fn runner_pulls_approved_drafts_and_records_once_after_receipt_retry()
         let digest = lys_pass::drafts::request_digest("prepared");
         let mut requests = Vec::new();
         for path in [
-            "/drafts?app=sample&state=approved",
-            "/drafts/draft/executed",
-            "/drafts?app=sample&state=approved",
-            "/drafts/draft/executed",
+            "/product-drafts?app=sample&state=approved",
+            "/product-drafts/draft/executed",
+            "/product-drafts?app=sample&state=approved",
+            "/product-drafts/draft/executed",
         ] {
             let (mut socket, _) = listener.accept().await?;
             let mut bytes = Vec::new();

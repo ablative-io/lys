@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{Client, Error, Refusal, Target};
+use crate::{Client, Error, Target};
 
 /// A held act, whose words are immutable bytes rather than reserialized JSON.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,8 +74,10 @@ pub enum Execution {
     RefusedOnExecution {
         /// The exact request that was refused.
         request_digest: String,
-        /// The shared permission refusal.
-        refusal: Refusal,
+        /// The product's own name for the refusal.
+        refusal: String,
+        /// The product's words for why.
+        reason: String,
     },
 }
 
@@ -275,7 +277,7 @@ impl Client {
         }
         let response = self
             .http
-            .post(self.endpoint("drafts")?)
+            .post(self.endpoint("product-drafts")?)
             .bearer_auth(pass)
             .json(draft)
             .send()
@@ -303,7 +305,7 @@ impl Client {
         if connector_pass.is_empty() || app.is_empty() {
             return Err(Error::Invalid("draft connector or app is missing"));
         }
-        let mut url = self.endpoint("drafts")?;
+        let mut url = self.endpoint("product-drafts")?;
         url.query_pairs_mut()
             .append_pair("app", app)
             .append_pair("state", "approved");
@@ -364,7 +366,7 @@ impl Client {
         if draft.id.is_empty() {
             return Err(Error::Invalid("draft id is missing"));
         }
-        let mut url = self.endpoint("drafts/")?;
+        let mut url = self.endpoint("product-drafts/")?;
         url.path_segments_mut()
             .map_err(|()| Error::Invalid("issuer cannot hold draft paths"))?
             .pop_if_empty()
@@ -379,7 +381,16 @@ impl Client {
                 }
                 serde_json::json!({ "receipt_digest": receipt_digest })
             }
-            Execution::RefusedOnExecution { refusal, .. } => serde_json::to_value(refusal)?,
+            Execution::RefusedOnExecution {
+                refusal, reason, ..
+            } => {
+                if refusal.is_empty() || reason.is_empty() {
+                    return Err(Error::Invalid(
+                        "execution refusal needs a name and a reason",
+                    ));
+                }
+                serde_json::json!({ "refusal": refusal, "reason": reason })
+            }
         };
         self.http
             .post(url)
