@@ -79,7 +79,8 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<String, ServerError> {
-        self.begin_provider_to(oidc, provider, address, browser, None).await
+        self.begin_provider_to(oidc, provider, address, browser, None)
+            .await
     }
 
     async fn begin_provider_to(
@@ -95,7 +96,14 @@ impl IssuerSignIn {
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;
         match self
-            .start_upstream(&begun, provider, address, state.clone(), browser, continuation)
+            .start_upstream(
+                &begun,
+                provider,
+                address,
+                state.clone(),
+                browser,
+                continuation,
+            )
             .await
         {
             Ok(location) => Ok(location),
@@ -267,34 +275,68 @@ fn callback_summary(body: &[u8]) -> String {
         return format!("body is not a JSON refusal ({} bytes)", body.len());
     };
     let error = match value.get("error").and_then(Value::as_str) {
-        Some(word @ ("BadRequest" | "Blocked" | "Connection" | "CSRFTokenError"
-            | "Database" | "DatabaseIo" | "Disabled" | "Encryption" | "Forbidden"
-            | "Internal" | "invalid_grant" | "invalid_target" | "JwtToken" | "JoseError"
-            | "MfaRequired" | "NoSession" | "NotFound" | "PasswordExpired" | "PasswordRefresh"
-            | "PreconditionRequired" | "Scim" | "SessionExpired" | "SessionTimeout"
-            | "Timeout" | "Unauthorized" | "NotAccepted")) => word,
+        Some(
+            word @ ("BadRequest"
+            | "Blocked"
+            | "Connection"
+            | "CSRFTokenError"
+            | "Database"
+            | "DatabaseIo"
+            | "Disabled"
+            | "Encryption"
+            | "Forbidden"
+            | "Internal"
+            | "invalid_grant"
+            | "invalid_target"
+            | "JwtToken"
+            | "JoseError"
+            | "MfaRequired"
+            | "NoSession"
+            | "NotFound"
+            | "PasswordExpired"
+            | "PasswordRefresh"
+            | "PreconditionRequired"
+            | "Scim"
+            | "SessionExpired"
+            | "SessionTimeout"
+            | "Timeout"
+            | "Unauthorized"
+            | "NotAccepted"),
+        ) => word,
         _ => "unrecognized",
     };
     let message = match value.get("message").and_then(Value::as_str) {
-        Some(text) if text.starts_with("User with email '")
-            && text.ends_with("' already exists but is not linked to this provider.") => {
-                "existing account is not linked to this provider"
-            }
-        Some(text @ ("User not found" | "Invalid value for the Upstream User ID"
-            | "Cannot find any user id in the response" | "bad provider_id in link cookie"
-            | "bad user_id in link cookie" | "Invalid E-Mail"
+        Some(text)
+            if text.starts_with("User with email '")
+                && text.ends_with("' already exists but is not linked to this provider.") =>
+        {
+            "existing account is not linked to this provider"
+        }
+        Some(
+            text @ ("User not found"
+            | "Invalid value for the Upstream User ID"
+            | "Cannot find any user id in the response"
+            | "bad provider_id in link cookie"
+            | "bad user_id in link cookie"
+            | "Invalid E-Mail"
             | "No `email` in ID token claims. This is a mandatory claim"
             | "Callback Code not found - timeout reached?"
-            | "Neither `access_token` nor `id_token` existed")) => text,
-        Some(text) if text.starts_with("HTTP ")
-            && text.contains(" during POST ")
-            && text.contains(" for upstream auth provider '") => {
-                "upstream token endpoint refused"
-            }
+            | "Neither `access_token` nor `id_token` existed"),
+        ) => text,
+        Some(text)
+            if text.starts_with("HTTP ")
+                && text.contains(" during POST ")
+                && text.contains(" for upstream auth provider '") =>
+        {
+            "upstream token endpoint refused"
+        }
         Some(_) => "unrecognized message redacted",
         None => "no string message",
     };
-    format!("body error={error}; message={message} ({} bytes)", body.len())
+    format!(
+        "body error={error}; message={message} ({} bytes)",
+        body.len()
+    )
 }
 
 /// A callback refusal keeps its status even when its body cannot be read.
@@ -406,7 +448,12 @@ async fn start(
     asked: Result<Query<Continue>, axum::extract::rejection::QueryRejection>,
 ) -> Response {
     let target = asked
-        .map_err(|error| failed(format!("the provider continuation is malformed: {}", error.body_text())))
+        .map_err(|error| {
+            failed(format!(
+                "the provider continuation is malformed: {}",
+                error.body_text()
+            ))
+        })
         .and_then(|Query(asked)| continuation_target(asked.continuation));
     let target = match target {
         Ok(target) => target,
@@ -435,12 +482,18 @@ fn continuation_target(target: Option<String>) -> Result<Option<String>, ServerE
         return Ok(None);
     };
     if target.len() > 8192
-        || !["/oauth/authorize?", "/oauth/mcp/authorize?"].iter().any(|path| target.starts_with(path))
+        || !["/oauth/authorize?", "/oauth/mcp/authorize?"]
+            .iter()
+            .any(|path| target.starts_with(path))
         || !target.is_ascii()
-        || target.bytes().any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+        || target
+            .bytes()
+            .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
         || target.contains(['#', '\\'])
     {
-        return Err(failed("the provider continuation is not a bounded authorize request on this origin"));
+        return Err(failed(
+            "the provider continuation is not a bounded authorize request on this origin",
+        ));
     }
     Ok(Some(target))
 }
@@ -487,10 +540,13 @@ async fn callback(
             StatusCode::SEE_OTHER,
             [
                 (header::SET_COOKIE, cookie),
-                (header::LOCATION, match continuation {
-                    Some(target) => target,
-                    None => SIGNED_IN.to_owned(),
-                }),
+                (
+                    header::LOCATION,
+                    match continuation {
+                        Some(target) => target,
+                        None => SIGNED_IN.to_owned(),
+                    },
+                ),
             ],
         )
             .into_response(),
@@ -513,7 +569,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_existing_unlinked_account_keeps_the_status_and_safe_cause() -> Result<(), Box<dyn Error>> {
+    async fn an_existing_unlinked_account_keeps_the_status_and_safe_cause()
+    -> Result<(), Box<dyn Error>> {
         let body = serde_json::json!({
             "error": "Forbidden",
             "message": "User with email 'private-address' already exists but is not linked to this provider.",
@@ -524,7 +581,10 @@ mod tests {
         let words = error.to_string();
         assert!(words.contains("403"), "{words}");
         assert!(words.contains("Forbidden"), "{words}");
-        assert!(words.contains("existing account is not linked to this provider"), "{words}");
+        assert!(
+            words.contains("existing account is not linked to this provider"),
+            "{words}"
+        );
         assert!(!words.contains("private-address"), "{words}");
         assert!(!words.contains("private-token"), "{words}");
         Ok(())
@@ -550,7 +610,11 @@ mod tests {
     #[tokio::test]
     async fn each_callback_refusal_keeps_its_actual_status() -> Result<(), Box<dyn Error>> {
         for status in [400, 401, 403, 404, 409, 422] {
-            let error = callback_refusal(answer(status, r#"{"error":"Forbidden","message":"User not found"}"#.to_owned())?).await;
+            let error = callback_refusal(answer(
+                status,
+                r#"{"error":"Forbidden","message":"User not found"}"#.to_owned(),
+            )?)
+            .await;
             let words = error.to_string();
             assert_eq!(error.name(), "SignInFailed");
             assert!(words.contains(&status.to_string()), "{words}");
@@ -560,7 +624,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn oversized_callback_bodies_are_named_without_logging_their_bytes() -> Result<(), Box<dyn Error>> {
+    async fn oversized_callback_bodies_are_named_without_logging_their_bytes()
+    -> Result<(), Box<dyn Error>> {
         let error = callback_refusal(answer(403, "private-token".repeat(1024))?).await;
         let words = error.to_string();
         assert!(words.contains("403"), "{words}");
