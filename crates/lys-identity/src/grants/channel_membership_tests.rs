@@ -3,7 +3,7 @@ use std::error::Error;
 
 use super::{identity_kind, placed_within};
 use crate::grants::Resource;
-use crate::{AgentId, ConnectorId, IdentityId, PersonId, ServiceAccountId};
+use crate::{AgentId, ConnectorId, IdentityId, MachineId, PersonId, ServiceAccountId};
 
 fn placements(
     pairs: &[(&str, &str, &str, &str)],
@@ -37,6 +37,10 @@ fn each_identity_names_its_own_kind() {
     assert_eq!(
         identity_kind(&IdentityId::Connector(ConnectorId::from_bytes([4; 16]))),
         "connector"
+    );
+    assert_eq!(
+        identity_kind(&IdentityId::Machine(MachineId::from_bytes([5; 16]))),
+        "machine"
     );
 }
 

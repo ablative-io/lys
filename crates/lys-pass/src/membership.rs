@@ -53,8 +53,8 @@ pub struct GrantLog {
 pub struct Subject {
     /// The directory identity id, as verified by the product.
     pub id: String,
-    /// The identity's kind: `person`, `agent`, `service_account` or
-    /// `connector`. An AI is asked about as its own agent identity, never
+    /// The identity's kind: `person`, `agent`, `service_account`,
+    /// `connector` or `machine`. An AI is asked about as its own agent identity, never
     /// as its responsible person.
     pub kind: String,
 }
