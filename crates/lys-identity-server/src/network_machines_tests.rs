@@ -83,8 +83,7 @@ fn a_later_join_of_the_same_computer_replaces_the_earlier_machine() -> Result<()
 }
 
 #[test]
-fn a_kept_file_naming_one_machine_twice_or_a_malformed_one_is_refused() -> Result<(), Box<dyn Error>>
-{
+fn a_kept_file_naming_one_machine_twice_or_a_malformed_one_is_refused() {
     let twice = kept(&json!([
         used("op-one", "ward", 10, Some(FIRST)),
         used("op-two", "desk", 20, Some(FIRST)),
@@ -92,7 +91,6 @@ fn a_kept_file_naming_one_machine_twice_or_a_malformed_one_is_refused() -> Resul
     assert!(twice.is_err(), "one machine for two joins");
     let malformed = kept(&json!([used("op-one", "ward", 10, Some("agent-00"))]));
     assert!(malformed.is_err(), "a machine identity that is not one");
-    Ok(())
 }
 
 #[test]

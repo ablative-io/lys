@@ -112,7 +112,7 @@ fn every_changed_owned_input_is_refused_and_the_real_witness_verifies() -> TestR
     let mut case = claimed.clone();
     case.tail_len = 1;
     effects.push(case);
-    let mut case = claimed.clone();
+    let mut case = claimed;
     case.lineage.pop();
     effects.push(case);
     for case in &effects {

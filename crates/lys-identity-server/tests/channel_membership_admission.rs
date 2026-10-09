@@ -80,11 +80,11 @@ async fn one_admission_reads_the_same_entries_at_every_roster_size() -> TestResu
         roster(&world, added, size - added).await?;
         added = size;
         let before = world.counts().await?;
-        let flushes = lys_log_store::process_flush_count();
+        let flush_mark = lys_log_store::process_flush_count();
         let reads = lys_log_store::process_read_count();
         let admitted = world.ask("/admission", &request).await?;
         let read = lys_log_store::process_read_count() - reads;
-        let flushed = lys_log_store::process_flush_count() - flushes;
+        let flushed = lys_log_store::process_flush_count() - flush_mark;
         assert_eq!(read, 0, "no leaf of the grant history is read");
         let after = world.counts().await?;
         assert_eq!(admitted["verdict"]["outcome"], "allowed", "{admitted}");

@@ -129,7 +129,7 @@ pub async fn bind(
     let holder = identity_id(&request.sub)?;
     let log: GrantLog = served_log(&state)?;
     let at = now();
-    let (revision, dependencies) = with_grants(&state, |mut judged| {
+    let (revision, dependencies) = with_grants(&state, |judged| {
         // Settled and projected through the revision taken, or refused.
         let frame = judged.grants.frame(judged.directory, None)?;
         if let Some(degraded) = frame.degradation() {

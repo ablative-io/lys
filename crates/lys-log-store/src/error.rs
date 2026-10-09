@@ -434,10 +434,14 @@ pub enum StoreError {
     /// A lock this store's state sits behind was poisoned by a panic while
     /// held, so what it guards may be half changed; it is refused, never read
     /// past. Reopen the log.
-    #[error("refusing: the {what} lock was poisoned by a panic while held; reopen the log")]
+    #[error(
+        "refusing: the {what} lock was poisoned by a panic while held ({reason}); reopen the log"
+    )]
     LockPoisoned {
         /// The state the poisoned lock guards.
         what: &'static str,
+        /// The poison's own words.
+        reason: String,
     },
 }
 

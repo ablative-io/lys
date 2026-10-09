@@ -46,7 +46,8 @@ pub const STREAM_BEHIND: &str = "grant_stream_behind_required_revision";
 pub const DEPENDENCY_REVOKED: &str = "grant_dependency_revoked";
 
 /// A frame or an admission refused by name. A refused frame withdraws readiness.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{name}: {reason}")]
 pub struct StreamRefusal {
     /// The stable name.
     pub name: &'static str,

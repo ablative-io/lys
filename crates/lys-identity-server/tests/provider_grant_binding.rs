@@ -158,7 +158,7 @@ async fn bound(
     Ok((pass, verified))
 }
 
-/// d089_r2_binding_and_dependency_counts: two independent grants, one
+/// `d089_r2_binding_and_dependency_counts`: two independent grants, one
 /// binding at a coherent revision; revoking one denies exactly its right,
 /// the other stays admitted; a refresh carries no revoked dependency; a
 /// binding moved to another pass or log is refused by name.
@@ -269,7 +269,7 @@ async fn a_binding_maps_each_right_to_its_ancestry_and_one_revoke_denies_one() -
         &log,
     );
     assert_eq!(
-        moved.map_err(|error| error.name().to_owned()),
+        moved.map(drop).map_err(|error| error.name().to_owned()),
         Err(BINDING_MISMATCH.to_owned())
     );
     let foreign = GrantLog {
@@ -285,13 +285,13 @@ async fn a_binding_maps_each_right_to_its_ancestry_and_one_revoke_denies_one() -
         &foreign,
     );
     assert_eq!(
-        elsewhere.map_err(|error| error.name().to_owned()),
+        elsewhere.map(drop).map_err(|error| error.name().to_owned()),
         Err(BINDING_LOG_MISMATCH.to_owned())
     );
     Ok(())
 }
 
-/// d089_r2_compatibility_and_refusal_counts: not asked for, no binding is
+/// `d089_r2_compatibility_and_refusal_counts`: not asked for, no binding is
 /// answered and the pass verifies as before; an unknown binding version is
 /// refused by name before the code is spent.
 #[tokio::test]

@@ -116,9 +116,9 @@ fn role_names(kind: &KindSchema) -> BTreeSet<&str> {
 
 /// Each role `was` and `now` both name whose actions differ.
 fn roles_changed(name: &str, was: &KindSchema, now: &KindSchema) -> Vec<RoleChange> {
-    let names = |actions: &BTreeSet<Action>| -> BTreeSet<&str> {
+    fn names(actions: &BTreeSet<Action>) -> BTreeSet<&str> {
         actions.iter().map(Action::as_str).collect()
-    };
+    }
     was.roles
         .iter()
         .filter_map(|(role, before)| {

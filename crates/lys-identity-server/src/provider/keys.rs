@@ -61,7 +61,9 @@ struct Retired {
     kid: String,
     /// The public key, base64url, as the key set publishes it.
     x: String,
-    retired_at: u64,
+    /// When it stopped signing.
+    #[serde(rename = "retired_at")]
+    at: u64,
 }
 
 /// The administrator's rotation of the signing key.
@@ -171,6 +173,7 @@ impl SigningKeys {
     }
 
     /// The current key's id.
+    #[cfg(test)]
     pub(super) fn kid(&self) -> &str {
         &self.kid
     }
@@ -201,7 +204,7 @@ impl SigningKeys {
             .enumerate()
             .filter_map(move |(index, retired)| {
                 let earlier = self.retired.get(..index).unwrap_or_default();
-                let fresh = retired.retired_at.saturating_add(window) > at
+                let fresh = retired.at.saturating_add(window) > at
                     && retired.kid != self.kid
                     && !earlier.iter().any(|before| before.kid == retired.kid);
                 fresh.then_some(retired)
@@ -260,13 +263,13 @@ impl SigningKeys {
         let mut retired: Vec<Retired> = self
             .retired
             .iter()
-            .filter(|retired| retired.retired_at.saturating_add(window) > at)
+            .filter(|retired| retired.at.saturating_add(window) > at)
             .cloned()
             .collect();
         retired.push(Retired {
             kid: self.kid.clone(),
             x: URL_SAFE_NO_PAD.encode(self.current.public_key_bytes()),
-            retired_at: at,
+            at,
         });
         let table = Table {
             format: FORMAT.to_owned(),

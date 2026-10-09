@@ -68,11 +68,11 @@ async fn measured(
     body: &Value,
 ) -> Result<(Value, Work), Box<dyn std::error::Error>> {
     let before = world.counts().await?;
-    let flushes = lys_log_store::process_flush_count();
+    let flush_mark = lys_log_store::process_flush_count();
     let reads = lys_log_store::process_read_count();
     let answer = world.ask(path, body).await?;
     let read = lys_log_store::process_read_count() - reads;
-    let flushed = lys_log_store::process_flush_count() - flushes;
+    let flushed = lys_log_store::process_flush_count() - flush_mark;
     let after = world.counts().await?;
     assert_eq!(
         flushed, 0,
@@ -219,7 +219,11 @@ async fn a_revocation_reaches_only_the_revoked_subject() -> TestResult {
     let mut page = world.recipients("ward", "ward-a", 8, &Value::Null);
     page["at_least"] = revoked["receipt"]["revision"].clone();
     let (answer, work) = measured(&world, "/recipients", &page).await?;
-    assert_eq!(ids(&answer, "subject"), [ada.clone()], "{answer}");
+    assert_eq!(
+        ids(&answer, "subject"),
+        std::slice::from_ref(&ada),
+        "{answer}"
+    );
     assert!(!answer.to_string().contains(&bea), "{answer}");
     assert_eq!(count(&work, "rows_emitted"), Some(1), "{work:?}");
     assert_eq!(count(&work, "rows_skipped"), Some(0), "{work:?}");

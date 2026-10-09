@@ -635,7 +635,7 @@ async fn a_runner_that_comes_up_after_the_service_is_followed_from_the_first_req
             drop(said.send(line.to_owned()));
         }
     });
-    let (service, named) = Service::start_saying(
+    let (service, named) = Box::pin(Service::start_saying(
         GRANT_MODEL,
         None,
         None,
@@ -643,7 +643,7 @@ async fn a_runner_that_comes_up_after_the_service_is_followed_from_the_first_req
         |config| config.proxy_dir = Some(config.log_dir.with_file_name("proxy")),
         Some(say),
         named,
-    )
+    ))
     .await?;
     let ended = ends.recv().await.ok_or("the follow's end was not said")?;
     assert!(
@@ -849,7 +849,7 @@ async fn a_peer_that_leaves_before_its_greeting_does_not_end_the_staying_runner(
 #[tokio::test]
 async fn a_service_that_stops_closes_the_grant_channel_it_holds_to_a_runner_still_there()
 -> TestResult {
-    let (mut service, named) = Service::start_saying(
+    let (mut service, named) = Box::pin(Service::start_saying(
         GRANT_MODEL,
         None,
         None,
@@ -857,7 +857,7 @@ async fn a_service_that_stops_closes_the_grant_channel_it_holds_to_a_runner_stil
         |config| config.proxy_dir = Some(config.log_dir.with_file_name("proxy")),
         None,
         named,
-    )
+    ))
     .await?;
     let cookie = service
         .sign_in(Login {

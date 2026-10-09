@@ -124,7 +124,7 @@ pub async fn reset(
         grants.ledger().start()
     ));
     let revision = grants.revision();
-    slot.insert(grants);
+    *slot = Some(grants);
     state.grant_setup.changes.published(revision);
     Ok(Json(ResetAnswer {
         discarded,

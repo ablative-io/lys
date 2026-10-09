@@ -57,19 +57,19 @@ fn leaf(body: &[u8], key: &Ed25519Identity) -> Vec<u8> {
 #[test]
 fn a_draft_names_its_resource_id_as_the_product_names_it() {
     let stream = "mHyUs0FppSFqSzfT5kjBzZk23asX6tgScUEKNwJawq0";
-    let decoded = super::decode(&created_on("team", stream, "write")).unwrap();
-    let super::DraftEvent::Created(event) = decoded else {
+    let decoded = crate::draft_event::decode(&created_on("team", stream, "write")).unwrap();
+    let crate::draft_event::DraftEvent::Created(event) = decoded else {
         panic!("a created draft decodes as created");
     };
     assert_eq!(event.target.id, stream);
     for bad in ["a/b", "a:b", "a=b", "a+b", "a b"] {
         assert!(
-            super::decode(&created_on("team", bad, "write")).is_err(),
+            crate::draft_event::decode(&created_on("team", bad, "write")).is_err(),
             "{bad:?}"
         );
     }
-    assert!(super::decode(&created_on("Team", "one", "write")).is_err());
-    assert!(super::decode(&created_on("team", "one", "Write")).is_err());
+    assert!(crate::draft_event::decode(&created_on("Team", "one", "write")).is_err());
+    assert!(crate::draft_event::decode(&created_on("team", "one", "Write")).is_err());
 }
 
 #[test]

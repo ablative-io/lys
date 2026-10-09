@@ -103,7 +103,7 @@ impl Error {
             Self::Truncated(_) => "rights_truncated",
             Self::Transport(_) | Self::CannotAsk(_) => "lys_could_not_be_asked",
             Self::Url(_) => "endpoint_refused",
-            Self::Binding { name, .. } => *name,
+            Self::Binding { name, .. } => name,
             Self::TokenRefused { name, .. } => name,
         }
     }

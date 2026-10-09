@@ -337,7 +337,7 @@ async fn only_the_administrator_and_the_owning_app_may_ask() -> TestResult {
 }
 
 /// ACCESS-006 R3: a page of the resources one subject may act on.
-fn resources_page(rooms: &Rooms, subject: (&str, &str), rows: u32, after: Value) -> Value {
+fn resources_page(rooms: &Rooms, subject: (&str, &str), rows: u32, after: &Value) -> Value {
     json!({
         "contract": 1,
         "log": rooms.log,
@@ -352,7 +352,7 @@ fn resources_page(rooms: &Rooms, subject: (&str, &str), rows: u32, after: Value)
 }
 
 /// ACCESS-006 R3: a page of the subjects who may act on one channel.
-fn recipients_page(rooms: &Rooms, channel: &str, rows: u32, after: Value) -> Value {
+fn recipients_page(rooms: &Rooms, channel: &str, rows: u32, after: &Value) -> Value {
     json!({
         "contract": 1,
         "log": rooms.log,
@@ -403,7 +403,7 @@ async fn resources_page_through_the_ward_and_skip_the_restricted_child() -> Test
     let first = page(
         &rooms,
         "resources",
-        &resources_page(&rooms, bea, 2, Value::Null),
+        &resources_page(&rooms, bea, 2, &Value::Null),
     )
     .await?;
     assert_eq!(first["outcome"]["outcome"], "page", "{first}");
@@ -414,7 +414,7 @@ async fn resources_page_through_the_ward_and_skip_the_restricted_child() -> Test
     let next = first["outcome"]["next"].clone();
     assert!(next.is_string(), "{first}");
 
-    let second = page(&rooms, "resources", &resources_page(&rooms, bea, 2, next)).await?;
+    let second = page(&rooms, "resources", &resources_page(&rooms, bea, 2, &next)).await?;
     assert_eq!(ids(&second, "resource"), ["ward-c"], "{second}");
     assert_eq!(
         second["outcome"]["skipped"], 1,
@@ -433,7 +433,7 @@ async fn a_revocation_between_pages_is_seen_by_the_next_page() -> TestResult {
     let first = page(
         &rooms,
         "resources",
-        &resources_page(&rooms, bea, 1, Value::Null),
+        &resources_page(&rooms, bea, 1, &Value::Null),
     )
     .await?;
     assert_eq!(ids(&first, "resource"), ["ward-a"]);
@@ -448,7 +448,7 @@ async fn a_revocation_between_pages_is_seen_by_the_next_page() -> TestResult {
         &revoke,
     )
     .await?)?;
-    let mut request = resources_page(&rooms, bea, 1, first["outcome"]["next"].clone());
+    let mut request = resources_page(&rooms, bea, 1, &first["outcome"]["next"]);
     request["at_least"] = revoked["receipt"]["revision"].clone();
     let after = page(&rooms, "resources", &request).await?;
     assert!(ids(&after, "resource").is_empty(), "{after}");
@@ -465,22 +465,22 @@ async fn a_cursor_is_bound_to_its_question() -> TestResult {
     let first = page(
         &rooms,
         "resources",
-        &resources_page(&rooms, bea, 1, Value::Null),
+        &resources_page(&rooms, bea, 1, &Value::Null),
     )
     .await?;
     let next = first["outcome"]["next"].clone();
     let ada = (rooms.ada.as_str(), "person");
     for (request, name) in [
         (
-            resources_page(&rooms, ada, 1, next.clone()),
+            resources_page(&rooms, ada, 1, &next),
             "membership_cursor_foreign",
         ),
         (
-            resources_page(&rooms, bea, 1, json!("not-a-cursor")),
+            resources_page(&rooms, bea, 1, &json!("not-a-cursor")),
             "membership_cursor_malformed",
         ),
         (
-            resources_page(&rooms, bea, 0, Value::Null),
+            resources_page(&rooms, bea, 0, &Value::Null),
             "membership_page_bound_invalid",
         ),
     ] {
@@ -491,14 +491,14 @@ async fn a_cursor_is_bound_to_its_question() -> TestResult {
     let substituted = page(
         &rooms,
         "recipients",
-        &recipients_page(&rooms, "ward-a", 1, next),
+        &recipients_page(&rooms, "ward-a", 1, &next),
     )
     .await?;
     assert_eq!(
         substituted["outcome"]["refusal"], "membership_cursor_foreign",
         "{substituted}"
     );
-    let mut tiny = resources_page(&rooms, bea, 1, Value::Null);
+    let mut tiny = resources_page(&rooms, bea, 1, &Value::Null);
     tiny["bounds"]["bytes"] = json!(1);
     let over = page(&rooms, "resources", &tiny).await?;
     assert_eq!(
@@ -525,7 +525,7 @@ async fn recipients_are_each_listed_once_whatever_their_chains() -> TestResult {
         let answer = page(
             &rooms,
             "recipients",
-            &recipients_page(&rooms, "ward-a", 1, after),
+            &recipients_page(&rooms, "ward-a", 1, &after),
         )
         .await?;
         pages += 1;
@@ -540,14 +540,14 @@ async fn recipients_are_each_listed_once_whatever_their_chains() -> TestResult {
     let restricted = page(
         &rooms,
         "recipients",
-        &recipients_page(&rooms, "ward-secret", 5, Value::Null),
+        &recipients_page(&rooms, "ward-secret", 5, &Value::Null),
     )
     .await?;
     assert!(ids(&restricted, "subject").is_empty(), "{restricted}");
     let outside = page(
         &rooms,
         "recipients",
-        &recipients_page(&rooms, "elsewhere-a", 5, Value::Null),
+        &recipients_page(&rooms, "elsewhere-a", 5, &Value::Null),
     )
     .await?;
     assert_eq!(
@@ -599,7 +599,7 @@ async fn one_channel_grant_admits_a_guest_and_nothing_wider() -> TestResult {
     let roster = page(
         &rooms,
         "resources",
-        &resources_page(&rooms, bea, 10, Value::Null),
+        &resources_page(&rooms, bea, 10, &Value::Null),
     )
     .await?;
     assert_eq!(

@@ -270,7 +270,7 @@ mod tests {
     use std::pin::pin;
     use std::task::{Context, Poll, Waker};
 
-    /// d089_r1_replay_live_race, signal half: the subscription is the owned
+    /// `d089_r1_replay_live_race`, signal half: the subscription is the owned
     /// installation signal and `published` the owned commit signal, placed
     /// exactly as the route places them (subscribe, then read the barrier
     /// under the hold; commit, then publish under the hold). A commit
@@ -279,7 +279,7 @@ mod tests {
     /// delivered twice, because the reread starts strictly after the cursor.
     /// No clock, sleep or timeout is used: each poll is one owned step.
     #[test]
-    fn a_commit_at_any_point_of_a_wait_is_seen_once() -> Result<(), Box<dyn std::error::Error>> {
+    fn a_commit_at_any_point_of_a_wait_is_seen_once() {
         let mut context = Context::from_waker(Waker::noop());
         // Revoke before open: committed and published at r+1 before the
         // subscription; the read under the hold already holds it, so the
@@ -330,7 +330,6 @@ mod tests {
             ));
         }
         assert_eq!(*after.borrow_and_update(), 5);
-        Ok(())
     }
 
     /// The published schema types and the wire types read the same JSON,

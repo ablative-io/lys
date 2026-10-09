@@ -1086,7 +1086,7 @@ mod tests {
                 sender
                     .send(Ok(message))
                     .await
-                    .map_err(|_| "qualification_fixture_output_ended".to_owned())?;
+                    .map_err(|error| format!("qualification_fixture_output_ended: {error}"))?;
             }
             drop(sender);
             Ok::<(), String>(())

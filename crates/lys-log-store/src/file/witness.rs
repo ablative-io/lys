@@ -55,7 +55,7 @@ impl FileTailProvider {
         Ok(self
             .reading
             .lock()
-            .map_err(|_| poisoned())?
+            .map_err(|error| poisoned(&error))?
             .as_ref()
             .map(Arc::clone))
     }
@@ -65,15 +65,16 @@ impl FileTailProvider {
             store: FileLeafStore::open_read_only(&self.dir)?,
             owner: Arc::new(()),
         });
-        *self.reading.lock().map_err(|_| poisoned())? = Some(Arc::clone(&fresh));
+        *self.reading.lock().map_err(|error| poisoned(&error))? = Some(Arc::clone(&fresh));
         Ok(fresh)
     }
 }
 
 /// The tail reading's lock was poisoned: refused by name, never read past.
-fn poisoned() -> StoreError {
+fn poisoned(error: &impl std::fmt::Display) -> StoreError {
     StoreError::LockPoisoned {
         what: "tail witness reading",
+        reason: error.to_string(),
     }
 }
 

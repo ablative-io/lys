@@ -2,7 +2,7 @@
 //!
 //! `POST /grants/membership` takes the shared [`MembershipRequest`] every
 //! product sends and answers the shared [`MembershipDecision`]: the types
-//! are lys-pass's, so the route, its OpenAPI schema and every product's
+//! are lys-pass's, so the route, its `OpenAPI` schema and every product's
 //! adapter have one owner. It is a question: nothing is recorded and no use
 //! is written. It is open to the administrator and to an app, through its
 //! credential, for its own kinds only, exactly as the batch check is.

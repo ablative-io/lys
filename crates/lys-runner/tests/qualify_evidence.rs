@@ -92,14 +92,14 @@ struct Staged {
 
 impl Staged {
     /// The run's one `END ` line.
-    fn end(&self) -> Result<&str, Box<dyn Error>> {
+    fn end(&self) -> &str {
         let lines: Vec<&str> = self
             .stdout
             .lines()
             .filter(|line| line.starts_with("END "))
             .collect();
         assert_eq!(lines.len(), 1, "{}{}", self.stdout, self.stderr);
-        Ok(lines[0])
+        lines[0]
     }
 
     /// The first evidence record of `adapter`.
@@ -131,14 +131,13 @@ impl Staged {
     }
 
     /// Refused with no pins: `proved=0`, each adapter failing for `reason`.
-    fn refused(&self, reason: &str) -> TestResult {
+    fn refused(&self, reason: &str) {
         assert_eq!(self.pins, b"");
-        let end = self.end()?;
+        let end = self.end();
         assert!(end.contains("result=FAIL proved=0"), "{end}");
         for adapter in ADAPTERS {
             assert!(end.contains(&format!("{adapter}:{reason}")), "{end}");
         }
-        Ok(())
     }
 }
 
@@ -235,7 +234,7 @@ fn integer(value: &Value, number: u64) {
 #[test]
 fn test_fixture_evidence_is_refused_by_name_and_leaves_no_pins() -> TestResult {
     let result = stage_a(&every(&json!(true)), &json!({}))?;
-    result.refused("fixture-evidence-is-never-a-pin")?;
+    result.refused("fixture-evidence-is-never-a-pin");
     for adapter in ADAPTERS {
         assert_eq!(result.first(adapter)?["fixture"], json!(true));
     }
@@ -245,7 +244,7 @@ fn test_fixture_evidence_is_refused_by_name_and_leaves_no_pins() -> TestResult {
 #[test]
 fn test_real_marked_control_pins_both_exact_evidence_digests() -> TestResult {
     let result = stage_a(&every(&json!(false)), &json!({}))?;
-    let end = result.end()?;
+    let end = result.end();
     assert!(end.contains("result=PASS proved=2 failed=[]"), "{end}");
     result.assert_pins(&ADAPTERS)?;
     for adapter in ADAPTERS {
@@ -257,7 +256,7 @@ fn test_real_marked_control_pins_both_exact_evidence_digests() -> TestResult {
 #[test]
 fn test_a_fixture_partner_cannot_supply_a_second_pin() -> TestResult {
     let result = stage_a(&json!({"claude-code": false, "codex": true}), &json!({}))?;
-    let end = result.end()?;
+    let end = result.end();
     assert!(end.contains("result=FAIL proved=1"), "{end}");
     assert!(
         end.contains("codex:fixture-evidence-is-never-a-pin"),
@@ -275,7 +274,7 @@ fn numeric_marker(field: &str, number: u64) -> TestResult {
         let markers = marker("launcher", field, json!(number));
         stage_a(&every(&json!(false)), &markers)?
     };
-    result.refused(&format!("launcher:{field}-not-boolean"))?;
+    result.refused(&format!("launcher:{field}-not-boolean"));
     for adapter in ADAPTERS {
         integer(&result.first(adapter)?[field], number);
     }
@@ -320,9 +319,7 @@ fn test_identity_markers_refuse_numeric_stand_ins_without_pins() -> TestResult {
         ("stop", "exit_observed", 1, "exit-not-observed"),
     ] {
         let result = stage_a(&every(&json!(false)), &marker(step, field, json!(value)))?;
-        result
-            .refused(&format!("{step}:{reason}"))
-            .map_err(|error| format!("marker {field}: {error}"))?;
+        result.refused(&format!("{step}:{reason}"));
     }
     Ok(())
 }

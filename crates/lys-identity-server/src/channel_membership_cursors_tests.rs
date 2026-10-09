@@ -26,6 +26,11 @@ fn asked<'a>(served: &'a GrantLog, question: &'a str, revision: u64) -> Asked<'a
     }
 }
 
+/// A page refusal as a test's error, its name first.
+fn refused((name, reason): crate::channel_membership::Named) -> Box<dyn std::error::Error> {
+    format!("{name}: {reason}").into()
+}
+
 fn random(byte: u8) -> [u8; HANDLE_BYTES] {
     [byte; HANDLE_BYTES]
 }
@@ -38,10 +43,16 @@ fn refusal<T>(answer: Result<T, (String, String)>) -> Option<String> {
 fn a_cursor_continues_only_its_own_question_and_asker() -> Result<(), Box<dyn std::error::Error>> {
     let served = log(0);
     let mut book = CursorBook::new(60, 4);
-    let handle = book.issue(&asked(&served, "q", 3), ("ward-a", None), random(1), 100)?;
-    let continued = book.take(&handle, &asked(&served, "q", 3), 101)?;
+    let handle = book
+        .issue(&asked(&served, "q", 3), ("ward-a", None), random(1), 100)
+        .map_err(refused)?;
+    let continued = book
+        .take(&handle, &asked(&served, "q", 3), 101)
+        .map_err(refused)?;
     assert_eq!(continued.after, "ward-a");
-    let again = book.take(&handle, &asked(&served, "q", 4), 102)?;
+    let again = book
+        .take(&handle, &asked(&served, "q", 4), 102)
+        .map_err(refused)?;
     assert_eq!(again, continued, "using a cursor does not release it");
     assert_eq!(
         refusal(book.take(&handle, &asked(&served, "other", 4), 102)),
@@ -71,7 +82,9 @@ fn a_cursor_continues_only_its_own_question_and_asker() -> Result<(), Box<dyn st
 fn retention_ends_at_the_operators_seconds() -> Result<(), Box<dyn std::error::Error>> {
     let served = log(0);
     let mut book = CursorBook::new(60, 4);
-    let handle = book.issue(&asked(&served, "q", 3), ("k", None), random(1), 100)?;
+    let handle = book
+        .issue(&asked(&served, "q", 3), ("k", None), random(1), 100)
+        .map_err(refused)?;
     assert!(book.take(&handle, &asked(&served, "q", 3), 159).is_ok());
     assert_eq!(
         refusal(book.take(&handle, &asked(&served, "q", 3), 160)),
@@ -85,10 +98,19 @@ fn retention_ends_at_the_operators_seconds() -> Result<(), Box<dyn std::error::E
 fn completion_releases_the_whole_listing() -> Result<(), Box<dyn std::error::Error>> {
     let served = log(0);
     let mut book = CursorBook::new(60, 8);
-    let first = book.issue(&asked(&served, "q", 3), ("a", None), random(1), 100)?;
-    let chain = book.take(&first, &asked(&served, "q", 3), 100)?.chain;
-    let second = book.issue(&asked(&served, "q", 3), ("b", Some(chain)), random(2), 100)?;
-    let elsewhere = book.issue(&asked(&served, "r", 3), ("z", None), random(3), 100)?;
+    let first = book
+        .issue(&asked(&served, "q", 3), ("a", None), random(1), 100)
+        .map_err(refused)?;
+    let chain = book
+        .take(&first, &asked(&served, "q", 3), 100)
+        .map_err(refused)?
+        .chain;
+    let second = book
+        .issue(&asked(&served, "q", 3), ("b", Some(chain)), random(2), 100)
+        .map_err(refused)?;
+    let elsewhere = book
+        .issue(&asked(&served, "r", 3), ("z", None), random(3), 100)
+        .map_err(refused)?;
     assert_eq!(book.retained(), 3);
     book.complete(chain);
     assert_eq!((book.retained(), book.released()), (1, 2));
@@ -107,14 +129,18 @@ fn another_epoch_or_an_earlier_revision_resets_the_listing()
 -> Result<(), Box<dyn std::error::Error>> {
     let served = log(0);
     let mut book = CursorBook::new(60, 8);
-    let handle = book.issue(&asked(&served, "q", 7), ("a", None), random(1), 100)?;
+    let handle = book
+        .issue(&asked(&served, "q", 7), ("a", None), random(1), 100)
+        .map_err(refused)?;
     let reset = log(1);
     assert_eq!(
         refusal(book.take(&handle, &asked(&reset, "q", 7), 101)),
         Some(CURSOR_RESET.to_owned())
     );
     assert_eq!(book.retained(), 0, "a reset releases the listing");
-    let handle = book.issue(&asked(&served, "q", 7), ("a", None), random(2), 100)?;
+    let handle = book
+        .issue(&asked(&served, "q", 7), ("a", None), random(2), 100)
+        .map_err(refused)?;
     assert_eq!(
         refusal(book.take(&handle, &asked(&served, "q", 6), 101)),
         Some(CURSOR_RESET.to_owned())
@@ -126,14 +152,17 @@ fn another_epoch_or_an_earlier_revision_resets_the_listing()
 fn no_more_than_the_operators_count_is_kept() -> Result<(), Box<dyn std::error::Error>> {
     let served = log(0);
     let mut book = CursorBook::new(60, 2);
-    book.issue(&asked(&served, "q", 1), ("a", None), random(1), 100)?;
-    book.issue(&asked(&served, "q", 1), ("b", None), random(2), 100)?;
+    book.issue(&asked(&served, "q", 1), ("a", None), random(1), 100)
+        .map_err(refused)?;
+    book.issue(&asked(&served, "q", 1), ("b", None), random(2), 100)
+        .map_err(refused)?;
     assert_eq!(
         refusal(book.issue(&asked(&served, "q", 1), ("c", None), random(3), 100)),
         Some(CURSORS_FULL.to_owned())
     );
     assert_eq!(book.retained(), 2);
-    book.issue(&asked(&served, "q", 1), ("c", None), random(3), 160)?;
+    book.issue(&asked(&served, "q", 1), ("c", None), random(3), 160)
+        .map_err(refused)?;
     assert_eq!(book.retained(), 1, "expiry made room");
     Ok(())
 }

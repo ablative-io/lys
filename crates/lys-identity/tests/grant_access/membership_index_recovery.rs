@@ -9,13 +9,12 @@
 
 #![cfg(unix)]
 
-mod support;
-
 use std::error::Error;
 use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use crate::support::{T0, World, actions, pass};
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
     GrantBook, GrantError, GrantId, Grants, MemoryRelationships, Model, PassOn, RecipientKind,
@@ -24,7 +23,6 @@ use lys_identity::grants::{
 use lys_identity::log::Reopen;
 use lys_identity::{IdentityId, OperationId};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, Start, StoreError, StoreResult};
-use support::{T0, World, actions, pass};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -48,9 +46,11 @@ type Opened = Grants<FileLeafStore, MemoryRelationships>;
 
 /// What `world`'s grants are opened from: their log, key and model, and a
 /// snapshot owed at every entry, so an open writes one at the whole log.
-fn inputs(
-    world: &World,
-) -> Result<(Reopen<FileLeafStore>, Ed25519Identity, Model, NonZeroU64), Box<dyn Error>> {
+/// What [`inputs`] answers: the log's reopen, the key, the model and the
+/// snapshot interval.
+type Inputs = (Reopen<FileLeafStore>, Ed25519Identity, Model, NonZeroU64);
+
+fn inputs(world: &World) -> Result<Inputs, Box<dyn Error>> {
     let path = world.dir.path().join("grants");
     let reopen: Reopen<FileLeafStore> = Box::new(move || FileLeafStore::open(&path));
     let key = Ed25519Identity::load(&world.dir.path().join("service.key"))?;
@@ -147,7 +147,7 @@ fn snapshotted(world: &World) -> TestResult {
 /// another refusal changes nothing; the reset naming it rebuilds the book
 /// that applied every event and writes a checkpoint the next open resumes
 /// from; and a reset of grants no longer refused is itself refused.
-fn held_then_reset(world: &World) -> TestResult {
+fn held_then_reset(world: &mut World) -> TestResult {
     let mut name = String::new();
     for _ in 0..2 {
         let held = opened(world)?
@@ -157,10 +157,10 @@ fn held_then_reset(world: &World) -> TestResult {
             return Err(format!("held by another name: {held}").into());
         };
         assert!(refusal.starts_with("Snapshot"), "{refusal}");
-        name = refusal
+        refusal
             .split_once(':')
             .map_or(refusal.as_str(), |(named, _)| named)
-            .to_owned();
+            .clone_into(&mut name);
     }
     assert!(
         world.directory.projection().is_ok(),
@@ -230,7 +230,7 @@ fn a_damaged_checkpoint_holds_the_grants_until_the_operator_resets_them() -> Tes
     let last = bytes.len().checked_sub(1).ok_or("the snapshot is empty")?;
     bytes[last] ^= 0xff;
     std::fs::write(&path, bytes)?;
-    held_then_reset(&world)
+    held_then_reset(&mut world)
 }
 
 #[test]
@@ -245,7 +245,7 @@ fn a_foreign_checkpoint_holds_the_grants_until_the_operator_resets_them() -> Tes
         foreign.dir.path().join("grants").join("snapshot.bin"),
         world.dir.path().join("grants").join("snapshot.bin"),
     )?;
-    held_then_reset(&world)
+    held_then_reset(&mut world)
 }
 
 #[test]

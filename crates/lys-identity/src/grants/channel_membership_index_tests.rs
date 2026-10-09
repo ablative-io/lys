@@ -50,12 +50,12 @@ fn frame(
         GrantChange::Issue(_) | GrantChange::Use { .. } => ChangeKind::Issue,
     };
     let event = GrantEvent::new(OperationId::generate()?, caller(), 1, change)?;
-    let signed = sign_grant_event(event, &signer.key)?;
+    let evidence = sign_grant_event(event, &signer.key)?;
     Ok(ChangeFrame::Change {
         revision,
         grant: grant.to_string(),
         change: kind,
-        event: event_hex(signed.bytes()),
+        event: event_hex(evidence.bytes()),
     })
 }
 
@@ -91,7 +91,7 @@ fn ready_at(index: &mut MembershipIndex, revision: u64) -> TestResult {
     Ok(())
 }
 
-/// d089_r1_revision_and_ready_counts, index half: a pass bound at r+1 is
+/// `d089_r1_revision_and_ready_counts`, index half: a pass bound at r+1 is
 /// refused at r, one revoke at r+1 is applied once, and the Ready covering
 /// it admits only the independent path.
 #[test]
@@ -125,7 +125,7 @@ fn one_revoke_is_applied_once_and_ready_covers_it() -> TestResult {
     Ok(())
 }
 
-/// d089_r1_replay_live_race, index half: omission is a gap with its length,
+/// `d089_r1_replay_live_race`, index half: omission is a gap with its length,
 /// an identical duplicate applies nothing, a conflicting one is refused.
 #[test]
 fn omission_duplicate_and_conflict_are_told_apart() -> TestResult {
@@ -179,8 +179,8 @@ fn watermarks_advance_and_ready_must_agree() -> TestResult {
 /// each withdraw readiness by name.
 #[test]
 fn foreign_reset_and_forged_frames_withdraw_ready() -> TestResult {
-    let signer = signer()?;
     let other = signer()?;
+    let signer = signer()?;
     let mut index = index(&signer)?;
     let grant = GrantId::generate()?;
     let foreign = LogName { epoch: 1, ..log() };

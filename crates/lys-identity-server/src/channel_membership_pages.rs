@@ -205,19 +205,17 @@ fn answer<S: LeafStore>(
     let chain = continued
         .as_ref()
         .map(|continued: &Continued| continued.chain);
-    let next = match (filled.more, &filled.last) {
-        (true, Some(last)) => Some(membership.cursors()?.issue(
-            &asked,
-            (last, chain),
-            asking.random,
-            asking.at,
-        )?),
-        _ => {
-            if let Some(chain) = chain {
-                membership.cursors()?.complete(chain);
-            }
-            None
+    let next = if let (true, Some(last)) = (filled.more, &filled.last) {
+        Some(
+            membership
+                .cursors()?
+                .issue(&asked, (last, chain), asking.random, asking.at)?,
+        )
+    } else {
+        if let Some(chain) = chain {
+            membership.cursors()?.complete(chain);
         }
+        None
     };
     let returned = u64::try_from(filled.rows.len()).unwrap_or(u64::MAX);
     counts.page(returned, filled.skipped);

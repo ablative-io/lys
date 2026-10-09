@@ -4,13 +4,11 @@
 //! is asked about, from the book's live index; a revoked grant is read only
 //! when no live grant answers, to refuse by its exact name, and never allows.
 
-mod support;
-
 use std::error::Error;
 
+use crate::support::World;
 use lys_identity::grants::{Frame, GrantError, PassOn, RevokeRequest, Route};
 use lys_identity::{IdentityId, OperationId};
-use support::World;
 
 type TestResult = Result<(), Box<dyn Error>>;
 

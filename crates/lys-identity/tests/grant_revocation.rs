@@ -372,7 +372,7 @@ fn control_1_a_degraded_reading_refuses_an_ancestor_revoke_and_keeps_an_independ
     };
     let events = world.events();
     let asked = read_by(tom_agent)?;
-    let directory = world.directory.projection()?;
+    let directory = &world.directory.projection()?.clone();
     for refused in [
         world
             .grants

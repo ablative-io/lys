@@ -198,7 +198,7 @@ impl TailFaults {
         step: TailFaultStep,
         make: impl Fn() -> StoreError + Send + Sync + 'static,
     ) -> StoreResult<()> {
-        *self.slot(step).lock().map_err(|_| poisoned())? = Some(Box::new(make));
+        *self.slot(step).lock().map_err(|error| poisoned(&error))? = Some(Box::new(make));
         Ok(())
     }
 
@@ -208,7 +208,7 @@ impl TailFaults {
     ///
     /// [`StoreError::LockPoisoned`] when the step's lock was poisoned.
     pub fn clear(&self, step: TailFaultStep) -> StoreResult<()> {
-        *self.slot(step).lock().map_err(|_| poisoned())? = None;
+        *self.slot(step).lock().map_err(|error| poisoned(&error))? = None;
         Ok(())
     }
 
@@ -216,7 +216,7 @@ impl TailFaults {
         Ok(self
             .slot(step)
             .lock()
-            .map_err(|_| poisoned())?
+            .map_err(|error| poisoned(&error))?
             .as_ref()
             .map(|make| make()))
     }
@@ -289,8 +289,9 @@ impl<P: TailWitnessProvider> TailWitnessProvider for FaultTailProvider<P> {
 }
 
 /// A fault step's lock was poisoned: refused by name, never read past.
-fn poisoned() -> StoreError {
+fn poisoned(error: &impl std::fmt::Display) -> StoreError {
     StoreError::LockPoisoned {
         what: "tail fault step",
+        reason: error.to_string(),
     }
 }

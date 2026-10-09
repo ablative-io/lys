@@ -113,7 +113,7 @@ fn revocations(page: &ChangesPage) -> usize {
         .count()
 }
 
-/// d089_r1_revision_and_ready_counts: issue at r, revoke at r+1; the app
+/// `d089_r1_revision_and_ready_counts`: issue at r, revoke at r+1; the app
 /// sees one revocation and one Ready covering r+1, its index refuses
 /// admission from r once r+1 is required, and an independent grant stays
 /// admitted.
@@ -273,7 +273,7 @@ async fn a_foreign_log_or_rolled_back_cursor_is_a_reset() -> TestResult {
     Ok(())
 }
 
-/// d089_r1_old_install_and_bounded_replay, identity half: the identity is
+/// `d089_r1_old_install_and_bounded_replay`, identity half: the identity is
 /// recorded once beside the grant log, survives a restart, and is the log
 /// every membership decision names.
 #[tokio::test]
@@ -306,7 +306,7 @@ async fn the_log_identity_is_recorded_once_and_named_by_membership() -> TestResu
     Ok(())
 }
 
-/// d089_r1_replay_live_race, wait half: a waiting read is released by the
+/// `d089_r1_replay_live_race`, wait half: a waiting read is released by the
 /// grants' own commit, and the revoke appears exactly once whether it
 /// committed before the wait began or after.
 #[tokio::test]
@@ -315,10 +315,10 @@ async fn a_waiting_read_is_released_by_the_commit_and_sees_it_once() -> TestResu
     let doc = format!("{NOTES}.doc");
     let held = grant(&world, &doc, "1", "reader").await?;
     let first = read(&world, &world.notes, &json!({"limit": 16})).await?;
-    let Some(ChangeFrame::Ready { revision: head }) = first.frames.last().cloned() else {
+    let Some(ChangeFrame::Ready { revision: ready_at }) = first.frames.last().cloned() else {
         return Err("a baseline ends ready".into());
     };
-    let body = json!({"log": first.log, "after": head, "limit": 16, "wait": true});
+    let body = json!({"log": first.log, "after": ready_at, "limit": 16, "wait": true});
     let base = world.service.base.clone();
     let credential = world.notes.clone();
     let waiting = tokio::spawn(async move {
@@ -339,7 +339,7 @@ async fn a_waiting_read_is_released_by_the_commit_and_sees_it_once() -> TestResu
         page = read(
             &world,
             &world.notes,
-            &json!({"log": first.log, "after": head, "limit": 16}),
+            &json!({"log": first.log, "after": ready_at, "limit": 16}),
         )
         .await?;
     }

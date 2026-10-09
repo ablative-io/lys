@@ -84,8 +84,10 @@ async fn drafted(
     words: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let grant = table.bea_holds("1", mode).await?;
-    let made = ok(create(table, &table.bea, &request(&op()?, &grant, "1", words)).await?)?;
-    Ok(made["draft"].as_str().ok_or("a draft id")?.to_owned())
+    let operation = op()?;
+    let body = request(&operation, &grant, "1", words);
+    let answered = ok(create(table, &table.bea, &body).await?)?;
+    Ok(answered["draft"].as_str().ok_or("a draft id")?.to_owned())
 }
 
 #[tokio::test]
@@ -289,7 +291,10 @@ async fn executed_and_refused_on_execution_close_the_draft_and_the_dashboard_cou
 }
 
 /// The ids of a page's drafts, and its `next` and `total`.
-fn paged(page: &Value) -> Result<(Vec<String>, Option<String>, u64), Box<dyn std::error::Error>> {
+/// A page of drafts: their ids in order, the cursor to the next, and the total.
+type Paged = (Vec<String>, Option<String>, u64);
+
+fn paged(page: &Value) -> Result<Paged, Box<dyn std::error::Error>> {
     let ids = page["drafts"].as_array().ok_or("a list")?.iter();
     let ids = ids.filter_map(|draft| draft["id"].as_str().map(str::to_owned));
     let next = page["next"].as_str().map(str::to_owned);
@@ -322,7 +327,7 @@ async fn both_views_answer_the_callers_page_and_a_next_cursor() -> TestResult {
     let last = paged(&ok(
         get(&table.service, &path, Auth::Cookie(&table.bea)).await?
     )?)?;
-    assert_eq!((last.0.len(), last.1, last.2), (1, None, 3), "{last:?}");
+    assert_eq!((last.0.len(), &last.1, last.2), (1, &None, 3), "{last:?}");
     assert_eq!([ids, last.0].concat(), made, "in draft id order, each once");
     let zero = get(
         &table.service,

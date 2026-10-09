@@ -174,17 +174,20 @@ impl PublicSignIn {
             config.validate()?;
             Ok::<_, Failure>(lys_identity_server::service(&config).await?)
         }
-        .await;
+        .await
+        // Words, not the boxed error: the cleanup below awaits, and a boxed
+        // error is not Send.
+        .map_err(|error| error.to_string());
         match outcome {
-            Ok(router) => Ok(Self {
-                router: Some(router),
+            Ok(service) => Ok(Self {
+                router: Some(service),
                 next,
                 provider_posts,
                 issuer,
                 directory,
             }),
             Err(error) => match issuer.close().await {
-                Ok(()) => Err(error),
+                Ok(()) => Err(error.into()),
                 Err(cleanup) => Err(format!(
                     "public sign-in start failed: {error}; cleanup failed: {cleanup}"
                 )

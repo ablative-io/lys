@@ -5,13 +5,12 @@
 //! changed (`TAIL_INTEGRITY`), refused after a later append (`TAIL_RACE`), and
 //! refused by its provider's original failure (`TAIL_FAILURE`).
 
-#[path = "grant_tail_authority/integrity.rs"]
 mod integrity;
-mod support;
 
 use std::error::Error;
 use std::sync::Arc;
 
+use crate::support::{World, alpha, pass};
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
     Action, ExerciseRequest, GrantChange, GrantError, GrantEvent, GrantId, GrantLedger, Grants,
@@ -22,7 +21,6 @@ use lys_identity::restart::SNAPSHOT_EVERY;
 use lys_identity::{IdentityId, OperationId};
 use lys_log_store::FileLeafStore;
 use lys_log_store::witness::{FileTailProvider, TailWitnessProvider};
-use support::{World, alpha, pass};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -297,35 +295,32 @@ fn tail_authority_agrees_with_replay_for_every_hop_and_an_independent_chain() ->
             case.name
         );
         let replay = replayed(&mut world, holder, selected)?;
-        match (case.ends)(&chain) {
-            Some(ended) => {
-                assert_eq!(
-                    authority.bearing,
-                    TailBearing::Relevant {
-                        index: settled,
-                        effect,
-                    },
-                    "{}",
-                    case.name
-                );
-                assert_eq!(
-                    replay.map(|permit| permit.grant),
-                    Err(GrantError::Revoked {
-                        grant: ended.to_string()
-                    }),
-                    "{}: replay refuses what the tail named relevant",
-                    case.name
-                );
-            }
-            None => {
-                assert_eq!(authority.bearing, TailBearing::Disjoint, "{}", case.name);
-                assert_eq!(
-                    replay.map(|permit| permit.grant),
-                    Ok(selected),
-                    "{}: replay keeps what the tail proved disjoint",
-                    case.name
-                );
-            }
+        if let Some(ended) = (case.ends)(&chain) {
+            assert_eq!(
+                authority.bearing,
+                TailBearing::Relevant {
+                    index: settled,
+                    effect,
+                },
+                "{}",
+                case.name
+            );
+            assert_eq!(
+                replay.map(|permit| permit.grant),
+                Err(GrantError::Revoked {
+                    grant: ended.to_string()
+                }),
+                "{}: replay refuses what the tail named relevant",
+                case.name
+            );
+        } else {
+            assert_eq!(authority.bearing, TailBearing::Disjoint, "{}", case.name);
+            assert_eq!(
+                replay.map(|permit| permit.grant),
+                Ok(selected),
+                "{}: replay keeps what the tail proved disjoint",
+                case.name
+            );
         }
     }
     Ok(())

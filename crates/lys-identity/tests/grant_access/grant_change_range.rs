@@ -1,25 +1,23 @@
 #![cfg(test)]
 
-//! DIRECTORY-089 R1, d089_r1_old_install_and_bounded_replay (cost half):
+//! DIRECTORY-089 R1, `d089_r1_old_install_and_bounded_replay` (cost half):
 //! two logs with the same requested delta and different historical lengths
 //! emit the same delta and read the same number of leaves through the
 //! range read, bounded by the checkpoint distance and never the history;
 //! the whole-history read and a position-by-position read are the positive
 //! controls the counter must tell apart.
 
-mod support;
-
 use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use crate::support::World;
 use lys_identity::IdentityId;
 use lys_identity::checkpoints::CHECKPOINT_EVERY;
 use lys_identity::grants::{MemoryRelationships, PassOn, Route};
 use lys_identity::log::Reopen;
 use lys_log_store::{Frontier, LeafStore, PinnedRoot, StoreError, StoreResult};
-use support::World;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -53,7 +51,7 @@ impl Counted {
 }
 
 impl LeafStore for Counted {
-    fn origin(&self) -> &str {
+    fn origin(&self) -> &'static str {
         "example.test/lys/grants"
     }
 
