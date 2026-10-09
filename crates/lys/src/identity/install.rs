@@ -440,9 +440,13 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         )
     })?;
     let configuration = private_files::write(&layout.service_config(), &encoded)?;
-    if let Some(line) = server_config::membership_readback(rendered.get("membership")) {
-        emitter.note(&line);
-    }
+    emitter.note(&server_config::membership_readback(
+        rendered.get("membership"),
+    ));
+    emitter.note(&server_config::provider_readback(
+        rendered["provider"].get("rights_bytes"),
+        &layout.logs_dir().join("identity.log"),
+    )?);
     let changed = configuration != Outcome::Unchanged || service_key_file != Outcome::Unchanged;
     let code = if setup_code::has_administrator(&layout)? {
         None

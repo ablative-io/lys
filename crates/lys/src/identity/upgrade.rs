@@ -558,9 +558,14 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let membership = placed
         .as_ref()
         .and_then(|carried| carried.membership.as_ref());
-    if let Some(line) = install::server_config::membership_readback(membership) {
-        emitter.note(&line);
-    }
+    emitter.note(&install::server_config::membership_readback(membership));
+    let rights_bytes = placed
+        .as_ref()
+        .and_then(|carried| carried.rights_bytes.as_ref());
+    emitter.note(&install::server_config::provider_readback(
+        rights_bytes,
+        &layout.logs_dir().join("identity.log"),
+    )?);
     emitter.finish();
     Ok(())
 }

@@ -97,6 +97,10 @@ pub struct Carried {
     /// its own: no number for them is decided, so a service with none
     /// refuses every membership page by name until the operator names them.
     pub membership: Option<Value>,
+    /// The ceiling on a pass's rights an earlier configuration named
+    /// (`provider.rights_bytes`, ACCESS-002 R1). The install writes none of its
+    /// own; one the operator named survives every install and upgrade run.
+    pub rights_bytes: Option<Value>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -229,6 +233,9 @@ pub fn render(
     if let Some(membership) = &carried.membership {
         rendered["membership"] = membership.clone();
     }
+    if let Some(cap) = &carried.rights_bytes {
+        rendered["provider"]["rights_bytes"] = cap.clone();
+    }
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
     }
@@ -244,17 +251,70 @@ pub const MEMBERSHIP_SETTINGS: [&str; 4] = [
     "membership.cursors_max",
 ];
 
-/// The readback line an install or upgrade says when the configuration it
-/// wrote names no `membership` settings, or `None` when it names them. No
-/// value is chosen for them here: none is stated anywhere yet.
-pub fn membership_readback(membership: Option<&Value>) -> Option<String> {
-    if membership.is_some_and(|named| !named.is_null()) {
-        return None;
-    }
-    Some(format!(
-        "membership pages: refused membership_pages_unconfigured until the operator names {} in identity.json; no value is chosen for them",
-        MEMBERSHIP_SETTINGS.join(", ")
-    ))
+/// The readback line an install or upgrade says for the `membership`
+/// settings of the configuration it wrote: the values it names, each setting
+/// it leaves out said as unset, or, when it names none, that every page is
+/// refused until the operator names them. No value is chosen here.
+pub fn membership_readback(membership: Option<&Value>) -> String {
+    let Some(named) = membership.filter(|named| !named.is_null()) else {
+        return format!(
+            "membership pages: refused membership_pages_unconfigured until the operator names {} in identity.json; no value is chosen for them",
+            MEMBERSHIP_SETTINGS.join(", ")
+        );
+    };
+    let values: Vec<String> = MEMBERSHIP_SETTINGS
+        .iter()
+        .map(|setting| {
+            let key = setting.trim_start_matches("membership.");
+            named.get(key).filter(|value| !value.is_null()).map_or_else(
+                || format!("{setting} unset"),
+                |value| format!("{setting} {value}"),
+            )
+        })
+        .collect();
+    format!(
+        "membership pages: identity.json names {}",
+        values.join(", ")
+    )
+}
+
+/// The words the service's largest-rights line opens with after its name
+/// (`lys-identity-server`'s `provider/rights_claim.rs`, `LARGEST_SEEN`).
+const LARGEST_SEEN: &str = "provider: the largest pass rights document so far is";
+
+/// The readback line for a pass's rights ceiling: the `provider.rights_bytes`
+/// the configuration names, or unset, and the largest rights document the
+/// running service has measured, the last such line in `log`, so the ceiling
+/// is raised on evidence. A log not yet written says no pass is measured.
+pub fn provider_readback(rights_bytes: Option<&Value>, log: &Path) -> IdentityResult<String> {
+    let cap = rights_bytes
+        .filter(|cap| !cap.is_null())
+        .map_or_else(|| "unset".to_owned(), Value::to_string);
+    let text = match std::fs::read_to_string(log) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => {
+            return Err(IdentityError::new(
+                ErrorKind::ConfigUnreadable,
+                "read",
+                "identity.log",
+                error.to_string(),
+            )
+            .at(log));
+        }
+    };
+    let seen = text
+        .lines()
+        .rev()
+        .find_map(|line| line.split_once(LARGEST_SEEN).map(|(_, rest)| rest.trim()));
+    Ok(match seen {
+        Some(seen) => format!(
+            "pass rights: provider.rights_bytes is {cap}; the largest rights document the service has measured is {seen}"
+        ),
+        None => format!(
+            "pass rights: provider.rights_bytes is {cap}; the service has measured no pass's rights since its log began"
+        ),
+    })
 }
 
 /// What the configuration written under `layout` names that a run again
@@ -280,6 +340,11 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
         message_service: message_service(&earlier, &path)?,
         trusted_proxies: named(earlier.get("trusted_proxies")),
         membership: named(earlier.get("membership")),
+        rights_bytes: named(
+            earlier
+                .get("provider")
+                .and_then(|provider| provider.get("rights_bytes")),
+        ),
         issuer: named(earlier.get("issuer")).and_then(|issuer| issuer.as_str().map(str::to_owned)),
         issuer_moved_from: named(earlier.get("issuer_moved_from"))
             .and_then(|issuer| issuer.as_str().map(str::to_owned)),

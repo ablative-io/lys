@@ -33,6 +33,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, MutexGuard};
 
 use base64::Engine;
@@ -172,6 +173,9 @@ pub struct OpenIdProvider {
     code_seconds: u64,
     pass_seconds: u64,
     rights_bytes: Option<usize>,
+    /// The largest rights document a pass has carried since start, in bytes, so the
+    /// cap is raised on evidence (Tom, 10 Oct 2026).
+    rights_seen: AtomicUsize,
     codes: Mutex<HashMap<String, Grant>>,
     tokens: Mutex<Tokens>,
 }
@@ -252,6 +256,7 @@ impl OpenIdProvider {
             code_seconds: settings.code_seconds,
             pass_seconds: settings.pass_seconds,
             rights_bytes: settings.rights_bytes,
+            rights_seen: AtomicUsize::new(0),
             codes: Mutex::new(HashMap::new()),
             tokens: Mutex::new(tokens),
         })

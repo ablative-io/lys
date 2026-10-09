@@ -105,7 +105,8 @@ pub(super) fn pass(
         Ok((asserted, read, decided))
     })?;
     let Read { rights, paths } = read;
-    let (rights, rights_truncated) = bounded(rights, app, provider.rights_bytes)?;
+    let (rights, rights_truncated) =
+        bounded(rights, app, provider.rights_bytes, &provider.rights_seen)?;
     let claims = Claims {
         iss: provider.issuer.clone(),
         sub: holder.to_string(),
@@ -303,13 +304,17 @@ fn bounded(
     rights: Vec<Right>,
     app: &str,
     cap: Option<usize>,
+    seen: &std::sync::atomic::AtomicUsize,
 ) -> Result<(Vec<Right>, Option<String>), ServerError> {
-    let Some(cap) = cap else {
-        return Ok((rights, None));
-    };
     let size = serde_json::to_vec(&rights)
         .map_err(|error| unavailable(format!("the pass's rights could not be encoded: {error}")))?
         .len();
+    if size > seen.fetch_max(size, std::sync::atomic::Ordering::Relaxed) {
+        eprintln!("{}", largest_seen_line(size, app, cap));
+    }
+    let Some(cap) = cap else {
+        return Ok((rights, None));
+    };
     if size > cap {
         Ok((Vec::new(), Some(app.to_owned())))
     } else {
@@ -317,9 +322,23 @@ fn bounded(
     }
 }
 
+/// The log line naming a new largest rights document, which the install's readback reads
+/// back ([`LARGEST_SEEN`]).
+fn largest_seen_line(size: usize, app: &str, cap: Option<usize>) -> String {
+    let cap = cap.map_or_else(|| "unset".to_owned(), |cap| cap.to_string());
+    format!(
+        "lys-identity-server {LARGEST_SEEN} {size} bytes, for app {app}; provider.rights_bytes is {cap}"
+    )
+}
+
+/// The words the largest-rights line opens with, after the service's name.
+const LARGEST_SEEN: &str = "provider: the largest pass rights document so far is";
+
 #[cfg(test)]
 mod tests {
-    use super::{PassResource, Right, bounded, owned_by};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::{PassResource, Right, bounded, largest_seen_line, owned_by};
 
     fn right(id: &str) -> Right {
         Right {
@@ -340,13 +359,18 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let rights = vec![right("1"), right("2")];
         let size = serde_json::to_vec(&rights)?.len();
-        let (kept, truncated) = bounded(rights.clone(), "notes", Some(size))?;
+        let (kept, truncated) = bounded(rights.clone(), "notes", Some(size), &AtomicUsize::new(0))?;
         assert_eq!(kept, rights);
         assert_eq!(truncated, None);
-        let (kept, truncated) = bounded(rights.clone(), "notes", Some(size - 1))?;
+        let (kept, truncated) = bounded(
+            rights.clone(),
+            "notes",
+            Some(size - 1),
+            &AtomicUsize::new(0),
+        )?;
         assert!(kept.is_empty());
         assert_eq!(truncated.as_deref(), Some("notes"));
-        let (kept, truncated) = bounded(rights.clone(), "notes", None)?;
+        let (kept, truncated) = bounded(rights.clone(), "notes", None, &AtomicUsize::new(0))?;
         assert_eq!(kept, rights);
         assert_eq!(truncated, None);
         Ok(())
@@ -358,5 +382,32 @@ mod tests {
         assert!(!owned_by("notesx.doc", "notes"));
         assert!(!owned_by("files.doc", "notes"));
         assert!(!owned_by("*", "notes"));
+    }
+
+    /// Every pass's rights are measured, capped or not: the high-water rises to the largest
+    /// document seen and a smaller one leaves it, and the line names the size, the app and
+    /// the cap, so the cap is raised on evidence.
+    #[test]
+    fn the_largest_rights_document_seen_is_kept_and_named() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let seen = AtomicUsize::new(0);
+        let two = vec![right("a"), right("b")];
+        let size = serde_json::to_vec(&two)?.len();
+        bounded(two, "notes", None, &seen)?;
+        assert_eq!(seen.load(Ordering::Relaxed), size);
+        bounded(vec![right("a")], "notes", Some(65_536), &seen)?;
+        assert_eq!(
+            seen.load(Ordering::Relaxed),
+            size,
+            "a smaller document leaves it"
+        );
+        assert_eq!(
+            largest_seen_line(size, "notes", Some(65_536)),
+            format!(
+                "lys-identity-server provider: the largest pass rights document so far is {size} bytes, for app notes; provider.rights_bytes is 65536"
+            )
+        );
+        assert!(largest_seen_line(size, "notes", None).ends_with("provider.rights_bytes is unset"));
+        Ok(())
     }
 }
