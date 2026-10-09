@@ -231,6 +231,8 @@ fn grant(error: &GrantError) -> &str {
         GrantError::SignatureInvalid => "SignatureInvalid",
         GrantError::ReceiptInvalid { .. } => "ReceiptInvalid",
         GrantError::LogUnavailable { .. } => "LogUnavailable",
+        GrantError::CheckpointRefused { .. } => "CheckpointRefused",
+        GrantError::ResetRefused { .. } => "ResetRefused",
         GrantError::LeafNotAnEvent { .. } => "LeafNotAnEvent",
         GrantError::AppendRefused { .. } => "AppendRefused",
         GrantError::OperationUnresolved { .. } => "OperationUnresolved",

@@ -122,6 +122,7 @@ pub(crate) const PLACE: &[&str] = &[
 ];
 /// A batch of checks.
 pub(crate) const BATCH: &[&str] = &[
+    "CheckpointRefused",
     "NotAdmitted",
     "RequestMalformed",
     "credential_refused",

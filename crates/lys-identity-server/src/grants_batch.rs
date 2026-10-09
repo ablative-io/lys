@@ -157,6 +157,7 @@ pub(crate) fn unanswered(error: &GrantError) -> bool {
             | GrantError::ProjectionPending { .. }
             | GrantError::OperationUnresolved { .. }
             | GrantError::LogUnavailable { .. }
+            | GrantError::CheckpointRefused { .. }
     )
 }
 

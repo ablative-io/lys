@@ -554,6 +554,13 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     if json {
         emitter.field("build", "build", value);
     }
+    let placed = install::server_config::carried(&layout)?;
+    let membership = placed
+        .as_ref()
+        .and_then(|carried| carried.membership.as_ref());
+    if let Some(line) = install::server_config::membership_readback(membership) {
+        emitter.note(&line);
+    }
     emitter.finish();
     Ok(())
 }

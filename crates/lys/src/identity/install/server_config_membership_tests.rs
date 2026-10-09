@@ -6,7 +6,7 @@ use std::error::Error;
 
 use serde_json::json;
 
-use super::{Carried, carried, render};
+use super::{Carried, MEMBERSHIP_SETTINGS, carried, membership_readback, render};
 use crate::identity::config::DeploymentConfig;
 use crate::identity::install::layout::Layout;
 
@@ -52,5 +52,37 @@ fn no_membership_setting_is_written_unless_the_operator_named_one() -> Result<()
     assert_eq!(again.membership, Some(named.clone()));
     let rerun = render(&layout, &config, &again, false);
     assert_eq!(rerun["membership"], named, "a run again keeps it");
+    Ok(())
+}
+
+/// The readback names `membership_pages_unconfigured` and each of the four
+/// settings while they are unset, chooses no value, and says nothing once
+/// the operator has named them.
+#[test]
+fn the_readback_names_the_unconfigured_pages_until_the_settings_are_named()
+-> Result<(), Box<dyn Error>> {
+    let (folder, config) = deployment()?;
+    let layout = Layout::at(folder.path().to_path_buf());
+    let fresh = render(&layout, &config, &Carried::default(), false);
+    let line = membership_readback(fresh.get("membership")).ok_or("no readback line")?;
+    assert!(line.contains("membership_pages_unconfigured"), "{line}");
+    for setting in MEMBERSHIP_SETTINGS {
+        assert!(line.contains(setting), "{setting}: {line}");
+    }
+    assert!(
+        !line.chars().any(|letter| letter.is_ascii_digit()),
+        "no value is chosen: {line}"
+    );
+    assert_eq!(
+        membership_readback(Some(&serde_json::Value::Null)),
+        Some(line)
+    );
+    let named = json!({
+        "page_rows_max": 50,
+        "page_bytes_max": 32768,
+        "cursor_seconds": 300,
+        "cursors_max": 1000,
+    });
+    assert_eq!(membership_readback(Some(&named)), None);
     Ok(())
 }

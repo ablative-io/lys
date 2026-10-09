@@ -235,6 +235,28 @@ pub fn render(
     rendered
 }
 
+/// The settings a service with no membership page bounds refuses every
+/// page for, until the operator names them (ACCESS-006 R3, R5).
+pub const MEMBERSHIP_SETTINGS: [&str; 4] = [
+    "membership.page_rows_max",
+    "membership.page_bytes_max",
+    "membership.cursor_seconds",
+    "membership.cursors_max",
+];
+
+/// The readback line an install or upgrade says when the configuration it
+/// wrote names no `membership` settings, or `None` when it names them. No
+/// value is chosen for them here: none is stated anywhere yet.
+pub fn membership_readback(membership: Option<&Value>) -> Option<String> {
+    if membership.is_some_and(|named| !named.is_null()) {
+        return None;
+    }
+    Some(format!(
+        "membership pages: refused membership_pages_unconfigured until the operator names {} in identity.json; no value is chosen for them",
+        MEMBERSHIP_SETTINGS.join(", ")
+    ))
+}
+
 /// What the configuration written under `layout` names that a run again
 /// keeps, or `None` when no configuration has been written.
 pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {

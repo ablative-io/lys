@@ -16,7 +16,12 @@
 //! requires the state to read back whole and to hold exactly one receipt per
 //! leaf, the last completing the snapshot's root. A snapshot failing any
 //! check is refused by its [`SnapshotRefusal`] name, logged, and never used:
-//! the state is rebuilt from every leaf and a new snapshot is written.
+//! the state is rebuilt from every leaf and a new snapshot is written. An
+//! owner may instead hold itself unready on a refused snapshot
+//! (`Ledger::open_held`), the grants do (ACCESS-006 R5), and rebuild
+//! only when its operator names the refusal it discards
+//! (`Ledger::open_rebuilt`). A log that never held a snapshot is not a
+//! refusal of one, and is folded from every leaf either way.
 //!
 //! # When a snapshot is written
 //!
@@ -170,6 +175,47 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             }
             Err(refusal) => Self::rebuild(reopen, refusal, &public, every),
         }
+    }
+
+    /// Opens the log as [`Ledger::open`] does, except that a snapshot it
+    /// finds and refuses is answered by its refusal, never rebuilt past: the
+    /// owner stays unready until its operator resets it. A log holding no
+    /// snapshot is folded from every leaf, as it always was.
+    pub(crate) fn open_held(
+        reopen: &Reopen<S>,
+        key: &Ed25519Identity,
+        every: NonZeroU64,
+    ) -> Result<Resumed<S, K>, K::Error> {
+        let public = key.public_key_bytes();
+        let store = reopen().map_err(|error| store_down::<K>(&error))?;
+        check_past_pin::<S, K>(&store, &public)?;
+        match Self::resume(store, &public, every)? {
+            Ok((ledger, opening)) => {
+                tracing::info!(domain = K::DOMAIN, "{}", ledger.start);
+                Ok(Ok((ledger, opening)))
+            }
+            Err(SnapshotRefusal::Missing) => {
+                Self::rebuild(reopen, SnapshotRefusal::Missing, &public, every).map(Ok)
+            }
+            Err(refusal) => {
+                tracing::warn!(
+                    domain = K::DOMAIN,
+                    "held unready, the snapshot refused: {refusal}"
+                );
+                Ok(Err(refusal))
+            }
+        }
+    }
+
+    /// Opens the log from every leaf, discarding the snapshot `refusal`
+    /// refused: the operator's reset of an owner [`Ledger::open_held`] held.
+    pub(crate) fn open_rebuilt(
+        reopen: &Reopen<S>,
+        key: &Ed25519Identity,
+        every: NonZeroU64,
+        refusal: SnapshotRefusal,
+    ) -> Result<(Self, Opening<K::Event>), K::Error> {
+        Self::rebuild(reopen, refusal, &key.public_key_bytes(), every)
     }
 
     fn resume(store: S, key: &[u8; 32], every: NonZeroU64) -> Result<Resumed<S, K>, K::Error> {

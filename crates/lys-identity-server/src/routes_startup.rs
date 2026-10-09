@@ -205,7 +205,17 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     });
     crate::teams_migration::at_start(&state)?;
     crate::budgets_migration::advance(&state)?;
-    crate::import_bootstrap::ensure(&state)?;
+    // A refused grant checkpoint holds the grants until the operator resets
+    // them (ACCESS-006 R5); the rest of the service still starts and answers,
+    // and the loader's grants are brought forward at a later start.
+    match crate::import_bootstrap::ensure(&state) {
+        Err(ServerError::Grant(lys_identity::grants::GrantError::CheckpointRefused {
+            refusal,
+        })) => (state.say)(&format!(
+            "the loader's grants wait for the operator's checkpoint reset: {refusal}"
+        )),
+        other => other?,
+    }
     crate::goals_api::remind_from(&state);
     crate::budgets_act::settle_at_start(&state);
     crate::refusals_follow::follow_at_start(&state);

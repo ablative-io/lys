@@ -15,7 +15,7 @@ use std::sync::Arc;
 use lys_core::Ed25519Identity;
 use lys_core::merkle::InclusionProof;
 use lys_log_store::witness::{TailWitness, TailWitnessProvider};
-use lys_log_store::{LeafStore, Start};
+use lys_log_store::{LeafStore, SnapshotRefusal, Start};
 
 use super::error::GrantError;
 use super::events::{GrantEvent, SignedGrantEvent, verify_grant_event};
@@ -58,6 +58,17 @@ impl Leaves for GrantLeaves {
     }
 }
 
+/// An opening, or the refused checkpoint and the store's opener handed back.
+pub(crate) type Checked<S> =
+    Result<(GrantLedger<S>, Opening<SignedGrantEvent>), (SnapshotRefusal, Reopen<S>)>;
+
+/// The grants held unready by the checkpoint `refusal` refused.
+pub(crate) fn checkpoint_refused(refusal: &SnapshotRefusal) -> GrantError {
+    GrantError::CheckpointRefused {
+        refusal: refusal.to_string(),
+    }
+}
+
 /// The grant log.
 pub struct GrantLedger<S: LeafStore> {
     ledger: Ledger<S, GrantLeaves>,
@@ -82,14 +93,60 @@ impl<S: LeafStore> GrantLedger<S> {
     /// Open with an explicitly supplied current-head tail capability.
     ///
     /// # Errors
-    /// Retains the original opening failure; no capability is inferred from storage.
+    /// Retains the original opening failure; no capability is inferred from
+    /// storage. A refused checkpoint is [`GrantError::CheckpointRefused`]:
+    /// the grants are held unready, never rebuilt from the log's history
+    /// (ACCESS-006 R5); only the operator reset (`Grants::open_reset`) rebuilds.
     pub fn open_with_tail_provider(
         reopen: Reopen<S>,
         key: &Ed25519Identity,
         every: NonZeroU64,
         tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
     ) -> Result<(Self, Opening<SignedGrantEvent>), GrantError> {
-        let (ledger, opening) = Ledger::open(&reopen, key, every)?;
+        Self::open_checked(reopen, key, every, tail_provider)?
+            .map_err(|(refusal, _)| checkpoint_refused(&refusal))
+    }
+
+    /// Open as [`GrantLedger::open_with_tail_provider`] does, answering a
+    /// refused checkpoint by its refusal with `reopen` handed back, so an
+    /// operator reset can confirm it before anything is rebuilt.
+    ///
+    /// # Errors
+    /// Retains the original opening failure.
+    pub(crate) fn open_checked(
+        reopen: Reopen<S>,
+        key: &Ed25519Identity,
+        every: NonZeroU64,
+        tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
+    ) -> Result<Checked<S>, GrantError> {
+        Ok(match Ledger::open_held(&reopen, key, every)? {
+            Ok((ledger, opening)) => Ok((
+                Self {
+                    ledger,
+                    reopen,
+                    service_key: key.public_key_bytes(),
+                    uncertain: None,
+                    tail_provider,
+                },
+                opening,
+            )),
+            Err(refusal) => Err((refusal, reopen)),
+        })
+    }
+
+    /// Open from every leaf, discarding the checkpoint `refusal` refused:
+    /// the operator's reset, after the operator named that refusal.
+    ///
+    /// # Errors
+    /// Retains the original opening failure.
+    pub(crate) fn open_rebuilt(
+        reopen: Reopen<S>,
+        key: &Ed25519Identity,
+        every: NonZeroU64,
+        tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
+        refusal: SnapshotRefusal,
+    ) -> Result<(Self, Opening<SignedGrantEvent>), GrantError> {
+        let (ledger, opening) = Ledger::open_rebuilt(&reopen, key, every, refusal)?;
         Ok((
             Self {
                 ledger,

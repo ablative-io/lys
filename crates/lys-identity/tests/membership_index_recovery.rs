@@ -1,7 +1,8 @@
-//! Restoring the membership indexes (ACCESS-006 R5) against the grant log's
-//! recovery as it stands: a damaged or foreign checkpoint is refused by its
-//! name and never read, the live indexes come back only from the verified
-//! log, the same as the book that applied every event; a damaged tail leaf
+//! Restoring the membership indexes (ACCESS-006 R5): a damaged or foreign
+//! checkpoint holds the grants unready by its `Snapshot…` name, never read
+//! and never rebuilt past, while the directory still answers; only an
+//! operator reset naming that refusal rebuilds them, from the verified log,
+//! to the book that applied every event, live indexes and all; a damaged tail leaf
 //! refuses the open by name while the directory beside it still answers;
 //! and a revocation interrupted at each boundary of its append resumes to
 //! one authoritative generation, never a mix of allow and deny.
@@ -43,21 +44,51 @@ fn model() -> Result<Model, Box<dyn Error>> {
     )?)
 }
 
-/// `world`'s grants opened again over their log, a snapshot owed at every
-/// entry, so the first open writes one at the whole log.
-fn open(world: &World) -> Result<Grants<FileLeafStore, MemoryRelationships>, Box<dyn Error>> {
+type Opened = Grants<FileLeafStore, MemoryRelationships>;
+
+/// What `world`'s grants are opened from: their log, key and model, and a
+/// snapshot owed at every entry, so an open writes one at the whole log.
+fn inputs(
+    world: &World,
+) -> Result<(Reopen<FileLeafStore>, Ed25519Identity, Model, NonZeroU64), Box<dyn Error>> {
     let path = world.dir.path().join("grants");
     let reopen: Reopen<FileLeafStore> = Box::new(move || FileLeafStore::open(&path));
     let key = Ed25519Identity::load(&world.dir.path().join("service.key"))?;
     let every = NonZeroU64::new(1).ok_or("one is not zero")?;
+    Ok((reopen, key, model()?, every))
+}
+
+/// `world`'s grants opened again over their log, or the grants' refusal.
+fn opened(world: &World) -> Result<Result<Opened, GrantError>, Box<dyn Error>> {
+    let (reopen, key, model, every) = inputs(world)?;
     Ok(Grants::open_with(
         reopen,
         key,
         MemoryRelationships::default(),
-        model()?,
+        model,
         world.admin,
         every,
-    )?)
+    ))
+}
+
+/// `world`'s grants opened again over their log.
+fn open(world: &World) -> Result<Opened, Box<dyn Error>> {
+    Ok(opened(world)??)
+}
+
+/// The operator's reset of `world`'s grants, discarding `discard`.
+fn reset(
+    world: &World,
+    discard: &str,
+) -> Result<Result<(Opened, String), GrantError>, Box<dyn Error>> {
+    let (reopen, key, model, every) = inputs(world)?;
+    Ok(Grants::open_reset(
+        reopen,
+        (key, MemoryRelationships::default(), model, world.admin),
+        every,
+        None,
+        discard,
+    ))
 }
 
 /// Dana's root passed on to Tom, Lee's own root, and Tom's grant revoked:
@@ -111,14 +142,54 @@ fn snapshotted(world: &World) -> TestResult {
     Ok(())
 }
 
-/// The refused checkpoint is named, the indexes are the applied book's.
-fn refused_and_rebuilt(world: &World) -> TestResult {
-    let reopened = open(world)?;
-    let start = reopened.ledger().start();
-    let refusal = start
-        .refusal()
-        .ok_or_else(|| format!("the checkpoint was read: {start}"))?;
-    assert!(refusal.to_string().starts_with("Snapshot"), "{refusal}");
+/// The refused checkpoint holds the grants unready by its `Snapshot…`
+/// name, open after open, while the directory still answers; a reset naming
+/// another refusal changes nothing; the reset naming it rebuilds the book
+/// that applied every event and writes a checkpoint the next open resumes
+/// from; and a reset of grants no longer refused is itself refused.
+fn held_then_reset(world: &World) -> TestResult {
+    let mut name = String::new();
+    for _ in 0..2 {
+        let held = opened(world)?
+            .err()
+            .ok_or("the refused checkpoint was read past")?;
+        let GrantError::CheckpointRefused { refusal } = &held else {
+            return Err(format!("held by another name: {held}").into());
+        };
+        assert!(refusal.starts_with("Snapshot"), "{refusal}");
+        name = refusal
+            .split_once(':')
+            .map_or(refusal.as_str(), |(named, _)| named)
+            .to_owned();
+    }
+    assert!(
+        world.directory.projection().is_ok(),
+        "the directory is another authority domain and still answers"
+    );
+    let other = if name == "SnapshotWrongRoot" {
+        "SnapshotMalformed"
+    } else {
+        "SnapshotWrongRoot"
+    };
+    let wrong = reset(world, other)?.err();
+    assert!(
+        matches!(wrong, Some(GrantError::ResetRefused { .. })),
+        "{wrong:?}"
+    );
+    assert!(
+        matches!(
+            opened(world)?.err(),
+            Some(GrantError::CheckpointRefused { .. })
+        ),
+        "a refused reset changes nothing"
+    );
+    let (reopened, discarded) = reset(world, &name)??;
+    assert!(discarded.starts_with(&name), "{discarded}");
+    assert!(
+        matches!(reopened.ledger().start(), Start::Rebuilt { .. }),
+        "{}",
+        reopened.ledger().start()
+    );
     assert_eq!(
         reopened.book(),
         world.grants.book(),
@@ -133,11 +204,24 @@ fn refused_and_rebuilt(world: &World) -> TestResult {
         live(reopened.book(), tom).is_empty(),
         "the revoked chain stays pruned"
     );
+    drop(reopened);
+    let resumed = open(world)?;
+    assert!(
+        matches!(resumed.ledger().start(), Start::Resumed { .. }),
+        "the reset's checkpoint is read: {}",
+        resumed.ledger().start()
+    );
+    drop(resumed);
+    let again = reset(world, &name)?.err();
+    assert!(
+        matches!(again, Some(GrantError::ResetRefused { .. })),
+        "{again:?}"
+    );
     Ok(())
 }
 
 #[test]
-fn a_damaged_checkpoint_is_named_and_never_read() -> TestResult {
+fn a_damaged_checkpoint_holds_the_grants_until_the_operator_resets_them() -> TestResult {
     let mut world = World::new()?;
     history(&mut world)?;
     snapshotted(&world)?;
@@ -146,11 +230,11 @@ fn a_damaged_checkpoint_is_named_and_never_read() -> TestResult {
     let last = bytes.len().checked_sub(1).ok_or("the snapshot is empty")?;
     bytes[last] ^= 0xff;
     std::fs::write(&path, bytes)?;
-    refused_and_rebuilt(&world)
+    held_then_reset(&world)
 }
 
 #[test]
-fn a_foreign_checkpoint_is_named_and_never_read() -> TestResult {
+fn a_foreign_checkpoint_holds_the_grants_until_the_operator_resets_them() -> TestResult {
     let mut world = World::new()?;
     history(&mut world)?;
     let mut foreign = World::new()?;
@@ -161,7 +245,7 @@ fn a_foreign_checkpoint_is_named_and_never_read() -> TestResult {
         foreign.dir.path().join("grants").join("snapshot.bin"),
         world.dir.path().join("grants").join("snapshot.bin"),
     )?;
-    refused_and_rebuilt(&world)
+    held_then_reset(&world)
 }
 
 #[test]

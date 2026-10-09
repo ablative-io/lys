@@ -14,8 +14,8 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_log_store::LeafStore;
 use lys_log_store::witness::TailWitnessProvider;
+use lys_log_store::{LeafStore, SnapshotRefusal};
 
 use super::admission::{DelegateRequest, RootRequest, Route, judge_delegation, judge_root};
 use super::error::GrantError;
@@ -25,7 +25,7 @@ use super::model::Model;
 use super::permission::RelationshipStore;
 use super::projection::GrantBook;
 use super::receipt::GrantReceipt;
-use super::recovery::GrantLedger;
+use super::recovery::{GrantLedger, checkpoint_refused};
 use super::revocation::judge_revoke;
 use super::settlement::ProjectionDegraded;
 use super::state;
@@ -198,34 +198,28 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         every: NonZeroU64,
         tail_provider: Option<Arc<dyn TailWitnessProvider + Send + Sync>>,
     ) -> Result<Self, GrantError> {
-        let (mut ledger, opening) =
+        let (ledger, opening) =
             GrantLedger::open_with_tail_provider(reopen, &key, every, tail_provider)?;
-        let read = opening
+        // A snapshot whose state does not read is refused like any other:
+        // the grants are held unready, never rebuilt from history here.
+        let (book, folded) = match opening
             .state
             .as_deref()
-            .map(|held| state::decode(held, opening.size));
-        let (book, folded, events) = match read {
-            None => (GrantBook::new(), 0, opening.events),
-            Some(Ok(book)) => (book, opening.size, opening.events),
-            Some(Err(reason)) => (GrantBook::new(), 0, ledger.refuse_state(reason, &key)?),
+            .map(|held| state::decode(held, opening.size))
+        {
+            None => (GrantBook::new(), 0),
+            Some(Ok(book)) => (book, opening.size),
+            Some(Err(reason)) => {
+                return Err(checkpoint_refused(&SnapshotRefusal::StateUnreadable {
+                    reason,
+                }));
+            }
         };
-        let mut grants = Self {
-            model,
-            root_authority,
-            key,
+        Self::opened(
             ledger,
-            book,
-            folded,
-            relationships,
-            unreported: BTreeMap::new(),
-            startup_degraded: None,
-        };
-        for (signed, coordinate) in events {
-            grants.record_committed(&signed, coordinate)?;
-        }
-        grants.snapshot();
-        grants.startup_degraded = grants.project_reading()?.degraded;
-        Ok(grants)
+            (book, folded, opening.events),
+            (key, relationships, model, root_authority),
+        )
     }
 
     /// Take the opening projection failure for its operator report.

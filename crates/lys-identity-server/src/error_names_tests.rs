@@ -1133,6 +1133,18 @@ fn grant_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "LogUnavailable",
         ),
         (
+            ServerError::Grant(GrantError::CheckpointRefused {
+                refusal: detail.to_owned(),
+            }),
+            "CheckpointRefused",
+        ),
+        (
+            ServerError::Grant(GrantError::ResetRefused {
+                reason: detail.to_owned(),
+            }),
+            "ResetRefused",
+        ),
+        (
             ServerError::Grant(GrantError::LeafNotAnEvent {
                 index: 7,
                 reason: detail.to_owned(),

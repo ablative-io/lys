@@ -74,6 +74,7 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::SignatureInvalid
         | GrantError::ReceiptInvalid { .. }
         | GrantError::LogUnavailable { .. }
+        | GrantError::CheckpointRefused { .. }
         | GrantError::LeafNotAnEvent { .. }
         | GrantError::AppendRefused { .. }
         | GrantError::OperationUnresolved { .. }
@@ -81,6 +82,7 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::StaleDecision { .. }
         | GrantError::PermissionEngineUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
         GrantError::OperationReused { .. }
+        | GrantError::ResetRefused { .. }
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
         GrantError::RelationUnknown { .. }

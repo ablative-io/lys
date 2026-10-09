@@ -8,6 +8,7 @@ pub mod cannot_give;
 pub mod change_stream;
 pub mod channel_membership;
 pub mod channel_membership_index;
+mod checkpoint_reset;
 pub mod codec;
 mod commit;
 pub mod error;
@@ -43,6 +44,7 @@ pub use cannot_give::{
     SERVICE_ACCOUNT,
 };
 pub use channel_membership::{identity_kind, placed_within};
+pub use checkpoint_reset::refusal_name;
 pub use codec::{GRANT_ENVELOPE, MEMBERS, decode_grant, encode_grant};
 pub use error::GrantError;
 pub use events::{

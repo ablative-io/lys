@@ -339,6 +339,24 @@ pub enum GrantError {
         /// What the log store reported.
         reason: String,
     },
+    /// The grant log's checkpoint was refused, so the grants are held
+    /// unready: nothing is answered from them, and they are never rebuilt
+    /// from the log's history except by an operator reset naming the
+    /// refusal it discards (ACCESS-006 R5).
+    #[error(
+        "CheckpointRefused: {refusal}; the grants stay unready until an operator reset discards it"
+    )]
+    CheckpointRefused {
+        /// The snapshot refusal, by its `Snapshot…` name and words.
+        refusal: String,
+    },
+    /// An operator reset of the grant checkpoint was refused: none is
+    /// refused, or the one refused is not the one the operator named.
+    #[error("ResetRefused: {reason}")]
+    ResetRefused {
+        /// Why.
+        reason: String,
+    },
     /// A leaf of the grant log is not a grant event this service signed.
     #[error("LeafNotAnEvent: leaf {index} is not a grant event this service signed: {reason}")]
     LeafNotAnEvent {

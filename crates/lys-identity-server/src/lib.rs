@@ -118,6 +118,7 @@ pub mod goals_types;
 pub mod goals_views;
 pub mod grant_bindings_api;
 pub mod grant_changes;
+pub mod grant_checkpoint_reset;
 pub mod grant_contract;
 #[cfg(test)]
 mod grant_settlement_tests;

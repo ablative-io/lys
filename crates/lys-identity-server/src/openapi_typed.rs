@@ -394,6 +394,17 @@ pub(crate) fn typed(api: &mut Api) {
         route(
             (
                 POST,
+                "/grants/checkpoint/reset",
+                "Discard the refused grant checkpoint the administrator names and rebuild the grants from their log",
+            ),
+            S,
+            Some(api.schema::<crate::grant_checkpoint_reset::ResetBody>()),
+            Some(api.schema::<crate::grant_checkpoint_reset::ResetAnswer>()),
+            &[BATCH, ADMIN_BODY, &["ResetRefused"]],
+        ),
+        route(
+            (
+                POST,
                 "/grants/changes",
                 "The grant changes after a consumer's cursor, with watermarks, readiness and resets",
             ),
