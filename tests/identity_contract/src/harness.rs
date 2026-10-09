@@ -207,6 +207,16 @@ impl Harness {
 
 /// The grant log's origin in every started service.
 pub const GRANT_ORIGIN: &str = "example.test/lys/grants";
+
+/// The membership page ceiling every started service is configured with:
+/// test settings, chosen for these fixtures, never an install's number.
+pub const MEMBERSHIP_PAGE_ROWS_MAX: u32 = 64;
+/// The membership page byte ceiling every started service is configured with.
+pub const MEMBERSHIP_PAGE_BYTES_MAX: u32 = 65_536;
+/// How long every started service keeps a membership cursor, in seconds.
+pub const MEMBERSHIP_CURSOR_SECONDS: u64 = 600;
+/// How many membership cursors every started service keeps at once.
+pub const MEMBERSHIP_CURSORS_MAX: u32 = 64;
 /// The permission model every started service judges grants against. Its
 /// relation names say nothing of their actions: `alpha` carries read and
 /// write, `beta` carries read alone.
@@ -486,6 +496,12 @@ impl Service {
             proxy_dir: None,
             surface_dir: None,
             runner_socket: None,
+            membership: Some(lys_identity_server::config::MembershipSettings {
+                page_rows_max: MEMBERSHIP_PAGE_ROWS_MAX,
+                page_bytes_max: MEMBERSHIP_PAGE_BYTES_MAX,
+                cursor_seconds: MEMBERSHIP_CURSOR_SECONDS,
+                cursors_max: MEMBERSHIP_CURSORS_MAX,
+            }),
         };
         adjust(&mut config);
         std::fs::write(&config.grant_model_file, model)?;

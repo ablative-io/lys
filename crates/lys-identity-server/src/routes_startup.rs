@@ -200,6 +200,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         runners: crate::runner_client::Runners::new(key, config.runner_socket.clone()),
         acts: Mutex::new(acts),
         say,
+        membership: crate::channel_membership_counts::Membership::new(config.membership),
     });
     crate::teams_migration::at_start(&state)?;
     crate::budgets_migration::advance(&state)?;

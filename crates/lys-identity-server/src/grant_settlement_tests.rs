@@ -409,6 +409,7 @@ impl Table {
                 key,
             )?),
             say,
+            membership: crate::channel_membership_counts::Membership::new(None),
         };
         Ok(ReadyTable {
             state,

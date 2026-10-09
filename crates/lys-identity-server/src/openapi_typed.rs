@@ -418,6 +418,17 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<lys_pass::membership_admission::AdmissionDecision>()),
             &[BATCH],
         ),
+        route(
+            (
+                GET,
+                "/grants/membership/counts",
+                "The membership capability's work counts and retained entries",
+            ),
+            A,
+            None,
+            Some(api.schema::<crate::channel_membership_counts::MembershipCounts>()),
+            &[BATCH],
+        ),
     ];
     for route in routes {
         api.route(route);

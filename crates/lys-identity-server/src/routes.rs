@@ -147,6 +147,9 @@ pub struct AppState {
     pub acts: Mutex<crate::runner_acts::ActStore>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
+    /// The channel membership capability's page settings, kept cursors and
+    /// work counts (ACCESS-006).
+    pub membership: crate::channel_membership_counts::Membership,
 }
 
 /// Where the service says how a thing it keeps was started.

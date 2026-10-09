@@ -9,12 +9,22 @@
 //! decision would refuse. The caller states both bounds, a row count and an
 //! encoded-byte budget; there is no default page and no unlimited one.
 //!
-//! The continuation is an opaque cursor the provider issues. It binds the
-//! grant log and epoch, the question and the last key reached; it never
-//! grants anything, since every row of a later page is decided again at that
-//! page's revision. A cursor for another question is refused
-//! [`CURSOR_FOREIGN`], one from another log or epoch [`CURSOR_RESET`], and
-//! one the provider cannot read [`CURSOR_MALFORMED`].
+//! The provider names its own ceiling on both bounds, an operator setting;
+//! a page asking for more is refused [`PAGE_OVER_CEILING`] before anything
+//! is looked up, and a provider with no ceiling configured refuses every
+//! page [`PAGES_UNCONFIGURED`] rather than serve an unbounded one.
+//!
+//! The continuation is an opaque cursor the provider issues and keeps: the
+//! text is a random handle the provider looks up, so it cannot be forged or
+//! edited. It binds the asker, the grant log and epoch, the question and the
+//! last key reached; it never grants anything, since every row of a later
+//! page is decided again at that page's revision. A cursor for another asker
+//! or question is refused [`CURSOR_FOREIGN`], one from another log or epoch
+//! [`CURSOR_RESET`], one the provider cannot read [`CURSOR_MALFORMED`], and
+//! one it no longer keeps (its retention passed, its listing completed, or
+//! the provider restarted) [`CURSOR_EXPIRED`]. The provider keeps a finite
+//! number of cursors; a page that would need one more than that is refused
+//! [`CURSORS_FULL`].
 
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +41,18 @@ pub const CURSOR_FOREIGN: &str = "membership_cursor_foreign";
 pub const CURSOR_RESET: &str = "membership_cursor_reset";
 /// The cursor is not one this provider issued.
 pub const CURSOR_MALFORMED: &str = "membership_cursor_malformed";
+/// The cursor is no longer kept: its retention passed, its listing
+/// completed, or the provider restarted since it was issued.
+pub const CURSOR_EXPIRED: &str = "membership_cursor_expired";
+/// The provider already keeps as many cursors as its setting allows.
+pub const CURSORS_FULL: &str = "membership_cursors_full";
+/// The provider's kept cursors cannot be read, so no page that continues
+/// or issues one is served.
+pub const CURSORS_UNAVAILABLE: &str = "membership_cursors_unavailable";
+/// A bound asks for more than the provider's configured ceiling.
+pub const PAGE_OVER_CEILING: &str = "membership_page_over_ceiling";
+/// The provider has no page ceiling configured, so it serves no page.
+pub const PAGES_UNCONFIGURED: &str = "membership_pages_unconfigured";
 
 /// The caller's bounds on one page, both required and both positive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,6 +172,22 @@ pub struct MembershipPage {
     pub revision: Option<u64>,
     /// The page.
     pub outcome: PageOutcome,
+}
+
+/// Refuse `bounds` asking for more than the provider's `ceiling`, a bound
+/// at a time; [`validate_resources`] and [`validate_recipients`] have
+/// already refused a zero bound.
+pub fn within_ceiling(bounds: PageBounds, ceiling: PageBounds) -> Result<(), Refused> {
+    if bounds.rows > ceiling.rows || bounds.bytes > ceiling.bytes {
+        return Err(Refused {
+            name: PAGE_OVER_CEILING,
+            reason: format!(
+                "a page is bounded by at most {} rows and {} bytes here",
+                ceiling.rows, ceiling.bytes
+            ),
+        });
+    }
+    Ok(())
 }
 
 fn bounded(bounds: PageBounds) -> Result<(), Refused> {

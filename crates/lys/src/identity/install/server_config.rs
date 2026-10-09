@@ -92,6 +92,11 @@ pub struct Carried {
     /// existed is read as what it has been: development when it names an
     /// operator token that stands, else service.
     pub profile: Option<super::Profile>,
+    /// The operator's channel membership page settings an earlier
+    /// configuration named (ACCESS-006 R3, R5). The install writes none of
+    /// its own: no number for them is decided, so a service with none
+    /// refuses every membership page by name until the operator names them.
+    pub membership: Option<Value>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -221,6 +226,9 @@ pub fn render(
     if let Some(proxies) = &carried.trusted_proxies {
         rendered["trusted_proxies"] = proxies.clone();
     }
+    if let Some(membership) = &carried.membership {
+        rendered["membership"] = membership.clone();
+    }
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
     }
@@ -249,6 +257,7 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
         administrator: named(earlier.get("administrator")),
         message_service: message_service(&earlier, &path)?,
         trusted_proxies: named(earlier.get("trusted_proxies")),
+        membership: named(earlier.get("membership")),
         issuer: named(earlier.get("issuer")).and_then(|issuer| issuer.as_str().map(str::to_owned)),
         issuer_moved_from: named(earlier.get("issuer_moved_from"))
             .and_then(|issuer| issuer.as_str().map(str::to_owned)),
@@ -337,3 +346,7 @@ pub fn messages_from(path: &Path) -> IdentityResult<Value> {
     })?;
     Ok(value)
 }
+
+#[cfg(test)]
+#[path = "server_config_membership_tests.rs"]
+mod membership_tests;

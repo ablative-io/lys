@@ -33,6 +33,7 @@ use lys_pass::membership::{
     self, CONTRACT_VERSION, GrantLog, MembershipDecision, MembershipRequest, Verdict,
 };
 
+use crate::channel_membership_counts::Counts;
 use crate::error::ServerError;
 use crate::grants::{Decision, Judged, decide, with_grants};
 use crate::grants_batch::{asker, mode_of, unanswered};
@@ -76,17 +77,23 @@ pub(crate) fn named(error: impl Into<ServerError>) -> Named {
     (error.name(), error.to_string())
 }
 
-/// Whether `resource` is `workspace` or placed under it, restricted or not.
+/// Whether `resource` is `workspace` or placed under it, restricted or not,
+/// counting each placement read as an index probe.
 pub(crate) fn within<S: LeafStore>(
     judged: &Judged<'_, S>,
     resource: &Resource,
     workspace: &Resource,
+    counts: &Counts,
 ) -> bool {
     let held = judged.apps.held();
-    placed_within(resource, workspace, |child| {
+    let mut read = 0_u64;
+    let placed = placed_within(resource, workspace, |child| {
+        read += 1;
         held.parent(child.kind(), child.id())
             .and_then(|placed| Resource::new(&placed.parent_kind, &placed.parent_id).ok())
-    })
+    });
+    counts.probe(read);
+    placed
 }
 
 /// The exercise `request` asks about, once every binding is judged, or the
@@ -95,6 +102,7 @@ fn bind<S: LeafStore>(
     judged: &Judged<'_, S>,
     acting_for: Option<&str>,
     request: &MembershipRequest,
+    counts: &Counts,
 ) -> Result<ExerciseRequest, Named> {
     let caller = identity_id(&request.subject.id).map_err(named)?;
     let kind = identity_kind(&caller);
@@ -113,7 +121,7 @@ fn bind<S: LeafStore>(
         .map_err(named)?;
     let resource = Resource::new(&request.resource.kind, &request.resource.id).map_err(named)?;
     let workspace = Resource::new(&request.workspace.kind, &request.workspace.id).map_err(named)?;
-    if !within(judged, &resource, &workspace) {
+    if !within(judged, &resource, &workspace, counts) {
         return Err((
             membership::OUTSIDE_WORKSPACE.to_owned(),
             "the resource is not placed under the named workspace".to_owned(),
@@ -128,10 +136,11 @@ fn bind<S: LeafStore>(
 }
 
 /// The membership decision on `request`, made with `judged` at `at` for
-/// the asker acting for `acting_for`, from the grant log `served`.
+/// the asker acting for `acting_for`, from the grant log `served`, its
+/// work counted in `counts`.
 pub(crate) fn judge<S: LeafStore>(
     judged: &mut Judged<'_, S>,
-    acting_for: Option<&str>,
+    (acting_for, counts): (Option<&str>, &Counts),
     served: &GrantLog,
     request: &MembershipRequest,
     at: u64,
@@ -141,10 +150,11 @@ pub(crate) fn judge<S: LeafStore>(
     if let Err(refused) = membership::validate(request, served) {
         return before((refused.name.to_owned(), refused.reason));
     }
-    let asked = match bind(judged, acting_for, request) {
+    let asked = match bind(judged, acting_for, request, counts) {
         Ok(asked) => asked,
         Err(refused) => return before(refused),
     };
+    counts.decision();
     let decided = decide(
         judged,
         &asked,
@@ -201,10 +211,12 @@ pub async fn membership(
     let acting_for = asker(&state, &headers)?;
     let served = served_log(&state);
     let at = now();
+    let counts = &state.membership.counts;
+    counts.call();
     with_grants(&state, |mut judged| {
         Ok(Json(judge(
             &mut judged,
-            acting_for.as_deref(),
+            (acting_for.as_deref(), counts),
             &served,
             &request,
             at,

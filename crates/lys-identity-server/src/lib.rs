@@ -72,6 +72,8 @@ pub mod certificates_store;
 mod changes;
 pub mod channel_membership;
 pub mod channel_membership_admission;
+pub mod channel_membership_counts;
+mod channel_membership_cursors;
 pub mod channel_membership_pages;
 pub mod config;
 pub mod configuration_api;

@@ -111,6 +111,10 @@ pub struct GrantBook {
     /// Each holder's grants, derived on apply and on decode, never stored.
     by_holder: BTreeMap<IdentityId, BTreeSet<GrantId>>,
     by_kind: BTreeMap<(String, String), BTreeSet<GrantId>>,
+    /// The live grants of each holder and on each resource (ACCESS-006 R5),
+    /// derived on apply and on decode, never stored, and pruned when a grant
+    /// or one it derives from is revoked or spent.
+    live: live::Live,
     operations: HashMap<OperationId, u64>,
     refused: BTreeMap<u64, (OperationId, GrantError)>,
 }
@@ -305,6 +309,7 @@ impl GrantBook {
                         uses: 0,
                     },
                 );
+                self.index_live(grant.id());
             }
             GrantChange::Revoke { grant, reason } => {
                 if let Some(record) = self.records.get_mut(grant) {
@@ -315,8 +320,10 @@ impl GrantBook {
                         reason: reason.clone(),
                     });
                 }
+                self.prune_live(*grant);
             }
             GrantChange::Use { grant, route } => {
+                let mut spent = false;
                 if let Some(record) = self.records.get_mut(grant) {
                     record.last_use = LastUse::Seen {
                         at: event.recorded_at(),
@@ -333,7 +340,11 @@ impl GrantBook {
                             at: event.recorded_at(),
                             reason: ONE_TIME_SPENT.to_owned(),
                         });
+                        spent = true;
                     }
+                }
+                if spent {
+                    self.prune_live(*grant);
                 }
             }
         }
@@ -368,6 +379,9 @@ impl GrantBook {
 
 #[path = "book_state.rs"]
 pub(crate) mod state;
+
+#[path = "projection_live.rs"]
+mod live;
 
 #[cfg(test)]
 #[path = "projection_index_tests.rs"]

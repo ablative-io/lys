@@ -254,6 +254,10 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/grants/membership/admission",
             post(crate::channel_membership_admission::admit),
         )
+        .route(
+            "/grants/membership/counts",
+            get(crate::channel_membership_counts::counts),
+        )
         .route("/grants/why", post(why))
         .route("/grants/who", post(who))
         .route("/grants/reach", post(crate::grants_reach::reach))

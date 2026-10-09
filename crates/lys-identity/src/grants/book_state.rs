@@ -125,7 +125,8 @@ pub(crate) fn encode(book: &GrantBook) -> Result<Value, Unreadable> {
     ]))
 }
 
-/// The book a state value holds, with its lineage and resource indexes rebuilt.
+/// The book a state value holds, with its lineage, resource and live indexes
+/// rebuilt.
 pub(crate) fn decode(value: Value) -> Result<GrantBook, Unreadable> {
     let [records, operations, refused] = tuple::<3>(value, "a grant book")?;
     let mut book = GrantBook::new();
@@ -144,6 +145,7 @@ pub(crate) fn decode(value: Value) -> Result<GrantBook, Unreadable> {
             return Err(format!("grant {id} is recorded twice"));
         }
     }
+    book.rebuild_live();
     book.operations = read_indexed(operations, "an operation", read_operation)?
         .into_iter()
         .collect();

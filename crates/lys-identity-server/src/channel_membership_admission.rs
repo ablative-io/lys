@@ -2,9 +2,11 @@
 //! /grants/membership/admission`.
 //!
 //! A subject is admitted to a workspace when it holds at least one current
-//! grant within it. The question is answered from the book's holder index:
-//! only the subject's own grants are read, those on resources placed within
-//! the workspace are kept, in resource order, and each is decided by
+//! grant within it. The question is answered from the book's live holder
+//! index: only the subject's own live grants are read, never its revoked
+//! history, those on resources placed within the workspace are kept (a
+//! grant held above the workspace is not within it and does not admit), in
+//! resource order, and each is decided by
 //! [`decide`] on one of its actions until one stands. A revoked, expired or
 //! otherwise refused grant does not admit; a decision the grants could not
 //! make is answered by its name with no revision. Admission opens nothing:
@@ -24,6 +26,7 @@ use lys_pass::membership::{self, CONTRACT_VERSION, GrantLog, Verdict};
 use lys_pass::membership_admission::{self, AdmissionDecision, AdmissionRequest, NO_CURRENT_GRANT};
 
 use crate::channel_membership::{Named, contract_resource, named, served_log, within};
+use crate::channel_membership_counts::Counts;
 use crate::error::ServerError;
 use crate::grants::{Decision, Judged, decide, with_grants};
 use crate::grants_batch::{asker, unanswered};
@@ -34,7 +37,7 @@ use crate::session::now;
 /// the resource and the first of the grant's actions.
 fn questions<S: LeafStore>(
     judged: &Judged<'_, S>,
-    acting_for: Option<&str>,
+    (acting_for, counts): (Option<&str>, &Counts),
     request: &AdmissionRequest,
 ) -> Result<BTreeMap<Resource, ExerciseRequest>, Named> {
     let subject = identity_id(&request.subject.id).map_err(named)?;
@@ -51,10 +54,11 @@ fn questions<S: LeafStore>(
         .map_err(named)?;
     let workspace = Resource::new(&request.workspace.kind, &request.workspace.id).map_err(named)?;
     let mut asked = BTreeMap::new();
-    for record in judged.grants.book().held_by(subject) {
+    for record in judged.grants.book().live_held_by(subject) {
+        counts.probe(1);
         let grant = record.grant();
         let resource = grant.resource();
-        if asked.contains_key(resource) || !within(judged, resource, &workspace) {
+        if asked.contains_key(resource) || !within(judged, resource, &workspace, counts) {
             continue;
         }
         let Some(action) = grant.actions().iter().next() else {
@@ -73,10 +77,11 @@ fn questions<S: LeafStore>(
     Ok(asked)
 }
 
-/// The admission decision on `request`, made with `judged` at `at`.
+/// The admission decision on `request`, made with `judged` at `at`, its
+/// work counted in `counts`.
 pub(crate) fn admission<S: LeafStore>(
     judged: &mut Judged<'_, S>,
-    acting_for: Option<&str>,
+    (acting_for, counts): (Option<&str>, &Counts),
     served: &GrantLog,
     request: &AdmissionRequest,
     at: u64,
@@ -87,7 +92,7 @@ pub(crate) fn admission<S: LeafStore>(
     if let Err(refused) = membership_admission::validate(request, served) {
         return before((refused.name.to_owned(), refused.reason));
     }
-    let asked = match questions(judged, acting_for, request) {
+    let asked = match questions(judged, (acting_for, counts), request) {
         Ok(asked) => asked,
         Err(refused) => return before(refused),
     };
@@ -96,6 +101,7 @@ pub(crate) fn admission<S: LeafStore>(
         reason: "the subject holds no current grant within the workspace".to_owned(),
     };
     for question in asked.values() {
+        counts.decision();
         match decide(
             judged,
             question,
@@ -136,10 +142,12 @@ pub async fn admit(
     let acting_for = asker(&state, &headers)?;
     let served = served_log(&state);
     let at = now();
+    let counts = &state.membership.counts;
+    counts.call();
     with_grants(&state, |mut judged| {
         Ok(Json(admission(
             &mut judged,
-            acting_for.as_deref(),
+            (acting_for.as_deref(), counts),
             &served,
             &request,
             at,

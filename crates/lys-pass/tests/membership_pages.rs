@@ -184,3 +184,43 @@ fn a_page_names_its_counts_and_completion() -> Result<(), Box<dyn std::error::Er
     );
     Ok(())
 }
+
+/// ACCESS-006 R3: the provider's ceiling bounds each bound on its own, the
+/// ceiling itself is allowed, and one more row or byte is refused by name.
+#[test]
+fn a_bound_above_the_ceiling_is_refused_by_name() {
+    let ceiling = PageBounds {
+        rows: 4,
+        bytes: 4096,
+    };
+    assert!(membership_pages::within_ceiling(ceiling, ceiling).is_ok());
+    for over in [
+        PageBounds {
+            rows: 5,
+            bytes: 4096,
+        },
+        PageBounds {
+            rows: 4,
+            bytes: 4097,
+        },
+        PageBounds {
+            rows: u32::MAX,
+            bytes: u32::MAX,
+        },
+    ] {
+        let refused = membership_pages::within_ceiling(over, ceiling)
+            .err()
+            .map(|refused| refused.name);
+        assert_eq!(refused, Some(membership_pages::PAGE_OVER_CEILING));
+    }
+    let names = [
+        membership_pages::CURSOR_EXPIRED,
+        membership_pages::CURSORS_FULL,
+        membership_pages::CURSORS_UNAVAILABLE,
+        membership_pages::PAGE_OVER_CEILING,
+        membership_pages::PAGES_UNCONFIGURED,
+    ];
+    for name in names {
+        assert!(name.starts_with("membership_"), "{name}");
+    }
+}
