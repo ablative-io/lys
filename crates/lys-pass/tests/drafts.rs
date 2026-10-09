@@ -39,3 +39,55 @@ fn retry_after_acknowledgment_loss_does_not_execute_again() -> Result<(), Box<dy
     assert_eq!(product.writes, 1);
     Ok(())
 }
+
+#[tokio::test]
+async fn runner_pulls_approved_drafts_and_records_once_after_receipt_retry() -> Result<(), Box<dyn std::error::Error>> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?;
+    let server = tokio::spawn(async move {
+        let digest = lys_pass::drafts::request_digest("prepared");
+        let mut requests = Vec::new();
+        for path in ["/drafts?app=sample&state=approved", "/drafts/draft/executed", "/drafts?app=sample&state=approved", "/drafts/draft/executed"] {
+            let (mut socket, _) = listener.accept().await?;
+            let mut bytes = Vec::new();
+            loop {
+                let mut buffer = [0; 1024];
+                let count = socket.read(&mut buffer).await?;
+                if count == 0 { return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "draft request ended")); }
+                bytes.extend_from_slice(&buffer[..count]);
+                if let Some(end) = bytes.windows(4).position(|value| value == b"\r\n\r\n") {
+                    let headers = std::str::from_utf8(&bytes[..end]).map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+                    let mut length = 0;
+                    for header in headers.lines() {
+                        if let Some((key, value)) = header.split_once(':')
+                            && key.eq_ignore_ascii_case("content-length") {
+                            length = value.trim().parse::<usize>().map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+                        }
+                    }
+                    if bytes.len() >= end + 4 + length { break; }
+                }
+            }
+            let request = String::from_utf8(bytes).map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+            assert!(request.lines().next().is_some_and(|line| line.contains(path)));
+            let body = if path.contains('?') {
+                serde_json::json!({"drafts":[{"id":"draft","app":"sample","grant":"grant","target":{"kind":"sample.file","id":"held","action":"write"},"request_digest":digest,"words":"prepared"}],"total":1,"next":null}).to_string()
+            } else { "{}".to_owned() };
+            socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await?;
+            socket.shutdown().await?;
+            requests.push(request);
+        }
+        Ok::<_, std::io::Error>(requests)
+    });
+    let client = lys_pass::Client::new(reqwest::Client::builder().no_proxy().build()?, url::Url::parse(&format!("http://{address}"))?)?;
+    let mut product = Product::default();
+    for attempt in 0..2 {
+        let report = client.run_approved("connector-pass", "sample", None, &mut product).await?;
+        assert_eq!(report.acknowledged, 1);
+        assert_eq!(product.writes, 1, "attempt {attempt}");
+    }
+    let requests = server.await??;
+    assert!(requests.iter().all(|request| request.to_ascii_lowercase().contains("authorization: bearer connector-pass")));
+    assert!(requests[1].contains("receipt_digest"));
+    Ok(())
+}
