@@ -167,7 +167,7 @@ mod tests {
     use lys_identity::LifecycleState;
     use serde_json::Value;
 
-    use crate::dev_seed::seed_configured;
+    use lys_identity_server::dev_seed::seed_configured;
     use crate::network_store::{Machine, NetworkStore, Retirement};
     use crate::roles_records::{Holding, Version, Words};
     use crate::roles_store::RolesStore;
@@ -186,7 +186,7 @@ mod tests {
             .collect()
     }
 
-    fn fixture(config: &crate::config::Config) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    fn fixture(config: &lys_identity_server::Config) -> Result<BTreeSet<String>, Box<dyn Error>> {
             let seeded = seed_configured(config, [ADMINISTRATOR, "member"])?;
             let owner = seeded.people[0].id.to_string();
             let person = seeded.people[1].id.to_string();

@@ -55,8 +55,8 @@ mod tests {
     use identity_contract::fake_issuer::Login;
     use identity_contract::harness::{ADMINISTRATOR, Service};
     use lys_core::Ed25519Identity;
-    use crate::config::Config;
-    use crate::dev_seed::seed_configured;
+    use lys_identity_server::Config;
+    use lys_identity_server::dev_seed::seed_configured;
     use crate::teams_state::{Changed, Created, Hold, Line};
     use crate::teams_store::TeamStore;
 
