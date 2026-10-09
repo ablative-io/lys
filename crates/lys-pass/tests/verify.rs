@@ -5,11 +5,14 @@ use lys_pass::{Decision, KeySet, VerifiedPass};
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+/// The token a fixture file holds: its one line, without the file's newline.
 fn fixture(name: &str) -> Result<String> {
     Ok(std::fs::read_to_string(format!(
         "{}/fixtures/passes/{name}.jwt",
         env!("CARGO_MANIFEST_DIR")
-    ))?)
+    ))?
+    .trim_end()
+    .to_owned())
 }
 
 fn keys() -> Result<KeySet> {

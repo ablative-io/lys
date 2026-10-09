@@ -69,7 +69,10 @@ async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not(
         .iter()
         .filter_map(|app| app["id"].as_str())
         .collect();
-    assert_eq!(names, vec!["lys"], "a person sees approved apps only");
+    assert!(
+        names.is_empty(),
+        "a person sees only approved apps with a sign-in destination: {names:?}"
+    );
     refused(
         &get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&bea)).await?,
         404,

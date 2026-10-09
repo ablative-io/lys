@@ -301,7 +301,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/tree" "The caller's owned and led teams and descendants" G [AGENT, SIGNED, &["TeamsUnavailable", "RolesUnavailable", "ProvisioningUnavailable", "RuntimeUnavailable", "BudgetsUnavailable", "ConfigurationUnavailable", "goals_unavailable"]] scope("team", "read", []);
     GET "/teams" "Every team" S [SIGNED, &["NoPerson"]] scope("team", "read", []);
     POST "/teams" "Create a team" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "NoPerson"]] scope("team", "team.create", []);
-    GET "/teams/{id}" "One team" S [SIGNED] scope("team", "read", ["id"]);
+    GET "/teams/{id}" "One team" S [SIGNED, &["NoPerson", "TeamUnknown"]] scope("team", "read", ["id"]);
     POST "/teams/{id}/members" "Add a team member" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["AgentNotVisible", "NotAdmitted", "not_permitted", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "TeamsUnavailable", "NoPerson"]] scope("team", "team.member.add", ["id"]);
     POST "/teams/{id}/members/{member}/remove" "Remove a member" S [SIGNED_BODY] scope("team", "team.member.remove", ["id"]);
     POST "/teams/{id}/members/{member}/confirm" "Confirm a held membership" S [ADMIN_BODY, &["TeamsUnavailable"]] scope("team", "team.member.confirm", ["id"]);

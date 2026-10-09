@@ -117,7 +117,7 @@ mod tests {
             }))?;
             if id != "no_settings" {
                 apps.keep(Line::SignInSet(SignInSet {
-                    operation: format!("approve-{id}"),
+                    operation: format!("sign-in-{id}"),
                     app: id.to_owned(),
                     redirects: vec!["https://app.example.test/callback".to_owned()],
                     profile: false,

@@ -153,7 +153,7 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
         cases += 1;
         assert_eq!(decode_grant(bytes).as_ref(), Err(expected), "case {cases}");
     };
-    for key in [0, 14, 40] {
+    for key in [0, 15, 40] {
         let mut pairs = fixture();
         pairs.push((int(key), int(1)));
         refused(&bytes_of(pairs)?, &GrantError::MemberUnknown { key });

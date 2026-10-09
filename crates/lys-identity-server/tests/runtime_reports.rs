@@ -137,7 +137,14 @@ async fn a_found_session_is_kept_without_an_identity_and_stops_only_when_confirm
     assert_eq!(seen["reported_by"], table.seeded.people[1].id.to_string());
     assert_eq!(seen["stopped"], Value::Null);
 
-    let (status, network) = table.service.get("/network", Some(&table.bea)).await?;
+    let (status, hers) = table.service.get("/network", Some(&table.bea)).await?;
+    assert_eq!(status, 200, "{hers}");
+    assert_eq!(
+        hers["machines"],
+        json!([]),
+        "a person who neither named the computer nor may run on it does not see it"
+    );
+    let (status, network) = table.service.get("/network", Some(&table.ada)).await?;
     assert_eq!(status, 200, "{network}");
     assert_eq!(network["reports_served"], true);
     assert_eq!(
