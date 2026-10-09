@@ -1,6 +1,6 @@
 //! The team routes: a signed-in person creates a team they own, adds and
 //! removes its members and retires it; the administrator may change any
-//! team; every signed-in person reads every team. An agent is added only by
+//! team; a person reads only teams they own or belong to. An agent is added only by
 //! a caller who may operate it, and a person only by themselves or the
 //! administrator, because a team's goals and budgets act on its members.
 //!
@@ -184,7 +184,7 @@ pub struct TeamChanged {
 /// The answer of `GET /teams`.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct TeamsView {
-    /// Every team, in the order created.
+    /// Admitted teams, in the order created.
     pub teams: Vec<TeamView>,
 }
 
@@ -501,10 +501,10 @@ async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<TeamsView>, ServerError> {
-    signed_in(&state, &headers)?;
-    with_teams(&state, |store| {
+    let actor = signed_in(&state, &headers)?;
+    with_readable_teams(&state, &actor, |store, person| {
         Ok(TeamsView {
-            teams: store.teams().iter().map(view).collect(),
+            teams: store.teams_iter().filter(|team| visible_to(team, person)).map(view).collect(),
         })
     })
     .map(Json)
@@ -515,15 +515,38 @@ async fn one(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<TeamView>, ServerError> {
-    signed_in(&state, &headers)?;
+    let actor = signed_in(&state, &headers)?;
     let id = team_id(&id)?;
-    with_teams(&state, |store| {
+    with_readable_teams(&state, &actor, |store, person| {
         store
             .team(&id)
+            .filter(|team| visible_to(team, person))
             .map(view)
             .ok_or(ServerError::Team(TeamError::Unknown))
     })
     .map(Json)
+}
+
+fn visible_to(team: &Team, person: Option<&str>) -> bool {
+    person.is_none_or(|person| team.created.owner == person
+        || (team.members.iter().any(|member| member == person)
+            && !team.held.iter().any(|held| held.member == person)))
+}
+
+fn with_readable_teams<T>(
+    state: &AppState,
+    actor: &Actor,
+    act: impl FnOnce(&TeamStore, Option<&str>) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let person = if state.admission.is_administrator(projection, actor)? {
+            None
+        } else {
+            Some(own_person(projection, actor)?.to_string())
+        };
+        with_teams(state, |store| act(store, person.as_deref()))
+    })
 }
 
 async fn confirm(
