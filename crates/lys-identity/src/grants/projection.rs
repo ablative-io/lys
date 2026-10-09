@@ -108,6 +108,8 @@ pub struct GrantBook {
     records: BTreeMap<GrantId, GrantRecord>,
     children: BTreeMap<GrantId, BTreeSet<GrantId>>,
     by_resource: BTreeMap<Resource, BTreeSet<GrantId>>,
+    /// Each holder's grants, derived on apply and on decode, never stored.
+    by_holder: BTreeMap<IdentityId, BTreeSet<GrantId>>,
     by_kind: BTreeMap<(String, String), BTreeSet<GrantId>>,
     operations: HashMap<OperationId, u64>,
     refused: BTreeMap<u64, (OperationId, GrantError)>,
@@ -156,8 +158,13 @@ impl GrantBook {
             .filter_map(|id| self.records.get(id))
     }
 
-    /// Index one issued grant without walking earlier grants.
+    /// Index one issued grant by holder and by kind, without walking earlier
+    /// grants.
     pub(crate) fn index_kind(&mut self, grant: &Grant) {
+        self.by_holder
+            .entry(grant.holder())
+            .or_default()
+            .insert(grant.id());
         let kind = grant.resource().kind();
         self.by_kind
             .entry((owner_of(kind).to_owned(), kind.to_owned()))
@@ -165,11 +172,14 @@ impl GrantBook {
             .insert(grant.id());
     }
 
-    /// Every grant `holder` holds, in id order.
+    /// Every grant `holder` holds, in id order, read from the holder index
+    /// rather than the whole book (ACCESS-006 R3).
     pub fn held_by(&self, holder: IdentityId) -> impl Iterator<Item = &GrantRecord> {
-        self.records
-            .values()
-            .filter(move |record| record.grant.holder() == holder)
+        self.by_holder
+            .get(&holder)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| self.records.get(id))
     }
 
     /// Every grant on `resource`, in id order.

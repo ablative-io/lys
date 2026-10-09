@@ -212,3 +212,41 @@ fn a_held_mode_survives_the_snapshot() -> Result<(), Box<dyn Error>> {
     assert_eq!(reopened, book);
     Ok(())
 }
+
+/// ACCESS-006 R3: a holder's grants are read from the holder index, in id
+/// order, the same after the snapshot rebuilds it, and a holder with none
+/// is answered from the index without visiting the book.
+#[test]
+fn holder_index_answers_each_holder_and_rebuilds_from_the_snapshot() -> Result<(), Box<dyn Error>> {
+    let person = IdentityId::Person(PersonId::from_bytes([0xd1; 16]));
+    let agent = IdentityId::Agent(crate::AgentId::from_bytes([0xa7; 16]));
+    let absent = IdentityId::Person(PersonId::from_bytes([0xee; 16]));
+    let mut book = GrantBook::new();
+    for (index, (id, holder)) in [(5, person), (2, agent), (9, person), (7, agent)]
+        .into_iter()
+        .enumerate()
+    {
+        let event = issued(id, holder, Source::Root, PassOn::UseOnly)?;
+        book.apply(&event, u64::try_from(index)?)?;
+    }
+    let held = |book: &GrantBook, holder| -> Vec<GrantId> {
+        book.held_by(holder)
+            .map(|record| record.grant().id())
+            .collect()
+    };
+    assert_eq!(
+        held(&book, person),
+        [GrantId::from_bytes([5; 16]), GrantId::from_bytes([9; 16])]
+    );
+    assert_eq!(
+        held(&book, agent),
+        [GrantId::from_bytes([2; 16]), GrantId::from_bytes([7; 16])]
+    );
+    let decoded = super::state::decode(super::state::encode(&book)?)?;
+    assert_eq!(decoded, book, "the holder index is rebuilt, not stored");
+    let before = GrantBook::record_visits();
+    assert_eq!(held(&decoded, person), held(&book, person));
+    assert!(held(&decoded, absent).is_empty());
+    assert_eq!(GrantBook::record_visits() - before, 0);
+    Ok(())
+}
