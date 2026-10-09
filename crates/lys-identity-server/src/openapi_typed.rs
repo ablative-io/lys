@@ -140,7 +140,7 @@ pub(crate) fn typed(api: &mut Api) {
             A,
             None,
             Some(apps),
-            &[APP_READ],
+            &[APP_READ, &["NoPerson"]],
         ),
         route(
             (GET, "/apps/me", "The app a credential signs in as"),

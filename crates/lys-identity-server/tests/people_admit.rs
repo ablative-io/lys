@@ -223,7 +223,7 @@ async fn a_failed_step_is_named_with_the_steps_completed_before_it() -> TestResu
     let operation = OperationId::generate()?.to_string();
     let body = admit(&operation, "gamma");
     let (status, refused) = service.post("/people/admit", Some(&ada), &body).await?;
-    assert_eq!(status, 400, "{refused}");
+    assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "RelationUnknown", "{refused}");
     let receipt = &refused["receipt"];
     assert_eq!(receipt["failed"], "grant", "{refused}");
@@ -232,7 +232,7 @@ async fn a_failed_step_is_named_with_the_steps_completed_before_it() -> TestResu
     // Asking again with the same words fails at the same step and repeats
     // none of the four before it.
     let (status, again) = service.post("/people/admit", Some(&ada), &body).await?;
-    assert_eq!(status, 400, "{again}");
+    assert_eq!(status, 403, "{again}");
     assert_eq!(again["receipt"]["failed"], "grant");
     assert_eq!(again["receipt"]["person"], person);
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);

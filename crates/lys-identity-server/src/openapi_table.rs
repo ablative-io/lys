@@ -154,7 +154,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]] scope("person", "person.profile.set", ["id"]);
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY] scope("identity", "identity.transition", ["id"]);
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY] scope("person", "person.login.bind", ["id"]);
-    POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, first root grant" S [ADMIN_BODY, &["RelationUnknown"]] scope("person", "person.create", []);
+    POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, first root grant" S [ADMIN_BODY, &["RelationUnknown", "OperationReused"]] scope("person", "person.create", []);
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
     GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("person", "read", []);
     GET "/agents/{id}" "An agent the caller answers for" S [PERSON, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
@@ -196,7 +196,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/sign-in-providers" "Set a sign-in provider" S [ADMIN_BODY, &["ProviderRefused"]];
     POST "/link-audit" "Deliver a link-audit record" G [AGENT, &["NotAdmitted", "NotSignedIn", "RequestMalformed"]];
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
-    GET "/network" "The machines" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("machine", "read", []);
+    GET "/network" "The machines" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable", "NoPerson"]] scope("machine", "read", []);
     GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]] scope("harness", "read", []);
     POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]] scope("machine", "machine.create", []);
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]] scope("machine", "machine.retire", ["id"]);
@@ -299,7 +299,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/service-accounts" "Create a service account" S [SIGNED_BODY, &["NotAdmitted"], &["ServiceAccountReused"]] scope("service-account", "service-account.create", []);
     POST "/service-accounts/{id}/retire" "Retire a service account" S [SIGNED_BODY, &["ServiceAccountRetired", "ServiceAccountUnknown"]] scope("service-account", "service-account.retire", ["id"]);
     GET "/tree" "The caller's owned and led teams and descendants" G [AGENT, SIGNED, &["TeamsUnavailable", "RolesUnavailable", "ProvisioningUnavailable", "RuntimeUnavailable", "BudgetsUnavailable", "ConfigurationUnavailable", "goals_unavailable"]] scope("team", "read", []);
-    GET "/teams" "Every team" S [SIGNED] scope("team", "read", []);
+    GET "/teams" "Every team" S [SIGNED, &["NoPerson"]] scope("team", "read", []);
     POST "/teams" "Create a team" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "NoPerson"]] scope("team", "team.create", []);
     GET "/teams/{id}" "One team" S [SIGNED] scope("team", "read", ["id"]);
     POST "/teams/{id}/members" "Add a team member" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["AgentNotVisible", "NotAdmitted", "not_permitted", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "TeamsUnavailable", "NoPerson"]] scope("team", "team.member.add", ["id"]);
