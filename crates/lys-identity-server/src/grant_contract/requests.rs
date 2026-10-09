@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 use lys_identity::grants::{
-    Action, CannotGiveRequest, DelegateRequest, GrantId, PassOn, RecipientKind, Relation, Resource,
-    RevokeRequest, RootRequest, Route, Window,
+    Action, CannotGiveRequest, DelegateRequest, GrantId, Mode, PassOn, RecipientKind, Relation,
+    Resource, RevokeRequest, RootRequest, Route, Window,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::{Deserialize, Deserializer};
@@ -45,6 +45,29 @@ impl From<RouteWire> for Route {
             RouteWire::Browser => Self::Browser,
             RouteWire::Api => Self::Api,
             RouteWire::Tool => Self::Tool,
+        }
+    }
+}
+
+/// How a grant is exercised (ACCESS-001 R1): outright, or held for a draft
+/// one approver or two approve.
+#[derive(Debug, Clone, Copy, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ModeWire {
+    /// Exercised at once.
+    Outright,
+    /// Through a draft one approver approves.
+    ByDraft,
+    /// Through a draft two approvers approve.
+    ByTwo,
+}
+
+impl From<ModeWire> for Mode {
+    fn from(mode: ModeWire) -> Self {
+        match mode {
+            ModeWire::Outright => Self::Outright,
+            ModeWire::ByDraft => Self::ByDraft,
+            ModeWire::ByTwo => Self::ByTwo,
         }
     }
 }
@@ -150,9 +173,18 @@ pub struct RootBody {
     relation: String,
     pass_on: PassOnWire,
     window: WindowWire,
+    /// How the grant is exercised; absent, outright, as every grant issued
+    /// before the mode existed.
+    #[serde(default)]
+    mode: Option<ModeWire>,
 }
 
 impl RootBody {
+    /// The mode the grant is issued in.
+    pub fn mode(&self) -> Mode {
+        self.mode.map_or(Mode::Outright, Mode::from)
+    }
+
     /// The request, made by `caller`.
     pub fn request(&self, caller: IdentityId) -> Result<RootRequest, ServerError> {
         Ok(RootRequest {

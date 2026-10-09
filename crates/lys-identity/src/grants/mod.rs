@@ -12,6 +12,7 @@ pub mod events;
 pub mod expiry;
 pub mod frame;
 pub mod lineage;
+mod mode;
 pub mod model;
 pub mod permission;
 pub mod projection;

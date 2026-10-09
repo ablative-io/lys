@@ -1159,6 +1159,13 @@ fn grant_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "PermissionAbsent",
         ),
         (
+            ServerError::Grant(GrantError::ModeHeld {
+                grant: detail.to_owned(),
+                mode: "by_draft",
+            }),
+            "ModeHeld",
+        ),
+        (
             ServerError::Grant(GrantError::Identity(IdentityError::IdentifierMalformed {
                 kind: detail,
                 text: detail.to_owned(),
@@ -1499,6 +1506,7 @@ fn grant_authority_refusals_keep_their_forbidden_status() {
                 | "NotHeld"
                 | "EnvelopeMismatch"
                 | "PermissionAbsent"
+                | "ModeHeld"
         ) {
             assert_eq!(error.status(), StatusCode::FORBIDDEN, "{name}");
         }

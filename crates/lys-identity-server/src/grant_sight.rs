@@ -143,6 +143,7 @@ pub(crate) fn as_seen_by(
         GrantError::Revoked { grant }
         | GrantError::Expired { grant, .. }
         | GrantError::NotStarted { grant, .. }
+        | GrantError::ModeHeld { grant, .. }
         | GrantError::OperationUnresolved { grant, .. } => !grant_seen(judged, caller, grant),
         GrantError::IdentityNotActive { identity, .. }
         | GrantError::ResponsibleMismatch { identity, .. }
@@ -166,6 +167,7 @@ fn named_grant(error: &GrantError) -> Option<String> {
         GrantError::Revoked { grant }
         | GrantError::Expired { grant, .. }
         | GrantError::NotStarted { grant, .. }
+        | GrantError::ModeHeld { grant, .. }
         | GrantError::OperationUnresolved { grant, .. } => Some(grant.clone()),
         _ => None,
     }

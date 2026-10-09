@@ -26,7 +26,7 @@ use super::receipt::GrantReceipt;
 use super::recovery::GrantLedger;
 use super::revocation::judge_revoke;
 use super::state;
-use super::types::{Action, Grant, GrantId, Resource, Source};
+use super::types::{Action, Grant, GrantId, Mode, Resource, Source};
 use super::usage::{self, Unreported};
 use crate::id::{IdentityId, PersonId};
 use crate::log::Reopen;
@@ -110,7 +110,7 @@ pub struct Grants<S: LeafStore, R: RelationshipStore> {
     pub(super) unreported: BTreeMap<GrantId, Unreported>,
 }
 
-fn root_matches(request: &RootRequest, grant: &Grant) -> bool {
+pub(super) fn root_matches(request: &RootRequest, grant: &Grant, mode: Mode) -> bool {
     let parts = grant.parts();
     parts.issuer == request.caller
         && parts.holder == IdentityId::Person(request.holder)
@@ -119,6 +119,7 @@ fn root_matches(request: &RootRequest, grant: &Grant) -> bool {
         && parts.relation == request.relation
         && parts.pass_on == request.pass_on
         && parts.window == request.window
+        && grant.mode() == mode
 }
 
 fn delegation_matches(request: &DelegateRequest, grant: &Grant) -> bool {
@@ -259,7 +260,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         self.settle_for_change()?;
         if let Some((event, receipt)) = self.answered(request.operation)? {
             return match event.change() {
-                GrantChange::Issue(grant) if root_matches(request, grant) => {
+                GrantChange::Issue(grant) if root_matches(request, grant, Mode::Outright) => {
                     self.answer(event, receipt)
                 }
                 _ => Err(Self::reused(request.operation)),
@@ -423,6 +424,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at_least: Option<u64>,
     ) -> Result<Permit, GrantError> {
         let mut permit = self.explain_by(directory, request, only, at, at_least)?;
+        self.book.grant(permit.grant).map_or(Ok(()), Grant::exercisable)?;
         let used = self.record_use(request.caller, permit.grant, request.route, at);
         if let Err(error) = &used {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);

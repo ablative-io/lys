@@ -428,6 +428,18 @@ impl Grant {
         self.mode
     }
 
+    /// Refused `ModeHeld` unless the grant is exercised at once: a held
+    /// grant's act is taken through an approved draft.
+    pub fn exercisable(&self) -> Result<(), GrantError> {
+        if self.mode.is_held() {
+            return Err(GrantError::ModeHeld {
+                grant: self.parts.id.to_string(),
+                mode: self.mode.as_str(),
+            });
+        }
+        Ok(())
+    }
+
     /// Every member of the grant.
     pub fn parts(&self) -> &GrantParts {
         &self.parts

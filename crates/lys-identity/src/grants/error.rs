@@ -396,6 +396,15 @@ pub enum GrantError {
         /// The grant.
         grant: String,
     },
+    /// The grant is held by draft or by two: its act is taken through an
+    /// approved draft, never exercised at once (ACCESS-001 R1).
+    #[error("ModeHeld: {grant} is held {mode}, so its act is taken through an approved draft")]
+    ModeHeld {
+        /// The grant.
+        grant: String,
+        /// Its mode: by_draft or by_two.
+        mode: &'static str,
+    },
     /// A directory refusal met while judging a grant.
     #[error(transparent)]
     Identity(#[from] IdentityError),

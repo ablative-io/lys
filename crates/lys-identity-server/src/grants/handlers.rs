@@ -80,7 +80,7 @@ pub(crate) async fn issue_root(
         judged.apps.admit_kind(None, request.resource.kind())?;
         let recorded = judged
             .grants
-            .issue_root(judged.directory, &request, now())?;
+            .issue_root_in(judged.directory, &request, body.mode(), now())?;
         Ok(Json(RecordedView::from(&recorded)))
     })
 }

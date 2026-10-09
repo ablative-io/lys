@@ -236,6 +236,7 @@ fn grant(error: &GrantError) -> &str {
         GrantError::StaleDecision { .. } => "StaleDecision",
         GrantError::PermissionEngineUnavailable { .. } => "PermissionEngineUnavailable",
         GrantError::PermissionAbsent { .. } => "PermissionAbsent",
+        GrantError::ModeHeld { .. } => "ModeHeld",
         GrantError::Identity(error) => identity(error),
     }
 }
