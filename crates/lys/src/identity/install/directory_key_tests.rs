@@ -433,3 +433,45 @@ fn malformed_live_rights_refuse_before_any_key_write() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn an_upgrade_over_an_install_without_the_directory_key_makes_it_then_reads_it_back() -> TestResult
+{
+    // An install made before the directory key existed holds no such key,
+    // and the install refuses a build other than the placed one, so the
+    // upgrade makes the key as the install would, then reads it back.
+    let root = tempfile::tempdir()?;
+    let (url, handle) = fake_keys_with_configure(
+        None,
+        OnUpdate::Store,
+        false,
+        Some(declared_configure_access()?),
+    )?;
+    let config = deployment(root.path(), &url, b"")?;
+    let layout = crate::identity::install::layout::Layout::at(root.path().to_path_buf());
+    let text = include_str!("../../../../../deploy/identity/config.example.toml").replace(
+        "admin_url = \"http://127.0.0.1:8480\"",
+        &format!("admin_url = \"{url}\""),
+    );
+    std::fs::write(layout.deployment_config(), text)?;
+    let outcome = crate::identity::upgrade::verified_config(&layout);
+    let (seen, bodies) = stop(&url, handle)?;
+    outcome?;
+    assert!(
+        seen.iter()
+            .any(|line| line.starts_with("POST /auth/v1/api_keys ")),
+        "the missing key is made: {seen:?}"
+    );
+    assert_eq!(bodies.len(), 1, "one create, nothing else written");
+    assert_eq!(
+        rights(&bodies[0]["access"])?,
+        rights(&directory_key_access())?,
+        "made with the service's rights alone"
+    );
+    assert_eq!(
+        std::fs::read(config.state_dir().join(server_config::PROVIDERS_KEY_FILE))?,
+        TOKEN.as_bytes(),
+        "the service's key file holds the new key's token"
+    );
+    Ok(())
+}

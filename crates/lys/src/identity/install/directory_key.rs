@@ -274,14 +274,22 @@ pub fn provide(config: &DeploymentConfig) -> IdentityResult<Outcome> {
 }
 
 /// Reads the live authority before an upgrade changes any installed unit.
+/// An install that holds no directory key, made before the key existed, has
+/// it made first, as the install makes it: the install refuses a build
+/// other than the placed one, so only the upgrade can. A key that exists is
+/// never changed here.
 pub fn verify(config: &DeploymentConfig) -> IdentityResult<()> {
     let state = config.state_dir();
-    let held = private_files::read(&state.join(server_config::PROVIDERS_KEY_FILE))?;
     let api = RauthyApi::new(
         &config.issuer.admin_url,
         Some(read_secret(&state, API_KEY_SECRET)?),
     )?;
-    let listed = verify_configure(&api)?;
+    let mut listed = verify_configure(&api)?;
+    if named(&listed, DIRECTORY_KEY_NAME)?.is_none() {
+        provide(config)?;
+        listed = verify_configure(&api)?;
+    }
+    let held = private_files::read(&state.join(server_config::PROVIDERS_KEY_FILE))?;
     exact(
         DIRECTORY_KEY_NAME,
         named(&listed, DIRECTORY_KEY_NAME)?.as_ref(),
