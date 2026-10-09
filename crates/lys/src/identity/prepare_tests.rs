@@ -227,3 +227,67 @@ fn an_https_origin_keeps_the_host_bound_secure_session_cookie() -> Result<(), Bo
     assert!(env.lines().any(|line| line == "RAUTHY_COOKIE_MODE=host"));
     Ok(())
 }
+
+/// The value the rendered environment gives `name`.
+fn env_value(env: &str, name: &str) -> Option<String> {
+    env.lines()
+        .find_map(|line| line.strip_prefix(&format!("{name}=")).map(str::to_owned))
+}
+
+#[test]
+fn the_passkey_origin_names_its_port_and_the_public_url_stays_as_configured()
+-> Result<(), Box<dyn Error>> {
+    // Rauthy reads RP_ORIGIN's port as the text after its last ':', so an
+    // origin on a default port is refused at start unless the port is
+    // written. The issuer's own name, from PUB_URL, keeps the origin as
+    // configured, so a running service's issuer does not move.
+    for (origin, rp_origin, pub_url) in [
+        (
+            "https://identity.example.test",
+            "https://identity.example.test:443",
+            "identity.example.test",
+        ),
+        (
+            "https://identity.example.test/",
+            "https://identity.example.test:443",
+            "identity.example.test",
+        ),
+        (
+            "https://identity.example.test:8443",
+            "https://identity.example.test:8443",
+            "identity.example.test:8443",
+        ),
+        (
+            "http://localhost:8480",
+            "http://localhost:8480",
+            "localhost:8480",
+        ),
+        ("http://localhost", "http://localhost:80", "localhost"),
+        ("https://[::1]", "https://[::1]:443", "[::1]"),
+        ("https://[::1]:8443", "https://[::1]:8443", "[::1]:8443"),
+    ] {
+        // An https origin runs the sign-in service in proxy mode, which
+        // names the gateway it trusts.
+        let text = EXAMPLE
+            .replace(
+                "public_origin = \"http://localhost:8480\"",
+                &format!("public_origin = \"{origin}\""),
+            )
+            .replace(
+                "trusted_proxies = []",
+                "trusted_proxies = [\"172.29.48.1/32\"]",
+            );
+        let env = rendered_for(&text)?;
+        assert_eq!(
+            env_value(&env, "RAUTHY_RP_ORIGIN").as_deref(),
+            Some(rp_origin),
+            "{origin}"
+        );
+        assert_eq!(
+            env_value(&env, "RAUTHY_PUB_URL").as_deref(),
+            Some(pub_url),
+            "{origin}"
+        );
+    }
+    Ok(())
+}

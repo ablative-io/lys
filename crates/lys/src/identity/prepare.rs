@@ -174,6 +174,26 @@ pub fn bootstrap_api_key() -> String {
     base64::engine::general_purpose::STANDARD.encode(request.to_string())
 }
 
+/// The public origin as Rauthy's passkey origin: with its port always
+/// written, the scheme's own (443 for https, 80 for http) when the origin
+/// names none. Rauthy reads the port as the text after the origin's last
+/// `:` and refuses to start without one; the issuer's name, from
+/// `RAUTHY_PUB_URL`, keeps the origin as configured.
+fn passkey_origin(config: &DeploymentConfig) -> String {
+    let origin = config.issuer.public_origin.trim_end_matches('/');
+    let authority = config.pub_url();
+    let host_end = if authority.starts_with('[') {
+        authority.find(']').map_or(authority.len(), |end| end + 1)
+    } else {
+        0
+    };
+    if authority[host_end..].contains(':') {
+        return origin.to_owned();
+    }
+    let port = if config.public_tls() { 443 } else { 80 };
+    format!("{origin}:{port}")
+}
+
 /// Renders the compose environment from the configuration and credentials.
 pub fn render_env(
     config: &DeploymentConfig,
@@ -199,14 +219,7 @@ pub fn render_env(
         ("RAUTHY_LISTEN_PORT", config.issuer.listen_port.to_string()),
         ("RAUTHY_PUB_URL", config.pub_url().to_string()),
         ("RAUTHY_RP_ID", config.rp_id().to_string()),
-        (
-            "RAUTHY_RP_ORIGIN",
-            config
-                .issuer
-                .public_origin
-                .trim_end_matches('/')
-                .to_string(),
-        ),
+        ("RAUTHY_RP_ORIGIN", passkey_origin(config)),
         // The sign-in service names itself on the public origin's scheme: it
         // calls itself https only in proxy mode, so proxy mode follows an
         // https origin and nothing else.
