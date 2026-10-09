@@ -151,6 +151,7 @@ fn strands(book: &GrantBook, old: &AppSchema, new: &AppSchema, at: u64) -> Vec<S
             kind: grant.resource().kind(),
             relation: &grant.parts().relation,
             actions: grant.actions(),
+            held: grant.mode().is_held(),
         });
     stranded(old, new, standing)
         .into_iter()

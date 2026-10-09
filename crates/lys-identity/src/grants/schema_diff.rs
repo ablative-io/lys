@@ -119,10 +119,14 @@ pub struct Standing<'a> {
     pub relation: &'a Relation,
     /// The actions it carries.
     pub actions: &'a BTreeSet<Action>,
+    /// Whether it is held by draft or by two, so a change making one of its
+    /// actions hot strands it (ACCESS-001 R2).
+    pub held: bool,
 }
 
 /// The standing grants of `old`'s app that changing to `new` would strand,
-/// counted by the kind and relation they are held under.
+/// counted by the kind and relation they are held under: one whose relation
+/// or actions go, and one held by draft or by two whose action becomes hot.
 pub fn stranded<'a>(
     old: &AppSchema,
     new: &AppSchema,
@@ -134,7 +138,9 @@ pub fn stranded<'a>(
             continue;
         }
         let strands = new.kind(grant.kind).is_none_or(|kind| {
-            !kind.relations.contains_key(grant.relation) || !grant.actions.is_subset(&kind.actions)
+            !kind.relations.contains_key(grant.relation)
+                || !grant.actions.is_subset(&kind.actions)
+                || (grant.held && grant.actions.iter().any(|action| kind.is_hot(action)))
         });
         if strands {
             let key = Named {

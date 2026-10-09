@@ -255,6 +255,7 @@ fn a_change_names_what_it_adds_and_removes_and_what_it_strands() -> Outcome {
             kind,
             relation,
             actions,
+            held: false,
         }),
     );
     let expected = BTreeMap::from([

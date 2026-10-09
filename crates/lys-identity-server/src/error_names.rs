@@ -261,6 +261,7 @@ fn app(error: &AppError) -> &str {
         AppError::SchemaChangeStrandsGrants { .. } => "schema_change_strands_grants",
         AppError::SchemaVersionUnknown { .. } => "schema_version_unknown",
         AppError::SchemaChangePending { .. } => "schema_change_pending",
+        AppError::GrantModeOnHotAction { .. } => "grant_mode_on_hot_action",
         AppError::RedirectInvalid { .. } | AppError::NoRedirect { .. } => "redirect_invalid",
         AppError::PlacementInvalid { .. } => "placement_invalid",
         AppError::CredentialRefused { .. } => "credential_refused",

@@ -1257,6 +1257,15 @@ fn app_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "action_not_declared",
         ),
         (
+            ServerError::App(AppError::GrantModeOnHotAction {
+                app: detail.to_owned(),
+                action: detail.to_owned(),
+                class: "hot",
+                mode: "by_draft",
+            }),
+            "grant_mode_on_hot_action",
+        ),
+        (
             ServerError::App(AppError::NotYourApp {
                 kind: detail.to_owned(),
                 owner: detail.to_owned(),

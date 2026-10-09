@@ -166,7 +166,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];
     POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused", "WithheldFromAgents"]] scope("grant", "grant.delegate", []);
     GET "/grants/model" "Lys's own permission model" S [SIGNED] scope("grant", "read", []);
-    POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused", "WithheldFromAgents"]];
+    POST "/grants/roots" "Issue a root grant, outright or held by draft or by two" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused", "WithheldFromAgents", "grant_mode_on_hot_action"]];
     POST "/grants/agent-roots" "Record the administrator's roots for giving people and agents access" S [ADMIN, &["NoPerson", "RelationUnknown"], &["RootAuthorityRefused", "WithheldFromAgents"]];
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]] scope("grant", "grant.check", []);
     POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, UNANSWERED, &["NotHeld"]] scope("grant", "grant.why", []);

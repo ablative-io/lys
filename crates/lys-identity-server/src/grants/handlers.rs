@@ -2,6 +2,7 @@
 //! and the questions why, who and what cannot be given.
 
 use super::{Decision, Judged, decide, grant_view, with_grants};
+use crate::apps_error::AppError;
 use crate::error::ServerError;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, CannotGiveBody, DelegateBody, GrantList, GrantView, HolderView,
@@ -14,7 +15,7 @@ use crate::session::now;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
-use lys_identity::grants::{ExerciseRequest, GrantError};
+use lys_identity::grants::{ExerciseRequest, GrantError, Mode, RootRequest, owner_of};
 use lys_identity::{IdentityError, IdentityId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -68,6 +69,29 @@ pub(super) async fn read(
     })
 }
 
+/// Refused `grant_mode_on_hot_action` when `mode` holds the grant for a
+/// draft and its relation carries an action the app's schema marks hot: a hot
+/// action is decided from the pass alone, so it is never held (D4).
+fn refuse_held_on_hot(
+    judged: &Judged<'_>,
+    request: &RootRequest,
+    mode: Mode,
+) -> Result<(), ServerError> {
+    let kind = request.resource.kind();
+    let Some(schema) = judged.apps.schema(owner_of(kind)).filter(|_| mode.is_held()) else {
+        return Ok(());
+    };
+    match schema.hot_action(kind, &request.relation) {
+        Some(action) => Err(ServerError::App(AppError::GrantModeOnHotAction {
+            app: schema.app().to_owned(),
+            action: action.to_string(),
+            class: "hot",
+            mode: mode.as_str(),
+        })),
+        None => Ok(()),
+    }
+}
+
 pub(crate) async fn issue_root(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -78,6 +102,7 @@ pub(crate) async fn issue_root(
             &state, &headers, &judged,
         )?)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
+        refuse_held_on_hot(&judged, &request, body.mode())?;
         let recorded = judged
             .grants
             .issue_root_in(judged.directory, &request, body.mode(), now())?;

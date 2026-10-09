@@ -12,6 +12,8 @@
 //!   different faults and are named differently.
 //! - A parent is a kind of the same app, and following parents never returns
 //!   to the kind it started from.
+//! - A hot action, named under a kind's `hot`, is one the kind declares; every
+//!   other action is deliberate (ACCESS-001 R2, in `schema_class.rs`).
 //! - Every kind, relation and action name is one the permission engine takes:
 //!   three to sixty-four lowercase letters, digits and underscores, starting
 //!   with a letter and not ending with an underscore. A relation is never
@@ -25,10 +27,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
 use super::model::KindModel;
 use super::types::{Action, Relation, Resource};
+
+#[path = "schema_class.rs"]
+mod class;
 
 /// The app whose schema is Lys's own model.
 pub const LYS_APP: &str = "lys";
@@ -145,6 +150,8 @@ pub struct KindSchema {
     pub relations: BTreeMap<Relation, BTreeSet<Action>>,
     /// The kinds whose relations flow down to this one.
     pub parents: BTreeSet<String>,
+    /// The actions decided from the pass alone; every other one is deliberate.
+    pub hot: BTreeSet<Action>,
 }
 
 /// An app's schema, checked.
@@ -162,6 +169,7 @@ struct Raw {
     actions: BTreeSet<Action>,
     relations: Vec<(String, Relation, Pointed)>,
     parents: Pointed,
+    hot: BTreeSet<Action>,
 }
 
 fn object<'a>(
@@ -224,7 +232,7 @@ fn relation(pointer: &str, name: &str) -> Result<Relation, SchemaError> {
 
 fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
     let body = object(value, pointer, "a kind")?;
-    only(body, pointer, &["actions", "relations", "parents"])?;
+    only(body, pointer, &["actions", "relations", "parents", "hot"])?;
     let actions_at = format!("{pointer}/actions");
     let listed = body
         .get("actions")
@@ -241,6 +249,7 @@ fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
     if actions.is_empty() {
         return Err(invalid(&actions_at, "a kind declares at least one action"));
     }
+    let hot = class::hot(body, pointer, &actions)?;
     let mut relations = Vec::new();
     if let Some(value) = body.get("relations") {
         let relations_at = format!("{pointer}/relations");
@@ -279,6 +288,7 @@ fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
         actions,
         relations,
         parents,
+        hot,
     })
 }
 
@@ -419,6 +429,7 @@ impl AppSchema {
                         actions: kind.actions,
                         relations,
                         parents,
+                        hot: kind.hot,
                     },
                 )
             })
@@ -470,6 +481,7 @@ impl AppSchema {
             actions,
             relations,
             parents: BTreeSet::new(),
+            hot: BTreeSet::new(),
         };
         Self {
             app: LYS_APP.to_owned(),
@@ -499,36 +511,6 @@ impl AppSchema {
             };
         }
         self.kinds.get(kind)
-    }
-
-    /// The schema as JSON, in the form it is read from.
-    pub fn to_json(&self) -> Value {
-        let names = |actions: &BTreeSet<Action>| -> Vec<String> {
-            actions.iter().map(ToString::to_string).collect()
-        };
-        let relations = |kind: &KindSchema| -> Map<String, Value> {
-            kind.relations
-                .iter()
-                .map(|(relation, actions)| (relation.to_string(), json!(names(actions))))
-                .collect()
-        };
-        if self.app == LYS_APP {
-            let kind = self.kinds.get(ANY_KIND);
-            return json!({"relations": kind.map(relations).unwrap_or_default()});
-        }
-        let kinds: Map<String, Value> = self
-            .kinds
-            .iter()
-            .map(|(name, kind)| {
-                let body = json!({
-                    "actions": names(&kind.actions),
-                    "relations": relations(kind),
-                    "parents": kind.parents.iter().collect::<Vec<_>>(),
-                });
-                (name.clone(), body)
-            })
-            .collect();
-        json!({"kinds": kinds})
     }
 
     /// Each kind of an app's schema as the grants judge it, under `version`.

@@ -132,6 +132,21 @@ pub enum AppError {
         /// The kind.
         kind: String,
     },
+    /// A grant held by draft or by two names a hot action (ACCESS-001 R2):
+    /// a hot action is decided from the pass alone, so it is never held.
+    #[error(
+        "grant_mode_on_hot_action: {mode} does not apply to `{action}` of {app}, whose class is {class}"
+    )]
+    GrantModeOnHotAction {
+        /// The app whose schema marks the action.
+        app: String,
+        /// The action.
+        action: String,
+        /// Its class: hot.
+        class: &'static str,
+        /// The mode asked for.
+        mode: &'static str,
+    },
     /// An app kind does not declare the action asked about.
     #[error("action_not_declared: the kind `{kind}` declares no action `{action}`")]
     ActionNotDeclared {
@@ -261,7 +276,8 @@ impl AppError {
             | Self::AppOperationReused { .. }
             | Self::SchemaVersionMoved { .. }
             | Self::SchemaChangeStrandsGrants { .. }
-            | Self::SchemaChangePending { .. } => StatusCode::CONFLICT,
+            | Self::SchemaChangePending { .. }
+            | Self::GrantModeOnHotAction { .. } => StatusCode::CONFLICT,
             Self::AppsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
         }
     }
