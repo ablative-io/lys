@@ -56,71 +56,145 @@ fn request() -> Value {
 type Rights = BTreeMap<String, BTreeSet<String>>;
 
 fn invalid_rights() -> IdentityError {
-    IdentityError::new(ErrorKind::RauthyUnexpected, "verify live API key rights", "api_keys",
-        "the issuer answered malformed or duplicate API key rights")
+    IdentityError::new(
+        ErrorKind::RauthyUnexpected,
+        "verify live API key rights",
+        "api_keys",
+        "the issuer answered malformed or duplicate API key rights",
+    )
 }
 
 fn rights(access: &Value) -> IdentityResult<Rights> {
     let mut rights = Rights::new();
     for entry in access.as_array().ok_or_else(invalid_rights)? {
-        let group = entry.get("group").and_then(Value::as_str)
-            .filter(|group| !group.is_empty()).ok_or_else(invalid_rights)?;
+        let group = entry
+            .get("group")
+            .and_then(Value::as_str)
+            .filter(|group| !group.is_empty())
+            .ok_or_else(invalid_rights)?;
         let mut granted = BTreeSet::new();
-        for right in entry.get("access_rights").and_then(Value::as_array).ok_or_else(invalid_rights)? {
-            let right = right.as_str().filter(|right| !right.is_empty()).ok_or_else(invalid_rights)?;
-            if !granted.insert(right.to_owned()) { return Err(invalid_rights()); }
+        for right in entry
+            .get("access_rights")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid_rights)?
+        {
+            let right = right
+                .as_str()
+                .filter(|right| !right.is_empty())
+                .ok_or_else(invalid_rights)?;
+            if !granted.insert(right.to_owned()) {
+                return Err(invalid_rights());
+            }
         }
-        if rights.insert(group.to_owned(), granted).is_some() { return Err(invalid_rights()); }
+        if rights.insert(group.to_owned(), granted).is_some() {
+            return Err(invalid_rights());
+        }
     }
     Ok(rights)
 }
 
 fn forbidden(error: IdentityError, right: &str) -> IdentityError {
-    if error.kind() != ErrorKind::RauthyForbidden { return error; }
-    IdentityError::new(ErrorKind::RauthyForbidden, "verify live API key rights", API_KEY_NAME,
-        format!("the live key cannot exercise the required API key rights: {right}; in the issuer administrator screen, edit the {API_KEY_NAME} API key and grant {right}, then rerun the install; bootstrap declarations do not update a live key"))
+    if error.kind() != ErrorKind::RauthyForbidden {
+        return error;
+    }
+    IdentityError::new(
+        ErrorKind::RauthyForbidden,
+        "verify live API key rights",
+        API_KEY_NAME,
+        format!(
+            "the live key cannot exercise the required API key rights: {right}; in the issuer administrator screen, edit the {API_KEY_NAME} API key and grant {right}, then rerun the install; bootstrap declarations do not update a live key"
+        ),
+    )
 }
 
 fn keys(api: &RauthyApi) -> IdentityResult<Vec<Value>> {
-    api.list_api_keys().map_err(|error| forbidden(error, "ApiKeys/read"))
+    api.list_api_keys()
+        .map_err(|error| forbidden(error, "ApiKeys/read"))
 }
 
 fn named(keys: &[Value], name: &str) -> IdentityResult<Option<Rights>> {
-    let mut matches = keys.iter().filter(|key| key.get("name").and_then(Value::as_str) == Some(name));
-    let found = matches.next().map(|key| rights(&key["access"])).transpose()?;
-    if matches.next().is_some() { return Err(invalid_rights()); }
+    let mut matches = keys
+        .iter()
+        .filter(|key| key.get("name").and_then(Value::as_str) == Some(name));
+    let found = matches
+        .next()
+        .map(|key| rights(&key["access"]))
+        .transpose()?;
+    if matches.next().is_some() {
+        return Err(invalid_rights());
+    }
     Ok(found)
 }
 
 fn differences(current: &Rights, wanted: &Rights) -> (Vec<String>, Vec<String>) {
-    let missing = wanted.iter().flat_map(|(group, rights)| rights.iter()
-        .filter(|right| !current.get(group).is_some_and(|held| held.contains(*right)))
-        .map(|right| format!("{group}/{right}"))).collect();
-    let extra = current.iter().flat_map(|(group, rights)| rights.iter()
-        .filter(|right| !wanted.get(group).is_some_and(|held| held.contains(*right)))
-        .map(|right| format!("{group}/{right}"))).collect();
+    let missing = wanted
+        .iter()
+        .flat_map(|(group, rights)| {
+            rights
+                .iter()
+                .filter(|right| !current.get(group).is_some_and(|held| held.contains(*right)))
+                .map(|right| format!("{group}/{right}"))
+        })
+        .collect();
+    let extra = current
+        .iter()
+        .flat_map(|(group, rights)| {
+            rights
+                .iter()
+                .filter(|right| !wanted.get(group).is_some_and(|held| held.contains(*right)))
+                .map(|right| format!("{group}/{right}"))
+        })
+        .collect();
     (missing, extra)
 }
 
 fn exact(name: &str, current: Option<&Rights>, wanted: &Rights) -> IdentityResult<()> {
     let empty = Rights::new();
     let (missing, extra) = differences(current.unwrap_or(&empty), wanted);
-    if current == Some(wanted) { return Ok(()); }
-    Err(IdentityError::new(ErrorKind::ReadBackMismatch, "verify live API key rights", name,
-        format!("missing rights: {}; undeclared rights: {}; in the issuer administrator screen, edit the {name} API key to grant the missing rights and remove the undeclared rights, then rerun the install; bootstrap declarations do not update a live key", missing.join(", "), extra.join(", "))))
+    if current == Some(wanted) {
+        return Ok(());
+    }
+    Err(IdentityError::new(
+        ErrorKind::ReadBackMismatch,
+        "verify live API key rights",
+        name,
+        format!(
+            "missing rights: {}; undeclared rights: {}; in the issuer administrator screen, edit the {name} API key to grant the missing rights and remove the undeclared rights, then rerun the install; bootstrap declarations do not update a live key",
+            missing.join(", "),
+            extra.join(", ")
+        ),
+    ))
 }
 
 fn configure_rights() -> IdentityResult<Rights> {
-    let bytes = base64::engine::general_purpose::STANDARD.decode(bootstrap_api_key())
-        .map_err(|error| IdentityError::new(ErrorKind::RauthyUnexpected, "decode declared API key rights", API_KEY_NAME, error.to_string()))?;
-    let declaration: Value = serde_json::from_slice(&bytes).map_err(|error|
-        IdentityError::new(ErrorKind::RauthyUnexpected, "parse declared API key rights", API_KEY_NAME, error.to_string()))?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(bootstrap_api_key())
+        .map_err(|error| {
+            IdentityError::new(
+                ErrorKind::RauthyUnexpected,
+                "decode declared API key rights",
+                API_KEY_NAME,
+                error.to_string(),
+            )
+        })?;
+    let declaration: Value = serde_json::from_slice(&bytes).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::RauthyUnexpected,
+            "parse declared API key rights",
+            API_KEY_NAME,
+            error.to_string(),
+        )
+    })?;
     rights(&declaration["access"])
 }
 
 fn verify_configure(api: &RauthyApi) -> IdentityResult<Vec<Value>> {
     let listed = keys(api)?;
-    exact(API_KEY_NAME, named(&listed, API_KEY_NAME)?.as_ref(), &configure_rights()?)?;
+    exact(
+        API_KEY_NAME,
+        named(&listed, API_KEY_NAME)?.as_ref(),
+        &configure_rights()?,
+    )?;
     Ok(listed)
 }
 
@@ -138,7 +212,8 @@ fn create(api: &RauthyApi) -> IdentityResult<Credential> {
     match api.create_api_key(DIRECTORY_KEY_NAME, &request()) {
         Err(error) if error.kind() == ErrorKind::RauthyUncertain => {
             if listed(api)?.is_some() {
-                api.renew_api_key_secret(DIRECTORY_KEY_NAME).map_err(|error| forbidden(error, "ApiKeys/update"))
+                api.renew_api_key_secret(DIRECTORY_KEY_NAME)
+                    .map_err(|error| forbidden(error, "ApiKeys/update"))
             } else {
                 Err(error)
             }
@@ -170,7 +245,10 @@ pub fn reconcile(api: &RauthyApi, held: Option<&[u8]>) -> IdentityResult<Option<
             if held.is_some_and(holds_directory_token) {
                 None
             } else {
-                Some(api.renew_api_key_secret(DIRECTORY_KEY_NAME).map_err(|error| forbidden(error, "ApiKeys/update"))?)
+                Some(
+                    api.renew_api_key_secret(DIRECTORY_KEY_NAME)
+                        .map_err(|error| forbidden(error, "ApiKeys/update"))?,
+                )
             }
         }
     };
@@ -199,12 +277,26 @@ pub fn provide(config: &DeploymentConfig) -> IdentityResult<Outcome> {
 pub fn verify(config: &DeploymentConfig) -> IdentityResult<()> {
     let state = config.state_dir();
     let held = private_files::read(&state.join(server_config::PROVIDERS_KEY_FILE))?;
-    let api = RauthyApi::new(&config.issuer.admin_url, Some(read_secret(&state, API_KEY_SECRET)?))?;
+    let api = RauthyApi::new(
+        &config.issuer.admin_url,
+        Some(read_secret(&state, API_KEY_SECRET)?),
+    )?;
     let listed = verify_configure(&api)?;
-    exact(DIRECTORY_KEY_NAME, named(&listed, DIRECTORY_KEY_NAME)?.as_ref(), &rights(&directory_key_access())?)?;
-    if !held.as_deref().is_some_and(|token| holds_directory_token(token)) {
-        return Err(IdentityError::new(ErrorKind::ReadBackMismatch, "verify the directory service's key", DIRECTORY_KEY_NAME,
-            "the service key file does not hold lys_directory; after an issuer administrator grants the declared lys_configure rights, rerun lys identity install to provision the directory key before upgrading"));
+    exact(
+        DIRECTORY_KEY_NAME,
+        named(&listed, DIRECTORY_KEY_NAME)?.as_ref(),
+        &rights(&directory_key_access())?,
+    )?;
+    if !held
+        .as_deref()
+        .is_some_and(|token| holds_directory_token(token))
+    {
+        return Err(IdentityError::new(
+            ErrorKind::ReadBackMismatch,
+            "verify the directory service's key",
+            DIRECTORY_KEY_NAME,
+            "the service key file does not hold lys_directory; after an issuer administrator grants the declared lys_configure rights, rerun lys identity install to provision the directory key before upgrading",
+        ));
     }
     Ok(())
 }

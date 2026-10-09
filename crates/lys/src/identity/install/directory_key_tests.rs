@@ -93,7 +93,11 @@ fn fake_keys_with_configure(
                 let keys: Vec<Value> = held
                     .iter()
                     .map(|access| json!({"name": DIRECTORY_KEY_NAME, "access": access}))
-                    .chain(configure.iter().map(|access| json!({"name": API_KEY_NAME, "access": access})))
+                    .chain(
+                        configure
+                            .iter()
+                            .map(|access| json!({"name": API_KEY_NAME, "access": access})),
+                    )
                     .collect();
                 (200, json!({ "keys": keys }).to_string())
             } else if line.starts_with("POST /auth/v1/api_keys ") {
@@ -136,7 +140,10 @@ fn deployment(root: &std::path::Path, api: &str, token: &[u8]) -> TestResult<Dep
     config.issuer.admin_url = api.to_owned();
     private_files::ensure_dir(&config.state_dir())?;
     private_files::write(&config.state_dir().join(API_KEY_SECRET.file), &[b'A'; 64])?;
-    private_files::write(&config.state_dir().join(server_config::PROVIDERS_KEY_FILE), token)?;
+    private_files::write(
+        &config.state_dir().join(server_config::PROVIDERS_KEY_FILE),
+        token,
+    )?;
     Ok(config)
 }
 
@@ -147,10 +154,15 @@ fn provide_refuses_a_forbidden_live_key_without_rewriting_the_service_token() ->
     let config = deployment(root.path(), &url, b"lys_configure$held")?;
     let outcome = provide(&config);
     let (seen, bodies) = stop(&url, handle)?;
-    let error = outcome.err().ok_or("the forbidden live key passed install")?;
+    let error = outcome
+        .err()
+        .ok_or("the forbidden live key passed install")?;
     assert_eq!(error.kind(), ErrorKind::RauthyForbidden);
     assert!(error.to_string().contains("ApiKeys/read"), "{error}");
-    assert_eq!(std::fs::read(config.state_dir().join(server_config::PROVIDERS_KEY_FILE))?, b"lys_configure$held");
+    assert_eq!(
+        std::fs::read(config.state_dir().join(server_config::PROVIDERS_KEY_FILE))?,
+        b"lys_configure$held"
+    );
     assert_eq!(seen.len(), 1);
     assert!(bodies.is_empty());
     Ok(())
@@ -159,34 +171,71 @@ fn provide_refuses_a_forbidden_live_key_without_rewriting_the_service_token() ->
 #[test]
 fn upgrade_preflight_checks_live_rights_and_never_mutates_a_key() -> TestResult {
     for (configure, directory, token, refused) in [
-        (json!([{"group":"Users","access_rights":["read"]}]), directory_key_access(), TOKEN.as_bytes(), Some("ApiKeys/create")),
-        (declared_configure_access()?, widened(), TOKEN.as_bytes(), Some("Secrets/update")),
-        (declared_configure_access()?, directory_key_access(), b"lys_configure$held".as_slice(), Some("service key file")),
-        (declared_configure_access()?, directory_key_access(), TOKEN.as_bytes(), None),
+        (
+            json!([{"group":"Users","access_rights":["read"]}]),
+            directory_key_access(),
+            TOKEN.as_bytes(),
+            Some("ApiKeys/create"),
+        ),
+        (
+            declared_configure_access()?,
+            widened(),
+            TOKEN.as_bytes(),
+            Some("Secrets/update"),
+        ),
+        (
+            declared_configure_access()?,
+            directory_key_access(),
+            b"lys_configure$held".as_slice(),
+            Some("service key file"),
+        ),
+        (
+            declared_configure_access()?,
+            directory_key_access(),
+            TOKEN.as_bytes(),
+            None,
+        ),
     ] {
         let root = tempfile::tempdir()?;
-        let (url, handle) = fake_keys_with_configure(Some(directory), OnUpdate::Store, false, Some(configure))?;
+        let (url, handle) =
+            fake_keys_with_configure(Some(directory), OnUpdate::Store, false, Some(configure))?;
         let config = deployment(root.path(), &url, token)?;
         let layout = crate::identity::install::layout::Layout::at(root.path().to_path_buf());
         let text = include_str!("../../../../../deploy/identity/config.example.toml")
-            .replace("public_origin = \"http://localhost:8480\"", "public_origin = \"http://localhost:8490\"")
-            .replace("admin_url = \"http://127.0.0.1:8480\"", &format!("admin_url = \"{url}\""));
+            .replace(
+                "public_origin = \"http://localhost:8480\"",
+                "public_origin = \"http://localhost:8490\"",
+            )
+            .replace(
+                "admin_url = \"http://127.0.0.1:8480\"",
+                &format!("admin_url = \"{url}\""),
+            );
         std::fs::write(layout.deployment_config(), text)?;
         let before = std::fs::read(layout.deployment_config())?;
         let outcome = crate::identity::upgrade::verified_config(&layout);
         let (seen, bodies) = stop(&url, handle)?;
         match refused {
             Some(detail) => {
-                let error = outcome.err().ok_or("invalid live authority passed upgrade")?;
+                let error = outcome
+                    .err()
+                    .ok_or("invalid live authority passed upgrade")?;
                 assert_eq!(error.kind(), ErrorKind::ReadBackMismatch);
                 assert!(error.to_string().contains(detail), "{error}");
-                assert!(error.to_string().contains("issuer administrator"), "{error}");
+                assert!(
+                    error.to_string().contains("issuer administrator"),
+                    "{error}"
+                );
             }
-            None => { outcome?; }
+            None => {
+                outcome?;
+            }
         }
         assert_eq!(seen, ["GET /auth/v1/api_keys HTTP/1.1"]);
         assert!(bodies.is_empty());
-        assert_eq!(std::fs::read(config.state_dir().join(server_config::PROVIDERS_KEY_FILE))?, token);
+        assert_eq!(
+            std::fs::read(config.state_dir().join(server_config::PROVIDERS_KEY_FILE))?,
+            token
+        );
         assert_eq!(std::fs::read(layout.deployment_config())?, before);
     }
     Ok(())
@@ -300,7 +349,10 @@ fn a_key_that_keeps_other_rights_is_a_read_back_mismatch() -> TestResult {
     assert_eq!(error.kind(), ErrorKind::ReadBackMismatch);
     assert!(error.to_string().contains("Secrets/update"), "{error}");
     assert!(error.to_string().contains("ApiKeys/create"), "{error}");
-    assert!(error.to_string().contains("issuer administrator"), "{error}");
+    assert!(
+        error.to_string().contains("issuer administrator"),
+        "{error}"
+    );
     Ok(())
 }
 
@@ -314,8 +366,14 @@ fn a_configure_key_without_key_rights_is_refused_naming_them() -> TestResult {
     assert_eq!(error.kind(), ErrorKind::RauthyForbidden);
     assert!(error.to_string().contains("API key rights"), "{error}");
     assert!(error.to_string().contains("ApiKeys/read"), "{error}");
-    assert!(error.to_string().contains("issuer administrator"), "{error}");
-    assert!(!error.to_string().contains("upgrading the install grants"), "{error}");
+    assert!(
+        error.to_string().contains("issuer administrator"),
+        "{error}"
+    );
+    assert!(
+        !error.to_string().contains("upgrading the install grants"),
+        "{error}"
+    );
     assert_eq!(seen.len(), 1, "nothing was asked after the refusal");
     assert!(bodies.is_empty(), "nothing was written");
     Ok(())
@@ -342,7 +400,12 @@ fn missing_directory_rights_name_each_right_and_the_administrator_repair() -> Te
     stop(&url, handle)?;
     let error = outcome.err().ok_or("missing rights were accepted")?;
     assert_eq!(error.kind(), ErrorKind::ReadBackMismatch);
-    for required in ["Users/create", "Users/update", "issuer administrator", "lys_directory"] {
+    for required in [
+        "Users/create",
+        "Users/update",
+        "issuer administrator",
+        "lys_directory",
+    ] {
         assert!(error.to_string().contains(required), "{error}");
     }
     Ok(())
@@ -350,14 +413,21 @@ fn missing_directory_rights_name_each_right_and_the_administrator_repair() -> Te
 
 #[test]
 fn malformed_live_rights_refuse_before_any_key_write() -> TestResult {
-    for access in [json!({"group":"Users"}), json!([{"group":"Users","access_rights":["read", 1]}]), json!([
-        {"group":"Users","access_rights":["read"]},
-        {"group":"Users","access_rights":["update"]}
-    ])] {
+    for access in [
+        json!({"group":"Users"}),
+        json!([{"group":"Users","access_rights":["read", 1]}]),
+        json!([
+            {"group":"Users","access_rights":["read"]},
+            {"group":"Users","access_rights":["update"]}
+        ]),
+    ] {
         let (url, handle) = fake_keys(Some(access), OnUpdate::Store, false)?;
         let outcome = reconcile(&RauthyApi::new(&url, None)?, Some(TOKEN.as_bytes()));
         let (seen, bodies) = stop(&url, handle)?;
-        assert_eq!(outcome.err().ok_or("malformed rights accepted")?.kind(), ErrorKind::RauthyUnexpected);
+        assert_eq!(
+            outcome.err().ok_or("malformed rights accepted")?.kind(),
+            ErrorKind::RauthyUnexpected
+        );
         assert_eq!(seen, ["GET /auth/v1/api_keys HTTP/1.1"]);
         assert!(bodies.is_empty());
     }
