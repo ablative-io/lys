@@ -38,7 +38,7 @@ use axum::{Json, Router};
 use lys_core::Ed25519Identity;
 use lys_identity::OperationId;
 use lys_identity::grants::{AppSchema, LYS_APP, app_id};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::apps_binding::{Acting, Binding, Registrar, acting, new_secret};
@@ -47,7 +47,7 @@ use crate::apps_state::{
     Approved, By, Client, Decided, Line, LysRecorded, Registered, SignInSet, Standing,
 };
 use crate::apps_store::AppStore;
-use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued};
+use crate::apps_views::{AppView, Approval, RegistrarIssued};
 use crate::config::Config;
 use crate::error::ServerError;
 use crate::routes::{AppState, with_directory};
@@ -391,8 +391,8 @@ pub(crate) fn view(apps: &AppStore, id: &str) -> Result<AppView, ServerError> {
 }
 
 /// Whether `who` may see `app`: the administrator sees every app, an app
-/// itself, a registrar those it registered, and a signed-in person those
-/// approved.
+/// itself, a registrar those it registered, and a person only those whose
+/// approved client has a sign-in destination.
 fn sees(who: &Acting, app: &crate::apps_state::App) -> bool {
     match who {
         Acting::Administrator(_) => true,
@@ -403,23 +403,45 @@ fn sees(who: &Acting, app: &crate::apps_state::App) -> bool {
                     id: service_account.clone(),
                 }
         }
-        Acting::Person(_) => app.standing() == Standing::Approved,
+        Acting::Person(_) => app.standing() == Standing::Approved
+            && app.approved.as_ref().is_some_and(|approved| approved.client.client_id == app.registered.app)
+            && app.sign_in.as_ref().is_some_and(|settings| !settings.redirects.is_empty()),
+    }
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum AppRead {
+    Personal { id: String, name: String, state: Standing },
+    Registry(Box<AppView>),
+}
+
+#[derive(Serialize)]
+struct AppsRead {
+    apps: Vec<AppRead>,
+}
+
+fn read_view(who: &Acting, app: &crate::apps_state::App) -> AppRead {
+    if matches!(who, Acting::Person(_)) {
+        AppRead::Personal { id: app.registered.app.clone(), name: app.registered.name.clone(), state: app.standing() }
+    } else {
+        AppRead::Registry(Box::new(AppView::from(app)))
     }
 }
 
 async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<AppsView>, ServerError> {
+) -> Result<Json<AppsRead>, ServerError> {
     with_apps(&state, |apps, projection| {
         let who = acting(&state, apps.held(), &headers, projection)?;
-        Ok(AppsView {
+        Ok(AppsRead {
             apps: apps
                 .held()
                 .apps
                 .iter()
                 .filter(|app| sees(&who, app))
-                .map(AppView::from)
+                .map(|app| read_view(&who, app))
                 .collect(),
         })
     })
@@ -430,12 +452,12 @@ async fn one(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     UrlPath(id): UrlPath<String>,
-) -> Result<Json<AppView>, ServerError> {
+) -> Result<Json<AppRead>, ServerError> {
     with_apps(&state, |apps, projection| {
         let who = acting(&state, apps.held(), &headers, projection)?;
         apps.app(&id)
             .filter(|app| sees(&who, app))
-            .map(AppView::from)
+            .map(|app| read_view(&who, app))
             .ok_or_else(|| AppError::AppUnknown { app: id.clone() }.into())
     })
     .map(Json)

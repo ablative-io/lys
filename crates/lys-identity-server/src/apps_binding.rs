@@ -195,6 +195,7 @@ pub fn acting(
         return Ok(if state.admission.is_administrator(projection, &actor)? {
             Acting::Administrator(actor)
         } else {
+            crate::read_api::own_person(projection, &actor)?;
             Acting::Person(actor)
         });
     };
