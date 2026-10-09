@@ -265,6 +265,7 @@ impl ServerError {
             Self::Machine(error) => error.status(),
             Self::Cord(error) => error.status(),
             Self::Canvas(error) => error.status(),
+            Self::ProductDraft(error) => error.status(),
         }
     }
 }

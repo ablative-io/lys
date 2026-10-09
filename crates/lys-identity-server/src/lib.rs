@@ -97,6 +97,7 @@ pub mod error_machine;
 mod error_names;
 #[cfg(test)]
 mod error_names_tests;
+pub mod error_product_draft;
 pub mod error_provider;
 mod error_status;
 pub mod error_team;
@@ -169,6 +170,7 @@ pub mod operator;
 #[cfg(test)]
 mod pass_provenance_tests;
 pub mod people_admit;
+pub mod product_drafts;
 pub mod provider;
 pub mod provisioning_api;
 pub mod provisioning_store;

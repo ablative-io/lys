@@ -166,7 +166,7 @@ async fn a_caller_sees_only_their_own_agents_and_never_a_retired_one() -> Result
     Ok(())
 }
 
-/// The counts `/requests`, `/drafts` and `/reviews` answer for `cookie`.
+/// The counts `/requests`, `/drafts`, `/product-drafts` and `/reviews` answer for `cookie`.
 async fn counted(table: &Table, cookie: &str) -> Result<Value> {
     let requests = table.read("/requests", cookie).await?;
     let requests = requests["requests"]
@@ -179,7 +179,19 @@ async fn counted(table: &Table, cookie: &str) -> Result<Value> {
     let drafts = drafts["drafts"].as_array().ok_or("no drafts")?.len();
     let reviews = table.read("/reviews", cookie).await?;
     let reviews = reviews["due"].as_array().ok_or("no due")?.len();
-    Ok(json!({ "requests": requests, "drafts": drafts, "reviews": reviews }))
+    let product_drafts = table.read("/product-drafts", cookie).await?;
+    let product_drafts = product_drafts["drafts"]
+        .as_array()
+        .ok_or("no product drafts")?
+        .iter()
+        .filter(|draft| draft["state"] == "waiting" || draft["state"] == "approved")
+        .count();
+    Ok(json!({
+        "requests": requests,
+        "drafts": drafts,
+        "product_drafts": product_drafts,
+        "reviews": reviews,
+    }))
 }
 
 #[tokio::test]

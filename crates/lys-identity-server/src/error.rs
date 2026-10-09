@@ -262,6 +262,9 @@ pub enum ServerError {
     /// A refusal of a person's canvas.
     #[error(transparent)]
     Canvas(#[from] crate::error_canvas::CanvasError),
+    /// A refusal of a product draft route (ACCESS-001 R3).
+    #[error(transparent)]
+    ProductDraft(#[from] crate::error_product_draft::ProductDraftError),
     /// The signed-in sessions could not be kept or read back.
     #[error("SessionsUnavailable: {reason}")]
     SessionsUnavailable {

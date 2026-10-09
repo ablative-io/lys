@@ -9,7 +9,7 @@
 //! same function that route calls: an agent's usage is computed as
 //! `GET /agents/{id}/usage` computes it, its goals `GET /agents/{id}/goals`', and
 //! the waiting counts are counted from the answers of `GET /requests`,
-//! `GET /drafts` and `GET /reviews`. A part that cannot be read is answered as
+//! `GET /drafts`, `GET /product-drafts` and `GET /reviews`. A part that cannot be read is answered as
 //! the refusal its own route would answer, `{refusal, reason}`, never as zero
 //! or empty, and the rest of the dashboard is still answered.
 //!
@@ -157,6 +157,9 @@ pub struct Waiting {
     pub requests: CountPart,
     /// The drafts `GET /drafts` answers waiting on the caller's decision.
     pub drafts: CountPart,
+    /// The product drafts `GET /product-drafts` answers the caller that are
+    /// not yet closed: waiting on approval, or approved and not executed.
+    pub product_drafts: CountPart,
     /// The grants `GET /reviews` answers due for the caller's review.
     pub reviews: CountPart,
 }
@@ -265,9 +268,11 @@ fn waiting(state: &AppState, headers: &HeaderMap) -> Waiting {
         crate::drafts_list::listed(state, headers, crate::drafts_list::DraftsQuery::default())
             .map(|list| list.drafts.len());
     let reviews = crate::reviews_api::review_view(state, headers).map(|view| view.due.len());
+    let product_drafts = crate::product_drafts::open_count(state, headers);
     Waiting {
         requests: requests.map_err(Refusal::from).into(),
         drafts: drafts.map_err(Refusal::from).into(),
+        product_drafts: product_drafts.map_err(Refusal::from).into(),
         reviews: reviews.map_err(Refusal::from).into(),
     }
 }

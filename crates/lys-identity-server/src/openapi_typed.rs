@@ -371,4 +371,5 @@ pub(crate) fn typed(api: &mut Api) {
     for route in routes {
         api.route(route);
     }
+    crate::product_drafts::typed(api);
 }
