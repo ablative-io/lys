@@ -11,7 +11,7 @@ use ciborium::Value;
 use super::codec::recipient_code;
 use super::error::GrantError;
 use super::projection::USE_BY_HOLDER;
-use super::types::RecipientKind;
+use super::types::{Mode, RecipientKind};
 use crate::state_value::{Unreadable, array, list, read_text, read_uint, text, uint};
 
 const OPERATION_REUSED: u64 = 1;
@@ -28,9 +28,13 @@ const GRANT_UNKNOWN: u64 = 11;
 const ALREADY_REVOKED: u64 = 12;
 const EVENT_MISMATCH: u64 = 13;
 const WITHHELD_FROM_AGENTS: u64 = 14;
+const MODE_HELD: u64 = 15;
 
 /// The reasons an `EventMismatch` the book keeps may give.
 const MISMATCH_REASONS: [&str; 1] = [USE_BY_HOLDER];
+
+/// The held modes a `ModeHeld` the book keeps may name.
+const HELD_MODES: [Mode; 2] = [Mode::ByDraft, Mode::ByTwo];
 
 fn coded(code: u64, members: Vec<Value>) -> Value {
     let mut items = vec![uint(code)];
@@ -82,6 +86,7 @@ pub(crate) fn encode_refusal(refusal: &GrantError) -> Result<Value, Unreadable> 
         GrantError::WithheldFromAgents { relation, withheld } => {
             coded(WITHHELD_FROM_AGENTS, vec![text(relation), text(withheld)])
         }
+        GrantError::ModeHeld { grant, mode } => coded(MODE_HELD, vec![text(grant), text(mode)]),
         other => {
             return Err(format!(
                 "the book holds a refusal with no stable encoded form: {other}"
@@ -165,6 +170,16 @@ pub(crate) fn decode_refusal(value: Value) -> Result<GrantError, Unreadable> {
             relation: next_text(members)?,
             withheld: next_text(members)?,
         },
+        MODE_HELD => {
+            let grant = next_text(members)?;
+            let found = next_text(members)?;
+            let mode = HELD_MODES
+                .into_iter()
+                .map(Mode::as_str)
+                .find(|mode| *mode == found)
+                .ok_or_else(|| format!("`{found}` is not a held mode"))?;
+            GrantError::ModeHeld { grant, mode }
+        }
         EVENT_MISMATCH => {
             let found = next_text(members)?;
             let reason = MISMATCH_REASONS
@@ -192,7 +207,7 @@ mod tests {
     use super::{decode_refusal, encode_refusal};
     use crate::grants::error::GrantError;
     use crate::grants::projection::USE_BY_HOLDER;
-    use crate::grants::types::RecipientKind;
+    use crate::grants::types::{Mode, RecipientKind};
 
     #[test]
     fn every_refusal_the_book_keeps_reads_back_by_name() -> Result<(), String> {
@@ -251,10 +266,28 @@ mod tests {
             GrantError::EventMismatch {
                 reason: USE_BY_HOLDER,
             },
+            GrantError::ModeHeld {
+                grant: "g".to_owned(),
+                mode: Mode::ByDraft.as_str(),
+            },
+            GrantError::ModeHeld {
+                grant: "g".to_owned(),
+                mode: Mode::ByTwo.as_str(),
+            },
         ];
         for refusal in refusals {
             assert_eq!(decode_refusal(encode_refusal(&refusal)?)?, refusal);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_mode_held_naming_no_held_mode_is_unreadable() -> Result<(), String> {
+        let outright = encode_refusal(&GrantError::ModeHeld {
+            grant: "g".to_owned(),
+            mode: Mode::Outright.as_str(),
+        })?;
+        assert!(decode_refusal(outright).is_err());
         Ok(())
     }
 

@@ -335,7 +335,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             GrantId::generate()?,
         )?;
         let grant = if once {
-            Grant::once(grant.parts().clone())?
+            Grant::once(grant.parts().clone())?.with_mode(grant.mode())
         } else {
             grant
         };

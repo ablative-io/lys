@@ -3,13 +3,15 @@
 //! refused `ModeHeld` by name, before any use is recorded; asking why is still
 //! answered, naming the held grant. A held root is issued under its mode,
 //! answers a retry of its operation, and refuses the same operation asked
-//! again in another mode.
+//! again in another mode. A grant passed on from a held root carries the
+//! root's mode, so a held right is never handed on outright.
 
 use std::error::Error;
 
-use crate::support::{T0, World, alpha};
+use crate::support::{T0, World, alpha, pass};
 use lys_identity::grants::{
-    Action, ExerciseRequest, GrantError, Mode, PassOn, Relation, RootRequest, Route, Window,
+    Action, ExerciseRequest, GrantError, Mode, PassOn, RecipientKind, Relation, RootRequest, Route,
+    Window,
 };
 use lys_identity::{IdentityId, OperationId};
 
@@ -23,7 +25,7 @@ fn request(world: &World, operation: OperationId) -> Result<RootRequest, Box<dyn
         holder: world.dana,
         resource: alpha()?,
         relation: Relation::new("heron")?,
-        pass_on: PassOn::UseOnly,
+        pass_on: pass(&["read", "write"], &[RecipientKind::Person])?,
         window: Window::new(T0, None)?,
     })
 }
@@ -103,5 +105,54 @@ fn a_held_root_answers_its_retry_and_refuses_another_mode() -> TestResult {
         .find(|record| record.grant().id().to_string() == first)
         .ok_or("the book holds it")?;
     assert_eq!(held.grant().mode(), Mode::ByTwo);
+    Ok(())
+}
+
+#[test]
+fn a_grant_passed_on_from_a_held_root_carries_its_mode() -> TestResult {
+    for mode in [Mode::ByDraft, Mode::ByTwo] {
+        let mut world = World::new()?;
+        let root = issue(&mut world, mode, OperationId::generate()?)?;
+        let source = world
+            .grants
+            .book()
+            .records()
+            .find(|record| record.grant().id().to_string() == root)
+            .map(|record| record.grant().id())
+            .ok_or("the book holds the root")?;
+        let lent = world.request(
+            IdentityId::Person(world.dana),
+            source,
+            IdentityId::Person(world.tom),
+            "tern",
+            PassOn::UseOnly,
+            None,
+        )?;
+        let lent = world.delegate(&lent)?.event.grant();
+        let held = world
+            .grants
+            .book()
+            .grant(lent)
+            .ok_or("the book holds the grant passed on")?;
+        assert_eq!(
+            held.mode(),
+            mode,
+            "{mode:?}: passed on in the source's mode"
+        );
+        let before = world.events();
+        let refused = world
+            .exercise(IdentityId::Person(world.tom), "read", Route::Api)
+            .err()
+            .ok_or("a right passed on from a held root was exercised at once")?;
+        assert_eq!(
+            refused,
+            GrantError::ModeHeld {
+                grant: lent.to_string(),
+                mode: mode.as_str(),
+            },
+            "{mode:?}"
+        );
+        assert_eq!(world.events(), before, "{mode:?}: no use is recorded");
+    }
     Ok(())
 }

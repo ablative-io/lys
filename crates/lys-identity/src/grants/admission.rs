@@ -349,6 +349,10 @@ pub fn judge_delegation(
             check_end(request.window.ends_at(), ancestor)?;
         }
     }
+    // A grant passed on carries its source's mode, so a right held by draft
+    // or by two is never handed on outright (ACCESS-001 R1; the brief does
+    // not say, and carrying never widens what the source allows).
+    let mode = source.mode();
     Grant::new(GrantParts {
         id,
         issuer: request.caller,
@@ -363,4 +367,5 @@ pub fn judge_delegation(
         model_version: within.model_version,
         operation: request.operation,
     })
+    .map(|grant| grant.with_mode(mode))
 }
