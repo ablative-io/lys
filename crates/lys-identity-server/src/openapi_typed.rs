@@ -385,6 +385,28 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<lys_pass::membership::MembershipDecision>()),
             &[BATCH],
         ),
+        route(
+            (
+                POST,
+                "/grants/membership/resources",
+                "The resources a subject may read or post in, a bounded page at a time",
+            ),
+            A,
+            Some(api.schema::<lys_pass::membership_pages::ResourcePageRequest>()),
+            Some(api.schema::<lys_pass::membership_pages::MembershipPage>()),
+            &[BATCH],
+        ),
+        route(
+            (
+                POST,
+                "/grants/membership/recipients",
+                "The subjects who may read or post in a channel, a bounded page at a time",
+            ),
+            A,
+            Some(api.schema::<lys_pass::membership_pages::RecipientPageRequest>()),
+            Some(api.schema::<lys_pass::membership_pages::MembershipPage>()),
+            &[BATCH],
+        ),
     ];
     for route in routes {
         api.route(route);

@@ -109,7 +109,12 @@ async fn rooms() -> Result<Rooms, Box<dyn std::error::Error>> {
     assert_eq!(refusal["verdict"]["refusal"], "membership_log_mismatch");
     assert!(refusal["revision"].is_null(), "{refusal}");
     rooms.log = refusal["log"].clone();
-    for (channel, restricted) in [("ward-a", false), ("ward-b", false), ("ward-secret", true)] {
+    for (channel, restricted) in [
+        ("ward-a", false),
+        ("ward-b", false),
+        ("ward-c", false),
+        ("ward-secret", true),
+    ] {
         place(&rooms, channel, "ward", restricted).await?;
     }
     place(&rooms, "elsewhere-a", "elsewhere", false).await?;
@@ -328,5 +333,226 @@ async fn only_the_administrator_and_the_owning_app_may_ask() -> TestResult {
     )
     .await?)?;
     assert_eq!(admin["request"], request);
+    Ok(())
+}
+
+/// ACCESS-006 R3: a page of the resources one subject may act on.
+fn resources_page(rooms: &Rooms, subject: (&str, &str), rows: u32, after: Value) -> Value {
+    json!({
+        "contract": 1,
+        "log": rooms.log,
+        "workspace": {"kind": kind("workspace"), "id": "ward"},
+        "subject": {"id": subject.0, "kind": subject.1},
+        "kind": kind("channel"),
+        "action": "read",
+        "at_least": 0,
+        "bounds": {"rows": rows, "bytes": 65536},
+        "after": after,
+    })
+}
+
+/// ACCESS-006 R3: a page of the subjects who may act on one channel.
+fn recipients_page(rooms: &Rooms, channel: &str, rows: u32, after: Value) -> Value {
+    json!({
+        "contract": 1,
+        "log": rooms.log,
+        "workspace": {"kind": kind("workspace"), "id": "ward"},
+        "resource": {"kind": kind("channel"), "id": channel},
+        "action": "read",
+        "at_least": 0,
+        "bounds": {"rows": rows, "bytes": 65536},
+        "after": after,
+    })
+}
+
+async fn page(
+    rooms: &Rooms,
+    path: &str,
+    request: &Value,
+) -> Result<Value, Box<dyn std::error::Error>> {
+    let answer = ok(post(
+        &rooms.service,
+        &format!("/grants/membership/{path}"),
+        Auth::Bearer(&rooms.credential),
+        request,
+    )
+    .await?)?;
+    assert_eq!(answer["contract"], 1);
+    assert_eq!(answer["log"], rooms.log);
+    Ok(answer)
+}
+
+fn ids(page: &Value, field: &str) -> Vec<String> {
+    page["outcome"]["rows"]
+        .as_array()
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|row| row[field]["id"].as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn resources_page_through_the_ward_and_skip_the_restricted_child() -> TestResult {
+    let rooms = rooms().await?;
+    grant(&rooms, &rooms.bea, ("channel", "ward-a"), "reader").await?;
+    grant(&rooms, &rooms.bea, ("workspace", "ward"), "member").await?;
+    let bea = (rooms.bea.as_str(), "person");
+
+    let first = page(
+        &rooms,
+        "resources",
+        &resources_page(&rooms, bea, 2, Value::Null),
+    )
+    .await?;
+    assert_eq!(first["outcome"]["outcome"], "page", "{first}");
+    assert_eq!(ids(&first, "resource"), ["ward-a", "ward-b"], "{first}");
+    assert_eq!(first["outcome"]["returned"], 2);
+    assert_eq!(first["outcome"]["complete"], false);
+    assert!(first["revision"].is_u64());
+    let next = first["outcome"]["next"].clone();
+    assert!(next.is_string(), "{first}");
+
+    let second = page(&rooms, "resources", &resources_page(&rooms, bea, 2, next)).await?;
+    assert_eq!(ids(&second, "resource"), ["ward-c"], "{second}");
+    assert_eq!(
+        second["outcome"]["skipped"], 1,
+        "ward-secret is decided and left out"
+    );
+    assert_eq!(second["outcome"]["complete"], true);
+    assert!(second["outcome"]["next"].is_null());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_revocation_between_pages_is_seen_by_the_next_page() -> TestResult {
+    let rooms = rooms().await?;
+    let member = grant(&rooms, &rooms.bea, ("workspace", "ward"), "member").await?;
+    let bea = (rooms.bea.as_str(), "person");
+    let first = page(
+        &rooms,
+        "resources",
+        &resources_page(&rooms, bea, 1, Value::Null),
+    )
+    .await?;
+    assert_eq!(ids(&first, "resource"), ["ward-a"]);
+    let grant_id = member["grant"]
+        .as_str()
+        .ok_or("the issue names its grant")?;
+    let revoke = json!({"operation": op()?, "route": "api", "reason": "left the ward"});
+    let revoked = ok(post(
+        &rooms.service,
+        &format!("/grants/{grant_id}/revoke"),
+        Auth::Cookie(&rooms.admin),
+        &revoke,
+    )
+    .await?)?;
+    let mut request = resources_page(&rooms, bea, 1, first["outcome"]["next"].clone());
+    request["at_least"] = revoked["receipt"]["revision"].clone();
+    let after = page(&rooms, "resources", &request).await?;
+    assert!(ids(&after, "resource").is_empty(), "{after}");
+    assert_eq!(after["outcome"]["returned"], 0);
+    assert_eq!(after["outcome"]["complete"], true);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_cursor_is_bound_to_its_question() -> TestResult {
+    let rooms = rooms().await?;
+    grant(&rooms, &rooms.bea, ("workspace", "ward"), "member").await?;
+    let bea = (rooms.bea.as_str(), "person");
+    let first = page(
+        &rooms,
+        "resources",
+        &resources_page(&rooms, bea, 1, Value::Null),
+    )
+    .await?;
+    let next = first["outcome"]["next"].clone();
+    let ada = (rooms.ada.as_str(), "person");
+    for (request, name) in [
+        (
+            resources_page(&rooms, ada, 1, next.clone()),
+            "membership_cursor_foreign",
+        ),
+        (
+            resources_page(&rooms, bea, 1, json!("not-a-cursor")),
+            "membership_cursor_malformed",
+        ),
+        (
+            resources_page(&rooms, bea, 0, Value::Null),
+            "membership_page_bound_invalid",
+        ),
+    ] {
+        let refused = page(&rooms, "resources", &request).await?;
+        assert_eq!(refused["outcome"]["refusal"], name, "{refused}");
+        assert!(refused["outcome"].get("rows").is_none());
+    }
+    let substituted = page(
+        &rooms,
+        "recipients",
+        &recipients_page(&rooms, "ward-a", 1, next),
+    )
+    .await?;
+    assert_eq!(
+        substituted["outcome"]["refusal"], "membership_cursor_foreign",
+        "{substituted}"
+    );
+    let mut tiny = resources_page(&rooms, bea, 1, Value::Null);
+    tiny["bounds"]["bytes"] = json!(1);
+    let over = page(&rooms, "resources", &tiny).await?;
+    assert_eq!(
+        over["outcome"]["refusal"], "membership_page_row_over_budget",
+        "{over}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn recipients_are_each_listed_once_whatever_their_chains() -> TestResult {
+    let rooms = rooms().await?;
+    grant(&rooms, &rooms.bea, ("channel", "ward-a"), "reader").await?;
+    grant(&rooms, &rooms.bea, ("workspace", "ward"), "member").await?;
+    grant(&rooms, &rooms.ada, ("workspace", "ward"), "member").await?;
+    grant(&rooms, &rooms.ada, ("channel", "elsewhere-a"), "reader").await?;
+    let mut expected = vec![rooms.ada.clone(), rooms.bea.clone()];
+    expected.sort();
+
+    let mut listed = Vec::new();
+    let mut after = Value::Null;
+    let mut pages = 0;
+    loop {
+        let answer = page(
+            &rooms,
+            "recipients",
+            &recipients_page(&rooms, "ward-a", 1, after),
+        )
+        .await?;
+        pages += 1;
+        listed.extend(ids(&answer, "subject"));
+        if answer["outcome"]["complete"] == true {
+            break;
+        }
+        after = answer["outcome"]["next"].clone();
+    }
+    assert_eq!(listed, expected, "one row per recipient, in a stable order");
+    assert_eq!(pages, 2);
+    let restricted = page(
+        &rooms,
+        "recipients",
+        &recipients_page(&rooms, "ward-secret", 5, Value::Null),
+    )
+    .await?;
+    assert!(ids(&restricted, "subject").is_empty(), "{restricted}");
+    let outside = page(
+        &rooms,
+        "recipients",
+        &recipients_page(&rooms, "elsewhere-a", 5, Value::Null),
+    )
+    .await?;
+    assert_eq!(
+        outside["outcome"]["refusal"], "membership_outside_workspace",
+        "{outside}"
+    );
     Ok(())
 }

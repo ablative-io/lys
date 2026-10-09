@@ -53,7 +53,7 @@ pub(crate) fn served_log(state: &AppState) -> GrantLog {
     }
 }
 
-fn pass_mode(mode: Mode) -> lys_pass::Mode {
+pub(crate) fn pass_mode(mode: Mode) -> lys_pass::Mode {
     match mode {
         Mode::Outright => lys_pass::Mode::Outright,
         Mode::ByDraft => lys_pass::Mode::ByDraft,
@@ -61,7 +61,7 @@ fn pass_mode(mode: Mode) -> lys_pass::Mode {
     }
 }
 
-fn contract_resource(resource: &Resource) -> lys_pass::rights::Resource {
+pub(crate) fn contract_resource(resource: &Resource) -> lys_pass::rights::Resource {
     lys_pass::rights::Resource {
         kind: resource.kind().to_owned(),
         id: resource.id().to_owned(),
@@ -69,11 +69,24 @@ fn contract_resource(resource: &Resource) -> lys_pass::rights::Resource {
 }
 
 /// A refusal's stable name and words.
-type Named = (String, String);
+pub(crate) type Named = (String, String);
 
-fn named(error: impl Into<ServerError>) -> Named {
+pub(crate) fn named(error: impl Into<ServerError>) -> Named {
     let error = error.into();
     (error.name(), error.to_string())
+}
+
+/// Whether `resource` is `workspace` or placed under it, restricted or not.
+pub(crate) fn within<S: LeafStore>(
+    judged: &Judged<'_, S>,
+    resource: &Resource,
+    workspace: &Resource,
+) -> bool {
+    let held = judged.apps.held();
+    placed_within(resource, workspace, |child| {
+        held.parent(child.kind(), child.id())
+            .and_then(|placed| Resource::new(&placed.parent_kind, &placed.parent_id).ok())
+    })
 }
 
 /// The exercise `request` asks about, once every binding is judged, or the
@@ -100,12 +113,7 @@ fn bind<S: LeafStore>(
         .map_err(named)?;
     let resource = Resource::new(&request.resource.kind, &request.resource.id).map_err(named)?;
     let workspace = Resource::new(&request.workspace.kind, &request.workspace.id).map_err(named)?;
-    let held = judged.apps.held();
-    let within = placed_within(&resource, &workspace, |child| {
-        held.parent(child.kind(), child.id())
-            .and_then(|placed| Resource::new(&placed.parent_kind, &placed.parent_id).ok())
-    });
-    if !within {
+    if !within(judged, &resource, &workspace) {
         return Err((
             membership::OUTSIDE_WORKSPACE.to_owned(),
             "the resource is not placed under the named workspace".to_owned(),
