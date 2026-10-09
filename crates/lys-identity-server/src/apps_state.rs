@@ -42,6 +42,10 @@ mod operation_tests;
 #[path = "apps_connector_tests.rs"]
 mod connector_tests;
 
+#[cfg(test)]
+#[path = "apps_children_tests.rs"]
+mod children_tests;
+
 use crate::apps_binding::{Binding, Registrar};
 use crate::read_views::Login;
 use fold::{allows_on, apply, beside_its_approval, ids_read, lys_app};
@@ -536,6 +540,15 @@ impl Held {
     /// The parent a resource of `kind` and `id` is placed in.
     pub fn parent(&self, kind: &str, id: &str) -> Option<&Placed> {
         self.placements.get(self.index.parent(kind, id)?)
+    }
+
+    /// The resources placed in the resource of `kind` and `id`, by their
+    /// first placement, in the order kept, read from the index.
+    pub fn children<'a>(&'a self, kind: &str, id: &str) -> impl Iterator<Item = &'a Placed> + use<'a> {
+        self.index
+            .children(kind, id)
+            .iter()
+            .filter_map(|position| self.placements.get(*position))
     }
 
     /// The line kept under `operation`, whichever kind it is.

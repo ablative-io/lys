@@ -1,6 +1,7 @@
 //! Derived locations retain the fold's app, history, placement and registrar order.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use super::{App, Placed, Registrar};
 
@@ -28,6 +29,8 @@ pub(super) struct Index {
     pub(super) apps: HashMap<String, usize>,
     pub(super) operations: HashMap<String, Location>,
     parents: HashMap<String, HashMap<String, usize>>,
+    /// Each parent's children by their first placement, in the order kept.
+    children: HashMap<String, HashMap<String, Vec<usize>>>,
 }
 
 impl Index {
@@ -68,14 +71,30 @@ impl Index {
     }
 
     pub(super) fn placement(&mut self, placed: &Placed, position: usize) {
-        self.parents
+        let first = self
+            .parents
             .entry(placed.child_kind.clone())
             .or_default()
-            .entry(placed.child_id.clone())
-            .or_insert(position);
+            .entry(placed.child_id.clone());
+        if let Entry::Vacant(vacant) = first {
+            vacant.insert(position);
+            self.children
+                .entry(placed.parent_kind.clone())
+                .or_default()
+                .entry(placed.parent_id.clone())
+                .or_default()
+                .push(position);
+        }
     }
 
     pub(super) fn parent(&self, kind: &str, id: &str) -> Option<usize> {
         self.parents.get(kind)?.get(id).copied()
+    }
+
+    pub(super) fn children(&self, kind: &str, id: &str) -> &[usize] {
+        self.children
+            .get(kind)
+            .and_then(|ids| ids.get(id))
+            .map_or(&[], Vec::as_slice)
     }
 }
