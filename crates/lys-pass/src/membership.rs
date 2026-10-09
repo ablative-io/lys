@@ -38,6 +38,7 @@ pub const OUTSIDE_WORKSPACE: &str = "membership_outside_workspace";
 /// identities, or from different epochs of one identity, never compare.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = MembershipGrantLog))]
 pub struct GrantLog {
     /// The log's stable identity, fixed when the log was created.
     pub identity: String,
@@ -48,6 +49,7 @@ pub struct GrantLog {
 /// The verified identity a membership is asked about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = MembershipSubject))]
 pub struct Subject {
     /// The directory identity id, as verified by the product.
     pub id: String,
@@ -60,6 +62,7 @@ pub struct Subject {
 /// One membership question, every member explicit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = MembershipRequest))]
 pub struct MembershipRequest {
     /// The contract version the asker speaks.
     pub contract: u32,
@@ -81,6 +84,7 @@ pub struct MembershipRequest {
 /// The answer to one membership question.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = MembershipDecision))]
 pub struct MembershipDecision {
     /// The contract version the provider answered under.
     pub contract: u32,
@@ -98,6 +102,7 @@ pub struct MembershipDecision {
 /// Allowed, held for approval, or refused by name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "outcome", rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = MembershipVerdict))]
 pub enum Verdict {
     /// The subject may take the action now.
     Allowed {

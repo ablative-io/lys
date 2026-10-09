@@ -1817,6 +1817,7 @@ dependencies = [
  "lys-identity",
  "lys-log-store",
  "lys-openapi",
+ "lys-pass",
  "lys-runner",
  "openidconnect",
  "rand 0.9.5",
@@ -1870,6 +1871,7 @@ dependencies = [
  "thiserror 2.0.19",
  "tokio",
  "url",
+ "utoipa",
 ]
 
 [[package]]

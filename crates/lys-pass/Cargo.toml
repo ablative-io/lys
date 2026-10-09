@@ -18,6 +18,12 @@ serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 url.workspace = true
+utoipa = { workspace = true, optional = true }
+
+[features]
+# Derive the OpenAPI schemas of the shared contracts, for the Lys server
+# that serves them; products need not take utoipa.
+openapi = ["dep:utoipa"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["io-util"] }

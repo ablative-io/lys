@@ -7,6 +7,7 @@ use crate::Error;
 /// How a grant may be exercised.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = PassMode))]
 pub enum Mode {
     /// The product may act immediately.
     Outright,
@@ -31,6 +32,7 @@ pub struct Holder {
 /// One explicitly reached resource.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = PassResource))]
 pub struct Resource {
     /// The application's qualified kind.
     pub kind: String,
