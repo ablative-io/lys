@@ -223,7 +223,9 @@ async fn administrator_pages_and_native_callback_keep_issuer_authentication() ->
                 .to_str()?
                 .contains("SignInStateUnknown")
         );
-        let held = seen.lock().map_err(|error| format!("observer lock failed: {error}"))?;
+        let held = seen
+            .lock()
+            .map_err(|error| format!("observer lock failed: {error}"))?;
         assert_eq!(
             held.len(),
             6,
