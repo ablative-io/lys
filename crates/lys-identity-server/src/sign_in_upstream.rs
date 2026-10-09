@@ -275,8 +275,10 @@ fn callback_summary(body: &[u8]) -> String {
         return format!("body is not a JSON refusal ({} bytes)", body.len());
     };
     let error = match value.get("error").and_then(Value::as_str) {
-        Some(
-            word @ ("BadRequest"
+        Some(word)
+            if matches!(
+                word,
+                "BadRequest"
             | "Blocked"
             | "Connection"
             | "CSRFTokenError"
@@ -301,8 +303,8 @@ fn callback_summary(body: &[u8]) -> String {
             | "SessionTimeout"
             | "Timeout"
             | "Unauthorized"
-            | "NotAccepted"),
-        ) => word,
+            | "NotAccepted"
+            ) => word,
         _ => "unrecognized",
     };
     let message = match value.get("message").and_then(Value::as_str) {
