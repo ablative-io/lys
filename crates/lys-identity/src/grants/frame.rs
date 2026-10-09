@@ -18,7 +18,9 @@ use super::admission::effective;
 use super::authority::{ExerciseRequest, Grants, Permit};
 use super::error::GrantError;
 use super::events::GrantChange;
+use super::lineage::Lineage;
 use super::permission::{Relationship, RelationshipStore, confirm};
+use super::projection::GrantRecord;
 use super::settlement::ProjectionDegraded;
 use super::types::GrantId;
 use crate::operation::OperationId;
@@ -44,6 +46,17 @@ pub(super) struct Settled {
     pub(super) degraded: Option<Arc<ProjectionDegraded>>,
 }
 
+#[cfg(any(test, feature = "test-support"))]
+thread_local! {
+    static HISTORY_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Count one retired grant read by a decision, for the live-only regression.
+fn note_history_read() {
+    #[cfg(any(test, feature = "test-support"))]
+    HISTORY_READS.with(|reads| reads.set(reads.get() + 1));
+}
+
 impl<'d> Frame<'d> {
     /// Read `grants`' relationships once, after `settled`, with `directory`.
     pub(super) fn read<S: LeafStore, R: RelationshipStore>(
@@ -61,6 +74,14 @@ impl<'d> Frame<'d> {
         };
         frame.current_degraded_revision(grants)?;
         Ok(frame)
+    }
+
+    /// The retired grants decisions on this thread have read, for the
+    /// ACCESS-006 R6 regression: an allowed decision reads none.
+    #[cfg(any(test, feature = "test-support"))]
+    #[must_use]
+    pub fn history_reads() -> usize {
+        HISTORY_READS.with(std::cell::Cell::get)
     }
 
     /// The revision every decision in this frame is made at.
@@ -206,6 +227,45 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         Ok(())
     }
 
+    /// Whether `record` is a grant `request`'s caller holds carrying its
+    /// action, restricted to `only` when it names one.
+    fn fits(&self, record: &GrantRecord, request: &ExerciseRequest, only: Option<GrantId>) -> bool {
+        record.grant().holder() == request.caller
+            && self
+                .model
+                .actions_of(record.grant())
+                .contains(&request.action)
+            && only.is_none_or(|grant| record.grant().id() == grant)
+    }
+
+    /// The chain `record` rests on, judged against `frame`, or why it does
+    /// not stand.
+    fn judged(
+        &self,
+        frame: &Frame<'_>,
+        record: &GrantRecord,
+        at: u64,
+    ) -> Result<Lineage, GrantError> {
+        effective(&self.book, frame.directory, record.grant().id(), at).and_then(|lineage| {
+            if let Some((operation, revoked)) = frame.unresolved
+                && lineage.path.contains(&revoked)
+            {
+                return Err(GrantError::OperationUnresolved {
+                    operation: operation.to_string(),
+                    grant: revoked.to_string(),
+                });
+            }
+            self.fresh(&lineage.path, frame.projected)?;
+            confirm(&frame.held, &lineage.path, at)?;
+            Ok(lineage)
+        })
+    }
+
+    /// Decide from the live grants on the resource alone (ACCESS-006 R6):
+    /// the book's live index never holds a revoked, spent or orphaned grant.
+    /// Only when no live grant fits is the retired history read, and then
+    /// only for the exact name of its refusal (`Revoked`, by the revoked
+    /// grant); nothing read from it ever allows.
     fn decide_in(
         &self,
         frame: &Frame<'_>,
@@ -214,31 +274,13 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
     ) -> Result<Permit, GrantError> {
         let mut refusal = None;
-        let candidates = self.book.on_resource(&request.resource).filter(|record| {
-            record.grant().holder() == request.caller
-                && self
-                    .model
-                    .actions_of(record.grant())
-                    .contains(&request.action)
-                && only.is_none_or(|grant| record.grant().id() == grant)
-        });
-        for record in candidates {
+        let live = self
+            .book
+            .live_on_resource(&request.resource)
+            .filter(|record| self.fits(record, request, only));
+        for record in live {
             let grant = record.grant();
-            let decided =
-                effective(&self.book, frame.directory, grant.id(), at).and_then(|lineage| {
-                    if let Some((operation, revoked)) = frame.unresolved
-                        && lineage.path.contains(&revoked)
-                    {
-                        return Err(GrantError::OperationUnresolved {
-                            operation: operation.to_string(),
-                            grant: revoked.to_string(),
-                        });
-                    }
-                    self.fresh(&lineage.path, frame.projected)?;
-                    confirm(&frame.held, &lineage.path, at)?;
-                    Ok(lineage)
-                });
-            match decided {
+            match self.judged(frame, record, at) {
                 Ok(lineage) => {
                     return Ok(Permit {
                         grant: grant.id(),
@@ -257,6 +299,18 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                     });
                 }
                 Err(error) => {
+                    refusal.get_or_insert(error);
+                }
+            }
+        }
+        if refusal.is_none() {
+            let retired = self
+                .book
+                .on_resource(&request.resource)
+                .filter(|record| self.fits(record, request, only));
+            for record in retired {
+                note_history_read();
+                if let Err(error) = self.judged(frame, record, at) {
                     refusal.get_or_insert(error);
                 }
             }
