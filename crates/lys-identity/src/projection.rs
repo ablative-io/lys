@@ -28,6 +28,9 @@ pub mod accounts;
 #[path = "projection_draft.rs"]
 pub mod draft;
 
+#[path = "projection_product_draft.rs"]
+pub mod product_draft;
+
 /// The inactive identity that interrupts a reporting chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ReportingGap {
@@ -106,6 +109,7 @@ pub struct Projection {
     link_sources: Arc<HashMap<String, u64>>,
     accounts: Arc<accounts::Accounts>,
     drafts: Arc<BTreeMap<OperationId, Arc<draft::DraftRecord>>>,
+    product_drafts: Arc<BTreeMap<OperationId, Arc<product_draft::ProductDraftRecord>>>,
 }
 
 fn unknown(identity: IdentityId) -> IdentityError {
@@ -136,6 +140,7 @@ impl Projection {
             link_sources: Arc::clone(&self.link_sources),
             accounts,
             drafts: Arc::clone(&self.drafts),
+            product_drafts: Arc::clone(&self.product_drafts),
         }
     }
 
@@ -377,6 +382,7 @@ impl Projection {
             Entry::Identity(event) => self.apply(event, index),
             Entry::Install(event) => self.apply_install(event, index),
             Entry::Draft(event) => self.apply_draft(event, index),
+            Entry::ProductDraft(event) => self.apply_product_draft(event, index),
         }
     }
 

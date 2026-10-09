@@ -71,7 +71,7 @@ fn read_record(value: Value) -> Result<(IdentityId, Record), Unreadable> {
 
 /// The projection as a state value.
 pub(crate) fn encode(projection: &Projection) -> Value {
-    array(vec![
+    let mut parts = vec![
         array(
             projection
                 .records
@@ -96,12 +96,19 @@ pub(crate) fn encode(projection: &Projection) -> Value {
             |source| text(source),
         ),
         super::draft::state::encode(projection),
-    ])
+    ];
+    // Product drafts follow only when one is held, so a snapshot of a
+    // directory without them keeps its earlier bytes and readers.
+    if !projection.product_drafts.is_empty() {
+        parts.push(super::product_draft::state::encode(projection));
+    }
+    array(parts)
 }
 
 /// The projection a state value holds, with its login indexes rebuilt.
 pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
     let mut parts = list(value, "a directory projection")?;
+    let product_drafts = if parts.len() == 5 { parts.pop() } else { None };
     let drafts = if parts.len() == 4 {
         parts
             .pop()
@@ -163,6 +170,9 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
         .rebuild_reporting_indexes()
         .map_err(|error| error.to_string())?;
     super::draft::state::decode(&mut projection, drafts)?;
+    if let Some(product_drafts) = product_drafts {
+        super::product_draft::state::decode(&mut projection, product_drafts)?;
+    }
     Ok(projection)
 }
 

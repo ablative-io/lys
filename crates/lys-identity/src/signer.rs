@@ -24,6 +24,7 @@ use crate::encoding::{
 use crate::error::IdentityError;
 use crate::event::IdentityEvent;
 use crate::install_event::{self, INSTALL_EVENT_VERSION, InstallEvent};
+use crate::product_draft_event::{self, ProductDraftEvent};
 
 /// The content type the protected header names.
 pub const CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v1+cbor";
@@ -35,6 +36,8 @@ pub const INSTALL_CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v3+cb
 pub const DRAFT_CONTENT_TYPE: &str = "application/vnd.lys.identity-draft.v1+cbor";
 /// The envelope retaining original request bytes and terminal decisions.
 pub const DRAFT_V2_CONTENT_TYPE: &str = "application/vnd.lys.identity-draft.v2+cbor";
+/// The envelope of a product's held act and its decisions (ACCESS-001 R3).
+pub const PRODUCT_DRAFT_CONTENT_TYPE: &str = "application/vnd.lys.identity-product-draft.v1+cbor";
 
 fn content_type(event: &IdentityEvent) -> &'static str {
     if event.version() == 2 {
@@ -93,6 +96,8 @@ pub enum Entry {
     Install(InstallEvent),
     /// A prepared change or a decision bound to its hash.
     Draft(Box<DraftEvent>),
+    /// A product's held act, a decision on it, or its close.
+    ProductDraft(Box<ProductDraftEvent>),
 }
 
 /// An event with the exact bytes that were signed, ready to append or just verified.
@@ -120,7 +125,7 @@ impl SignedEvent {
         match &self.entry {
             Entry::Identity(event) => Ok(event),
             Entry::Install(_) => Err(IdentityError::InstallEntry),
-            Entry::Draft(_) => Err(IdentityError::DraftEntry),
+            Entry::Draft(_) | Entry::ProductDraft(_) => Err(IdentityError::DraftEntry),
         }
     }
 
@@ -188,6 +193,21 @@ pub fn sign_draft_event(
     ))
 }
 
+/// Validate and sign a canonical product draft payload with the directory service key.
+pub fn sign_product_draft_event(
+    event: ProductDraftEvent,
+    service_key: &Ed25519Identity,
+) -> Result<SignedEvent, IdentityError> {
+    event.validate()?;
+    let body = product_draft_event::encode(&event);
+    Ok(seal(
+        &body,
+        PRODUCT_DRAFT_CONTENT_TYPE,
+        Entry::ProductDraft(Box::new(event)),
+        service_key,
+    ))
+}
+
 /// Verify `message` against the directory service's public key and return the event it carries.
 pub fn verify_event(
     message: &[u8],
@@ -204,6 +224,7 @@ pub fn verify_event(
         && parts.protected != protected_header(&kid, INSTALL_CONTENT_TYPE)
         && parts.protected != protected_header(&kid, DRAFT_CONTENT_TYPE)
         && parts.protected != protected_header(&kid, DRAFT_V2_CONTENT_TYPE)
+        && parts.protected != protected_header(&kid, PRODUCT_DRAFT_CONTENT_TYPE)
     {
         return Err(IdentityError::EventMalformed {
             reason: "the protected header is not the identity-event header",
@@ -232,6 +253,12 @@ pub fn verify_event(
             DRAFT_CONTENT_TYPE
         };
         (Entry::Draft(Box::new(draft)), media_type)
+    } else if parts.protected == protected_header(&kid, PRODUCT_DRAFT_CONTENT_TYPE) {
+        let draft = product_draft_event::decode(&parts.payload)?;
+        (
+            Entry::ProductDraft(Box::new(draft)),
+            PRODUCT_DRAFT_CONTENT_TYPE,
+        )
     } else if install_event::body_version(&parts.payload)? == Some(INSTALL_EVENT_VERSION) {
         let event = install_event::decode(&parts.payload)?;
         (Entry::Install(event), INSTALL_CONTENT_TYPE)

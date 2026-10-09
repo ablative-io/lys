@@ -25,6 +25,7 @@ pub mod link_audit;
 pub mod log;
 pub mod message_service;
 pub mod operation;
+pub mod product_draft_event;
 pub mod profile;
 pub mod projection;
 pub mod provenance;
@@ -47,5 +48,6 @@ pub use profile::Profile;
 pub use provenance::{Actor, AuthMethod, Provenance};
 pub use restart::SNAPSHOT_EVERY;
 pub use signer::{
-    Entry, SignedEvent, sign_draft_event, sign_event, sign_install_event, verify_event,
+    Entry, SignedEvent, sign_draft_event, sign_event, sign_install_event, sign_product_draft_event,
+    verify_event,
 };

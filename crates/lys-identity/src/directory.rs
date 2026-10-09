@@ -45,6 +45,9 @@ mod install;
 #[path = "directory_draft.rs"]
 mod draft;
 
+#[path = "directory_product_draft.rs"]
+mod product_draft;
+
 /// Why the directory stopped answering, if it has.
 type Broken = Option<String>;
 
