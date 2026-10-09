@@ -99,10 +99,14 @@ fn holder_of(directory: &Projection, holder: IdentityId) -> Result<Holder, Serve
         IdentityId::Agent(_) => "agent",
         IdentityId::ServiceAccount(_) => "service_account",
         IdentityId::Connector(_) => "connector",
+        IdentityId::Machine(_) => "machine",
     };
     let responsible = match holder {
         IdentityId::Person(_) => None,
-        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) | IdentityId::Connector(_) => Some(
+        IdentityId::Agent(_)
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_) => Some(
             record
                 .responsible()
                 .ok_or_else(|| {
