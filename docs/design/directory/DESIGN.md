@@ -158,6 +158,16 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 
 | Path | Note | Brief |
 |------|------|-------|
+| `CHANGELOG.md` | Public grant response marker and Rust source-shape compatibility notes. | DIRECTORY-090 |
+| `crates/lys-log-store/src/witness.rs` | Complete ephemeral tail-witness capability, frontier/range binding and verification contract. | DIRECTORY-090 |
+| `crates/lys-log-store/src/file/witness.rs` | Real file-backed tail reading and tested cross-writer coherence for one bounded reading. | DIRECTORY-090 |
+| `crates/lys-log-store/tests/tail_witness.rs` | Real-store completeness, second-writer race, integrity, failure and reopen witness proofs. | DIRECTORY-090 |
+| `crates/lys-log-store/src/lib.rs` | Export the explicit complete-tail witness capability without changing stored bytes. | DIRECTORY-090 |
+| `crates/lys-log-store/src/store.rs` | Keep opaque leaf storage separate from the explicitly supplied witness capability. | DIRECTORY-090 |
+| `crates/lys-log-store/src/file.rs` | Connect the complete file-backed witness provider to store ownership. | DIRECTORY-090 |
+| `crates/lys-log-store/src/file/head.rs` | Prove head ownership and cross-writer invalidation for the witness reading, without a lifetime lease assumption. | DIRECTORY-090 |
+| `crates/lys-log-store/src/file/open.rs` | Verify fresh store identity/frontier and reopen invalidation for witness acquisition. | DIRECTORY-090 |
+| `crates/lys-log-store/src/error.rs` | Preserve named store and witness verification failures without fabricated tails. | DIRECTORY-090 |
 | `crates/lys-core/src/clock.rs` | The instance-owned Clock contract, SystemClock default, supplied UTC instant and checked conversion; DIRECTORY-088. | DIRECTORY-088 |
 | `crates/lys-core/tests/clock.rs` | Clock isolation, supplied creation-time/error/count controls and preserved old-state proof; DIRECTORY-088. | DIRECTORY-088 |
 | `crates/lys/src/commands/ca_dispatch.rs` | One real CA dispatcher shared by the production entry and separate clock fixture; DIRECTORY-088. | DIRECTORY-088 |

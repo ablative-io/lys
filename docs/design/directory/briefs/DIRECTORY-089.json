@@ -1,0 +1,115 @@
+{
+  "id": "DIRECTORY-089",
+  "cluster": "directory",
+  "title": "A resumable grant stream and signed pass dependencies for product revocation",
+  "depends_on": [
+    "DIRECTORY-006",
+    "DIRECTORY-048",
+    "DIRECTORY-058",
+    "ACCESS-002",
+    "ACCESS-003"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C23",
+    "C24",
+    "C25"
+  ],
+  "stories": [
+    "S8",
+    "S10",
+    "S79"
+  ],
+  "design_anchor": [
+    "ADR-116",
+    "ADR-135"
+  ],
+  "purpose": "Waffles's ruling 9415d1ab, corrected by 7228e299, selects grant withdrawal as the authority for liminal ACCESS-005. Crumpet's source intake reads Lys f12df005d0013d8dd0ee9c0a388ef06fa41a1973/tree032b6e11c411f826d822ed742532b62dc88e8756 and liminal cdce7124b6ab30659697efee1fecbcfeeaca58b6/treef30a40a714ad02490a530481a0196f26ac9f812f. Lys already has signed irreversible grant revocation, receipt revision and public batch at_least/revision; it has no public resumable grant-change stream or producer pass-to-grant binding. Its local frame fence does not implement a product admission fence. The cache key is (grant-log identity,GrantId), with the receipt revision from that log, never the event-format version. Losing a right denies that right, and only losing the admitting right closes a connection. This brief supplies the two NEW Lys prerequisites without claiming they already run. C23/C24/C25 and S8/S10 split with DIRECTORY-006: its existing ancestry, signed commit and revoker rules remain the foundation, while this brief owns their new public stream and producer binding. S79 splits with DIRECTORY-025: its local projection-freshness refusal stays there, and the new remote cursor/readiness contract is here. ACCESS-002/003 are explicit cross-cluster future producer/library dependencies, not unreviewed existing APIs.",
+  "task": "Specify the public consumer-owned ordered/resumable grant read, stable log identity/reset/gap/readiness and compatibility; bind a produced pass to coherent grant ancestry and required revision; require bounded source/count reds and independent positive controls. Write documents only here; implementation, product protocol, runtime and qualification follow separately owned briefs and handovers.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Publish an ordered resumable grant read with identity, gaps and readiness",
+      "spec": "NEW public contract. THE SYSTEM SHALL expose an authenticated, consumer-opened grant-change stream through Lys's published API, not a product callback. A cursor names a stable grant-log identity and the last applied receipt revision; the revision is coordinate.index+1, never GrantEvent.version, a timestamp or a token tombstone bool. The identity belongs to the authoritative log and survives ordinary restart, key rotation and compaction. Opening a supported old grant install creates and durably records this identity once, without rewriting signed grant leaves, operations or existing snapshots; reopening returns the same identity. Failure before durable identity publication is a named unavailable outcome. Recovery of an existing identity failure must not silently mint a replacement. An intentional replacement uses an explicit reset contract naming the old/new identities; an identity mismatch, rollback, lost retained cursor or discontinuity yields named ResetRequired/Gap, never empty-success or cursor zero. Retention and subscriber buffers have explicit finite bounds. A cursor outside retained history requires a bounded authenticated snapshot plus its revision and identity; it never rescans all history or pretends the missing events were delivered.\n\nThe stream authenticates and judges its caller through ordinary Lys grants and existing grant-view visibility, without granting authority by subscribing. It discloses only grants the caller may inspect and supplies an ordered revision watermark for filtered unrelated changes. Each committed change frame identifies the log, revision, GrantId and signed change/receipt evidence; revocation frames name the affected grant and its irreversible withdrawal, with descendant dependencies resolved from the producer binding. Replay begins strictly after the cursor, is contiguous through changes/watermarks, and duplicates are idempotently identified by log/revision/evidence; conflicting evidence at one revision is a named integrity failure. A Ready frame states the complete durable and projected revision through which the snapshot/replay has been installed. Under the same grant-owner serialization as commits, install the subscriber and capture the replay/live barrier before releasing the owner; a revoke at that boundary appears in replay or live delivery exactly once in logical application. No network write, await of the consumer or subscriber drain holds directory/apps/grants locks. Bounded publication cannot block grant mutation: a slow reader receives a named gap/closed read and resumes from its applied cursor. Cancellation removes its owned subscription and bounded buffer, without a detached task.\n\nReady-before-admission is an explicit NEW consumer contract. A consumer may admit only while its stream is ready and its cached identified-log revision is at least the signed binding's required revision; the Lys batch at_least/revision fence in grants_batch.rs:49-89 and frame.rs:79-94 remains the server-side comparison, not an already implemented product fence. A stream loss or gap makes new admission fail by name; existing connections continue, all are rechecked on resume, and gap length is reported. Losing one right denies that right; losing the admitting right closes the connection with a reason through the product's separately versioned protocol prerequisite. The read neither calls products nor polls on a clock; readiness, commit, cancellation and resume are owned signals. No default-open, silent fallback or synthetic Ready exists.",
+      "acceptance": [
+        "d089_r1_revision_and_ready_counts uses the real public stream and actual signed grant log: issue at revision r, apply one revoke at r+1, and observe one logical revocation, one Ready covering r+1, and zero admissions from cache r after the required r+1 is installed. Vary event-format versions without changing cursor ordering. Independent allowed grant decisions remain allowed; the revoker matrix preserves every allowed/refused caller from revocation.rs:36-66. Missing stream API is a prerequisite failure, not an observed behavioral red.",
+        "d089_r1_replay_live_race places an owned signal at subscriber/barrier installation and one at actual durable commit. Exercise revoke-before-open, revoke-at-barrier and revoke-after-Ready; each has exactly one applied revocation and no lost revision, with no stale Connect result overwriting it. Inject omission, duplicate and conflicting duplicate separately: omission yields Gap, identical duplicate applies zero extra changes, conflict yields integrity refusal. Test waits on these signals, never sleeps, timeouts or watchdogs.",
+        "d089_r1_gap_reset_cancel_counts disconnects and overflows the actual reader. New-admission count is zero until authenticated replay/snapshot and Ready; existing connections are rechecked exactly once per resumed decision fence with current rights, and lost admitting rights close. Assert named gap and reported gap length. Cancel one reader: its live subscription/buffer/task counts return to zero while another reader and mutations continue. An introduced lost-gap notification or leaked subscriber must fail the count assertion.",
+        "d089_r1_old_install_and_bounded_replay starts from a supported pre-identity grant install, verifies all historical signatures and exact old leaf/snapshot bytes, creates one durable identity and closes/reopens twice. Identity and revisions remain stable; crash/failed sync never acknowledges Ready. A new log identity and an out-of-retention cursor require explicit reset/snapshot, never stale admission. Instrument two logs with the same requested delta and different historical lengths: emitted/applied delta counts are equal; visited old-prefix leaves are bounded by the log's fixed checkpoint seek bound, independent of total history; no whole-book clone, extra per-message disk call or all-history loop is accepted.",
+        "Source baseline f12df005 has one public /grants/{id}/revoke route and the existing batch revision fence, but zero public resumable stream/Ready/binding endpoints in the owned grant route inventory. That is a source capability count, not a timed or behavioral run. The new executable fixtures must record their actual baseline assertion failures separately from missing APIs, then pass with all positive controls after implementation. All tests must complete under two seconds; every run reports full pass/fail/skip counts."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/grant_changes.rs",
+          "crates/lys-identity-server/src/grant_changes/stream.rs",
+          "crates/lys-identity-server/tests/grant_changes.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/src/grants/handlers.rs",
+          "crates/lys-identity/src/grants/authority.rs",
+          "crates/lys-identity/src/grants/receipt.rs",
+          "crates/lys-identity-server/src/openapi_typed.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C24",
+        "C25"
+      ],
+      "stories": [
+        "S8",
+        "S10",
+        "S79"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Bind each issued pass to its grant ancestry and required log revision",
+      "spec": "NEW producer contract. WHEN an audience pass is issued from live Lys rights, THE SYSTEM SHALL produce a signed, bounded binding containing the issuing authority/key identity, audience, exact canonical pass digest, holder, grant-log identity, required receipt revision, and every effective right's GrantId plus the complete grant ancestry that justified it. The digest binds the exact issued credential bytes and cannot be moved to another pass, holder, issuer or audience. The revision is the coherent decision frame used to derive those rights; all dependencies come from the same identified log and no partially projected or unresolved revocation is signed as a current allow. Reuse the existing grants frame/batch freshness and revocation authority; do not introduce a second revoker or recompute reach in a product. An unknown/missing ancestor, stale frame, unpublished key, mixed log identity, cycle, over-bound chain/claim or unsupported binding version is a named refusal before a token/binding is acknowledged. The finite size/hop/right bounds are stated in the published types and install settings, preserving existing ancestry limits, with no silent truncation or guess from holder strings.\n\nThe published producer API and verifier contract let a product map the credential to (grant-log identity,GrantId) dependencies and a required revision. The binding is separate from existing signed WirePassV1 bytes; no trailing fields, rewritten signatures or interpretation of participant/live as Lys session/run/grant ids is permitted. Lys's future signed audience pass and any interim registry producer consume this same binding contract. A registry-owned V1 producer must acquire a Lys-judged binding for the exact issued pass through the API; that registry's implementation and transport/SDK changes require its own brief. Existing supported credential bytes remain verifiable unchanged during an explicitly versioned rollout; a revocation-enabled connection requires the accompanying new binding and refuses absence by name, never assigns revision zero. Document the old-client/new-server compatibility matrix and upgrade path before enabling that requirement, with the consumer's own admission brief owning enforcement. No current pass is claimed to carry a required revision.\n\nA grant revoke is permanent; a refresh re-reads live rights and issues a new binding/revision without the revoked dependency. Independent grant paths stay usable and duplicate effective paths are recorded without granting extra rights. Keep pass expiry, audience isolation and caller/session/lifecycle checks; session termination, agent run ending, certificate revocation and credential-specific withdrawal are distinct meanings and never inferred from this binding. Publishing the pass and binding is one success outcome: any failure must leave no acknowledged unbound credential or partial allow. Existing stored token/session/grant shapes are not silently repurposed. The log-identity storage introduction and any actual stored binding shape change ship their migration and old-install tests; a genuinely never-installed new shape may be created directly only with that fact and exact commit stated in its implementation handback.",
+      "acceptance": [
+        "d089_r2_binding_and_dependency_counts issues two passes under independent grant paths at a coherent identified revision, verifies signatures independently and reads every grant/ancestor and required revision from the actual public binding. Revoke one ancestor: exactly the dependent rights are denied; independent rights and connections remain usable, and only a lost admitting right closes through the product prerequisite. A refresh has zero revoked dependencies. Substitute pass, issuer, holder, audience, log identity, ancestor or revision one at a time: each is refused by name with zero admitted calls.",
+        "d089_r2_issue_revoke_race holds the real producer at an owned decision/signing boundary and durably revokes the admitting grant. The producer either signs the earlier coherent revision with its complete binding, which requires stream catch-up before admission, or refuses/recomputes at the newer revision; it never signs a mixed revision, resurrects a revoked right or acknowledges a partial pair. All counters end at actual issue reply, commit/Ready or named refusal, not at enqueue. Include a positive control that substitutes a stale frame and proves the existing at_least/StaleDecision fence is exercised.",
+        "d089_r2_compatibility_and_refusal_counts verifies supported old grants, receipts, sessions and access-token records still reopen and their old signatures/ids/windows are unchanged. Canonical WirePassV1 fixtures remain byte-equal and verifiable; only the separate versioned binding is new. Each compatibility-matrix row counts accepted credentials and named binding-required refusals under the explicit rollout. Oversize, missing/cyclic ancestry, unsupported version and interrupted pair publication each acknowledge zero partial pairs and admit zero guessed rights. No old format is discarded as a migration substitute.",
+        "d089_r2_bounded_work_counts samples actual producer/stream/verifier work for fixed right/chain/delta bounds at two different total-history lengths. Name directory/apps/grants/provider locks and their lifetimes, clones of whole state, dependency sync stages and historical leaves visited. The verifier's message/admission lookup uses the local indexed dependency cache: no per-message request to Lys, disk sync or history traversal. Source baseline provider.rs:102-115 holds session_id/subject/app/profile/expiry only, WirePassV1 has no grant id/revision, and ACCESS-002/003 are future producer/library prerequisites. Their absence is reported as a source count; executable red/green and physical costs remain unmeasured until actually run. Positive controls introduce one wrong dependency and one forbidden all-history traversal and must fail."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/provider/grant_binding.rs",
+          "crates/lys-identity-server/src/grant_bindings_api.rs",
+          "crates/lys-identity-server/tests/provider_grant_binding.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/provider.rs",
+          "crates/lys-identity-server/src/provider/endpoints.rs",
+          "crates/lys-identity-server/src/grants_batch.rs",
+          "crates/lys-identity/src/grants/frame.rs",
+          "crates/lys-identity-server/src/openapi_typed.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C23",
+        "C25"
+      ],
+      "stories": [
+        "S8",
+        "S79"
+      ]
+    }
+  ],
+  "boundaries": [
+    "This job writes only DIRECTORY-089.json/.md and gate-named additions to directory/design.json with its rendered DESIGN.md. No implementation, other brief, checklist/story alteration, Cargo, runtime credential, source test, main movement or push is included. The documents commit through an isolated index to refs/lanes/crumpet-grant-stream for the lead's later fast-forward.",
+    "The revoker remains exactly the existing issuer/ancestor-holder/root authority in grants/revocation.rs:36-66. Lys never calls a product or polls on a timer; it publishes a read the consumer owns. No new permissions are implied by reading, being an app or holding a prefix.",
+    "Liminal ACCESS-005 owns the NEW cached admission fence, live connection/right checks, reconnect application and explicitly versioned reasoned-close wire prerequisite. The registry producer and SDK/transport rollout are separate owned work; this brief never changes V1 bytes or claims holder.live is a Lys session id.",
+    "Credential-specific revocation (B), withdrawing one compromised pass while keeping its grants, is future work requiring its own brief and ordered decision record; the existing agent-token tombstone bool is not a remote revision.",
+    "Source capability counts are not observed behavioral reds; missing APIs, compile errors, a historical subset or a document gate never qualifies runtime. No patient-record or school deployment is ready on the strength of this brief. Every stored-shape implementation ships the old-install migration/test or explicitly proves its new shape has never been installed."
+  ],
+  "verification": [
+    "Inventory fixed local main f12df005: DIRECTORY-088 is the highest allocated directory brief id, and DIRECTORY-089.json/.md are absent. Directory owns grants through DIRECTORY-006 and its structure entries; preserve every existing brief, checklist, story and design object. Next-free means after the highest id, never fill a historical gap.",
+    "Retain exact git-show source bytes and counts for grants_batch.rs:49-89, grants/frame.rs:79-94, grants/revocation.rs:36-66, receipt.rs:53-56, grant routes and provider/V1 shapes. Keep existing permission/freshness behaviors separate from the NEW public stream, binding, stable identity and product fence. Read the ruling and correction by canonical id and exact author.",
+    "Run Lys's own sh scripts/design/gate.sh at f12df005 in owned baseline/candidate doc/script snapshots; retain full stdout/stderr, command exits, valid-document/coverage/warning/failure/render counts and compare normalized failures. Require zero new failures from this pair and only gate-named structure additions. Inherited failures elsewhere are recorded, not fixed. Format JSON source, render the pair/affected design through the pinned scripts, prove every new string leaf renders, and compare every untouched byte/object.",
+    "Commit only the gated pair and authorized declaration/render additions through a private Git index to refs/lanes/crumpet-grant-stream; parent f12df005. Verify exact commit/tree/path list and each committed blob against the gated candidate; preserve shared HEAD/index/staged work. No main update or push in this job. The lead owns publication and later full source qualification.",
+    "Later implementation authors signal-based reds before fixes and runs the real public producer/stream/store boundaries, old-install migration/compatibility, every count and positive control with complete pass/fail/skip/exits. No test over two seconds is accepted as normal. Count at completed durable/Ready/refusal boundaries; report locks, whole-state clones, disk syncs per call and all-history visits. Full gate, landing, installation and runtime proof are separate from this document gate."
+  ]
+}
