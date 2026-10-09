@@ -194,6 +194,9 @@ pub struct GrantView {
     pub window: WindowView,
     /// The model version it was judged under.
     pub model_version: u64,
+    /// How its actions may be exercised: `outright`, `by_draft` or `by_two`,
+    /// as check/batch answers it (ACCESS-001 R1).
+    pub mode: &'static str,
     /// The operation that authorised it.
     pub operation: String,
     /// Whether it was revoked directly.
@@ -245,6 +248,7 @@ impl GrantView {
                 ends_at: parts.window.ends_at(),
             },
             model_version: parts.model_version,
+            mode: grant.mode().as_str(),
             operation: parts.operation.to_string(),
             revoked: record.revoked().is_some(),
             revoked_at: record.revoked().map(|revocation| revocation.at),

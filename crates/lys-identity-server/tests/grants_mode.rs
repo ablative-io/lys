@@ -3,10 +3,11 @@
 //! on a `by_draft` right answers allowed false, mode `by_draft` and the grant's
 //! id, so a product holds the act for a draft rather than refusing it; an
 //! outright right answers allowed true, mode outright; `which` names each
-//! id's mode beside it. A grant issued without a mode is outright.
+//! id's mode beside it. A grant issued without a mode is outright, and a
+//! grant read back names its mode.
 
 use identity_contract::apps::{
-    Auth, NOTES, TestResult, check, login, ok, op, post, registered, root, seeded,
+    Auth, NOTES, TestResult, check, get, login, ok, op, post, registered, root, seeded,
 };
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use serde_json::{Value, json};
@@ -94,5 +95,38 @@ async fn a_mode_outside_the_three_is_refused_by_name() -> TestResult {
     let doc = format!("{NOTES}.doc");
     let refused = held_root(&service, &admin, &bea, (&doc, "1"), "by_three").await;
     assert!(refused.is_err(), "by_three was issued: {refused:?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_grant_read_back_names_its_mode() -> TestResult {
+    let (service, seeded) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea = seeded.people[1].id.to_string();
+    registered(&service, &admin, NOTES).await?;
+    let doc = format!("{NOTES}.doc");
+    let mut issued = Vec::new();
+    for (id, mode) in [("1", "by_draft"), ("2", "by_two")] {
+        let answer = held_root(&service, &admin, &bea, (&doc, id), mode).await?;
+        issued.push((answer["grant"].clone(), mode));
+    }
+    let plain = ok(root(&service, &admin, &bea, (&doc, "3"), "editor").await?)?;
+    issued.push((plain["grant"].clone(), "outright"));
+    for (grant, mode) in issued {
+        let grant = grant.as_str().ok_or("the issue names its grant")?;
+        let read = ok(get(&service, &format!("/grants/{grant}"), Auth::Cookie(&admin)).await?)?;
+        assert_eq!(read["mode"], mode, "{read}");
+    }
+    let listed = ok(get(&service, "/grants", Auth::Cookie(&admin)).await?)?;
+    let modes: Vec<&Value> = listed["grants"]
+        .as_array()
+        .ok_or("the list holds grants")?
+        .iter()
+        .map(|grant| &grant["mode"])
+        .collect();
+    assert!(
+        modes.iter().all(|mode| mode.is_string()),
+        "every listed grant names its mode: {listed}"
+    );
     Ok(())
 }
