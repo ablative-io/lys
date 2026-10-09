@@ -64,6 +64,15 @@ fn fake_keys(
     on_update: OnUpdate,
     forbidden: bool,
 ) -> TestResult<(String, JoinHandle<Seen>)> {
+    fake_keys_with_configure(access, on_update, forbidden, None)
+}
+
+fn fake_keys_with_configure(
+    access: Option<Value>,
+    on_update: OnUpdate,
+    forbidden: bool,
+    configure: Option<Value>,
+) -> TestResult<(String, JoinHandle<Seen>)> {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let url = format!("http://{}", listener.local_addr()?);
     let handle = std::thread::spawn(move || -> Seen {
@@ -84,6 +93,7 @@ fn fake_keys(
                 let keys: Vec<Value> = held
                     .iter()
                     .map(|access| json!({"name": DIRECTORY_KEY_NAME, "access": access}))
+                    .chain(configure.iter().map(|access| json!({"name": API_KEY_NAME, "access": access})))
                     .collect();
                 (200, json!({ "keys": keys }).to_string())
             } else if line.starts_with("POST /auth/v1/api_keys ") {
@@ -113,6 +123,69 @@ fn fake_keys(
         Ok((seen, bodies))
     });
     Ok((url, handle))
+}
+
+fn declared_configure_access() -> TestResult<Value> {
+    let bytes = base64::engine::general_purpose::STANDARD.decode(bootstrap_api_key())?;
+    Ok(serde_json::from_slice::<Value>(&bytes)?["access"].clone())
+}
+
+fn deployment(root: &std::path::Path, api: &str, token: &[u8]) -> TestResult<DeploymentConfig> {
+    let text = include_str!("../../../../../deploy/identity/config.example.toml");
+    let mut config = DeploymentConfig::parse(text, root.to_path_buf())?;
+    config.issuer.admin_url = api.to_owned();
+    private_files::write(&config.state_dir().join(API_KEY_SECRET.file), &vec![b'A'; 64])?;
+    private_files::write(&config.state_dir().join(server_config::PROVIDERS_KEY_FILE), token)?;
+    Ok(config)
+}
+
+#[test]
+fn provide_refuses_a_forbidden_live_key_without_rewriting_the_service_token() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let (url, handle) = fake_keys(None, OnUpdate::Store, true)?;
+    let config = deployment(root.path(), &url, b"lys_configure$held")?;
+    let outcome = provide(&config);
+    let (seen, bodies) = stop(&url, handle)?;
+    let error = outcome.err().ok_or("the forbidden live key passed install")?;
+    assert_eq!(error.kind(), ErrorKind::RauthyForbidden);
+    assert!(error.to_string().contains("ApiKeys/read"), "{error}");
+    assert_eq!(std::fs::read(config.state_dir().join(server_config::PROVIDERS_KEY_FILE))?, b"lys_configure$held");
+    assert_eq!(seen.len(), 1);
+    assert!(bodies.is_empty());
+    Ok(())
+}
+
+#[test]
+fn upgrade_preflight_checks_live_rights_and_never_mutates_a_key() -> TestResult {
+    for (configure, directory, token, refused) in [
+        (json!([{"group":"Users","access_rights":["read"]}]), directory_key_access(), TOKEN.as_bytes(), Some("ApiKeys/create")),
+        (declared_configure_access()?, widened(), TOKEN.as_bytes(), Some("Secrets/update")),
+        (declared_configure_access()?, directory_key_access(), b"lys_configure$held".as_slice(), Some("service key file")),
+        (declared_configure_access()?, directory_key_access(), TOKEN.as_bytes(), None),
+    ] {
+        let root = tempfile::tempdir()?;
+        let (url, handle) = fake_keys_with_configure(Some(directory), OnUpdate::Store, false, Some(configure))?;
+        let config = deployment(root.path(), &url, token)?;
+        let layout = crate::identity::install::layout::Layout::at(root.path().to_path_buf());
+        std::fs::write(layout.deployment_config(), toml::to_string(&config)?)?;
+        let before = std::fs::read(layout.deployment_config())?;
+        let outcome = crate::identity::upgrade::verified_config(&layout);
+        let (seen, bodies) = stop(&url, handle)?;
+        match refused {
+            Some(detail) => {
+                let error = outcome.err().ok_or("invalid live authority passed upgrade")?;
+                assert_eq!(error.kind(), ErrorKind::ReadBackMismatch);
+                assert!(error.to_string().contains(detail), "{error}");
+                assert!(error.to_string().contains("issuer administrator"), "{error}");
+            }
+            None => { outcome?; }
+        }
+        assert_eq!(seen, ["GET /auth/v1/api_keys HTTP/1.1"]);
+        assert!(bodies.is_empty());
+        assert_eq!(std::fs::read(config.state_dir().join(server_config::PROVIDERS_KEY_FILE))?, token);
+        assert_eq!(std::fs::read(layout.deployment_config())?, before);
+    }
+    Ok(())
 }
 
 fn stop(url: &str, handle: JoinHandle<Seen>) -> Seen {
@@ -154,7 +227,7 @@ fn the_service_is_given_a_key_of_its_own_without_secrets_update_or_key_rights() 
     assert_eq!(bodies.len(), 1, "one key was made");
     let made = &bodies[0];
     assert_eq!(made["name"], "lys_directory");
-    let granted = rights(&made["access"]);
+    let granted = rights(&made["access"])?;
     assert_eq!(
         granted
             .get("Secrets")
