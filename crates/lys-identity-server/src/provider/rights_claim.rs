@@ -17,6 +17,13 @@
 //!
 //! The grants are held (`with_grants`) for the reading alone; no provider
 //! lock is taken under them, and the pass is signed after they are released.
+//!
+//! When the product asks for the pass's grant binding (DIRECTORY-089 R2,
+//! `grant_binding`), the same reading settles the log first, takes the
+//! revision the grants then stand at, requires every decision to reflect
+//! it, keeps each right's ancestry, and refuses by name a degraded reading
+//! or grants that moved under the reading; the binding is signed after the
+//! pass, beside it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -26,8 +33,10 @@ use lys_identity::{IdentityId, LifecycleState};
 use lys_pass::rights::Resource as PassResource;
 use lys_pass::{Claims, Holder, Right};
 
+use super::grant_binding::{Decided, binding};
 use super::{OpenIdProvider, unavailable};
 use crate::error::ServerError;
+use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
 use crate::grants::{Decision, Judged, decide, with_grants};
 use crate::grants_batch::unanswered;
@@ -39,28 +48,63 @@ pub(super) struct Pass {
     pub(super) token: String,
     /// Its `exp`: the first instant it is no longer good.
     pub(super) expires_at: u64,
+    /// Its signed grant binding, when one was asked for.
+    pub(super) binding: Option<String>,
+}
+
+/// The rights a reading decided, and each grant's ancestry as it read it.
+struct Read {
+    rights: Vec<Right>,
+    paths: BTreeMap<String, Vec<String>>,
 }
 
 /// The pass for `holder` to the app `app` at `at`, living the provider's
 /// pass lifetime and never past `ends_at`, the end of the sign-in it stands
-/// on. A holder retired or suspended is refused `HolderRetired`.
+/// on, with its grant binding when `bind` asks for one. A holder retired or
+/// suspended is refused `HolderRetired`.
 pub(super) fn pass(
     state: &AppState,
     provider: &OpenIdProvider,
-    holder: IdentityId,
-    app: &str,
-    at: u64,
-    ends_at: u64,
+    (holder, app): (IdentityId, &str),
+    (at, ends_at): (u64, u64),
+    bind: bool,
 ) -> Result<Pass, ServerError> {
     let expires_at = ends_at.min(at.saturating_add(provider.pass_seconds));
     if expires_at <= at {
         return Err(ServerError::Provider(ProviderError::SessionEnded));
     }
-    let (asserted, rights) = with_grants(state, |mut judged| {
+    let log = if bind {
+        Some(crate::channel_membership::served_log(state)?)
+    } else {
+        None
+    };
+    let (asserted, read, decided) = with_grants(state, |mut judged| {
         let asserted = holder_of(judged.directory, holder)?;
-        let rights = rights(&mut judged, holder, app, at)?;
-        Ok((asserted, rights))
+        let required = if bind {
+            // Settled first, so the revision taken is the one decided at.
+            judged.grants.frame(judged.directory, None)?;
+            Some(judged.grants.revision())
+        } else {
+            None
+        };
+        let read = rights(&mut judged, holder, app, at, required)?;
+        let decided = match required {
+            None => None,
+            Some(revision) => {
+                let now = judged.grants.revision();
+                if now != revision {
+                    return Err(GrantStreamError::BindingRevisionMoved {
+                        decided: revision,
+                        now,
+                    }
+                    .into());
+                }
+                Some(revision)
+            }
+        };
+        Ok((asserted, read, decided))
     })?;
+    let Read { rights, paths } = read;
     let (rights, rights_truncated) = bounded(rights, app, provider.rights_bytes)?;
     let claims = Claims {
         iss: provider.issuer.clone(),
@@ -75,9 +119,21 @@ pub(super) fn pass(
     };
     let value = serde_json::to_value(&claims)
         .map_err(|error| unavailable(format!("the pass could not be encoded: {error}")))?;
+    let token = provider.signed(&value)?;
+    let binding = match (decided, log) {
+        (Some(revision), Some(log)) => Some(binding(
+            provider,
+            &claims,
+            &token,
+            log,
+            &Decided { revision, paths },
+        )?),
+        _ => None,
+    };
     Ok(Pass {
-        token: provider.signed(&value)?,
+        token,
         expires_at,
+        binding,
     })
 }
 
@@ -162,15 +218,23 @@ const fn mode_of(mode: Mode) -> lys_pass::Mode {
 }
 
 /// Every effective right `holder` has at `at` on the app `app`'s kinds,
-/// decided under one hold of the grants, in kind, id and grant order.
+/// decided under one hold of the grants, in kind, id and grant order, each
+/// decision reflecting `required` when it names a revision, with each
+/// grant's ancestry as it was read. Under a required revision a right
+/// decided from a degraded reading refuses the whole reading.
 fn rights(
     judged: &mut Judged<'_>,
     holder: IdentityId,
     app: &str,
     at: u64,
-) -> Result<Vec<Right>, ServerError> {
+    required: Option<u64>,
+) -> Result<Read, ServerError> {
+    let mut paths: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let Some(schema) = judged.apps.schema(app) else {
-        return Ok(Vec::new());
+        return Ok(Read {
+            rights: Vec::new(),
+            paths,
+        });
     };
     let kinds: Vec<(String, Vec<Action>)> = schema
         .kinds()
@@ -190,14 +254,25 @@ fn rights(
                     resource: resource.clone(),
                     action: action.clone(),
                 };
-                let permit = match decide(judged, &request, at, None, Decision::Explain) {
+                let permit = match decide(judged, &request, at, required, Decision::Explain) {
                     Ok((permit, _)) => permit,
                     Err(error) if unanswered(&error) => return Err(error.into()),
                     Err(_) => continue,
                 };
+                if required.is_some()
+                    && let Some(degraded) = &permit.degraded
+                {
+                    return Err(GrantStreamError::BindingDegraded {
+                        refusal: ServerError::Grant(degraded.error().clone()).name(),
+                    }
+                    .into());
+                }
                 let Some(mode) = judged.grants.book().grant(permit.grant).map(Grant::mode) else {
                     continue;
                 };
+                paths
+                    .entry(permit.grant.to_string())
+                    .or_insert_with(|| permit.path.iter().map(ToString::to_string).collect());
                 found
                     .entry((kind.clone(), id.clone(), permit.grant.to_string()))
                     .or_insert_with(|| (mode_of(mode), Vec::new()))
@@ -206,7 +281,7 @@ fn rights(
             }
         }
     }
-    Ok(found
+    let rights = found
         .into_iter()
         .map(|((kind, id, grant), (mode, actions))| Right {
             resource: PassResource { kind, id },
@@ -214,7 +289,8 @@ fn rights(
             mode,
             grant,
         })
-        .collect())
+        .collect();
+    Ok(Read { rights, paths })
 }
 
 /// `rights` whole, or none and the app named as truncated when, as JSON,

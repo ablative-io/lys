@@ -40,18 +40,19 @@ use crate::grants_batch::{asker, mode_of, unanswered};
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
 
-/// The epoch of a grant log no reset has replaced. No reset contract exists
-/// yet (DIRECTORY-089 R1 owns it), so every served log is in this epoch.
-pub const ORIGINAL_EPOCH: u64 = 0;
-
-/// The grant log this service decides from: the origin the log was created
-/// with, which the store pins at creation and never changes, in its
-/// original epoch.
-pub(crate) fn served_log(state: &AppState) -> GrantLog {
-    GrantLog {
-        identity: state.grant_setup.log_origin.clone(),
-        epoch: ORIGINAL_EPOCH,
-    }
+/// The grant log this service decides from: the identity recorded once for
+/// it and its reset epoch (DIRECTORY-089 R1), the same the grant change
+/// stream and every pass binding name, never the configured origin.
+///
+/// # Errors
+/// `grant_log_identity_unavailable` when it cannot be read or recorded: no
+/// decision is answered from a guessed log.
+pub(crate) fn served_log(state: &AppState) -> Result<GrantLog, ServerError> {
+    let served = crate::grant_changes::served(state)?;
+    Ok(GrantLog {
+        identity: served.identity,
+        epoch: served.epoch,
+    })
 }
 
 pub(crate) fn pass_mode(mode: Mode) -> lys_pass::Mode {
@@ -209,7 +210,7 @@ pub async fn membership(
         reason: refused.body_text(),
     })?;
     let acting_for = asker(&state, &headers)?;
-    let served = served_log(&state);
+    let served = served_log(&state)?;
     let at = now();
     let counts = &state.membership.counts;
     counts.call();

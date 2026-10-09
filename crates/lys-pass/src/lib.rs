@@ -1,5 +1,6 @@
 //! Shared pass verification and permission contracts for products.
 
+pub mod binding;
 pub mod conformance;
 pub mod deliberate;
 pub mod drafts;
@@ -66,6 +67,15 @@ pub enum Error {
     /// A supplied endpoint is malformed.
     #[error("endpoint_refused")]
     Url(#[from] url::ParseError),
+    /// A pass's grant binding is absent, unsupported or not the pass's
+    /// (DIRECTORY-089 R2), by its stable name.
+    #[error("{name}: {reason}")]
+    Binding {
+        /// The binding's stable refusal name.
+        name: &'static str,
+        /// Its words.
+        reason: &'static str,
+    },
     /// A named issuer refusal of the exchange or refresh.
     #[error("token_refused: {name}: {reason}")]
     TokenRefused {
@@ -93,6 +103,7 @@ impl Error {
             Self::Truncated(_) => "rights_truncated",
             Self::Transport(_) | Self::CannotAsk(_) => "lys_could_not_be_asked",
             Self::Url(_) => "endpoint_refused",
+            Self::Binding { name, .. } => *name,
             Self::TokenRefused { name, .. } => name,
         }
     }
@@ -146,23 +157,41 @@ impl Client {
 
     /// Exchange an authorization code using credentials owned by the caller.
     pub async fn fetch_token(&self, request: &TokenRequest<'_>) -> Result<TokenResponse, Error> {
-        if request.client_id.is_empty()
-            || request.client_secret.is_empty()
-            || request.code.is_empty()
-            || request.redirect_uri.is_empty()
-            || request.code_verifier.is_empty()
-        {
-            return Err(Error::Invalid("token request is incomplete"));
+        self.token(&code_form(request)?).await
+    }
+
+    /// [`Client::fetch_token`], asking Lys for the pass's grant binding
+    /// beside it (DIRECTORY-089 R2). An answer without one is refused
+    /// `grant_binding_required`, never taken as a pass at revision zero.
+    pub async fn fetch_bound_token(
+        &self,
+        request: &TokenRequest<'_>,
+    ) -> Result<TokenResponse, Error> {
+        let mut form = code_form(request)?.to_vec();
+        form.push(("grant_binding", binding::BINDING_REQUEST));
+        bound(self.token(&form).await?)
+    }
+
+    /// [`Client::refresh_token`], asking for the new pass's grant binding.
+    pub async fn refresh_bound_token(
+        &self,
+        client_id: &str,
+        client_secret: &str,
+        refresh_token: &str,
+    ) -> Result<TokenResponse, Error> {
+        if client_id.is_empty() || client_secret.is_empty() || refresh_token.is_empty() {
+            return Err(Error::Invalid("refresh request is incomplete"));
         }
-        self.token(&[
-            ("grant_type", "authorization_code"),
-            ("client_id", request.client_id),
-            ("client_secret", request.client_secret),
-            ("code", request.code),
-            ("redirect_uri", request.redirect_uri),
-            ("code_verifier", request.code_verifier),
-        ])
-        .await
+        bound(
+            self.token(&[
+                ("grant_type", "refresh_token"),
+                ("client_id", client_id),
+                ("client_secret", client_secret),
+                ("refresh_token", refresh_token),
+                ("grant_binding", binding::BINDING_REQUEST),
+            ])
+            .await?,
+        )
     }
 
     /// Ask Lys to refresh from live grants; no timer or cached authority is used.
@@ -194,6 +223,32 @@ impl Client {
             .map_err(|error| Error::Transport(Box::new(error)))?;
         read_token(response).await
     }
+}
+
+/// The authorization-code exchange form of `request`.
+fn code_form<'a>(request: &TokenRequest<'a>) -> Result<[(&'static str, &'a str); 6], Error> {
+    if request.client_id.is_empty()
+        || request.client_secret.is_empty()
+        || request.code.is_empty()
+        || request.redirect_uri.is_empty()
+        || request.code_verifier.is_empty()
+    {
+        return Err(Error::Invalid("token request is incomplete"));
+    }
+    Ok([
+        ("grant_type", "authorization_code"),
+        ("client_id", request.client_id),
+        ("client_secret", request.client_secret),
+        ("code", request.code),
+        ("redirect_uri", request.redirect_uri),
+        ("code_verifier", request.code_verifier),
+    ])
+}
+
+/// `answer`, refused by name when it carries no grant binding.
+fn bound(answer: TokenResponse) -> Result<TokenResponse, Error> {
+    binding::required(answer.grant_binding.as_deref())?;
+    Ok(answer)
 }
 
 /// A token endpoint's answer: the pass, or the issuer's refusal by name. A
@@ -254,6 +309,10 @@ pub struct TokenResponse {
     pub id_token: Option<String>,
     /// The credential used for a live refresh, when issued.
     pub refresh_token: Option<String>,
+    /// The pass's signed grant binding, present only when it was asked for
+    /// (DIRECTORY-089 R2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grant_binding: Option<String>,
 }
 
 #[derive(Deserialize)]

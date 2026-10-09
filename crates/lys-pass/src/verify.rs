@@ -80,6 +80,41 @@ impl KeySet {
     }
 }
 
+/// The payload of the compact JWS `token`, once its header names `typ`,
+/// `EdDSA` and a published key, and its signature verifies strictly under
+/// that key. Nothing in the payload is read before then.
+pub(crate) fn signed_payload(token: &str, keys: &KeySet, typ: &str) -> Result<Vec<u8>, Error> {
+    let mut parts = token.split('.');
+    let header = parts.next().ok_or(Error::Invalid("missing header"))?;
+    let payload = parts.next().ok_or(Error::Invalid("missing claims"))?;
+    let signature = parts.next().ok_or(Error::Invalid("missing signature"))?;
+    if parts.next().is_some() {
+        return Err(Error::Invalid("too many token segments"));
+    }
+    let decoded: Header = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(header)?)?;
+    if decoded.alg != "EdDSA"
+        || decoded.typ != typ
+        || decoded.kid.is_empty()
+        || decoded.kid.chars().any(char::is_control)
+        || decoded
+            .crit
+            .as_ref()
+            .is_some_and(|values| !values.is_empty())
+        || decoded.b64 == Some(false)
+    {
+        return Err(Error::Invalid("unsupported signed token header"));
+    }
+    let key = keys
+        .keys
+        .get(&decoded.kid)
+        .ok_or_else(|| Error::UnpublishedKey(decoded.kid.clone()))?;
+    let signature =
+        Signature::from_slice(&URL_SAFE_NO_PAD.decode(signature)?).map_err(Error::Signature)?;
+    key.verify_strict(format!("{header}.{payload}").as_bytes(), &signature)
+        .map_err(Error::Signature)?;
+    Ok(URL_SAFE_NO_PAD.decode(payload)?)
+}
+
 type ActionIndex = BTreeMap<String, Vec<usize>>;
 type ResourceIndex = BTreeMap<String, ActionIndex>;
 
@@ -102,35 +137,7 @@ impl VerifiedPass {
         if issuer.is_empty() || audience.is_empty() {
             return Err(Error::Invalid("trusted issuer or audience is missing"));
         }
-        let mut parts = token.split('.');
-        let header = parts.next().ok_or(Error::Invalid("missing header"))?;
-        let payload = parts.next().ok_or(Error::Invalid("missing claims"))?;
-        let signature = parts.next().ok_or(Error::Invalid("missing signature"))?;
-        if parts.next().is_some() {
-            return Err(Error::Invalid("too many token segments"));
-        }
-        let decoded: Header = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(header)?)?;
-        if decoded.alg != "EdDSA"
-            || decoded.typ != "JWT"
-            || decoded.kid.is_empty()
-            || decoded.kid.chars().any(char::is_control)
-            || decoded
-                .crit
-                .as_ref()
-                .is_some_and(|values| !values.is_empty())
-            || decoded.b64 == Some(false)
-        {
-            return Err(Error::Invalid("unsupported signed token header"));
-        }
-        let key = keys
-            .keys
-            .get(&decoded.kid)
-            .ok_or_else(|| Error::UnpublishedKey(decoded.kid.clone()))?;
-        let signature =
-            Signature::from_slice(&URL_SAFE_NO_PAD.decode(signature)?).map_err(Error::Signature)?;
-        key.verify_strict(format!("{header}.{payload}").as_bytes(), &signature)
-            .map_err(Error::Signature)?;
-        let claims: Claims = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload)?)?;
+        let claims: Claims = serde_json::from_slice(&signed_payload(token, keys, "JWT")?)?;
         if claims.iss != issuer {
             return Err(Error::WrongIssuer);
         }

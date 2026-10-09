@@ -44,6 +44,15 @@ impl Changes {
         Ok(())
     }
 
+    /// One place among the change subscriptions, for a wait owned by another
+    /// reader (DIRECTORY-089 R1): every waiting reader shares this one bound,
+    /// and the place is given back when the permit is dropped.
+    pub(crate) fn hold_place(&self) -> Result<tokio::sync::SemaphorePermit<'_>, ServerError> {
+        self.waiting
+            .try_acquire()
+            .map_err(|error| unavailable(format!("change subscriptions are at capacity: {error}")))
+    }
+
     async fn checked_after(
         &self,
         after: Option<OperationId>,

@@ -12,7 +12,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::endpoints::{Exchange, admitted_client, display_name, malformed, provider};
-use super::rights_claim::pass;
+use super::grant_binding::asked;
+use super::rights_claim::{Pass, pass};
 use super::{Access, ID_TOKEN_SECONDS, Kind, held, random};
 use crate::error::ServerError;
 use crate::error_provider::ProviderError;
@@ -43,6 +44,8 @@ fn digest(token: &str) -> String {
 /// app and its return address are judged again here, at this request.
 fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, ServerError> {
     let provider = provider(state)?;
+    // An unsupported binding version is refused before the code is taken.
+    let bind = asked(form.grant_binding.as_deref())?;
     let admitted = admitted_client(state, client, &form.redirect_uri)?;
     let client_id = admitted.app;
     let at = now();
@@ -86,10 +89,9 @@ fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, Ser
     let issued = pass(
         state,
         provider,
-        IdentityId::Person(taken.person),
-        &client_id,
-        at,
-        ends_at,
+        (IdentityId::Person(taken.person), client_id.as_str()),
+        (at, ends_at),
+        bind,
     )?;
     let refresh = random::<32>()?;
     let kept = |expires_at, kind| Access {
@@ -109,13 +111,24 @@ fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, Ser
         Some((digest(&refresh), kept(ends_at, Some(Kind::Refresh)))),
         at,
     )?;
-    Ok(json!({
-        "access_token": issued.token,
-        "token_type": "Bearer",
-        "expires_in": issued.expires_at.saturating_sub(at),
-        "id_token": id_token,
-        "refresh_token": refresh,
-    }))
+    Ok(answered(
+        json!({
+            "access_token": issued.token,
+            "token_type": "Bearer",
+            "expires_in": issued.expires_at.saturating_sub(at),
+            "id_token": id_token,
+            "refresh_token": refresh,
+        }),
+        issued.binding,
+    ))
+}
+
+/// `answer`, carrying the pass's grant binding beside it when one was made.
+fn answered(mut answer: Value, binding: Option<String>) -> Value {
+    if let Some(binding) = binding {
+        answer["grant_binding"] = Value::String(binding);
+    }
+    answer
 }
 
 /// The exchange of a refresh token for a new pass, from the grants live now:
@@ -123,6 +136,7 @@ fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, Ser
 /// token stands on the Lys sign-in it was issued in, and ends with it.
 fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, ServerError> {
     let provider = provider(state)?;
+    let bind = asked(form.grant_binding.as_deref())?;
     let at = now();
     let lookup = digest(&form.refresh_token);
     let unknown = || ServerError::Provider(ProviderError::RefreshUnknown);
@@ -149,13 +163,12 @@ fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, 
     let person = subject
         .parse::<lys_identity::PersonId>()
         .map_err(ServerError::Identity)?;
-    let issued = pass(
+    let issued: Pass = pass(
         state,
         provider,
-        IdentityId::Person(person),
-        client,
-        at,
-        ends_at,
+        (IdentityId::Person(person), client),
+        (at, ends_at),
+        bind,
     )?;
     held(&provider.tokens)?.insert(
         digest(&issued.token),
@@ -169,10 +182,13 @@ fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, 
         },
         at,
     )?;
-    Ok(json!({
-        "access_token": issued.token,
-        "token_type": "Bearer",
-        "expires_in": issued.expires_at.saturating_sub(at),
-        "refresh_token": form.refresh_token,
-    }))
+    Ok(answered(
+        json!({
+            "access_token": issued.token,
+            "token_type": "Bearer",
+            "expires_in": issued.expires_at.saturating_sub(at),
+            "refresh_token": form.refresh_token,
+        }),
+        issued.binding,
+    ))
 }

@@ -56,6 +56,7 @@ mod bearer;
 mod client_auth;
 mod endpoints;
 mod exchange;
+mod grant_binding;
 mod issue;
 mod keys;
 mod refusal;
@@ -264,6 +265,11 @@ impl OpenIdProvider {
     /// naming it by its key id.
     fn signed(&self, claims: &Value) -> Result<String, ServerError> {
         Ok(held(&self.keys)?.signed(claims))
+    }
+
+    /// Sign `claims` as a compact JWS of the type `typ` with the current key.
+    fn signed_as(&self, claims: &Value, typ: &str) -> Result<String, ServerError> {
+        Ok(held(&self.keys)?.signed_as(claims, typ))
     }
 
     /// How long a retired key stays published: until every token it signed

@@ -678,6 +678,9 @@ pub enum ServerError {
     /// A refusal of Lys's `OpenID` provider.
     #[error(transparent)]
     Provider(#[from] crate::error_provider::ProviderError),
+    /// A refusal of the grant change stream or a pass binding (DIRECTORY-089).
+    #[error(transparent)]
+    GrantStream(#[from] crate::error_grant_stream::GrantStreamError),
     /// A sign-in provider refused the client id it was proved with.
     #[error("ProviderRefused: {provider} did not accept this client id ({status}): {reason}")]
     ProviderRefused {

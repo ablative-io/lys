@@ -10,6 +10,12 @@ use crate::openapi_refusals::{
 };
 use crate::openapi_table::{A, GET, POST, PUT, S};
 
+/// The grant log's recorded identity could not be read (DIRECTORY-089 R1).
+const LOG_IDENTITY: &[&str] = &["grant_log_identity_unavailable"];
+/// A read of the grant change stream: its bounded wait, and a log position
+/// that is not a signed event.
+const STREAM: &[&str] = &["RuntimeUnavailable", "LeafNotAnEvent"];
+
 /// The routes an app codes against, each with the types it takes and answers.
 pub(crate) fn typed(api: &mut Api) {
     use crate::apps_api::{AppApprovalBody, DecideBody, RegisterBody, RegistrarBody};
@@ -377,13 +383,24 @@ pub(crate) fn typed(api: &mut Api) {
         route(
             (
                 POST,
+                "/grants/changes",
+                "The grant changes after a consumer's cursor, with watermarks, readiness and resets",
+            ),
+            A,
+            Some(api.schema::<crate::grant_changes::ChangesRequestSchema>()),
+            Some(api.schema::<crate::grant_changes::ChangesPageSchema>()),
+            &[BATCH, LOG_IDENTITY, STREAM],
+        ),
+        route(
+            (
+                POST,
                 "/grants/membership",
                 "Whether a subject may read or post in a placed channel, at one revision",
             ),
             A,
             Some(api.schema::<lys_pass::membership::MembershipRequest>()),
             Some(api.schema::<lys_pass::membership::MembershipDecision>()),
-            &[BATCH],
+            &[BATCH, LOG_IDENTITY],
         ),
         route(
             (
@@ -394,7 +411,7 @@ pub(crate) fn typed(api: &mut Api) {
             A,
             Some(api.schema::<lys_pass::membership_pages::ResourcePageRequest>()),
             Some(api.schema::<lys_pass::membership_pages::MembershipPage>()),
-            &[BATCH],
+            &[BATCH, LOG_IDENTITY],
         ),
         route(
             (
@@ -405,7 +422,7 @@ pub(crate) fn typed(api: &mut Api) {
             A,
             Some(api.schema::<lys_pass::membership_pages::RecipientPageRequest>()),
             Some(api.schema::<lys_pass::membership_pages::MembershipPage>()),
-            &[BATCH],
+            &[BATCH, LOG_IDENTITY],
         ),
         route(
             (
@@ -416,7 +433,7 @@ pub(crate) fn typed(api: &mut Api) {
             A,
             Some(api.schema::<lys_pass::membership_admission::AdmissionRequest>()),
             Some(api.schema::<lys_pass::membership_admission::AdmissionDecision>()),
-            &[BATCH],
+            &[BATCH, LOG_IDENTITY],
         ),
         route(
             (

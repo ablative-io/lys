@@ -102,6 +102,7 @@ mod error_names;
 #[cfg(test)]
 mod error_names_tests;
 pub mod error_product_draft;
+pub mod error_grant_stream;
 pub mod error_provider;
 mod error_status;
 pub mod error_team;
@@ -115,6 +116,7 @@ pub mod goals_state;
 pub mod goals_store;
 pub mod goals_types;
 pub mod goals_views;
+pub mod grant_changes;
 pub mod grant_contract;
 #[cfg(test)]
 mod grant_settlement_tests;

@@ -262,6 +262,7 @@ impl ServerError {
             Self::Budget(error) => error.status(),
             Self::Call(error) => error.status(),
             Self::Provider(error) => error.status(),
+            Self::GrantStream(error) => error.status(),
             Self::Holding(error) => error.status(),
             Self::Machine(error) => error.status(),
             Self::Cord(error) => error.status(),

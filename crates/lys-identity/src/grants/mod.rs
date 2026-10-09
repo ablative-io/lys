@@ -5,7 +5,9 @@
 pub mod admission;
 pub mod authority;
 pub mod cannot_give;
+pub mod change_stream;
 pub mod channel_membership;
+pub mod channel_membership_index;
 pub mod codec;
 mod commit;
 pub mod error;

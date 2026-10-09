@@ -140,7 +140,7 @@ pub async fn admit(
         reason: refused.body_text(),
     })?;
     let acting_for = asker(&state, &headers)?;
-    let served = served_log(&state);
+    let served = served_log(&state)?;
     let at = now();
     let counts = &state.membership.counts;
     counts.call();

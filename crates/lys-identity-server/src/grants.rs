@@ -77,6 +77,8 @@ pub struct GrantSetup {
     pub spicedb: Option<SpiceDbEngine>,
     pub(crate) model_revision: std::sync::atomic::AtomicU64,
     pub(crate) refresh: std::sync::Mutex<()>,
+    /// The grant log's recorded identity and its commit signal (DIRECTORY-089 R1).
+    pub(crate) changes: crate::grant_changes::GrantChanges,
 }
 
 impl GrantSetup {
@@ -237,6 +239,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants/agent-roots", post(crate::agent_roots::reissue))
         .route("/grants/check", post(check))
         .route("/grants/check/batch", post(crate::grants_batch::batch))
+        .route("/grants/changes", post(crate::grant_changes::changes))
         .route("/grants/which", post(crate::grants_batch::which))
         .route(
             "/grants/membership",
@@ -354,10 +357,14 @@ fn with_directory_grants_model<A, T>(
         };
         let authorized = judge(Judged {
             directory: &projection,
-            grants,
+            grants: &mut *grants,
             root,
             apps: &mut apps,
-        })?;
+        });
+        // Every commit is made under this hold: its revision is signalled
+        // before the hold ends, whether the act was answered or refused.
+        state.grant_setup.changes.published(grants.revision());
+        let authorized = authorized?;
         drop(projection);
         apply(directory, authorized)
     })

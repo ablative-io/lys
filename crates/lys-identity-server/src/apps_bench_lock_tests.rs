@@ -18,6 +18,7 @@ fn setup() -> Result<GrantSetup, Box<dyn Error>> {
         spicedb: None,
         model_revision: AtomicU64::new(1),
         refresh: Mutex::new(()),
+        changes: crate::grant_changes::GrantChanges::default(),
     })
 }
 

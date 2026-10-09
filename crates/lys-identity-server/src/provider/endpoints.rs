@@ -265,6 +265,10 @@ pub(super) struct Exchange {
     /// The refresh token a `refresh_token` grant presents (ACCESS-002 R2).
     #[serde(default)]
     pub(super) refresh_token: String,
+    /// The grant binding version asked for beside the pass (DIRECTORY-089
+    /// R2); absent, the answer carries none, as before bindings existed.
+    #[serde(default)]
+    pub(super) grant_binding: Option<String>,
     pub(super) client_id: Option<String>,
     pub(super) client_secret: Option<String>,
 }

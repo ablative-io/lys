@@ -421,7 +421,7 @@ fn serve<T>(
     page: impl FnOnce(&mut Judged<'_>, &Asking<'_>, &T) -> Result<MembershipPage, Named>,
 ) -> Result<Json<MembershipPage>, ServerError> {
     let acting_for = asker(state, headers)?;
-    let served = served_log(state);
+    let served = served_log(state)?;
     let mut random = [0_u8; HANDLE_BYTES];
     rand::rng().fill_bytes(&mut random);
     let membership = &state.membership;

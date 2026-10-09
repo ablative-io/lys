@@ -22,6 +22,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::Budget(error) => budget(error),
         ServerError::Call(error) => error.name(),
         ServerError::Provider(error) => error.name(),
+        ServerError::GrantStream(error) => error.name(),
         ServerError::Holding(error) => error.name(),
         ServerError::Machine(error) => error.name(),
         ServerError::Cord(error) => error.name(),

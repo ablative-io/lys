@@ -61,6 +61,7 @@ fn exchange(client_id: Option<&str>, client_secret: Option<&str>) -> Exchange {
         redirect_uri: "https://product.example.test/callback".to_owned(),
         code_verifier: "verifier".to_owned(),
         refresh_token: String::new(),
+        grant_binding: None,
         client_id: client_id.map(str::to_owned),
         client_secret: client_secret.map(str::to_owned),
     }

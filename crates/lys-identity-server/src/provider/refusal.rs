@@ -8,6 +8,7 @@ use serde_json::json;
 
 use crate::apps_error::AppError;
 use crate::error::ServerError;
+use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
 
 /// An OAuth error answer carrying the refusal by name.
@@ -35,6 +36,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         ) => "invalid_scope",
         ServerError::RequestMalformed { .. }
         | ServerError::BodyTooLarge
+        | ServerError::GrantStream(GrantStreamError::BindingUnsupported { .. })
         | ServerError::Holding(..) => "invalid_request",
         ServerError::Team(..)
         | ServerError::Budget(..)
@@ -150,6 +152,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
             | ProviderError::PassRefused { .. },
         )
         | ServerError::ProviderRefused { .. }
+        | ServerError::GrantStream(..)
         | ServerError::SignInProvidersRefused { .. }
         | ServerError::NotPermitted { .. }
         | ServerError::NoLiveSession { .. }

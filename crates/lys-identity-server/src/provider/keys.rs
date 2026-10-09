@@ -177,7 +177,13 @@ impl SigningKeys {
 
     /// `claims` as a compact JWS signed with the current key, naming it.
     pub(super) fn signed(&self, claims: &Value) -> String {
-        let header = json!({ "alg": "EdDSA", "typ": "JWT", "kid": self.kid });
+        self.signed_as(claims, "JWT")
+    }
+
+    /// `claims` as a compact JWS of the type `typ`, signed with the current
+    /// key and naming it: a pass's grant binding is never typed as a pass.
+    pub(super) fn signed_as(&self, claims: &Value, typ: &str) -> String {
+        let header = json!({ "alg": "EdDSA", "typ": typ, "kid": self.kid });
         let input = format!(
             "{}.{}",
             URL_SAFE_NO_PAD.encode(header.to_string()),

@@ -360,6 +360,7 @@ impl Table {
                 spicedb: None,
                 model_revision: AtomicU64::new(model_revision),
                 refresh: Mutex::new(()),
+                changes: crate::grant_changes::GrantChanges::default(),
             },
             secrets: None,
             requests: None,

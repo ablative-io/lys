@@ -62,6 +62,7 @@ impl Table {
             spicedb: None,
             model_revision: std::sync::atomic::AtomicU64::new(apps.model_revision()),
             refresh: Mutex::new(()),
+            changes: crate::grant_changes::GrantChanges::default(),
         };
         Ok(Self {
             storage,
