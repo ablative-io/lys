@@ -67,18 +67,11 @@ pub(crate) fn typed(api: &mut Api) {
             S,
             Some(api.schema::<crate::apps_client_credentials::ClientCredentialIssueBody>()),
             Some(api.schema::<crate::apps_views::ClientCredentialGiven>()),
-            &[ADMIN_BODY, CREDENTIAL, &["NoPerson", "SecretsUnavailable"]],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/bearer/issue",
-                "Issue an approved app its bearer, answered once, with a reference on every replay",
-            ),
-            S,
-            Some(api.schema::<crate::apps_client_credentials::ClientCredentialIssueBody>()),
-            Some(api.schema::<crate::apps_views::AppBearerGiven>()),
-            &[ADMIN_BODY, CREDENTIAL, &["SecretsUnavailable"]],
+            &[
+                ADMIN_BODY,
+                CREDENTIAL,
+                &["NoPerson", "SecretsUnavailable", "AppClientNoCustody"],
+            ],
         ),
         route(
             (
