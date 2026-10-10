@@ -101,9 +101,7 @@ fn follow_seat(server: &Server, seat: &str, json: bool) -> CliResult<()> {
         if let Some(cursor) = cursor {
             body["cursor"] = json!(cursor);
         } else if !json {
-            eprintln!(
-                "attaching to seat {name}; Ctrl-C detaches, and the seat's session runs on"
-            );
+            eprintln!("attaching to seat {name}; Ctrl-C detaches, and the seat's session runs on");
         }
         let answer = server.post(&route, &body)?;
         let page: Page = serde_json::from_value(answer).map_err(|error| {
@@ -230,9 +228,7 @@ fn follow_bytes(server: &Server, session: &str, json: bool) -> CliResult<()> {
     let id = segment("session_id_invalid", "the session id", session)?;
     let route = format!("/runtime/sessions/{id}/read-bytes");
     if !json {
-        eprintln!(
-            "attaching read-only to session {id}; Ctrl-C detaches, and the session runs on"
-        );
+        eprintln!("attaching read-only to session {id}; Ctrl-C detaches, and the session runs on");
     }
     let mut cursor: Option<u64> = None;
     loop {

@@ -143,14 +143,25 @@ fn get_sends_the_pass_to_the_runs_own_route_and_never_prints_it() -> TestResult 
     let shown = printed(&output);
     assert!(output.status.success(), "{shown}");
     assert!(shown.contains("agent x at revision 2"), "{shown}");
-    assert!(shown.contains("focus = \"the door\" (revision 2, by agent-x)"), "{shown}");
+    assert!(
+        shown.contains("focus = \"the door\" (revision 2, by agent-x)"),
+        "{shown}"
+    );
     assert!(shown.contains("expired: lantern"), "{shown}");
     assert!(!shown.contains(PASS), "the pass was printed: {shown}");
     let requests = served(handle)?;
     let head = requests[0].lines().next().unwrap_or_default().to_owned();
     assert_eq!(head, "GET /api/me/variables HTTP/1.1");
-    assert!(requests[0].contains(&format!("lys-agent-pass: {PASS}")), "{}", requests[0]);
-    assert!(requests[0].contains("lys-seat: seat-fixture"), "{}", requests[0]);
+    assert!(
+        requests[0].contains(&format!("lys-agent-pass: {PASS}")),
+        "{}",
+        requests[0]
+    );
+    assert!(
+        requests[0].contains("lys-seat: seat-fixture"),
+        "{}",
+        requests[0]
+    );
     Ok(())
 }
 
@@ -182,7 +193,11 @@ fn set_patches_with_the_revision_read_and_removes_with_an_empty_value() -> TestR
     let answer: Value = serde_json::from_str(shown.trim())?;
     assert_eq!(answer["scope"]["kind"], "session");
     let requests = served(handle)?;
-    assert!(requests[0].starts_with("POST /api/me/session/variables HTTP/1.1"), "{}", requests[0]);
+    assert!(
+        requests[0].starts_with("POST /api/me/session/variables HTTP/1.1"),
+        "{}",
+        requests[0]
+    );
     let body = body_of(&requests[0])?;
     assert_eq!(body["revision"], 1);
     assert_eq!(body["expires_at"], 1_800_000_000_u64);
@@ -214,7 +229,11 @@ fn a_refusal_is_shown_by_its_name_and_the_codex_variables_carry_the_pass() -> Te
     assert!(shown.contains("revision 3, not 1"), "{shown}");
     assert!(!shown.contains(PASS), "the pass was printed: {shown}");
     let requests = served(handle)?;
-    assert!(requests[0].contains(&format!("lys-agent-pass: {PASS}")), "{}", requests[0]);
+    assert!(
+        requests[0].contains(&format!("lys-agent-pass: {PASS}")),
+        "{}",
+        requests[0]
+    );
     Ok(())
 }
 

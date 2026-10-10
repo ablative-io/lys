@@ -172,8 +172,14 @@ fn seat_import_sources_maps_declared_files() -> TestResult {
         ("env.MONITOR_GATE_STATE_DIR", "replaced_by_lys"),
         ("statusLine", "replaced_by_lys"),
         ("hooks.Stop", "replaced_by_lys"),
-        ("enabledPlugins.fixture-plugin@fixture-market", "no Lys owner: plugin"),
-        ("extraKnownMarketplaces.fixture-market", "no Lys owner: plugin"),
+        (
+            "enabledPlugins.fixture-plugin@fixture-market",
+            "no Lys owner: plugin",
+        ),
+        (
+            "extraKnownMarketplaces.fixture-market",
+            "no Lys owner: plugin",
+        ),
         ("enableAllProjectMcpServers", "no Lys owner: plugin"),
         ("disableAgentView", "harness_ui_state"),
         ("tui", "harness_ui_state"),
@@ -185,7 +191,10 @@ fn seat_import_sources_maps_declared_files() -> TestResult {
         ("voiceEnabled", "harness_ui_state"),
     ] {
         let member = format!("claude.settings#{member}");
-        assert!(excluded(&fragment, &member, reason), "{member} is not {reason}");
+        assert!(
+            excluded(&fragment, &member, reason),
+            "{member} is not {reason}"
+        );
     }
 
     assert_eq!(fragment.sources.len(), 3);
@@ -210,23 +219,41 @@ fn seat_import_sources_maps_declared_files() -> TestResult {
         return Err(format!("one destination, found {:?}", fragment.destinations).into());
     };
     assert_eq!(destination.record_kind, "profile_version");
-    let change = destination.change.as_object().ok_or("the change is an object")?;
+    let change = destination
+        .change
+        .as_object()
+        .ok_or("the change is an object")?;
     assert_eq!(change.keys().collect::<Vec<_>>(), ["settings"]);
     assert_eq!(destination.record_id, "fixture-seat");
     let settings = &destination.change["settings"];
-    assert_eq!(settings["model_access"], serde_json::json!(["fixture-model-1"]));
+    assert_eq!(
+        settings["model_access"],
+        serde_json::json!(["fixture-model-1"])
+    );
     assert_eq!(settings["instructions"], PROMPT);
     assert_eq!(settings["permissions"]["default_mode"], "bypassPermissions");
-    assert_eq!(settings["permissions"]["allow"], serde_json::json!(["Read"]));
+    assert_eq!(
+        settings["permissions"]["allow"],
+        serde_json::json!(["Read"])
+    );
     let directories = serde_json::json!(["/tmp/fixture-dir"]);
-    assert_eq!(settings["permissions"]["additional_directories"], directories);
+    assert_eq!(
+        settings["permissions"]["additional_directories"],
+        directories
+    );
     let servers = settings["mcp_servers"]
         .as_array()
         .ok_or("mcp_servers is a list")?;
-    let names: Vec<&str> = servers.iter().filter_map(|one| one["name"].as_str()).collect();
+    let names: Vec<&str> = servers
+        .iter()
+        .filter_map(|one| one["name"].as_str())
+        .collect();
     assert_eq!(names, ["tools", "web"]);
     assert_eq!(servers[0]["command"]["program"], "/bin/fixture-tools");
-    assert_eq!(servers[0]["command"]["args"], serde_json::json!(["--port", "1"]));
+    assert_eq!(
+        servers[0]["command"]["args"],
+        serde_json::json!(["--port", "1"])
+    );
     assert_eq!(servers[0]["command"]["env"]["FIXTURE_NAME"], "fixture");
     assert_eq!(servers[1]["url"], "http://127.0.0.1:8/mcp");
     for id in ["claude.settings", "claude.mcp", "claude.system_prompt"] {
@@ -234,7 +261,12 @@ fn seat_import_sources_maps_declared_files() -> TestResult {
     }
 
     let status = "claude.settings#statusLine: replaced by Lys's own status line";
-    assert!(fragment.replacements.iter().any(|one| one.starts_with(status)));
+    assert!(
+        fragment
+            .replacements
+            .iter()
+            .any(|one| one.starts_with(status))
+    );
     assert_eq!(settings.get("harness"), None, "no build is declared");
     Ok(())
 }
@@ -259,7 +291,11 @@ fn seat_import_sources_declares_the_seats_build_for_its_harness() -> TestResult 
     let profile = write(root.path(), "fixture-channels.config.toml", text)?;
     let given = manifest(Harness::Codex, None, Some(profile));
     let fragment = read_files(&given, Some(&declared));
-    assert!(refused(&fragment, UNSUPPORTED, "manifest.harness"), "{:?}", fragment.refusals);
+    assert!(
+        refused(&fragment, UNSUPPORTED, "manifest.harness"),
+        "{:?}",
+        fragment.refusals
+    );
     assert!(fragment.destinations.is_empty());
     Ok(())
 }
@@ -271,7 +307,10 @@ fn seat_import_sources_refuses_an_unknown_member() -> TestResult {
     let settings = r#"{ "model": "m", "fixtureNeverSeen": 1, "env": { "FIXTURE": "1" } }"#;
     write(&folder, "settings.json", settings)?;
     let fragment = files(&manifest(Harness::Claude, Some(folder), None));
-    for member in ["claude.settings#fixtureNeverSeen", "claude.settings#env.FIXTURE"] {
+    for member in [
+        "claude.settings#fixtureNeverSeen",
+        "claude.settings#env.FIXTURE",
+    ] {
         assert!(refused(&fragment, UNSUPPORTED, member), "{member}");
     }
     Ok(())
@@ -329,8 +368,14 @@ fn seat_import_keys_refuses_inline() -> TestResult {
         "claude.mcp#mcpServers.addressed.url",
         "claude.mcp#mcpServers.queried.url",
     ] {
-        assert!(refused(&fragment, "import_credential_inline", member), "{member}");
-        assert!(fragment.excluded.iter().any(|one| one.source_id == member), "{member}");
+        assert!(
+            refused(&fragment, "import_credential_inline", member),
+            "{member}"
+        );
+        assert!(
+            fragment.excluded.iter().any(|one| one.source_id == member),
+            "{member}"
+        );
     }
     let answer = serde_json::to_string(&fragment)?;
     assert!(!answer.contains(CANARY));
@@ -346,7 +391,12 @@ fn seat_import_keys_refuses_inline() -> TestResult {
     let servers: Vec<&str> = fragment
         .destinations
         .iter()
-        .flat_map(|one| one.change["settings"]["mcp_servers"].as_array().into_iter().flatten())
+        .flat_map(|one| {
+            one.change["settings"]["mcp_servers"]
+                .as_array()
+                .into_iter()
+                .flatten()
+        })
         .filter_map(|one| one["name"].as_str())
         .collect();
     assert_eq!(servers, ["clean"]);
@@ -367,11 +417,19 @@ fn seat_import_sources_distinguishes_roots() -> TestResult {
     }
     let fragment = files(&manifest(Harness::Claude, Some(second.clone()), None));
     let shown = second.display().to_string();
-    assert!(fragment.sources.iter().all(|one| one.locator.starts_with(&shown)));
+    assert!(
+        fragment
+            .sources
+            .iter()
+            .all(|one| one.locator.starts_with(&shown))
+    );
     let [destination] = fragment.destinations.as_slice() else {
         return Err("one destination".into());
     };
-    assert_eq!(destination.change["settings"]["model_access"], serde_json::json!(["model-two"]));
+    assert_eq!(
+        destination.change["settings"]["model_access"],
+        serde_json::json!(["model-two"])
+    );
     Ok(())
 }
 
@@ -392,7 +450,10 @@ fn seat_import_sources_names_each_read_failure() -> TestResult {
         .iter()
         .find(|one| one.id == "claude.mcp")
         .ok_or("the missing file keeps its entry")?;
-    assert!(matches!(source.completeness, Completeness::Incomplete { .. }));
+    assert!(matches!(
+        source.completeness,
+        Completeness::Incomplete { .. }
+    ));
 
     let malformed = root.path().join("malformed");
     fs::create_dir_all(&malformed)?;
@@ -504,7 +565,10 @@ fn seat_import_sources_preserves_channels() -> TestResult {
         ("tui.model_availability_nux", "harness_ui_state"),
     ] {
         let member = format!("codex.profile#{member}");
-        assert!(excluded(&fragment, &member, reason), "{member} is not {reason}");
+        assert!(
+            excluded(&fragment, &member, reason),
+            "{member} is not {reason}"
+        );
     }
 
     let [source] = fragment.sources.as_slice() else {
@@ -517,10 +581,15 @@ fn seat_import_sources_preserves_channels() -> TestResult {
         return Err("one destination".into());
     };
     let settings = &destination.change["settings"];
-    assert_eq!(settings["model_access"], serde_json::json!(["fixture-codex-model"]));
+    assert_eq!(
+        settings["model_access"],
+        serde_json::json!(["fixture-codex-model"])
+    );
     assert_eq!(settings["instructions"], "Fixture instructions.");
     assert_eq!(settings["permissions"]["default_mode"], "workspace-write");
-    let servers = settings["mcp_servers"].as_array().ok_or("mcp_servers is a list")?;
+    let servers = settings["mcp_servers"]
+        .as_array()
+        .ok_or("mcp_servers is a list")?;
     let local = servers
         .iter()
         .find(|one| one["name"] == "local")
@@ -528,7 +597,11 @@ fn seat_import_sources_preserves_channels() -> TestResult {
     assert_eq!(local["command"]["env"]["FIXTURE_LEVEL"], 3);
     assert!(local.get("channel").is_none_or(|channel| channel == "off"));
     assert!(servers.iter().all(|one| one["name"] != "dormant"));
-    assert!(servers.iter().any(|one| one["url"] == "http://127.0.0.1:7/mcp"));
+    assert!(
+        servers
+            .iter()
+            .any(|one| one["url"] == "http://127.0.0.1:7/mcp")
+    );
     Ok(())
 }
 

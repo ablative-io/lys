@@ -388,10 +388,7 @@ mod tests {
         assert_eq!(seat.revision, 3);
         let sealed = held.encode()?;
         assert_eq!(Held::decode(&sealed)?, held);
-        assert_eq!(
-            Held::decode(&sealed)?.seat("waffles"),
-            held.seat("waffles")
-        );
+        assert_eq!(Held::decode(&sealed)?.seat("waffles"), held.seat("waffles"));
         Ok(())
     }
 

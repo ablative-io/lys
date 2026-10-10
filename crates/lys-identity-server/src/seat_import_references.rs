@@ -47,8 +47,7 @@ pub const CREDENTIAL_IN_ANSWER: &str = "credential_value_in_answer";
 /// A reference's public identity differs from the one Lys records.
 pub const IDENTITY_MISMATCH: &str = "import_reference_identity_mismatch";
 
-const NO_DOOR: &str =
-    "this service is configured with no door address, so the handle cannot be resolved through the approved broker";
+const NO_DOOR: &str = "this service is configured with no door address, so the handle cannot be resolved through the approved broker";
 
 /// The mode a seat-identity file must have.
 const FILE_MODE: u32 = 0o600;

@@ -160,7 +160,9 @@ pub enum SeatImportError {
         kind: String,
     },
     /// The destination kind has no owner the importer writes.
-    #[error("import_destination_unsupported: {record} is of kind `{kind}`, which no Lys owner imports")]
+    #[error(
+        "import_destination_unsupported: {record} is of kind `{kind}`, which no Lys owner imports"
+    )]
     DestinationUnsupported {
         /// The record.
         record: String,

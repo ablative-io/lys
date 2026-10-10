@@ -149,7 +149,10 @@ fn seat_import_references_judge_the_file_by_metadata_alone() -> TestResult {
     assert!(!file.usable);
     // The refusal names the mode read from the metadata: had the file been
     // opened, a mode-000 file would have answered permission denied instead.
-    let reason = file.reason.as_deref().ok_or("an unusable file has a reason")?;
+    let reason = file
+        .reason
+        .as_deref()
+        .ok_or("an unusable file has a reason")?;
     assert!(reason.contains("0000"), "{reason}");
     let locator = path.display().to_string();
     assert!(refused(&fragment, "import_reference_unusable", &locator));
@@ -171,7 +174,11 @@ fn seat_import_keys_refuses_wrong_owner() -> TestResult {
     let mut bound_elsewhere = facts();
     bound_elsewhere.door_identity = Some("agent-elsewhere".to_owned());
     let fragment = read_references_from(&given, &bound_elsewhere, None, owner);
-    assert!(refused(&fragment, "import_reference_identity_mismatch", &locator));
+    assert!(refused(
+        &fragment,
+        "import_reference_identity_mismatch",
+        &locator
+    ));
     let file = reference(&fragment, "seat_identity_file")?;
     assert!(!file.usable);
     assert_eq!(file.public_identity.as_deref(), Some(AGENT));
@@ -179,7 +186,11 @@ fn seat_import_keys_refuses_wrong_owner() -> TestResult {
     let mut unanswered = facts();
     unanswered.responsible = None;
     let fragment = read_references_from(&given, &unanswered, None, owner);
-    assert!(refused(&fragment, "import_responsible_missing", "fixture-seat"));
+    assert!(refused(
+        &fragment,
+        "import_responsible_missing",
+        "fixture-seat"
+    ));
 
     let missing = dir.path().join("absent.seat.json");
     let absent = manifest(Some(missing.clone()), &[]);
@@ -226,15 +237,27 @@ fn seat_import_references_resolve_handles_only_through_the_broker() -> TestResul
         let broker = Broker::answering(answer);
         let given = manifest(None, &["handle-1", "bad handle"]);
         let fragment = read_references_from(&given, &facts(), Some(&broker), 0);
-        assert!(refused(&fragment, name, "handle-1"), "{name}: {:?}", fragment.refusals);
-        assert!(refused(&fragment, "import_reference_unresolved", "bad handle"));
+        assert!(
+            refused(&fragment, name, "handle-1"),
+            "{name}: {:?}",
+            fragment.refusals
+        );
+        assert!(refused(
+            &fragment,
+            "import_reference_unresolved",
+            "bad handle"
+        ));
         assert_eq!(broker.reads.get(), 1);
         assert_eq!(fragment.references.len(), 2);
         assert!(fragment.references.iter().all(|one| !one.usable));
     }
 
     let fragment = read_references_from(&manifest(None, &["handle-1"]), &facts(), None, 0);
-    assert!(refused(&fragment, "import_reference_unresolved", "handle-1"));
+    assert!(refused(
+        &fragment,
+        "import_reference_unresolved",
+        "handle-1"
+    ));
     let reason = reference(&fragment, "broker_handle")?.reason.clone();
     assert!(reason.is_some_and(|reason| reason.contains("no door address")));
     Ok(())

@@ -153,7 +153,10 @@ fn seat_import_help_names_every_subcommand_and_flag() -> TestResult {
     assert!(String::from_utf8(output.stdout)?.contains("--manifest"));
     let output = lys(root.path(), &["seat", "import", "confirm", "--help"])?;
     let help = String::from_utf8(output.stdout)?;
-    assert!(help.contains("--plan") && help.contains("--revision"), "{help}");
+    assert!(
+        help.contains("--plan") && help.contains("--revision"),
+        "{help}"
+    );
     Ok(())
 }
 
@@ -166,7 +169,12 @@ fn seat_import_without_its_flags_is_a_usage_error() -> TestResult {
         &["seat", "import", "status"][..],
     ] {
         let output = lys(root.path(), args)?;
-        assert_eq!(output.status.code(), Some(2), "{args:?}: {}", printed(&output));
+        assert_eq!(
+            output.status.code(),
+            Some(2),
+            "{args:?}: {}",
+            printed(&output)
+        );
     }
     Ok(())
 }
@@ -182,16 +190,42 @@ fn a_bulk_name_and_a_bad_manifest_are_refused_before_anything_is_sent() -> TestR
     let absent = absent.display().to_string();
     for (args, refusal) in [
         (
-            vec!["seat", "import", "confirm", "*", "--plan", "p", "--revision", "r"],
+            vec![
+                "seat",
+                "import",
+                "confirm",
+                "*",
+                "--plan",
+                "p",
+                "--revision",
+                "r",
+            ],
             "import_bulk_refused",
         ),
-        (vec!["seat", "import", "status", "waffles,gaia"], "import_bulk_refused"),
         (
-            vec!["seat", "import", "dry-run", "waffles", "--manifest", absent.as_str()],
+            vec!["seat", "import", "status", "waffles,gaia"],
+            "import_bulk_refused",
+        ),
+        (
+            vec![
+                "seat",
+                "import",
+                "dry-run",
+                "waffles",
+                "--manifest",
+                absent.as_str(),
+            ],
             "import_manifest_unreadable",
         ),
         (
-            vec!["seat", "import", "dry-run", "waffles", "--manifest", malformed.as_str()],
+            vec![
+                "seat",
+                "import",
+                "dry-run",
+                "waffles",
+                "--manifest",
+                malformed.as_str(),
+            ],
             "import_manifest_malformed",
         ),
     ] {
@@ -199,8 +233,14 @@ fn a_bulk_name_and_a_bad_manifest_are_refused_before_anything_is_sent() -> TestR
         assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
         let all = printed(&output);
         assert!(all.contains(refusal), "{args:?}: {all}");
-        assert!(!all.contains("identity_server_unreachable"), "{args:?}: {all}");
-        assert!(!all.contains(TOKEN), "the operator token was printed:\n{all}");
+        assert!(
+            !all.contains("identity_server_unreachable"),
+            "{args:?}: {all}"
+        );
+        assert!(
+            !all.contains(TOKEN),
+            "the operator token was printed:\n{all}"
+        );
     }
     Ok(())
 }
@@ -232,7 +272,14 @@ fn a_dry_run_sends_the_named_manifest_and_shows_the_whole_plan() -> TestResult {
     let path = manifest.display().to_string();
     let output = lys(
         root.path(),
-        &["seat", "import", "dry-run", "waffles", "--manifest", path.as_str()],
+        &[
+            "seat",
+            "import",
+            "dry-run",
+            "waffles",
+            "--manifest",
+            path.as_str(),
+        ],
     )?;
     let request = one_request(handle)?;
     assert!(output.status.success(), "{}", printed(&output));
@@ -250,7 +297,10 @@ fn a_dry_run_sends_the_named_manifest_and_shows_the_whole_plan() -> TestResult {
         request.starts_with("POST /api/seats/waffles/import/dry-run HTTP/1.1\r\n"),
         "{request}"
     );
-    assert!(request.contains(&format!("lys-operator: {TOKEN}\r\n")), "{request}");
+    assert!(
+        request.contains(&format!("lys-operator: {TOKEN}\r\n")),
+        "{request}"
+    );
     assert_eq!(body(&request)?, json!({ "manifest": declared }));
     assert!(!printed(&output).contains(TOKEN));
     Ok(())
@@ -285,8 +335,14 @@ fn a_confirmation_names_the_exact_plan_and_shows_the_servers_refusal() -> TestRe
     let request = one_request(handle)?;
     assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
     let all = printed(&output);
-    assert!(all.contains("import_source_changed: /seats/waffles/settings.json"), "{all}");
-    assert!(!all.contains(TOKEN), "the operator token was printed:\n{all}");
+    assert!(
+        all.contains("import_source_changed: /seats/waffles/settings.json"),
+        "{all}"
+    );
+    assert!(
+        !all.contains(TOKEN),
+        "the operator token was printed:\n{all}"
+    );
     assert!(
         request.starts_with("POST /api/seats/waffles/import/confirm HTTP/1.1\r\n"),
         "{request}"
@@ -311,7 +367,10 @@ fn the_status_prints_one_json_object_under_json() -> TestResult {
         json!({ "seat": "waffles", "selected": "op-1", "previewed": null, "imports": [] }),
     )])?;
     install(root.path(), &address)?;
-    let output = lys(root.path(), &["--json", "seat", "import", "status", "waffles"])?;
+    let output = lys(
+        root.path(),
+        &["--json", "seat", "import", "status", "waffles"],
+    )?;
     let request = one_request(handle)?;
     assert!(output.status.success(), "{}", printed(&output));
     let answer: Value = serde_json::from_slice(&output.stdout)?;

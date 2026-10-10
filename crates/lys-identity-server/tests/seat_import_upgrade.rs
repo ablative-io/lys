@@ -41,24 +41,30 @@ fn installed(stores: &Stores) -> TestResult {
         "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
         "mcp_servers": [], "instructions": "the installed profile", "note": "",
     }))?;
-    stores.provisioning.lock().map_err(|error| error.to_string())?.set(
-        AGENT,
-        0,
-        Version {
-            number: 0,
-            operation: lys_identity::OperationId::generate()?.to_string(),
-            settings,
-            set_by: PERSON.to_owned(),
-            set_at: 1,
-            reviewed: None,
-        },
-    )?;
+    stores
+        .provisioning
+        .lock()
+        .map_err(|error| error.to_string())?
+        .set(
+            AGENT,
+            0,
+            Version {
+                number: 0,
+                operation: lys_identity::OperationId::generate()?.to_string(),
+                settings,
+                set_by: PERSON.to_owned(),
+                set_at: 1,
+                reviewed: None,
+            },
+        )?;
     lys_identity_server::words_store::set(
         &stores.words,
         Save {
             layer: Layer::Workspace,
             slot: Slot::WakeUp,
-            setting: Setting::Text { text: "Wake up.".to_owned() },
+            setting: Setting::Text {
+                text: "Wake up.".to_owned(),
+            },
             revision: 0,
             by: PERSON.to_owned(),
         },
@@ -66,17 +72,21 @@ fn installed(stores: &Stores) -> TestResult {
     let limits = serde_json::from_value(json!([
         { "unit": "tokens", "amount": 1000, "period": "day", "act": "notice" }
     ]))?;
-    stores.budgets.lock().map_err(|error| error.to_string())?.set_limits(
-        Limits {
-            holder: person(),
-            limits,
-            warn_at: None,
-            version: 0,
-            by: PERSON.to_owned(),
-            at: 1,
-        },
-        0,
-    )?;
+    stores
+        .budgets
+        .lock()
+        .map_err(|error| error.to_string())?
+        .set_limits(
+            Limits {
+                holder: person(),
+                limits,
+                warn_at: None,
+                version: 0,
+                by: PERSON.to_owned(),
+                at: 1,
+            },
+            0,
+        )?;
     Ok(())
 }
 
@@ -121,14 +131,24 @@ fn seat_import_old_install_upgrade() -> TestResult {
         .iter()
         .find(|destination| destination.record_kind == "profile_version")
         .ok_or("no profile destination")?;
-    assert_eq!(profile.expected_revision, Some(1), "bound over the installed version");
+    assert_eq!(
+        profile.expected_revision,
+        Some(1),
+        "bound over the installed version"
+    );
     let operation = lys_identity::OperationId::generate()?.to_string();
     stores.imports.reserve(reserved(&operation, &plan))?;
     let revisions = stores.revisions()?;
 
     // While the upgrade is reversible, nothing is written.
     let pending = || -> std::io::Result<bool> { Ok(true) };
-    let held_back = apply(&stores.imports, &stores.owners(), &operation, &pending, &Unsignalled);
+    let held_back = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &pending,
+        &Unsignalled,
+    );
     assert!(
         matches!(&held_back, Err(error) if error.name() == "import_upgrade_pending"),
         "{held_back:?}"
@@ -139,19 +159,34 @@ fn seat_import_old_install_upgrade() -> TestResult {
     let unreadable = || -> std::io::Result<bool> {
         Err(std::io::Error::other("fixture: the intent cannot be read"))
     };
-    let refused = apply(&stores.imports, &stores.owners(), &operation, &unreadable, &Unsignalled);
+    let refused = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &unreadable,
+        &Unsignalled,
+    );
     assert!(
         matches!(&refused, Err(error) if error.name() == "import_upgrade_intent_unreadable"),
         "{refused:?}"
     );
     assert_eq!(stores.revisions()?, revisions);
-    let kept = stores.imports.operation(&operation)?.ok_or("no operation")?;
+    let kept = stores
+        .imports
+        .operation(&operation)?
+        .ok_or("no operation")?;
     assert!(kept.steps.is_empty());
     assert_eq!(kept.state(), "in_progress");
 
     // Once committed, the same operation applies; what was installed stays.
     let committed = || -> std::io::Result<bool> { Ok(false) };
-    let applied = apply(&stores.imports, &stores.owners(), &operation, &committed, &Unsignalled)?;
+    let applied = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &committed,
+        &Unsignalled,
+    )?;
     assert_eq!(applied.operation.state(), "completed");
     drop(stores);
     let stores = Stores::open(dir.path(), &key)?;
@@ -163,7 +198,10 @@ fn seat_import_old_install_upgrade() -> TestResult {
         .profile(AGENT)
         .map(|profile| profile.versions.len())
         .ok_or("no profile")?;
-    assert_eq!(versions, 2, "the imported version follows the installed one");
+    assert_eq!(
+        versions, 2,
+        "the imported version follows the installed one"
+    );
     Ok(())
 }
 

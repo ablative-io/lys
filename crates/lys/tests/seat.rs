@@ -137,7 +137,9 @@ fn seat_help_names_every_subcommand() -> TestResult {
     let output = lys(root.path(), &["seat", "--help"])?;
     assert!(output.status.success(), "{}", printed(&output));
     let help = String::from_utf8(output.stdout)?;
-    for word in ["add", "list", "start", "stop", "restart", "send", "--server"] {
+    for word in [
+        "add", "list", "start", "stop", "restart", "send", "--server",
+    ] {
         assert!(help.contains(word), "{word} is missing from:\n{help}");
     }
     Ok(())
@@ -149,7 +151,12 @@ fn seat_add_help_names_its_flags() -> TestResult {
     let output = lys(root.path(), &["seat", "add", "--help"])?;
     assert!(output.status.success(), "{}", printed(&output));
     let help = String::from_utf8(output.stdout)?;
-    for flag in ["--agent", "--profile-version", "--machine", "--working-folder"] {
+    for flag in [
+        "--agent",
+        "--profile-version",
+        "--machine",
+        "--working-folder",
+    ] {
         assert!(help.contains(flag), "{flag} is missing from:\n{help}");
     }
     Ok(())
@@ -210,7 +217,10 @@ fn a_server_off_loopback_is_refused_before_anything_is_sent() -> TestResult {
     assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
     let all = printed(&output);
     assert!(all.contains("server_not_loopback"), "{all}");
-    assert!(!all.contains(TOKEN), "the operator token was printed:\n{all}");
+    assert!(
+        !all.contains(TOKEN),
+        "the operator token was printed:\n{all}"
+    );
     Ok(())
 }
 
@@ -228,7 +238,10 @@ fn an_unreachable_server_is_named_and_the_token_is_never_printed() -> TestResult
         assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
         let all = printed(&output);
         assert!(all.contains("identity_server_unreachable"), "{all}");
-        assert!(!all.contains(TOKEN), "the operator token was printed:\n{all}");
+        assert!(
+            !all.contains(TOKEN),
+            "the operator token was printed:\n{all}"
+        );
     }
     Ok(())
 }
@@ -253,7 +266,10 @@ fn a_refusal_is_shown_by_the_servers_name_and_the_operator_header_is_sent() -> T
         all.contains("seat_not_running: seat waffles has no running session"),
         "{all}"
     );
-    assert!(!all.contains(TOKEN), "the operator token was printed:\n{all}");
+    assert!(
+        !all.contains(TOKEN),
+        "the operator token was printed:\n{all}"
+    );
 
     let [request] = requests.as_slice() else {
         return Err(format!("expected one request, read {requests:?}").into());
@@ -321,6 +337,9 @@ fn the_list_names_an_unread_runner_rather_than_showing_nothing() -> TestResult {
     let [request] = requests.as_slice() else {
         return Err(format!("expected one request, read {requests:?}").into());
     };
-    assert!(request.starts_with("GET /api/seats HTTP/1.1\r\n"), "{request}");
+    assert!(
+        request.starts_with("GET /api/seats HTTP/1.1\r\n"),
+        "{request}"
+    );
     Ok(())
 }

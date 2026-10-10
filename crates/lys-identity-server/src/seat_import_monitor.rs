@@ -340,7 +340,11 @@ async fn ask(asking: &Asking, path: &str, body: Option<&Value>) -> Result<Value,
     }
     let mut bytes = Vec::new();
     while let Some(chunk) = answered.chunk().await.map_err(|error| {
-        refusal(SOURCE_UNAVAILABLE, &member, format!("the answer could not be read: {error}"))
+        refusal(
+            SOURCE_UNAVAILABLE,
+            &member,
+            format!("the answer could not be read: {error}"),
+        )
     })? {
         if bytes.len() + chunk.len() > ANSWER_BOUND {
             let detail = format!("the answer is larger than {ANSWER_BOUND} bytes");
@@ -415,7 +419,10 @@ fn listed<'a>(
                 .is_some_and(|lines| lines.as_u64() != Some(0)),
             "the journal skipped lines it could not read",
         ),
-        (nonempty(body.get("skips")), "the journal names skipped lines"),
+        (
+            nonempty(body.get("skips")),
+            "the journal names skipped lines",
+        ),
         (
             nonempty(health.and_then(|health| health.get("skips"))),
             "the journal names skipped lines",
@@ -460,7 +467,12 @@ fn variables(
     let revision = body.get("revision").and_then(Value::as_u64);
     let held = body.get("entries").and_then(Value::as_object);
     let (Some(revision), Some(held)) = (revision, held) else {
-        return incomplete(base, VARIABLES, body, "the answer carries no revision or entries");
+        return incomplete(
+            base,
+            VARIABLES,
+            body,
+            "the answer carries no revision or entries",
+        );
     };
     let lys = match who.session.filter(|_| scope.starts_with("session:")) {
         Some(session) => Scope::Session {
@@ -502,7 +514,10 @@ fn variables(
             continue;
         }
         let expiry = entry.get("expires_at").and_then(Value::as_str);
-        let expires_at = match expiry.map(crate::seat_import_schedules::instant).transpose() {
+        let expires_at = match expiry
+            .map(crate::seat_import_schedules::instant)
+            .transpose()
+        {
             Ok(nanos) => nanos,
             Err(reason) => {
                 let member = format!("{at}.expires_at");

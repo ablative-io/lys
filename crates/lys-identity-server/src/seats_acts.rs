@@ -143,9 +143,7 @@ pub(crate) fn admitted(
                 }
                 .into()),
             },
-            Err(error)
-                if crate::error_status::grant_status(&error) == StatusCode::FORBIDDEN =>
-            {
+            Err(error) if crate::error_status::grant_status(&error) == StatusCode::FORBIDDEN => {
                 Ok(None)
             }
             Err(error) => Err(error.into()),

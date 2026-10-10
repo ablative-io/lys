@@ -67,7 +67,8 @@ impl SchedulesKept {
     }
 
     fn append(&self, line: Line) -> Result<(), ServerError> {
-        self.kept.with(|log, unavailable| log.append(line, unavailable))
+        self.kept
+            .with(|log, unavailable| log.append(line, unavailable))
     }
 }
 
@@ -169,8 +170,10 @@ pub fn change(schedules: &SchedulesKept, changed: Changed) -> Result<Item, Serve
         Change::Source {
             source: Source::Text { text },
         } => {
-            crate::words_state::checked_text(text).map_err(|refused| SchedulesError::Malformed {
-                reason: refused.to_string(),
+            crate::words_state::checked_text(text).map_err(|refused| {
+                SchedulesError::Malformed {
+                    reason: refused.to_string(),
+                }
             })?;
         }
         Change::MaxOccurrences {
@@ -226,12 +229,8 @@ pub trait Deliver: Send + Sync {
     /// can be reached, by name.
     fn sessions(&self, recipient: &Recipient) -> Result<Vec<(String, Option<String>)>, String>;
     /// `source` rendered for `session` of `agent` now.
-    fn worded(
-        &self,
-        source: &Source,
-        agent: Option<&str>,
-        session: &str,
-    ) -> Result<Worded, String>;
+    fn worded(&self, source: &Source, agent: Option<&str>, session: &str)
+    -> Result<Worded, String>;
     /// Ask the session's runner for `operation`, answering how it stands.
     fn operate(&self, operation: Operation) -> Delivering<'_>;
 }
@@ -260,7 +259,13 @@ pub async fn pass(
                 text: sent.text.clone(),
             },
         };
-        answer(schedules, &schedule, &sent.operation, deliver.operate(operation).await).await?;
+        answer(
+            schedules,
+            &schedule,
+            &sent.operation,
+            deliver.operate(operation).await,
+        )
+        .await?;
     }
     // Then every occurrence due.
     let due = schedules.with(|log| Ok(log.held().due(at)))?;
@@ -269,9 +274,16 @@ pub async fn pass(
         if held.stopped.is_some() || held.paused() {
             continue;
         }
-        let occurrence = u64::try_from(held.fired.len()).unwrap_or(u64::MAX).saturating_add(1);
+        let occurrence = u64::try_from(held.fired.len())
+            .unwrap_or(u64::MAX)
+            .saturating_add(1);
         let operation = op_id(&[&id, &occurrence.to_string(), &due_at.to_string()]);
-        let fired = fire(&held, deliver, (operation, occurrence, due_at, coalesced), at);
+        let fired = fire(
+            &held,
+            deliver,
+            (operation, occurrence, due_at, coalesced),
+            at,
+        );
         let asks: Vec<(String, Operation)> = fired
             .sent
             .iter()
@@ -294,9 +306,10 @@ pub async fn pass(
         }
         let after = item(schedules, &id)?;
         if after.stopped.is_none() && after.next_due.is_none() && after.settled() {
-            let reason = if after.max_occurrences().is_some_and(|max| {
-                u64::try_from(after.fired.len()).unwrap_or(u64::MAX) >= max
-            }) || after.schedule.interval.is_none()
+            let reason = if after
+                .max_occurrences()
+                .is_some_and(|max| u64::try_from(after.fired.len()).unwrap_or(u64::MAX) >= max)
+                || after.schedule.interval.is_none()
             {
                 "finished"
             } else {
@@ -391,10 +404,9 @@ async fn answer(
         Err(Undelivered::Unknown(words)) => (Delivery::Pending, words, false),
     };
     let changed = schedules.with(|log| {
-        Ok(log
-            .held()
-            .sent(operation)
-            .is_some_and(|(_, sent)| sent.state.unsettled() && (sent.state != state || sent.words != words)))
+        Ok(log.held().sent(operation).is_some_and(|(_, sent)| {
+            sent.state.unsettled() && (sent.state != state || sent.words != words)
+        }))
     })?;
     if changed {
         schedules.append(Line::Answered(Answered {

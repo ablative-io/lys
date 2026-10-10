@@ -196,7 +196,9 @@ impl Journal {
 
     /// The import reserved under `key`, while it is not stopped.
     pub fn keyed(&self, key: &str) -> Option<&Operation> {
-        self.keys.get(key).and_then(|operation| self.operation(operation))
+        self.keys
+            .get(key)
+            .and_then(|operation| self.operation(operation))
     }
 
     /// The seat's latest import.

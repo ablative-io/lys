@@ -8,16 +8,16 @@ use serde_json::{Number, Value};
 
 use crate::budgets_limits::Limit;
 use crate::budgets_state::{Holder, HolderKind};
+use crate::error::ServerError;
 use crate::error_seat_import::SeatImportError;
 use crate::provisioning_store::Settings;
-use crate::error::ServerError;
 use crate::schedules_state::{
     Change as Altered, Changed, Item, Line as ScheduleLine, Recipient, Schedule,
 };
 use crate::schedules_store::SchedulesKept;
 use crate::seat_import_plan::{BOUNDS, DestinationEntry, Refusal, record};
-use crate::variables_state::Scope;
 use crate::session::now;
+use crate::variables_state::Scope;
 use crate::words_state::{Layer, Setting, Slot};
 
 /// A `profile_version` change: the next version of the agent's profile.
@@ -214,8 +214,7 @@ pub fn checked(destination: &DestinationEntry, agent: &str) -> Result<(), Refusa
         member: at.clone(),
         detail,
     };
-    let change =
-        parsed(destination).map_err(|error| refusal(error.name(), error.to_string()))?;
+    let change = parsed(destination).map_err(|error| refusal(error.name(), error.to_string()))?;
     let foreign = |id: &str| {
         refusal(
             "import_destination_foreign",

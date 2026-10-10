@@ -162,8 +162,10 @@ impl Schedule {
             return refuse("recipients is empty".to_owned());
         }
         if let Source::Text { text } = &self.source {
-            crate::words_state::checked_text(text).map_err(|refused| SchedulesError::Malformed {
-                reason: refused.to_string(),
+            crate::words_state::checked_text(text).map_err(|refused| {
+                SchedulesError::Malformed {
+                    reason: refused.to_string(),
+                }
             })?;
         }
         Ok(())
@@ -472,7 +474,10 @@ impl Folded for Schedules {
         match line {
             Line::Set(schedule) => {
                 if self.item(&schedule.id).is_some() {
-                    return Err(format!("operation `{}` already names a schedule", schedule.id));
+                    return Err(format!(
+                        "operation `{}` already names a schedule",
+                        schedule.id
+                    ));
                 }
                 let mut item = Item {
                     schedule,
@@ -569,9 +574,9 @@ impl Schedules {
                     Some(interval) if interval > 0 => (now - first) / interval + 1,
                     _ => 1,
                 };
-                let last = first.saturating_add((coalesced - 1).saturating_mul(
-                    item.schedule.interval.unwrap_or(0),
-                ));
+                let last = first.saturating_add(
+                    (coalesced - 1).saturating_mul(item.schedule.interval.unwrap_or(0)),
+                );
                 let last = match item.until() {
                     Some(until) if last >= until => first,
                     _ => last,

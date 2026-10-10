@@ -35,7 +35,9 @@ use crate::runner_sessions::{driven, ended_in, kind};
 use crate::seats_acts::{RESTART, START, STOP, Standing, act, admitted, live_session};
 use crate::seats_api::{body, seat, shown, with_seats};
 use crate::seats_state::{Line, Seat, Started, Stopped};
-use crate::seats_views::{SeatOperationBody, SeatRestarted, SeatStarted, SeatStopBody, SeatStopped};
+use crate::seats_views::{
+    SeatOperationBody, SeatRestarted, SeatStarted, SeatStopBody, SeatStopped,
+};
 use crate::session::now;
 
 /// A seat's session started, as the start answers it.

@@ -129,15 +129,19 @@ pub(crate) fn words(state: &AppState) -> Result<&WordsKept, ServerError> {
 }
 
 fn body<T>(given: Result<Json<T>, JsonRejection>) -> Result<T, ServerError> {
-    given.map(|Json(body)| body).map_err(|refused| ServerError::RequestMalformed {
-        reason: refused.body_text(),
-    })
+    given
+        .map(|Json(body)| body)
+        .map_err(|refused| ServerError::RequestMalformed {
+            reason: refused.body_text(),
+        })
 }
 
 /// The signed-in actor's name for a receipt: their person, or `operator`
 /// for the install's operator token, which is bound to no person.
 fn named(state: &AppState, actor: &lys_identity::Actor) -> Result<String, ServerError> {
-    match with_directory(state, |directory| own_person(directory.projection()?, actor)) {
+    match with_directory(state, |directory| {
+        own_person(directory.projection()?, actor)
+    }) {
         Ok(person) => Ok(person.to_string()),
         Err(ServerError::NoPerson) => Ok("operator".to_owned()),
         Err(error) => Err(error),
@@ -371,10 +375,20 @@ pub(crate) fn rendered(
     };
     if let Some(variables) = state.variables.as_ref() {
         if let Some(session) = session {
-            inputs.session = Some(scope(variables, Scope::Session { id: session.to_owned() })?);
+            inputs.session = Some(scope(
+                variables,
+                Scope::Session {
+                    id: session.to_owned(),
+                },
+            )?);
         }
         if let Some(agent) = agent {
-            inputs.agent = Some(scope(variables, Scope::Agent { id: agent.to_owned() })?);
+            inputs.agent = Some(scope(
+                variables,
+                Scope::Agent {
+                    id: agent.to_owned(),
+                },
+            )?);
         }
     }
     if let (Some(goals), Some(agent)) = (state.goals.as_ref(), agent) {

@@ -29,7 +29,12 @@ pub(crate) fn agents(api: &mut Api) -> Vec<Entry> {
             Some(template),
             Some(saved.clone()),
         ),
-        (POST, "/words/{slot}", Some(save.clone()), Some(saved.clone())),
+        (
+            POST,
+            "/words/{slot}",
+            Some(save.clone()),
+            Some(saved.clone()),
+        ),
         (GET, "/agents/{id}/words", None, Some(for_agent)),
         (
             POST,
@@ -63,13 +68,23 @@ pub(crate) fn agents(api: &mut Api) -> Vec<Entry> {
             Some(read.clone()),
         ),
         (GET, "/me/variables", None, Some(read.clone())),
-        (POST, "/me/variables", Some(patch.clone()), Some(read.clone())),
+        (
+            POST,
+            "/me/variables",
+            Some(patch.clone()),
+            Some(read.clone()),
+        ),
         (GET, "/me/session/variables", None, Some(read.clone())),
         (POST, "/me/session/variables", Some(patch), Some(read)),
         (GET, "/schedules", None, Some(schedules)),
         (POST, "/schedules", Some(schedule), Some(item.clone())),
         (GET, "/schedules/{id}", None, Some(item.clone())),
-        (POST, "/schedules/{id}/change", Some(change), Some(item.clone())),
+        (
+            POST,
+            "/schedules/{id}/change",
+            Some(change),
+            Some(item.clone()),
+        ),
         (POST, "/schedules/{id}/stop", Some(stop), Some(item)),
     ]
 }

@@ -70,7 +70,9 @@ impl WordsError {
 }
 
 /// The five message slots.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[schema(as = WordsSlot)]
 #[serde(rename_all = "snake_case")]
 pub enum Slot {
@@ -138,7 +140,9 @@ impl Slot {
 }
 
 /// Where words are set: the workspace, one agent or one session.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[schema(as = WordsLayer)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Layer {
@@ -481,9 +485,9 @@ pub fn checked_text(text: &str) -> Result<String, WordsError> {
 pub fn checked_name(name: &str) -> Result<String, WordsError> {
     let ok = !name.is_empty()
         && name.len() <= 64
-        && name
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_');
+        && name.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
+        });
     if ok {
         Ok(name.to_owned())
     } else {

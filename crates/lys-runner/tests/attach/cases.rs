@@ -63,12 +63,8 @@ fn a_managed_sessions_user_turn_is_an_attach_line_of_kind_user() -> TestResult {
     let turn = json!({"type":"user","session_id":CONVERSATION,"uuid":"u-1",
         "parent_tool_use_id":null,"message":{"role":"user","content":"hello from the person"}});
     sessions.attach_frame("seat", generation, Transport::Claude, &turn)?;
-    let (read, cursor, ended) = lines(sessions.attach_read(
-        "seat",
-        None,
-        false,
-        &AtomicBool::new(false),
-    )?)?;
+    let (read, cursor, ended) =
+        lines(sessions.attach_read("seat", None, false, &AtomicBool::new(false))?)?;
     assert_eq!(read.len(), 1);
     assert_eq!(read[0].kind, USER);
     assert_eq!(read[0].text, "hello from the person");
@@ -132,7 +128,10 @@ fn the_ring_keeps_its_bound_and_names_the_oldest_cursor_it_holds() -> TestResult
     let kept = ring.from(None)?;
     assert_eq!(kept.lines.len(), 2);
     assert_eq!(kept.cursor, 3);
-    let ahead = ring.from(Some(4)).err().ok_or("a cursor past the end read")?;
+    let ahead = ring
+        .from(Some(4))
+        .err()
+        .ok_or("a cursor past the end read")?;
     assert_eq!(ahead.name(), "cursor_ahead");
     Ok(())
 }

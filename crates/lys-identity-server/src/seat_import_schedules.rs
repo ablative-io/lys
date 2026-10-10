@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
+use crate::schedules_state::{INTERVAL_MAX, INTERVAL_MIN, Recipient, Schedule, Source};
 use crate::seat_import_monitor::{
     BOUND_EXCEEDED, CREDENTIAL_INLINE, MEMBER_UNSUPPORTED, empty, reached, refusal, secret_shaped,
 };
@@ -25,7 +26,6 @@ use crate::seat_import_monitor_maps::words_text;
 use crate::seat_import_plan::{
     Completeness, DestinationEntry, Excluded, Fragment, Refusal, ScheduleCounts, SourceEntry,
 };
-use crate::schedules_state::{INTERVAL_MAX, INTERVAL_MIN, Recipient, Schedule, Source};
 use crate::words_state::Slot;
 
 /// A legacy recipient the manifest maps to no Lys seat.
@@ -216,7 +216,11 @@ fn whole(schedule: &Value, field: &str, id: &str) -> Result<Option<u64>, Refusal
         None | Some(Value::Null) => Ok(None),
         Some(value) => value.as_u64().map(Some).ok_or_else(|| {
             let member = format!("schedule {id}.{field}");
-            refusal(MEMBER_UNSUPPORTED, &member, format!("{value} is not a whole number"))
+            refusal(
+                MEMBER_UNSUPPORTED,
+                &member,
+                format!("{value} is not a whole number"),
+            )
         }),
     }
 }

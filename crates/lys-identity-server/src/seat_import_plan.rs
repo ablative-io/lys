@@ -275,7 +275,9 @@ impl ScheduleCounts {
 }
 
 /// A refusal by name, of one member, for example `import_source_unreadable`.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[schema(as = SeatImportRefusal)]
 #[serde(deny_unknown_fields)]
 pub struct Refusal {
@@ -446,7 +448,11 @@ pub fn assemble(
             refusals.push(refused("import_source_incomplete", &source.locator, reason));
         }
     }
-    let ids: BTreeSet<&str> = merged.sources.iter().map(|source| source.id.as_str()).collect();
+    let ids: BTreeSet<&str> = merged
+        .sources
+        .iter()
+        .map(|source| source.id.as_str())
+        .collect();
     let mut destinations = merged.destinations;
     destinations.sort_by(|left, right| {
         (kind_rank(&left.record_kind), &left.record_id)
@@ -456,8 +462,15 @@ pub fn assemble(
     let mut next: BTreeMap<String, u64> = BTreeMap::new();
     for destination in &mut destinations {
         let member = format!("{} {}", destination.record_kind, destination.record_id);
-        if !seen.insert((destination.record_kind.clone(), destination.record_id.clone())) {
-            refusals.push(refused("import_destination_ambiguous", &member, "named twice"));
+        if !seen.insert((
+            destination.record_kind.clone(),
+            destination.record_id.clone(),
+        )) {
+            refusals.push(refused(
+                "import_destination_ambiguous",
+                &member,
+                "named twice",
+            ));
         }
         for source in &destination.source_entry_ids {
             if !ids.contains(source.as_str()) {
@@ -535,7 +548,8 @@ pub fn assemble(
     let bytes = serde_json::to_vec(&plan).map_or(usize::MAX, |bytes| bytes.len());
     if u64::try_from(bytes).unwrap_or(u64::MAX) > BOUNDS.plan_bytes {
         let detail = format!("the plan is {bytes} bytes; at most {}", BOUNDS.plan_bytes);
-        plan.refusals.push(refused("import_bound_exceeded", "plan_bytes", detail));
+        plan.refusals
+            .push(refused("import_bound_exceeded", "plan_bytes", detail));
     }
     plan
 }
@@ -630,8 +644,7 @@ fn sha256(text: &str) -> String {
 /// or changed.
 pub async fn gather(manifest: &Manifest, state: &AppState) -> Result<Plan, ServerError> {
     let seat = crate::seats_api::seat(state, &manifest.seat)?;
-    let people =
-        crate::seats_api::responsible(state, &BTreeSet::from([seat.added.agent.clone()]))?;
+    let people = crate::seats_api::responsible(state, &BTreeSet::from([seat.added.agent.clone()]))?;
     let facts = SeatFacts {
         seat: seat.added.name.clone(),
         agent: seat.added.agent.clone(),

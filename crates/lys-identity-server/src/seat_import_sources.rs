@@ -56,8 +56,7 @@ pub const REVISION_REDACTED: &str = "sha256_redacted_canonical";
 /// The revision kind of a source that has no revision.
 pub const REVISION_NONE: &str = "none";
 
-const CODEX_MACHINE_OWNED: &str =
-    "machine_owned: the approval policy and project trust are the machine's own Codex configuration, never a profile member (the Codex launch takes them from the machine)";
+const CODEX_MACHINE_OWNED: &str = "machine_owned: the approval policy and project trust are the machine's own Codex configuration, never a profile member (the Codex launch takes them from the machine)";
 /// The Claude settings that are the harness's own interface or preferences.
 const CLAUDE_UI: [&str; 7] = [
     "alwaysThinkingEnabled",
@@ -230,7 +229,9 @@ fn read_one(
     };
     let (revision_kind, revision, completeness) =
         revision_of(&bytes, document.as_ref(), &sorted.secrets);
-    fragment.sources.push(entry(revision_kind, revision.clone(), completeness));
+    fragment
+        .sources
+        .push(entry(revision_kind, revision.clone(), completeness));
     for (member, reason) in std::mem::take(&mut sorted.excluded) {
         fragment.excluded.push(Excluded {
             source_id: member,
@@ -252,7 +253,10 @@ fn read_bounded(path: &Path) -> Result<Vec<u8>, Failure> {
     let shown = path.display();
     let unreadable = |error: std::io::Error| match error.kind() {
         ErrorKind::NotFound => (SOURCE_MISSING, format!("{shown} does not exist")),
-        _ => (SOURCE_UNREADABLE, format!("{shown} cannot be read: {error}")),
+        _ => (
+            SOURCE_UNREADABLE,
+            format!("{shown} cannot be read: {error}"),
+        ),
     };
     let metadata = fs::symlink_metadata(path).map_err(unreadable)?;
     if metadata.file_type().is_symlink() {
@@ -291,7 +295,10 @@ fn sort(
     replaced: Replaced<'_>,
 ) -> Result<(Sorted, Option<Value>), Failure> {
     let malformed = |what: &str, error: &dyn std::fmt::Display| {
-        (SOURCE_MALFORMED, format!("{} is not {what}: {error}", kind.id()))
+        (
+            SOURCE_MALFORMED,
+            format!("{} is not {what}: {error}", kind.id()),
+        )
     };
     match kind {
         Kind::ClaudeSettings | Kind::ClaudeMcp => {
@@ -334,7 +341,11 @@ fn revision_of(
         return no_revision("the text holds a secret-shaped value");
     };
     match withheld(document, secrets) {
-        Ok(redacted) => (REVISION_REDACTED, sha256_hex(&redacted), Completeness::Complete),
+        Ok(redacted) => (
+            REVISION_REDACTED,
+            sha256_hex(&redacted),
+            Completeness::Complete,
+        ),
         Err(reason) => no_revision(&reason),
     }
 }
@@ -354,7 +365,9 @@ fn withheld(value: &Value, secrets: &BTreeSet<String>) -> Result<Vec<u8>, String
     let mut copy = value.clone();
     for pointer in secrets {
         let Some(slot) = copy.pointer_mut(pointer) else {
-            return Err(format!("the withheld member {pointer} is not in the document"));
+            return Err(format!(
+                "the withheld member {pointer} is not in the document"
+            ));
         };
         *slot = Value::String(WITHHELD.to_owned());
     }
@@ -447,10 +460,7 @@ fn scan(sorted: &mut Sorted, value: &Value, path: &str, pointer: &str, parent: &
                 let at = dotted(path, key);
                 let below = child(pointer, key);
                 let named = matches!(parent, "env" | "headers" | "http_headers");
-                if named
-                    && secret_name(key)
-                    && item.as_str().is_some_and(|text| !text.is_empty())
-                {
+                if named && secret_name(key) && item.as_str().is_some_and(|text| !text.is_empty()) {
                     sorted.credential(&at, below);
                     continue;
                 }
@@ -548,10 +558,9 @@ pub fn codex_profile(source_id: &str, document: &Value) -> Sorted {
                         ..Permissions::default()
                     });
                 }
-                Some(_) | None => sorted.unsupported(
-                    key,
-                    "the sandbox mode is not one the Codex launch takes",
-                ),
+                Some(_) | None => {
+                    sorted.unsupported(key, "the sandbox mode is not one the Codex launch takes")
+                }
             },
             "approval_policy" => sorted.exclude(key, CODEX_MACHINE_OWNED),
             "model_reasoning_effort" | "service_tier" | "approvals_reviewer" => {

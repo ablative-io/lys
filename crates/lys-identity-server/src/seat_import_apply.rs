@@ -145,9 +145,10 @@ impl<'a> Owners<'a> {
                 })
             }
             Change::Template(change) => owned(self.words, "words")?.with(|log, _| {
-                let held = log.held().templates.get(&change.name).is_some_and(|held| {
-                    held.revision == next && held.text == change.text.trim()
-                });
+                let held =
+                    log.held().templates.get(&change.name).is_some_and(|held| {
+                        held.revision == next && held.text == change.text.trim()
+                    });
                 Ok(ours(held, next))
             }),
             Change::Slot(change) => owned(self.words, "words")?.with(|log, _| {
@@ -383,7 +384,10 @@ pub fn apply(
         return Err(stopped(halted));
     }
     let plan = &held.reserved.plan;
-    let who = (plan.agent.as_str(), held.reserved.confirmation.person.as_str());
+    let who = (
+        plan.agent.as_str(),
+        held.reserved.confirmation.person.as_str(),
+    );
     let mut writes = 0;
     for (index, destination) in plan.destinations.iter().enumerate() {
         let step = step_id(operation, index);
@@ -392,12 +396,13 @@ pub fn apply(
         }
         fenced(fence)?;
         let record = member(destination);
-        let expected = destination.expected_revision.ok_or_else(|| {
-            SeatImportError::DestinationMalformed {
-                record: record.clone(),
-                reason: "the plan bound no revision".to_owned(),
-            }
-        })?;
+        let expected =
+            destination
+                .expected_revision
+                .ok_or_else(|| SeatImportError::DestinationMalformed {
+                    record: record.clone(),
+                    reason: "the plan bound no revision".to_owned(),
+                })?;
         let change = parsed(destination)?;
         let keep = |revision: u64, outcome: Outcome| {
             imports.record(Line::Step(Step {
@@ -482,7 +487,13 @@ pub fn resume_at_start(state: &AppState) {
     let fence = || crate::operator::upgrade_pending(state);
     for operation in open {
         let owners = Owners::of(state);
-        match apply(&state.seat_imports, &owners, &operation, &fence, &Unsignalled) {
+        match apply(
+            &state.seat_imports,
+            &owners,
+            &operation,
+            &fence,
+            &Unsignalled,
+        ) {
             Ok(applied) => (state.say)(&format!(
                 "seat import {operation} resumed and completed with {} writes",
                 applied.writes

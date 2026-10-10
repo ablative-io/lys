@@ -112,8 +112,7 @@ impl Captured {
 
 /// A file of its own for one of `what`'s outputs, removed once closed.
 fn scratch(what: &str) -> TestResult<File> {
-    Ok(tempfile::tempfile()
-        .map_err(|error| format!("{what}: no file for its output: {error}"))?)
+    Ok(tempfile::tempfile().map_err(|error| format!("{what}: no file for its output: {error}"))?)
 }
 
 /// The handle to `file` that `what` writes through.
@@ -199,14 +198,18 @@ fn left_behind() -> TestResult<Vec<String>> {
     let (census_pid, listed) = census()?;
     let me = std::process::id();
     let Some(group) = listed.iter().find(|row| row.pid == me).map(|row| row.group) else {
-        return Err(
-            format!("process_census_unreadable: ps listed no row for this test process {me}")
-                .into(),
-        );
+        return Err(format!(
+            "process_census_unreadable: ps listed no row for this test process {me}"
+        )
+        .into());
     };
     let mut ancestry = vec![me];
     let mut at = me;
-    while let Some(parent) = listed.iter().find(|row| row.pid == at).map(|row| row.parent) {
+    while let Some(parent) = listed
+        .iter()
+        .find(|row| row.pid == at)
+        .map(|row| row.parent)
+    {
         if parent == 0 || ancestry.contains(&parent) {
             break;
         }

@@ -39,7 +39,10 @@ fn time_left_renders_two_hours_before_the_deadline() {
         ..Inputs::default()
     };
     let rendered = render("Reminder: {{time_left}} ({{deadline}}).", &inputs);
-    assert_eq!(rendered.text, "Reminder: 2 hours 0 minutes left (1970-01-01T04:46:40Z).");
+    assert_eq!(
+        rendered.text,
+        "Reminder: 2 hours 0 minutes left (1970-01-01T04:46:40Z)."
+    );
     assert!(rendered.missing.is_empty());
     assert_eq!(time_left(100, 160), "60 seconds past the deadline");
     assert_eq!(span(90), "1 minutes");
@@ -56,7 +59,10 @@ fn a_sessions_variable_is_read_before_the_agents_and_each_revision_is_named_once
         )),
         ..Inputs::default()
     };
-    let rendered = render("{{vars.focus}} by {{vars.owner}}, again {{vars.focus}}.", &inputs);
+    let rendered = render(
+        "{{vars.focus}} by {{vars.owner}}, again {{vars.focus}}.",
+        &inputs,
+    );
     assert_eq!(rendered.text, "the install by waffles, again the install.");
     assert_eq!(rendered.contributed.len(), 2);
     assert_eq!(rendered.contributed[0].key, "session s1");
@@ -71,7 +77,10 @@ fn a_missing_key_renders_empty_and_is_named_and_a_fallback_renders_in_its_place(
         agent: Some(scope("agent a1", 1, &[])),
         ..Inputs::default()
     };
-    let rendered = render("[{{vars.absent}}] [{{vars.absent | none set}}] [{{elsewhere}}]", &inputs);
+    let rendered = render(
+        "[{{vars.absent}}] [{{vars.absent | none set}}] [{{elsewhere}}]",
+        &inputs,
+    );
     assert_eq!(rendered.text, "[] [none set] []");
     assert_eq!(rendered.missing, vec!["vars.absent", "elsewhere"]);
     assert!(rendered.contributed.is_empty(), "nothing was read");
@@ -80,7 +89,11 @@ fn a_missing_key_renders_empty_and_is_named_and_a_fallback_renders_in_its_place(
 #[test]
 fn a_value_holding_braces_is_rendered_as_text_and_a_lone_opening_is_text() {
     let inputs = Inputs {
-        session: Some(scope("session s1", 2, &[("tricky", json!("{{vars.other}}"))])),
+        session: Some(scope(
+            "session s1",
+            2,
+            &[("tricky", json!("{{vars.other}}"))],
+        )),
         ..Inputs::default()
     };
     let rendered = render("{{vars.tricky}} and {{ not closed", &inputs);

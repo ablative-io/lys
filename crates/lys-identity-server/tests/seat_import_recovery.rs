@@ -31,7 +31,9 @@ fn open() -> std::io::Result<bool> {
 }
 
 fn key(dir: &std::path::Path) -> Result<Arc<Ed25519Identity>, Box<dyn Error>> {
-    Ok(Arc::new(Ed25519Identity::load_or_generate(&dir.join("key"))?))
+    Ok(Arc::new(Ed25519Identity::load_or_generate(
+        &dir.join("key"),
+    )?))
 }
 
 /// The owner records the fixture's import leaves, read after a reopen:
@@ -66,7 +68,13 @@ fn seat_import_rerun_is_noop() -> TestResult {
         stores.imports.reserve(reserved(&operation, &plan))?,
         Reservation::Fresh(operation.clone())
     );
-    let applied = apply(&stores.imports, &stores.owners(), &operation, &open, &Unsignalled)?;
+    let applied = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &open,
+        &Unsignalled,
+    )?;
     assert_eq!(applied.writes, 7, "{:?}", applied.operation.steps);
     assert_eq!(applied.operation.state(), "completed");
     let transfer = applied
@@ -88,7 +96,13 @@ fn seat_import_rerun_is_noop() -> TestResult {
         return Err("a completed rerun reserved a new import".into());
     };
     assert_eq!(kept.reserved.operation, operation);
-    let rerun = apply(&stores.imports, &stores.owners(), &operation, &open, &Unsignalled)?;
+    let rerun = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &open,
+        &Unsignalled,
+    )?;
     assert_eq!(rerun.writes, 0);
     assert_eq!(stores.imports.leaves()?, leaves);
     assert_imported_once(&stores)?;
@@ -159,12 +173,25 @@ fn seat_import_resumes_after_each_step() -> TestResult {
         // The restart resumes the same operation, with no second confirmation.
         let stores = Stores::open(dir.path(), &key)?;
         assert_eq!(stores.imports.open_operations()?, vec![operation.clone()]);
-        let applied = apply(&stores.imports, &stores.owners(), &operation, &open, &Unsignalled)?;
+        let applied = apply(
+            &stores.imports,
+            &stores.owners(),
+            &operation,
+            &open,
+            &Unsignalled,
+        )?;
         assert_eq!(applied.operation.state(), "completed", "{exit:?}");
         assert_eq!(applied.operation.steps.len(), steps, "{exit:?}");
         if let Exit::Written(step) = &exit {
-            let kept = applied.operation.step(step).ok_or("the step was not kept")?;
-            assert_eq!(kept.outcome, Outcome::Reconciled, "{exit:?}: a lost reply is read back");
+            let kept = applied
+                .operation
+                .step(step)
+                .ok_or("the step was not kept")?;
+            assert_eq!(
+                kept.outcome,
+                Outcome::Reconciled,
+                "{exit:?}: a lost reply is read back"
+            );
         }
         drop(stores);
         let stores = Stores::open(dir.path(), &key)?;
@@ -185,10 +212,20 @@ fn an_interrupted_import_resumes_from_its_reservation() -> TestResult {
         let stores = Stores::open(dir.path(), &key)?;
         let plan = stores.plan(at, vec![fragment("r1", at)]);
         stores.imports.reserve(reserved(&operation, &plan))?;
-        assert_eq!(stores.revisions()?, [0; 6], "a reservation writes no destination");
+        assert_eq!(
+            stores.revisions()?,
+            [0; 6],
+            "a reservation writes no destination"
+        );
     }
     let stores = Stores::open(dir.path(), &key)?;
-    let applied = apply(&stores.imports, &stores.owners(), &operation, &open, &Unsignalled)?;
+    let applied = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &open,
+        &Unsignalled,
+    )?;
     assert_eq!(applied.writes, 7);
     assert_imported_once(&stores)?;
     Ok(())
@@ -208,7 +245,10 @@ fn seat_import_preserves_edits() -> TestResult {
     for file in &files {
         std::fs::write(file, format!("fixture source {}", file.display()))?;
     }
-    let before = files.iter().map(|file| digest(file)).collect::<Result<Vec<_>, _>>()?;
+    let before = files
+        .iter()
+        .map(|file| digest(file))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let at = now();
     let stores = Stores::open(dir.path(), &key)?;
@@ -220,11 +260,15 @@ fn seat_import_preserves_edits() -> TestResult {
         .ok_or("no focus variable")?;
     let operation = lys_identity::OperationId::generate()?.to_string();
     stores.imports.reserve(reserved(&operation, &plan))?;
-    let exit = Exit::Kept(lys_identity_server::seat_import_apply::step_id(&operation, focus));
+    let exit = Exit::Kept(lys_identity_server::seat_import_apply::step_id(
+        &operation, focus,
+    ));
     assert!(apply(&stores.imports, &stores.owners(), &operation, &open, &exit).is_err());
 
     // While the import is interrupted, the person changes the goal.
-    let scope = Scope::Agent { id: AGENT.to_owned() };
+    let scope = Scope::Agent {
+        id: AGENT.to_owned(),
+    };
     let mut values = std::collections::BTreeMap::new();
     values.insert("goal".to_owned(), json!("the person's own goal"));
     patch(
@@ -237,14 +281,26 @@ fn seat_import_preserves_edits() -> TestResult {
             expires_at: None,
         },
     )?;
-    let stopped = apply(&stores.imports, &stores.owners(), &operation, &open, &Unsignalled);
+    let stopped = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &open,
+        &Unsignalled,
+    );
     let Err(stopped) = stopped else {
         return Err("the import overwrote a person's edit".into());
     };
     assert_eq!(stopped.name(), "import_stopped", "{stopped}");
-    assert!(stopped.to_string().contains("import_destination_moved"), "{stopped}");
+    assert!(
+        stopped.to_string().contains("import_destination_moved"),
+        "{stopped}"
+    );
     assert!(stopped.to_string().contains("/goal"), "{stopped}");
-    let kept = stores.imports.operation(&operation)?.ok_or("no operation")?;
+    let kept = stores
+        .imports
+        .operation(&operation)?
+        .ok_or("no operation")?;
     assert_eq!(kept.state(), "stopped");
     let halted = kept.halted.ok_or("not halted")?;
     assert_eq!(halted.refusal, "import_destination_moved");
@@ -256,10 +312,19 @@ fn seat_import_preserves_edits() -> TestResult {
     // A stopped import selects nothing and stays stopped.
     let selectable = stores.imports.require_selectable(SEAT);
     assert!(matches!(&selectable, Err(error) if error.name() == "import_incomplete"));
-    let again = apply(&stores.imports, &stores.owners(), &operation, &open, &Unsignalled);
+    let again = apply(
+        &stores.imports,
+        &stores.owners(),
+        &operation,
+        &open,
+        &Unsignalled,
+    );
     assert!(matches!(&again, Err(error) if error.name() == "import_stopped"));
 
-    let after = files.iter().map(|file| digest(file)).collect::<Result<Vec<_>, _>>()?;
+    let after = files
+        .iter()
+        .map(|file| digest(file))
+        .collect::<Result<Vec<_>, _>>()?;
     assert_eq!(before, after, "no source is changed by an import");
     Ok(())
 }

@@ -145,7 +145,10 @@ fn placeholder(inner: &str, inputs: &Inputs, contributed: &mut Vec<Contributed>)
         None => (inner, None),
     };
     if let Some(key) = name.strip_prefix("vars.") {
-        for scope in [inputs.session.as_ref(), inputs.agent.as_ref()].into_iter().flatten() {
+        for scope in [inputs.session.as_ref(), inputs.agent.as_ref()]
+            .into_iter()
+            .flatten()
+        {
             if let Some(variable) = scope.values.get(key) {
                 note(contributed, "variables", &scope.name, scope.revision);
                 return Some(shown(&variable.value));
@@ -160,7 +163,9 @@ fn placeholder(inner: &str, inputs: &Inputs, contributed: &mut Vec<Contributed>)
             }
             Some(goals_text(&inputs.goals, inputs.now))
         }
-        "time_left" => inputs.deadline.map(|deadline| time_left(deadline, inputs.now)),
+        "time_left" => inputs
+            .deadline
+            .map(|deadline| time_left(deadline, inputs.now)),
         "deadline" => inputs.deadline.map(|deadline| stamp(deadline)),
         other => inputs.numbers.get(other).cloned(),
     };

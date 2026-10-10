@@ -181,14 +181,13 @@ impl Scene {
         self.table.ok(&path, &body).await
     }
 
-    async fn confirm(
-        &self,
-        plan: &Value,
-        operation: &str,
-    ) -> Result<(u16, Value), Box<dyn Error>> {
+    async fn confirm(&self, plan: &Value, operation: &str) -> Result<(u16, Value), Box<dyn Error>> {
         let path = format!("/seats/{SEAT}/import/confirm");
         let body = confirm_body(plan, operation);
-        self.table.service.post(&path, Some(&self.table.ada), &body).await
+        self.table
+            .service
+            .post(&path, Some(&self.table.ada), &body)
+            .await
     }
 
     async fn status(&self) -> Result<Value, Box<dyn Error>> {
@@ -209,7 +208,13 @@ impl Scene {
             "/schedules".to_owned(),
             format!("/seats/{SEAT}"),
         ] {
-            read.push(self.table.service.get(&path, Some(&self.table.ada)).await?.1);
+            read.push(
+                self.table
+                    .service
+                    .get(&path, Some(&self.table.ada))
+                    .await?
+                    .1,
+            );
         }
         Ok(read)
     }
@@ -240,7 +245,11 @@ async fn refused_and_unwritten(scene: &Scene, plan: &Value) -> TestResult {
     let before = scene.destinations().await?;
     let answer = scene.confirm(plan, &operation()?).await?;
     refused(&answer, "import_plan_refused");
-    assert_eq!(scene.destinations().await?, before, "a refused import wrote");
+    assert_eq!(
+        scene.destinations().await?,
+        before,
+        "a refused import wrote"
+    );
     Ok(())
 }
 
@@ -331,7 +340,11 @@ async fn seat_import_signal_faults() -> TestResult {
     std::fs::write(&prompt, "You are Waffles, changed after the preview.\n")?;
     let answer = scene.confirm(&plan, &operation()?).await?;
     refused(&answer, SOURCE_MOVED);
-    assert!(answer.1.to_string().contains("system-prompt.md"), "{}", answer.1);
+    assert!(
+        answer.1.to_string().contains("system-prompt.md"),
+        "{}",
+        answer.1
+    );
     assert_eq!(scene.destinations().await?, before, "a moved source wrote");
     answers.push(answer.1);
     std::fs::write(&prompt, "You are Waffles.\n")?;
@@ -343,8 +356,10 @@ async fn seat_import_signal_faults() -> TestResult {
     std::fs::set_permissions(&settings, std::fs::Permissions::from_mode(0o600))?;
     let refusals = plan_refusals(&plan)?;
     assert!(
-        refusals.iter().any(|refusal| refusal["name"] == "import_source_unreadable"
-            && refusal.to_string().contains("settings.json")),
+        refusals
+            .iter()
+            .any(|refusal| refusal["name"] == "import_source_unreadable"
+                && refusal.to_string().contains("settings.json")),
         "{plan}"
     );
     refused_and_unwritten(&scene, &plan).await?;
@@ -360,11 +375,15 @@ async fn seat_import_signal_faults() -> TestResult {
     )?;
     std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o000))?;
     for reference in [&absent, &unreadable] {
-        let plan = scene.dry_run(&scene.manifest(false, Some(reference))).await?;
+        let plan = scene
+            .dry_run(&scene.manifest(false, Some(reference)))
+            .await?;
         let refusals = plan_refusals(&plan)?;
         let locator = reference.to_str().ok_or("fixture path is not text")?;
         assert!(
-            refusals.iter().any(|refusal| refusal.to_string().contains(locator)),
+            refusals
+                .iter()
+                .any(|refusal| refusal.to_string().contains(locator)),
             "{plan}"
         );
         refused_and_unwritten(&scene, &plan).await?;
@@ -376,9 +395,12 @@ async fn seat_import_signal_faults() -> TestResult {
     let plan = scene.dry_run(&scene.manifest(true, None)).await?;
     scene.argus.set(Mode::Answer)?;
     assert!(
-        plan_refusals(&plan)?.iter().any(|refusal| refusal["name"]
-            == "import_source_unavailable"
-            && refusal["member"].as_str().is_some_and(|member| member.contains("/api/"))),
+        plan_refusals(&plan)?
+            .iter()
+            .any(|refusal| refusal["name"] == "import_source_unavailable"
+                && refusal["member"]
+                    .as_str()
+                    .is_some_and(|member| member.contains("/api/"))),
         "{plan}"
     );
     refused_and_unwritten(&scene, &plan).await?;
@@ -408,7 +430,11 @@ async fn seat_import_signal_faults() -> TestResult {
         Ok((status, text)) => assert_ne!(status, 200, "completed across the exit: {text}"),
     }
     let status_path = format!("/seats/{SEAT}/import");
-    let (_, after_exit) = scene.table.service.get(&status_path, Some(&scene.table.ada)).await?;
+    let (_, after_exit) = scene
+        .table
+        .service
+        .get(&status_path, Some(&scene.table.ada))
+        .await?;
 
     // Recovery is the same confirmation. A reserved import resumes as
     // itself; an exit before reservation leaves nothing reserved, and the
@@ -416,7 +442,10 @@ async fn seat_import_signal_faults() -> TestResult {
     // same operation.
     let mut answer = scene.confirm(&plan, &confirming).await?;
     if answer.1["refusal"] == "import_plan_unknown" {
-        assert!(after_exit["state"].is_null(), "a reserved import was forgotten: {after_exit}");
+        assert!(
+            after_exit["state"].is_null(),
+            "a reserved import was forgotten: {after_exit}"
+        );
         plan = scene.dry_run(&with_argus).await?;
         answer = scene.confirm(&plan, &confirming).await?;
     }
@@ -429,10 +458,21 @@ async fn seat_import_signal_faults() -> TestResult {
     let settled = scene.destinations().await?;
     let again = scene.confirm(&plan, &confirming).await?;
     assert_eq!(again.0, 200, "{}", again.1);
-    assert_eq!(again.1["receipt"], answer.1["receipt"], "a rerun made a second receipt");
+    assert_eq!(
+        again.1["receipt"], answer.1["receipt"],
+        "a rerun made a second receipt"
+    );
     assert_eq!(scene.destinations().await?, settled, "a rerun wrote");
-    let (_, live) = scene.table.service.get("/runtime/live", Some(&scene.table.ada)).await?;
-    assert_eq!(live["sessions"].as_array().map(Vec::len), Some(0), "import started {live}");
+    let (_, live) = scene
+        .table
+        .service
+        .get("/runtime/live", Some(&scene.table.ada))
+        .await?;
+    assert_eq!(
+        live["sessions"].as_array().map(Vec::len),
+        Some(0),
+        "import started {live}"
+    );
     scene.table.close()
 }
 
@@ -450,7 +490,10 @@ async fn seat_import_hot_paths_do_no_import_work() -> TestResult {
         "/seats/owned".to_owned(),
         "/runtime/live".to_owned(),
     ];
-    let (send, ada) = (format!("/seats/{SEAT}/send"), Some(scene.table.ada.as_str()));
+    let (send, ada) = (
+        format!("/seats/{SEAT}/send"),
+        Some(scene.table.ada.as_str()),
+    );
     let mut before = Vec::new();
     for path in &reads {
         before.push(scene.table.service.get(path, ada).await?);
@@ -468,9 +511,15 @@ async fn seat_import_hot_paths_do_no_import_work() -> TestResult {
     }
     let body = json!({ "operation": operation()?, "text": "hello" });
     let delivered = scene.table.service.post(&send, ada, &body).await?;
-    assert_eq!(delivered.1["refusal"], "seat_not_running", "{}", delivered.1);
+    assert_eq!(
+        delivered.1["refusal"], "seat_not_running",
+        "{}",
+        delivered.1
+    );
 
-    release.send(()).map_err(|()| "the held request was dropped")?;
+    release
+        .send(())
+        .map_err(|()| "the held request was dropped")?;
     let (status, text) = in_flight.await??;
     assert_eq!(status, 200, "{text}");
     scene.table.close()

@@ -89,7 +89,9 @@ impl SeatImports {
         &self,
     ) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, Preview>>, ServerError> {
         self.previews.lock().map_err(|error| {
-            unavailable(format!("the seat import previews lock is poisoned: {error}"))
+            unavailable(format!(
+                "the seat import previews lock is poisoned: {error}"
+            ))
         })
     }
 

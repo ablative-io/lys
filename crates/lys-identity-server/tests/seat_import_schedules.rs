@@ -116,7 +116,12 @@ fn seat_import_schedule_counts() {
             "monitor:schedule:expired-at-capture",
         ]
     );
-    assert!(fragment.excluded.iter().all(|excluded| excluded.revision == "7"));
+    assert!(
+        fragment
+            .excluded
+            .iter()
+            .all(|excluded| excluded.revision == "7")
+    );
     assert_eq!(fragment.destinations.len(), 3);
     for entry in &fragment.destinations {
         assert_eq!(entry.record_kind, "schedule");
@@ -130,7 +135,10 @@ fn seat_import_schedule_counts() {
         .iter()
         .map(|entry| &entry.change["stopped_reason"])
         .collect();
-    assert_eq!(reasons, [&json!("paused"), &json!("failed"), &json!("uncertain")]);
+    assert_eq!(
+        reasons,
+        [&json!("paused"), &json!("failed"), &json!("uncertain")]
+    );
 }
 
 #[test]
@@ -144,7 +152,13 @@ fn until_is_exclusive_at_exactly_captured_at() -> Result<(), String> {
     let open = schedule("s", "active", None, &["s-a"]);
     assert_eq!(standing(&open, CAPTURED_AT)?, Standing::Live);
     assert!(standing(&json!({"state": "active", "until": 5}), CAPTURED_AT).is_err());
-    assert!(standing(&json!({"state": "active", "until": "tomorrow"}), CAPTURED_AT).is_err());
+    assert!(
+        standing(
+            &json!({"state": "active", "until": "tomorrow"}),
+            CAPTURED_AT
+        )
+        .is_err()
+    );
     Ok(())
 }
 
@@ -152,7 +166,11 @@ fn until_is_exclusive_at_exactly_captured_at() -> Result<(), String> {
 fn finished_takes_precedence_over_until() -> Result<(), String> {
     for until in [Some(LATER), Some(AT_CAPTURE), Some(BEFORE), None] {
         let finished = schedule("s", "finished", until, &["s-a"]);
-        assert_eq!(standing(&finished, CAPTURED_AT)?, Standing::Finished, "{until:?}");
+        assert_eq!(
+            standing(&finished, CAPTURED_AT)?,
+            Standing::Finished,
+            "{until:?}"
+        );
     }
     let fragment = classify(
         &[schedule("done", "finished", Some(BEFORE), &["s-a"])],
@@ -185,7 +203,10 @@ fn seat_import_shared_schedule() {
     for (fragment, seat) in [(&first, "a"), (&second, "b")] {
         assert!(fragment.refusals.is_empty(), "{:?}", fragment.refusals);
         let [entry] = fragment.destinations.as_slice() else {
-            panic!("one destination for seat {seat}: {:?}", fragment.destinations);
+            panic!(
+                "one destination for seat {seat}: {:?}",
+                fragment.destinations
+            );
         };
         assert_eq!(entry.record_id, "schedule:shared");
         assert_eq!(
@@ -196,7 +217,10 @@ fn seat_import_shared_schedule() {
         assert_eq!(entry.change["bindings"].as_array().map(Vec::len), Some(2));
         assert_eq!(entry.change["next_due"], 1_900_000_800);
         assert_eq!(entry.change["occurrences_completed"], 12);
-        let bindings = entry.change["bindings"].as_array().cloned().unwrap_or_default();
+        let bindings = entry.change["bindings"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
         let this: Vec<&Value> = bindings
             .iter()
             .filter(|binding| binding["this_import"] == true)
@@ -211,7 +235,11 @@ fn seat_import_shared_schedule() {
         schedule["recipients"] = Value::Null;
         schedule
     };
-    assert_eq!(definition(&first), definition(&second), "one definition for both seats");
+    assert_eq!(
+        definition(&first),
+        definition(&second),
+        "one definition for both seats"
+    );
 }
 
 #[test]
@@ -221,10 +249,22 @@ fn an_event_triggered_schedule_is_unrepresentable() {
     triggered["at"] = Value::Null;
     triggered["interval_seconds"] = Value::Null;
     let mut windowed = schedule("night", "active", Some(LATER), &["s-a"]);
-    windowed["window"] = json!({"timezone": "Etc/UTC", "start": "02:00", "end": "06:00", "weekdays": [1]});
-    let fragment = classify(&[triggered, windowed], CAPTURED_AT, &map(&[("s-a", "a")]), "a");
-    assert_eq!(names(&fragment), [SCHEDULE_UNREPRESENTABLE, SCHEDULE_UNREPRESENTABLE]);
-    assert_eq!(fragment.refusals[0].member, "schedule after-compaction.events");
+    windowed["window"] =
+        json!({"timezone": "Etc/UTC", "start": "02:00", "end": "06:00", "weekdays": [1]});
+    let fragment = classify(
+        &[triggered, windowed],
+        CAPTURED_AT,
+        &map(&[("s-a", "a")]),
+        "a",
+    );
+    assert_eq!(
+        names(&fragment),
+        [SCHEDULE_UNREPRESENTABLE, SCHEDULE_UNREPRESENTABLE]
+    );
+    assert_eq!(
+        fragment.refusals[0].member,
+        "schedule after-compaction.events"
+    );
     assert_eq!(fragment.refusals[1].member, "schedule night.window");
     assert!(fragment.destinations.is_empty());
 }
@@ -237,16 +277,29 @@ fn a_live_schedule_for_another_seat_is_counted_not_imported() {
     assert!(fragment.destinations.is_empty());
     let counts = fragment.schedule_counts.expect("counts");
     assert_eq!((counts.total, counts.live, counts.not_imported), (1, 1, 1));
-    assert!(fragment.excluded[0].reason.contains("no recipient maps to seat a"));
+    assert!(
+        fragment.excluded[0]
+            .reason
+            .contains("no recipient maps to seat a")
+    );
 }
 
 #[test]
 fn the_seat_binding_delivers_to_the_seats_lys_agent() {
     let mine = schedule("mine", "active", Some(LATER), &["s-w"]);
-    let fragment = classify_for(&[mine], CAPTURED_AT, &map(&[("s-w", "waffles")]), "waffles", "agent-7f");
+    let fragment = classify_for(
+        &[mine],
+        CAPTURED_AT,
+        &map(&[("s-w", "waffles")]),
+        "waffles",
+        "agent-7f",
+    );
     assert!(fragment.refusals.is_empty(), "{:?}", fragment.refusals);
     let change = &fragment.destinations[0].change;
-    assert_eq!(change["schedule"]["recipients"], json!([{"kind": "agent", "id": "agent-7f"}]));
+    assert_eq!(
+        change["schedule"]["recipients"],
+        json!([{"kind": "agent", "id": "agent-7f"}])
+    );
     assert_eq!(change["bindings"][0]["seat"], "waffles");
     assert_eq!(change["state"], "active");
 }

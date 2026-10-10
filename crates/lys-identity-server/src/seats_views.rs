@@ -342,11 +342,24 @@ mod tests {
         let state = |seat: &Seat, reading: &Reading<'_>| view(seat, None, reading).state;
         let (working, idle, dead) = (live(true, true), live(true, false), live(false, false));
         assert_eq!(state(&seat(None), &Reading::Read(None)), "not-seen");
-        assert_eq!(state(&seat(Some("op-b")), &Reading::Read(Some(&working))), "online-working");
-        assert_eq!(state(&seat(Some("op-b")), &Reading::Read(Some(&idle))), "online-idle");
-        assert_eq!(state(&seat(Some("op-b")), &Reading::Read(Some(&dead))), "offline");
+        assert_eq!(
+            state(&seat(Some("op-b")), &Reading::Read(Some(&working))),
+            "online-working"
+        );
+        assert_eq!(
+            state(&seat(Some("op-b")), &Reading::Read(Some(&idle))),
+            "online-idle"
+        );
+        assert_eq!(
+            state(&seat(Some("op-b")), &Reading::Read(Some(&dead))),
+            "offline"
+        );
         assert_eq!(state(&seat(Some("op-b")), &Reading::Read(None)), "offline");
-        let unread = view(&seat(Some("op-b")), None, &Reading::Unread("runner_unreachable"));
+        let unread = view(
+            &seat(Some("op-b")),
+            None,
+            &Reading::Unread("runner_unreachable"),
+        );
         assert_eq!(unread.state, "unknown");
         assert_eq!(unread.reason.as_deref(), Some("runner_unreachable"));
         let shown = view(&seat(Some("op-b")), None, &Reading::Read(Some(&idle)));

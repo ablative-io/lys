@@ -162,7 +162,12 @@ fn attach_needs_one_target_and_type_is_for_a_seat_only() -> TestResult {
         &["attach", "--session", "session-1", "--type"][..],
     ] {
         let output = lys(root.path(), args)?;
-        assert_eq!(output.status.code(), Some(2), "{args:?}: {}", printed(&output));
+        assert_eq!(
+            output.status.code(),
+            Some(2),
+            "{args:?}: {}",
+            printed(&output)
+        );
     }
     Ok(())
 }
@@ -191,7 +196,10 @@ fn an_unreachable_server_is_named_and_the_token_is_never_printed() -> TestResult
         assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
         let all = printed(&output);
         assert!(all.contains("identity_server_unreachable"), "{all}");
-        assert!(!all.contains(TOKEN), "the operator token was printed:\n{all}");
+        assert!(
+            !all.contains(TOKEN),
+            "the operator token was printed:\n{all}"
+        );
     }
     Ok(())
 }
@@ -234,7 +242,10 @@ fn a_seat_is_followed_from_each_pages_cursor_until_it_ends() -> TestResult {
         opening.starts_with("POST /api/seats/waffles/attach HTTP/1.1\r\n"),
         "{opening}"
     );
-    assert!(opening.contains(&format!("lys-operator: {TOKEN}\r\n")), "{opening}");
+    assert!(
+        opening.contains(&format!("lys-operator: {TOKEN}\r\n")),
+        "{opening}"
+    );
     let opening = body_of(opening)?;
     assert_eq!(opening["follow"], true, "{opening}");
     assert!(opening.get("cursor").is_none(), "{opening}");

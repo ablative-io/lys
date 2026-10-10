@@ -109,24 +109,37 @@ async fn an_agent_layer_warning_is_what_its_sessions_resolve_to() -> TestResult 
 
     // A session with no session-layer text resolves to the agent's, in the
     // fold itself: the session layer is passed over when it holds nothing.
-    let held: Words = serde_json::from_value(
-        table
-            .service
-            .get("/words", Some(&table.ada))
-            .await?
-            .1,
-    )?;
-    let for_session = held.resolve(Slot::ContextWarning, Some(&table.beas_agent), Some("session-1"));
+    let held: Words =
+        serde_json::from_value(table.service.get("/words", Some(&table.ada)).await?.1)?;
+    let for_session = held.resolve(
+        Slot::ContextWarning,
+        Some(&table.beas_agent),
+        Some("session-1"),
+    );
     assert_eq!(for_session.source, "agent");
-    assert!(for_session.text.is_some_and(|text| text.contains("Bea's agent")));
-    assert_eq!(held.revision(&Layer::Agent { id: table.beas_agent.clone() }, Slot::ContextWarning), 1);
+    assert!(
+        for_session
+            .text
+            .is_some_and(|text| text.contains("Bea's agent"))
+    );
+    assert_eq!(
+        held.revision(
+            &Layer::Agent {
+                id: table.beas_agent.clone()
+            },
+            Slot::ContextWarning
+        ),
+        1
+    );
 
     // Another agent still resolves to the built-in wording.
     let other = table.resolved(&table.adas_agent).await?;
     assert_eq!(slot(&other, "context_warning")["source"], "built_in");
-    assert!(slot(&other, "context_warning")["text"]
-        .as_str()
-        .is_some_and(|text| text.starts_with("[Lys context watch]")));
+    assert!(
+        slot(&other, "context_warning")["text"]
+            .as_str()
+            .is_some_and(|text| text.starts_with("[Lys context watch]"))
+    );
     Ok(())
 }
 
@@ -151,10 +164,18 @@ async fn a_link_follows_its_template_and_an_edit_changes_the_next_resolution() -
 
     let resolved = table.resolved(&table.beas_agent).await?;
     let wake = slot(&resolved, "wake_up");
-    assert_eq!(wake["text"], "Night shift words, {{vars.focus | no focus set}}.");
+    assert_eq!(
+        wake["text"],
+        "Night shift words, {{vars.focus | no focus set}}."
+    );
     let kinds: Vec<&str> = wake["contributed"]
         .as_array()
-        .map(|kinds| kinds.iter().filter_map(|row| row["kind"].as_str()).collect())
+        .map(|kinds| {
+            kinds
+                .iter()
+                .filter_map(|row| row["kind"].as_str())
+                .collect()
+        })
         .unwrap_or_default();
     assert_eq!(kinds, ["words", "template"], "{wake}");
 
@@ -275,7 +296,10 @@ async fn the_preview_renders_the_numbers_and_sends_nothing() -> TestResult {
         .await?;
     assert_eq!(status, 200, "{answer}");
     let text = answer["text"].as_str().unwrap_or_default();
-    assert!(text.starts_with("[Lys context watch] Context is at 71 percent"), "{text}");
+    assert!(
+        text.starts_with("[Lys context watch] Context is at 71 percent"),
+        "{text}"
+    );
     assert!(text.contains("No open goal."), "{text}");
     assert_eq!(answer["source"], "built_in");
     assert_eq!(answer["missing"], json!([]));
@@ -335,7 +359,10 @@ async fn the_workspace_layer_is_the_administrators_and_an_agents_layer_its_respo
 
     let (status, answer) = table
         .service
-        .get(&format!("/agents/{}/words", table.adas_agent), Some(&table.bea))
+        .get(
+            &format!("/agents/{}/words", table.adas_agent),
+            Some(&table.bea),
+        )
         .await?;
     assert_eq!(status, 404, "{answer}");
     assert_eq!(answer["refusal"], "AgentNotVisible");
@@ -358,7 +385,8 @@ async fn the_workspace_layer_is_the_administrators_and_an_agents_layer_its_respo
 }
 
 #[tokio::test]
-async fn a_preview_without_an_agent_is_the_administrators_and_a_bad_body_is_malformed() -> TestResult {
+async fn a_preview_without_an_agent_is_the_administrators_and_a_bad_body_is_malformed() -> TestResult
+{
     let table = Table::set().await?;
     let (status, answer) = table
         .service
@@ -373,7 +401,11 @@ async fn a_preview_without_an_agent_is_the_administrators_and_a_bad_body_is_malf
 
     let (status, answer) = table
         .service
-        .post("/words/preview", Some(&table.ada), &json!({ "slot": "elsewhere" }))
+        .post(
+            "/words/preview",
+            Some(&table.ada),
+            &json!({ "slot": "elsewhere" }),
+        )
         .await?;
     assert_eq!(status, 400, "{answer}");
     assert_eq!(answer["refusal"], "RequestMalformed");
@@ -431,29 +463,48 @@ fn the_fold_resolves_most_specific_first_and_inherit_passes_a_layer_over() -> Te
         by: "person-1".to_owned(),
         at: 1,
     };
-    let agent = Layer::Agent { id: "agent-1".to_owned() };
-    let session = Layer::Session { id: "session-1".to_owned() };
+    let agent = Layer::Agent {
+        id: "agent-1".to_owned(),
+    };
+    let session = Layer::Session {
+        id: "session-1".to_owned(),
+    };
     words.hold(set(
         Layer::Workspace,
         Slot::ContextWarning,
-        Setting::Text { text: "workspace".to_owned() },
+        Setting::Text {
+            text: "workspace".to_owned(),
+        },
         1,
     ))?;
     words.hold(set(
         agent.clone(),
         Slot::ContextWarning,
-        Setting::Text { text: "agent".to_owned() },
+        Setting::Text {
+            text: "agent".to_owned(),
+        },
         1,
     ))?;
-    words.hold(set(session.clone(), Slot::ContextWarning, Setting::Inherit, 1))?;
+    words.hold(set(
+        session.clone(),
+        Slot::ContextWarning,
+        Setting::Inherit,
+        1,
+    ))?;
     let resolved = words.resolve(Slot::ContextWarning, Some("agent-1"), Some("session-1"));
     assert_eq!(resolved.text.as_deref(), Some("agent"));
     assert_eq!(resolved.source, "agent");
-    assert_eq!(resolved.contributed.len(), 2, "the session's inherit and the agent's text");
+    assert_eq!(
+        resolved.contributed.len(),
+        2,
+        "the session's inherit and the agent's text"
+    );
     words.hold(set(
         session,
         Slot::ContextWarning,
-        Setting::Text { text: "session".to_owned() },
+        Setting::Text {
+            text: "session".to_owned(),
+        },
         2,
     ))?;
     let resolved = words.resolve(Slot::ContextWarning, Some("agent-1"), Some("session-1"));

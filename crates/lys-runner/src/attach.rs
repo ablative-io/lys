@@ -369,8 +369,7 @@ fn codex_item(item: &Value, at: u64) -> Vec<AttachLine> {
                     "{}.{} {}",
                     field(item, "/server").unwrap_or("server"),
                     field(item, "/tool").unwrap_or("tool"),
-                    item
-                        .get("arguments")
+                    item.get("arguments")
                         .map(Value::to_string)
                         .unwrap_or_default()
                 ),
@@ -385,8 +384,7 @@ fn codex_item(item: &Value, at: u64) -> Vec<AttachLine> {
             TOOL_CALL,
             format!(
                 "file change {}",
-                item
-                    .get("changes")
+                item.get("changes")
                     .and_then(Value::as_array)
                     .map(|changes| {
                         changes

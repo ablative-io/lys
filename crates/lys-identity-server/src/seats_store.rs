@@ -298,7 +298,10 @@ mod tests {
         let path = dir.path().join("seats");
         let mut store = SeatStore::open(&path, Arc::clone(&key))?;
         store.keep(added("op-a", "waffles"))?;
-        assert_eq!(store.keep(added("op-a", "waffles"))?, added("op-a", "waffles"));
+        assert_eq!(
+            store.keep(added("op-a", "waffles"))?,
+            added("op-a", "waffles")
+        );
         assert!(matches!(
             store.keep(added("op-a", "other")),
             Err(ServerError::Seat(SeatError::OperationReused { .. }))

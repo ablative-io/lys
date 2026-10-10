@@ -19,7 +19,9 @@ use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::seed_configured;
-use lys_identity_server::schedules_state::{Change, Changed, Delivery, Recipient, Schedule, Source};
+use lys_identity_server::schedules_state::{
+    Change, Changed, Delivery, Recipient, Schedule, Source,
+};
 use lys_identity_server::schedules_store::{
     Deliver, Delivering, SchedulesKept, Undelivered, Worded, change, item, open, pass, set,
 };
@@ -94,7 +96,12 @@ impl Deliver for Runner {
         Ok(vec![("session-1".to_owned(), Some(AGENT.to_owned()))])
     }
 
-    fn worded(&self, source: &Source, _agent: Option<&str>, _session: &str) -> Result<Worded, String> {
+    fn worded(
+        &self,
+        source: &Source,
+        _agent: Option<&str>,
+        _session: &str,
+    ) -> Result<Worded, String> {
         let Source::Text { text } = source else {
             return Err("slot words need a server".to_owned());
         };
@@ -162,7 +169,10 @@ async fn a_once_schedule_fires_once_with_its_text_rendered_and_then_stops() -> T
     assert_eq!(fired.sent[0].text, "Stand-up in the usual room.");
     assert_eq!(fired.sent[0].state, Delivery::Delivered);
     assert_eq!(item.next_due, None);
-    assert_eq!(item.stopped.as_ref().map(|stopped| stopped.reason.as_str()), Some("finished"));
+    assert_eq!(
+        item.stopped.as_ref().map(|stopped| stopped.reason.as_str()),
+        Some("finished")
+    );
     Ok(())
 }
 
@@ -180,7 +190,10 @@ async fn an_interval_schedule_with_max_three_stops_after_three() -> TestResult {
     let item = item(&kept, "op-s2")?;
     assert_eq!(item.fired.len(), 3);
     assert_eq!(item.fired[2].due, at + 180);
-    assert_eq!(item.stopped.as_ref().map(|stopped| stopped.reason.as_str()), Some("finished"));
+    assert_eq!(
+        item.stopped.as_ref().map(|stopped| stopped.reason.as_str()),
+        Some("finished")
+    );
     Ok(())
 }
 
@@ -219,7 +232,11 @@ async fn an_uncertain_delivery_stops_the_schedule_and_says_why() -> TestResult {
     let item = item(&kept, "op-s4")?;
     assert_eq!(item.fired[0].sent[0].state, Delivery::Uncertain);
     let stopped = item.stopped.as_ref().expect("stopped");
-    assert!(stopped.reason.starts_with("uncertain_delivery:"), "{}", stopped.reason);
+    assert!(
+        stopped.reason.starts_with("uncertain_delivery:"),
+        "{}",
+        stopped.reason
+    );
     assert_eq!(item.next_due, None);
     pass(&kept, &runner, at + 121).await?;
     assert_eq!(runner.typed(), 1, "never sent again");
@@ -250,7 +267,10 @@ async fn a_lost_answer_is_asked_again_under_the_same_id_and_never_typed_twice() 
     assert_eq!(pending.fired[0].sent[0].state, Delivery::Pending);
     pass(&kept, &runner, at + 62).await?;
     assert_eq!(runner.typed(), 1, "the runner answered as it stood");
-    assert_eq!(item(&kept, "op-s5")?.fired[0].sent[0].state, Delivery::Delivered);
+    assert_eq!(
+        item(&kept, "op-s5")?.fired[0].sent[0].state,
+        Delivery::Delivered
+    );
     Ok(())
 }
 
@@ -277,7 +297,13 @@ async fn a_pause_keeps_the_count_and_a_resume_continues_it() -> TestResult {
     assert_eq!(item(&kept, "op-s6")?.fired.len(), 1, "the count is kept");
     pass(&kept, &runner, at + 181).await?;
     assert_eq!(runner.typed(), 2);
-    assert_eq!(item(&kept, "op-s6")?.stopped.as_ref().map(|s| s.reason.as_str()), Some("finished"));
+    assert_eq!(
+        item(&kept, "op-s6")?
+            .stopped
+            .as_ref()
+            .map(|s| s.reason.as_str()),
+        Some("finished")
+    );
     Ok(())
 }
 
@@ -329,18 +355,35 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
     let table = Table::set().await?;
     let at = now()? + 86_400;
     let body = table.body(&table.beas_agent, at)?;
-    let (status, set) = table.service.post("/schedules", Some(&table.bea), &body).await?;
+    let (status, set) = table
+        .service
+        .post("/schedules", Some(&table.bea), &body)
+        .await?;
     assert_eq!(status, 200, "{set}");
-    let id = set["schedule"]["id"].as_str().unwrap_or_default().to_owned();
+    let id = set["schedule"]["id"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
     assert_eq!(set["next_due"], at);
-    assert_eq!(set["schedule"]["author"].as_str().map(|a| a.starts_with("person-")), Some(true));
+    assert_eq!(
+        set["schedule"]["author"]
+            .as_str()
+            .map(|a| a.starts_with("person-")),
+        Some(true)
+    );
 
     // The same operation in the same words answers as it stands; in other words it is refused.
-    let (status, again) = table.service.post("/schedules", Some(&table.bea), &body).await?;
+    let (status, again) = table
+        .service
+        .post("/schedules", Some(&table.bea), &body)
+        .await?;
     assert_eq!(status, 200, "{again}");
     let mut other = body.clone();
     other["source"] = json!({ "kind": "text", "text": "Something else." });
-    let (status, refused) = table.service.post("/schedules", Some(&table.bea), &other).await?;
+    let (status, refused) = table
+        .service
+        .post("/schedules", Some(&table.bea), &other)
+        .await?;
     assert_eq!(status, 409, "{refused}");
     assert_eq!(refused["refusal"], "schedule_reused");
 
@@ -364,10 +407,18 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
 
     let (status, stopped) = table
         .service
-        .post(&format!("/schedules/{id}/stop"), Some(&table.ada), &json!({ "words": "done" }))
+        .post(
+            &format!("/schedules/{id}/stop"),
+            Some(&table.ada),
+            &json!({ "words": "done" }),
+        )
         .await?;
     assert_eq!(status, 200, "{stopped}");
-    assert!(stopped["stopped"]["reason"].as_str().is_some_and(|r| r.starts_with("stopped_by:")));
+    assert!(
+        stopped["stopped"]["reason"]
+            .as_str()
+            .is_some_and(|r| r.starts_with("stopped_by:"))
+    );
     let (status, refused) = table
         .service
         .post(&format!("/schedules/{id}/change"), Some(&table.bea), &json!({ "operation": OperationId::generate()?.to_string(), "change": { "field": "paused", "paused": false } }))
@@ -376,24 +427,38 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
     assert_eq!(refused["refusal"], "schedule_stopped");
 
     // Refusals by name.
-    let (status, refused) = table.service.get("/schedules/op-nobody", Some(&table.ada)).await?;
+    let (status, refused) = table
+        .service
+        .get("/schedules/op-nobody", Some(&table.ada))
+        .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "schedule_unknown");
     let (status, refused) = table
         .service
-        .post("/schedules", Some(&table.ada), &table.body(&table.beas_agent, 1)?)
+        .post(
+            "/schedules",
+            Some(&table.ada),
+            &table.body(&table.beas_agent, 1)?,
+        )
         .await?;
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "schedule_malformed");
     let (status, refused) = table
         .service
-        .post("/schedules", Some(&table.bea), &table.body(&table.adas_agent, at)?)
+        .post(
+            "/schedules",
+            Some(&table.bea),
+            &table.body(&table.adas_agent, at)?,
+        )
         .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "AgentNotVisible");
     let mut session = table.body(&table.beas_agent, at)?;
     session["recipients"] = json!([{ "kind": "session", "id": "session-nobody" }]);
-    let (status, refused) = table.service.post("/schedules", Some(&table.ada), &session).await?;
+    let (status, refused) = table
+        .service
+        .post("/schedules", Some(&table.ada), &session)
+        .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "SessionUnknown");
     let (status, refused) = table.service.get("/schedules", None).await?;
@@ -403,10 +468,17 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
     // Bea does not see a schedule on Ada's agent.
     let (status, adas) = table
         .service
-        .post("/schedules", Some(&table.ada), &table.body(&table.adas_agent, at)?)
+        .post(
+            "/schedules",
+            Some(&table.ada),
+            &table.body(&table.adas_agent, at)?,
+        )
         .await?;
     assert_eq!(status, 200, "{adas}");
-    let adas_id = adas["schedule"]["id"].as_str().unwrap_or_default().to_owned();
+    let adas_id = adas["schedule"]["id"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
     let (status, refused) = table
         .service
         .get(&format!("/schedules/{adas_id}"), Some(&table.bea))

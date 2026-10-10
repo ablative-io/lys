@@ -47,10 +47,7 @@ pub struct PatchBody {
 /// The variables routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route(
-            "/agents/{id}/variables",
-            get(read_agent).post(patch_agent),
-        )
+        .route("/agents/{id}/variables", get(read_agent).post(patch_agent))
         .route(
             "/runtime/sessions/{id}/variables",
             get(read_session).post(patch_session),
@@ -87,8 +84,7 @@ async fn read_own_session(
     headers: HeaderMap,
 ) -> Result<Json<Read>, ServerError> {
     let (_agent, session) = own_run(&state, &headers)?;
-    let read =
-        crate::variables_store::read(variables(&state)?, &Scope::Session { id: session })?;
+    let read = crate::variables_store::read(variables(&state)?, &Scope::Session { id: session })?;
     Ok(Json(read))
 }
 
@@ -98,10 +94,14 @@ async fn patch_own_agent(
     given: Result<Json<PatchBody>, JsonRejection>,
 ) -> Result<Json<Read>, ServerError> {
     let (agent, _session) = own_run(&state, &headers)?;
-    let body = given.map(|Json(body)| body).map_err(|refused| ServerError::RequestMalformed {
-        reason: refused.body_text(),
-    })?;
-    let author = IdentityId::Agent(AgentId::from_str(&agent).map_err(|_unread| ServerError::AgentNotVisible)?);
+    let body = given
+        .map(|Json(body)| body)
+        .map_err(|refused| ServerError::RequestMalformed {
+            reason: refused.body_text(),
+        })?;
+    let author = IdentityId::Agent(
+        AgentId::from_str(&agent).map_err(|_unread| ServerError::AgentNotVisible)?,
+    );
     patched(&state, Scope::Agent { id: agent }, author, body)
 }
 
@@ -111,10 +111,14 @@ async fn patch_own_session(
     given: Result<Json<PatchBody>, JsonRejection>,
 ) -> Result<Json<Read>, ServerError> {
     let (agent, session) = own_run(&state, &headers)?;
-    let body = given.map(|Json(body)| body).map_err(|refused| ServerError::RequestMalformed {
-        reason: refused.body_text(),
-    })?;
-    let author = IdentityId::Agent(AgentId::from_str(&agent).map_err(|_unread| ServerError::AgentNotVisible)?);
+    let body = given
+        .map(|Json(body)| body)
+        .map_err(|refused| ServerError::RequestMalformed {
+            reason: refused.body_text(),
+        })?;
+    let author = IdentityId::Agent(
+        AgentId::from_str(&agent).map_err(|_unread| ServerError::AgentNotVisible)?,
+    );
     patched(&state, Scope::Session { id: session }, author, body)
 }
 

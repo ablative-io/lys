@@ -62,7 +62,9 @@ impl VariablesError {
 }
 
 /// Whose variables: an agent's or a session's.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[schema(as = VariablesScope)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Scope {
@@ -235,7 +237,10 @@ impl Variables {
 pub fn checked_name(name: &str) -> Result<(), VariablesError> {
     let ok = !name.is_empty()
         && name.len() <= 64
-        && name.bytes().next().is_some_and(|byte| byte.is_ascii_lowercase())
+        && name
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_lowercase())
         && name
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_');

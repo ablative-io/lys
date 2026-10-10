@@ -72,14 +72,12 @@ impl Run {
                 format!("{} is not JSON: {error}", path.display()),
             )
         })?;
-        let entry = root
-            .pointer("/mcpServers/lys")
-            .ok_or_else(|| {
-                refused(
-                    "run_pass_absent",
-                    format!("{} carries no lys entry under mcpServers", path.display()),
-                )
-            })?;
+        let entry = root.pointer("/mcpServers/lys").ok_or_else(|| {
+            refused(
+                "run_pass_absent",
+                format!("{} carries no lys entry under mcpServers", path.display()),
+            )
+        })?;
         let url = entry
             .get("url")
             .and_then(Value::as_str)
@@ -222,13 +220,15 @@ fn parsed(given: &str) -> CliResult<(String, Value)> {
 /// The server's refusal by its name and words, or a named failure to find
 /// the run's pass or reach the server.
 pub fn run(args: VariablesArgs, json: bool) -> CliResult<()> {
-    let folder = args
-        .folder
-        .clone()
-        .map_or_else(|| std::env::current_dir().map_err(|source| CliError::Io {
-            context: "reading the working folder".to_owned(),
-            source,
-        }), Ok::<PathBuf, CliError>)?;
+    let folder = args.folder.clone().map_or_else(
+        || {
+            std::env::current_dir().map_err(|source| CliError::Io {
+                context: "reading the working folder".to_owned(),
+                source,
+            })
+        },
+        Ok::<PathBuf, CliError>,
+    )?;
     let run = Run::discover(&folder)?;
     let answer = match args.command {
         VariablesCommand::Get { session } => run.send("GET", route(session), None)?,
@@ -245,7 +245,10 @@ pub fn run(args: VariablesArgs, json: bool) -> CliResult<()> {
             }
             let mut body = Map::new();
             body.insert("revision".to_owned(), json!(revision));
-            body.insert("values".to_owned(), Value::Object(map.into_iter().collect()));
+            body.insert(
+                "values".to_owned(),
+                Value::Object(map.into_iter().collect()),
+            );
             if let Some(expires_at) = expires_at {
                 body.insert("expires_at".to_owned(), json!(expires_at));
             }

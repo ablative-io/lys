@@ -42,7 +42,14 @@ pub(crate) async fn send(
     given: Result<Json<SeatSendBody>, JsonRejection>,
 ) -> Result<Json<SeatSent>, ServerError> {
     let given = body(given)?;
-    Box::pin(deliver(&state, &headers, (&uri.to_string(), &name), given, "send")).await
+    Box::pin(deliver(
+        &state,
+        &headers,
+        (&uri.to_string(), &name),
+        given,
+        "send",
+    ))
+    .await
 }
 
 /// A line typed in `lys attach --type`: a message, kept as typed from an attach.
@@ -91,11 +98,12 @@ pub(crate) async fn attach(
     let answer = match given.cursor {
         None => {
             let caller = standing.asker.to_string();
-            act(&state, (&driven, &caller, "attach"), None, read).await?.0
+            act(&state, (&driven, &caller, "attach"), None, read)
+                .await?
+                .0
         }
         Some(_) => {
-            crate::runner_client::ask(&state, &driven.machine, driven.runner.clone(), read)
-                .await?
+            crate::runner_client::ask(&state, &driven.machine, driven.runner.clone(), read).await?
         }
     };
     let (lines, cursor, ended) = match answer {
@@ -195,7 +203,14 @@ async fn deliver(
         text: given.text.clone(),
         enter: true,
     };
-    match act(state, (&driven, &admission.caller, how), Some(digest.clone()), input).await {
+    match act(
+        state,
+        (&driven, &admission.caller, how),
+        Some(digest.clone()),
+        input,
+    )
+    .await
+    {
         Ok(_) => {}
         Err(ServerError::Runner { refusal, .. })
             if matches!(refusal.as_str(), "session_ended" | "session_unknown") =>

@@ -45,7 +45,10 @@ pub fn compose(deployment: &Deployment, args: &[&str]) -> TestResult<Output> {
     if deployment.bundled {
         command.args(["--profile", "bundled-db"]);
     }
-    output(command.args(args), &format!("docker compose {}", args.join(" ")))
+    output(
+        command.args(args),
+        &format!("docker compose {}", args.join(" ")),
+    )
 }
 
 /// The resolved compose model, as JSON.

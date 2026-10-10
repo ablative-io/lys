@@ -51,10 +51,7 @@ struct Seen {
 }
 
 fn seen(id: &str, session: &Session, table: &Table) -> Result<Seen, RunnerError> {
-    let control = session
-        .live
-        .as_ref()
-        .and_then(|live| live.control.as_ref());
+    let control = session.live.as_ref().and_then(|live| live.control.as_ref());
     let turn_active = match control {
         Some(control) => {
             let status = control.controller.control_status();
@@ -141,8 +138,7 @@ impl Sessions {
                 .collect::<Result<Vec<_>, _>>()?,
         };
         drop(table);
-        held
-            .into_iter()
+        held.into_iter()
             .map(|Seen { mut view, held }| {
                 view.alive = match (held, view.pid) {
                     (true, Some(pid)) => present(&view.session, pid)?,

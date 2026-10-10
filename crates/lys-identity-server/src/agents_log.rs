@@ -205,7 +205,10 @@ impl<F: Folded, S: LeafStore> RecordLog<F, S> {
     /// Resolve an append whose outcome is not known by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing
     /// is answered from memory and nothing is appended.
-    pub fn settle(&mut self, unavailable: &dyn Fn(String) -> ServerError) -> Result<(), ServerError> {
+    pub fn settle(
+        &mut self,
+        unavailable: &dyn Fn(String) -> ServerError,
+    ) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key, unavailable)?;
             self.log = log;

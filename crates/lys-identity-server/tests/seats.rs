@@ -37,7 +37,10 @@ fn refused(answer: &(u16, Value), status: u16, name: &str) {
 async fn a_seat_is_added_once_by_name_and_listed_not_seen() -> TestResult {
     let table = Table::set().await?;
     let machine = table
-        .machine(&machine_body(&table, "Box")?, Some(json!({ "kind": "lys" })))
+        .machine(
+            &machine_body(&table, "Box")?,
+            Some(json!({ "kind": "lys" })),
+        )
         .await?;
     let body = seat_body(&table, "waffles", &machine)?;
     let added = table.ok("/seats", &body).await?;
@@ -57,16 +60,25 @@ async fn a_seat_is_added_once_by_name_and_listed_not_seen() -> TestResult {
 
     let mut reused = body.clone();
     reused["name"] = json!("other");
-    let answer = table.service.post("/seats", Some(&table.ada), &reused).await?;
+    let answer = table
+        .service
+        .post("/seats", Some(&table.ada), &reused)
+        .await?;
     refused(&answer, 409, "seat_operation_reused");
 
     let taken = seat_body(&table, "waffles", &machine)?;
-    let answer = table.service.post("/seats", Some(&table.ada), &taken).await?;
+    let answer = table
+        .service
+        .post("/seats", Some(&table.ada), &taken)
+        .await?;
     refused(&answer, 409, "seat_name_taken");
 
     for invalid in ["Waffles", "", "a b", &"x".repeat(65)] {
         let body = seat_body(&table, invalid, &machine)?;
-        let answer = table.service.post("/seats", Some(&table.ada), &body).await?;
+        let answer = table
+            .service
+            .post("/seats", Some(&table.ada), &body)
+            .await?;
         refused(&answer, 400, "seat_name_invalid");
     }
 
@@ -85,7 +97,10 @@ async fn a_seat_is_added_once_by_name_and_listed_not_seen() -> TestResult {
     assert_eq!(seats.len(), 1, "{listed}");
     assert_eq!(seats[0]["state"], "not-seen");
 
-    let (status, one) = table.service.get("/seats/waffles", Some(&table.ada)).await?;
+    let (status, one) = table
+        .service
+        .get("/seats/waffles", Some(&table.ada))
+        .await?;
     assert_eq!(status, 200, "{one}");
     assert_eq!(one["name"], "waffles");
     let answer = table.service.get("/seats/absent", Some(&table.ada)).await?;
@@ -98,22 +113,32 @@ async fn a_seat_needs_a_machine_with_a_runner() -> TestResult {
     let table = Table::set().await?;
     let bare = table.machine(&machine_body(&table, "Bare")?, None).await?;
     let body = seat_body(&table, "waffles", &bare)?;
-    let answer = table.service.post("/seats", Some(&table.ada), &body).await?;
+    let answer = table
+        .service
+        .post("/seats", Some(&table.ada), &body)
+        .await?;
     refused(&answer, 409, "MachineWithoutRunner");
     let body = seat_body(&table, "waffles", "op-00000000000000000000000000000009")?;
-    let answer = table.service.post("/seats", Some(&table.ada), &body).await?;
+    let answer = table
+        .service
+        .post("/seats", Some(&table.ada), &body)
+        .await?;
     refused(&answer, 404, "MachineUnknown");
     table.close()
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_second_machine_naming_this_installs_runner_is_refused_naming_the_first() -> TestResult
-{
+async fn a_second_machine_naming_this_installs_runner_is_refused_naming_the_first() -> TestResult {
     let table = Table::set().await?;
     let first = table
-        .machine(&machine_body(&table, "First")?, Some(json!({ "kind": "lys" })))
+        .machine(
+            &machine_body(&table, "First")?,
+            Some(json!({ "kind": "lys" })),
+        )
         .await?;
-    let second = table.machine(&machine_body(&table, "Second")?, None).await?;
+    let second = table
+        .machine(&machine_body(&table, "Second")?, None)
+        .await?;
     let answer = table
         .service
         .post(
@@ -144,7 +169,10 @@ async fn a_second_machine_naming_this_installs_runner_is_refused_naming_the_firs
 async fn a_seat_whose_profile_does_not_require_controls_is_not_started() -> TestResult {
     let table = Table::set().await?;
     let machine = table
-        .machine(&machine_body(&table, "Box")?, Some(json!({ "kind": "lys" })))
+        .machine(
+            &machine_body(&table, "Box")?,
+            Some(json!({ "kind": "lys" })),
+        )
         .await?;
     table
         .ok("/seats", &seat_body(&table, "waffles", &machine)?)
@@ -180,7 +208,10 @@ async fn a_seat_whose_profile_does_not_require_controls_is_not_started() -> Test
 async fn a_session_the_runner_holds_for_no_seat_is_seen_but_unregistered() -> TestResult {
     let table = Table::set().await?;
     let machine = table
-        .machine(&machine_body(&table, "Box")?, Some(json!({ "kind": "lys" })))
+        .machine(
+            &machine_body(&table, "Box")?,
+            Some(json!({ "kind": "lys" })),
+        )
         .await?;
     let (status, started) = table
         .start(
@@ -210,7 +241,10 @@ async fn a_session_the_runner_holds_for_no_seat_is_seen_but_unregistered() -> Te
 async fn a_runner_that_cannot_be_read_leaves_its_seats_unknown_and_named() -> TestResult {
     let mut table = Table::set().await?;
     let machine = table
-        .machine(&machine_body(&table, "Box")?, Some(json!({ "kind": "lys" })))
+        .machine(
+            &machine_body(&table, "Box")?,
+            Some(json!({ "kind": "lys" })),
+        )
         .await?;
     table
         .ok("/seats", &seat_body(&table, "waffles", &machine)?)
@@ -306,7 +340,10 @@ async fn the_document_names_every_seat_refusal() -> TestResult {
 async fn a_seat_whose_latest_import_is_incomplete_is_not_started() -> TestResult {
     let mut table = Table::set().await?;
     let machine = table
-        .machine(&machine_body(&table, "Box")?, Some(json!({ "kind": "lys" })))
+        .machine(
+            &machine_body(&table, "Box")?,
+            Some(json!({ "kind": "lys" })),
+        )
         .await?;
     table
         .ok("/seats", &seat_body(&table, "waffles", &machine)?)
@@ -316,7 +353,10 @@ async fn a_seat_whose_latest_import_is_incomplete_is_not_started() -> TestResult
     let settings = json!({ "model": "claude-fable-5-1", "permissions": { "defaultMode": "plan" } });
     std::fs::write(folder.join("settings.json"), settings.to_string())?;
     std::fs::write(folder.join("system-prompt.md"), "You are Waffles.\n")?;
-    std::fs::write(folder.join("mcp.json"), json!({ "mcpServers": {} }).to_string())?;
+    std::fs::write(
+        folder.join("mcp.json"),
+        json!({ "mcpServers": {} }).to_string(),
+    )?;
     let intent = table.dir.path().join("upgrade-intent.json");
     std::fs::write(&intent, b"pending")?;
     table
@@ -326,7 +366,10 @@ async fn a_seat_whose_latest_import_is_incomplete_is_not_started() -> TestResult
 
     let manifest = json!({ "seat": "waffles", "harness": "claude", "claude_folder": folder });
     let plan = table
-        .ok("/seats/waffles/import/dry-run", &json!({ "manifest": manifest }))
+        .ok(
+            "/seats/waffles/import/dry-run",
+            &json!({ "manifest": manifest }),
+        )
         .await?;
     assert_eq!(plan["refusals"], json!([]), "{plan}");
     let confirm = json!({

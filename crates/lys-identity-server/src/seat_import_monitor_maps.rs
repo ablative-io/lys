@@ -217,7 +217,10 @@ pub(crate) fn budgets(body: &Value, who: &Identity<'_>, base: &str) -> Fragment 
         }),
         source_entry_ids: vec![source_id.clone()],
     });
-    if row.get("window_tokens").is_some_and(|window| !window.is_null()) {
+    if row
+        .get("window_tokens")
+        .is_some_and(|window| !window.is_null())
+    {
         fragment.excluded.push(Excluded {
             source_id,
             revision,
@@ -266,7 +269,10 @@ pub(crate) fn prompts(body: &Value, who: &Identity<'_>, base: &str) -> Fragment 
         let checkpoint = record.get("checkpoint").and_then(Value::as_str);
         if let Some(checkpoint) = checkpoint.filter(|text| !text.is_empty()) {
             let member = format!("prompt-settings {id}.checkpoint");
-            let detail = format!("a checkpoint of {} bytes has no Lys words slot", checkpoint.len());
+            let detail = format!(
+                "a checkpoint of {} bytes has no Lys words slot",
+                checkpoint.len()
+            );
             fragment
                 .refusals
                 .push(refusal(MEMBER_UNSUPPORTED, &member, detail));
@@ -361,12 +367,7 @@ pub(crate) fn prompts(body: &Value, who: &Identity<'_>, base: &str) -> Fragment 
 
 /// Record the prompt setting `id`'s source entry, or its exclusion when it
 /// was deleted in the monitor; its source id when it is to be mapped.
-fn prompt_source(
-    fragment: &mut Fragment,
-    id: &str,
-    record: &Value,
-    base: &str,
-) -> Option<String> {
+fn prompt_source(fragment: &mut Fragment, id: &str, record: &Value, base: &str) -> Option<String> {
     let Some(revision) = record.get("revision").and_then(Value::as_u64) else {
         let member = format!("prompt-settings {id}.revision");
         let refused = refusal(MEMBER_UNSUPPORTED, &member, "not a whole revision");
@@ -426,6 +427,10 @@ pub(crate) fn words_text(member: &str, text: &str) -> Result<String, Refusal> {
 fn template_name(id: &str, slot: Slot) -> Result<String, Refusal> {
     let scope = id.strip_prefix("template:").unwrap_or(id);
     crate::words_state::checked_name(&format!("{scope}-{}", slot.name())).map_err(|refused| {
-        refusal(MEMBER_UNSUPPORTED, &format!("prompt-settings {id}"), refused.to_string())
+        refusal(
+            MEMBER_UNSUPPORTED,
+            &format!("prompt-settings {id}"),
+            refused.to_string(),
+        )
     })
 }

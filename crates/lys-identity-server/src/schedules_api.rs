@@ -20,9 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ServerError;
 use crate::read_api::own_person;
 use crate::routes::{AppState, is_administrator, signed_in, with_directory};
-use crate::schedules_state::{
-    Change, Changed, Item, Recipient, Schedule, SchedulesError, Source,
-};
+use crate::schedules_state::{Change, Changed, Item, Recipient, Schedule, SchedulesError, Source};
 use crate::schedules_store::{Deliver, Delivering, SchedulesKept, Undelivered, Worded};
 use crate::session::now;
 use crate::variables_api::session_agent;
@@ -99,9 +97,11 @@ pub(crate) fn schedules(state: &AppState) -> Result<&SchedulesKept, ServerError>
 }
 
 fn body<T>(given: Result<Json<T>, JsonRejection>) -> Result<T, ServerError> {
-    given.map(|Json(body)| body).map_err(|refused| ServerError::RequestMalformed {
-        reason: refused.body_text(),
-    })
+    given
+        .map(|Json(body)| body)
+        .map_err(|refused| ServerError::RequestMalformed {
+            reason: refused.body_text(),
+        })
 }
 
 /// The agents `recipients` name, each session resolved to its agent.
@@ -123,7 +123,9 @@ fn agents_of(state: &AppState, recipients: &[Recipient]) -> Result<Vec<String>, 
 fn over(state: &AppState, headers: &HeaderMap, agents: &[String]) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
     if is_administrator(state, &actor)? {
-        return match with_directory(state, |directory| own_person(directory.projection()?, &actor)) {
+        return match with_directory(state, |directory| {
+            own_person(directory.projection()?, &actor)
+        }) {
             Ok(person) => Ok(person.to_string()),
             Err(ServerError::NoPerson) => Ok("operator".to_owned()),
             Err(error) => Err(error),
@@ -246,11 +248,7 @@ async fn stop(
     let agents = agents_of(&state, item.recipients())?;
     let by = over(&state, &headers, &agents).map_err(|_refused| SchedulesError::Unknown)?;
     let words = body.words.trim();
-    let item = crate::schedules_store::stop(
-        kept,
-        &id,
-        format!("stopped_by: {by}: {words}"),
-    )?;
+    let item = crate::schedules_store::stop(kept, &id, format!("stopped_by: {by}: {words}"))?;
     Ok(Json(item))
 }
 
@@ -275,7 +273,12 @@ impl Deliver for Live<'_> {
         }
     }
 
-    fn worded(&self, source: &Source, agent: Option<&str>, session: &str) -> Result<Worded, String> {
+    fn worded(
+        &self,
+        source: &Source,
+        agent: Option<&str>,
+        session: &str,
+    ) -> Result<Worded, String> {
         let numbers = BTreeMap::new();
         let worded = match source {
             Source::Slot { slot } => {
@@ -297,15 +300,9 @@ impl Deliver for Live<'_> {
             Source::Text { text } => {
                 let mut numbers = numbers;
                 numbers.insert("text".to_owned(), text.clone());
-                let (rendered, contributed) = crate::words_api::rendered(
-                    self.0,
-                    text,
-                    agent,
-                    Some(session),
-                    numbers,
-                    None,
-                )
-                .map_err(|error| error.to_string())?;
+                let (rendered, contributed) =
+                    crate::words_api::rendered(self.0, text, agent, Some(session), numbers, None)
+                        .map_err(|error| error.to_string())?;
                 Worded {
                     text: rendered.text,
                     contributed,

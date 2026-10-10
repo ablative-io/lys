@@ -66,7 +66,11 @@ async fn without_the_right_each_act_is_refused_naming_the_action_and_the_url() -
     for (act, action, body) in [
         ("stop", "seat.stop", json!({ "operation": operation()? })),
         ("start", "seat.start", json!({ "operation": operation()? })),
-        ("restart", "seat.restart", json!({ "operation": operation()?, "force": true })),
+        (
+            "restart",
+            "seat.restart",
+            json!({ "operation": operation()?, "force": true }),
+        ),
         (
             "send",
             "seat.send",

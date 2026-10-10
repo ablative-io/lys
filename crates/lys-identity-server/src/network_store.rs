@@ -447,7 +447,9 @@ impl NetworkStore {
             && let Some(holder) = self.kept.runners.iter().find_map(|(holder, record)| {
                 (holder != id
                     && *record == RunnerRecord::Lys
-                    && self.machine(holder).is_some_and(|held| held.retired.is_none()))
+                    && self
+                        .machine(holder)
+                        .is_some_and(|held| held.retired.is_none()))
                 .then(|| holder.clone())
             })
         {

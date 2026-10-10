@@ -86,15 +86,27 @@ fn variables(scope: &str, revision: u64, entries: &Value) -> Value {
 fn recorded() -> Recorded {
     let ok = StatusCode::OK;
     let answers = BTreeMap::from([
-        ("/api/budgets", (ok, json!({"budgets": [budget(41, &json!([50, 70]))], "invalid": []}))),
+        (
+            "/api/budgets",
+            (
+                ok,
+                json!({"budgets": [budget(41, &json!([50, 70]))], "invalid": []}),
+            ),
+        ),
         ("/api/prompt-settings", (ok, prompts())),
         (
             "/api/scheduled-messages",
-            (ok, json!({"schedules": [], "error": null,
+            (
+                ok,
+                json!({"schedules": [], "error": null,
                 "health": {"tick_ms": 1000, "last_tick_at": null, "busy_schedule": null,
-                    "timer_active": true, "skips": [], "held": []}})),
+                    "timer_active": true, "skips": [], "held": []}}),
+            ),
         ),
-        ("/api/rules", (ok, json!({"rules": [], "skipped_lines": 0, "skips": []}))),
+        (
+            "/api/rules",
+            (ok, json!({"rules": [], "skipped_lines": 0, "skips": []})),
+        ),
     ]);
     let agent = json!({
         "focus": {"value": "Review parser", "expires_at": null,
@@ -107,8 +119,14 @@ fn recorded() -> Recorded {
             "updated_at": "2030-03-17T17:00:00Z", "author": "Tom"},
     });
     let variables = BTreeMap::from([
-        ("agent:waffles".to_owned(), variables("agent:waffles", 3, &agent)),
-        ("session:sess-w".to_owned(), variables("session:sess-w", 9, &session)),
+        (
+            "agent:waffles".to_owned(),
+            variables("agent:waffles", 3, &agent),
+        ),
+        (
+            "session:sess-w".to_owned(),
+            variables("session:sess-w", 9, &session),
+        ),
     ]);
     Recorded { answers, variables }
 }
@@ -119,7 +137,12 @@ async fn serve(recorded: Recorded) -> Result<String, Box<dyn Error>> {
     let base = format!("http://{}", listener.local_addr()?);
     let recorded = Arc::new(recorded);
     let mut routes = Router::new();
-    for path in ["/api/budgets", "/api/prompt-settings", "/api/scheduled-messages", "/api/rules"] {
+    for path in [
+        "/api/budgets",
+        "/api/prompt-settings",
+        "/api/scheduled-messages",
+        "/api/rules",
+    ] {
         let recorded = Arc::clone(&recorded);
         routes = routes.route(
             path,
@@ -136,7 +159,10 @@ async fn serve(recorded: Recorded) -> Result<String, Box<dyn Error>> {
             let scope = body["scope"].as_str().unwrap_or_default();
             let answer = match asked.variables.get(scope) {
                 Some(answer) => (StatusCode::OK, axum::Json(answer.clone())),
-                None => (StatusCode::UNPROCESSABLE_ENTITY, axum::Json(json!({"error": scope}))),
+                None => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    axum::Json(json!({"error": scope})),
+                ),
             };
             async move { answer }
         }),
@@ -169,7 +195,11 @@ fn destination<'a>(fragment: &'a Fragment, kind: &str, id: &str) -> Option<&'a V
 }
 
 fn refusal_names(fragment: &Fragment) -> Vec<&str> {
-    fragment.refusals.iter().map(|refused| refused.name.as_str()).collect()
+    fragment
+        .refusals
+        .iter()
+        .map(|refused| refused.name.as_str())
+        .collect()
 }
 
 #[tokio::test]
@@ -192,7 +222,10 @@ async fn seat_import_monitor_maps_records() -> TestResult {
         .iter()
         .find(|excluded| excluded.source_id == "monitor:budget:sess-w")
         .ok_or("the window override is not kept as not imported")?;
-    assert_eq!(window.reason, "no Lys owner for a context window override (window_tokens)");
+    assert_eq!(
+        window.reason,
+        "no Lys owner for a context window override (window_tokens)"
+    );
     let budget = fragment
         .sources
         .iter()
@@ -205,11 +238,20 @@ async fn seat_import_monitor_maps_records() -> TestResult {
     assert_eq!(inform["setting"]["kind"], "text");
     let scheduled = destination(&fragment, "words_slot", "agent:waffles/scheduled_reminder");
     let scheduled = scheduled.ok_or("no linked reminder")?;
-    assert_eq!(scheduled["setting"], json!({"kind": "template", "name": "night-scheduled_reminder"}));
+    assert_eq!(
+        scheduled["setting"],
+        json!({"kind": "template", "name": "night-scheduled_reminder"})
+    );
     let template = destination(&fragment, "words_template", "night-scheduled_reminder");
-    assert_eq!(template.ok_or("no template")?["text"], "Night shift: {{goals}}");
+    assert_eq!(
+        template.ok_or("no template")?["text"],
+        "Night shift: {{goals}}"
+    );
     assert!(
-        !fragment.destinations.iter().any(|entry| entry.change.to_string().contains("not this seat's")),
+        !fragment
+            .destinations
+            .iter()
+            .any(|entry| entry.change.to_string().contains("not this seat's")),
         "another agent's words are not imported"
     );
 
@@ -227,7 +269,12 @@ async fn seat_import_monitor_maps_records() -> TestResult {
             .iter()
             .any(|excluded| excluded.source_id == "monitor:variables:session:sess-w/stale")
     );
-    assert!(fragment.prerequisites.iter().any(|line| line.contains("sess-w")));
+    assert!(
+        fragment
+            .prerequisites
+            .iter()
+            .any(|line| line.contains("sess-w"))
+    );
 
     let target = fragment
         .sources
@@ -247,7 +294,13 @@ async fn seat_import_monitor_maps_records() -> TestResult {
         .iter()
         .find(|entry| entry.id == "monitor:variables:session:sess-w")
         .ok_or("no session variables source")?;
-    assert_eq!((variables.revision_kind.as_str(), variables.source_revision.as_str()), ("native", "9"));
+    assert_eq!(
+        (
+            variables.revision_kind.as_str(),
+            variables.source_revision.as_str()
+        ),
+        ("native", "9")
+    );
     assert_eq!(fragment.schedule_counts.map(|counts| counts.total), Some(0));
     Ok(())
 }
@@ -265,41 +318,74 @@ async fn seat_import_monitor_refuses_incomplete() -> TestResult {
             json!({"budgets": [{"id": "sess-w", "name": "waffles", "budget_error": "inform level 90 is above compact_at 85"}], "invalid": []}),
             SOURCE_INCOMPLETE,
         ),
-        ("/api/rules", json!({"rules": [], "skipped_lines": 2, "skips": []}), SOURCE_INCOMPLETE),
+        (
+            "/api/rules",
+            json!({"rules": [], "skipped_lines": 2, "skips": []}),
+            SOURCE_INCOMPLETE,
+        ),
         (
             "/api/scheduled-messages",
             json!({"schedules": [], "error": null, "health": {"skips": [], "held": ["night"]}}),
             SOURCE_INCOMPLETE,
         ),
-        ("/api/prompt-settings", json!({"defaults": {}}), SOURCE_INCOMPLETE),
+        (
+            "/api/prompt-settings",
+            json!({"defaults": {}}),
+            SOURCE_INCOMPLETE,
+        ),
     ];
     for (path, body, name) in cases {
         let mut answers = recorded();
         answers.answers.insert(path, (StatusCode::OK, body));
         let fragment = read(answers).await?;
-        assert_eq!(refusal_names(&fragment), [name], "{path}: {:?}", fragment.refusals);
-        assert!(fragment.refusals[0].member.contains(path), "{:?}", fragment.refusals);
+        assert_eq!(
+            refusal_names(&fragment),
+            [name],
+            "{path}: {:?}",
+            fragment.refusals
+        );
+        assert!(
+            fragment.refusals[0].member.contains(path),
+            "{:?}",
+            fragment.refusals
+        );
         if !fragment.refusals[0].member.contains('#') {
             let entry = fragment
                 .sources
                 .iter()
                 .find(|entry| entry.locator.ends_with(path))
                 .ok_or("no source entry for the API")?;
-            assert!(matches!(entry.completeness, Completeness::Incomplete { .. }), "{entry:?}");
+            assert!(
+                matches!(entry.completeness, Completeness::Incomplete { .. }),
+                "{entry:?}"
+            );
         }
     }
 
     let mut down = recorded();
     let error = json!({"error": "unavailable"});
-    down.answers.insert("/api/budgets", (StatusCode::SERVICE_UNAVAILABLE, error));
+    down.answers
+        .insert("/api/budgets", (StatusCode::SERVICE_UNAVAILABLE, error));
     let fragment = read(down).await?;
     assert_eq!(refusal_names(&fragment), [SOURCE_UNAVAILABLE]);
-    assert!(fragment.destinations.iter().all(|entry| entry.record_kind != "budget_limits"));
+    assert!(
+        fragment
+            .destinations
+            .iter()
+            .all(|entry| entry.record_kind != "budget_limits")
+    );
 
     let mut empty = recorded();
-    empty.answers.insert("/api/budgets", (StatusCode::OK, json!({"budgets": [], "invalid": []})));
+    empty.answers.insert(
+        "/api/budgets",
+        (StatusCode::OK, json!({"budgets": [], "invalid": []})),
+    );
     let fragment = read(empty).await?;
-    assert!(fragment.refusals.is_empty(), "zero rows with no error is complete: {:?}", fragment.refusals);
+    assert!(
+        fragment.refusals.is_empty(),
+        "zero rows with no error is complete: {:?}",
+        fragment.refusals
+    );
     let budgets = fragment
         .sources
         .iter()
@@ -308,7 +394,8 @@ async fn seat_import_monitor_refuses_incomplete() -> TestResult {
     assert_eq!(budgets.completeness, Completeness::Complete);
 
     let mut twice = recorded();
-    let rows = json!({"budgets": [budget(1, &json!([50])), budget(2, &json!([60]))], "invalid": []});
+    let rows =
+        json!({"budgets": [budget(1, &json!([50])), budget(2, &json!([60]))], "invalid": []});
     twice.answers.insert("/api/budgets", (StatusCode::OK, rows));
     let fragment = read(twice).await?;
     assert_eq!(refusal_names(&fragment), [SCOPE_AMBIGUOUS]);
@@ -317,10 +404,22 @@ async fn seat_import_monitor_refuses_incomplete() -> TestResult {
     let gone = format!("http://{}", closed.local_addr()?);
     drop(closed);
     let fragment = read_monitor(&source(&gone), CAPTURED_AT).await;
-    assert!(refusal_names(&fragment).iter().all(|name| *name == SOURCE_UNAVAILABLE));
-    assert_eq!(fragment.refusals.len(), 6, "every API is named: {:?}", fragment.refusals);
+    assert!(
+        refusal_names(&fragment)
+            .iter()
+            .all(|name| *name == SOURCE_UNAVAILABLE)
+    );
+    assert_eq!(
+        fragment.refusals.len(),
+        6,
+        "every API is named: {:?}",
+        fragment.refusals
+    );
     assert!(fragment.destinations.is_empty());
-    assert_eq!(fragment.schedule_counts, None, "an unread listing is not zero schedules");
+    assert_eq!(
+        fragment.schedule_counts, None,
+        "an unread listing is not zero schedules"
+    );
     Ok(())
 }
 
@@ -332,8 +431,16 @@ async fn an_unset_secret_variable_refuses_without_asking() -> TestResult {
     source.secret_header = Some("x-collector-secret".to_owned());
     let fragment = read_monitor(&source, CAPTURED_AT).await;
     assert_eq!(refusal_names(&fragment), [SOURCE_UNAVAILABLE]);
-    assert!(fragment.refusals[0].detail.contains("LYS_SEAT_IMPORT_TEST_SECRET_NEVER_SET"));
-    assert!(fragment.refusals[0].detail.contains("is not set"), "{:?}", fragment.refusals);
+    assert!(
+        fragment.refusals[0]
+            .detail
+            .contains("LYS_SEAT_IMPORT_TEST_SECRET_NEVER_SET")
+    );
+    assert!(
+        fragment.refusals[0].detail.contains("is not set"),
+        "{:?}",
+        fragment.refusals
+    );
     assert!(fragment.destinations.is_empty());
     Ok(())
 }
@@ -346,15 +453,27 @@ async fn a_secret_named_with_no_header_refuses_without_asking() -> TestResult {
     let fragment = read_monitor(&source, CAPTURED_AT).await;
     assert_eq!(refusal_names(&fragment), [SOURCE_UNAVAILABLE]);
     assert_eq!(fragment.refusals[0].member, "monitor.secret_header");
-    assert!(fragment.refusals[0].detail.contains("no header name is assumed"));
-    assert!(fragment.sources.is_empty(), "nothing was asked: {:?}", fragment.sources);
+    assert!(
+        fragment.refusals[0]
+            .detail
+            .contains("no header name is assumed")
+    );
+    assert!(
+        fragment.sources.is_empty(),
+        "nothing was asked: {:?}",
+        fragment.sources
+    );
     assert!(fragment.destinations.is_empty());
 
     source.secret_header = Some("not a header".to_owned());
     let fragment = read_monitor(&source, CAPTURED_AT).await;
     assert_eq!(refusal_names(&fragment), [SOURCE_UNAVAILABLE]);
     assert_eq!(fragment.refusals[0].member, "monitor.secret_header");
-    assert!(fragment.sources.is_empty(), "nothing was asked: {:?}", fragment.sources);
+    assert!(
+        fragment.sources.is_empty(),
+        "nothing was asked: {:?}",
+        fragment.sources
+    );
     Ok(())
 }
 
@@ -368,22 +487,45 @@ async fn seat_import_monitor_revision_projection() -> TestResult {
             .map(|entry| (entry.revision_kind.clone(), entry.source_revision.clone()))
     };
     let mut first = recorded();
-    first.answers.insert("/api/budgets", (StatusCode::OK, json!({"budgets": [budget(10, &json!([50, 70]))], "invalid": []})));
+    first.answers.insert(
+        "/api/budgets",
+        (
+            StatusCode::OK,
+            json!({"budgets": [budget(10, &json!([50, 70]))], "invalid": []}),
+        ),
+    );
     let mut used = recorded();
-    used.answers.insert("/api/budgets", (StatusCode::OK, json!({"budgets": [budget(64, &json!([50, 70]))], "invalid": []})));
+    used.answers.insert(
+        "/api/budgets",
+        (
+            StatusCode::OK,
+            json!({"budgets": [budget(64, &json!([50, 70]))], "invalid": []}),
+        ),
+    );
     let mut changed = recorded();
-    changed.answers.insert("/api/budgets", (StatusCode::OK, json!({"budgets": [budget(10, &json!([40, 70]))], "invalid": []})));
+    changed.answers.insert(
+        "/api/budgets",
+        (
+            StatusCode::OK,
+            json!({"budgets": [budget(10, &json!([40, 70]))], "invalid": []}),
+        ),
+    );
     let first = revision(&read(first).await?).ok_or("no budget source")?;
     let used = revision(&read(used).await?).ok_or("no budget source")?;
     let changed = revision(&read(changed).await?).ok_or("no budget source")?;
     assert_eq!(first.0, "content_sha256");
-    assert_eq!(first, used, "a usage observation does not move the definition's revision");
+    assert_eq!(
+        first, used,
+        "a usage observation does not move the definition's revision"
+    );
     assert_ne!(first, changed, "changed inform levels move it");
 
     let mut renumbered = recorded();
     let mut body = prompts();
     body["records"][1]["revision"] = json!(5);
-    renumbered.answers.insert("/api/prompt-settings", (StatusCode::OK, body));
+    renumbered
+        .answers
+        .insert("/api/prompt-settings", (StatusCode::OK, body));
     let prompt = |fragment: &Fragment| {
         fragment
             .sources
@@ -395,7 +537,13 @@ async fn seat_import_monitor_revision_projection() -> TestResult {
     let after = read(renumbered).await?;
     assert_eq!(prompt(&before).as_deref(), Some("4"));
     assert_eq!(prompt(&after).as_deref(), Some("5"));
-    let words = |fragment: &Fragment| destination(fragment, "words_slot", "agent:waffles/context_warning").cloned();
-    assert_eq!(words(&before), words(&after), "the wording is identical while the native revision moved");
+    let words = |fragment: &Fragment| {
+        destination(fragment, "words_slot", "agent:waffles/context_warning").cloned()
+    };
+    assert_eq!(
+        words(&before),
+        words(&after),
+        "the wording is identical while the native revision moved"
+    );
     Ok(())
 }

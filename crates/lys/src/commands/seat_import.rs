@@ -123,7 +123,11 @@ fn listed<'a>(value: &'a Value, key: &str) -> &'a [Value] {
 
 /// The plan's lines: what it reads, writes and refuses, and how to confirm it.
 fn plan_lines(plan: &Value) {
-    println!("plan {} of seat {}", shown(plan, "plan_id"), shown(plan, "seat"));
+    println!(
+        "plan {} of seat {}",
+        shown(plan, "plan_id"),
+        shown(plan, "seat")
+    );
     println!("revision: {}", shown(plan, "plan_revision"));
     println!("captured at: {}", shown(plan, "captured_at"));
     println!("agent: {}", shown(plan, "agent"));
@@ -176,7 +180,10 @@ fn plan_lines(plan: &Value) {
         );
     }
     for prerequisite in listed(plan, "prerequisites") {
-        println!("before the move: {}", prerequisite.as_str().unwrap_or_default());
+        println!(
+            "before the move: {}",
+            prerequisite.as_str().unwrap_or_default()
+        );
     }
     let refusals = listed(plan, "refusals");
     for refusal in refusals {

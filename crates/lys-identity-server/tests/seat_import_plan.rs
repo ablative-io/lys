@@ -113,16 +113,26 @@ fn plan(captured_at: u64, fragments: Vec<Fragment>) -> Plan {
 }
 
 fn names(plan: &Plan) -> Vec<&str> {
-    plan.refusals.iter().map(|refusal| refusal.name.as_str()).collect()
+    plan.refusals
+        .iter()
+        .map(|refusal| refusal.name.as_str())
+        .collect()
 }
 
 #[test]
 fn seat_import_dry_run_names_every_field_at_one_instant() -> TestResult {
-    let plan = plan(1_700_000_000, fragments("r1", "Argus hooks become Lys hooks"));
+    let plan = plan(
+        1_700_000_000,
+        fragments("r1", "Argus hooks become Lys hooks"),
+    );
     assert!(plan.refusals.is_empty(), "{:?}", plan.refusals);
     confirmable(&plan)?;
     assert_eq!(plan.version, PLAN_VERSION);
-    assert!(plan.plan_id.starts_with("plan-") && plan.plan_id.len() == 37, "{}", plan.plan_id);
+    assert!(
+        plan.plan_id.starts_with("plan-") && plan.plan_id.len() == 37,
+        "{}",
+        plan.plan_id
+    );
     assert_eq!(plan.plan_revision.len(), 64);
     assert_eq!(plan.captured_at, 1_700_000_000);
     assert_eq!(plan.seat, "waffles");
@@ -160,7 +170,10 @@ fn seat_import_dry_run_names_every_field_at_one_instant() -> TestResult {
         ]
     );
     assert_eq!(plan.references.len(), 1);
-    assert_eq!(plan.replacements, vec!["Argus hooks become Lys hooks".to_owned()]);
+    assert_eq!(
+        plan.replacements,
+        vec!["Argus hooks become Lys hooks".to_owned()]
+    );
     assert_eq!(plan.prerequisites.len(), 1);
     assert_eq!(plan.bounds.plan_bytes, 4 * 1024 * 1024);
     Ok(())
@@ -170,7 +183,10 @@ fn seat_import_dry_run_names_every_field_at_one_instant() -> TestResult {
 fn seat_import_confirmation_binds_replacements() {
     let shown = plan(10, fragments("r1", "Argus hooks become Lys hooks"));
     let later = plan(20, fragments("r1", "Argus hooks become Lys hooks"));
-    assert_eq!(shown.plan_revision, later.plan_revision, "the instant is not what is confirmed");
+    assert_eq!(
+        shown.plan_revision, later.plan_revision,
+        "the instant is not what is confirmed"
+    );
     assert_ne!(shown.plan_id, later.plan_id, "each dry run is its own plan");
     let swapped = plan(10, fragments("r1", "Argus hooks become an unrelated hook"));
     assert_ne!(shown.plan_revision, swapped.plan_revision);
@@ -190,7 +206,9 @@ fn a_refusal_or_an_incomplete_source_is_shown_and_refuses_confirmation() {
     found[0].sources.push(source(
         "argus-budgets",
         "",
-        Completeness::Incomplete { reason: "skipped 2 lines".to_owned() },
+        Completeness::Incomplete {
+            reason: "skipped 2 lines".to_owned(),
+        },
     ));
     let refused = plan(1, found);
     assert!(names(&refused).contains(&"import_member_unsupported"));
@@ -203,7 +221,11 @@ fn a_refusal_or_an_incomplete_source_is_shown_and_refuses_confirmation() {
 fn every_destination_is_checked_before_it_is_bound() {
     let mut found = fragments("r1", "hooks");
     found[0].destinations.extend([
-        destination("context_window", "agent.waffles", json!({ "window_tokens": 200_000 })),
+        destination(
+            "context_window",
+            "agent.waffles",
+            json!({ "window_tokens": 200_000 }),
+        ),
         destination(
             "words_slot",
             "agent:someone-else/wake_up",
@@ -240,7 +262,11 @@ fn every_destination_is_checked_before_it_is_bound() {
         "import_destination_ambiguous",
         "import_destination_unsourced",
     ] {
-        assert!(names(&refused).contains(&name), "{name}: {:?}", refused.refusals);
+        assert!(
+            names(&refused).contains(&name),
+            "{name}: {:?}",
+            refused.refusals
+        );
     }
 }
 
@@ -446,24 +472,39 @@ async fn seat_import_confirmation_is_per_seat() -> TestResult {
         })
         .await?;
     let path = "/seats/waffles/import/confirm";
-    let answer = table.service.post(path, Some(&bea), &confirm("plan-x")?).await?;
+    let answer = table
+        .service
+        .post(path, Some(&bea), &confirm("plan-x")?)
+        .await?;
     refused(&answer, 403, "not_permitted");
     let reason = answer.1["reason"].as_str().ok_or("no reason")?;
-    assert!(reason.contains("seat.import") && reason.contains(path), "{reason}");
+    assert!(
+        reason.contains("seat.import") && reason.contains(path),
+        "{reason}"
+    );
 
     // The person responsible, confirming a plan no dry run showed.
-    let answer = table.service.post(path, Some(&table.ada), &confirm("plan-x")?).await?;
+    let answer = table
+        .service
+        .post(path, Some(&table.ada), &confirm("plan-x")?)
+        .await?;
     refused(&answer, 404, "import_plan_unknown");
 
     // More than one seat at once.
     for many in ["waffles,gaia", "all"] {
         let path = format!("/seats/{many}/import/confirm");
-        let answer = table.service.post(&path, Some(&table.ada), &confirm("plan-x")?).await?;
+        let answer = table
+            .service
+            .post(&path, Some(&table.ada), &confirm("plan-x")?)
+            .await?;
         refused(&answer, 400, "import_bulk_refused");
     }
     let mut malformed = confirm("plan-x")?;
     malformed["operation"] = json!("not-an-operation");
-    let answer = table.service.post(path, Some(&table.ada), &malformed).await?;
+    let answer = table
+        .service
+        .post(path, Some(&table.ada), &malformed)
+        .await?;
     assert_eq!(answer.0, 400, "{}", answer.1);
 
     // A manifest naming another seat than the route.
@@ -474,7 +515,10 @@ async fn seat_import_confirmation_is_per_seat() -> TestResult {
         .await?;
     refused(&answer, 400, "import_seat_mismatch");
 
-    let (status, held) = table.service.get("/seats/waffles/import", Some(&table.ada)).await?;
+    let (status, held) = table
+        .service
+        .get("/seats/waffles/import", Some(&table.ada))
+        .await?;
     assert_eq!(status, 200, "{held}");
     assert_eq!(held["seat"], "waffles");
     assert_eq!(held["selected"], Value::Null);

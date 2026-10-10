@@ -252,8 +252,7 @@ fn slot_words(state: &Arc<AppState>, crossing: &Crossing) -> Option<String> {
         crossing.session.as_deref(),
     )
     .ok()?;
-    if resolved.source == "profile" || (slot == Slot::Compaction && resolved.source == "built_in")
-    {
+    if resolved.source == "profile" || (slot == Slot::Compaction && resolved.source == "built_in") {
         return None;
     }
     let mut numbers = std::collections::BTreeMap::new();

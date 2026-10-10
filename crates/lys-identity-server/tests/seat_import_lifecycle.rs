@@ -104,8 +104,8 @@ async fn managed_version(table: &Table) -> TestResult {
 /// Whether lys-runner's `QUALIFIED` list is still empty, read from its
 /// source as DIRECTORY-064's pin leaves it.
 fn qualified_is_empty() -> Result<bool, Box<dyn Error>> {
-    let process = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../lys-runner/src/harness_control/process.rs");
+    let process =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../lys-runner/src/harness_control/process.rs");
     Ok(std::fs::read_to_string(process)?.contains(QUALIFIED_EMPTY))
 }
 
@@ -134,11 +134,7 @@ impl Scene {
         Ok(plan)
     }
 
-    async fn confirm(
-        &self,
-        plan: &Value,
-        operation: &str,
-    ) -> Result<(u16, Value), Box<dyn Error>> {
+    async fn confirm(&self, plan: &Value, operation: &str) -> Result<(u16, Value), Box<dyn Error>> {
         let body = json!({
             "plan_id": plan["plan_id"], "plan_revision": plan["plan_revision"],
             "operation": operation,
@@ -202,7 +198,11 @@ impl Scene {
         if answer.0 != 200 {
             assert_eq!(answer.1["refusal"], "import_plan_unknown", "{}", answer.1);
         }
-        assert_eq!(self.held().await?, before, "a repeated confirmation changed state");
+        assert_eq!(
+            self.held().await?,
+            before,
+            "a repeated confirmation changed state"
+        );
         Ok(())
     }
 
@@ -275,10 +275,18 @@ async fn seat_import_status_survives_restart_and_upgrade() -> TestResult {
         .service
         .restart_adjusted(|config| config.operator_upgrade_file = Some(intent))
         .await?;
-    assert_eq!(scene.held().await?, held, "an upgrade handoff changed the import");
+    assert_eq!(
+        scene.held().await?,
+        held,
+        "an upgrade handoff changed the import"
+    );
     assert_eq!(scene.status().await?, completed);
     scene.confirmed_again(&plan, &confirming).await?;
-    assert_eq!(scene.seat_sessions().await?, Vec::<Value>::new(), "import started a seat");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        Vec::<Value>::new(),
+        "import started a seat"
+    );
     scene.table.close()
 }
 
@@ -291,7 +299,11 @@ async fn seat_import_survives_lifecycle() -> TestResult {
     let (_, _, completed) = scene.imported().await?;
     let answer = scene.start().await?;
     unqualified(&answer);
-    assert_eq!(scene.seat_sessions().await?, Vec::<Value>::new(), "a refused start started");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        Vec::<Value>::new(),
+        "a refused start started"
+    );
     assert_eq!(scene.status().await?, completed);
     scene.table.close()
 }
@@ -345,10 +357,18 @@ async fn survives(
     assert_eq!(sent.0, 200, "{}", sent.1);
 
     scene.attach_and_exit().await?;
-    assert_eq!(scene.seat_sessions().await?, sessions, "attach exit moved the seat");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        sessions,
+        "attach exit moved the seat"
+    );
 
     scene.table.service.restart().await?;
-    assert_eq!(scene.seat_sessions().await?, sessions, "service exit moved the seat");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        sessions,
+        "service exit moved the seat"
+    );
 
     let intent = scene.intent()?;
     scene
@@ -356,7 +376,11 @@ async fn survives(
         .service
         .restart_adjusted(|config| config.operator_upgrade_file = Some(intent))
         .await?;
-    assert_eq!(scene.seat_sessions().await?, sessions, "upgrade moved the seat");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        sessions,
+        "upgrade moved the seat"
+    );
 
     let again = scene
         .table
@@ -375,7 +399,11 @@ async fn survives(
         "{}",
         answer.1
     );
-    assert_eq!(scene.seat_sessions().await?, sessions, "the importer restarted the seat");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        sessions,
+        "the importer restarted the seat"
+    );
     scene.table.close()
 }
 
@@ -404,18 +432,41 @@ async fn seat_import_upgrade_failure_named() -> TestResult {
 
     let confirming = operation()?;
     let answer = scene.confirm(&plan, &confirming).await?;
-    assert_ne!(answer.0, 200, "confirmed across a pending upgrade: {}", answer.1);
-    assert_eq!(answer.1["refusal"], "import_upgrade_pending", "{}", answer.1);
+    assert_ne!(
+        answer.0, 200,
+        "confirmed across a pending upgrade: {}",
+        answer.1
+    );
+    assert_eq!(
+        answer.1["refusal"], "import_upgrade_pending",
+        "{}",
+        answer.1
+    );
     // The upgrade owner's intent is retained as written, and the import is
     // not complete: nothing of it is selected.
-    assert_eq!(std::fs::read(&intent)?, b"pending", "the import touched the upgrade intent");
+    assert_eq!(
+        std::fs::read(&intent)?,
+        b"pending",
+        "the import touched the upgrade intent"
+    );
     let path = format!("/seats/{SEAT}/import");
-    let (code, kept) = scene.table.service.get(&path, Some(&scene.table.ada)).await?;
+    let (code, kept) = scene
+        .table
+        .service
+        .get(&path, Some(&scene.table.ada))
+        .await?;
     assert_ne!(kept["state"], "completed", "{kept}");
     if code != 200 {
-        assert!(kept["refusal"].as_str().is_some(), "an unnamed status refusal: {kept}");
+        assert!(
+            kept["refusal"].as_str().is_some(),
+            "an unnamed status refusal: {kept}"
+        );
     }
-    assert_eq!(scene.seat_sessions().await?, sessions, "cleanup touched a seat");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        sessions,
+        "cleanup touched a seat"
+    );
 
     // The upgrade clears; the confirmation is sent and its reply discarded.
     std::fs::remove_file(&intent)?;
@@ -438,6 +489,10 @@ async fn seat_import_upgrade_failure_named() -> TestResult {
     let answer = scene.confirm(&plan, &confirming).await?;
     assert_eq!(answer.0, 200, "{}", answer.1);
     assert_eq!(scene.held().await?, held, "recovery imported twice");
-    assert_eq!(scene.seat_sessions().await?, sessions, "recovery started a seat");
+    assert_eq!(
+        scene.seat_sessions().await?,
+        sessions,
+        "recovery started a seat"
+    );
     scene.table.close()
 }

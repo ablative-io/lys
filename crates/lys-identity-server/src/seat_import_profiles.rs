@@ -51,8 +51,7 @@ pub(crate) const NO_MEMBER: &str =
 pub const UI_STATE: &str =
     "harness_ui_state: the harness's own interface or preference setting, not seat configuration";
 /// A setting the machine owns rather than the seat.
-pub const MACHINE_OWNED: &str =
-    "machine_owned: the machine's own setting, never a profile member";
+pub const MACHINE_OWNED: &str = "machine_owned: the machine's own setting, never a profile member";
 /// A setting whose role moves to Lys's own hooks, status line and delivery.
 pub const REPLACED_BY_LYS: &str =
     "replaced_by_lys: the monitor's role moves to Lys's own hooks, status line and delivery";

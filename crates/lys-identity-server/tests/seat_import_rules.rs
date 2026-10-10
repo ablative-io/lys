@@ -55,7 +55,13 @@ fn rule(id: &str, scope: &Value, status: &str, retired_at: Option<&str>, revisio
 fn seat_import_rules_inactive() {
     let rules = [
         rule("current", &json!("all"), "active", None, 3),
-        rule("retired", &json!(["waffles"]), "retired", Some("2030-02-01T00:00:00Z"), 5),
+        rule(
+            "retired",
+            &json!(["waffles"]),
+            "retired",
+            Some("2030-02-01T00:00:00Z"),
+            5,
+        ),
         rule("theirs", &json!(["gaia"]), "active", None, 1),
     ];
     let before = rules.clone();
@@ -109,11 +115,16 @@ fn a_rule_hit_count_is_not_its_revision() {
 #[test]
 fn a_secret_shaped_rule_member_refuses_without_its_value() {
     let mut leaky = rule("leaky", &json!("all"), "active", None, 2);
-    leaky["rewrite"] = json!({"command": format!("curl -H 'Authorization: Bearer {CANARY}'"), "api_key": CANARY});
+    leaky["rewrite"] =
+        json!({"command": format!("curl -H 'Authorization: Bearer {CANARY}'"), "api_key": CANARY});
     let mut message = rule("message", &json!("all"), "active", None, 2);
     message["message"] = json!(CANARY);
     let fragment = transfer_rules(&[leaky, message], "waffles");
-    let names: Vec<&str> = fragment.refusals.iter().map(|refused| refused.name.as_str()).collect();
+    let names: Vec<&str> = fragment
+        .refusals
+        .iter()
+        .map(|refused| refused.name.as_str())
+        .collect();
     assert_eq!(names, [CREDENTIAL_INLINE, CREDENTIAL_INLINE]);
     assert_eq!(fragment.refusals[0].member, "rule leaky.rewrite.api_key");
     assert_eq!(fragment.refusals[1].member, "rule message.message");
@@ -128,7 +139,11 @@ fn a_rule_without_its_revision_or_scope_is_refused_by_name() {
     unrevised["state_revision"] = Value::Null;
     let unscoped = rule("unscoped", &json!(7), "active", None, 1);
     let fragment = transfer_rules(&[unrevised, unscoped], "waffles");
-    let names: Vec<&str> = fragment.refusals.iter().map(|refused| refused.name.as_str()).collect();
+    let names: Vec<&str> = fragment
+        .refusals
+        .iter()
+        .map(|refused| refused.name.as_str())
+        .collect();
     assert_eq!(names, [MEMBER_UNSUPPORTED, MEMBER_UNSUPPORTED]);
     assert_eq!(fragment.refusals[1].member, "rule unscoped.scope");
     assert!(fragment.destinations.is_empty());

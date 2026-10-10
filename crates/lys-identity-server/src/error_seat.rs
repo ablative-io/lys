@@ -234,7 +234,10 @@ mod tests {
                 },
                 "runner_lys_taken",
             ),
-            (SeatError::AttachRefused { name: name() }, "seat_attach_refused"),
+            (
+                SeatError::AttachRefused { name: name() },
+                "seat_attach_refused",
+            ),
             (SeatError::TextEmpty { name: name() }, "seat_text_empty"),
             (
                 SeatError::TextControl {

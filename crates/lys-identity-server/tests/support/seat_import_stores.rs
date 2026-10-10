@@ -282,15 +282,22 @@ pub fn fragment(revision: &str, now: u64) -> Fragment {
 /// its revision: template, slot, variables, limits, schedule, profile.
 fn probes() -> Vec<DestinationEntry> {
     let fixture = fragment("probe", now()).destinations;
-    ["words_template", "words_slot", "variable", "budget_limits", "schedule", "profile_version"]
-        .iter()
-        .filter_map(|kind| {
-            fixture
-                .iter()
-                .find(|destination| destination.record_kind == *kind)
-                .cloned()
-        })
-        .collect()
+    [
+        "words_template",
+        "words_slot",
+        "variable",
+        "budget_limits",
+        "schedule",
+        "profile_version",
+    ]
+    .iter()
+    .filter_map(|kind| {
+        fixture
+            .iter()
+            .find(|destination| destination.record_kind == *kind)
+            .cloned()
+    })
+    .collect()
 }
 
 /// Where an apply is ended, as a process exit would end it.

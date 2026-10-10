@@ -80,13 +80,20 @@ impl Table {
         let adas_key = Arc::new(Ed25519Identity::load_or_generate(
             &service.dir.path().join("ada-agent.key"),
         )?);
-        for (agent, key, cookie) in [(&beas_agent, &beas_key, &bea), (&adas_agent, &adas_key, &ada)] {
+        for (agent, key, cookie) in [
+            (&beas_agent, &beas_key, &bea),
+            (&adas_agent, &adas_key, &ada),
+        ] {
             let issue = json!({
                 "operation": OperationId::generate()?.to_string(),
                 "request": STANDARD.encode(create_certificate_request(key, agent)?),
             });
             let (status, answer) = service
-                .post(&format!("/agents/{agent}/certificates"), Some(cookie), &issue)
+                .post(
+                    &format!("/agents/{agent}/certificates"),
+                    Some(cookie),
+                    &issue,
+                )
                 .await?;
             assert_eq!(status, 200, "{answer}");
         }
@@ -150,9 +157,11 @@ async fn a_patch_carries_the_revision_read_and_a_stale_one_is_refused() -> TestR
     assert_eq!(answer["values"]["focus"]["value"], "the door install");
     assert_eq!(answer["values"]["step"]["value"], 3);
     assert_eq!(answer["values"]["focus"]["revision"], 1);
-    assert!(answer["values"]["focus"]["author"]
-        .as_str()
-        .is_some_and(|author| author.starts_with("person-")));
+    assert!(
+        answer["values"]["focus"]["author"]
+            .as_str()
+            .is_some_and(|author| author.starts_with("person-"))
+    );
 
     let (status, answer) = table.patch(&table.bea, &table.beas_agent, &body).await?;
     assert_eq!(status, 409, "{answer}");
@@ -163,13 +172,19 @@ async fn a_patch_carries_the_revision_read_and_a_stale_one_is_refused() -> TestR
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["revision"], 2);
     assert!(answer["values"].get("step").is_none(), "{answer}");
-    assert_eq!(answer["values"]["focus"]["revision"], 1, "an omitted key is unchanged");
+    assert_eq!(
+        answer["values"]["focus"]["revision"], 1,
+        "an omitted key is unchanged"
+    );
     assert_eq!(answer["values"]["next"]["revision"], 2);
 
     let (status, read) = table.read(&table.bea, &table.beas_agent).await?;
     assert_eq!(status, 200, "{read}");
     assert_eq!(read["revision"], 2);
-    assert_eq!(read["scope"], json!({ "kind": "agent", "id": table.beas_agent }));
+    assert_eq!(
+        read["scope"],
+        json!({ "kind": "agent", "id": table.beas_agent })
+    );
     Ok(())
 }
 
@@ -198,9 +213,18 @@ async fn an_expired_key_reads_as_absent_and_is_named() -> TestResult {
 #[tokio::test]
 async fn a_malformed_name_or_an_empty_patch_is_refused_by_name() -> TestResult {
     let table = Table::set().await?;
-    for values in [json!({ "Focus": 1 }), json!({ "9lives": 1 }), json!({ "a-b": 1 }), json!({})] {
+    for values in [
+        json!({ "Focus": 1 }),
+        json!({ "9lives": 1 }),
+        json!({ "a-b": 1 }),
+        json!({}),
+    ] {
         let (status, answer) = table
-            .patch(&table.ada, &table.beas_agent, &json!({ "revision": 0, "values": values }))
+            .patch(
+                &table.ada,
+                &table.beas_agent,
+                &json!({ "revision": 0, "values": values }),
+            )
             .await?;
         assert_eq!(status, 400, "{answer}");
         assert_eq!(answer["refusal"], "variables_malformed", "{answer}");
@@ -218,14 +242,26 @@ async fn the_agent_patches_its_own_and_another_agent_is_refused_naming_the_grant
     let table = Table::set().await?;
     let body = json!({ "revision": 0, "values": { "focus": "mine" } });
     let (status, answer) = table
-        .signed_patch(&table.beas_agent, &table.beas_key, &table.beas_agent, 1, &body)
+        .signed_patch(
+            &table.beas_agent,
+            &table.beas_key,
+            &table.beas_agent,
+            1,
+            &body,
+        )
         .await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["values"]["focus"]["author"], table.beas_agent);
 
     let body = json!({ "revision": 1, "values": { "focus": "theirs" } });
     let (status, answer) = table
-        .signed_patch(&table.adas_agent, &table.adas_key, &table.beas_agent, 2, &body)
+        .signed_patch(
+            &table.adas_agent,
+            &table.adas_key,
+            &table.beas_agent,
+            2,
+            &body,
+        )
         .await?;
     assert_eq!(status, 403, "{answer}");
     assert_eq!(answer["refusal"], "not_permitted");
@@ -246,14 +282,15 @@ async fn the_agent_patches_its_own_and_another_agent_is_refused_naming_the_grant
 
     let (status, answer) = table
         .service
-        .get("/runtime/sessions/session-nobody/variables", Some(&table.ada))
+        .get(
+            "/runtime/sessions/session-nobody/variables",
+            Some(&table.ada),
+        )
         .await?;
     assert_eq!(status, 404, "{answer}");
     assert_eq!(answer["refusal"], "SessionUnknown");
 
-    let (status, answer) = table
-        .read(&table.ada, "agent-not-an-id")
-        .await?;
+    let (status, answer) = table.read(&table.ada, "agent-not-an-id").await?;
     assert_eq!(status, 404, "{answer}");
     assert_eq!(answer["refusal"], "AgentNotVisible");
     Ok(())
@@ -284,7 +321,11 @@ async fn a_runs_own_routes_take_its_pass_and_nothing_else() -> TestResult {
 
     let (status, answer) = table
         .service
-        .post_signed("/me/session/variables", ("lys-agent-pass", "short"), b"{}".to_vec())
+        .post_signed(
+            "/me/session/variables",
+            ("lys-agent-pass", "short"),
+            b"{}".to_vec(),
+        )
         .await?;
     assert_eq!(status, 401, "{answer}");
     assert_eq!(answer["refusal"], "AgentPassRefused");
