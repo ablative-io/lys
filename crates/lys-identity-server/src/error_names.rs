@@ -5,6 +5,7 @@ use lys_identity::grants::GrantError;
 
 use crate::apps_error::AppError;
 use crate::error::ServerError;
+use crate::error_agents::AgentsError;
 use crate::error_budget::BudgetError;
 use crate::error_team::TeamError;
 use crate::goals_types::GoalError;
@@ -19,7 +20,7 @@ impl ServerError {
 fn server(error: &ServerError) -> &str {
     match error {
         ServerError::Team(error) => team(error),
-        ServerError::Budget(error) => budget(error),
+        ServerError::Agents(error) => agents(error),
         ServerError::Call(error) => error.name(),
         ServerError::Provider(error) => error.name(),
         ServerError::GrantStream(error) => error.name(),
@@ -32,10 +33,6 @@ fn server(error: &ServerError) -> &str {
         ServerError::Identity(error) => identity(error),
         ServerError::Grant(error) => grant(error),
         ServerError::App(error) => app(error),
-        ServerError::Goal(error) => goal(error),
-        ServerError::Words(error) => error.name(),
-        ServerError::Variables(error) => error.name(),
-        ServerError::Schedules(error) => error.name(),
         ServerError::Inactive { .. } => "inactive",
         ServerError::NotSignedIn => "NotSignedIn",
         ServerError::NotAdmitted { .. } => "NotAdmitted",
@@ -144,8 +141,6 @@ fn server(error: &ServerError) -> &str {
         ServerError::NoLiveSession { .. } => "no_live_session",
         ServerError::RunnerAbsent { .. } => "runner_absent",
         ServerError::AuthorityUnavailable { .. } => "authority_unavailable",
-        ServerError::Seat(error) => error.name(),
-        ServerError::SeatImport(error) => error.name(),
     }
 }
 
@@ -317,5 +312,18 @@ fn budget(error: &BudgetError) -> &str {
         BudgetError::BudgetExhausted { .. } => "BudgetExhausted",
         BudgetError::BudgetVersionConflict { .. } => "BudgetVersionConflict",
         BudgetError::BudgetRefused { refusal, .. } => refusal,
+    }
+}
+
+/// The agents cluster's refusal names, each owner's own.
+fn agents(error: &AgentsError) -> String {
+    match error {
+        AgentsError::Budget(error) => budget(error).to_string(),
+        AgentsError::Goal(error) => goal(error).to_string(),
+        AgentsError::Words(error) => error.name().to_string(),
+        AgentsError::Variables(error) => error.name().to_string(),
+        AgentsError::Schedules(error) => error.name().to_string(),
+        AgentsError::Seat(error) => error.name().to_string(),
+        AgentsError::SeatImport(error) => error.name().to_string(),
     }
 }

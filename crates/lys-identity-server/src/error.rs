@@ -9,9 +9,9 @@ pub enum ServerError {
     /// A team refusal, preserving its status and response words.
     #[error(transparent)]
     Team(#[from] crate::error_team::TeamError),
-    /// A budget or organisation setting refusal, preserving its response.
+    /// The agents cluster's refusals (budgets, goals, words, variables, schedules, seats and seat imports), each keeping its own status and name; one variant so this file stays under the length gate.
     #[error(transparent)]
-    Budget(#[from] crate::error_budget::BudgetError),
+    Agents(#[from] crate::error_agents::AgentsError),
     /// A refusal of the calls routes.
     #[error(transparent)]
     Call(#[from] crate::error_call::CallError),
@@ -35,18 +35,6 @@ pub enum ServerError {
     /// An apps refusal: a registration, a schema, a kind or an app's credential.
     #[error(transparent)]
     App(#[from] crate::apps_error::AppError),
-    /// A goals refusal: an item, its judgement or its reminders.
-    #[error(transparent)]
-    Goal(#[from] crate::goals_state::GoalError),
-    /// A words refusal (AGENTS-001 R1): a slot, a layer, a template or a stale save.
-    #[error(transparent)]
-    Words(#[from] crate::words_state::WordsError),
-    /// A variables refusal (AGENTS-001 R2): a scope, a name or a stale patch.
-    #[error(transparent)]
-    Variables(#[from] crate::variables_state::VariablesError),
-    /// A schedules refusal (AGENTS-001 R4): a schedule, its change or its stop.
-    #[error(transparent)]
-    Schedules(#[from] crate::schedules_state::SchedulesError),
     /// The caller's directory identity is not Active for the requested act.
     #[error("inactive: {identity} is {state} and may not act")]
     Inactive {
@@ -747,10 +735,4 @@ pub enum ServerError {
         /// Why, in words.
         words: String,
     },
-    /// A seat's refusal (AGENTS-002), preserving its name and status.
-    #[error(transparent)]
-    Seat(#[from] crate::error_seat::SeatError),
-    /// A seat import's refusal (AGENTS-003), preserving its name and status.
-    #[error(transparent)]
-    SeatImport(#[from] crate::error_seat_import::SeatImportError),
 }

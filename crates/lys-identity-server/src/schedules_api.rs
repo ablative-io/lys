@@ -24,7 +24,6 @@ use crate::schedules_state::{Change, Changed, Item, Recipient, Schedule, Schedul
 use crate::schedules_store::{Deliver, Delivering, SchedulesKept, Undelivered, Worded};
 use crate::session::now;
 use crate::variables_api::session_agent;
-use crate::words_state::Slot;
 
 /// A schedule to set.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -310,7 +309,6 @@ impl Deliver for Live<'_> {
                 }
             }
         };
-        let _ = Slot::ScheduledReminder;
         Ok(worded)
     }
 

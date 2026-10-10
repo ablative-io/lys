@@ -9,10 +9,7 @@ title: Prompt words, variables, countdowns and schedules, held in Lys and render
 
 > **Cluster:** agents
 > **Depends on:** DIRECTORY-051, DIRECTORY-064
-> **Design anchor:**
-> - ADR-118 — Lys owns running and monitoring its agents and enforcing values; Argus reads data for analytics — Lys owns everything about running and monitoring an agent it starts: installing its hooks/status line, reading its session stream and recording tokens, context and time. Lys holds budgets, goals, expectations and deliverables and enforces them through its runner with notices, compaction requests or stops as the value says. The context-watch notices previously driven by Argus become Lys-driven acts. Lys exposes the resulting data for Argus, which keeps analytics and visualisation; Lys does not depend on it. Lys screens are plain controls/state plus the authoritative tool-policy and grant refused-acts list on each agent page. Context compaction, goals and reminders are Lys-owned background acts. Argus may read explicitly permitted Lys variables alongside its data stream; no secret or arbitrary environment export follows from this. DIRECTORY-051 creates the missing tool-boundary policy and its browser editor. It does not claim an OS sandbox. The runner proves socket peer identity in peer.rs and makes grantable decisions against the live grant authority, denying uncertainty. Codex pre-tool refusal coverage is explicitly unavailable. OS process containment is the separate card11VnzLRp.
-> - ADR-130 — Managed harness channels carry automatic context and reminder acts — 064 adds one runner-owned typed control/event channel per managed Claude or Codex session. It reuses 051 operation and usage owners, serialises all inputs at proved boundaries, requires actual harness evidence and retains uncertain outcomes without automatic resend. Legacy PTY sessions remain manual and cannot claim this capability. 065 extends the same Codex event reader for refusal coverage.
-> - ADR-137 — Argus's remaining functions move into Lys as data beside goals, and a seat is a Lys record launched by the runner through the proxy; no shared library — Words (five slots, four layers, templates), variables (per agent and session, revision, author, expiry), schedules and seats are identity-server records in Lys's log, rendered and acted on at delivery through DIRECTORY-064's dispatcher with the contributing revisions in the receipt. No shared library: Lodestone is a read-only query engine over a store and holds nothing; haematite is the store under Lys already; a library would be a second place for the same data. Seat start, stop and restart are deliberate acts under Lys rights (ADR-136). Argus's alarms, rules, launches and queue are not moved into Lys: they become liminal services and aion work (ADR-136 section 3). A seat moves off herdr and Argus one at a time, Waffles's first.
+> **Design anchor:** ADR-118, ADR-130, ADR-137
 > **Checklist:**
 > - C701 — The five message slots (context warning, preparation, compaction, wake-up, scheduled reminder) resolve built-in, then workspace, then agent, then session, with named templates; an empty layer inherits (AGENTS-001 R1).
 > - C702 — An agent's and a session's variables are JSON values with a revision, an author and an optional expiry; a stale revision is refused by name; the agent reads and sets its own through lys and the Lys MCP server (AGENTS-001 R2).
@@ -140,14 +137,6 @@ Behavioural. THE SYSTEM SHALL extend DIRECTORY-051's Usage screen in place with 
 **Stories:**
 - S402 (Tom, owner) — As the owner, I want to set a seat's words, variables, countdowns and schedules in one place and see what was actually delivered, so that overnight work runs without a second system.
 
-## Amendment 1 (Waffles, 10 October 2026, written whole under Tom's word to write everything and build once)
-
-- One fold-and-snapshot engine carries the three record kinds: `crates/lys-identity-server/src/agents_log.rs` (the goals store's engine with the fold made a trait, `Folded`, and the lock `Kept<F>`), so the words, variables and schedules stores are thin over it instead of three copies of the snapshot and settle logic. Their schemas are registered in `crates/lys-identity-server/src/openapi_agents_types.rs`.
-- The words resolve into the acts that type them (R3): `budgets_act.rs` asks the context warning and the compaction slot before a budget act (a slot nobody set keeps the crossing's own words and the profile's command); `runner_api.rs` asks the wake-up slot on a wake; `goals_store.rs` gains `revision()` so a rendering names the goals revision it read.
-- A run reads and patches its own variables by its run pass (DIRECTORY-077 R2) on `/me/variables` and `/me/session/variables`, with `agent_pass::run_session`; `lys variables get|set` reads the pass from the launch's `mcp.json` or the Codex variables and never prints it. The runner presents nothing: DIRECTORY-060 R3's present_client was not built, and the pass already reaches the seat's own configuration.
-- The three directories (`words_dir`, `variables_dir`, `schedules_dir`) are named by the install's rendered configuration (`crates/lys/src/identity/install/server_config.rs`) and the test harness (`tests/identity_contract/src/harness.rs`, `template_stores.rs`); `grant_settlement_tests.rs` carries the three fields of `AppState`.
-- Nothing here has been compiled or tested: the one Lys battery of 10 October is its first build, by Tom's rule of 9 October.
-
 ## Boundaries
 
 - No delivery path of its own: every send is a DIRECTORY-064 operation with its receipt.
@@ -160,3 +149,12 @@ Behavioural. THE SYSTEM SHALL extend DIRECTORY-051's Usage screen in place with 
 - This handwritten brief passes scripts/design/gate.sh, judged by its parsed failures, never by its exit code.
 - Written whole, read whole by the lead; the whole gate at the sha; then the one battery and install on Tom's Mac; the lead walks the Usage screen with pictures.
 - Four-heading handback with the hospital sentence; no test proves less; cargo nextest only; clippy pedantic -D warnings; file length 500.
+
+## Amendments
+
+### Amendment 1: Files outside the R1 to R5 lists, the acts that type the words, the run's own variables, and that nothing was compiled
+
+- **Date:** 2026-10-10
+- **By:** Waffles, written whole under Tom's word of 10 October to write everything and build once
+
+One fold-and-snapshot engine carries the three record kinds: crates/lys-identity-server/src/agents_log.rs (the goals store's engine with the fold made a trait, Folded, and the lock Kept), so the words, variables and schedules stores are thin over it; their schemas are registered in openapi_agents_types.rs. The words resolve into the acts that type them (R3): budgets_act.rs asks the context warning and the compaction slot before a budget act (a slot nobody set keeps the crossing's own words and the profile's command); runner_api.rs asks the wake-up slot on a wake through runner_words.rs; goals_store.rs gains revision() so a rendering names the goals revision it read. A run reads and patches its own variables by its run pass (DIRECTORY-077 R2) on /me/variables and /me/session/variables through agent_pass::run_session; lys variables get|set reads the pass from the launch's mcp.json or the Codex variables and never prints it; the runner presents nothing, DIRECTORY-060 R3's present_client was not built. The three directories (words_dir, variables_dir, schedules_dir) are named by the install's rendered configuration and the test harness; grant_settlement_tests.rs carries the three fields of AppState. Nothing was compiled before the one Lys battery of 10 October, by Tom's rule of 9 October.

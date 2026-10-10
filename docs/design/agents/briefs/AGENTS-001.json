@@ -174,5 +174,13 @@
     "This handwritten brief passes scripts/design/gate.sh, judged by its parsed failures, never by its exit code.",
     "Written whole, read whole by the lead; the whole gate at the sha; then the one battery and install on Tom's Mac; the lead walks the Usage screen with pictures.",
     "Four-heading handback with the hospital sentence; no test proves less; cargo nextest only; clippy pedantic -D warnings; file length 500."
+  ],
+  "amendments": [
+    {
+      "date": "2026-10-10",
+      "by": "Waffles, written whole under Tom's word of 10 October to write everything and build once",
+      "subject": "Files outside the R1 to R5 lists, the acts that type the words, the run's own variables, and that nothing was compiled",
+      "ruling": "One fold-and-snapshot engine carries the three record kinds: crates/lys-identity-server/src/agents_log.rs (the goals store's engine with the fold made a trait, Folded, and the lock Kept), so the words, variables and schedules stores are thin over it; their schemas are registered in openapi_agents_types.rs. The words resolve into the acts that type them (R3): budgets_act.rs asks the context warning and the compaction slot before a budget act (a slot nobody set keeps the crossing's own words and the profile's command); runner_api.rs asks the wake-up slot on a wake through runner_words.rs; goals_store.rs gains revision() so a rendering names the goals revision it read. A run reads and patches its own variables by its run pass (DIRECTORY-077 R2) on /me/variables and /me/session/variables through agent_pass::run_session; lys variables get|set reads the pass from the launch's mcp.json or the Codex variables and never prints it; the runner presents nothing, DIRECTORY-060 R3's present_client was not built. The three directories (words_dir, variables_dir, schedules_dir) are named by the install's rendered configuration and the test harness; grant_settlement_tests.rs carries the three fields of AppState. Nothing was compiled before the one Lys battery of 10 October, by Tom's rule of 9 October."
+    }
   ]
 }

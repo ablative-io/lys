@@ -261,12 +261,8 @@ impl ServerError {
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
             Self::App(error) => error.status(),
-            Self::Goal(error) => error.status(),
-            Self::Words(error) => error.status(),
-            Self::Variables(error) => error.status(),
-            Self::Schedules(error) => error.status(),
             Self::Team(error) => error.status(),
-            Self::Budget(error) => error.status(),
+            Self::Agents(error) => error.status(),
             Self::Call(error) => error.status(),
             Self::Provider(error) => error.status(),
             Self::GrantStream(error) => error.status(),
@@ -275,8 +271,6 @@ impl ServerError {
             Self::Cord(error) => error.status(),
             Self::Canvas(error) => error.status(),
             Self::ProductDraft(error) => error.status(),
-            Self::Seat(error) => error.status(),
-            Self::SeatImport(error) => error.status(),
         }
     }
 }

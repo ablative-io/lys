@@ -49,7 +49,7 @@ pub struct BudgetStore<S: LeafStore = FileLeafStore> {
 type Opened<S> = (FrontierLog<S>, Held, Start);
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
-    ServerError::Budget(BudgetError::BudgetsUnavailable {
+    ServerError::from(BudgetError::BudgetsUnavailable {
         reason: what.to_string(),
     })
 }
@@ -272,7 +272,7 @@ impl<S: LeafStore> BudgetStore<S> {
             .limit_set(&limits.holder)
             .map_or(0, |limits| limits.version);
         if held != expected {
-            return Err(ServerError::Budget(BudgetError::BudgetVersionConflict {
+            return Err(ServerError::from(BudgetError::BudgetVersionConflict {
                 held,
                 expected,
             }));
@@ -283,7 +283,7 @@ impl<S: LeafStore> BudgetStore<S> {
         let limits = crate::budgets_limits::Limits { version, ..limits }
             .checked()
             .map_err(|refused| {
-                ServerError::Budget(BudgetError::BudgetRefused {
+                ServerError::from(BudgetError::BudgetRefused {
                     refusal: refused.refusal,
                     words: refused.words,
                 })
@@ -304,7 +304,7 @@ impl<S: LeafStore> BudgetStore<S> {
             .budget(&budget.holder, budget.measure)
             .map_or(0, |held| held.version);
         if held != expected {
-            return Err(ServerError::Budget(BudgetError::BudgetVersionConflict {
+            return Err(ServerError::from(BudgetError::BudgetVersionConflict {
                 held,
                 expected,
             }));

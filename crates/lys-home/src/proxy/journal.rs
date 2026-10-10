@@ -608,7 +608,10 @@ pub fn recover(
             },
             call,
         };
-        let report = record(home, journal, &mut job);
+        // A lost call is recorded on its own: no session is kept open across
+        // it, so its sessions table lives and dies with this one record.
+        let mut sessions = super::persist::OpenSessions::default();
+        let report = record(home, journal, &mut sessions, &mut job);
         if let Some(reason) = &report.held {
             return Err(ProxyError::io(
                 "recording a lost call",

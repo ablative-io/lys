@@ -260,7 +260,7 @@ impl TreeState {
             self.at_ms,
             None,
         )
-        .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))?;
+        .map_err(|reason| ServerError::from(BudgetError::BudgetsUnavailable { reason }))?;
         if used.figure.is_some()
             && !self.budgets.uses.iter().any(|usage| {
                 agents.contains(&usage.agent)

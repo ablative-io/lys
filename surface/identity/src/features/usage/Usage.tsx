@@ -25,9 +25,9 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
     budgets: request<BudgetsView>('/budgets/agent/' + path),
     usage: request<UsageView>('/agents/' + path + '/usage'),
     goals: request<GoalsView>('/agents/' + path + '/goals'),
-    words: request<WordsForAgent>('/agents/' + path + '/words'),
-    variables: request<VariablesRead>('/agents/' + path + '/variables'),
-    schedules: request<SchedulesView>('/schedules'),
+    words: panel(request<WordsForAgent>('/agents/' + path + '/words')),
+    variables: panel(request<VariablesRead>('/agents/' + path + '/variables')),
+    schedules: panel(request<SchedulesView>('/schedules')),
   }), 'usage:' + agent + ':' + revision);
   const changed = (words: string) => { setNotice(words); setRevision((value) => value + 1); };
   return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals, words, variables, schedules }) => {
@@ -38,11 +38,18 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
-      <Words agent={agent} words={words} changed={changed} />
-      <Variables agent={agent} variables={variables} changed={changed} />
-      <Schedules agent={agent} schedules={schedules.schedules} changed={changed} />
+      {'held' in words ? <Words agent={agent} words={words.held} changed={changed} /> : <p className="dim" role="status">The words could not be read: {words.refused}</p>}
+      {'held' in variables ? <Variables agent={agent} variables={variables.held} changed={changed} /> : <p className="dim" role="status">The variables could not be read: {variables.refused}</p>}
+      {'held' in schedules ? <Schedules agent={agent} schedules={schedules.held.schedules} changed={changed} /> : <p className="dim" role="status">The schedules could not be read: {schedules.refused}</p>}
     </>;
   }} /></>;
+}
+
+/** One of the three AGENTS-001 panels: what it read, or why it could not, so a service without that owner still shows the budgets and goals. */
+type Panel<T> = { held: T } | { refused: string };
+
+function panel<T>(read: Promise<T>): Promise<Panel<T>> {
+  return read.then((held) => ({ held }), (error: unknown) => ({ refused: error instanceof Error ? error.message : String(error) }));
 }
 
 /** A team's limits and goals: the same two tables as an agent's. A team's use is read with its limits. */

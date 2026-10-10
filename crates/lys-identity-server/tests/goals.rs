@@ -28,6 +28,7 @@ use lys_identity::OperationId;
 use lys_identity_server::agent_signature::{HEADER, payload};
 use lys_identity_server::dev_seed::seed_configured;
 use lys_identity_server::error::ServerError;
+use lys_identity_server::error_agents::AgentsError;
 use lys_identity_server::goals_state::{
     Delivery, Event, Evented, EvidenceKind, Goal, GoalError, Holder, HolderKind, Kind, Marked,
     Remind, Standing,
@@ -237,7 +238,7 @@ async fn marking_a_goal_met_cancels_its_pending_reminders() -> TestResult {
     assert!(self::item(&goals, "op-g1")?.fired.is_empty());
     let again = goals.with(|store| store.mark(marked("op-m2", "op-g1", Standing::Dropped, None)));
     assert!(
-        matches!(again, Err(ServerError::Goal(GoalError::Closed { .. }))),
+        matches!(again, Err(ServerError::Agents(AgentsError::Goal(GoalError::Closed { .. })))),
         "{again:?}"
     );
     Ok(())
@@ -253,7 +254,7 @@ fn a_deliverable_without_named_evidence_is_refused() -> TestResult {
     assert!(
         matches!(
             refused,
-            Err(ServerError::Goal(GoalError::EvidenceMissing { .. }))
+            Err(ServerError::Agents(AgentsError::Goal(GoalError::EvidenceMissing { .. })))
         ),
         "{refused:?}"
     );
@@ -262,7 +263,7 @@ fn a_deliverable_without_named_evidence_is_refused() -> TestResult {
     assert!(
         matches!(
             claimless,
-            Err(ServerError::Goal(GoalError::EvidenceMissing { .. }))
+            Err(ServerError::Agents(AgentsError::Goal(GoalError::EvidenceMissing { .. })))
         ),
         "{claimless:?}"
     );
@@ -444,7 +445,7 @@ async fn a_restart_reads_only_the_leaves_after_the_snapshot() -> TestResult {
         })
     });
     assert!(
-        matches!(reused, Err(ServerError::Goal(GoalError::Reused { .. }))),
+        matches!(reused, Err(ServerError::Agents(AgentsError::Goal(GoalError::Reused { .. })))),
         "{reused:?}"
     );
     Ok(())

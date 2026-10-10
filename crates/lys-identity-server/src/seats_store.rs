@@ -273,6 +273,7 @@ mod tests {
 
     use super::SeatStore;
     use crate::error::ServerError;
+    use crate::error_agents::AgentsError;
     use crate::error_seat::SeatError;
     use crate::seats_state::{Added, Line, Started};
 
@@ -304,11 +305,11 @@ mod tests {
         );
         assert!(matches!(
             store.keep(added("op-a", "other")),
-            Err(ServerError::Seat(SeatError::OperationReused { .. }))
+            Err(ServerError::Agents(AgentsError::Seat(SeatError::OperationReused { .. })))
         ));
         assert!(matches!(
             store.keep(added("op-b", "waffles")),
-            Err(ServerError::Seat(SeatError::NameTaken { .. }))
+            Err(ServerError::Agents(AgentsError::Seat(SeatError::NameTaken { .. })))
         ));
         store.keep(Line::Started(Started {
             operation: "op-c".to_owned(),
@@ -326,7 +327,7 @@ mod tests {
         assert_eq!(reopened.len(), 1);
         assert!(matches!(
             reopened.named("absent"),
-            Err(ServerError::Seat(SeatError::Unknown { .. }))
+            Err(ServerError::Agents(AgentsError::Seat(SeatError::Unknown { .. })))
         ));
         Ok(())
     }
