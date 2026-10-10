@@ -55,6 +55,17 @@ impl Sessions {
         }
     }
 
+    /// The program owners are started as, said once; an install says its
+    /// `lys`, a test its fixture. Unsaid, owners run this runner's own
+    /// executable.
+    pub fn set_owner_program(&self, program: std::path::PathBuf) {
+        if self.owner_program.set(program).is_err() {
+            crate::error::said(
+                "seat_owner_program_repeated: the owner program was said twice; the first stands",
+            );
+        }
+    }
+
     /// Makes this runner the owner `state` describes; said once.
     ///
     /// # Errors
@@ -201,12 +212,15 @@ impl Sessions {
                     format!("writing {}: {error}", key_path.display()),
                 )
             })?;
-        let lys = std::env::current_exe().map_err(|error| {
-            refused(
-                "seat_owner_start_failed",
-                format!("this runner's own executable is unknown: {error}"),
-            )
-        })?;
+        let lys = match self.owner_program.get() {
+            Some(program) => program.clone(),
+            None => std::env::current_exe().map_err(|error| {
+                refused(
+                    "seat_owner_start_failed",
+                    format!("this runner's own executable is unknown: {error}"),
+                )
+            })?,
+        };
         let plan = OwnerPlan::new(binding.clone(), managed, responsible);
         let endpoint = spawn::start(
             &OwnerSpawn {

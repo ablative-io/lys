@@ -365,3 +365,52 @@ fn seat_cost_counts_complete_transition() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn seat_owner_idle_is_event_driven() -> TestResult {
+    use lys_runner::seat_owner::counts::Meter;
+    use lys_runner::seat_owner::spawn::wait_ready;
+    use std::io::{BufReader, Write};
+
+    // The runner's wait for an owner is a blocking read on a pipe. With the
+    // ready signal held closed, no counter moves; releasing it does exactly
+    // one read. No sleep, watchdog or timeout stands in for the signal.
+    let (reader, mut writer) = std::io::pipe()?;
+    let meter = Arc::new(Meter::default());
+    let (done, waited) = std::sync::mpsc::channel();
+    let counted = Arc::clone(&meter);
+    let waiter = std::thread::spawn(move || {
+        let result = wait_ready(&mut BufReader::new(reader), &counted);
+        done.send(()).expect("the test is waiting");
+        result
+    });
+    assert_eq!(
+        meter.snapshot(),
+        Work::default(),
+        "nothing moves while the signal is held"
+    );
+    assert!(
+        waited.try_recv().is_err(),
+        "the waiter has not returned without its signal"
+    );
+    let own = Leader {
+        pid: std::process::id(),
+        start: StartIdentity("macos:1.000001".to_owned()),
+    };
+    let line = lys_runner::seat_owner::protocol::ready_line(
+        "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f",
+        std::path::Path::new("/tmp/owner.sock"),
+        &own,
+    );
+    writeln!(writer, "{line}")?;
+    waited.recv()?;
+    let (runner, socket, announced) = waiter.join().map_err(|_| "the waiter panicked")??;
+    assert_eq!(runner, "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f");
+    assert_eq!(socket, std::path::PathBuf::from("/tmp/owner.sock"));
+    assert_eq!(announced, own);
+    let work = meter.snapshot();
+    assert_eq!(work.calls, 1, "exactly the declared work: one read");
+    assert_eq!(work.wakes, 0, "no wake without a signal");
+    assert_eq!(work.bytes_copied, u64::try_from(line.len() + 1)?);
+    Ok(())
+}

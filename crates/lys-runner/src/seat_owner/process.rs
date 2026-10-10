@@ -37,6 +37,26 @@ pub struct OwnerState {
 }
 
 impl OwnerState {
+    /// The state of an owner that is the process `own`, serving `binding`
+    /// as runner `runner` on `socket`, over its established `store`.
+    #[must_use]
+    pub fn new(
+        store: OwnerStore,
+        binding: OwnerBinding,
+        own: Leader,
+        runner: String,
+        socket: PathBuf,
+    ) -> Self {
+        Self {
+            store: Mutex::new(store),
+            binding,
+            own,
+            runner,
+            socket,
+            meter: Arc::new(Meter::default()),
+        }
+    }
+
     /// The owner's binding.
     #[must_use]
     pub fn binding(&self) -> &OwnerBinding {
@@ -192,14 +212,13 @@ pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
     })?;
     let sessions = Arc::clone(runner.sessions());
     let runner_id = sessions.runner().to_owned();
-    let state = Arc::new(OwnerState {
-        store: Mutex::new(store),
-        binding: plan.binding.clone(),
-        own: own.clone(),
-        runner: runner_id.clone(),
-        socket: socket.clone(),
-        meter: Arc::new(Meter::default()),
-    });
+    let state = Arc::new(OwnerState::new(
+        store,
+        plan.binding.clone(),
+        own.clone(),
+        runner_id.clone(),
+        socket.clone(),
+    ));
     sessions.adopt_owner(Arc::clone(&state))?;
     sessions.start_managed(plan.managed.clone(), None, plan.responsible.clone())?;
     let harness = sessions.leader_of(&plan.binding.session)?;

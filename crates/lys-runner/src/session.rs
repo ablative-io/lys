@@ -240,6 +240,9 @@ pub struct Sessions {
     pub(crate) owner_state: std::sync::OnceLock<Arc<crate::seat_owner::process::OwnerState>>,
     /// The seats this runner started owners for, indexed by session.
     pub(crate) owned: Mutex<BTreeMap<String, crate::seat_owner::sessions::OwnedSeat>>,
+    /// The program owners run as, when said; this runner's own executable
+    /// otherwise.
+    pub(crate) owner_program: std::sync::OnceLock<PathBuf>,
     pub(crate) scrollback: usize,
     pub(crate) writer: crate::durable::Writer,
     #[cfg(test)]
@@ -361,6 +364,7 @@ impl Sessions {
                 server_key: std::sync::OnceLock::new(),
                 owner_state: std::sync::OnceLock::new(),
                 owned: Mutex::new(BTreeMap::new()),
+                owner_program: std::sync::OnceLock::new(),
                 scrollback,
                 writer,
                 #[cfg(test)]
