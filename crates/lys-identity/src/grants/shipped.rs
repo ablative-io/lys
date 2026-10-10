@@ -8,7 +8,7 @@
 //! only adds.
 
 /// The shipped model's version. Raise it whenever [`ACTIONS`] gains one.
-pub const SHIPPED_VERSION: u64 = 4;
+pub const SHIPPED_VERSION: u64 = 5;
 
 /// The acts the first model named, kept so every grant made under it
 /// still resolves.
@@ -78,6 +78,7 @@ pub const ACTIONS: &[&str] = &[
     "runtime-session.keys",
     "runtime-session.resize",
     "runtime.stop-everything",
+    "seat.import",
     "seat.restart",
     "seat.send",
     "seat.start",
@@ -140,6 +141,7 @@ pub const WITHHELD_FROM_AGENTS: &[&str] = &[
     "service-account.create",
     "service-account.retire",
     "team.budget.set",
+    "seat.import",
 ];
 
 /// The acts an agent may hold, each decided: with [`WITHHELD_FROM_AGENTS`]
@@ -340,6 +342,7 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
     ("team.parent.set", "Choose this team’s parent"),
     ("team.retire", "Retire this team"),
     ("write", "Write to this resource"),
+    ("seat.import", "Import configuration into this seat"),
 ];
 
 /// The prefix of the relation that carries one action alone.

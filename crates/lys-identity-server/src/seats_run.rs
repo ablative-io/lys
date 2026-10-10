@@ -5,8 +5,10 @@
 //! A start goes through the server's own start path, the one the start
 //! command takes, from the seat's exact profile version, and only when that
 //! version's session requires controls, so the runner starts it managed. A
-//! seat whose agent has no responsible person is not started, nor one Argus
-//! still lists online. A stop is refused while the harness reports a turn
+//! seat whose agent has no responsible person is not started, nor one whose
+//! latest import is in progress or stopped (`import_incomplete`, refused
+//! before anything is stopped or started), nor one the monitor still lists
+//! online. A stop is refused while the harness reports a turn
 //! in progress unless force is named; between turns a managed session is
 //! asked to end through the harness's own end request, and the runner then
 //! ends its process. A restart is a stop and then a start, under a new
@@ -121,6 +123,7 @@ pub(crate) async fn restart(
     OperationId::from_str(&given.operation)?;
     let held = seat(&state, &name)?;
     let (admission, standing) = admitted(&state, &headers, &held, RESTART, &uri.to_string())?;
+    state.seat_imports.require_selectable(&held.added.name)?;
     let mut notes = Vec::new();
     let stopped = if held.running {
         let ended = Box::pin(end(
@@ -179,6 +182,7 @@ async fn begin(
         }
         .into());
     }
+    state.seat_imports.require_selectable(&name)?;
     if let (true, Some(session)) = (held.running, &held.session)
         && session != operation
         && live_session(state, &held.added.machine, session)
@@ -205,7 +209,7 @@ async fn begin(
         }
         .into());
     }
-    let mut notes = vec![crate::seats_argus::check(&name).await?];
+    let mut notes = vec![crate::seats_monitor::check(&name).await?];
     let chosen = Chosen {
         profile: Some(version),
         directory: held.added.working_folder.clone(),

@@ -304,9 +304,27 @@ pub mod error_seat;
 pub mod seats_acts;
 pub mod seat_supervision;
 pub mod seats_api;
-mod seats_argus;
+mod seats_monitor;
 mod seats_run;
 mod seats_send;
 pub mod seats_state;
 pub mod seats_store;
 pub mod seats_views;
+
+/// Importing one seat's existing configuration (AGENTS-003): its manifest,
+/// readers, plan, rights, journal, apply, routes and refusals.
+pub mod error_seat_import;
+pub mod seat_import_api;
+pub mod seat_import_apply;
+pub mod seat_import_monitor;
+pub mod seat_import_plan;
+pub mod seat_import_profiles;
+pub mod seat_import_references;
+pub mod seat_import_rights;
+pub mod seat_import_rules;
+pub mod seat_import_schedules;
+pub mod seat_import_sources;
+pub mod seat_import_state;
+pub mod seat_import_store;
+mod seat_import_monitor_maps;
+pub mod seat_import_changes;

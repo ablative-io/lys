@@ -163,17 +163,17 @@ mod tests {
         tracing::subscriber::with_default(WarnLines::new(say), || {
             tracing::warn!(
                 target: "lys_identity_server::apps_client_credentials",
-                app = "haematite",
+                app = "studio",
                 "a credential could not be ended at the broker"
             );
-            tracing::info!(app = "haematite", "said nowhere");
-            tracing::debug!(app = "haematite", "said nowhere");
+            tracing::info!(app = "studio", "said nowhere");
+            tracing::debug!(app = "studio", "said nowhere");
         });
         let lines = heard.lock().map_err(|poisoned| poisoned.to_string())?;
         assert_eq!(
             *lines,
             vec![
-                "WARN lys_identity_server::apps_client_credentials: a credential could not be ended at the broker app=haematite"
+                "WARN lys_identity_server::apps_client_credentials: a credential could not be ended at the broker app=studio"
                     .to_owned()
             ]
         );

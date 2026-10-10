@@ -145,6 +145,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::RunnerAbsent { .. } => "runner_absent",
         ServerError::AuthorityUnavailable { .. } => "authority_unavailable",
         ServerError::Seat(error) => error.name(),
+        ServerError::SeatImport(error) => error.name(),
     }
 }
 

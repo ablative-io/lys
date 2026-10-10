@@ -636,6 +636,12 @@ pub enum SeatCommand {
         #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
         text: Vec<String>,
     },
+
+    /// Import one seat's existing configuration by a confirmed,
+    /// restartable plan: a dry run that changes nothing, then the person's
+    /// confirmation of that exact plan. Importing never starts, stops or
+    /// restarts a seat.
+    Import(SeatImportArgs),
 }
 
 /// `lys attach`: the seat or session to show, and how.
@@ -662,6 +668,52 @@ pub struct AttachArgs {
     /// and is sent only to a numeric loopback address.
     #[arg(long, value_name = "BASE")]
     pub server: Option<String>,
+}
+
+/// `lys seat import`: what to do.
+#[derive(Debug, clap::Args)]
+pub struct SeatImportArgs {
+    /// What to do.
+    #[command(subcommand)]
+    pub command: SeatImportCommand,
+}
+
+/// `lys seat import` subcommands, each of one seat.
+#[derive(Debug, Subcommand)]
+pub enum SeatImportCommand {
+    /// Read the seat's declared sources at one instant and show the whole
+    /// plan: its sources and revisions, every record it writes, credential
+    /// references, replacements, schedule counts, exclusions,
+    /// prerequisites and refusals. Nothing is sent, started or changed.
+    DryRun {
+        /// The seat.
+        name: String,
+
+        /// The JSON manifest naming the seat's sources.
+        #[arg(long, value_name = "PATH")]
+        manifest: PathBuf,
+    },
+
+    /// Confirm the exact plan a dry run showed, as the person responsible,
+    /// and apply it under one operation that resumes after a stop.
+    Confirm {
+        /// The seat.
+        name: String,
+
+        /// The plan id the dry run showed.
+        #[arg(long, value_name = "ID")]
+        plan: String,
+
+        /// The plan revision the dry run showed.
+        #[arg(long, value_name = "REVISION")]
+        revision: String,
+    },
+
+    /// Show every import of the seat and the one selected.
+    Status {
+        /// The seat.
+        name: String,
+    },
 }
 
 #[cfg(test)]

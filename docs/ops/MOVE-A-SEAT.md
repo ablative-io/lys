@@ -17,8 +17,10 @@ whose runner is this install's own (kind `lys`). Every value comes from your own
   never prints it).
 - Argus is still running, so the old state can be checked against the new state. Its base is in `ARGUS_URL`
   (`http://127.0.0.1:4100` on this estate). The identity server makes its own check, refusing a start with
-  `seat_online_in_argus`, at the base its `LYS_ARGUS_URL` names (and `LYS_ARGUS_SECRET`, when Argus wants one): set
-  it to the same base in the service's environment, or the check is skipped and the start says Argus was not read.
+  `seat_online_in_monitor`, at the base its `LYS_MONITOR_URL` names: set it to the same base in the service's
+  environment, or the check is skipped and the start says the monitor was not asked. When Argus wants its collector
+  secret, set `LYS_MONITOR_SECRET` to it and `LYS_MONITOR_SECRET_HEADER` to the header Argus reads it from; a secret
+  set with no header name refuses the start `ConfigInvalid`, and no header name is assumed.
 - You know the seat's herdr pane and its Argus session id:
 
   ```sh
@@ -55,7 +57,7 @@ whose runner is this install's own (kind `lys`). Every value comes from your own
    lys seat start <seat>
    ```
 
-   must be refused with `seat_online_in_argus`, naming `<seat>`. This is the guard that stops a seat from being
+   must be refused with `seat_online_in_monitor`, naming `<seat>`. This is the guard that stops a seat from being
    watched twice. If Argus cannot be reached, the start says so and does not block. In that case, check
    `online` by hand with the `curl` command above before going on.
 
@@ -94,7 +96,7 @@ whose runner is this install's own (kind `lys`). Every value comes from your own
    the harness session id as `<session-uuid>`. `lys seat list` shows `<seat>` as `online-idle` or `online-working`,
    with its last signal time. The Sessions screen in Lys shows the same: under **Operations**, the **Seats** table is on the page when nothing is running, and in the **Agents** panel otherwise.
 
-   If Lys refuses the start, the refusal is named; `seat_online_in_argus` means step 4 or 5 has not finished.
+   If Lys refuses the start, the refusal is named; `seat_online_in_monitor` means step 4 or 5 has not finished.
 
 7. **Send the seat a message from the screen and from the CLI.** Then read both messages back in the seat's
    transcript.

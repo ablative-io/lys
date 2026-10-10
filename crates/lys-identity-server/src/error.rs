@@ -750,4 +750,7 @@ pub enum ServerError {
     /// A seat's refusal (AGENTS-002), preserving its name and status.
     #[error(transparent)]
     Seat(#[from] crate::error_seat::SeatError),
+    /// A seat import's refusal (AGENTS-003), preserving its name and status.
+    #[error(transparent)]
+    SeatImport(#[from] crate::error_seat_import::SeatImportError),
 }

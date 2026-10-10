@@ -82,15 +82,15 @@ pub enum SeatError {
         /// Its session.
         session: String,
     },
-    /// Argus's registry still lists the seat's name online.
+    /// The monitor's registry still lists the seat's name online.
     #[error(
-        "seat_online_in_argus: Argus at {argus} lists seat `{name}` online: stop it there and turn its delivery off before starting it from Lys"
+        "seat_online_in_monitor: the monitor at {monitor} lists seat `{name}` online: stop it there and turn its delivery off before starting it from Lys"
     )]
-    OnlineInArgus {
+    OnlineInMonitor {
         /// The seat.
         name: String,
-        /// The Argus base asked.
-        argus: String,
+        /// The monitor base asked.
+        monitor: String,
     },
     /// Another live machine already names this install's own runner.
     #[error(
@@ -139,7 +139,7 @@ impl SeatError {
             Self::Running { .. } => "seat_running",
             Self::NotRunning { .. } => "seat_not_running",
             Self::TurnInProgress { .. } => "seat_turn_in_progress",
-            Self::OnlineInArgus { .. } => "seat_online_in_argus",
+            Self::OnlineInMonitor { .. } => "seat_online_in_monitor",
             Self::RunnerLysTaken { .. } => "runner_lys_taken",
             Self::AttachRefused { .. } => "seat_attach_refused",
             Self::TextEmpty { .. } => "seat_text_empty",
@@ -162,7 +162,7 @@ impl SeatError {
             | Self::Running { .. }
             | Self::NotRunning { .. }
             | Self::TurnInProgress { .. }
-            | Self::OnlineInArgus { .. }
+            | Self::OnlineInMonitor { .. }
             | Self::RunnerLysTaken { .. } => StatusCode::CONFLICT,
         }
     }
@@ -222,11 +222,11 @@ mod tests {
                 "seat_turn_in_progress",
             ),
             (
-                SeatError::OnlineInArgus {
+                SeatError::OnlineInMonitor {
                     name: name(),
-                    argus: "http://argus".to_owned(),
+                    monitor: "http://monitor".to_owned(),
                 },
-                "seat_online_in_argus",
+                "seat_online_in_monitor",
             ),
             (
                 SeatError::RunnerLysTaken {

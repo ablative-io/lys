@@ -269,7 +269,8 @@ async fn the_document_names_every_seat_refusal() -> TestResult {
                 "seat_no_responsible",
                 "seat_running",
                 "seat_not_managed",
-                "seat_online_in_argus",
+                "seat_online_in_monitor",
+                "import_incomplete",
                 "not_permitted",
             ][..],
         ),
@@ -295,5 +296,63 @@ async fn the_document_names_every_seat_refusal() -> TestResult {
             );
         }
     }
+    table.close()
+}
+
+/// A seat whose latest import is not complete is refused `import_incomplete`
+/// before anything starts. The import here is reserved and then held by a
+/// pending upgrade's fence, so it stays in progress.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_seat_whose_latest_import_is_incomplete_is_not_started() -> TestResult {
+    let mut table = Table::set().await?;
+    let machine = table
+        .machine(&machine_body(&table, "Box")?, Some(json!({ "kind": "lys" })))
+        .await?;
+    table
+        .ok("/seats", &seat_body(&table, "waffles", &machine)?)
+        .await?;
+    let folder = table.dir.path().join("seat-resources").join("waffles");
+    std::fs::create_dir_all(&folder)?;
+    let settings = json!({ "model": "claude-fable-5-1", "permissions": { "defaultMode": "plan" } });
+    std::fs::write(folder.join("settings.json"), settings.to_string())?;
+    std::fs::write(folder.join("system-prompt.md"), "You are Waffles.\n")?;
+    std::fs::write(folder.join("mcp.json"), json!({ "mcpServers": {} }).to_string())?;
+    let intent = table.dir.path().join("upgrade-intent.json");
+    std::fs::write(&intent, b"pending")?;
+    table
+        .service
+        .restart_adjusted(|config| config.operator_upgrade_file = Some(intent))
+        .await?;
+
+    let manifest = json!({ "seat": "waffles", "harness": "claude", "claude_folder": folder });
+    let plan = table
+        .ok("/seats/waffles/import/dry-run", &json!({ "manifest": manifest }))
+        .await?;
+    assert_eq!(plan["refusals"], json!([]), "{plan}");
+    let confirm = json!({
+        "plan_id": plan["plan_id"], "plan_revision": plan["plan_revision"],
+        "operation": operation()?,
+    });
+    let answer = table
+        .service
+        .post("/seats/waffles/import/confirm", Some(&table.ada), &confirm)
+        .await?;
+    refused(&answer, 503, "import_upgrade_pending");
+
+    let answer = table
+        .service
+        .post(
+            "/seats/waffles/start",
+            Some(&table.ada),
+            &json!({ "operation": operation()? }),
+        )
+        .await?;
+    refused(&answer, 409, "import_incomplete");
+    let (_, live) = table.service.get("/runtime/live", Some(&table.ada)).await?;
+    assert_eq!(
+        live["sessions"].as_array().map(Vec::len),
+        Some(0),
+        "a refused start starts nothing: {live}"
+    );
     table.close()
 }

@@ -276,6 +276,7 @@ impl ServerError {
             Self::Canvas(error) => error.status(),
             Self::ProductDraft(error) => error.status(),
             Self::Seat(error) => error.status(),
+            Self::SeatImport(error) => error.status(),
         }
     }
 }

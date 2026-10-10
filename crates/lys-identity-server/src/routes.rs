@@ -158,6 +158,9 @@ pub struct AppState {
     pub membership: crate::channel_membership_counts::Membership,
     /// The seats (AGENTS-002), kept beside the directory log: always open.
     pub seats: Mutex<crate::seats_store::SeatStore>,
+    /// The seats' imports (AGENTS-003), kept beside the directory log:
+    /// always open, as the seats are.
+    pub seat_imports: crate::seat_import_store::SeatImports,
 }
 
 /// Where the service says how a thing it keeps was started.

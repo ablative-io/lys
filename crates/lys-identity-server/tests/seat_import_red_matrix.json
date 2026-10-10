@@ -1,0 +1,250 @@
+{
+  "format": "lys-seat-import-red-matrix/v1",
+  "brief": "docs/design/agents/briefs/AGENTS-003.json",
+  "evidence": "Each row's red and green are written from the one assembled qualification, never by hand ahead of it: red is the named test run on the pinned main base without the import behaviour, green the same test on the exact change. Each is {\"commit\", \"command\", \"exit\", \"cases\": {\"run\", \"passed\", \"failed\", \"skipped\"}, \"failure\"} (failure: the red's assertion or refusal text; empty on green). \"unrun\" is the explicit marker for evidence no battery has produced yet; the first battery yields every figure at once and nothing is invented. This file is the record; no test reads it. A missing test target or a compile failure runs zero cases and is not a behavioural red.",
+  "withdrawn": {
+    "requirements": [
+      "R8",
+      "R10"
+    ],
+    "by": "Tom, 10 October 2026, relayed by Gaia (AGENTS-003 coordinator) to writer I4",
+    "reason": "Measurements are killed: the R8 count fixtures and ratchet (seat_import_counts.rs/.json, lys-runner seat_import_hot_paths.rs/.json) and the R10 scale fixture (seat_import_scale.rs/.json) are not written. The one structural guard kept is behavioural: seat_import_hot_paths_do_no_import_work shows the hot paths answer while an import is held mid-confirm."
+  },
+  "rows": [
+    {
+      "test": "seat_import_sources_maps_declared_files",
+      "requirement": "R1",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_sources.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_sources_distinguishes_roots",
+      "requirement": "R1",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_sources.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_sources_preserves_channels",
+      "requirement": "R1",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_sources.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_monitor_maps_records",
+      "requirement": "R2",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_monitor.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_monitor_refuses_incomplete",
+      "requirement": "R2",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_monitor.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_monitor_revision_projection",
+      "requirement": "R2",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_monitor.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_keys_reference_only",
+      "requirement": "R3",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_references.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_keys_refuses_inline",
+      "requirement": "R3",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_references.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_keys_refuses_wrong_owner",
+      "requirement": "R3",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_references.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_dry_run_is_read_only",
+      "requirement": "R4",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_plan.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_confirmation_is_per_seat",
+      "requirement": "R4",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_plan.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_confirmation_binds_replacements",
+      "requirement": "R4",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_plan.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_rerun_is_noop",
+      "requirement": "R5",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_recovery.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_resumes_after_each_step",
+      "requirement": "R5",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_recovery.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_preserves_edits",
+      "requirement": "R5",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_recovery.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_old_install_upgrade",
+      "requirement": "R5",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_upgrade.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_schedule_counts",
+      "requirement": "R6",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_schedules.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_shared_schedule",
+      "requirement": "R6",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_schedules.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_rules_inactive",
+      "requirement": "R6",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_rules.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_survives_lifecycle",
+      "requirement": "R7",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_lifecycle.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_survives_lifecycle_once_qualified",
+      "requirement": "R7",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_lifecycle.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_upgrade_failure_named",
+      "requirement": "R7",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_lifecycle.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_status_survives_restart_and_upgrade",
+      "requirement": "R7",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_lifecycle.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_hot_path_counts",
+      "requirement": "R8",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_counts.rs",
+      "withdrawn": true
+    },
+    {
+      "test": "seat_import_count_ratchet",
+      "requirement": "R8",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_counts.rs",
+      "withdrawn": true
+    },
+    {
+      "test": "seat_import_count_latency_evidence",
+      "requirement": "R8",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_counts.rs",
+      "withdrawn": true
+    },
+    {
+      "test": "seat_import_hot_paths_do_no_import_work",
+      "requirement": "R8",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_faults.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_signal_faults",
+      "requirement": "R9",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_faults.rs",
+      "red": "unrun",
+      "green": "unrun"
+    },
+    {
+      "test": "seat_import_threefold_scale",
+      "requirement": "R10",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_scale.rs",
+      "withdrawn": true
+    },
+    {
+      "test": "seat_import_bounds_and_liveness",
+      "requirement": "R10",
+      "crate": "lys-identity-server",
+      "file": "tests/seat_import_scale.rs",
+      "withdrawn": true
+    }
+  ]
+}

@@ -77,6 +77,9 @@ pub fn run(args: SeatArgs, json: bool) -> CliResult<()> {
                 println!("session: {}", shown(answer, "session"));
             });
         }
+        SeatCommand::Import(import) => {
+            crate::commands::seat_import::run(&server, import.command, json)?;
+        }
     }
     Ok(())
 }

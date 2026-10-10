@@ -27,3 +27,5 @@ pub mod verify;
 pub mod attach;
 pub mod seat;
 pub mod seat_client;
+// `lys seat import` (AGENTS-003).
+pub mod seat_import;

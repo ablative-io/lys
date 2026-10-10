@@ -97,6 +97,11 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         seats.start(),
         seats.len()
     ));
+    let seat_imports = crate::seat_import_store::SeatImports::open(
+        &config.log_dir.with_file_name("seat-imports"),
+        Arc::clone(&key),
+    )?;
+    say(&seat_imports.started()?);
     let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model = apps.model()?;
     let spicedb = config
@@ -218,6 +223,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         say,
         membership: crate::channel_membership_counts::Membership::new(config.membership),
         seats: Mutex::new(seats),
+        seat_imports,
     });
     crate::teams_migration::at_start(&state)?;
     crate::budgets_migration::advance(&state)?;
@@ -232,6 +238,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         )),
         other => other?,
     }
+    // Imports resume before any schedule timer runs, so a schedule an
+    // interrupted import set is paused before it could fire.
+    crate::seat_import_apply::resume_at_start(&state);
     crate::goals_api::remind_from(&state);
     crate::schedules_api::fire_from(&state);
     crate::budgets_act::settle_at_start(&state);

@@ -416,8 +416,12 @@ impl Table {
             membership: crate::channel_membership_counts::Membership::new(None),
             seats: Mutex::new(crate::seats_store::SeatStore::open(
                 &path.join("seats"),
-                key,
+                Arc::clone(&key),
             )?),
+            seat_imports: crate::seat_import_store::SeatImports::open(
+                &path.join("seat-imports"),
+                key,
+            )?,
         };
         Ok(ReadyTable {
             state,
