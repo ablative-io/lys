@@ -1,0 +1,31 @@
+{
+  "captured": "an installed runner state directory before AGENTS-004: lys-runner-sessions/v3 with one live manual session, one ended session and one responsible person; no seat-owners.json and no seat-owners.journal exist, which is how an old install is told from a new record",
+  "sessions.json": {
+    "format": "lys-runner-sessions/v3",
+    "sessions": [
+      {
+        "session": "manual-live-7c1f",
+        "pid": 48213,
+        "leader_start": { "pid": 48213, "start": "1760054401-48213-boottime-7a3f" },
+        "started_at": 1760054401000,
+        "columns": 160,
+        "rows": 48,
+        "ended": null
+      },
+      {
+        "session": "manual-ended-2b90",
+        "pid": 47110,
+        "leader_start": { "pid": 47110, "start": "1760050111-47110-boottime-7a3f" },
+        "started_at": 1760050111000,
+        "columns": 120,
+        "rows": 40,
+        "ended": { "how": "exited", "at": 1760053990000, "status": 0, "signal": null }
+      }
+    ],
+    "responsible": { "manual-live-7c1f": "tom" }
+  },
+  "uncertain_control_ids": [
+    "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f",
+    "9e2f0f3c9a1e5b7d4c2a8e6f1b3d5a7c"
+  ]
+}

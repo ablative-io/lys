@@ -74,6 +74,7 @@ pub mod refusal_log;
 pub mod refusals;
 pub mod rotation;
 pub mod scrollback;
+pub mod seat_owner;
 pub mod session;
 pub mod socket;
 pub mod state;
