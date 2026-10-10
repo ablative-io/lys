@@ -288,6 +288,36 @@ fn terminal_cleanup(left: Result<crate::pty::Left, crate::error::RunnerError>) -
     }
 }
 
+/// After the repeated hang-up of session `id`, give its program
+/// [`REPEAT_GRACE`]; if the same leader is still running then, kill its
+/// process group and say so. A program can hold a hang-up blocked forever (a
+/// shell's `exec` from inside its SIGHUP trap passes the block on), and a
+/// runner that only repeats the hang-up would wait on it forever.
+fn escalate(id: &str, leader: crate::peer::Leader) {
+    let session = id.to_owned();
+    let spawned = std::thread::Builder::new()
+        .name(format!("lys-runner-escalate-{id}"))
+        .spawn(move || {
+            let id = session;
+            std::thread::sleep(REPEAT_GRACE);
+            match crate::pty::kill_if_still(&leader) {
+                Ok(true) => crate::error::said(&format!(
+                    "session {id}: rotation_signal_escalated: still running {} s after the repeated hang-up; its process group was killed",
+                    REPEAT_GRACE.as_secs()
+                )),
+                Ok(false) => {}
+                Err(error) => crate::error::said(&format!(
+                    "session {id}: rotation_escalation_failed: {error}"
+                )),
+            }
+        });
+    if let Err(error) = spawned {
+        crate::error::said(&format!(
+            "session {id}: rotation_escalation_failed: the escalation could not be started: {error}"
+        ));
+    }
+}
+
 #[cfg(test)]
 mod cleanup_tests {
     use super::terminal_cleanup;
@@ -321,34 +351,5 @@ mod cleanup_tests {
             .is_some_and(|words| words.starts_with("group_cleanup_failed:")
                 && words.contains("process_group_unreadable"))
         );
-    }
-}
-
-/// After the repeated hang-up of session `id`, give its program
-/// [`REPEAT_GRACE`]; if the same leader is still running then, kill its
-/// process group and say so. A program can hold a hang-up blocked forever (a
-/// shell's `exec` from inside its SIGHUP trap passes the block on), and a
-/// runner that only repeats the hang-up would wait on it forever.
-fn escalate(id: &str, leader: crate::peer::Leader) {
-    let id = id.to_owned();
-    let spawned = std::thread::Builder::new()
-        .name(format!("lys-runner-escalate-{id}"))
-        .spawn(move || {
-            std::thread::sleep(REPEAT_GRACE);
-            match crate::pty::kill_if_still(&leader) {
-                Ok(true) => crate::error::said(&format!(
-                    "session {id}: rotation_signal_escalated: still running {} s after the repeated hang-up; its process group was killed",
-                    REPEAT_GRACE.as_secs()
-                )),
-                Ok(false) => {}
-                Err(error) => crate::error::said(&format!(
-                    "session {id}: rotation_escalation_failed: {error}"
-                )),
-            }
-        });
-    if let Err(error) = spawned {
-        crate::error::said(&format!(
-            "session {id}: rotation_escalation_failed: the escalation could not be started: {error}"
-        ));
     }
 }

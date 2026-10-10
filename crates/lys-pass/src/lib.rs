@@ -325,6 +325,7 @@ pub struct TokenResponse {
     pub grant_binding: Option<String>,
 }
 
+#[cfg(feature = "http")]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TokenRefusal {
