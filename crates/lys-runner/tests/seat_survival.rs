@@ -349,7 +349,8 @@ fn seat_owner_preserves_manual_lifecycle() -> TestResult {
         "rows": 24
     }))?;
     sessions.start(launch)?;
-    let supervised = supervised("manual");
+    // `supervised` is already the launch bound above; the helper is named by its path.
+    let supervised = self::supervised("manual");
     let binding = supervised.owner.clone().ok_or("supervised")?;
     let refused = sessions
         .start_owned(supervised, binding, None)

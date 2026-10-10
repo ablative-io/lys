@@ -431,7 +431,7 @@ async fn without_a_words_directory_the_routes_answer_words_unavailable() -> Test
         None,
         None,
         |config| config.words_dir = None,
-        |config| Ok(seed_configured(config, [ADMINISTRATOR])?),
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
     .await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
