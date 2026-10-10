@@ -1,10 +1,11 @@
 //! A fixture for the AGENTS-004 survival tests: the real owner steps with no
 //! harness, and a runner that starts one and then waits to be killed.
 //!
-//! As `runner seat-owner --dir D --server-key K --scrollback N` it reads the
-//! plan, records its establish intent, opens a runner of its own on the
-//! owner socket, adopts its owner state and writes the ready line, exactly
-//! as `lys runner seat-owner` does short of starting the managed session.
+//! As `runner seat-owner --dir D --server-key K --scrollback N` it detaches
+//! into a session of its own, reads the plan, records its establish intent,
+//! opens a runner of its own on the owner socket, adopts its owner state and
+//! writes the ready line, exactly as `lys runner seat-owner` does short of
+//! starting the managed session.
 //! As `--as-runner STATE SESSION KEY_HEX` it is the runner: it starts an
 //! owner for a supervised binding through `Sessions::start_owned`, prints
 //! the owned seat as JSON on standard output and blocks on standard input
@@ -20,7 +21,7 @@ use std::sync::Arc;
 use lys_runner::harness_control::{ManagedLaunch, Transport};
 use lys_runner::peer::{self, Leader};
 use lys_runner::protocol::{Launch, unhex};
-use lys_runner::seat_owner::process::{OwnerState, establish};
+use lys_runner::seat_owner::process::{OwnerState, detach, establish};
 use lys_runner::seat_owner::protocol::{OwnerBinding, RUNNER_STATE, SOCKET, ready_line};
 use lys_runner::seat_owner::spawn::OwnerPlan;
 use lys_runner::seat_owner::store::OwnerStore;
@@ -65,6 +66,9 @@ fn key_from_hex(hex: &str) -> Result<[u8; 32], RunnerError> {
 }
 
 fn owner(args: &[String]) -> Result<(), RunnerError> {
+    // The real owner's first step: a session of its own, so the runner that
+    // started it, and that runner's terminal, can die without reaching it.
+    detach()?;
     let dir = PathBuf::from(option(args, "--dir")?);
     let key_path = option(args, "--server-key")?;
     let server_key = key_from_hex(&std::fs::read_to_string(&key_path).map_err(|error| {

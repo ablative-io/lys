@@ -148,10 +148,11 @@ impl Sessions {
     ///
     /// # Errors
     ///
-    /// `seat_owner_held` when the session already has an owner or a
-    /// session of this runner; `seat_owner_start_failed` when this runner
-    /// serves no socket yet, or the owner cannot be started; the owner's
-    /// own refusals, read from its ready pipe.
+    /// `seat_owner_held` when the session already has an owner, another
+    /// start for it is under way, or it is a session of this runner;
+    /// `seat_owner_start_failed` when this runner serves no socket yet, or
+    /// the owner cannot be started; the owner's own refusals, read from its
+    /// ready pipe.
     pub fn start_owned(
         self: &Arc<Self>,
         mut managed: ManagedLaunch,
@@ -175,12 +176,9 @@ impl Sessions {
                 ),
             ));
         }
-        if self.owned_index()?.contains_key(&binding.session) {
-            return Err(refused(
-                "seat_owner_held",
-                format!("session {} already has an owner", binding.session),
-            ));
-        }
+        // Reserved until this start ends, ready or refused: a concurrent
+        // start for the same seat is refused here by name and spawns nothing.
+        let reservation = self.reserve_owner_start(&binding.session)?;
         let dir = owner_dir(&self.state_dir, &binding.session);
         fs::create_dir_all(&dir)
             .and_then(|()| fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)))
@@ -250,7 +248,71 @@ impl Sessions {
             ));
         }
         owned.insert(seat.binding.session.clone(), seat);
+        drop(owned);
+        drop(reservation);
         Ok((pid, at))
+    }
+
+    /// Reserves `session` for one owner start, under the owned index's lock,
+    /// so the check and the reservation are one step.
+    ///
+    /// # Errors
+    ///
+    /// `seat_owner_held` when the session already has an owner or another
+    /// start for it is under way; `seat_owner_store_unavailable` when a lock
+    /// is poisoned.
+    fn reserve_owner_start(&self, session: &str) -> Result<OwnerStartReservation<'_>, RunnerError> {
+        let owned = self.owned_index()?;
+        if owned.contains_key(session) {
+            return Err(refused(
+                "seat_owner_held",
+                format!("session {session} already has an owner"),
+            ));
+        }
+        let mut starts = self.owner_starts.lock().map_err(|_poisoned| {
+            refused(
+                "seat_owner_store_unavailable",
+                "the owner-start reservations' lock is poisoned",
+            )
+        })?;
+        if !starts.insert(session.to_owned()) {
+            return Err(refused(
+                "seat_owner_held",
+                format!("an owner for session {session} is already being started"),
+            ));
+        }
+        drop(starts);
+        drop(owned);
+        Ok(OwnerStartReservation {
+            sessions: self,
+            session: session.to_owned(),
+        })
+    }
+}
+
+/// One owner start under way for `session`; released when the start ends,
+/// whether its owner became ready or was refused.
+struct OwnerStartReservation<'a> {
+    sessions: &'a Sessions,
+    session: String,
+}
+
+impl Drop for OwnerStartReservation<'_> {
+    fn drop(&mut self) {
+        match self.sessions.owner_starts.lock() {
+            Ok(mut starts) => {
+                starts.remove(&self.session);
+            }
+            Err(poisoned) => {
+                // The reservation is released all the same, and said: a
+                // poisoned lock must not hold the seat reserved for ever.
+                poisoned.into_inner().remove(&self.session);
+                crate::error::said(&format!(
+                    "seat_owner_store_unavailable: the owner-start reservations' lock was poisoned while releasing session {}",
+                    self.session
+                ));
+            }
+        }
     }
 }
 

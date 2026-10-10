@@ -41,6 +41,11 @@ pub use super::record::{
 };
 use super::rules::{apply, is_hex_id, refused, validate_record};
 
+/// The indexed current projection's file, in the store's directory.
+pub const PROJECTION: &str = "seat-owners.json";
+/// The bounded recovery tail's file, in the store's directory.
+pub const JOURNAL: &str = "seat-owners.journal";
+
 /// The store.
 #[derive(Debug)]
 pub struct OwnerStore {
@@ -108,7 +113,7 @@ impl OwnerStore {
                 format!("making {}: {error}", dir.display()),
             )
         })?;
-        let projection_path = dir.join("seat-owners.json");
+        let projection_path = dir.join(PROJECTION);
         let already_versioned = match fs::metadata(&projection_path) {
             Ok(_) => true,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
@@ -156,8 +161,8 @@ impl OwnerStore {
                 format!("making {}: {error}", dir.display()),
             )
         })?;
-        let projection_path = dir.join("seat-owners.json");
-        let journal_path = dir.join("seat-owners.journal");
+        let projection_path = dir.join(PROJECTION);
+        let journal_path = dir.join(JOURNAL);
         let mut counts = StoreCounts::default();
         let projection = match fs::read(&projection_path) {
             Ok(bytes) => {

@@ -191,6 +191,22 @@ pub fn establish(
     Ok(())
 }
 
+/// The owner's first act: a session and process group of its own, so no
+/// client's exit, hangup or group signal reaches it or its harness
+/// (AGENTS-004 R1). Every owner, the installed one and the test fixture
+/// alike, takes this step before it reads its plan.
+///
+/// # Errors
+///
+/// `seat_owner_start_failed` when the kernel refuses the new session, as it
+/// does for a process that already leads a group.
+pub fn detach() -> Result<(), RunnerError> {
+    rustix::process::setsid().map_err(|error| {
+        RunnerError::refused("seat_owner_start_failed", format!("setsid: {error}"))
+    })?;
+    Ok(())
+}
+
 /// Serves as the owner in `serve.dir` until stopped: establishes the lease,
 /// opens a runner of its own, starts the one managed session, records its
 /// harness, then listens and writes the ready line on standard output.
@@ -201,11 +217,7 @@ pub fn establish(
 /// started before the lease is recorded, and the ready line is not written
 /// before the harness is recorded.
 pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
-    // The owner's first act: a session and process group of its own, so no
-    // client's exit, hangup or group signal reaches it or its harness.
-    rustix::process::setsid().map_err(|error| {
-        RunnerError::refused("seat_owner_start_failed", format!("setsid: {error}"))
-    })?;
+    detach()?;
     let plan = OwnerPlan::read(&serve.dir)?;
     let pid = std::process::id();
     let own = Leader {

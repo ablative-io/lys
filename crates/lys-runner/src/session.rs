@@ -241,6 +241,10 @@ pub struct Sessions {
     pub(crate) owner_state: std::sync::OnceLock<Arc<crate::seat_owner::process::OwnerState>>,
     /// The seats this runner started owners for, indexed by session.
     pub(crate) owned: Mutex<BTreeMap<String, crate::seat_owner::sessions::OwnedSeat>>,
+    /// Sessions whose owner is being started and is not yet ready: reserved
+    /// under the `owned` lock before the spawn, so a second start for the
+    /// same seat is refused by name and never spawns a second owner.
+    pub(crate) owner_starts: Mutex<BTreeSet<String>>,
     /// The program owners run as, when said; this runner's own executable
     /// otherwise.
     pub(crate) owner_program: std::sync::OnceLock<PathBuf>,
@@ -368,6 +372,7 @@ impl Sessions {
                 server_key: std::sync::OnceLock::new(),
                 owner_state: std::sync::OnceLock::new(),
                 owned: Mutex::new(BTreeMap::new()),
+                owner_starts: Mutex::new(BTreeSet::new()),
                 owner_program: std::sync::OnceLock::new(),
                 unreachable: Mutex::new(Vec::new()),
                 scrollback,

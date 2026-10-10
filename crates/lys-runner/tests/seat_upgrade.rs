@@ -36,6 +36,33 @@ fn kill(pid: u32) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// The owners a test started, each ended when the test ends on any path,
+/// passing or failing: an owner outlives the runner that started it by
+/// design, so only the test can end it.
+#[derive(Default)]
+struct Owners(Vec<u32>);
+
+impl Owners {
+    fn hold(&mut self, seat: &OwnedSeat) {
+        self.0.push(seat.endpoint.owner.pid);
+    }
+}
+
+impl Drop for Owners {
+    fn drop(&mut self) {
+        for &pid in &self.0 {
+            if let Err(error) = kill(pid) {
+                let gone = error
+                    .downcast_ref::<rustix::io::Errno>()
+                    .is_some_and(|errno| *errno == rustix::io::Errno::SRCH);
+                if !gone {
+                    eprintln!("owner {pid} could not be ended: {error}");
+                }
+            }
+        }
+    }
+}
+
 fn alive(pid: u32) -> bool {
     rustix::process::Pid::from_raw(i32::try_from(pid).unwrap_or(0))
         .is_some_and(|pid| rustix::process::test_kill_process(pid).is_ok())
@@ -73,7 +100,9 @@ fn seat_started_before_an_upgrade_keeps_its_owner() -> TestResult {
     let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
     // The installed binary, before the upgrade.
     fs::write(state.join("owner-build"), "0.9.0-before\n")?;
+    let mut owners = Owners::default();
     let (before, mut old_runner) = runner_with_owner(&state, "before", &key)?;
+    owners.hold(&before);
     assert_eq!(before.endpoint.build, "0.9.0-before");
     let owner_before = before.endpoint.owner;
     assert!(alive(owner_before.pid));
@@ -84,6 +113,7 @@ fn seat_started_before_an_upgrade_keeps_its_owner() -> TestResult {
     old_runner.wait()?;
     fs::write(state.join("owner-build"), "1.0.0-after\n")?;
     let (after, mut new_runner) = runner_with_owner(&state, "after", &key)?;
+    owners.hold(&after);
     assert_eq!(after.endpoint.build, "1.0.0-after");
     assert_ne!(after.endpoint.owner.pid, owner_before.pid);
 
@@ -109,8 +139,7 @@ fn seat_started_before_an_upgrade_keeps_its_owner() -> TestResult {
     assert_eq!(new.build, "1.0.0-after");
     assert!(counts.record_visits <= 2, "{counts:?}");
 
-    kill(owner_before.pid)?;
-    kill(after.endpoint.owner.pid)?;
+    drop(owners);
     kill(new_runner.id())?;
     new_runner.wait()?;
     Ok(())

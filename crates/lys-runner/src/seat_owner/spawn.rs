@@ -23,6 +23,7 @@ use super::counts::Meter;
 use super::protocol::{
     LOG, OwnerBinding, OwnerEndpoint, PLAN, SOCKET, owner_dir, parse_ready_line,
 };
+use super::store::{JOURNAL, PROJECTION};
 use crate::error::RunnerError;
 use crate::harness_control::ManagedLaunch;
 use crate::peer::{self, Leader};
@@ -164,11 +165,20 @@ pub struct OwnerSpawn<'a> {
 pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, RunnerError> {
     plan.validate()?;
     let dir = owner_dir(spawn.state, &plan.binding.session);
-    if dir.join("seat-owners.json").exists() {
-        return Err(RunnerError::refused(
-            "seat_owner_held",
-            format!("session {} already has an owner", plan.binding.session),
-        ));
+    // An owner's record is its journal until its first checkpoint writes the
+    // projection: either one present means the session has an owner. A file
+    // whose presence the kernel cannot say is a refusal, never an absence.
+    for record in [PROJECTION, JOURNAL] {
+        let path = dir.join(record);
+        let held = path
+            .try_exists()
+            .map_err(|error| start_failed(format!("reading {}: {error}", path.display())))?;
+        if held {
+            return Err(RunnerError::refused(
+                "seat_owner_held",
+                format!("session {} already has an owner", plan.binding.session),
+            ));
+        }
     }
     fs::create_dir_all(&dir)
         .and_then(|()| fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)))

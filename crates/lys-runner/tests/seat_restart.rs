@@ -16,7 +16,6 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_runner::Client;
 use lys_runner::peer::{self, Leader, StartIdentity};
 use lys_runner::protocol::{Act, Answer, hex};
 use lys_runner::seat_owner::protocol::{ClientKind, OwnerAnswer, OwnerCommand};
@@ -24,6 +23,7 @@ use lys_runner::seat_owner::record::Cursors;
 use lys_runner::seat_owner::recovery::{self, Found, Unreachable};
 use lys_runner::seat_owner::sessions::OwnedSeat;
 use lys_runner::session::Sessions;
+use lys_runner::{Client, RunnerError};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -116,10 +116,48 @@ fn view_of(answer: Answer) -> Result<lys_runner::seat_owner::protocol::OwnerView
     }
 }
 
-fn refusal_of(answer: Answer) -> Result<String, Box<dyn Error>> {
-    match answer {
-        Answer::Refused { refusal, .. } => Ok(refusal),
-        other => Err(format!("not a refusal: {other:?}").into()),
+/// The refusal an owner answered. `Client::ask` hands a refused act back
+/// as `RunnerError::Refused`, never as an `Answer`, so an answer or any
+/// other error is not a refusal.
+fn refusal_of(asked: Result<Answer, Box<dyn Error>>) -> Result<String, Box<dyn Error>> {
+    match asked {
+        Ok(answer) => Err(format!("not a refusal: {answer:?}").into()),
+        Err(error) => match error.downcast::<RunnerError>() {
+            Ok(refused) => match *refused {
+                RunnerError::Refused { refusal, .. } => Ok(refusal),
+                other => Err(format!("not a refusal: {other:?}").into()),
+            },
+            Err(other) => Err(format!("not a refusal: {other}").into()),
+        },
+    }
+}
+
+/// The owners a test started, each ended when the test ends on any path,
+/// passing or failing: an owner outlives the runner that started it by
+/// design, so only the test can end it.
+struct Owners(Vec<u32>);
+
+impl Owners {
+    fn hold(seat: &OwnedSeat) -> Self {
+        Self(vec![seat.endpoint.owner.pid])
+    }
+}
+
+impl Drop for Owners {
+    fn drop(&mut self) {
+        for &pid in &self.0 {
+            let ended = pid_of(pid)
+                .map_err(|error| error.to_string())
+                .and_then(|pid| {
+                    match rustix::process::kill_process(pid, rustix::process::Signal::KILL) {
+                        Ok(()) | Err(rustix::io::Errno::SRCH) => Ok(()),
+                        Err(error) => Err(error.to_string()),
+                    }
+                });
+            if let Err(error) = ended {
+                eprintln!("owner {pid} could not be ended: {error}");
+            }
+        }
     }
 }
 
@@ -137,6 +175,7 @@ fn seat_survives_runner_restart() -> TestResult {
     let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
     let state = dir.path().join("state");
     let (seat, mut runner) = runner_with_owner(&state, "restart", &key)?;
+    let owners = Owners::hold(&seat);
     let before = view_of(hello(&seat, ClientKind::Runner, &key)?)?;
 
     // The runner dies without a goodbye.
@@ -189,10 +228,7 @@ fn seat_survives_runner_restart() -> TestResult {
         ),
         "{moved:?}"
     );
-    rustix::process::kill_process(
-        pid_of(seat.endpoint.owner.pid)?,
-        rustix::process::Signal::TERM,
-    )?;
+    drop(owners);
     Ok(())
 }
 
@@ -202,6 +238,7 @@ fn seat_survives_identity_restart() -> TestResult {
     let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
     let state = dir.path().join("state");
     let (seat, mut runner) = runner_with_owner(&state, "identity", &key)?;
+    let owners = Owners::hold(&seat);
 
     // The identity server binds, an accepted hook moves the hook cursor
     // once, then the server is gone and its replacement binds again at the
@@ -228,10 +265,7 @@ fn seat_survives_identity_restart() -> TestResult {
 
     drop(runner.stdin.take());
     runner.wait()?;
-    rustix::process::kill_process(
-        pid_of(seat.endpoint.owner.pid)?,
-        rustix::process::Signal::TERM,
-    )?;
+    drop(owners);
     Ok(())
 }
 
@@ -241,6 +275,7 @@ fn seat_reconnect_keeps_uncertainty() -> TestResult {
     let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
     let state = dir.path().join("state");
     let (seat, mut runner) = runner_with_owner(&state, "uncertain", &key)?;
+    let owners = Owners::hold(&seat);
 
     // The owner records the receipt cursor as possibly sent; the reply is
     // lost; both clients restart and send the same intent again. It is the
@@ -280,7 +315,7 @@ fn seat_reconnect_keeps_uncertainty() -> TestResult {
                 hook: 0,
             },
         },
-    )?;
+    );
     assert_eq!(refusal_of(back)?, "seat_owner_cursor_regression");
     assert_eq!(
         view_of(ask(&seat, &key, OwnerCommand::Status)?)?
@@ -288,10 +323,7 @@ fn seat_reconnect_keeps_uncertainty() -> TestResult {
             .receipt,
         3
     );
-    rustix::process::kill_process(
-        pid_of(seat.endpoint.owner.pid)?,
-        rustix::process::Signal::TERM,
-    )?;
+    drop(owners);
     Ok(())
 }
 
@@ -301,6 +333,7 @@ fn seat_reconnect_refuses_foreign_generation() -> TestResult {
     let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
     let state = dir.path().join("state");
     let (seat, mut runner) = runner_with_owner(&state, "foreign", &key)?;
+    let owners = Owners::hold(&seat);
 
     // A reused pid: a record naming a live pid with another start identity
     // is unreachable, named so, and not the owner.
@@ -348,7 +381,7 @@ fn seat_reconnect_refuses_foreign_generation() -> TestResult {
         ..seat.clone()
     };
     assert_eq!(
-        refusal_of(hello(&dead, ClientKind::Runner, &key)?)?,
+        refusal_of(hello(&dead, ClientKind::Runner, &key))?,
         "seat_owner_generation_stale"
     );
     let wrong = OwnedSeat {
@@ -359,7 +392,7 @@ fn seat_reconnect_refuses_foreign_generation() -> TestResult {
         ..seat.clone()
     };
     assert_eq!(
-        refusal_of(hello(&wrong, ClientKind::Runner, &key)?)?,
+        refusal_of(hello(&wrong, ClientKind::Runner, &key))?,
         "seat_owner_binding_mismatch"
     );
     let forged = ask(
@@ -373,7 +406,7 @@ fn seat_reconnect_refuses_foreign_generation() -> TestResult {
                 start: StartIdentity("macos:0.000000".to_owned()),
             },
         },
-    )?;
+    );
     assert_eq!(refusal_of(forged)?, "seat_owner_client_unproved");
     assert!(alive(seat.endpoint.owner.pid));
     assert_eq!(
@@ -383,9 +416,6 @@ fn seat_reconnect_refuses_foreign_generation() -> TestResult {
 
     drop(runner.stdin.take());
     runner.wait()?;
-    rustix::process::kill_process(
-        pid_of(seat.endpoint.owner.pid)?,
-        rustix::process::Signal::TERM,
-    )?;
+    drop(owners);
     Ok(())
 }

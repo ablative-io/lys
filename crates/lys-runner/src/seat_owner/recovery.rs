@@ -109,6 +109,32 @@ pub fn prove(seat: &OwnedSeat) -> Option<Unreachable> {
     }
 }
 
+/// Whether `recorded` is the directory `found`, by the kernel's identity
+/// (device and inode) rather than by spelling: the runner records its
+/// canonical state path and a reader may reach the same directory through a
+/// symbolic link (macOS's `/var` is `/private/var`). A recorded directory
+/// that does not exist is another directory.
+///
+/// # Errors
+///
+/// `seat_owner_store_unavailable` when either directory's identity cannot be
+/// read for another reason than its absence.
+fn same_directory(recorded: &Path, found: &Path) -> Result<bool, RunnerError> {
+    use std::os::unix::fs::MetadataExt;
+    let identity = |path: &Path| match fs::metadata(path) {
+        Ok(metadata) => Ok(Some((metadata.dev(), metadata.ino()))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(RunnerError::refused(
+            "seat_owner_store_unavailable",
+            format!("reading {}: {error}", path.display()),
+        )),
+    };
+    let (Some(recorded), Some(found)) = (identity(recorded)?, identity(found)?) else {
+        return Ok(false);
+    };
+    Ok(recorded == found)
+}
+
 /// Reads every owner directory under `state` and proves each owner.
 ///
 /// # Errors
@@ -171,10 +197,10 @@ pub fn recover(state: &Path) -> Result<(Vec<Found>, RecoveryCounts), RunnerError
                 format!("{} does not read: {error}", path.display()),
             )
         })?;
-        if seat.endpoint.dir != dir
-            || dir
-                .file_name()
-                .is_none_or(|name| name != seat.binding.session.as_str())
+        if dir
+            .file_name()
+            .is_none_or(|name| name != seat.binding.session.as_str())
+            || !same_directory(&seat.endpoint.dir, &dir)?
         {
             return Err(RunnerError::refused(
                 "seat_owner_record_invalid",

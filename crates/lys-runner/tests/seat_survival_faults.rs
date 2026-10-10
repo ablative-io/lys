@@ -231,10 +231,18 @@ fn seat_survival_checkpoint_refused_is_red_by_name() -> TestResult {
     store.checkpoint()?;
     let projection = dir.path().join("seat-owners.json");
     let before = fs::read(&projection)?;
+    // A change after the checkpoint for the next one to write: the receipt
+    // cursor moves forward. (A live owner is never retired: retirement
+    // follows a recorded exit, refused `seat_owner_live` before it.)
     store.record(
         &hex_id(4),
-        &Intent::Retire {
+        &Intent::Cursors {
             session: "b".to_owned(),
+            cursors: Cursors {
+                receipt: 1,
+                feed: 0,
+                hook: 0,
+            },
         },
     )?;
     fs::create_dir(dir.path().join("seat-owners.writing"))?;

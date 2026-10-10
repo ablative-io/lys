@@ -15,13 +15,13 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_runner::Client;
 use lys_runner::harness_control::ManagedLaunch;
 use lys_runner::peer::{self, Leader, StartIdentity};
 use lys_runner::protocol::{Act, Answer, hex};
 use lys_runner::seat_owner::protocol::{ClientKind, OwnerAnswer, OwnerBinding, OwnerCommand};
 use lys_runner::seat_owner::sessions::OwnedSeat;
 use lys_runner::session::Sessions;
+use lys_runner::{Client, RunnerError};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -57,7 +57,7 @@ fn supervised(session: &str) -> Result<ManagedLaunch, serde_json::Error> {
             "columns": 120,
             "rows": 40
         },
-        "transport": "claude",
+        "transport": {"mode": "claude"},
         "conversation": "0f3c9a1e-5b7d-4c2a-8e6f-1b3d5a7c9e2f",
         "requires_controls": false,
         "owner": {
@@ -106,10 +106,46 @@ fn bound(answer: Answer) -> Result<lys_runner::seat_owner::protocol::OwnerView, 
     }
 }
 
-fn refusal_of(answer: Answer) -> Result<String, Box<dyn Error>> {
-    match answer {
-        Answer::Refused { refusal, .. } => Ok(refusal),
-        other => Err(format!("not a refusal: {other:?}").into()),
+/// The refusal an owner answered. `Client::ask` hands a refused act back
+/// as `RunnerError::Refused`, never as an `Answer`, so an answer or any
+/// other error is not a refusal.
+fn refusal_of(asked: Result<Answer, Box<dyn Error>>) -> Result<String, Box<dyn Error>> {
+    match asked {
+        Ok(answer) => Err(format!("not a refusal: {answer:?}").into()),
+        Err(error) => match error.downcast::<RunnerError>() {
+            Ok(refused) => match *refused {
+                RunnerError::Refused { refusal, .. } => Ok(refusal),
+                other => Err(format!("not a refusal: {other:?}").into()),
+            },
+            Err(other) => Err(format!("not a refusal: {other}").into()),
+        },
+    }
+}
+
+/// The owners a test started, each ended when the test ends on any path,
+/// passing or failing: an owner outlives the runner that started it by
+/// design, so only the test can end it.
+#[derive(Default)]
+struct Owners(Vec<u32>);
+
+impl Owners {
+    fn hold(&mut self, seat: &OwnedSeat) {
+        self.0.push(seat.endpoint.owner.pid);
+    }
+}
+
+impl Drop for Owners {
+    fn drop(&mut self) {
+        for &pid in &self.0 {
+            if let Err(error) = kill(pid, rustix::process::Signal::KILL) {
+                let gone = error
+                    .downcast_ref::<rustix::io::Errno>()
+                    .is_some_and(|errno| *errno == rustix::io::Errno::SRCH);
+                if !gone {
+                    eprintln!("owner {pid} could not be ended: {error}");
+                }
+            }
+        }
     }
 }
 
@@ -147,7 +183,9 @@ fn seat_survives_terminal_crash() -> TestResult {
     let dir = tempfile::tempdir()?;
     let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
     let state = dir.path().join("state");
+    let mut owners = Owners::default();
     let (seat, mut runner) = runner_with_owner(&state, "survives", &key)?;
+    owners.hold(&seat);
     let owner = seat.endpoint.owner.pid;
     assert!(alive(owner), "the owner runs");
 
@@ -187,6 +225,7 @@ fn seat_survives_terminal_crash() -> TestResult {
     );
 
     let (detached_seat, mut detaching) = runner_with_owner(&state, "detached", &key)?;
+    owners.hold(&detached_seat);
     drop(detaching.stdin.take());
     let status = detaching.wait()?;
     assert!(status.success(), "the runner detached cleanly: {status}");
@@ -194,9 +233,7 @@ fn seat_survives_terminal_crash() -> TestResult {
     let view = bound(hello(&detached_seat, own_leader()?, &key)?)?;
     assert_eq!(view.owner, detached_seat.endpoint.owner);
 
-    for pid in [owner, detached_seat.endpoint.owner.pid] {
-        kill(pid, rustix::process::Signal::TERM)?;
-    }
+    drop(owners);
     Ok(())
 }
 
@@ -233,6 +270,10 @@ fn seat_owner_is_unique() -> TestResult {
                 .map_err(|panic| format!("a start panicked: {panic:?}"))?,
         );
     }
+    let mut owners = Owners::default();
+    for seat in sessions.owned_seats()? {
+        owners.hold(&seat);
+    }
     let started: Vec<_> = outcomes.iter().filter(|outcome| outcome.is_ok()).collect();
     let refused: Vec<String> = outcomes
         .iter()
@@ -255,7 +296,7 @@ fn seat_owner_is_unique() -> TestResult {
     let mut forged = own_leader()?;
     forged.start = StartIdentity("macos:0.000000".to_owned());
     assert_eq!(
-        refusal_of(hello(&seat, forged, &key)?)?,
+        refusal_of(hello(&seat, forged, &key))?,
         "seat_owner_client_unproved"
     );
     let foreign = Leader {
@@ -263,7 +304,7 @@ fn seat_owner_is_unique() -> TestResult {
         start: seat.endpoint.owner.start.clone(),
     };
     assert_eq!(
-        refusal_of(hello(&seat, foreign, &key)?)?,
+        refusal_of(hello(&seat, foreign, &key))?,
         "seat_owner_client_unproved"
     );
     let stale = OwnedSeat {
@@ -274,7 +315,7 @@ fn seat_owner_is_unique() -> TestResult {
         ..seat.clone()
     };
     assert_eq!(
-        refusal_of(hello(&stale, own_leader()?, &key)?)?,
+        refusal_of(hello(&stale, own_leader()?, &key))?,
         "seat_owner_generation_stale"
     );
     let other = OwnedSeat {
@@ -285,13 +326,13 @@ fn seat_owner_is_unique() -> TestResult {
         ..seat.clone()
     };
     assert_eq!(
-        refusal_of(hello(&other, own_leader()?, &key)?)?,
+        refusal_of(hello(&other, own_leader()?, &key))?,
         "seat_owner_binding_mismatch"
     );
     assert!(alive(seat.endpoint.owner.pid), "the owner was not touched");
     let view = bound(hello(&seat, own_leader()?, &key)?)?;
     assert_eq!(view.owner, seat.endpoint.owner);
-    kill(seat.endpoint.owner.pid, rustix::process::Signal::TERM)?;
+    drop(owners);
     Ok(())
 }
 
@@ -309,7 +350,7 @@ fn seat_owner_preserves_manual_lifecycle() -> TestResult {
             "columns": 120,
             "rows": 40
         },
-        "transport": "claude",
+        "transport": {"mode": "claude"},
         "conversation": "0f3c9a1e-5b7d-4c2a-8e6f-1b3d5a7c9e2f",
         "requires_controls": false
     }))?;
