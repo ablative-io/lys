@@ -316,14 +316,14 @@ fn budget(error: &BudgetError) -> &str {
 }
 
 /// The agents cluster's refusal names, each owner's own.
-fn agents(error: &AgentsError) -> String {
+fn agents(error: &AgentsError) -> &str {
     match error {
-        AgentsError::Budget(error) => budget(error).to_string(),
-        AgentsError::Goal(error) => goal(error).to_string(),
-        AgentsError::Words(error) => error.name().to_string(),
-        AgentsError::Variables(error) => error.name().to_string(),
-        AgentsError::Schedules(error) => error.name().to_string(),
-        AgentsError::Seat(error) => error.name().to_string(),
-        AgentsError::SeatImport(error) => error.name().to_string(),
+        AgentsError::Budget(error) => budget(error),
+        AgentsError::Goal(error) => goal(error),
+        AgentsError::Words(error) => error.name(),
+        AgentsError::Variables(error) => error.name(),
+        AgentsError::Schedules(error) => error.name(),
+        AgentsError::Seat(error) => error.name(),
+        AgentsError::SeatImport(error) => error.name(),
     }
 }

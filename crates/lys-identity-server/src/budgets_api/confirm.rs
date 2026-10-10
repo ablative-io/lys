@@ -5,6 +5,7 @@ use super::{UnitUnavailable, authorised, with_budgets_mut};
 use crate::budgets_limits::Limit;
 use crate::budgets_state::{Act, Budget, Holder, HolderKind, Length, Measure};
 use crate::error::ServerError;
+use crate::error_agents::AgentsError;
 use crate::error_budget::BudgetError;
 use crate::routes::{AppState, signed_in};
 use crate::session::now;
@@ -44,23 +45,25 @@ pub(super) async fn confirm(
         if !store.held().unconfirmed.iter().any(|pending| {
             pending.requested.holder == holder && pending.requested.measure == body.measure
         }) {
-            return Err(ServerError::Budget(BudgetError::BudgetRefused {
-                refusal: "budget_invalid",
-                words: "only an unconfirmed legacy personal budget can be confirmed".to_owned(),
-            }));
+            return Err(ServerError::Agents(AgentsError::Budget(
+                BudgetError::BudgetRefused {
+                    refusal: "budget_invalid",
+                    words: "only an unconfirmed legacy personal budget can be confirmed".to_owned(),
+                },
+            )));
         }
         let budget = store
             .held()
             .budget(&holder, body.measure)
             .cloned()
             .ok_or_else(|| {
-                ServerError::Budget(BudgetError::BudgetRefused {
+                ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
                     refusal: "budget_invalid",
                     words: format!(
                         "person `{}` has no {:?} budget to confirm",
                         holder.id, body.measure
                     ),
-                })
+                }))
             })?;
         store.set_confirmed(
             Budget {
@@ -96,7 +99,11 @@ pub(super) fn source_gaps(
                     zone: None,
                 };
                 crate::budgets_usage::source_figure(held, &limit, agents, zone, at_ms).map_err(
-                    |reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }),
+                    |reason| {
+                        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
+                            reason,
+                        }))
+                    },
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;

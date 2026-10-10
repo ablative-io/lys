@@ -145,14 +145,14 @@ fn seat_import_help_names_every_subcommand_and_flag() -> TestResult {
     let root = tempfile::tempdir()?;
     let output = lys(root.path(), &["seat", "import", "--help"])?;
     assert!(output.status.success(), "{}", printed(&output));
-    let help = String::from_utf8(output.stdout)?;
+    let help = String::from_utf8(output.stdout.clone())?;
     for word in ["dry-run", "confirm", "status"] {
         assert!(help.contains(word), "{word} is missing from:\n{help}");
     }
     let output = lys(root.path(), &["seat", "import", "dry-run", "--help"])?;
-    assert!(String::from_utf8(output.stdout)?.contains("--manifest"));
+    assert!(String::from_utf8(output.stdout.clone())?.contains("--manifest"));
     let output = lys(root.path(), &["seat", "import", "confirm", "--help"])?;
-    let help = String::from_utf8(output.stdout)?;
+    let help = String::from_utf8(output.stdout.clone())?;
     assert!(
         help.contains("--plan") && help.contains("--revision"),
         "{help}"
@@ -283,7 +283,7 @@ fn a_dry_run_sends_the_named_manifest_and_shows_the_whole_plan() -> TestResult {
     )?;
     let request = one_request(handle)?;
     assert!(output.status.success(), "{}", printed(&output));
-    let stdout = String::from_utf8(output.stdout)?;
+    let stdout = String::from_utf8(output.stdout.clone())?;
     for line in [
         "plan plan-0123 of seat waffles",
         "writes words_slot agent:agent-1/wake_up  at revision 0",

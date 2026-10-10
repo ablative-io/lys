@@ -340,7 +340,7 @@ async fn without_a_variables_directory_the_routes_answer_variables_unavailable()
         None,
         None,
         |config| config.variables_dir = None,
-        |config| Ok(seed_configured(config, [ADMINISTRATOR])?),
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
     .await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;

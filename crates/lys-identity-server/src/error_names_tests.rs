@@ -1,5 +1,6 @@
 //! Every refusal keeps its protocol name when its explanation changes.
 
+use crate::error_agents::AgentsError;
 use std::collections::BTreeSet;
 
 use axum::http::StatusCode;
@@ -24,9 +25,9 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "TeamsUnavailable",
         ),
         (
-            ServerError::Budget(BudgetError::BudgetsUnavailable {
+            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
                 reason: detail.to_owned(),
-            }),
+            })),
             "BudgetsUnavailable",
         ),
         (
@@ -56,7 +57,10 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             }),
             "app_id_invalid",
         ),
-        (ServerError::Goal(GoalError::Unknown), "goal_unknown"),
+        (
+            ServerError::Agents(AgentsError::Goal(GoalError::Unknown)),
+            "goal_unknown",
+        ),
         (
             ServerError::Inactive {
                 identity: detail.to_owned(),
@@ -1403,41 +1407,46 @@ fn app_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
 fn goal_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
     vec![
         (
-            ServerError::Goal(GoalError::Unavailable {
+            ServerError::Agents(AgentsError::Goal(GoalError::Unavailable {
                 reason: detail.to_owned(),
-            }),
+            })),
             "goals_unavailable",
         ),
-        (ServerError::Goal(GoalError::Unknown), "goal_unknown"),
         (
-            ServerError::Goal(GoalError::Reused {
+            ServerError::Agents(AgentsError::Goal(GoalError::Unknown)),
+            "goal_unknown",
+        ),
+        (
+            ServerError::Agents(AgentsError::Goal(GoalError::Reused {
                 operation: detail.to_owned(),
-            }),
+            })),
             "goal_reused",
         ),
         (
-            ServerError::Goal(GoalError::Closed {
+            ServerError::Agents(AgentsError::Goal(GoalError::Closed {
                 goal: detail.to_owned(),
                 standing: detail,
-            }),
+            })),
             "goal_closed",
         ),
         (
-            ServerError::Goal(GoalError::NotYourJudgement {
+            ServerError::Agents(AgentsError::Goal(GoalError::NotYourJudgement {
                 agent: detail.to_owned(),
-            }),
+            })),
             "not_your_judgement",
         ),
         (
-            ServerError::Goal(GoalError::ReminderNeedsDeadline),
+            ServerError::Agents(AgentsError::Goal(GoalError::ReminderNeedsDeadline)),
             "reminder_needs_deadline",
         ),
         (
-            ServerError::Goal(GoalError::WordsMalformed { why: detail }),
+            ServerError::Agents(AgentsError::Goal(GoalError::WordsMalformed { why: detail })),
             "goal_words_malformed",
         ),
         (
-            ServerError::Goal(GoalError::EvidenceMissing { why: detail }),
+            ServerError::Agents(AgentsError::Goal(GoalError::EvidenceMissing {
+                why: detail,
+            })),
             "evidence_missing",
         ),
     ]
@@ -1493,42 +1502,44 @@ fn team_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
 fn budget_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
     vec![
         (
-            ServerError::Budget(BudgetError::BudgetsUnavailable {
+            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
                 reason: detail.to_owned(),
-            }),
+            })),
             "BudgetsUnavailable",
         ),
         (
-            ServerError::Budget(BudgetError::ConfigurationUnavailable {
+            ServerError::Agents(AgentsError::Budget(BudgetError::ConfigurationUnavailable {
                 reason: detail.to_owned(),
-            }),
+            })),
             "ConfigurationUnavailable",
         ),
         (
-            ServerError::Budget(BudgetError::ConfigurationVersionConflict {
-                held: 7,
-                expected: 7,
-            }),
+            ServerError::Agents(AgentsError::Budget(
+                BudgetError::ConfigurationVersionConflict {
+                    held: 7,
+                    expected: 7,
+                },
+            )),
             "ConfigurationVersionConflict",
         ),
         (
-            ServerError::Budget(BudgetError::BudgetExhausted {
+            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetExhausted {
                 words: detail.to_owned(),
-            }),
+            })),
             "BudgetExhausted",
         ),
         (
-            ServerError::Budget(BudgetError::BudgetVersionConflict {
+            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetVersionConflict {
                 held: 7,
                 expected: 7,
-            }),
+            })),
             "BudgetVersionConflict",
         ),
         (
-            ServerError::Budget(BudgetError::BudgetRefused {
+            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
                 refusal: "budget:name",
                 words: detail.to_owned(),
-            }),
+            })),
             "budget:name",
         ),
     ]

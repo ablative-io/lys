@@ -38,14 +38,12 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::BodyTooLarge
         | ServerError::GrantStream(GrantStreamError::BindingUnsupported { .. })
         | ServerError::Holding(..) => "invalid_request",
-        ServerError::Team(..)
         ServerError::AuthorityUnavailable { .. } => "temporarily_unavailable",
-        | ServerError::Budget(..)
+        ServerError::Team(..)
         | ServerError::HarnessCatalogueUnreadable { .. }
         | ServerError::Identity(..)
         | ServerError::Grant(..)
         | ServerError::App(..)
-        | ServerError::Goal(..)
         | ServerError::Inactive { .. }
         | ServerError::NotSignedIn
         | ServerError::NotAdmitted { .. }
@@ -162,8 +160,7 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::IssuerChallengeExpired
         | ServerError::IssuerRefused { .. }
         | ServerError::Runner { .. }
-        | ServerError::Seat(..)
-        | ServerError::SeatImport(..) => "server_error",
+        | ServerError::Agents(..) => "server_error",
     }
 }
 

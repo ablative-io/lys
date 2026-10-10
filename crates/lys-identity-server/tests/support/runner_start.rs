@@ -1,4 +1,5 @@
 #![cfg(test)]
+#![allow(dead_code, reason = "shared support: each test binary that includes this file uses a part of it")]
 //! A declared fixture program reads its config before signalling readiness.
 
 #[path = "harness_description.rs"]

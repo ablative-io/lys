@@ -1,5 +1,6 @@
 //! The organisation zone is durable; only first setup reads the host zone.
 
+use crate::error_agents::AgentsError;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -44,24 +45,26 @@ const ORIGIN: &str = "lys/identity/organisation";
 const DOMAIN: &str = "lys/identity/organisation-zone/v1";
 
 fn unavailable(error: impl std::fmt::Display) -> ServerError {
-    ServerError::Budget(BudgetError::ConfigurationUnavailable {
+    ServerError::Agents(AgentsError::Budget(BudgetError::ConfigurationUnavailable {
         reason: error.to_string(),
-    })
+    }))
 }
 
 /// Refuse an unknown zone at the boundary, without falling back to another one.
 pub fn checked(zone: &str) -> Result<(), ServerError> {
     let known = jiff::tz::TimeZone::get(zone).map_err(|error| {
-        ServerError::Budget(BudgetError::BudgetRefused {
+        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
             refusal: "ConfigurationZoneRefused",
             words: format!("{zone} is not an IANA zone: {error}"),
-        })
+        }))
     })?;
     if known.iana_name().is_none() {
-        return Err(ServerError::Budget(BudgetError::BudgetRefused {
-            refusal: "ConfigurationZoneRefused",
-            words: format!("{zone} has no named IANA zone"),
-        }));
+        return Err(ServerError::Agents(AgentsError::Budget(
+            BudgetError::BudgetRefused {
+                refusal: "ConfigurationZoneRefused",
+                words: format!("{zone} has no named IANA zone"),
+            },
+        )));
     }
     Ok(())
 }
@@ -69,10 +72,12 @@ pub fn checked(zone: &str) -> Result<(), ServerError> {
 /// Refuse a model with no name or a window of no tokens.
 pub fn checked_windows(windows: &crate::budgets_feed::Windows) -> Result<(), ServerError> {
     let refuse = |words: String| {
-        Err(ServerError::Budget(BudgetError::BudgetRefused {
-            refusal: "ConfigurationMalformed",
-            words,
-        }))
+        Err(ServerError::Agents(AgentsError::Budget(
+            BudgetError::BudgetRefused {
+                refusal: "ConfigurationMalformed",
+                words,
+            },
+        )))
     };
     for (model, window) in windows {
         if model.trim().is_empty() || model.trim() != model {
@@ -193,12 +198,12 @@ impl ConfigurationStore {
             None => self.zone.model_windows.clone(),
         };
         if self.zone.version != expected {
-            return Err(ServerError::Budget(
+            return Err(ServerError::Agents(AgentsError::Budget(
                 BudgetError::ConfigurationVersionConflict {
                     held: self.zone.version,
                     expected,
                 },
-            ));
+            )));
         }
         let next = Zone {
             zone,

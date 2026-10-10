@@ -168,6 +168,7 @@ pub(crate) fn online_in(body: &Value, name: &str) -> Result<Option<bool>, String
 
 #[cfg(test)]
 mod tests {
+    use crate::error_agents::AgentsError;
     use axum::Router;
     use axum::routing::get;
     use serde_json::json;
@@ -207,7 +208,9 @@ mod tests {
         assert!(
             matches!(
                 refused,
-                Err(ServerError::Seat(SeatError::OnlineInMonitor { .. }))
+                Err(ServerError::Agents(AgentsError::Seat(
+                    SeatError::OnlineInMonitor { .. }
+                )))
             ),
             "{refused:?}"
         );

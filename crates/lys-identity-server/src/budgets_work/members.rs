@@ -1,5 +1,6 @@
 //! Coverage builds reverse membership once instead of scanning teams per agent.
 
+use crate::error_agents::AgentsError;
 use std::collections::BTreeSet;
 use std::error::Error;
 
@@ -86,7 +87,9 @@ fn team(id: &str, parent: Option<&str>, members: Vec<String>) -> Team {
 
 fn unavailable(result: Result<Vec<crate::budgets_state::Standing>, ServerError>) -> String {
     match result {
-        Err(ServerError::Budget(BudgetError::BudgetsUnavailable { reason })) => reason,
+        Err(ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
+            reason,
+        }))) => reason,
         Err(other) => format!("unexpected error: {other}"),
         Ok(standings) => format!("unexpected coverage of {} agents", standings.len()),
     }

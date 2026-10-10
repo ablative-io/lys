@@ -2,6 +2,7 @@
 //! serves, against the checked-in ratchet. Counts gate; durations are kept
 //! beside them as evidence and never widen a limit.
 
+use std::sync::Arc;
 use std::error::Error;
 use std::time::{Duration, Instant};
 

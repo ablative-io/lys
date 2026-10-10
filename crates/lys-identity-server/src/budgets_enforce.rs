@@ -1,5 +1,6 @@
 //! A known threshold crossing asks each covered agent's act under a durable identity.
 
+use crate::error_agents::AgentsError;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -22,9 +23,9 @@ mod dispatch;
 use dispatch::{Dispatch, dispatch};
 
 fn unavailable(reason: impl std::fmt::Display) -> ServerError {
-    ServerError::Budget(BudgetError::BudgetsUnavailable {
+    ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
         reason: reason.to_string(),
-    })
+    }))
 }
 
 /// Unknown figures make no claim about being under a stop threshold.
@@ -423,21 +424,23 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                     } else {
                         crate::budgets_usage::reset(&limit, &zone, at_ms).map_err(unavailable)?
                     };
-                    return Err(ServerError::Budget(BudgetError::BudgetExhausted {
-                        words: format!(
-                            "{} limit {} for {} on {:?} {}; reported {figure}; resets at {} milliseconds since the Unix epoch",
-                            limit.unit.name(),
-                            limit.amount,
-                            limit
-                                .period
-                                .map_or("none", crate::budgets_state::Length::name),
-                            collection.holder.kind,
-                            collection.holder.id,
-                            reset.ok_or_else(|| unavailable(
-                                "an exhausted period has no reset instant"
-                            ))?
-                        ),
-                    }));
+                    return Err(ServerError::Agents(AgentsError::Budget(
+                        BudgetError::BudgetExhausted {
+                            words: format!(
+                                "{} limit {} for {} on {:?} {}; reported {figure}; resets at {} milliseconds since the Unix epoch",
+                                limit.unit.name(),
+                                limit.amount,
+                                limit
+                                    .period
+                                    .map_or("none", crate::budgets_state::Length::name),
+                                collection.holder.kind,
+                                collection.holder.id,
+                                reset.ok_or_else(|| unavailable(
+                                    "an exhausted period has no reset instant"
+                                ))?
+                            ),
+                        },
+                    )));
                 }
             }
         }

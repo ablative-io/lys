@@ -1,5 +1,6 @@
 //! Team coverage includes admitted descendants and never grants membership authority.
 
+use crate::error_agents::AgentsError;
 use std::collections::{BTreeMap, BTreeSet};
 
 use lys_identity::projection::Projection;
@@ -77,9 +78,11 @@ impl<'a> Membership<'a> {
                     break;
                 }
                 if !visiting.insert(team.created.id.clone()) {
-                    return Err(ServerError::Budget(BudgetError::BudgetsUnavailable {
-                        reason: "team budget coverage contains a parent cycle".to_owned(),
-                    }));
+                    return Err(ServerError::Agents(AgentsError::Budget(
+                        BudgetError::BudgetsUnavailable {
+                            reason: "team budget coverage contains a parent cycle".to_owned(),
+                        },
+                    )));
                 }
                 covered.insert(team.created.id.clone());
                 current = team
@@ -87,9 +90,11 @@ impl<'a> Membership<'a> {
                     .as_ref()
                     .map(|parent| {
                         self.by_id.get(parent.as_str()).copied().ok_or_else(|| {
-                            ServerError::Budget(BudgetError::BudgetsUnavailable {
-                                reason: format!("team budget parent {parent} is missing"),
-                            })
+                            ServerError::Agents(AgentsError::Budget(
+                                BudgetError::BudgetsUnavailable {
+                                    reason: format!("team budget parent {parent} is missing"),
+                                },
+                            ))
                         })
                     })
                     .transpose()?;

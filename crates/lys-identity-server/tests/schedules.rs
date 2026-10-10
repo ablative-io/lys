@@ -499,7 +499,7 @@ async fn without_a_schedules_directory_the_routes_answer_schedules_unavailable()
         None,
         None,
         |config| config.schedules_dir = None,
-        |config| Ok(seed_configured(config, [ADMINISTRATOR])?),
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
     .await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;

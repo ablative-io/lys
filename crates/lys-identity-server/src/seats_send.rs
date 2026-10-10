@@ -239,6 +239,7 @@ fn kept_same(kept: &Sent, asked: &Line) -> bool {
 mod tests {
     use super::checked_text;
     use crate::error::ServerError;
+    use crate::error_agents::AgentsError;
     use crate::error_seat::SeatError;
 
     #[test]
@@ -246,11 +247,15 @@ mod tests {
         assert!(checked_text("waffles", "hello\nthere\tyou").is_ok());
         assert!(matches!(
             checked_text("waffles", "  \n"),
-            Err(ServerError::Seat(SeatError::TextEmpty { .. }))
+            Err(ServerError::Agents(AgentsError::Seat(
+                SeatError::TextEmpty { .. }
+            )))
         ));
         assert!(matches!(
             checked_text("waffles", "hello\u{1b}[2J"),
-            Err(ServerError::Seat(SeatError::TextControl { code: 0x1b, .. }))
+            Err(ServerError::Agents(AgentsError::Seat(
+                SeatError::TextControl { code: 0x1b, .. }
+            )))
         ));
     }
 }

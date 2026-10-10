@@ -7,6 +7,7 @@
 //! its values are never shown. A change names the version it was read at, and a change that
 //! crossed another is refused `BudgetVersionConflict`.
 
+use crate::error_agents::AgentsError;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -111,10 +112,12 @@ fn kind_of(kind: &str) -> Result<HolderKind, ServerError> {
         "agent" => Ok(HolderKind::Agent),
         "team" => Ok(HolderKind::Team),
         "person" => Ok(HolderKind::Person),
-        other => Err(ServerError::Budget(BudgetError::BudgetRefused {
-            refusal: "holder_unknown",
-            words: format!("{other} is not a holder: agent, team or person"),
-        })),
+        other => Err(ServerError::Agents(AgentsError::Budget(
+            BudgetError::BudgetRefused {
+                refusal: "holder_unknown",
+                words: format!("{other} is not a holder: agent, team or person"),
+            },
+        ))),
     }
 }
 
@@ -178,14 +181,14 @@ pub(crate) fn with_budgets<T>(
     act: impl FnOnce(&mut BudgetStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     let store = state.budgets.as_ref().ok_or_else(|| {
-        ServerError::Budget(BudgetError::BudgetsUnavailable {
+        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
             reason: "the configuration names no budgets_dir".to_owned(),
-        })
+        }))
     })?;
     let mut store = store.lock().map_err(|error| {
-        ServerError::Budget(BudgetError::BudgetsUnavailable {
+        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
             reason: format!("budget store lock poisoned: {error}"),
-        })
+        }))
     })?;
     store.settle()?;
     act(&mut store)
@@ -224,10 +227,10 @@ async fn set(
     body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<BudgetsView>, ServerError> {
     let bytes = body.map_err(|rejected| {
-        ServerError::Budget(BudgetError::BudgetRefused {
+        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
             refusal: "budget_malformed",
             words: rejected.body_text(),
-        })
+        }))
     })?;
     let holder = Holder {
         kind: kind_of(&kind)?,
@@ -245,10 +248,10 @@ async fn set(
     let Json(body) = Json::<BudgetBody>::from_request(request, &state)
         .await
         .map_err(|rejected| {
-            ServerError::Budget(BudgetError::BudgetRefused {
+            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
                 refusal: "budget_malformed",
                 words: rejected.body_text(),
-            })
+            }))
         })?;
     let limits = Limits {
         holder: holder.clone(),
@@ -260,10 +263,10 @@ async fn set(
     }
     .checked()
     .map_err(|refused| {
-        ServerError::Budget(BudgetError::BudgetRefused {
+        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
             refusal: refused.refusal,
             words: refused.words,
-        })
+        }))
     })?;
     let zone = crate::configuration_api::organisation(&state)?.zone;
     let standings = crate::budgets_members::standings(&state)?;
@@ -462,7 +465,11 @@ pub(crate) fn current_usage(
             .used_live(limit, agents, at_ms, sessions));
     }
     crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, at_ms, None, sessions)
-        .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
+        .map_err(|reason| {
+            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
+                reason,
+            }))
+        })
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 //! Startup metadata remains read-only; the administrator versions the organisation zone.
 
+use crate::error_agents::AgentsError;
 use std::sync::Arc;
 
 use axum::extract::State;
@@ -88,9 +89,9 @@ pub(crate) fn organisation(
     state: &AppState,
 ) -> Result<crate::configuration_store::Zone, ServerError> {
     let mut store = state.configuration.lock().map_err(|error| {
-        ServerError::Budget(BudgetError::ConfigurationUnavailable {
+        ServerError::Agents(AgentsError::Budget(BudgetError::ConfigurationUnavailable {
             reason: format!("organisation setting lock poisoned: {error}"),
-        })
+        }))
     })?;
     store.settle()?;
     Ok(store.zone().clone())
@@ -118,10 +119,10 @@ async fn set_zone(
     let actor = signed_in(&state, &headers)?;
     crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|error| {
-        ServerError::Budget(BudgetError::BudgetRefused {
+        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
             refusal: "ConfigurationMalformed",
             words: error.body_text(),
-        })
+        }))
     })?;
     let by = crate::routes::with_directory(&state, |directory| {
         if crate::routes::admitted_agent(directory.projection()?, &actor)? {
@@ -132,9 +133,9 @@ async fn set_zone(
             .map(|person| person.to_string())
     })?;
     let mut store = state.configuration.lock().map_err(|error| {
-        ServerError::Budget(BudgetError::ConfigurationUnavailable {
+        ServerError::Agents(AgentsError::Budget(BudgetError::ConfigurationUnavailable {
             reason: format!("organisation setting lock poisoned: {error}"),
-        })
+        }))
     })?;
     store
         .set(body.zone, body.model_windows, body.version, by)

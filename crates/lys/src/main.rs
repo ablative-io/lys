@@ -1,3 +1,6 @@
+// The install renders one json! document of the whole server configuration;
+// its macro recursion passes the default limit of 128.
+#![recursion_limit = "256"]
 //! `lys` — command-line surface for the lys trust primitives.
 //!
 //! This binary is a thin surface over [`lys_core`]: it parses arguments,

@@ -1,5 +1,6 @@
 //! Native feed records charge once before their source cursor is advanced.
 
+use crate::error_agents::AgentsError;
 use std::sync::Arc;
 
 use lys_runner::tracking::{Measure, RECORD_VERSION, Unavailable, UsageRecord};
@@ -12,9 +13,9 @@ use crate::error_budget::BudgetError;
 use crate::routes::AppState;
 
 fn refused(reason: impl Into<String>) -> ServerError {
-    ServerError::Budget(BudgetError::BudgetsUnavailable {
+    ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
         reason: reason.into(),
-    })
+    }))
 }
 
 /// Keep each charge durably, then keep the refusals and cursor together.
