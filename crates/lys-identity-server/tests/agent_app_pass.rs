@@ -345,3 +345,54 @@ async fn a_revoked_credential_is_refused_at_the_next_ask() -> TestResult {
     assert!(!reason.contains(&token), "{reason}");
     Ok(())
 }
+
+#[tokio::test]
+async fn issued_agent_passes_attest_the_current_certificate_key_and_remove_withdrawn_keys()
+-> TestResult {
+    use base64::{
+        Engine as _,
+        engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+    };
+    use lys_core::{Ed25519Identity, ca::create_certificate_request};
+    use sha2::{Digest as _, Sha256};
+
+    let world = opened().await?;
+    let agent = world.scribe.clone();
+    let key = std::sync::Arc::new(Ed25519Identity::load_or_generate(
+        &world.service.dir.path().join("agent.key"),
+    )?);
+    let serial = op()?;
+    let route = format!("/agents/{agent}/certificates");
+    let request = json!({"operation": serial, "request": STANDARD.encode(create_certificate_request(&key, &agent)?)});
+    let (status, issued) = world
+        .service
+        .post(&route, Some(&world.admin), &request)
+        .await?;
+    assert_eq!(status, 200, "{issued}");
+    let grant = given(&world, &agent, "certificate-document").await?;
+    let (_, credential) = credential(&world, &grant).await?;
+    let headers = [(CREDENTIAL, credential.as_str())];
+    let body = json!({"audience": NOTES});
+    let (status, answer) = ask(&world, &agent, &headers, &body).await?;
+    assert_eq!(status, 200);
+    let pass = verified(&world, &answer, NOTES).await?;
+    let expected = URL_SAFE_NO_PAD.encode(Sha256::digest(key.public_key_bytes()));
+    assert_eq!(pass.claims().agent_key_thumbprints, [expected]);
+    let withdrawal = format!("{route}/{serial}/withdrawal");
+    let (status, withdrawn) = world
+        .service
+        .post(
+            &withdrawal,
+            Some(&world.admin),
+            &json!({"reason": "key withdrawn"}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{withdrawn}");
+    let (status, answer) = ask(&world, &agent, &headers, &body).await?;
+    assert_eq!(status, 200);
+    let pass = verified(&world, &answer, NOTES).await?;
+    assert!(pass.claims().agent_key_thumbprints.is_empty());
+    assert_eq!(pass.claims().sub, agent);
+    assert_eq!(pass.claims().rights.len(), 1);
+    Ok(())
+}

@@ -171,3 +171,25 @@ fn wrong_issuer_never_trusts_a_pass_from_another_authority() -> Result {
     );
     Ok(())
 }
+
+#[test]
+fn older_passes_omit_agent_keys_and_new_claims_round_trip() -> Result {
+    let pass = VerifiedPass::verify(
+        &fixture("valid")?,
+        &keys()?,
+        "https://issuer.example",
+        "sample",
+        100,
+    )?;
+    assert!(pass.claims().agent_key_thumbprints.is_empty());
+    let mut value = serde_json::to_value(pass.claims())?;
+    assert!(value.get("agent_key_thumbprints").is_none());
+    value["agent_key_thumbprints"] = serde_json::json!(["signed-key-thumbprint"]);
+    let claims: lys_pass::Claims = serde_json::from_value(value)?;
+    assert_eq!(claims.agent_key_thumbprints, ["signed-key-thumbprint"]);
+    assert_eq!(
+        serde_json::to_value(claims)?["agent_key_thumbprints"],
+        serde_json::json!(["signed-key-thumbprint"])
+    );
+    Ok(())
+}
