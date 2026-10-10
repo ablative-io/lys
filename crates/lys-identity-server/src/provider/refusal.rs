@@ -11,9 +11,9 @@ use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
 
-/// An OAuth error answer carrying the refusal by name.
-pub(super) fn oauth_refusal(error: &ServerError) -> Response {
-    let code = match error {
+/// The OAuth error code a refusal is answered with.
+fn oauth_code(error: &ServerError) -> &'static str {
+    match error {
         ServerError::Provider(ProviderError::ClientUnknown)
         | ServerError::App(
             AppError::CredentialRefused { .. }
@@ -161,7 +161,43 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::IssuerChallengeExpired
         | ServerError::IssuerRefused { .. }
         | ServerError::Runner { .. } => "server_error",
-    };
+    }
+}
+
+/// What the service's log says of a refused token request: the client id
+/// it presented (`none` when it named none), the OAuth code answered, Lys's
+/// name for the refusal and its reason. Never a secret, code, verifier or
+/// token: the reasons are Lys's own words (DIRECTORY-094).
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct RefusedFields {
+    pub(super) client_id: String,
+    pub(super) error: &'static str,
+    pub(super) refusal: String,
+    pub(super) reason: String,
+}
+
+/// The fields of a refused token request's log line.
+pub(super) fn refused_fields(client_id: Option<&str>, error: &ServerError) -> RefusedFields {
+    RefusedFields {
+        client_id: client_id.unwrap_or("none").to_owned(),
+        error: oauth_code(error),
+        refusal: error.name(),
+        reason: error.to_string(),
+    }
+}
+
+/// The one line the service says for a refused token request.
+pub(super) fn refused_line(client_id: Option<&str>, error: &ServerError) -> String {
+    let fields = refused_fields(client_id, error);
+    format!(
+        "token request refused: client_id {} error {} refusal {} reason {}",
+        fields.client_id, fields.error, fields.refusal, fields.reason
+    )
+}
+
+/// An OAuth error answer carrying the refusal by name.
+pub(super) fn oauth_refusal(error: &ServerError) -> Response {
+    let code = oauth_code(error);
     let body = json!({
         "error": code,
         "error_description": error.to_string(),

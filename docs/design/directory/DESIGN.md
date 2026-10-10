@@ -1317,6 +1317,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `docs/design/directory/briefs/DIRECTORY-093.md` | rendered markdown | DIRECTORY-093 |
 | `docs/design/directory/briefs/DIRECTORY-094.json` | the brief | DIRECTORY-094 |
 | `docs/design/directory/briefs/DIRECTORY-094.md` | rendered markdown | DIRECTORY-094 |
+| `crates/lys-identity-server/tests/provider.rs` | the provider's integration tests; its table can say every log line to the test | DIRECTORY-094 |
+| `crates/lys-identity-server/tests/shared/provider_client_credentials.rs` | an app's virtual client credentials at the token exchange, and the refused step's log line | DIRECTORY-094 |
 
 ## Inventory
 

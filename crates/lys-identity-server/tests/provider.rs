@@ -66,9 +66,18 @@ async fn table(code_seconds: u64) -> Result<(Service, String, String), Box<dyn E
 async fn table_kept(
     code_seconds: u64,
 ) -> Result<(Service, String, String, Custody), Box<dyn Error>> {
+    table_kept_saying(code_seconds, None).await
+}
+
+/// `table_kept`, saying every line of the service's log to `say`.
+async fn table_kept_saying(
+    code_seconds: u64,
+    say: Option<lys_identity_server::routes::Say>,
+) -> Result<(Service, String, String, Custody), Box<dyn Error>> {
     let custody = identity_contract::app_custody::serve().await?;
     let broker = custody.base.clone();
-    let (service, ()) = Service::start_adjusted(
+    // Boxed as start_adjusted boxes it: the service's start is a large future.
+    let (service, ()) = Box::pin(Service::start_saying(
         GRANT_MODEL,
         None,
         None,
@@ -99,6 +108,7 @@ async fn table_kept(
                 rights_bytes: None,
             });
         },
+        say,
         |config| {
             let key = config.log_dir.with_file_name("provider.key");
             std::fs::write(key, [5u8; 32])?;
@@ -123,7 +133,7 @@ async fn table_kept(
             )?);
             Ok(())
         },
-    )
+    ))
     .await?;
     let cookie = service
         .sign_in(Login {

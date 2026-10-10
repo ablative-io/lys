@@ -414,3 +414,63 @@ async fn bearer_rotation_keeps_two_issued_virtual_clients_live() -> TestResult {
     }
     Ok(())
 }
+
+/// DIRECTORY-094 R1: a refused token request is said on the service's log,
+/// once, naming the client and the reason and never the secret it was
+/// given; a served one is said nowhere.
+#[tokio::test]
+async fn a_refused_token_step_is_said_with_the_client_and_the_reason() -> TestResult {
+    let heard: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let lines = Arc::clone(&heard);
+    let say: lys_identity_server::routes::Say = Arc::new(move |line: &str| match lines.lock() {
+        Ok(mut lines) => lines.push(line.to_owned()),
+        Err(poisoned) => eprintln!("the test's log was poisoned: {poisoned}; lost: {line}"),
+    });
+    let (service, cookie, _person, custody) = table_kept_saying(CODE_SECONDS, Some(say)).await?;
+    let issued = issue(
+        &service,
+        &cookie,
+        PRODUCT,
+        &OperationId::generate()?.to_string(),
+    )
+    .await?;
+    let credential = value(&issued)?;
+    let refused_lines =
+        |heard: &std::sync::Mutex<Vec<String>>| -> Result<Vec<String>, Box<dyn Error>> {
+            Ok(heard
+                .lock()
+                .map_err(|poisoned| poisoned.to_string())?
+                .iter()
+                .filter(|line| line.contains("token request refused"))
+                .cloned()
+                .collect())
+        };
+    let (status, answer) = sign_in_with(&service, &cookie, &credential, true).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert!(
+        refused_lines(&heard)?.is_empty(),
+        "a served exchange is said nowhere"
+    );
+    let wrong = format!("{credential}-not-this-one");
+    let (status, answer) = sign_in_with(&service, &cookie, &wrong, false).await?;
+    assert_eq!(status, 401, "{answer}");
+    let said = refused_lines(&heard)?;
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said[0].contains(&format!("client_id {PRODUCT} "))
+            && said[0].contains("error invalid_client")
+            && said[0].contains("refusal credential_refused"),
+        "{}",
+        said[0]
+    );
+    let everything = heard
+        .lock()
+        .map_err(|poisoned| poisoned.to_string())?
+        .join("\n");
+    assert!(
+        !everything.contains(&wrong) && !everything.contains(&credential),
+        "a credential reached the log"
+    );
+    drop(custody);
+    Ok(())
+}

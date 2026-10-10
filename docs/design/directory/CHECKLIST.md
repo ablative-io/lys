@@ -574,4 +574,4 @@
 
 ## A refused token step is readable from Lys's log (DIRECTORY-094)
 
-- [ ] **C732** — Every refused /oauth/token request writes one warn line naming the client_id presented, the OAuth code, Lys's refusal name and its reason, and never a secret, code, verifier or token (DIRECTORY-094 R1).
+- [x] **C732** — Every refused /oauth/token request writes one warn line naming the client_id presented, the OAuth code, Lys's refusal name and its reason, and never a secret, code, verifier or token (DIRECTORY-094 R1).

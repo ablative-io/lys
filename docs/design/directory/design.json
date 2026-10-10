@@ -6089,6 +6089,16 @@
       "path": "docs/design/directory/briefs/DIRECTORY-094.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-094"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/provider.rs",
+      "note": "the provider's integration tests; its table can say every log line to the test",
+      "brief": "DIRECTORY-094"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/shared/provider_client_credentials.rs",
+      "note": "an app's virtual client credentials at the token exchange, and the refused step's log line",
+      "brief": "DIRECTORY-094"
     }
   ],
   "inventory": [

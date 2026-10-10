@@ -321,3 +321,35 @@ async fn issuer_challenge_and_refusal_are_oauth_server_errors() -> Result<(), Bo
     }
     Ok(())
 }
+
+/// DIRECTORY-094 R1: a refused token request's log line names the client,
+/// the OAuth code, Lys's name for the refusal and its reason.
+#[test]
+fn a_refused_token_requests_line_names_the_client_and_the_reason() {
+    use crate::apps_error::AppError;
+    use crate::error::ServerError;
+    let refused = ServerError::from(AppError::CredentialRefused {
+        reason: "no live client credential of this app holds that secret",
+    });
+    assert_eq!(
+        super::refusal::refused_fields(Some("haematite"), &refused),
+        super::refusal::RefusedFields {
+            client_id: "haematite".to_owned(),
+            error: "invalid_client",
+            refusal: "credential_refused".to_owned(),
+            reason: "credential_refused: no live client credential of this app holds that secret"
+                .to_owned(),
+        }
+    );
+    let unknown = ServerError::Provider(ProviderError::ClientUnknown);
+    let fields = super::refusal::refused_fields(None, &unknown);
+    assert_eq!(
+        (fields.client_id.as_str(), fields.error),
+        ("none", "invalid_client")
+    );
+    assert!(
+        super::refusal::refused_line(Some("haematite"), &refused).starts_with(
+            "token request refused: client_id haematite error invalid_client refusal credential_refused reason "
+        )
+    );
+}

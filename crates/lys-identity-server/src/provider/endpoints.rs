@@ -8,7 +8,7 @@
 //! own, and never under a provider guard. No lock is held while the token
 //! exchange waits on the secrets broker (`client_auth`).
 
-use super::refusal::oauth_refusal;
+use super::refusal::{oauth_refusal, refused_line};
 use super::{Grant, Kind, OpenIdProvider, encoded, held, random, unavailable};
 use crate::apps_binding::sign_in_redirect;
 use crate::apps_error::AppError;
@@ -294,6 +294,11 @@ pub(super) async fn token(
     headers: HeaderMap,
     form: Result<Form<Exchange>, FormRejection>,
 ) -> Response {
+    // The client the request named, for the log line a refusal is said in.
+    let client_id = match &form {
+        Ok(Form(form)) => presented(&headers, form).map(|(id, _secret)| id),
+        Err(_rejected) => None,
+    };
     let answer = match form {
         Ok(Form(form)) => match super::client_auth::authenticated(&state, &headers, &form).await {
             Ok(client) => super::issue::exchange(&state, &form, &client),
@@ -310,7 +315,10 @@ pub(super) async fn token(
             Json(answer),
         )
             .into_response(),
-        Err(error) => oauth_refusal(&error),
+        Err(error) => {
+            (state.say)(&refused_line(client_id.as_deref(), &error));
+            oauth_refusal(&error)
+        }
     }
 }
 
