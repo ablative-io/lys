@@ -75,6 +75,12 @@ impl Sessions {
             Collected::Notify { notification } => self.notified(id, notification),
         };
         self.writer.barrier()?;
+        if matches!(collected, Collected::Hook { .. }) && result.is_ok() {
+            // An accepted hook moves the owner's durable hook cursor once,
+            // under an intent derived from the cursor it reaches, so a lost
+            // reply never charges it twice (AGENTS-004 R2).
+            self.advance_hook_cursor(id)?;
+        }
         result
     }
 

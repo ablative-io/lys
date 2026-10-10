@@ -236,6 +236,7 @@ impl Sessions {
             endpoint,
             established_at: now_ms(),
         };
+        super::recovery::record_endpoint(&seat)?;
         let pid = seat.endpoint.owner.pid;
         let at = seat.established_at;
         let mut owned = self.owned_index()?;
@@ -250,6 +251,76 @@ impl Sessions {
         }
         owned.insert(seat.binding.session.clone(), seat);
         Ok((pid, at))
+    }
+}
+
+impl Sessions {
+    /// Finds the owners a previous runner started under this state and
+    /// proves each at the kernel: the live ones are indexed, the others
+    /// kept and named (AGENTS-004 R2). Nothing is restarted or replayed.
+    ///
+    /// # Errors
+    ///
+    /// The recovery's refusals; an endpoint record that does not read is
+    /// never skipped.
+    pub fn recover_owners(&self) -> Result<super::recovery::RecoveryCounts, RunnerError> {
+        let (found, counts) = super::recovery::recover(&self.state_dir)?;
+        let mut owned = self.owned_index()?;
+        let mut unreachable = self.unreachable_lock()?;
+        for owner in found {
+            if owner.live() {
+                owned.insert(owner.seat.binding.session.clone(), owner.seat);
+            } else {
+                unreachable.push(owner);
+            }
+        }
+        Ok(counts)
+    }
+
+    /// The owners on record the kernel did not confirm at open.
+    ///
+    /// # Errors
+    ///
+    /// `seat_owner_store_unavailable` when the list's lock is poisoned.
+    pub fn unreachable_owners(&self) -> Result<Vec<super::recovery::Found>, RunnerError> {
+        Ok(self.unreachable_lock()?.clone())
+    }
+
+    fn unreachable_lock(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, Vec<super::recovery::Found>>, RunnerError> {
+        self.unreachable.lock().map_err(|_| {
+            refused(
+                "seat_owner_store_unavailable",
+                "the unreachable-owner list's lock is poisoned",
+            )
+        })
+    }
+
+    /// Moves this owner's durable hook cursor forward by one for `id`, when
+    /// this runner is the owner of `id`; a manual session moves nothing.
+    ///
+    /// # Errors
+    ///
+    /// The store's refusals.
+    pub fn advance_hook_cursor(&self, id: &str) -> Result<(), RunnerError> {
+        let Some(state) = self.owner_state() else {
+            return Ok(());
+        };
+        if state.binding().session != id {
+            return Ok(());
+        }
+        let mut cursors = state.view()?.cursors;
+        cursors.hook = cursors.hook.saturating_add(1);
+        let intent = process::derived_intent(&format!("{id}:hook"), &cursors.hook.to_string());
+        state.record(
+            &intent,
+            &super::record::Intent::Cursors {
+                session: id.to_owned(),
+                cursors,
+            },
+        )?;
+        Ok(())
     }
 }
 

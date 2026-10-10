@@ -243,6 +243,9 @@ pub struct Sessions {
     /// The program owners run as, when said; this runner's own executable
     /// otherwise.
     pub(crate) owner_program: std::sync::OnceLock<PathBuf>,
+    /// Owners on record the kernel did not confirm at open: unknown
+    /// authority, kept and named, never restarted here.
+    pub(crate) unreachable: Mutex<Vec<crate::seat_owner::recovery::Found>>,
     pub(crate) scrollback: usize,
     pub(crate) writer: crate::durable::Writer,
     #[cfg(test)]
@@ -365,6 +368,7 @@ impl Sessions {
                 owner_state: std::sync::OnceLock::new(),
                 owned: Mutex::new(BTreeMap::new()),
                 owner_program: std::sync::OnceLock::new(),
+                unreachable: Mutex::new(Vec::new()),
                 scrollback,
                 writer,
                 #[cfg(test)]
@@ -375,6 +379,9 @@ impl Sessions {
         sessions.persist(&table)?;
         drop(table);
         sessions.writer.barrier()?;
+        // The owners a previous runner started are found and proved, never
+        // restarted or replayed (AGENTS-004 R2).
+        sessions.recover_owners()?;
         Ok(sessions)
     }
 

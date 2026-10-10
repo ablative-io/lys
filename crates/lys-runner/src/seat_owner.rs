@@ -26,6 +26,7 @@ pub mod counts;
 pub mod process;
 pub mod protocol;
 pub mod record;
+pub mod recovery;
 pub mod rules;
 pub mod sessions;
 pub mod spawn;

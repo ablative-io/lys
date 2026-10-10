@@ -139,6 +139,7 @@ pub(super) fn perform(
         )),
         Act::Owned => Ok(Answer::Owned {
             owners: sessions.owned_seats()?,
+            unreachable: sessions.unreachable_owners()?,
         }),
         Act::End { session } => {
             let ended = sessions.end(&session, left)?;

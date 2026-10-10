@@ -387,8 +387,10 @@ pub enum Answer {
     },
     /// The supervised seats this runner started owners for.
     Owned {
-        /// Each owned seat, by session.
+        /// Each owned seat proved live, by session.
         owners: Vec<crate::seat_owner::sessions::OwnedSeat>,
+        /// Each owner on record the kernel did not confirm, named why.
+        unreachable: Vec<crate::seat_owner::recovery::Found>,
     },
 }
 
