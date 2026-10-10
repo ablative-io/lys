@@ -371,7 +371,9 @@ fn a_child_outliving_the_stop_budget_is_refused_by_name() -> TestResult {
         "ending the outliving child",
     )?;
     assert!(ended.status.success(), "{}", output_text(&ended));
-    let refusal = answer.err().ok_or("a child outliving the budget was not refused")?;
+    let refusal = answer
+        .err()
+        .ok_or("a child outliving the budget was not refused")?;
     let words = refusal.to_string();
     assert!(words.starts_with("process_stop_exceeded: "), "{words}");
     assert!(words.contains(&format!("{pid} ")), "{words}");

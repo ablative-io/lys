@@ -294,12 +294,8 @@ fn record_refused(
             if latest != Some(Reported::Starting) {
                 return Ok(());
             }
-            let mut report = runner_report(
-                driven,
-                Reported::Stopped,
-                refusal.clone(),
-                words.clone(),
-            );
+            let mut report =
+                runner_report(driven, Reported::Stopped, refusal.clone(), words.clone());
             report.operation = report_id(&driven.session, REFUSED);
             store.report(report).map(drop)
         })

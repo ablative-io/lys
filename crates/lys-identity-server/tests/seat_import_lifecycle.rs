@@ -295,7 +295,10 @@ async fn seat_import_status_survives_restart_and_upgrade() -> TestResult {
         held,
         "an upgrade handoff changed the import"
     );
-    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
+    assert_eq!(
+        surviving(scene.status().await?),
+        surviving(completed.clone())
+    );
     scene.confirmed_again(&plan, &confirming).await?;
     assert_eq!(
         scene.seat_sessions().await?,
@@ -319,7 +322,10 @@ async fn seat_import_survives_lifecycle() -> TestResult {
         Vec::<Value>::new(),
         "a refused start started"
     );
-    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
+    assert_eq!(
+        surviving(scene.status().await?),
+        surviving(completed.clone())
+    );
     scene.table.close()
 }
 
@@ -342,7 +348,10 @@ async fn seat_import_survives_lifecycle_once_qualified() -> TestResult {
         answer.1
     );
     start_refused(&answer);
-    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
+    assert_eq!(
+        surviving(scene.status().await?),
+        surviving(completed.clone())
+    );
     scene.table.close()
 }
 
@@ -407,7 +416,10 @@ async fn survives(
         "the in-flight send was not resolved as itself"
     );
     assert_eq!(scene.get(&format!("/seats/{SEAT}")).await?, seat);
-    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
+    assert_eq!(
+        surviving(scene.status().await?),
+        surviving(completed.clone())
+    );
     // A confirmation while the seat runs is refused by name (the seat runs,
     // or the restarts forgot the dry run) and touches it not.
     let answer = scene.confirm(plan, confirming).await?;
