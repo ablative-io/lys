@@ -98,11 +98,10 @@ impl Run {
     fn at(url: &str, pass: String, seat: Option<String>) -> CliResult<Self> {
         // The MCP url carries a path (`/api/mcp`); the authority is the part
         // before it.
-        let origin = url
-            .strip_prefix("http://")
-            .map(|rest| rest.split('/').next().unwrap_or(rest))
-            .map(|host_port| format!("http://{host_port}"))
-            .unwrap_or_else(|| url.to_owned());
+        let origin = url.strip_prefix("http://").map_or_else(
+            || url.to_owned(),
+            |rest| format!("http://{}", rest.split('/').next().unwrap_or(rest)),
+        );
         let authority = Authority::from_http_url(&origin)
             .map_err(|detail| refused("server_base_invalid", format!("{url}: {detail}")))?;
         let path = url
