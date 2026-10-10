@@ -3,4 +3,5 @@
 
 pub mod compose;
 pub mod fixtures;
+pub mod processes;
 pub mod server;

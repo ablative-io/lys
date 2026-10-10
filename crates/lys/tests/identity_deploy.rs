@@ -5,17 +5,22 @@
 //! resolves a lost response by read-back, and health names each unready
 //! service. Container-backed: runs only on the identity leg of
 //! .land/gates.sh.
+//!
+//! Every test here ends by proving it left no process running
+//! ([`leaves_no_process`]), and every process it starts is waited for on
+//! every path (DIRECTORY-093).
 
 pub mod identity_support;
 
 use std::collections::BTreeSet;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output};
 
 use identity_support::compose::{self, require_runtime};
 use identity_support::fixtures::{
     Deployment, TestResult, leaks, output_text, repository_root, succeeded,
 };
+use identity_support::processes::{leaves_no_process, output};
 use identity_support::server::{LossyProxy, cookies_set, rauthy_json};
 
 /// The services compose.yaml declares; no other Ablative service is among them.
@@ -78,6 +83,10 @@ fn session_cookie_is_kept_over_plain_http(deployment: &Deployment) -> TestResult
 
 #[test]
 fn id001_deploy_fresh_install_is_ready_and_configure_is_idempotent() -> TestResult {
+    leaves_no_process(deploy_fresh_install_is_ready_and_configure_is_idempotent)
+}
+
+fn deploy_fresh_install_is_ready_and_configure_is_idempotent() -> TestResult {
     require_runtime()?;
     let deployment = Deployment::new("deploy", |text| text)?;
     compose::render(&deployment)?;
@@ -180,6 +189,10 @@ fn id001_deploy_fresh_install_is_ready_and_configure_is_idempotent() -> TestResu
 
 #[test]
 fn health_names_each_unready_service_in_turn() -> TestResult {
+    leaves_no_process(health_names_each_unready_service)
+}
+
+fn health_names_each_unready_service() -> TestResult {
     require_runtime()?;
     let deployment = Deployment::new("health", |text| text)?;
     compose::render(&deployment)?;
@@ -206,18 +219,73 @@ fn health_names_each_unready_service_in_turn() -> TestResult {
     Ok(())
 }
 
-fn git(args: &[&str]) -> TestResult<String> {
-    let output = Command::new("git")
+/// The settings every git command the pin test runs carries, so that none
+/// starts a process it does not wait for: no automatic maintenance or
+/// garbage collection, and none detached; no commit-graph write and no
+/// submodule fetch after a fetch; no file-system monitor daemon; no
+/// credential helper; no hooks (DIRECTORY-093).
+const QUIET_GIT: [&str; 16] = [
+    "-c",
+    "maintenance.auto=false",
+    "-c",
+    "gc.auto=0",
+    "-c",
+    "gc.autoDetach=false",
+    "-c",
+    "fetch.writeCommitGraph=false",
+    "-c",
+    "fetch.recurseSubmodules=false",
+    "-c",
+    "core.fsmonitor=false",
+    "-c",
+    "credential.helper=",
+    "-c",
+    "core.hooksPath=/dev/null",
+];
+
+/// The pin test's fetch of origin's ablative branch. A fetch ends by
+/// starting `git maintenance run --auto --detach`, which nothing waits on,
+/// so it is told to start none, beside [`QUIET_GIT`] saying the same.
+const FETCH_ABLATIVE: [&str; 7] = [
+    "-C",
+    "vendor/rauthy",
+    "fetch",
+    "--quiet",
+    "--no-auto-maintenance",
+    "origin",
+    "ablative",
+];
+
+/// `git -C <repository root>` with [`QUIET_GIT`] and `args`, run to its end
+/// and reaped on every path; refused by name unless it succeeds.
+fn git_run(args: &[&str], trace: bool) -> TestResult<Output> {
+    let mut command = Command::new("git");
+    command
         .arg("-C")
         .arg(repository_root())
+        .args(QUIET_GIT)
         .args(args)
-        .output()?;
-    succeeded(&output, &format!("git {}", args.join(" ")))?;
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
+        .env("GIT_TERMINAL_PROMPT", "0");
+    if trace {
+        command.env("GIT_TRACE", "1");
+    }
+    let what = format!("git {}", args.join(" "));
+    let ran = output(&mut command, &what)?;
+    succeeded(&ran, &what)?;
+    Ok(ran)
+}
+
+fn git(args: &[&str]) -> TestResult<String> {
+    let ran = git_run(args, false)?;
+    Ok(String::from_utf8(ran.stdout)?.trim().to_string())
 }
 
 #[test]
 fn id001_pin_clone_vendor_rauthy_is_the_pinned_ablative_commit() -> TestResult {
+    leaves_no_process(pin_clone_vendor_rauthy_is_the_pinned_ablative_commit)
+}
+
+fn pin_clone_vendor_rauthy_is_the_pinned_ablative_commit() -> TestResult {
     let versions: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(
         repository_root().join("deploy/identity/versions.json"),
     )?)?;
@@ -243,14 +311,20 @@ fn id001_pin_clone_vendor_rauthy_is_the_pinned_ablative_commit() -> TestResult {
     );
     let origin = git(&["-C", "vendor/rauthy", "remote", "get-url", "origin"])?;
     assert_eq!(origin, url, "the submodule was fetched from somewhere else");
-    git(&[
-        "-C",
-        "vendor/rauthy",
-        "fetch",
-        "--quiet",
-        "origin",
-        "ablative",
-    ])?;
+    let fetched = git_run(&FETCH_ABLATIVE, true)?;
+    let trace = String::from_utf8_lossy(&fetched.stderr);
+    assert!(
+        trace.contains("trace: built-in: git fetch"),
+        "the fetch was traced: {trace}"
+    );
+    let started: Vec<&str> = trace
+        .lines()
+        .filter(|line| line.contains("run_command") && line.contains("maintenance"))
+        .collect();
+    assert!(
+        started.is_empty(),
+        "the fetch started maintenance: {started:?}"
+    );
     git(&[
         "-C",
         "vendor/rauthy",

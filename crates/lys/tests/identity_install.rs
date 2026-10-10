@@ -44,6 +44,7 @@ use identity_support::compose::require_runtime;
 use identity_support::fixtures::{
     TestResult, free_network, free_port, output_text, repository_root, succeeded,
 };
+use identity_support::processes::{leaves_no_process, output};
 use sha2::{Digest, Sha256};
 
 /// The deployment configuration the install writes, as shipped.
@@ -70,10 +71,12 @@ fn binaries() -> TestResult<PathBuf> {
 /// The screens, built from this tree and packaged with the manifest the
 /// install verifies, written here from the manifest's documented format.
 fn screens(at: &Path) -> TestResult<PathBuf> {
-    let prepared = Command::new("python3")
-        .arg(repository_root().join("scripts/identity-gates/surface_fixture.py"))
-        .arg(env!("CARGO_TARGET_TMPDIR"))
-        .output()?;
+    let prepared = output(
+        Command::new("python3")
+            .arg(repository_root().join("scripts/identity-gates/surface_fixture.py"))
+            .arg(env!("CARGO_TARGET_TMPDIR")),
+        "prepare the shared screens",
+    )?;
     succeeded(&prepared, "prepare the shared screens")?;
     let surface = PathBuf::from(String::from_utf8(prepared.stdout)?.trim());
     let package = at.join("screens");
@@ -97,10 +100,12 @@ fn screens(at: &Path) -> TestResult<PathBuf> {
             })
         })
         .collect();
-    let commit = Command::new("git")
-        .current_dir(repository_root())
-        .args(["rev-parse", "HEAD"])
-        .output()?;
+    let commit = output(
+        Command::new("git")
+            .current_dir(repository_root())
+            .args(["rev-parse", "HEAD"]),
+        "git rev-parse HEAD",
+    )?;
     succeeded(&commit, "read the screens' source commit")?;
     let manifest = serde_json::json!({
         "format": "lys-identity-surface/v1",
@@ -282,6 +287,12 @@ fn operation() -> String {
 
 #[test]
 fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
+    leaves_no_process(first_install_and_sign_in_never_name_the_issuer)
+}
+
+/// The install test's body, which [`leaves_no_process`] proves left no
+/// process running once its estate is closed or dropped (DIRECTORY-093).
+fn first_install_and_sign_in_never_name_the_issuer() -> TestResult {
     require_runtime()?;
     let bin = binaries()?;
     let work = tempfile::TempDir::new()?;
@@ -307,20 +318,22 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         estate.root.path().join("deployment.toml"),
         deployment(&estate.project, estate.rauthy_port, estate.service_port)?,
     )?;
-    let installed = Command::new(bin.join("lys"))
-        .args(["identity", "install", "--root"])
-        .arg(estate.root.path())
-        .arg("--service-port")
-        .arg(estate.service_port.to_string())
-        .arg("--broker-port")
-        .arg(estate.broker_port.to_string())
-        .arg("--proxy-port")
-        .arg(proxy_port.to_string())
-        .arg("--surface")
-        .arg(&package)
-        .env_clear()
-        .envs(login.iter().map(|(name, value)| (name, value)))
-        .output()?;
+    let installed = output(
+        Command::new(bin.join("lys"))
+            .args(["identity", "install", "--root"])
+            .arg(estate.root.path())
+            .arg("--service-port")
+            .arg(estate.service_port.to_string())
+            .arg("--broker-port")
+            .arg(estate.broker_port.to_string())
+            .arg("--proxy-port")
+            .arg(proxy_port.to_string())
+            .arg("--surface")
+            .arg(&package)
+            .env_clear()
+            .envs(login.iter().map(|(name, value)| (name, value))),
+        "lys identity install",
+    )?;
     succeeded(&installed, "lys identity install")?;
     let recorded: serde_json::Value =
         serde_json::from_slice(&std::fs::read(estate.root.path().join("identity.json"))?)?;

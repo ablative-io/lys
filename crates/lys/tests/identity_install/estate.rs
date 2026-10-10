@@ -6,6 +6,7 @@ use rustix::fs::{FlockOperation, flock};
 use rustix::io::Errno;
 
 use super::identity_support::fixtures::{TestResult, succeeded};
+use super::identity_support::processes::output;
 
 /// The prefix every estate's folder carries, so the folder a killed test
 /// leaves can be found and swept by the next estate.
@@ -57,9 +58,10 @@ fn stop_service(pid_file: &Path) -> TestResult<bool> {
         Ok(()) => {}
         Err(Errno::AGAIN) => {
             stopped = true;
-            let killed = Command::new("kill")
-                .args(["-KILL", &pid.to_string()])
-                .output()?;
+            let killed = output(
+                Command::new("kill").args(["-KILL", &pid.to_string()]),
+                &format!("kill -KILL {pid}"),
+            )?;
             succeeded(&killed, &format!("stop owned service {pid}"))?;
             lock(&exit, FlockOperation::LockShared)?;
         }
@@ -95,16 +97,16 @@ fn stop_all(root: &Path, project: &str, failures: &mut Vec<String>) -> Vec<&'sta
         }
     }
     if root.join("state/compose.env").exists() {
-        match compose(root, project)
-            .args(["down", "-v", "--remove-orphans"])
-            .output()
-        {
-            Ok(output) => {
-                if let Err(error) = succeeded(&output, "remove install containers") {
+        match output(
+            compose(root, project).args(["down", "-v", "--remove-orphans"]),
+            "remove install containers",
+        ) {
+            Ok(removed) => {
+                if let Err(error) = succeeded(&removed, "remove install containers") {
                     failures.push(error.to_string());
                 }
             }
-            Err(error) => failures.push(format!("remove install containers: {error}")),
+            Err(error) => failures.push(error.to_string()),
         }
     }
     stopped
@@ -277,16 +279,15 @@ impl Estate {
             eprintln!("===== no compose project was written; no container logs");
             return;
         }
-        match self
-            .compose()
-            .args(["logs", "--no-color", "--timestamps"])
-            .output()
-        {
-            Ok(output) => eprintln!(
+        match output(
+            self.compose().args(["logs", "--no-color", "--timestamps"]),
+            "docker compose logs",
+        ) {
+            Ok(logs) => eprintln!(
                 "===== docker compose logs ({}) =====\n{}{}",
-                output.status,
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
+                logs.status,
+                String::from_utf8_lossy(&logs.stdout),
+                String::from_utf8_lossy(&logs.stderr)
             ),
             Err(error) => eprintln!("===== docker compose logs could not run: {error}"),
         }

@@ -31,6 +31,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::identity_support::fixtures::{TestResult, succeeded};
+use super::identity_support::processes::output;
 use super::{EMAIL, Heard, PASSWORD, Seen, ask, operation, send};
 
 /// The fixture product's client id, an app id.
@@ -169,18 +170,20 @@ fn recorded_pass_lifetime(installed: &Installed<'_>) -> TestResult<u64> {
 /// Runs the install again, which keeps what it wrote and restarts the
 /// service on it.
 fn install_again(installed: &Installed<'_>, read: &mut Heard) -> TestResult {
-    let again = Command::new(installed.lys)
-        .args(["identity", "install", "--root"])
-        .arg(installed.root)
-        .arg("--service-port")
-        .arg(installed.service_port.to_string())
-        .arg("--broker-port")
-        .arg(installed.broker_port.to_string())
-        .arg("--surface")
-        .arg(installed.package)
-        .env_clear()
-        .envs(installed.login.iter().map(|(name, value)| (name, value)))
-        .output()?;
+    let again = output(
+        Command::new(installed.lys)
+            .args(["identity", "install", "--root"])
+            .arg(installed.root)
+            .arg("--service-port")
+            .arg(installed.service_port.to_string())
+            .arg("--broker-port")
+            .arg(installed.broker_port.to_string())
+            .arg("--surface")
+            .arg(installed.package)
+            .env_clear()
+            .envs(installed.login.iter().map(|(name, value)| (name, value))),
+        "lys identity install, run again",
+    )?;
     succeeded(&again, "lys identity install, run again")?;
     read.install(&again);
     Ok(())

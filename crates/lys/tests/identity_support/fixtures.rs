@@ -15,6 +15,7 @@ use std::process::{Command, Output};
 use nix::fcntl::{Flock, FlockArg};
 
 use super::compose;
+use super::processes::output;
 
 /// The result every identity test and helper returns.
 pub type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -39,9 +40,10 @@ pub fn free_port() -> TestResult<u16> {
 /// claims are kept in one file every process reads and writes under an
 /// exclusive lock; a claim lasts as long as the process that made it.
 pub fn free_network() -> TestResult<String> {
-    let listed = Command::new("docker")
-        .args(["network", "ls", "--quiet"])
-        .output()?;
+    let listed = output(
+        Command::new("docker").args(["network", "ls", "--quiet"]),
+        "docker network ls",
+    )?;
     succeeded(&listed, "docker network ls")?;
     let ids: Vec<String> = String::from_utf8_lossy(&listed.stdout)
         .split_whitespace()
@@ -49,11 +51,13 @@ pub fn free_network() -> TestResult<String> {
         .collect();
     let mut used = Vec::new();
     if !ids.is_empty() {
-        let inspected = Command::new("docker")
-            .args(["network", "inspect", "--format"])
-            .arg("{{range .IPAM.Config}}{{.Subnet}} {{end}}")
-            .args(&ids)
-            .output()?;
+        let inspected = output(
+            Command::new("docker")
+                .args(["network", "inspect", "--format"])
+                .arg("{{range .IPAM.Config}}{{.Subnet}} {{end}}")
+                .args(&ids),
+            "docker network inspect",
+        )?;
         succeeded(&inspected, "docker network inspect")?;
         used.extend(
             String::from_utf8_lossy(&inspected.stdout)
@@ -110,11 +114,11 @@ fn alive(pid: u32) -> TestResult<bool> {
     if pid == std::process::id() {
         return Ok(true);
     }
-    Ok(Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stderr(std::process::Stdio::null())
-        .status()?
-        .success())
+    let probed = output(
+        Command::new("kill").args(["-0", &pid.to_string()]),
+        &format!("kill -0 {pid}"),
+    )?;
+    Ok(probed.status.success())
 }
 
 /// The addresses an IPv4 range covers, first and one past the last.
@@ -204,10 +208,12 @@ impl Deployment {
 
     /// Runs `lys identity <subcommand> --config <config>`.
     pub fn lys_with(&self, subcommand: &str, config: &Path) -> TestResult<Output> {
-        Ok(Command::new(env!("CARGO_BIN_EXE_lys"))
-            .args(["identity", subcommand, "--config"])
-            .arg(config)
-            .output()?)
+        output(
+            Command::new(env!("CARGO_BIN_EXE_lys"))
+                .args(["identity", subcommand, "--config"])
+                .arg(config),
+            &format!("lys identity {subcommand}"),
+        )
     }
 
     /// Runs `lys identity <subcommand>` against this deployment.

@@ -6,6 +6,7 @@ use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 
 use super::fixtures::{Deployment, TestResult, output_text, repository_root, succeeded};
+use super::processes::output;
 
 /// How long a fresh deployment may take to become ready once its images
 /// are present.
@@ -13,10 +14,8 @@ pub const READY_WITHIN: Duration = Duration::from_secs(180);
 
 /// Refuses to go on without a container runtime answering `docker info`.
 pub fn require_runtime() -> TestResult {
-    let answered = Command::new("docker")
-        .arg("info")
-        .output()
-        .is_ok_and(|output| output.status.success());
+    let answered = output(Command::new("docker").arg("info"), "docker info")
+        .is_ok_and(|answer| answer.status.success());
     if answered {
         Ok(())
     } else {
@@ -46,7 +45,7 @@ pub fn compose(deployment: &Deployment, args: &[&str]) -> TestResult<Output> {
     if deployment.bundled {
         command.args(["--profile", "bundled-db"]);
     }
-    Ok(command.args(args).output()?)
+    output(command.args(args), &format!("docker compose {}", args.join(" ")))
 }
 
 /// The resolved compose model, as JSON.
