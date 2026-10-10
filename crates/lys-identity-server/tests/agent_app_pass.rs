@@ -396,3 +396,112 @@ async fn issued_agent_passes_attest_the_current_certificate_key_and_remove_withd
     assert_eq!(pass.claims().rights.len(), 1);
     Ok(())
 }
+
+fn signed_pass_header(
+    agent: &str,
+    path: &str,
+    body: &Value,
+    key: &lys_core::Ed25519Identity,
+    nonce: u8,
+) -> Result<String, Box<dyn Error>> {
+    let signed_at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
+    let nonce = format!("{nonce:02x}").repeat(16);
+    let bytes = serde_json::to_vec(body)?;
+    let payload =
+        lys_identity_server::agent_signature::payload("POST", path, &bytes, signed_at, &nonce);
+    let signature = lys_core::attestation::sign_attestation(&payload, key).to_cose_bytes();
+    let mut encoded = String::new();
+    use std::fmt::Write as _;
+    for byte in signature {
+        write!(encoded, "{byte:02x}")?;
+    }
+    Ok(format!("{agent} {signed_at} {nonce} {encoded}"))
+}
+
+#[tokio::test]
+async fn a_certified_key_proves_an_app_pass_and_each_rejected_signature_keeps_its_name()
+-> TestResult {
+    use base64::{
+        Engine as _,
+        engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+    };
+    use lys_core::{Ed25519Identity, ca::create_certificate_request};
+    use lys_identity_server::agent_signature::HEADER;
+    use sha2::{Digest as _, Sha256};
+
+    let world = opened().await?;
+    let agent = world.scribe.clone();
+    let key = std::sync::Arc::new(Ed25519Identity::load_or_generate(
+        &world.service.dir.path().join("signed-agent.key"),
+    )?);
+    let serial = op()?;
+    let certificate_route = format!("/agents/{agent}/certificates");
+    let request = json!({"operation": serial, "request": STANDARD.encode(create_certificate_request(&key, &agent)?)});
+    let (status, certificate) = world
+        .service
+        .post(&certificate_route, Some(&world.admin), &request)
+        .await?;
+    assert_eq!(status, 200, "{certificate}");
+    let grant = given(&world, &agent, "signed-document").await?;
+    let body = json!({"audience": NOTES});
+    let path = format!("/agents/{agent}/pass");
+    let header = signed_pass_header(&agent, &path, &body, &key, 1)?;
+    let headers = [(HEADER, header.as_str())];
+    let (status, answer) = ask(&world, &agent, &headers, &body).await?;
+    assert_eq!(status, 200, "{answer}");
+    let pass = verified(&world, &answer, NOTES).await?;
+    assert_eq!(pass.claims().sub, agent);
+    assert_eq!(
+        pass.claims().agent_key_thumbprints,
+        [URL_SAFE_NO_PAD.encode(Sha256::digest(key.public_key_bytes()))]
+    );
+    assert_eq!(pass.claims().rights.len(), 1);
+    assert_eq!(pass.claims().rights[0].grant, grant);
+
+    let replayed = ask(&world, &agent, &headers, &body).await?;
+    refused(&replayed, 401, "AgentSignatureRefused")?;
+    assert!(
+        replayed.1["reason"]
+            .as_str()
+            .ok_or("no replay reason")?
+            .contains("nonce")
+    );
+
+    let header = signed_pass_header(&agent, &path, &body, &key, 2)?;
+    let changed = json!({"audience": FILES});
+    let tampered = ask(&world, &agent, &[(HEADER, &header)], &changed).await?;
+    refused(&tampered, 401, "AgentSignatureRefused")?;
+
+    let other_path = format!("/agents/{}/pass", world.courier);
+    let header = signed_pass_header(&agent, &other_path, &body, &key, 3)?;
+    let other = ask(&world, &world.courier, &[(HEADER, &header)], &body).await?;
+    refused(&other, 401, "AgentSignatureRefused")?;
+
+    let (_, token) = credential(&world, &grant).await?;
+    let header = signed_pass_header(&agent, &path, &body, &key, 4)?;
+    let mixed = ask(
+        &world,
+        &agent,
+        &[(HEADER, &header), (CREDENTIAL, &token)],
+        &body,
+    )
+    .await?;
+    refused(&mixed, 401, "agent_pass_unproven")?;
+    let legacy = ask(&world, &agent, &[(CREDENTIAL, &token)], &body).await?;
+    assert_eq!(legacy.0, 200, "{}", legacy.1);
+
+    let withdrawal = format!("{certificate_route}/{serial}/withdrawal");
+    let (status, withdrawn) = world
+        .service
+        .post(
+            &withdrawal,
+            Some(&world.admin),
+            &json!({"reason": "key withdrawn"}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{withdrawn}");
+    let header = signed_pass_header(&agent, &path, &body, &key, 5)?;
+    let withdrawn = ask(&world, &agent, &[(HEADER, &header)], &body).await?;
+    refused(&withdrawn, 401, "AgentSignatureRefused")?;
+    Ok(())
+}
