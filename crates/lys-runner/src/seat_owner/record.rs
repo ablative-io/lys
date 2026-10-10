@@ -42,6 +42,9 @@ pub struct Lease {
     pub holder: Holder,
     /// When it was taken, in milliseconds since the Unix epoch.
     pub taken_at: u64,
+    /// The build of the owner binary holding it (AGENTS-004 amendment 1).
+    #[serde(default)]
+    pub build: String,
 }
 
 /// Where the session's custody stands.
@@ -135,6 +138,9 @@ pub enum Intent {
         generation: u64,
         holder: Holder,
         taken_at: u64,
+        /// The build of the binary taking it.
+        #[serde(default)]
+        build: String,
     },
     /// Set the harness process-start identity.
     Harness { session: String, start: Leader },

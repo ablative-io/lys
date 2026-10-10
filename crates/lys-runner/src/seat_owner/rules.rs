@@ -155,6 +155,7 @@ pub(super) fn apply(projection: &mut Projection, intent: &Intent) -> Result<(), 
             generation,
             holder,
             taken_at,
+            build,
         } => {
             let record = held(projection, session)?;
             if *generation <= record.lease.generation {
@@ -175,6 +176,7 @@ pub(super) fn apply(projection: &mut Projection, intent: &Intent) -> Result<(), 
                 generation: *generation,
                 holder: holder.clone(),
                 taken_at: *taken_at,
+                build: build.clone(),
             };
         }
         Intent::Harness { session, start } => {

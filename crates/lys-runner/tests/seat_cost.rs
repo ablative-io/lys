@@ -38,6 +38,7 @@ fn establish(session: &str, pid: u32) -> Intent {
                 generation: 1,
                 holder: Holder::Owner { start: leader(pid) },
                 taken_at: 1_760_060_000_000,
+                build: "0.0.0-test".to_owned(),
             },
             custody: Custody::Owned,
             cursors: Cursors::default(),
@@ -401,10 +402,12 @@ fn seat_owner_idle_is_event_driven() -> TestResult {
         "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f",
         std::path::Path::new("/tmp/owner.sock"),
         &own,
+        "0.0.0-test",
     );
     writeln!(writer, "{line}")?;
     waited.recv()?;
-    let (runner, socket, announced) = waiter.join().map_err(|_| "the waiter panicked")??;
+    let (runner, socket, announced, build) = waiter.join().map_err(|_| "the waiter panicked")??;
+    assert_eq!(build, "0.0.0-test");
     assert_eq!(runner, "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f");
     assert_eq!(socket, std::path::PathBuf::from("/tmp/owner.sock"));
     assert_eq!(announced, own);

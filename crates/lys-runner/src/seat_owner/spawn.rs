@@ -212,7 +212,7 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
         .ok_or_else(|| start_failed("the owner's pipe was not made"))?;
     let meter = Meter::default();
     let ready = wait_ready(&mut BufReader::new(pipe), &meter);
-    let (runner, socket, announced) = match ready {
+    let (runner, socket, announced, build) = match ready {
         Ok(ready) => ready,
         Err(error) => {
             let status = child.wait().map_or_else(
@@ -255,7 +255,9 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             }
         })
         .map_err(|error| start_failed(format!("the reaper could not start: {error}")))?;
-    Ok(OwnerEndpoint::new(dir, runner, announced))
+    let mut endpoint = OwnerEndpoint::new(dir, runner, announced);
+    endpoint.build = build;
+    Ok(endpoint)
 }
 
 /// Waits on the owner's ready line. The read blocks on the pipe: that is
@@ -268,7 +270,7 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
 pub fn wait_ready(
     reader: &mut impl BufRead,
     meter: &Meter,
-) -> Result<(String, PathBuf, Leader), RunnerError> {
+) -> Result<(String, PathBuf, Leader, String), RunnerError> {
     let mut line = String::new();
     let read = reader
         .read_line(&mut line)

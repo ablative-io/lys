@@ -23,6 +23,16 @@ use crate::peer::Leader;
 /// The owner protocol's version, carried in every answer.
 pub const OWNER_PROTOCOL: u32 = 1;
 
+/// The build this binary announces as an owner.
+pub const BUILD: &str = env!("CARGO_PKG_VERSION");
+
+/// The build recorded for an owner that announced none.
+pub const UNVERSIONED: &str = "unversioned";
+
+fn unversioned() -> String {
+    UNVERSIONED.to_owned()
+}
+
 /// The directory under the runner's state holding one directory per owner.
 pub const OWNERS_DIR: &str = "owners";
 /// The owner's socket, in its directory.
@@ -337,6 +347,11 @@ pub struct OwnerEndpoint {
     pub runner: String,
     /// The owner process.
     pub owner: Leader,
+    /// The build of the owner binary serving it, as it announced itself:
+    /// a seat started before an upgrade keeps its original owner and
+    /// says so (AGENTS-004 amendment 1).
+    #[serde(default = "unversioned")]
+    pub build: String,
 }
 
 impl OwnerEndpoint {
@@ -350,6 +365,7 @@ impl OwnerEndpoint {
             socket,
             runner,
             owner,
+            build: BUILD.to_owned(),
         }
     }
 }
@@ -358,12 +374,13 @@ impl OwnerEndpoint {
 /// runner reads it from the pipe it holds, and nothing else, as the ready
 /// signal. Anything else on that pipe before it is the owner's refusal.
 #[must_use]
-pub fn ready_line(runner: &str, socket: &Path, owner: &Leader) -> String {
+pub fn ready_line(runner: &str, socket: &Path, owner: &Leader, build: &str) -> String {
     format!(
-        "owner ready runner={runner} socket={} pid={} start={}",
+        "owner ready runner={runner} socket={} pid={} start={} build={}",
         socket.display(),
         owner.pid,
-        owner.start.0
+        owner.start.0,
+        build.trim()
     )
 }
 
@@ -386,12 +403,14 @@ pub fn parse_ready_line(line: &str) -> Result<(String, PathBuf, Leader), RunnerE
     let mut socket = None;
     let mut pid = None;
     let mut start = None;
+    let mut build = UNVERSIONED.to_owned();
     for member in rest.split(' ') {
         match member.split_once('=') {
             Some(("runner", value)) => runner = Some(value.to_owned()),
             Some(("socket", value)) => socket = Some(PathBuf::from(value)),
             Some(("pid", value)) => pid = value.parse::<u32>().ok(),
             Some(("start", value)) => start = Some(value.to_owned()),
+            Some(("build", value)) if !value.is_empty() => build = value.to_owned(),
             _ => {}
         }
     }
@@ -404,6 +423,7 @@ pub fn parse_ready_line(line: &str) -> Result<(String, PathBuf, Leader), RunnerE
                     pid,
                     start: crate::peer::StartIdentity(start),
                 },
+                build,
             ))
         }
         _ => Err(RunnerError::refused(

@@ -9,6 +9,7 @@ export interface OwnedSeatView {
   session: string;
   conversation: string;
   generation: number;
+  build: string;
   owner_pid: number;
   owner_start: string;
   established_at: number;
@@ -31,9 +32,9 @@ export function OwnedList() {
   return <Gate load={load} title="the owned seats" renderError={(error) => <p role="alert" className="why-not">The owned seats could not be read: {String(error)}</p>} ok={(view) => <>
     {view.runner === 'unknown' ? <p role="status" className="note">The runner could not be read{view.reason ? ': ' + view.reason : ''}. Every owner below is as last recorded.</p> : null}
     {view.owners.length ? <table>
-      <thead><tr><th>Seat</th><th>Session</th><th>Generation</th><th>Owner</th><th>Established</th></tr></thead>
+      <thead><tr><th>Seat</th><th>Session</th><th>Generation</th><th>Build</th><th>Owner</th><th>Established</th></tr></thead>
       <tbody>{view.owners.map((owner) => <tr key={owner.session}>
-        <td>{owner.seat}</td><td>{owner.session}<p className="note">Conversation {owner.conversation}</p></td><td>{owner.generation}</td>
+        <td>{owner.seat}</td><td>{owner.session}<p className="note">Conversation {owner.conversation}</p></td><td>{owner.generation}</td><td>{owner.build}</td>
         <td>pid {owner.owner_pid}<p className="note">{reach(owner)}</p></td><td>{clockMs(owner.established_at)}</td>
       </tr>)}</tbody>
     </table> : <p className="note">This runner has started no seat owner.</p>}

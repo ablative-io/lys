@@ -65,6 +65,7 @@ fn record(session: &str, pid: u32) -> OwnerRecord {
             generation: 1,
             holder: Holder::Owner { start: leader(pid) },
             taken_at: 1_760_060_000_000,
+            build: "0.0.0-test".to_owned(),
         },
         custody: Custody::Owned,
         cursors: Cursors::default(),
@@ -432,6 +433,7 @@ fn seat_owner_store_fences_a_live_owner() -> TestResult {
             start: leader(5_008),
         },
         taken_at: 3,
+        build: "0.0.0-test".to_owned(),
     };
     assert_eq!(
         refusal(store.record(&hex_id(31), &stale)),

@@ -78,6 +78,7 @@ fn record(session: &str, start: Leader) -> OwnerRecord {
             generation: 1,
             holder: Holder::Owner { start },
             taken_at: 1_760_060_000_000,
+            build: "0.0.0-test".to_owned(),
         },
         custody: Custody::Owned,
         cursors: Cursors::default(),

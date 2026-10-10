@@ -101,37 +101,23 @@ WHEN the runner or identity server exits or restarts, THE SYSTEM SHALL leave the
 - S406 (An operator, a person running the estate) — As an operator, I want a supervised seat to keep working when its terminal, runner or identity service exits, so that a viewing or service failure does not end its conversation.
 - S407 (An operator, a person running the estate) — As an operator, I want to upgrade Lys while an active seat streams and receives control replies, so that the same seat continues under one proven owner.
 
-### R3: Hand active sessions and streams over during an upgrade
+### R3: An upgrade of the owner binary moves no harness
 
-WHEN an installed Lys upgrade is requested with supervised seats alive, THE SYSTEM SHALL prepare the incoming binary and authenticate its compatible handover endpoint before changing ownership or stopping an outgoing component. Replace crates/lys/src/identity/upgrade/runner.rs capture/empty refusal runner_sessions_live and stop path that stops the proxy with a handover for supervised seats. Transfer the same seat/session/generation, harness process-start identity, open control and terminal descriptors, partial frame bytes, bounded queued controls, receipt/feed cursors and required credential references through an authenticated versioned manifest. Keep one authoritative writer and transfer its lease atomically only after the successor confirms custody and durability. Retain the outgoing owner and compatible executable until that acknowledgement and the installed selection are both durable; rollback transfers custody back through the same authenticated lease fence before retiring the successor; an incompatible, unready or failed successor refuses the upgrade by name while the old owner continues serving. No stop/start fallback, replacement session or killed harness is permitted. The proxy handover preserves the listening endpoint, accepted upstream stream, partial downstream frame and call/usage journal custody; an accepted call is forwarded once and remains readable during transfer. Stage incoming services before changing the installed selection; rollback retains the live compatible owner and follows the same custody fence. Existing dormant handover.rs, session/adopt.rs, commands/proxy_handover.rs and proxy/handing.rs are source inventory only: undeclared helpers are not proof, and any reused helper must be integrated and satisfy this contract. Legacy manual sessions keep their existing explicit upgrade refusal rather than being adopted as supervised seats.
+Amendment 1 (10 October 2026, Waffles 16:1x on Tom's word; the descriptor transfer this requirement first asked for is not written, by design, and that is the ruling, not a gap). WHEN the installed Lys binary is upgraded with supervised seats alive, THE SYSTEM SHALL leave every live seat with the owner process it started with: one owner per seat means no harness descriptor, partial frame or child is ever moved between processes. The owner a seat started with keeps serving that seat until the seat ends; every seat started after the upgrade is served by the new binary. Each owner announces its build on its ready line; the runner records it in the owned seat's endpoint record and the owner in its lease; the owned-seats readback (Act::Owned, GET /seats/owned and the Seats screen) names the build per seat so the screen can say which seats still run the old binary. SCM_RIGHTS descriptor passing and kqueue EVFILT_PROC are not in Lys. The custody fence (prepare, transfer at the next generation, release) stays recorded and refused by name at the store.
 
 **Acceptance:**
-- seat_upgrade_hands_active_turn waits on a qualified harness active-turn event, parks an upstream stream after one partial frame, and upgrades through the real install path. On explicit release the complete stream is byte-identical, the same harness/session/conversation continues, each control receipt and hook is recorded once, and zero harness stop/start calls occur.
-- seat_upgrade_transfers_single_writer parks the successor before custody acknowledgement while a control and hook arrive. The old owner serves or durably queues them under its lease. After acknowledgement only the successor writes; the same ids/cursors are retained and no operation or usage row is duplicated.
-- seat_upgrade_failure_keeps_old_owner injects incompatible manifest, successor exit before acknowledgement, transfer write failure and install selection failure at separate named barriers. Each names the failed stage, leaves the outgoing compatible owner/harness serving, and performs no stop/start fallback or blind control resend.
-- seat_proxy_upgrade_keeps_accepted_call drives a real accepted streaming proxy call and a queued connection across handover. Both return their correlated complete responses; upstream-forward count is exactly one per call and there is one journal writer at every transition.
+- seat_started_before_an_upgrade_keeps_its_owner starts a seat with the owner binary announcing one build, replaces the runner, starts a second seat with the binary announcing a newer build, and proves the first seat is still served by its original owner process (same pid and start identity, same build) while the second names the new build; the replacement runner's recovery lists both live with their builds in one visit each.
 
 **Files:**
-- create: crates/lys-runner/src/seat_owner/handoff.rs
-- create: crates/lys-runner/tests/seat_handoff.rs
-- create: crates/lys-home/src/proxy/seat_handoff.rs
-- create: crates/lys/tests/seat_upgrade.rs
-- modify: crates/lys/src/identity/upgrade.rs
-- modify: crates/lys/src/identity/upgrade/runner.rs
-- modify: crates/lys/src/identity/upgrade/runner_tests.rs
-- modify: crates/lys/src/identity/install/proxy.rs
-- modify: crates/lys/src/commands/mod.rs
-- modify: crates/lys/src/commands/proxy.rs
-- modify: crates/lys/src/commands/proxy_handover.rs
-- modify: crates/lys-home/src/proxy/mod.rs
-- modify: crates/lys-home/src/proxy/forward.rs
-- modify: crates/lys-home/src/proxy/journal.rs
-
-**Checklist:**
-- C713 — An upgrade hands an active turn, control descriptors and proxy stream over with one writer; refusal keeps the old live owner and never falls back to stop/start (AGENTS-004 R3).
-
-**Stories:**
-- S407 (An operator, a person running the estate) — As an operator, I want to upgrade Lys while an active seat streams and receives control replies, so that the same seat continues under one proven owner.
+- create: crates/lys-runner/tests/seat_upgrade.rs
+- modify: crates/lys-runner/src/seat_owner/protocol.rs
+- modify: crates/lys-runner/src/seat_owner/spawn.rs
+- modify: crates/lys-runner/src/seat_owner/record.rs
+- modify: crates/lys-runner/src/seat_owner/rules.rs
+- modify: crates/lys-runner/src/seat_owner/process.rs
+- modify: crates/lys-identity-server/src/seat_supervision.rs
+- modify: surface/identity/src/features/sessions/Owned.tsx
+- modify: docs/ops/SEAT-SUPERVISION.md
 
 ### R4: Version ownership records and migrate actual installed state
 

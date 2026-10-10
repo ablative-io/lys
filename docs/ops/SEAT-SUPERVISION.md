@@ -45,9 +45,9 @@ The identity server signs its acts for the owner's runner id, which the bound vi
 
 `tests/seat_cost_ratchet.json` holds, per hot path (proxy forward, hook ingest, control delivery, registry read, reconnect, custody transfer), the ceiling for calls, keyed record visits, copied bytes, journal appends, physical syncs and idle wakes. A change is accepted at equal or lower counts only; the file's `provenance` member says whether a ceiling was measured or derived by reading. One owner transition is one sync; a duplicate readback is none; a registry read is one keyed lookup and no file; a reconnect visits the live owners plus at most the tail. The wait for an owner is a blocking read on its ready pipe: no timer, no poll, zero wakes while nothing arrives.
 
-## What is not here
+## Upgrading the owner binary
 
-The transfer of a live harness from an owner to its upgrade successor (the owner binary's own upgrade: control pipe descriptors, partial frames, and observing the harness exit without being its parent) is a design row, not written. The custody fence it will run through (prepare, transfer to a successor at the next generation, release) is recorded and tested at the store.
+An owner is never handed a live harness (AGENTS-004 amendment 1, Waffles 10 October 2026 16:1x, on Tom's word). One owner per seat means an upgrade of the owner binary moves no descriptor: the owner process a seat started with keeps serving that seat until the seat ends, and every seat started after the upgrade is served by the new binary. Each owner announces its build on its ready line; the runner records it in the owned seat (`endpoint.json`, member `build`) and the owner in its lease, and `GET /seats/owned` shows it per seat, so the screen says which seats still run the old build. `SCM_RIGHTS` and `kqueue EVFILT_PROC` are not in Lys. The custody fence (prepare, transfer at the next generation, release) stays recorded and tested at the store for a successor that is a new owner process of the same seat.
 
 ## Reading an owner
 

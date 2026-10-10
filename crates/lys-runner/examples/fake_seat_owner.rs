@@ -100,7 +100,16 @@ fn owner(args: &[String]) -> Result<(), RunnerError> {
         runner_id.clone(),
         socket.clone(),
     )))?;
-    let ready = ready_line(&runner_id, &socket, &own);
+    // The build this fake owner announces: `<state>/owner-build` when the
+    // test wrote one, so a seat started after an "upgrade" names the new
+    // build while an earlier seat keeps its owner and its build.
+    let build = socket
+        .ancestors()
+        .nth(3)
+        .map(|state| state.join("owner-build"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map_or_else(|| "fake".to_owned(), |build| build.trim().to_owned());
+    let ready = ready_line(&runner_id, &socket, &own, &build);
     runner.serve_until_stopped(move || {
         let mut out = std::io::stdout();
         if let Err(error) = writeln!(out, "{ready}").and_then(|()| out.flush()) {

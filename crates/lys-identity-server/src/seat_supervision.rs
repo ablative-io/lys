@@ -80,6 +80,8 @@ pub struct OwnedSeatView {
     pub generation: u64,
     /// The machine whose runner started it.
     pub machine: String,
+    /// The build of the owner binary serving it.
+    pub build: String,
     /// The owner process.
     pub owner_pid: u32,
     /// The owner process's start identity at the kernel.
@@ -111,6 +113,7 @@ fn view(machine: &str, seat: &lys_runner::seat_owner::sessions::OwnedSeat) -> Ow
         conversation: seat.binding.conversation.clone(),
         generation: seat.binding.generation,
         machine: machine.to_owned(),
+        build: seat.endpoint.build.clone(),
         owner_pid: seat.endpoint.owner.pid,
         owner_start: seat.endpoint.owner.start.0.clone(),
         established_at: seat.established_at,

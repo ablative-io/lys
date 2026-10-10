@@ -175,6 +175,7 @@ pub fn establish(
             generation: plan.binding.generation,
             holder: Holder::Owner { start: own.clone() },
             taken_at: now_ms(),
+            build: super::protocol::BUILD.to_owned(),
         },
         custody: Custody::Owned,
         cursors: Cursors::default(),
@@ -229,7 +230,7 @@ pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
             start: harness,
         },
     )?;
-    let ready = ready_line(&runner_id, &socket, &own);
+    let ready = ready_line(&runner_id, &socket, &own, super::protocol::BUILD);
     runner.serve_until_stopped(move || {
         let mut out = std::io::stdout();
         if let Err(error) = writeln!(out, "{ready}").and_then(|()| out.flush()) {
@@ -366,6 +367,7 @@ pub fn answer(
                     generation,
                     holder: Holder::Successor { start: successor },
                     taken_at: now_ms(),
+                    build: super::protocol::BUILD.to_owned(),
                 },
             )?;
             Ok(OwnerAnswer::Transferred { intent, generation })
