@@ -117,6 +117,9 @@ pub struct SeatImportStatus {
     pub selected: Option<String>,
     /// The plan id of its latest dry run, while the service holds it.
     pub previewed: Option<String>,
+    /// Its latest import's state, `completed`, `stopped` or `in_progress`;
+    /// absent while the seat has never been imported.
+    pub state: Option<String>,
     /// Every import of it, oldest first.
     pub imports: Vec<SeatImportReceipt>,
 }
@@ -333,6 +336,10 @@ async fn confirm(
         }
         .into());
     }
+    // A plan the dry run refused is never confirmed: it is refused by its own
+    // refusals before any source is read again, so a source the dry run could
+    // not read (and so holds no revision) is never mistaken for a changed one.
+    confirmable(&preview.plan)?;
     let read = gather(&preview.manifest, &state).await?;
     sources_unchanged(&preview.plan, &read)?;
     let key = vector_key(&preview.plan);
@@ -378,7 +385,8 @@ async fn status(
         .of_seat(&name)?
         .iter()
         .map(|operation| receipt(operation, 0))
-        .collect();
+        .collect::<Vec<_>>();
+    let latest = imports.last().map(|import| import.state.clone());
     let selected = state
         .seat_imports
         .selected(&name)?
@@ -391,6 +399,7 @@ async fn status(
         seat: name,
         selected,
         previewed,
+        state: latest,
         imports,
     }))
 }
