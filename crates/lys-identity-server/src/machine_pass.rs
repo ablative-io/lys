@@ -41,9 +41,6 @@ use crate::routes::AppState;
 use crate::runner_client::dial_key;
 use crate::runner_dial::signed_by;
 
-/// The route a machine asks for its pass on, as the router names it.
-pub(crate) const PASS_ROUTE: &str = "/runner/dial/{machine}/pass";
-
 /// A machine's request for a pass.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

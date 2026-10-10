@@ -44,7 +44,6 @@ use lys_runner::protocol::{read_greeting, unhex};
 use serde_json::{Value, json};
 
 use crate::error::ServerError;
-use crate::machine_pass::PASS_ROUTE;
 use crate::network_api::with_network;
 use crate::routes::AppState;
 use crate::runner_client::{RunnerRecord, dial_key};
@@ -56,7 +55,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route(EPOCH_ROUTE, get(epoch))
         .route("/runner/dial/{machine}/next", post(next))
         .route("/runner/dial/{machine}/replies/{ticket}", post(reply))
-        .route(PASS_ROUTE, post(crate::machine_pass::pass))
+        .route(
+            "/runner/dial/{machine}/pass",
+            post(crate::machine_pass::pass),
+        )
 }
 
 fn refused(reason: impl Into<String>) -> ServerError {
