@@ -271,6 +271,17 @@ async fn an_unavailable_stop_figure_refuses_both_starts_with_the_source_reason()
     Ok(())
 }
 
+/// What a start admitted past its budget is refused, check by check after
+/// the agent's: no profile version "1" is kept, the machine named is
+/// unknown, no handle record exists, and an unkept version needs nothing on
+/// record.
+const PAST_THE_BUDGET: [&str; 4] = [
+    "profile_version_not_reviewed",
+    "machine_not_allowed_for_role",
+    "check_record_missing",
+    "check_record_missing",
+];
+
 #[tokio::test]
 async fn a_fresh_agent_has_explicit_zero_spend_and_passes_start_admission() -> TestResult {
     let table = Table::with_usage(Vec::new()).await?;
@@ -288,17 +299,14 @@ async fn a_fresh_agent_has_explicit_zero_spend_and_passes_start_admission() -> T
     let checks = answer["checks"].as_array().ok_or("no start checks")?;
     assert_eq!(checks.len(), 5, "admitted past the budget check: {answer}");
     assert_eq!(checks[0]["result"], "passed", "{answer}");
-    for check in &checks[1..] {
-        assert_eq!(check["result"], "check_record_missing", "{answer}");
+    for (check, name) in checks[1..].iter().zip(PAST_THE_BUDGET) {
+        assert_eq!(check["result"], name, "{answer}");
     }
     let refused = answer["refused"].as_array().ok_or("no start refusals")?;
     assert_eq!(refused.len(), 4, "{answer}");
-    assert!(
-        refused
-            .iter()
-            .all(|refusal| refusal["refusal"] == "check_record_missing"),
-        "{answer}"
-    );
+    for (refusal, name) in refused.iter().zip(PAST_THE_BUDGET) {
+        assert_eq!(refusal["refusal"], name, "{answer}");
+    }
     Ok(())
 }
 
@@ -347,17 +355,14 @@ async fn prior_day_spend(has_session: bool) -> TestResult {
     let checks = answer["checks"].as_array().ok_or("no start checks")?;
     assert_eq!(checks.len(), 5, "{answer}");
     assert_eq!(checks[0]["result"], "passed", "{answer}");
-    for check in &checks[1..] {
-        assert_eq!(check["result"], "check_record_missing", "{answer}");
+    for (check, name) in checks[1..].iter().zip(PAST_THE_BUDGET) {
+        assert_eq!(check["result"], name, "{answer}");
     }
     let refused = answer["refused"].as_array().ok_or("no start refusals")?;
     assert_eq!(refused.len(), 4, "{answer}");
-    assert!(
-        refused
-            .iter()
-            .all(|refusal| refusal["refusal"] == "check_record_missing"),
-        "{answer}"
-    );
+    for (refusal, name) in refused.iter().zip(PAST_THE_BUDGET) {
+        assert_eq!(refusal["refusal"], name, "{answer}");
+    }
     Ok(())
 }
 
@@ -407,17 +412,14 @@ async fn a_recorded_plan_reset_admits_both_starts_and_names_the_fresh_window() -
     let checks = answer["checks"].as_array().ok_or("no start checks")?;
     assert_eq!(checks.len(), 5, "admitted past the budget check: {answer}");
     assert_eq!(checks[0]["result"], "passed", "{answer}");
-    for check in &checks[1..] {
-        assert_eq!(check["result"], "check_record_missing", "{answer}");
+    for (check, name) in checks[1..].iter().zip(PAST_THE_BUDGET) {
+        assert_eq!(check["result"], name, "{answer}");
     }
     let refused = answer["refused"].as_array().ok_or("no start refusals")?;
     assert_eq!(refused.len(), 4, "{answer}");
-    assert!(
-        refused
-            .iter()
-            .all(|refusal| refusal["refusal"] == "check_record_missing"),
-        "{answer}"
-    );
+    for (refusal, name) in refused.iter().zip(PAST_THE_BUDGET) {
+        assert_eq!(refusal["refusal"], name, "{answer}");
+    }
     assert_eq!(used["figure"], Value::Null, "{used}");
     assert_eq!(used["since_ms"], boundary, "{used}");
     assert_eq!(

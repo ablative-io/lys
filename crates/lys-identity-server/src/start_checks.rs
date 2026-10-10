@@ -48,17 +48,34 @@ pub(crate) fn reaches(machine: &Machine, version: &Version) -> Result<(), Server
         .iter()
         .filter(|server| server.command.is_none())
     {
-        let host = url_host(&server.url).ok_or_else(|| ServerError::LaunchUnrenderable {
-            reason: format!(
-                "server `{}` is reached at `{}`, which names no host",
-                server.name, server.url
-            ),
-        })?;
+        let host = server_host(server)?;
         if !machine.may_reach.contains(&host) {
             return Err(ServerError::MachineCannotReach { host });
         }
     }
     Ok(())
+}
+
+/// Every host a server of `version` is reached at, in the profile's order:
+/// what a machine's egress list must name for [`reaches`] to pass.
+pub(crate) fn needed_hosts(version: &Version) -> Result<Vec<String>, ServerError> {
+    version
+        .settings
+        .mcp_servers
+        .iter()
+        .filter(|server| server.command.is_none())
+        .map(server_host)
+        .collect()
+}
+
+/// The host `server` is reached at, or its refusal by name.
+fn server_host(server: &McpServer) -> Result<String, ServerError> {
+    url_host(&server.url).ok_or_else(|| ServerError::LaunchUnrenderable {
+        reason: format!(
+            "server `{}` is reached at `{}`, which names no host",
+            server.name, server.url
+        ),
+    })
 }
 
 /// The host of `url`, lower-cased, without scheme, credentials, port or path.

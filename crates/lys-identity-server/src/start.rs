@@ -17,6 +17,14 @@
 //! here runs the command, holds a process or puts a credential value in an
 //! answer.
 //!
+//! The service over the directory reads every other record from the store
+//! this server already keeps for it, the same facts the start-command route
+//! reads: the profile version, named by the operation it was set with as a
+//! launch record names it, from the provisioning store; the machines each
+//! role and the agent itself may run on, and each machine's egress list,
+//! from the network store; and the sessions a launch record's start runs
+//! as from the runtime reports.
+//!
 //! A service given a [`Launcher`] hands each given start to it, and the
 //! launcher asks the machine's runner, when the machine names one, to run
 //! it; the answer then carries the runner's word as its `runner` member. A
@@ -40,11 +48,11 @@ use lys_identity::start::active::Lifecycles;
 use lys_identity::start::authority::Admission;
 use lys_identity::start::credentials::HandleRecords;
 use lys_identity::start::egress::{EgressLists, ProfileNeeds};
-use lys_identity::start::machine_role::{HeldRole, RoleMachines};
+use lys_identity::start::machine_role::RoleMachines;
 use lys_identity::start::profile_command::ProfileVersionRecords;
-use lys_identity::start::profile_review::{ProfileReviews, Review};
+use lys_identity::start::profile_review::ProfileReviews;
 use lys_identity::start::request::{AgentRecord, AgentRecords};
-use lys_identity::start::state::{SessionReport, SessionReports};
+use lys_identity::start::state::SessionReports;
 use lys_identity::start::{
     Given, Grammars, LaunchRecords, Owners, StartError, give, give_again, state_of, withdraw,
 };
@@ -56,6 +64,9 @@ use crate::routes::{AppState, signed_in, with_directory};
 
 #[path = "start_pass_state.rs"]
 mod pass_state;
+
+#[path = "start_records.rs"]
+mod records;
 
 /// Who is asking, as the records a start keeps name them.
 pub trait Callers: Send + Sync {
@@ -135,6 +146,7 @@ pub struct StartService {
     clock: fn() -> u64,
     launcher: Option<Box<dyn Launcher>>,
     pass_state: Option<Arc<Mutex<crate::agent_pass_store::Passes>>>,
+    kept: Option<Arc<AppState>>,
 }
 
 impl StartService {
@@ -153,6 +165,7 @@ impl StartService {
             clock,
             launcher: None,
             pass_state: None,
+            kept: None,
         }
     }
 
@@ -165,9 +178,29 @@ impl StartService {
         }
     }
 
+    /// The service reading, before each start's checks, what the server
+    /// `state` keeps: the profile version's agent and the caller's handles.
+    #[must_use]
+    fn with_kept(self, state: Arc<AppState>) -> Self {
+        Self {
+            kept: Some(state),
+            ..self
+        }
+    }
+
     /// The owners as the library reads them.
     pub fn owners(&self) -> Owners<'_> {
         self.owners.owners()
+    }
+
+    /// The owners as the library reads them, reading the handles `broker`
+    /// lists in place of the constructed handle record when it lists them.
+    fn owners_with<'a>(&'a self, broker: Option<&'a records::Broker>) -> Owners<'a> {
+        let mut owners = self.owners();
+        if let Some(broker) = broker {
+            owners.handles = broker;
+        }
+        owners
     }
 
     /// The launch records, one caller at a time.
@@ -302,11 +335,20 @@ async fn start(
             "a start request is a JSON object naming the profile version and the machine",
         );
     };
+    let profile_version = members
+        .iter()
+        .find(|member| member.0 == "profile_version")
+        .map(|member| member.1.clone());
+    let checked = before_checks(&service, &headers, &agent, profile_version.as_deref()).await;
+    let broker = match checked {
+        Ok(broker) => broker,
+        Err(refused) => return refused.into_response(),
+    };
     if service.launcher.is_none() {
         return answer(service, &headers, move |service, launches, caller| {
             give(
                 launches,
-                &service.owners(),
+                &service.owners_with(broker.as_ref()),
                 caller,
                 members,
                 (service.clock)(),
@@ -321,7 +363,7 @@ async fn start(
         move |service, launches, caller| {
             give(
                 launches,
-                &service.owners(),
+                &service.owners_with(broker.as_ref()),
                 caller,
                 members,
                 (service.clock)(),
@@ -370,13 +412,25 @@ async fn start_again(
     headers: HeaderMap,
     UrlPath(source): UrlPath<String>,
 ) -> Response {
+    let agent = match service.launches() {
+        Ok(launches) => launches.record(&source).map(|kept| kept.agent.clone()),
+        Err(error) => return json(status(&error), error.to_json()),
+    };
+    // A record that is not kept is refused by the library, by name.
+    let broker = match agent {
+        Some(agent) => match before_checks(&service, &headers, &agent, None).await {
+            Ok(broker) => broker,
+            Err(refused) => return refused.into_response(),
+        },
+        None => None,
+    };
     let given = answer_with(
         Arc::clone(&service),
         &headers,
         move |service, launches, caller| {
             give_again(
                 launches,
-                &service.owners(),
+                &service.owners_with(broker.as_ref()),
                 caller,
                 &source,
                 (service.clock)(),
@@ -390,6 +444,36 @@ async fn start_again(
         Err((status, body)) => return json(status, body),
     };
     launch_given(&service, given, &caller).await
+}
+
+/// What a start reads before its checks, for a service over the server's
+/// own stores and a signed-in caller: a profile version kept for another
+/// agent is refused as the launcher refuses it, and the handles the secrets
+/// broker lists for the agent to that caller, fetched as the start-command
+/// route fetches them, are the handle record the checks read. A broker that
+/// cannot be reached refuses the start by its own name. With no stores, no
+/// caller or no broker configured, the constructed handle record is read,
+/// and a caller who is not signed in is refused by the library.
+async fn before_checks(
+    service: &StartService,
+    headers: &HeaderMap,
+    agent: &str,
+    profile_version: Option<&str>,
+) -> Result<Option<records::Broker>, ServerError> {
+    let Some(state) = service.kept.as_ref() else {
+        return Ok(None);
+    };
+    if service.callers.caller(headers).is_none() {
+        return Ok(None);
+    }
+    if let Some(profile_version) = profile_version {
+        records::owned(state, agent, profile_version)?;
+    }
+    if state.secrets.is_none() {
+        return Ok(None);
+    }
+    let held = crate::start_checks::handles(state, headers, agent).await?;
+    Ok(Some(records::Broker::listed(agent, held)))
 }
 
 async fn launch_given(service: &StartService, given: Given, caller: &str) -> Response {
@@ -513,69 +597,6 @@ impl Lifecycles for Directory {
     }
 }
 
-/// An owner's record a start reads that has not landed in this tree: every
-/// read answers that the record does not exist, so the check it feeds is
-/// refused by name, naming the card that makes it.
-struct NotLanded(&'static str);
-
-impl NotLanded {
-    fn absent<T>(&self, asked: &str) -> Option<T> {
-        tracing::info!(
-            owner = self.0,
-            asked,
-            "the record a start reads does not exist in this tree"
-        );
-        None
-    }
-}
-
-impl ProfileReviews for NotLanded {
-    fn review(&self, profile_version: &str) -> Option<Review> {
-        self.absent(profile_version)
-    }
-}
-
-impl RoleMachines for NotLanded {
-    fn roles(&self, agent: &str) -> Option<Vec<HeldRole>> {
-        self.absent(agent)
-    }
-}
-
-impl ProfileNeeds for NotLanded {
-    fn needs(&self, profile_version: &str) -> Option<Vec<String>> {
-        self.absent(profile_version)
-    }
-}
-
-impl EgressLists for NotLanded {
-    fn egress(&self, machine: &str) -> Option<Vec<String>> {
-        self.absent(machine)
-    }
-}
-
-impl ProfileVersionRecords for NotLanded {
-    fn executable(&self, profile_version: &str) -> Option<String> {
-        self.absent(profile_version)
-    }
-
-    fn arguments(&self, profile_version: &str) -> Option<Vec<String>> {
-        self.absent(profile_version)
-    }
-
-    fn working_directory(&self, profile_version: &str) -> Option<String> {
-        self.absent(profile_version)
-    }
-}
-
-impl SessionReports for NotLanded {
-    /// No sessions record exists here, so no report names any launch record
-    /// and every one reads unconfirmed, never running.
-    fn reports(&self, launch_record: &str) -> Vec<SessionReport> {
-        self.absent::<Vec<SessionReport>>(launch_record)
-            .unwrap_or_default()
-    }
-}
-
 fn agent_id(text: &str) -> bool {
     AgentId::from_str(text).is_ok()
 }
@@ -583,8 +604,9 @@ fn agent_id(text: &str) -> bool {
 /// The start service over the directory `state` holds, reading the handle
 /// record through `handles`, whose credential ids are held to
 /// `credential_id`, and keeping launch records in `dir`, signed by `key`.
-/// The roles card's, the network's and the sessions brief's records have
-/// not landed in this tree, so each is read as not existing.
+/// Reviews, profile versions, what each needs, the machines each role may
+/// run on, egress lists and session reports are read from the stores
+/// `state` keeps.
 pub fn directory_service(
     state: &Arc<AppState>,
     handles: Box<dyn HandleRecords + Send + Sync>,
@@ -604,13 +626,13 @@ pub fn directory_service(
         agents: Box::new(Directory(Arc::clone(state))),
         admission: Box::new(Directory(Arc::clone(state))),
         lifecycles: Box::new(Directory(Arc::clone(state))),
-        reviews: Box::new(NotLanded("Ink1H1Os")),
-        role_machines: Box::new(NotLanded("Ink1H1Os")),
+        reviews: Box::new(records::Kept(Arc::clone(state))),
+        role_machines: Box::new(records::Kept(Arc::clone(state))),
         handles,
-        needs: Box::new(NotLanded("Ink1H1Os")),
-        egress: Box::new(NotLanded("network row 8.5")),
-        profiles: Box::new(NotLanded("Ink1H1Os")),
-        sessions: Box::new(NotLanded("d5055cc1")),
+        needs: Box::new(records::Kept(Arc::clone(state))),
+        egress: Box::new(records::Kept(Arc::clone(state))),
+        profiles: Box::new(records::Kept(Arc::clone(state))),
+        sessions: Box::new(records::Kept(Arc::clone(state))),
         grammars: Grammars {
             agent_id,
             credential_id,
@@ -624,5 +646,9 @@ pub fn directory_service(
         Arc::clone(&state.agent_passes),
     );
     let runs = crate::runner_sessions::DirectoryLauncher(Arc::clone(state));
-    Ok(Arc::new(service.with_launcher(Box::new(runs))))
+    Ok(Arc::new(
+        service
+            .with_launcher(Box::new(runs))
+            .with_kept(Arc::clone(state)),
+    ))
 }

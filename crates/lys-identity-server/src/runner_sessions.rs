@@ -454,7 +454,7 @@ pub struct DirectoryLauncher(pub Arc<AppState>);
 
 /// The session a launch record's start runs as: the same each time the
 /// record is run, so a start sent again finds the session already held.
-fn launch_session(record: &str) -> String {
+pub(crate) fn launch_session(record: &str) -> String {
     let digest = Sha256::digest(format!("lys-identity/launch-session/v1\n{record}"));
     format!("op-{}", &hex(&digest)[..32])
 }

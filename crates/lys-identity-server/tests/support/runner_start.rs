@@ -177,6 +177,16 @@ impl Table {
         self.seeded.people[index].id.to_string()
     }
 
+    /// The first agent of the seeded person at `index`, when there is one.
+    pub fn agent_of(&self, index: usize) -> Option<String> {
+        self.seeded
+            .people
+            .get(index)?
+            .agents
+            .first()
+            .map(|agent| agent.id.to_string())
+    }
+
     /// Send a setup request and propagate any refusal.
     pub async fn ok(&self, path: &str, body: &Value) -> Result<Value, Box<dyn Error>> {
         let (status, answer) = self.service.post(path, Some(&self.ada), body).await?;
