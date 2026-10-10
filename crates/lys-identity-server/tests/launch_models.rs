@@ -31,7 +31,7 @@ impl Table {
         self.service.post(&path, Some(&self.ada), &body).await
     }
 
-    /// Record `models` for `harness`, review them, and ask for a start on a new machine.
+    /// Record `models` for `harness`, review them, and ask for a start on the table's machine.
     async fn start_profile(
         &self,
         from: u32,
@@ -44,21 +44,7 @@ impl Table {
         let reviewed = json!({ "operation": operation()? });
         let (status, set) = self.service.post(&path, Some(&self.ada), &reviewed).await?;
         assert_eq!(status, 200, "{set}");
-        let machine = operation()?;
-        let body = json!({
-            "operation": machine, "name": format!("Box {from}"), "kind": "server",
-            "runtime": "manifold", "slots": 1, "may_run": [self.agent()], "may_reach": [],
-        });
-        let (status, named) = self
-            .service
-            .post("/network/machines", Some(&self.ada), &body)
-            .await?;
-        assert_eq!(status, 200, "{named}");
-        self.ok(
-            &format!("/network/machines/{machine}/runner"),
-            &json!({"runner": {"kind": "lys"}}),
-        )
-        .await?;
+        let machine = self.lys_machine(&format!("Box {from}")).await?;
         let path = format!("/agents/{}/start-command", self.agent());
         let body = json!({ "machine": machine, "operation": operation()? });
         self.service.post(&path, Some(&self.ada), &body).await

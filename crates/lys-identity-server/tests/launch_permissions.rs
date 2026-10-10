@@ -53,23 +53,9 @@ impl Table {
         Ok(())
     }
 
-    /// Ask for a start on a new machine named `name`.
+    /// Ask for a start on the table's machine, named `name` when first asked.
     async fn start_profile(&self, name: &str) -> Result<(u16, Value), Box<dyn Error>> {
-        let machine = operation()?;
-        let body = json!({
-            "operation": machine, "name": name, "kind": "server",
-            "runtime": "manifold", "slots": 1, "may_run": [self.agent()], "may_reach": [],
-        });
-        let (status, named) = self
-            .service
-            .post("/network/machines", Some(&self.ada), &body)
-            .await?;
-        assert_eq!(status, 200, "{named}");
-        self.ok(
-            &format!("/network/machines/{machine}/runner"),
-            &json!({"runner": {"kind": "lys"}}),
-        )
-        .await?;
+        let machine = self.lys_machine(name).await?;
         let path = format!("/agents/{}/start-command", self.agent());
         let body = json!({ "machine": machine, "operation": operation()? });
         self.service.post(&path, Some(&self.ada), &body).await

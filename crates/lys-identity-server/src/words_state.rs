@@ -294,8 +294,8 @@ pub struct Resolved {
     pub contributed: Vec<Contributed>,
 }
 
-/// The words as their log folds them.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// The words as their log folds them, and what `GET /words` answers.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Words {
     /// Each layer's slots, by the layer's key then slot.

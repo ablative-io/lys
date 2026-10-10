@@ -6,7 +6,7 @@ mod harness_description;
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use axum::Router;
 use axum::extract::Request;
@@ -63,6 +63,8 @@ pub struct Table {
     pub serving: Option<Serving>,
     /// The key used to ask the runner directly.
     pub server_key: Arc<Ed25519Identity>,
+    /// The one machine of this table naming the install's own runner.
+    lys_machine: OnceLock<String>,
 }
 
 impl Table {
@@ -162,6 +164,7 @@ impl Table {
             dir,
             serving: Some(serving),
             server_key,
+            lys_machine: OnceLock::new(),
         };
         table.declare_program()?;
         Ok(table)
@@ -232,6 +235,35 @@ impl Table {
         )
         .await?;
         Ok(())
+    }
+
+    /// The one machine of this table that names the install's own runner:
+    /// named `name` on the first ask, answered as it is after. An install's
+    /// own runner is named by one live machine only (AGENTS-002 D3, a second
+    /// refused `runner_lys_taken`), so every start of a table shares it.
+    pub async fn lys_machine(&self, name: &str) -> Result<String, Box<dyn Error>> {
+        if let Some(machine) = self.lys_machine.get() {
+            return Ok(machine.clone());
+        }
+        let machine = operation()?;
+        let body = json!({
+            "operation": machine, "name": name, "kind": "server",
+            "runtime": "manifold", "slots": 1, "may_run": [self.agent()], "may_reach": [],
+        });
+        let (status, named) = self
+            .service
+            .post("/network/machines", Some(&self.ada), &body)
+            .await?;
+        assert_eq!(status, 200, "{named}");
+        self.ok(
+            &format!("/network/machines/{machine}/runner"),
+            &json!({"runner": {"kind": "lys"}}),
+        )
+        .await?;
+        self.lys_machine
+            .set(machine.clone())
+            .map_err(|held| format!("the table's lys machine was named twice: {held}"))?;
+        Ok(machine)
     }
 
     /// Name the requested machine, recording its runner when one is given.

@@ -31,6 +31,12 @@ fn server_cases(detail: &'static str) -> Vec<(ServerError, &'static str)> {
             "BudgetsUnavailable",
         ),
         (
+            ServerError::AuthorityUnavailable {
+                reason: detail.to_owned(),
+            },
+            "authority_unavailable",
+        ),
+        (
             ServerError::HarnessCatalogueUnreadable {
                 file: detail.to_owned(),
                 reason: detail.to_owned(),

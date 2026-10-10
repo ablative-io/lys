@@ -308,10 +308,10 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/variables" "Patch an agent's variables with the revision read" G [AGENT, SIGNED_BODY, &["AgentNotVisible", "not_permitted", "variables_malformed", "variables_stale", "variables_unavailable"]];
     GET "/runtime/sessions/{id}/variables" "A session's variables" G [AGENT, SIGNED, &["AgentNotVisible", "SessionUnknown", "not_permitted", "variables_unavailable"]];
     POST "/runtime/sessions/{id}/variables" "Patch a session's variables with the revision read" G [AGENT, SIGNED_BODY, &["AgentNotVisible", "SessionUnknown", "not_permitted", "variables_malformed", "variables_stale", "variables_unavailable"]];
-    GET "/me/variables" "The asking run's agent variables, by its run pass" S [SIGNED, &["NotAdmitted", "AgentPassRefused", "variables_unavailable"]];
-    POST "/me/variables" "Patch the asking run's agent variables, by its run pass" S [SIGNED_BODY, &["NotAdmitted", "AgentPassRefused", "variables_malformed", "variables_stale", "variables_unavailable"]];
-    GET "/me/session/variables" "The asking run's session variables, by its run pass" S [SIGNED, &["NotAdmitted", "AgentPassRefused", "variables_unavailable"]];
-    POST "/me/session/variables" "Patch the asking run's session variables, by its run pass" S [SIGNED_BODY, &["NotAdmitted", "AgentPassRefused", "variables_malformed", "variables_stale", "variables_unavailable"]];
+    GET "/me/variables" "The asking run's agent variables, by its run pass" P [SIGNED, &["NotAdmitted", "AgentPassRefused", "variables_unavailable"]];
+    POST "/me/variables" "Patch the asking run's agent variables, by its run pass" P [SIGNED_BODY, &["NotAdmitted", "AgentPassRefused", "variables_malformed", "variables_stale", "variables_unavailable"]];
+    GET "/me/session/variables" "The asking run's session variables, by its run pass" P [SIGNED, &["NotAdmitted", "AgentPassRefused", "variables_unavailable"]];
+    POST "/me/session/variables" "Patch the asking run's session variables, by its run pass" P [SIGNED_BODY, &["NotAdmitted", "AgentPassRefused", "variables_malformed", "variables_stale", "variables_unavailable"]];
     GET "/schedules" "The schedules the caller may see" S [SIGNED, &["schedules_unavailable"]];
     POST "/schedules" "Set a schedule" S [SIGNED_BODY, &["AgentNotVisible", "SessionUnknown", "schedule_malformed", "schedule_reused", "schedules_unavailable"]];
     GET "/schedules/{id}" "A schedule with every occurrence and delivery" S [SIGNED, &["schedule_unknown", "schedules_unavailable"]];
@@ -356,7 +356,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn", "CertificatesUnavailable"], &["CertificateWithdrawn"]] scope("agent", "agent.certificate.withdraw", ["id"]);
-    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable", "everything_stopped"]] scope("agent", "agent.start", ["id"]);
+    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable", "everything_stopped", "LaunchUnrenderable"]] scope("agent", "agent.start", ["id"]);
     POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable", "everything_stopped"]] scope("launch-record", "launch-record.start-again", ["id"]);
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY] scope("launch-record", "launch-record.withdraw", ["id"]);
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED] scope("launch-record", "read", ["id"]);

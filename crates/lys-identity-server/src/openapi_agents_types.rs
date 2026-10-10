@@ -12,6 +12,7 @@ use crate::schedules_state::Item as ScheduleItem;
 use crate::variables_api::PatchBody;
 use crate::variables_state::Read as VariablesRead;
 use crate::words_api::{Delivered, ForAgent, PreviewBody, SaveBody, Saved, TemplateBody};
+use crate::words_state::Words;
 
 /// The words, variables, schedules and agent pass routes, each with the
 /// types it takes and answers.
@@ -24,6 +25,7 @@ pub(crate) fn agents(api: &mut Api) -> Vec<Entry> {
     let (stop, item) = (api.schema::<StopBody>(), api.schema::<ScheduleItem>());
     let schedules = api.schema::<SchedulesView>();
     vec![
+        (GET, "/words", None, Some(api.schema::<Words>())),
         (POST, "/words/preview", Some(preview), Some(delivered)),
         (
             POST,

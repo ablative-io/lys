@@ -26,10 +26,15 @@ fn refused(answer: &(u16, Value), status: u16, name: &str) {
 }
 
 impl Table {
+    /// A machine of `runtime` for `may_run`, its runner the install's own
+    /// (`lys`) or another tool's socket: one live machine names the
+    /// install's own runner (AGENTS-002 D3), so a second placed machine
+    /// names a socket.
     async fn placed_machine(
         &self,
         runtime: Option<&str>,
         may_run: &[String],
+        runner: &str,
     ) -> Result<String, Box<dyn Error>> {
         let id = operation()?;
         let body = json!({
@@ -42,9 +47,14 @@ impl Table {
             .await?;
         assert_eq!(status, 200, "{named}");
         if runtime.is_some() {
+            let record = if runner == "lys" {
+                json!({"kind": "lys"})
+            } else {
+                json!({"kind": "socket", "path": self.dir.path().join("elsewhere.sock")})
+            };
             self.ok(
                 &format!("/network/machines/{id}/runner"),
-                &json!({"runner": {"kind": "lys"}}),
+                &json!({"runner": record}),
             )
             .await?;
         }
@@ -109,7 +119,7 @@ async fn each_refusal_is_by_name() -> TestResult {
     let agent = table.agent();
     let unheld = AgentId::generate()?.to_string();
     let open = table
-        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent), "lys")
         .await?;
 
     refused(
@@ -130,13 +140,15 @@ async fn each_refusal_is_by_name() -> TestResult {
         404,
         "MachineUnknown",
     );
-    let bare = table.placed_machine(None, &[]).await?;
+    let bare = table.placed_machine(None, &[], "lys").await?;
     refused(
         &table.ask(&agent, &bare, &table.ada).await?,
         409,
         "MachineWithoutRuntime",
     );
-    let elsewhere = table.placed_machine(Some("manifold"), &[]).await?;
+    let elsewhere = table
+        .placed_machine(Some("manifold"), &[], "socket")
+        .await?;
     refused(
         &table.ask(&agent, &elsewhere, &table.ada).await?,
         403,
@@ -195,7 +207,7 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
-        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent), "lys")
         .await?;
 
     let (status, start) = table.ask(&agent, &machine, &table.ada).await?;
@@ -274,7 +286,7 @@ async fn a_start_is_kept_once_under_its_operation() -> TestResult {
     let agent = table.agent();
     table.launch_profile().await?;
     let machine = table
-        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent), "lys")
         .await?;
     let path = format!("/agents/{agent}/start-command");
     let body = json!({ "machine": machine, "operation": operation()? });

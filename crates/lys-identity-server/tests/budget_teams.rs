@@ -59,7 +59,7 @@ impl Table {
         let (service, (seeded, sessions, machines)) = Service::start_with(move |config| {
             let seeded = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let mut sessions = Vec::with_capacity(count);
-            let mut machines = Vec::with_capacity(count);
+            let mut machines = Vec::with_capacity(1);
             if count > 0 {
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let mut runtime = RuntimeStore::open(
@@ -69,9 +69,14 @@ impl Table {
                         .ok_or("no runtime directory")?,
                     key,
                 )?;
+                // Every tracked session is on one machine: the restart test
+                // names that machine's runner as this install's own, and an
+                // install's own runner is named by one live machine only
+                // (AGENTS-002 D3, refused `runner_lys_taken` for a second).
+                let machine = OperationId::generate()?.to_string();
+                machines.push(machine.clone());
                 for _ in 0..count {
                     let session = OperationId::generate()?.to_string();
-                    let machine = OperationId::generate()?.to_string();
                     runtime.report(Report {
                         operation: OperationId::generate()?.to_string(),
                         session: session.clone(),
@@ -85,7 +90,6 @@ impl Table {
                         launch: None,
                     })?;
                     sessions.push(session);
-                    machines.push(machine);
                 }
             }
             Ok((seeded, sessions, machines))
