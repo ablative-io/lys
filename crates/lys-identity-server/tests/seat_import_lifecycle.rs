@@ -36,7 +36,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 const SEAT: &str = "waffles";
 /// The refusal a seat's start answers under this fixture: its owner cannot
 /// be started, so nothing starts.
-const UNQUALIFIED: &str = "seat_owner_start_failed";
+const START_REFUSED: &str = "seat_owner_start_failed";
 /// lys-runner's list of qualified launched binaries, empty until the pin.
 const QUALIFIED_EMPTY: &str = "const QUALIFIED: &[Qualification] = &[];";
 
@@ -114,10 +114,20 @@ fn qualified_is_empty() -> Result<bool, Box<dyn Error>> {
     Ok(std::fs::read_to_string(process)?.contains(QUALIFIED_EMPTY))
 }
 
+/// What of an answer an event must leave unchanged: everything but the
+/// latest dry run, which the service keeps in memory only (R4: a restart
+/// forgets it, and a person runs a new one), so it is no part of the import.
+fn surviving(mut answer: Value) -> Value {
+    if let Some(status) = answer.as_object_mut() {
+        status.remove("previewed");
+    }
+    answer
+}
+
 /// The start refused by its owner start's name.
 fn start_refused(answer: &(u16, Value)) {
     assert_ne!(answer.0, 200, "a managed start answered: {}", answer.1);
-    assert_eq!(answer.1["refusal"], UNQUALIFIED, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], START_REFUSED, "{}", answer.1);
 }
 
 impl Scene {
@@ -177,14 +187,7 @@ impl Scene {
             "/words".to_owned(),
             "/schedules".to_owned(),
         ] {
-            let mut answer = self.get(&path).await?;
-            // The latest dry run is kept in memory only (R4: a restart
-            // forgets it and the person runs a new one), so it is no part
-            // of the import that must survive.
-            if let Some(status) = answer.as_object_mut() {
-                status.remove("previewed");
-            }
-            held.push(answer);
+            held.push(surviving(self.get(&path).await?));
         }
         Ok(held)
     }
@@ -292,7 +295,7 @@ async fn seat_import_status_survives_restart_and_upgrade() -> TestResult {
         held,
         "an upgrade handoff changed the import"
     );
-    assert_eq!(scene.status().await?, completed);
+    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
     scene.confirmed_again(&plan, &confirming).await?;
     assert_eq!(
         scene.seat_sessions().await?,
@@ -316,7 +319,7 @@ async fn seat_import_survives_lifecycle() -> TestResult {
         Vec::<Value>::new(),
         "a refused start started"
     );
-    assert_eq!(scene.status().await?, completed);
+    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
     scene.table.close()
 }
 
@@ -339,7 +342,7 @@ async fn seat_import_survives_lifecycle_once_qualified() -> TestResult {
         answer.1
     );
     start_refused(&answer);
-    assert_eq!(scene.status().await?, completed);
+    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
     scene.table.close()
 }
 
@@ -404,7 +407,7 @@ async fn survives(
         "the in-flight send was not resolved as itself"
     );
     assert_eq!(scene.get(&format!("/seats/{SEAT}")).await?, seat);
-    assert_eq!(&scene.status().await?, completed);
+    assert_eq!(surviving(scene.status().await?), surviving(completed.clone()));
     // A confirmation while the seat runs is refused by name (the seat runs,
     // or the restarts forgot the dry run) and touches it not.
     let answer = scene.confirm(plan, confirming).await?;

@@ -380,3 +380,7 @@ mod tests {
         assert_eq!(part("op-a", "start").len(), 35);
     }
 }
+
+#[cfg(test)]
+#[path = "seats_run_tests.rs"]
+mod owner_tests;

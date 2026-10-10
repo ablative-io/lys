@@ -14,13 +14,14 @@ pub mod identity_support;
 
 use std::collections::BTreeSet;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Child, Command, Output};
+use std::time::Duration;
 
 use identity_support::compose::{self, require_runtime};
 use identity_support::fixtures::{
     Deployment, TestResult, leaks, output_text, repository_root, succeeded,
 };
-use identity_support::processes::{leaves_no_process, output};
+use identity_support::processes::{leaves_no_process, leaves_no_process_within, output};
 use identity_support::server::{LossyProxy, cookies_set, rauthy_json};
 
 /// The services compose.yaml declares; no other Ablative service is among them.
@@ -333,5 +334,46 @@ fn pin_clone_vendor_rauthy_is_the_pinned_ablative_commit() -> TestResult {
         pinned,
         "FETCH_HEAD",
     ])?;
+    Ok(())
+}
+
+/// `program` started with `arguments` and handed back unwaited, as a
+/// teardown's child is when its test returns.
+fn started(program: &str, arguments: &[&str]) -> TestResult<Child> {
+    Ok(Command::new(program).args(arguments).spawn()?)
+}
+
+/// A child still exiting when its test returns is waited for and reaped
+/// within the stop budget, never named as left running.
+#[test]
+fn a_child_exiting_as_its_test_ends_is_reaped_not_named() -> TestResult {
+    leaves_no_process(|| {
+        let child = started("true", &[])?;
+        drop(child);
+        Ok(())
+    })
+}
+
+/// A child that has not exited within the stop budget is refused by name,
+/// `process_stop_exceeded`, naming it; it is then ended and reaped.
+#[test]
+fn a_child_outliving_the_stop_budget_is_refused_by_name() -> TestResult {
+    let mut kept = None;
+    let answer = leaves_no_process_within(Duration::from_millis(300), || {
+        let child = started("sleep", &["30"])?;
+        kept = Some(child.id());
+        drop(child);
+        Ok(())
+    });
+    let pid = kept.ok_or("the child was never started")?;
+    let ended = output(
+        Command::new("kill").args(["-KILL", &pid.to_string()]),
+        "ending the outliving child",
+    )?;
+    assert!(ended.status.success(), "{}", output_text(&ended));
+    let refusal = answer.err().ok_or("a child outliving the budget was not refused")?;
+    let words = refusal.to_string();
+    assert!(words.starts_with("process_stop_exceeded: "), "{words}");
+    assert!(words.contains(&format!("{pid} ")), "{words}");
     Ok(())
 }

@@ -14,6 +14,9 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::process::{Child, Command, ExitStatus, Output, Stdio};
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use super::fixtures::{TestResult, succeeded};
 
@@ -195,6 +198,19 @@ fn census() -> TestResult<(u32, Vec<Listed>)> {
 /// in the group, and in any case every process descended from this one.
 /// This process, the ones that started it and the census are not counted.
 fn left_behind() -> TestResult<Vec<String>> {
+    Ok(still_running()?
+        .iter()
+        .map(|row| {
+            format!(
+                "{} {} (parent {}, group {}, state {})",
+                row.pid, row.command, row.parent, row.group, row.state
+            )
+        })
+        .collect())
+}
+
+/// The rows [`left_behind`] names.
+fn still_running() -> TestResult<Vec<Listed>> {
     let (census_pid, listed) = census()?;
     let me = std::process::id();
     let Some(group) = listed.iter().find(|row| row.pid == me).map(|row| row.group) else {
@@ -229,16 +245,84 @@ fn left_behind() -> TestResult<Vec<String>> {
     }
     let leads = group == me;
     Ok(listed
-        .iter()
+        .into_iter()
         .filter(|row| row.pid != census_pid && !ancestry.contains(&row.pid))
         .filter(|row| (leads && row.group == group) || descendants.contains(&row.pid))
-        .map(|row| {
-            format!(
-                "{} {} (parent {}, group {}, state {})",
-                row.pid, row.command, row.parent, row.group, row.state
-            )
-        })
         .collect())
+}
+
+/// How long a process this test started is given to finish exiting once the
+/// test is over, before the proof names it: a process still exiting when
+/// the test returns (a teardown's child on its way out on a loaded machine)
+/// is waited for, never counted, and one that has not exited by then is
+/// refused by name.
+pub const STOP_BUDGET: Duration = Duration::from_secs(10);
+
+/// Waits for each of this process's own children still listed, reaping it,
+/// within `budget` from now. Each wait is the kernel's own exit event, taken
+/// on a thread of its own, so nothing here polls or sleeps.
+///
+/// # Errors
+///
+/// `process_stop_exceeded` naming every child that has not exited within
+/// `budget`; `process_wait_failed` when a wait itself fails.
+fn reap_children(budget: Duration) -> TestResult {
+    let me = std::process::id();
+    let children: Vec<Listed> = still_running()?
+        .into_iter()
+        .filter(|row| row.parent == me)
+        .collect();
+    let (told, heard) = mpsc::channel();
+    for row in &children {
+        let told = told.clone();
+        let pid = row.pid;
+        thread::spawn(move || {
+            let waited = i32::try_from(pid)
+                .ok()
+                .and_then(rustix::process::Pid::from_raw)
+                .ok_or_else(|| format!("process_wait_failed: {pid} is not a process id"))
+                .and_then(|child| {
+                    match rustix::process::waitpid(
+                        Some(child),
+                        rustix::process::WaitOptions::empty(),
+                    ) {
+                        Ok(status) => Ok(status.is_some()),
+                        // Reaped between the census and this wait, by the
+                        // handle that started it: it has exited.
+                        Err(rustix::io::Errno::CHILD) => Ok(true),
+                        Err(error) => Err(format!("process_wait_failed: {pid}: {error}")),
+                    }
+                });
+            // The receiver may have given up at the budget; the child is
+            // reaped either way, so a send to no one is not an error.
+            told.send((pid, waited)).ok();
+        });
+    }
+    drop(told);
+    let deadline = Instant::now() + budget;
+    let mut waiting: Vec<u32> = children.iter().map(|row| row.pid).collect();
+    while !waiting.is_empty() {
+        let left = deadline.saturating_duration_since(Instant::now());
+        match heard.recv_timeout(left) {
+            Ok((pid, Ok(_))) => waiting.retain(|waited| *waited != pid),
+            Ok((_, Err(error))) => return Err(error.into()),
+            Err(mpsc::RecvTimeoutError::Timeout | mpsc::RecvTimeoutError::Disconnected) => {
+                let named = children
+                    .iter()
+                    .filter(|row| waiting.contains(&row.pid))
+                    .map(|row| format!("{} {}", row.pid, row.command))
+                    .collect::<Vec<String>>()
+                    .join("; ");
+                return Err(format!(
+                    "process_stop_exceeded: {} process(es) this test started had not exited {} ms after it ended: {named}",
+                    waiting.len(),
+                    budget.as_millis()
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Runs `test`, then proves it left no process running, as
@@ -250,8 +334,14 @@ fn left_behind() -> TestResult<Vec<String>> {
 /// A process that leaves both the group and its parent, as a daemon does,
 /// is out of the proof's sight: a test closes that by starting none.
 pub fn leaves_no_process(test: impl FnOnce() -> TestResult) -> TestResult {
+    leaves_no_process_within(STOP_BUDGET, test)
+}
+
+/// [`leaves_no_process`], giving this test's own children `budget` to
+/// finish exiting before the proof reads the process table.
+pub fn leaves_no_process_within(budget: Duration, test: impl FnOnce() -> TestResult) -> TestResult {
     let outcome = catch_unwind(AssertUnwindSafe(test));
-    let left = match left_behind() {
+    let left = match reap_children(budget).and_then(|()| left_behind()) {
         Ok(left) if left.is_empty() => None,
         Ok(left) => Some(format!(
             "process_left_running: the test ended with {} process(es) it started still running: {}",
