@@ -15,8 +15,11 @@ use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 use lys_core::Ed25519Identity;
+use lys_runner::peer::{Leader, StartIdentity, start_identity};
 use lys_runner::protocol::{Greeting, Output, Request, StatusView, hex, signed_bytes};
 use lys_runner::state::{Kept, KeptSession};
 use lys_runner::{
@@ -500,11 +503,40 @@ fn a_usage_limit_moves_the_session_on_and_the_list_end_stops_it() -> TestResult 
     held.stop()
 }
 
+/// Every line the runner says from here on, as it says it.
+fn heard() -> Result<mpsc::Receiver<String>, Box<dyn Error>> {
+    let (lines, heard) = mpsc::channel();
+    lys_runner::error::also_to(Box::new(move |line: &str| {
+        if lines.send(line.to_owned()).is_err() {
+            eprintln!("the test stopped hearing the runner before: {line}");
+        }
+    }))?;
+    Ok(heard)
+}
+
+/// The lines that name session `session`'s escalation, heard so far.
+fn escalation_lines(heard: &mpsc::Receiver<String>, session: &str) -> Vec<String> {
+    let named = format!("session {session}: rotation_");
+    heard
+        .try_iter()
+        .filter(|line| {
+            line.contains(&named)
+                && (line.contains("rotation_signal_escalated")
+                    || line.contains("rotation_escalation_failed")
+                    || line.contains("rotation_signal_repeated"))
+        })
+        .collect()
+}
+
 /// The first hang-up prints and restores the default signal action before
 /// replacing the shell with a blocking input reader. That output must cause
-/// the repeated hang-up to end the program, without waiting on a clock.
+/// the repeated hang-up to end the program, without waiting on a clock. On
+/// macOS the reader can inherit the hang-up blocked (bash 3.2 runs the trap
+/// with SIGHUP masked and `exec` keeps the mask), and then it is the
+/// repeat's grace that ends it; it is never the first hang-up's.
 #[test]
 fn a_program_that_drops_one_hang_up_is_told_again_when_it_prints() -> TestResult {
+    let heard = heard()?;
     let mut held = Held::start(1 << 16)?;
     let client = held.client();
     let script = "trap 'trap - HUP; echo still-on-$LYS_ACCOUNT_HANDLE; exec cat' HUP; \
@@ -530,7 +562,139 @@ fn a_program_that_drops_one_hang_up_is_told_again_when_it_prints() -> TestResult
         end.signal.is_some(),
         "the program ended without a signal: {end:?}"
     );
-    held.stop()
+    held.stop()?;
+    let escalated: Vec<String> = escalation_lines(&heard, "drops-one")
+        .into_iter()
+        .filter(|line| line.contains("rotation_signal_escalated"))
+        .collect();
+    assert!(
+        escalated.len() <= 2,
+        "at most one escalation per generation: {escalated:?}"
+    );
+    for line in &escalated {
+        assert!(
+            line.contains("still running 2 s after the repeated hang-up (REPEAT_GRACE)"),
+            "a program that printed is ended by the repeat's grace: {line}"
+        );
+        assert!(!line.contains("FIRST_HANGUP_GRACE"), "{line}");
+    }
+    Ok(())
+}
+
+/// DIRECTORY-091 R1: a program that holds the hang-up and prints nothing
+/// after it is never told again, so only the first hang-up's grace ends it:
+/// the shell's trap replaces it, silently, with a reader that is never sent
+/// another hang-up.
+#[test]
+fn a_program_that_holds_the_hang_up_and_prints_nothing_is_ended_after_the_first_grace() -> TestResult
+{
+    let heard = heard()?;
+    let begun = Instant::now();
+    let mut held = Held::start(1 << 16)?;
+    let client = held.client();
+    let script = "trap 'trap - HUP; exec cat' HUP; \
+                  echo \"at $LYS_ACCOUNT_HANDLE: usage limit reached\"; \
+                  read -r line";
+    let limit = Limit::Words {
+        words: vec!["usage limit reached".to_owned()],
+    };
+    started(&client, rotating("holds-silent", script, limit))?;
+    let output = until_ended(&client, "holds-silent")?;
+    assert!(output.text.contains("at h-account-two"), "{output:?}");
+    let end = output.ended.ok_or("no end")?;
+    assert_eq!(end.how, EndedHow::AccountsExhausted);
+    assert_eq!(end.status, None, "the program was killed, not exited");
+    assert!(end.signal.is_some(), "{end:?}");
+    // Each kill is said by the thread that made it, so the two lines are
+    // waited for as the runner says them.
+    let mut escalated = Vec::new();
+    let mut others = Vec::new();
+    while escalated.len() < 2 {
+        let line = heard.recv()?;
+        if line.contains("session holds-silent: rotation_signal_escalated") {
+            escalated.push(line);
+        } else if line.contains("session holds-silent: rotation_") {
+            others.push(line);
+        }
+    }
+    assert!(
+        begun.elapsed() < Duration::from_secs(40),
+        "two generations of ten seconds each took {:?}",
+        begun.elapsed()
+    );
+    held.stop()?;
+    others.extend(escalation_lines(&heard, "holds-silent"));
+    for line in &escalated {
+        assert!(
+            line.contains(
+                "still running 10 s after the first hang-up (FIRST_HANGUP_GRACE); its process group was killed"
+            ),
+            "{line}"
+        );
+    }
+    assert!(
+        others
+            .iter()
+            .all(|line| !line.contains("rotation_signal_repeated")
+                && !line.contains("REPEAT_GRACE")
+                && !line.contains("rotation_signal_escalated")),
+        "nothing was printed after the hang-up, so nothing was repeated: {others:?}"
+    );
+    Ok(())
+}
+
+/// DIRECTORY-091 R1 and R2: a program that the first hang-up ends is never
+/// escalated, and its exit is its own.
+#[test]
+fn a_program_that_ends_on_the_first_hang_up_is_never_escalated() -> TestResult {
+    let heard = heard()?;
+    let mut held = Held::start(1 << 16)?;
+    let client = held.client();
+    let script = "echo \"at $LYS_ACCOUNT_HANDLE: usage limit reached\"; read -r line";
+    let limit = Limit::Words {
+        words: vec!["usage limit reached".to_owned()],
+    };
+    started(&client, rotating("ends-on-one", script, limit))?;
+    let output = until_ended(&client, "ends-on-one")?;
+    let end = output.ended.ok_or("no end")?;
+    assert_eq!(end.how, EndedHow::AccountsExhausted);
+    assert!(end.signal.is_some(), "the hang-up ended it: {end:?}");
+    held.stop()?;
+    let lines = escalation_lines(&heard, "ends-on-one");
+    assert!(
+        lines
+            .iter()
+            .all(|line| !line.contains("rotation_signal_escalated")
+                && !line.contains("rotation_escalation_failed")),
+        "{lines:?}"
+    );
+    Ok(())
+}
+
+/// DIRECTORY-091 R2: a leader whose pid now names a process started at
+/// another time is not the leader that was hung up, and is never signalled.
+#[test]
+fn a_kill_after_the_grace_spares_a_process_that_is_not_the_leader() -> TestResult {
+    let mut other = Command::new("/bin/sleep")
+        .arg("60")
+        .process_group(0)
+        .spawn()?;
+    let pid = other.id();
+    let start = start_identity(pid)?;
+    let leader = Leader {
+        pid,
+        start: StartIdentity(format!("{}-not-this-one", start.0)),
+    };
+    let killed = lys_runner::pty::kill_if_still(&leader);
+    let still = other.try_wait()?;
+    other.kill()?;
+    other.wait()?;
+    assert!(
+        matches!(killed, Ok(false)),
+        "a different start is a different process: {killed:?}"
+    );
+    assert!(still.is_none(), "the process at that pid was signalled");
+    Ok(())
 }
 
 #[test]

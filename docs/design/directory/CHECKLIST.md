@@ -560,10 +560,10 @@
 
 ## A silent program that holds the hang-up is ended (DIRECTORY-091)
 
-- [ ] **C727** — A tripped generation whose program cannot receive the hang-up and prints nothing is killed with its process group FIRST_HANGUP_GRACE (10 s) after the first hang-up, or REPEAT_GRACE (2 s) after a repeat, stamped once with rotation_signal_escalated naming the grace that expired and its seconds (DIRECTORY-091 R1).
-- [ ] **C728** — The escalation kills only the leader the hang-up was sent to, judged by pid and start time; an exited or reused leader is left alone (DIRECTORY-091 R2).
+- [x] **C727** — A tripped generation whose program cannot receive the hang-up and prints nothing is killed with its process group FIRST_HANGUP_GRACE (10 s) after the first hang-up, or REPEAT_GRACE (2 s) after a repeat, stamped once with rotation_signal_escalated naming the grace that expired and its seconds (DIRECTORY-091 R1).
+- [x] **C728** — The escalation kills only the leader the hang-up was sent to, judged by pid and start time; an exited or reused leader is left alone (DIRECTORY-091 R2).
 
 ## An install test's model proxy ends with its estate (DIRECTORY-092)
 
-- [ ] **C729** — Estate's cleanup stops the model proxy (run/proxy.pid) with the runner, directory service and secrets broker on close and on Drop, and a proxy it cannot stop fails close naming proxy.pid (DIRECTORY-092 R1).
-- [ ] **C730** — Each install-test estate lives under the lys-estate- prefix with its owner and compose project recorded; making an estate sweeps and names every prefixed folder whose owner is gone, stopping its services through their exit locks only (DIRECTORY-092 R2).
+- [x] **C729** — Estate's cleanup stops the model proxy (run/proxy.pid) with the runner, directory service and secrets broker on close and on Drop, and a proxy it cannot stop fails close naming proxy.pid (DIRECTORY-092 R1).
+- [x] **C730** — Each install-test estate lives under the lys-estate- prefix with its owner and compose project recorded; making an estate sweeps and names every prefixed folder whose owner is gone, stopping its services through their exit locks only (DIRECTORY-092 R2).

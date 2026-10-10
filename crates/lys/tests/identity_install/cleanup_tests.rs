@@ -4,6 +4,7 @@ use std::process::{Child, Command, Stdio};
 
 use rustix::fs::{FlockOperation, flock};
 
+use super::estate::SERVICES;
 use super::{Estate, TestResult};
 
 struct Reaped(Child);
@@ -27,7 +28,7 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
     let blocked = root.path().join("blocked");
     assert!(Command::new("mkfifo").arg(&blocked).status()?.success());
     let mut children = Vec::new();
-    for name in ["runner", "identity", "secrets"] {
+    for name in SERVICES {
         let lock = std::fs::File::create(run.join(format!("{name}.exit")))?;
         flock(&lock, FlockOperation::LockExclusive)?;
         let child = Command::new("/bin/sh")
@@ -51,8 +52,7 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))?;
     // Each service's exit lock, opened before the scratch root is removed:
     // a lock held is a service still running.
-    let exits = ["runner", "identity", "secrets"]
-        .map(|name| std::fs::File::open(run.join(format!("{name}.exit"))));
+    let exits = SERVICES.map(|name| std::fs::File::open(run.join(format!("{name}.exit"))));
     let failed = std::panic::catch_unwind(|| {
         let estate = Estate {
             root,
@@ -61,6 +61,7 @@ fn an_install_failure_leaves_no_owned_service_running() -> TestResult {
             service_port: 2,
             broker_port: 3,
             cleaned: false,
+            swept: Vec::new(),
         };
         let guard = estate;
         std::panic::panic_any(guard.root.path().to_path_buf());
@@ -111,10 +112,34 @@ fn a_successful_test_reports_teardown_failure() -> TestResult {
         service_port: 2,
         broker_port: 3,
         cleaned: false,
+        swept: Vec::new(),
     };
     let run = estate.root.path().join("run");
     std::fs::create_dir(&run)?;
     std::fs::write(run.join("identity.pid"), "invalid-pid")?;
     assert!(estate.close().is_err(), "teardown failure was swallowed");
+    Ok(())
+}
+
+/// DIRECTORY-092 R1: a model proxy the estate cannot stop fails its close
+/// by name, as the other services do.
+#[test]
+fn a_proxy_the_estate_cannot_stop_fails_close_by_name() -> TestResult {
+    let estate = Estate {
+        root: tempfile::tempdir()?,
+        project: "cleanup-proxy".to_owned(),
+        rauthy_port: 1,
+        service_port: 2,
+        broker_port: 3,
+        cleaned: false,
+        swept: Vec::new(),
+    };
+    let run = estate.root.path().join("run");
+    std::fs::create_dir(&run)?;
+    std::fs::write(run.join("proxy.pid"), "invalid-pid")?;
+    let Err(error) = estate.close() else {
+        return Err("a proxy that could not be stopped was swallowed".into());
+    };
+    assert!(error.to_string().contains("proxy.pid"), "{error}");
     Ok(())
 }

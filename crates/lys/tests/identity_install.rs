@@ -22,6 +22,8 @@
 mod cleanup_tests;
 #[path = "identity_install/estate.rs"]
 mod estate;
+#[path = "identity_install/estate_sweep_tests.rs"]
+mod estate_sweep_tests;
 use estate::Estate;
 pub mod identity_support;
 #[path = "identity_install/login.rs"]
@@ -292,14 +294,12 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
     ];
     // A machine that runs Lys already has a model proxy on the installed port.
     let proxy_port = listeners[2].local_addr()?.port();
-    let estate = Estate {
-        root: tempfile::TempDir::new()?,
-        project: format!("lys-identity-test-install-{}", std::process::id()),
-        rauthy_port: free_port()?,
-        service_port: listeners[0].local_addr()?.port(),
-        broker_port: listeners[1].local_addr()?.port(),
-        cleaned: false,
-    };
+    let estate = Estate::new(
+        format!("lys-identity-test-install-{}", std::process::id()),
+        free_port()?,
+        listeners[0].local_addr()?.port(),
+        listeners[1].local_addr()?.port(),
+    )?;
     drop(listeners);
     let origin = format!("http://localhost:{}", estate.service_port);
     std::fs::set_permissions(estate.root.path(), std::fs::Permissions::from_mode(0o700))?;
@@ -493,6 +493,17 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
             "{location} is not the product's registered address"
         );
     }
+    // The model proxy's exit lock, opened before the estate removes its
+    // root: held while the proxy runs.
+    let proxy_exit = std::fs::File::open(estate.root.path().join("run/proxy.exit"))?;
     estate.close()?;
+    assert!(
+        rustix::fs::flock(
+            &proxy_exit,
+            rustix::fs::FlockOperation::NonBlockingLockExclusive
+        )
+        .is_ok(),
+        "the estate's close left its model proxy running"
+    );
     Ok(())
 }

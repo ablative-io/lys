@@ -3,7 +3,8 @@
 
 use std::io::Read;
 use std::sync::Arc;
-use std::time::Duration;
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::time::{Duration, Instant};
 
 use portable_pty::Child;
 
@@ -11,11 +12,45 @@ use super::super::{Sessions, now_ms};
 use super::plan;
 use crate::protocol::{Ended, EndedHow};
 
+/// How long a program has, after the first hang-up at a usage limit, before
+/// its process group is killed. A program that exits cleanly on the hang-up
+/// is still writing its own session file, which is user data, and a short
+/// window is not safe on a loaded machine (load 59 on Tom's Mac that day), so
+/// it is ten seconds (Waffles, 10 Oct 2026, 13:18).
+const FIRST_HANGUP_GRACE: Duration = Duration::from_secs(10);
+
 /// How long a program has, after the repeated hang-up, before its process
-/// group is killed: the rotation tests' own cadence, so a program that cannot
-/// receive the hang-up (its SIGHUP blocked) never holds the runner (Waffles,
-/// 10 Oct 2026, 12:09).
+/// group is killed. A program that printed after the hang-up has shown it is
+/// still running, not exiting, so the rotation tests' own cadence is enough
+/// (Waffles, 10 Oct 2026, 12:09, kept at 13:18).
 const REPEAT_GRACE: Duration = Duration::from_secs(2);
+
+/// Which hang-up's grace a generation's escalation is counting down.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Grace {
+    /// [`FIRST_HANGUP_GRACE`] from the first hang-up.
+    FirstHangUp,
+    /// [`REPEAT_GRACE`] from the repeated hang-up.
+    Repeat,
+}
+
+impl Grace {
+    fn length(self) -> Duration {
+        match self {
+            Self::FirstHangUp => FIRST_HANGUP_GRACE,
+            Self::Repeat => REPEAT_GRACE,
+        }
+    }
+
+    /// The hang-up it counts from and the grace's name, as the escalated
+    /// line says them.
+    fn words(self) -> &'static str {
+        match self {
+            Self::FirstHangUp => "the first hang-up (FIRST_HANGUP_GRACE)",
+            Self::Repeat => "the repeated hang-up (REPEAT_GRACE)",
+        }
+    }
+}
 
 impl Sessions {
     /// Keep the output of generation `generation` of session `id` until its
@@ -32,8 +67,9 @@ impl Sessions {
         let mut told = false;
         // Whether the repeat has been said; it is said once, however often it is sent.
         let mut said_again = false;
-        // Whether the kill after the repeat's grace is armed; it is armed once.
-        let mut escalating = false;
+        // The generation's one escalation, armed at the first hang-up that
+        // was sent; a repeat brings its deadline forward.
+        let mut escalation: Option<mpsc::Sender<Instant>> = None;
         loop {
             let read = match reader.read(&mut buffer) {
                 Ok(0) => break,
@@ -57,9 +93,10 @@ impl Sessions {
                     // loses nothing; one whose handler was for a single signal is
                     // ended there. Its output to that point is kept; shutdown work
                     // that is not output, such as writing its own session file, is
-                    // lost with it. A program that cannot receive the repeat (its
-                    // SIGHUP blocked) is killed with its group after
-                    // REPEAT_GRACE, by a thread of its own (`escalate`).
+                    // lost with it. A program that cannot receive the hang-up (its
+                    // SIGHUP blocked) is killed with its group by a thread of its
+                    // own (`escalate`): FIRST_HANGUP_GRACE after the first
+                    // hang-up, or REPEAT_GRACE after a repeat if that is sooner.
                     if !tripped && !told {
                         continue;
                     }
@@ -92,9 +129,23 @@ impl Sessions {
                             ));
                         }
                         let sent = crate::pty::end(&leader);
-                        if again && sent.is_ok() && !escalating {
-                            escalating = true;
-                            escalate(id, leader.clone());
+                        if sent.is_ok() {
+                            let grace = if again {
+                                Grace::Repeat
+                            } else {
+                                Grace::FirstHangUp
+                            };
+                            if escalation.is_none() {
+                                escalation = escalate(id, leader.clone(), grace);
+                            } else if let (true, Some(armed)) = (again, &escalation) {
+                                // A send that fails finds the escalation
+                                // already past its deadline and done.
+                                if armed.send(Instant::now()).is_err() {
+                                    crate::error::said(&format!(
+                                        "session {id}: rotation_escalation_done: the repeat came after the escalation acted"
+                                    ));
+                                }
+                            }
                         }
                         if let Err(error) = sent {
                             // On macOS a hang-up to a group whose leader has
@@ -288,22 +339,50 @@ fn terminal_cleanup(left: Result<crate::pty::Left, crate::error::RunnerError>) -
     }
 }
 
-/// After the repeated hang-up of session `id`, give its program
-/// [`REPEAT_GRACE`]; if the same leader is still running then, kill its
-/// process group and say so. A program can hold a hang-up blocked forever (a
-/// shell's `exec` from inside its SIGHUP trap passes the block on), and a
-/// runner that only repeats the hang-up would wait on it forever.
-fn escalate(id: &str, leader: crate::peer::Leader) {
+/// After a hang-up of session `id`, give its program `grace`; if the same
+/// leader is still running at the deadline, kill its process group and say
+/// which grace expired. Each instant sent on the answered channel is a
+/// repeated hang-up, and brings the deadline forward to [`REPEAT_GRACE`] after
+/// it when that is sooner. A program can hold a hang-up blocked forever (a
+/// shell's `exec` from inside its SIGHUP trap passes the block on) and print
+/// nothing, and a runner that only answers output would wait on it forever.
+/// `None` when the thread could not be started, which is said.
+fn escalate(id: &str, leader: crate::peer::Leader, grace: Grace) -> Option<mpsc::Sender<Instant>> {
+    let (repeats, heard) = mpsc::channel::<Instant>();
     let session = id.to_owned();
     let spawned = std::thread::Builder::new()
         .name(format!("lys-runner-escalate-{id}"))
         .spawn(move || {
             let id = session;
-            std::thread::sleep(REPEAT_GRACE);
+            let mut grace = grace;
+            let mut deadline = Instant::now() + grace.length();
+            loop {
+                let left = deadline.saturating_duration_since(Instant::now());
+                if left.is_zero() {
+                    break;
+                }
+                match heard.recv_timeout(left) {
+                    Ok(repeated) => {
+                        let sooner = repeated + REPEAT_GRACE;
+                        if sooner < deadline {
+                            deadline = sooner;
+                            grace = Grace::Repeat;
+                        }
+                    }
+                    Err(RecvTimeoutError::Timeout) => break,
+                    // The terminal's reader has ended; no repeat can come,
+                    // and the deadline still stands.
+                    Err(RecvTimeoutError::Disconnected) => {
+                        std::thread::sleep(left);
+                        break;
+                    }
+                }
+            }
             match crate::pty::kill_if_still(&leader) {
                 Ok(true) => crate::error::said(&format!(
-                    "session {id}: rotation_signal_escalated: still running {} s after the repeated hang-up; its process group was killed",
-                    REPEAT_GRACE.as_secs()
+                    "session {id}: rotation_signal_escalated: still running {} s after {}; its process group was killed",
+                    grace.length().as_secs(),
+                    grace.words()
                 )),
                 Ok(false) => {}
                 Err(error) => crate::error::said(&format!(
@@ -311,10 +390,38 @@ fn escalate(id: &str, leader: crate::peer::Leader) {
                 )),
             }
         });
-    if let Err(error) = spawned {
-        crate::error::said(&format!(
-            "session {id}: rotation_escalation_failed: the escalation could not be started: {error}"
-        ));
+    match spawned {
+        Ok(_) => Some(repeats),
+        Err(error) => {
+            crate::error::said(&format!(
+                "session {id}: rotation_escalation_failed: the escalation could not be started: {error}"
+            ));
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod grace_tests {
+    use std::time::Duration;
+
+    use super::{FIRST_HANGUP_GRACE, Grace, REPEAT_GRACE};
+
+    #[test]
+    fn the_first_hang_up_grace_is_ten_seconds() {
+        assert_eq!(FIRST_HANGUP_GRACE, Duration::from_secs(10));
+        assert_eq!(Grace::FirstHangUp.length(), FIRST_HANGUP_GRACE);
+        assert_eq!(
+            Grace::FirstHangUp.words(),
+            "the first hang-up (FIRST_HANGUP_GRACE)"
+        );
+    }
+
+    #[test]
+    fn the_repeat_grace_is_two_seconds() {
+        assert_eq!(REPEAT_GRACE, Duration::from_secs(2));
+        assert_eq!(Grace::Repeat.length(), REPEAT_GRACE);
+        assert_eq!(Grace::Repeat.words(), "the repeated hang-up (REPEAT_GRACE)");
     }
 }
 
