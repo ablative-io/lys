@@ -159,6 +159,16 @@
       "path": "crates/lys-identity-server/Cargo.toml",
       "note": "owned non-default benchmark target/instrumentation declaration; no unapproved dependency",
       "brief": "AGENTS-005"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/seat_send.rs",
+      "note": "a message to a seat lands as a user turn; refusals by name",
+      "brief": "AGENTS-002"
+    },
+    {
+      "path": "crates/lys-identity-server/src/network_store.rs",
+      "note": "the network store; one kind-lys runner per install",
+      "brief": "AGENTS-002"
     }
   ],
   "principles": [

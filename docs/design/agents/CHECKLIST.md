@@ -37,3 +37,4 @@
 - [ ] **C724** — Registry/liveness pages use current indexed fields and proven owner events instead of copying history and polling all seats; exact totals/freshness remain unchanged (AGENTS-005 R6).
 - [ ] **C725** — Terminal/pattern/transport paths count complete work, preserve every byte and match, and remove prefix re-search and shared network-wait holds (AGENTS-005 R7).
 - [ ] **C726** — Approval, connector, MCP refusal and nonce paths remove per-request global scans/copies/thread growth without stale grants or weakened replay/audit (AGENTS-005 R8).
+- [ ] **C734** — A message sent to a seat from the Sessions screen or `lys seat send` arrives in its Claude Code transcript as a user turn, never as typed keys (AGENTS-002 R6).

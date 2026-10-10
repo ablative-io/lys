@@ -148,6 +148,11 @@
           "id": "C726",
           "text": "Approval, connector, MCP refusal and nonce paths remove per-request global scans/copies/thread growth without stale grants or weakened replay/audit (AGENTS-005 R8).",
           "done": false
+        },
+        {
+          "id": "C734",
+          "text": "A message sent to a seat from the Sessions screen or `lys seat send` arrives in its Claude Code transcript as a user turn, never as typed keys (AGENTS-002 R6).",
+          "done": false
         }
       ]
     }

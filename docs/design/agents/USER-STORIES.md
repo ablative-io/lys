@@ -8,6 +8,8 @@
 
 **S411.** As the owner, I want every recurring seat path measured by a count proved to track real completion time and ratcheted only down, so that a performance claim cannot hide unmeasured work.
 
+**S418.** As Tom, I want to send a message to any seat from the Sessions screen or the lys CLI and see it arrive in that seat as a real turn, so that I can talk to my agents from Lys.
+
 ## Archie — an agent
 
 **S403.** As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind.

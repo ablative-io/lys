@@ -84,6 +84,8 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-home/Cargo.toml` | owned non-default benchmark target/instrumentation declaration; no unapproved dependency | AGENTS-005 |
 | `crates/lys-runner/Cargo.toml` | owned non-default benchmark target/instrumentation declaration; no unapproved dependency | AGENTS-005 |
 | `crates/lys-identity-server/Cargo.toml` | owned non-default benchmark target/instrumentation declaration; no unapproved dependency | AGENTS-005 |
+| `crates/lys-identity-server/tests/seat_send.rs` | a message to a seat lands as a user turn; refusals by name | AGENTS-002 |
+| `crates/lys-identity-server/src/network_store.rs` | the network store; one kind-lys runner per install | AGENTS-002 |
 
 ## Inventory
 
