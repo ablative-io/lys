@@ -7,8 +7,12 @@
 //!
 //! Seat survival through a real launched binary waits on DIRECTORY-064's
 //! qualification pin: lys-runner's `QUALIFIED` list is empty, so no managed
-//! harness can start. Today the imported seat's start is refused by name,
-//! `control_adapter_unqualified`, and that is what is asserted. The survival
+//! harness can start. A seat starts through its own owner (AGENTS-004 R1),
+//! and the owner asks the adapter's qualification once it runs; this
+//! service's fixture runner has no owner program to start, so here the
+//! imported seat's start is refused by name, `seat_owner_start_failed`,
+//! before any owner or harness exists, and that is what is asserted (the
+//! adapter's own `control_adapter_unqualified` is lys-runner's to prove). The survival
 //! legs are written whole in `survives`, called only from
 //! `seat_import_survives_lifecycle_once_qualified`, which asserts the list is
 //! empty and the refusal holds, and becomes the survival test itself the day
@@ -30,8 +34,9 @@ use support::{Table, operation};
 type TestResult = Result<(), Box<dyn Error>>;
 
 const SEAT: &str = "waffles";
-/// The refusal every managed start answers until DIRECTORY-064's pin lands.
-const UNQUALIFIED: &str = "control_adapter_unqualified";
+/// The refusal a seat's start answers under this fixture: its owner cannot
+/// be started, so nothing starts.
+const UNQUALIFIED: &str = "seat_owner_start_failed";
 /// lys-runner's list of qualified launched binaries, empty until the pin.
 const QUALIFIED_EMPTY: &str = "const QUALIFIED: &[Qualification] = &[];";
 
@@ -109,8 +114,8 @@ fn qualified_is_empty() -> Result<bool, Box<dyn Error>> {
     Ok(std::fs::read_to_string(process)?.contains(QUALIFIED_EMPTY))
 }
 
-/// The start refused by the unqualified control adapter's name.
-fn unqualified(answer: &(u16, Value)) {
+/// The start refused by its owner start's name.
+fn start_refused(answer: &(u16, Value)) {
     assert_ne!(answer.0, 200, "a managed start answered: {}", answer.1);
     assert_eq!(answer.1["refusal"], UNQUALIFIED, "{}", answer.1);
 }
@@ -172,7 +177,14 @@ impl Scene {
             "/words".to_owned(),
             "/schedules".to_owned(),
         ] {
-            held.push(self.get(&path).await?);
+            let mut answer = self.get(&path).await?;
+            // The latest dry run is kept in memory only (R4: a restart
+            // forgets it and the person runs a new one), so it is no part
+            // of the import that must survive.
+            if let Some(status) = answer.as_object_mut() {
+                status.remove("previewed");
+            }
+            held.push(answer);
         }
         Ok(held)
     }
@@ -290,15 +302,15 @@ async fn seat_import_status_survives_restart_and_upgrade() -> TestResult {
     scene.table.close()
 }
 
-/// Today an imported seat is not started: its managed start is refused
-/// `control_adapter_unqualified` by name, as DIRECTORY-064's pin leaves every
-/// launched binary, nothing starts, and the import stays the one completed.
+/// Today an imported seat is not started: its start is refused
+/// `seat_owner_start_failed` by name, nothing starts, and the import stays
+/// the one completed.
 #[tokio::test(flavor = "multi_thread")]
 async fn seat_import_survives_lifecycle() -> TestResult {
     let scene = scene().await?;
     let (_, _, completed) = scene.imported().await?;
     let answer = scene.start().await?;
-    unqualified(&answer);
+    start_refused(&answer);
     assert_eq!(
         scene.seat_sessions().await?,
         Vec::<Value>::new(),
@@ -309,7 +321,7 @@ async fn seat_import_survives_lifecycle() -> TestResult {
 }
 
 /// DIRECTORY-064's pin, held: lys-runner's `QUALIFIED` list is empty and the
-/// imported seat's start is refused `control_adapter_unqualified`. When the
+/// imported seat's start is refused by name, nothing starting. When the
 /// pin lands and the start answers, this is the survival test: the seat's
 /// session survives an attachment exit, a service exit and an upgrade
 /// handoff ([`survives`]).
@@ -326,7 +338,7 @@ async fn seat_import_survives_lifecycle_once_qualified() -> TestResult {
         "lys-runner names a qualified binary, yet the start was refused: {}",
         answer.1
     );
-    unqualified(&answer);
+    start_refused(&answer);
     assert_eq!(scene.status().await?, completed);
     scene.table.close()
 }
