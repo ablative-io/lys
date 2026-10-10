@@ -153,7 +153,8 @@ async fn verified(service: &Service, answer: &Value) -> Result<VerifiedPass, Box
     Ok(VerifiedPass::verify(
         pass,
         &KeySet::from_json(&keys)?,
-        &service.base,
+        // The issuer is the origin the service is seated at, not the loopback it is reached on.
+        PUBLIC,
         NOTES,
         now()?,
     )?)
