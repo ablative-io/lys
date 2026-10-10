@@ -1,0 +1,12 @@
+{
+  "format": "lys-runner-seat-survival-red-matrix/v1",
+  "brief": "AGENTS-004 R6",
+  "rule": "Every barrier below is tested red for its named reason, with the owner record untouched and nothing invented: a fault is refused by name, never read as empty, never skipped, never retried on a guess.",
+  "barriers": [
+    { "barrier": "plan_unreadable", "where": "OwnerPlan::read", "refusal": "seat_owner_start_failed", "untouched": "no owner directory is created" },
+    { "barrier": "ready_pipe_closed", "where": "spawn::wait_ready", "refusal": "seat_owner_start_failed", "untouched": "zero idle wakes, zero records" },
+    { "barrier": "kernel_proof_mismatch", "where": "recovery::prove", "refusal": "pid_reused", "untouched": "the endpoint record is kept and named, nothing restarted" },
+    { "barrier": "append_refused", "where": "OwnerStore::record", "refusal": "seat_owner_append_refused|seat_owner_store_unavailable", "untouched": "the projection in memory does not move" },
+    { "barrier": "checkpoint_refused", "where": "OwnerStore::checkpoint", "refusal": "seat_owner_checkpoint_refused", "untouched": "the projection on disk is the one before" }
+  ]
+}
