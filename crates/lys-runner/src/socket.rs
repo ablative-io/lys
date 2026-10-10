@@ -106,6 +106,7 @@ impl Runner {
     pub fn open(options: &Options) -> Result<Self, RunnerError> {
         refuse_live(&options.socket)?;
         let sessions = Sessions::open(&options.state, options.scrollback)?;
+        sessions.set_server_key(options.server_key);
         let listener = bind(&options.socket)?;
         sessions.serving_on(&options.socket);
         Ok(Self {

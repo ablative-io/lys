@@ -65,6 +65,16 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
         } => crate::commands::runner_join::run(&server, &machine, server_ca, scrollback),
         RunnerCommand::Judge { socket, harness } => judge(&socket, harness),
         RunnerCommand::StatusLine { socket } => status_line(&socket),
+        RunnerCommand::SeatOwner {
+            dir,
+            server_key,
+            scrollback,
+        } => lys_runner::seat_owner::process::serve(&lys_runner::seat_owner::process::OwnerServe {
+            dir,
+            server_key: public_key(&server_key)?,
+            scrollback,
+        })
+        .map_err(Into::into),
     }
 }
 

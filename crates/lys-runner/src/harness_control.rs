@@ -46,6 +46,11 @@ pub struct ManagedLaunch {
     pub conversation: String,
     /// Whether a manual transport must refuse the launch.
     pub requires_controls: bool,
+    /// The supervised-seat binding, when AGENTS-002 started this as a seat:
+    /// the session then gets an independent owner (AGENTS-004 R1). Absent
+    /// for a manual launch, which keeps its lifecycle; never inferred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<crate::seat_owner::protocol::OwnerBinding>,
 }
 
 #[derive(Debug, Clone)]

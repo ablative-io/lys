@@ -87,6 +87,12 @@ impl Sessions {
         proxy: Option<crate::tracking_proxy::ProxyTracking>,
         responsible: Option<String>,
     ) -> Result<(u32, u64), RunnerError> {
+        if let Some(binding) = managed.owner.clone() {
+            // A typed supervised-seat binding, and only that, selects an
+            // independent owner (AGENTS-004 R1); a manual launch is never
+            // guessed to be a seat.
+            return self.start_owned(managed, binding, responsible);
+        }
         crate::harness_control::process::validate_start(self, &managed, responsible.as_deref())?;
         let policy = managed
             .launch

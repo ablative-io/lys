@@ -133,6 +133,13 @@ pub(super) fn perform(
         } => sessions
             .resize(&session, columns, rows)
             .map(|()| Answer::Delivered { session }),
+        Act::Owner { .. } => Err(RunnerError::refused(
+            "seat_owner_client_unproved",
+            "an owner command is answered on the owner's socket, where its peer is proved",
+        )),
+        Act::Owned => Ok(Answer::Owned {
+            owners: sessions.owned_seats()?,
+        }),
         Act::End { session } => {
             let ended = sessions.end(&session, left)?;
             Ok(Answer::Ended { session, ended })

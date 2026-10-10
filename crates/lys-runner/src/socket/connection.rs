@@ -242,6 +242,15 @@ pub(super) async fn execute(
     let mut task = tokio::task::spawn_blocking(move || {
         let answer = match command {
             Command::Peer(request) => cached.answer(&held, &proved, request, &flag),
+            Command::Server(Act::Owner { command }, _) => {
+                // The owner proves the client at the kernel, so this is
+                // answered here, where the socket is, not in the act table.
+                let peer = crate::peer::peer_of(&proved).ok();
+                crate::seat_owner::sessions::answer_owner(&held, command, peer).map_or_else(
+                    |error| Answer::refusal(&error),
+                    |answer| Answer::Owner { answer },
+                )
+            }
             Command::Server(act, server) => perform(&held, &server, act, &flag, None)
                 .unwrap_or_else(|error| Answer::refusal(&error)),
         };

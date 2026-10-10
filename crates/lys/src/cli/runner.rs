@@ -138,6 +138,21 @@ pub enum RunnerCommand {
         #[arg(long)]
         socket: PathBuf,
     },
+    /// Serve as the independent owner of one supervised seat (AGENTS-004
+    /// R1), started by the runner in a session of its own; its plan is in
+    /// its directory.
+    #[command(hide = true)]
+    SeatOwner {
+        /// The owner's directory under the runner's state.
+        #[arg(long)]
+        dir: PathBuf,
+        /// The server's public key, as 64 hexadecimal characters.
+        #[arg(long)]
+        server_key: PathBuf,
+        /// Scrollback for the one session.
+        #[arg(long, default_value_t = SCROLLBACK)]
+        scrollback: usize,
+    },
 }
 
 /// The harnesses `lys runner judge` speaks for.

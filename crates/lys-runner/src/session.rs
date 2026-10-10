@@ -227,13 +227,20 @@ pub struct Sessions {
     table: Mutex<Table>,
     changed: Condvar,
     state: StateFile,
-    state_dir: PathBuf,
+    pub(crate) state_dir: PathBuf,
     /// The proxy's `usage` directory on this machine, once said.
     proxy_usage: std::sync::OnceLock<PathBuf>,
     /// The socket this runner serves on, once bound: where a proxied run's
     /// status line hands what its harness reported.
     serving: std::sync::OnceLock<PathBuf>,
-    scrollback: usize,
+    /// The server's public key, once the runner opened its socket; owners
+    /// this runner starts verify acts with it (AGENTS-004 R1).
+    pub(crate) server_key: std::sync::OnceLock<[u8; 32]>,
+    /// This runner's own owner state, when it is a seat owner.
+    pub(crate) owner_state: std::sync::OnceLock<Arc<crate::seat_owner::process::OwnerState>>,
+    /// The seats this runner started owners for, indexed by session.
+    pub(crate) owned: Mutex<BTreeMap<String, crate::seat_owner::sessions::OwnedSeat>>,
+    pub(crate) scrollback: usize,
     pub(crate) writer: crate::durable::Writer,
     #[cfg(test)]
     spawn_probe: Mutex<Option<SpawnProbe>>,
@@ -351,6 +358,9 @@ impl Sessions {
                 state_dir,
                 proxy_usage: std::sync::OnceLock::new(),
                 serving: std::sync::OnceLock::new(),
+                server_key: std::sync::OnceLock::new(),
+                owner_state: std::sync::OnceLock::new(),
+                owned: Mutex::new(BTreeMap::new()),
                 scrollback,
                 writer,
                 #[cfg(test)]

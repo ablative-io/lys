@@ -242,6 +242,15 @@ pub enum Act {
         #[serde(default)]
         follow: bool,
     },
+    /// A command to the seat owner this runner is (AGENTS-004 R1): bind,
+    /// read, move cursors, stop, or step a handover. A runner that is not
+    /// an owner refuses `seat_owner_not_an_owner`.
+    Owner {
+        /// The command.
+        command: crate::seat_owner::protocol::OwnerCommand,
+    },
+    /// The supervised seats this runner started owners for, from its index.
+    Owned,
 }
 
 /// An answer to one act.
@@ -370,6 +379,16 @@ pub enum Answer {
         cursor: u64,
         /// Whether the session has ended.
         ended: bool,
+    },
+    /// The owner's answer to its command.
+    Owner {
+        /// The answer.
+        answer: crate::seat_owner::protocol::OwnerAnswer,
+    },
+    /// The supervised seats this runner started owners for.
+    Owned {
+        /// Each owned seat, by session.
+        owners: Vec<crate::seat_owner::sessions::OwnedSeat>,
     },
 }
 

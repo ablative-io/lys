@@ -204,6 +204,14 @@ pub(super) fn start_runner(
     for directory in [layout.run_dir(), layout.logs_dir(), layout.data_dir()] {
         private_files::ensure_dir(&directory)?;
     }
+    // The seat owners the runner starts live under its state and outlive
+    // it (AGENTS-004 R1); the directory is made once and kept by upgrades.
+    private_files::ensure_dir(
+        &layout
+            .data_dir()
+            .join("runner")
+            .join(lys_runner::seat_owner::protocol::OWNERS_DIR),
+    )?;
     let log = layout.logs_dir().join("runner.log");
     let pid = layout.run_dir().join("runner.pid");
     let public = layout.run_dir().join("runner-server.pub");
