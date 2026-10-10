@@ -8,9 +8,12 @@ import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
 import { UsageBudgets } from './UsageBudgets';
 import { UsageGoals } from './UsageGoals';
+import { Words } from './Words';
+import { Variables } from './Variables';
+import { Schedules } from './Schedules';
 import { tracking } from './contract';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
-import type { BudgetsView, GoalsView, UsageView } from './contract';
+import type { BudgetsView, GoalsView, SchedulesView, UsageView, VariablesRead, WordsForAgent } from './contract';
 import './usage.css';
 
 /** `name` is the agent's name, said in place of its identifier wherever the service's words carry it. */
@@ -22,9 +25,12 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
     budgets: request<BudgetsView>('/budgets/agent/' + path),
     usage: request<UsageView>('/agents/' + path + '/usage'),
     goals: request<GoalsView>('/agents/' + path + '/goals'),
+    words: request<WordsForAgent>('/agents/' + path + '/words'),
+    variables: request<VariablesRead>('/agents/' + path + '/variables'),
+    schedules: request<SchedulesView>('/schedules'),
   }), 'usage:' + agent + ':' + revision);
   const changed = (words: string) => { setNotice(words); setRevision((value) => value + 1); };
-  return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals }) => {
+  return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals, words, variables, schedules }) => {
     const tracked = tracking(usage);
     return <>
       <ControlSetup agent={agent} />
@@ -32,6 +38,9 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
+      <Words agent={agent} words={words} changed={changed} />
+      <Variables agent={agent} variables={variables} changed={changed} />
+      <Schedules agent={agent} schedules={schedules.schedules} changed={changed} />
     </>;
   }} /></>;
 }

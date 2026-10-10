@@ -83,3 +83,37 @@ export function tracking(usage: UsageView): { complete: boolean; words: string }
 export function asLimit(budget: Budget): Limit {
   return { unit: budget.measure, amount: budget.limit, period: budget.period?.length ?? null, act: budget.act, ...(budget.period ? { zone: budget.period.zone } : {}) };
 }
+
+/** AGENTS-001: the words a seat is sent, its variables and its schedules, as the identity service answers them. */
+export type WordsSlot = 'context_warning' | 'preparation' | 'compaction' | 'wake_up' | 'scheduled_reminder';
+export const SLOTS: Record<WordsSlot, string> = {
+  context_warning: 'Context warning',
+  preparation: 'Preparation before compaction',
+  compaction: 'Compaction command',
+  wake_up: 'Wake-up',
+  scheduled_reminder: 'Scheduled reminder',
+};
+export type WordsSetting = { kind: 'text'; text: string } | { kind: 'template'; name: string } | { kind: 'inherit' };
+export type WordsHeld = { setting: WordsSetting; revision: number; by: string; at: number };
+export type WordsRevision = { kind: string; key: string; revision: number };
+export type WordsResolved = { slot: WordsSlot; text: string | null; source: string; contributed: WordsRevision[] };
+export type WordsForAgent = { agent: string; resolved: WordsResolved[]; held: Record<string, WordsHeld> };
+export type WordsDelivered = { slot: WordsSlot; text: string; source: string; contributed: WordsRevision[]; missing: string[] };
+export type WordsSaveBody = { setting: WordsSetting; revision: number };
+export type VariableHeld = { value: unknown; revision: number; author: string; expires_at?: number; at: number };
+export type VariablesRead = { scope: { kind: 'agent' | 'session'; id: string }; revision: number; values: Record<string, VariableHeld>; expired: string[] };
+export type VariablesPatchBody = { revision: number; values: Record<string, unknown>; expires_at?: number };
+export type ScheduleRecipient = { kind: 'agent' | 'session'; id: string };
+export type ScheduleSource = { kind: 'text'; text: string } | { kind: 'slot'; slot: WordsSlot };
+export type ScheduleDelivery = 'pending' | 'accepted' | 'delivered' | 'uncertain' | 'refused';
+export type ScheduleSent = { recipient: ScheduleRecipient; session: string; operation: string; text: string; contributed: WordsRevision[]; missing: string[]; state: ScheduleDelivery; words: string; at: number };
+export type ScheduleFired = { operation: string; schedule: string; occurrence: number; due: number; fired: number; coalesced: number; sent: ScheduleSent[]; refused?: string };
+export type ScheduleItem = {
+  schedule: { id: string; at: number; until?: number; interval?: number; max_occurrences?: number; recipients: ScheduleRecipient[]; source: ScheduleSource; author: string; set_at: number };
+  changes?: { operation: string; schedule: string; change: Record<string, unknown>; by: string; at: number }[];
+  fired: ScheduleFired[];
+  stopped?: { schedule: string; reason: string; at: number };
+  next_due: number | null;
+};
+export type SchedulesView = { schedules: ScheduleItem[] };
+export type ScheduleSetBody = { operation: string; at: number; until?: number; interval?: number; max_occurrences?: number; recipients: ScheduleRecipient[]; source: ScheduleSource };

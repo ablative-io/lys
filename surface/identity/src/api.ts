@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { SchedulesView, VariablesRead, WordsDelivered, WordsForAgent } from './features/usage/contract';
 import { subscribeChanges } from './live';
 import type { AgentView, DirectoryRecord, MeView, PeopleView, ReceiptAnswer, Refusal, SignedIn } from './generated';
 import type { ActionBody, DelegateBody, Grant, GrantList, GrantModel, Permit, ReachAnswer, ReachBody, Recorded, RevokeBody, WhoAnswer, WhoBody } from './generated/grants';
@@ -374,4 +375,16 @@ export const seats = {
     if (answer.delivered !== true) seatsUnreadable('The send answer did not confirm delivery; the message is not assumed delivered.');
     return answer;
   },
+};
+
+/** AGENTS-001: the words, variables and schedules reads an agent's file asks; every change goes through the kept-change hook with its path. */
+export const agentWords = {
+  forAgent: (agent: string): Promise<WordsForAgent> => request<WordsForAgent>('/agents/' + encodeURIComponent(agent) + '/words'),
+  preview: (body: { slot: string; agent?: string; session?: string; numbers?: Record<string, string> }): Promise<WordsDelivered> => request<WordsDelivered>('/words/preview', body),
+};
+export const agentVariables = {
+  read: (agent: string): Promise<VariablesRead> => request<VariablesRead>('/agents/' + encodeURIComponent(agent) + '/variables'),
+};
+export const agentSchedules = {
+  list: (): Promise<SchedulesView> => request<SchedulesView>('/schedules'),
 };

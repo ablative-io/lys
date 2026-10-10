@@ -140,6 +140,14 @@ Behavioural. THE SYSTEM SHALL extend DIRECTORY-051's Usage screen in place with 
 **Stories:**
 - S402 (Tom, owner) — As the owner, I want to set a seat's words, variables, countdowns and schedules in one place and see what was actually delivered, so that overnight work runs without a second system.
 
+## Amendment 1 (Waffles, 10 October 2026, written whole under Tom's word to write everything and build once)
+
+- One fold-and-snapshot engine carries the three record kinds: `crates/lys-identity-server/src/agents_log.rs` (the goals store's engine with the fold made a trait, `Folded`, and the lock `Kept<F>`), so the words, variables and schedules stores are thin over it instead of three copies of the snapshot and settle logic. Their schemas are registered in `crates/lys-identity-server/src/openapi_agents_types.rs`.
+- The words resolve into the acts that type them (R3): `budgets_act.rs` asks the context warning and the compaction slot before a budget act (a slot nobody set keeps the crossing's own words and the profile's command); `runner_api.rs` asks the wake-up slot on a wake; `goals_store.rs` gains `revision()` so a rendering names the goals revision it read.
+- A run reads and patches its own variables by its run pass (DIRECTORY-077 R2) on `/me/variables` and `/me/session/variables`, with `agent_pass::run_session`; `lys variables get|set` reads the pass from the launch's `mcp.json` or the Codex variables and never prints it. The runner presents nothing: DIRECTORY-060 R3's present_client was not built, and the pass already reaches the seat's own configuration.
+- The three directories (`words_dir`, `variables_dir`, `schedules_dir`) are named by the install's rendered configuration (`crates/lys/src/identity/install/server_config.rs`) and the test harness (`tests/identity_contract/src/harness.rs`, `template_stores.rs`); `grant_settlement_tests.rs` carries the three fields of `AppState`.
+- Nothing here has been compiled or tested: the one Lys battery of 10 October is its first build, by Tom's rule of 9 October.
+
 ## Boundaries
 
 - No delivery path of its own: every send is a DIRECTORY-064 operation with its receipt.
