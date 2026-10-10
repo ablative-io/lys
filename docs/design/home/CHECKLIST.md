@@ -225,3 +225,10 @@
 - [ ] **C196** — Every act that stores blocks (call ingest and its parts, harness events, import content, the given statement, templates, the proxy's persist fallback) puts them through one batch committed before the entry naming them is appended; a thirty-part call rises the device flushes by exactly two (HOME-038 R2).
 - [ ] **C197** — BlockStore::io() answers file pushes, directory syncs and device flushes as three counts a test reads, replacing syncs() and the capture timing's block_syncs (HOME-038 R3).
 - [ ] **C198** — BlockStore::get hashes what it read and refuses a block whose bytes do not hash to the name asked for as BlockDiffers naming both hashes, never repairing or removing it (HOME-038 R4).
+
+## Raw bodies as chunks, claims and reclaim (HOME-039)
+
+- [ ] **C199** — A raw body at or over 64 KiB is stored as Gear-chunked blocks (8 KiB minimum, 32 KiB average, 128 KiB maximum) under one lys/chunks/v1 manifest whose hash the record carries, with raw_request_chunks and raw_response_chunks saying so, and call_whole reads it back byte for byte or refuses it naming the manifest and the chunk (HOME-039 R1).
+- [ ] **C200** — BlockBatch::commit writes a claim under blocks/pending naming the session, the entry and every new hash before its first device flush, every act releases it with landed after its append, and a batch that reuses a claimed hash records itself as the claim's adopter (HOME-039 R2).
+- [ ] **C201** — BlockStore::reclaim, under blocks/.lock held exclusively against commits, unlinks the claim of a landed entry and frees the blocks of a claim older than the grace whose entry and adopters never landed, as one act with one counted flush, run at the proxy worker's start and hourly with its four counts reported (HOME-039 R2).
+- [ ] **C202** — The bound test is red at main for a growing conversation and for a committed act that never landed, green at the card's head, and blocks/pending and the chunk manifests have their STORES.md rows (HOME-039 R3).

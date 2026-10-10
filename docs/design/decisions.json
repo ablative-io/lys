@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-10-06",
+  "updated": "2026-10-10",
   "decisions": [
     {
       "id": "ADR-001",
@@ -2068,6 +2068,26 @@
         "The Lys log move onto haematite's LeafLog is a dated dependency on STOR-013, STOR-014 and STOR-015, boarded as a live row blocked on them; per-append durability is met by STOR-012.",
         "No Lys crate gains a haematite dependency until that move's own brief.",
         "Evidence is kept for good unless Tom sets a period."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-139",
+      "title": "A raw body is kept whole as content-defined chunks; a placed block is claimed until its entry lands; an unclaimed block is reclaimed under the store's lock",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-10-10",
+      "decided_by": "Waffles, 10 October 2026 21:4x, under Tom's word of 10 October 19:2x (the storage bug fully implemented, nothing else in front of it) and his rule of 10 October 06:2x that open numbers are decided with a stated reason",
+      "context": "ingest_call stores the raw request and the raw response whole as hash-named blocks (crates/lys-home/src/record/call.rs:233 and :234). The Messages API and the Responses API are stateless, so every request carries the whole conversation so far, and a session of n calls stores every prefix again: about n squared over two times the average turn, none of it deduped because no two bodies hash alike. A block is placed before the entry naming it is appended (HOME-038 R2), so a crash or a refused append leaves a block nothing names, which nothing finds (verify_all checks bytes against names, blocks.rs:250) and nothing removes. The bound test of LYSLOGSTORE-009 has no growing conversation in its mix, so it is green with both in place. Evidence is kept for good unless Tom sets a period (ADR-138). The live data path on 10 October is under 10 MiB with no homes yet; the growth begins when the seats move onto Lys.",
+      "decision": "A raw body at or over 64 KiB is stored as content-defined chunks, each a block, under one manifest block (lys/chunks/v1: the length, then the chunk hashes in order) whose hash the record carries where it carried the whole body's; the chunker is a Gear rolling hash with a table derived from SHA-256 of the byte value, a minimum of 8 KiB, an average of 32 KiB and a maximum of 128 KiB, so boundaries depend on the bytes alone and a call's new turn adds one or two new chunks while the rest repeat. A body under the threshold stays one block. Every block batch writes a claim under blocks/pending before its first device flush naming its session, its entry and its new hashes; the act releases the claim after its entry is appended; a batch reusing a claimed hash records itself as an adopter on that claim. Reclaim runs under blocks/.lock held exclusively (commits hold it shared) and, for a claim older than one hour, unlinks the claim when its entry or an adopter's entry is in the index, else frees the claim's blocks that no newer claim names, as one act with one counted flush, at the proxy worker's start and hourly. Rejected: a retention period (Tom's to set; this makes one cheap later, as an unlink of manifests no live entry names); a mark-and-sweep over every session's entries (reads history on every sweep, against ADR-112); reference counts beside blocks (a second copy of the truth); removing on read or at open (a read-only open must not mutate, ADR-059); a new chunking crate (eighty lines beside sha2, with a golden test, is reviewable in full).",
+      "quote": "We are constantly running out of hard drive space.",
+      "consequences": [
+        "HOME-039 is the brief; it depends on HOME-038 (the batch) and LYSLOGSTORE-009 (the inventory and the bound test) and goes into the Lys battery after them.",
+        "A session's raw request bytes grow with what is new in each call, not with the conversation's length; the fifty-call test and the bound test's conversations hold it.",
+        "blocks/pending and blocks/.lock are the only new names under a home's block store, with their STORES.md rows.",
+        "The threshold, the chunk sizes and the grace are constants with their reasons beside them; a change to any is a brief, never configuration.",
+        "A record written before HOME-039 reads unchanged: raw_request without raw_request_chunks is a whole body."
       ],
       "supersedes": [],
       "superseded_by": ""

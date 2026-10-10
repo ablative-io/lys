@@ -870,6 +870,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Raw bodies as chunks, claims and reclaim (HOME-039)",
+      "items": [
+        {
+          "id": "C199",
+          "text": "A raw body at or over 64 KiB is stored as Gear-chunked blocks (8 KiB minimum, 32 KiB average, 128 KiB maximum) under one lys/chunks/v1 manifest whose hash the record carries, with raw_request_chunks and raw_response_chunks saying so, and call_whole reads it back byte for byte or refuses it naming the manifest and the chunk (HOME-039 R1).",
+          "done": false
+        },
+        {
+          "id": "C200",
+          "text": "BlockBatch::commit writes a claim under blocks/pending naming the session, the entry and every new hash before its first device flush, every act releases it with landed after its append, and a batch that reuses a claimed hash records itself as the claim's adopter (HOME-039 R2).",
+          "done": false
+        },
+        {
+          "id": "C201",
+          "text": "BlockStore::reclaim, under blocks/.lock held exclusively against commits, unlinks the claim of a landed entry and frees the blocks of a claim older than the grace whose entry and adopters never landed, as one act with one counted flush, run at the proxy worker's start and hourly with its four counts reported (HOME-039 R2).",
+          "done": false
+        },
+        {
+          "id": "C202",
+          "text": "The bound test is red at main for a growing conversation and for a committed act that never landed, green at the card's head, and blocks/pending and the chunk manifests have their STORES.md rows (HOME-039 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

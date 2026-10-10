@@ -81,7 +81,8 @@
     "ADR-110",
     "ADR-072",
     "ADR-112",
-    "ADR-133"
+    "ADR-133",
+    "ADR-139"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -2214,6 +2215,31 @@
       "path": "crates/lys-home/src/proxy/persist.rs",
       "note": "touched by HOME-038 R2 and R3: the persist fallback uses a batch and the timing carries three counts",
       "brief": "HOME-038"
+    },
+    {
+      "path": "crates/lys-home/src/record/chunks.rs",
+      "note": "HOME-039 R1: the Gear chunker, its table and the manifest format",
+      "brief": "HOME-039"
+    },
+    {
+      "path": "crates/lys-home/src/record/chunks_tests.rs",
+      "note": "HOME-039 R1: golden boundaries, round trips, the fifty-call sum",
+      "brief": "HOME-039"
+    },
+    {
+      "path": "crates/lys-home/src/record/call/whole.rs",
+      "note": "touched by HOME-039 R1",
+      "brief": "HOME-039"
+    },
+    {
+      "path": "crates/lys/tests/store_bound.rs",
+      "note": "LYSLOGSTORE-009 R5 creates it; HOME-039 R3 adds the growing conversation and the crashed act",
+      "brief": "HOME-039"
+    },
+    {
+      "path": "docs/design/lys-log-store/STORES.md",
+      "note": "LYSLOGSTORE-009 R1 creates it; HOME-039 R3 adds blocks/pending and the chunk manifests",
+      "brief": "HOME-039"
     }
   ],
   "inventory": [

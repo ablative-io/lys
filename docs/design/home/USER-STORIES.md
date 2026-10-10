@@ -50,6 +50,8 @@
 
 **S79.** As Tom, I want a recorded call's blocks written as one durable operation with a fixed number of device flushes, so that the home's cost per act does not grow with the parts a reply has and a block that exists is whole.
 
+**S80.** As Tom, I want a session's recorded calls to cost the bytes that are new in each call, and a block that no entry names to be reclaimed while Lys runs, so that moving every seat onto Lys does not fill the disk.
+
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
