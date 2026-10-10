@@ -27,9 +27,15 @@ pub const MAX_OWNERS: usize = 4096;
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum Holder {
     /// The independent owner process itself, by its process-start identity.
-    Owner { start: Leader },
+    Owner {
+        /// Its process-start identity.
+        start: Leader,
+    },
     /// A successor owner prepared for an upgrade, not yet acknowledged.
-    Successor { start: Leader },
+    Successor {
+        /// Its process-start identity.
+        start: Leader,
+    },
 }
 
 /// The lease: one writer per session, fenced by a monotonic generation.
@@ -55,15 +61,25 @@ pub enum Custody {
     Owned,
     /// A successor was prepared under `intent` and has not acknowledged.
     HandingOver {
+        /// The intent that prepared the successor.
         intent: String,
+        /// The successor's process-start identity.
         successor: Leader,
+        /// When, in milliseconds since the Unix epoch.
         since: u64,
     },
     /// A deliberate stop was fenced under `intent`; the exit proof follows it.
-    Stopping { intent: String, since: u64 },
+    Stopping {
+        /// The intent that fenced the stop.
+        intent: String,
+        /// When, in milliseconds since the Unix epoch.
+        since: u64,
+    },
     /// The harness exited; the proof is the kernel's.
     Exited {
+        /// The intent that recorded the exit.
         intent: String,
+        /// How the harness ended, as the kernel reported it.
         exit: crate::protocol::Ended,
     },
 }
@@ -131,25 +147,50 @@ impl Projection {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "kind")]
 pub enum Intent {
     /// Establish an owner for a session no record holds.
-    Establish { record: OwnerRecord },
+    Establish {
+        /// The whole record, boxed: it is the one large variant.
+        record: Box<OwnerRecord>,
+    },
     /// Move the lease to `holder` at `generation`, which must exceed the held one.
     Lease {
+        /// The session.
         session: String,
+        /// The generation taken.
         generation: u64,
+        /// Who takes it.
         holder: Holder,
+        /// When, in milliseconds since the Unix epoch.
         taken_at: u64,
         /// The build of the binary taking it.
         #[serde(default)]
         build: String,
     },
     /// Set the harness process-start identity.
-    Harness { session: String, start: Leader },
+    Harness {
+        /// The session.
+        session: String,
+        /// The harness process-start identity.
+        start: Leader,
+    },
     /// Change custody.
-    Custody { session: String, custody: Custody },
+    Custody {
+        /// The session.
+        session: String,
+        /// The custody it moves to.
+        custody: Custody,
+    },
     /// Advance the cursors; a cursor never moves back.
-    Cursors { session: String, cursors: Cursors },
+    Cursors {
+        /// The session.
+        session: String,
+        /// The cursors reached.
+        cursors: Cursors,
+    },
     /// Retire the session's owner record from the live projection.
-    Retire { session: String },
+    Retire {
+        /// The session.
+        session: String,
+    },
 }
 
 /// One journal line.
@@ -167,9 +208,15 @@ pub(super) struct Line {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Applied {
     /// Appended and durable at this sequence.
-    Recorded { seq: u64 },
+    Recorded {
+        /// The sequence it took.
+        seq: u64,
+    },
     /// An intent of this id was already durable at this sequence; nothing was written.
-    Already { seq: u64 },
+    Already {
+        /// The sequence it was found at.
+        seq: u64,
+    },
 }
 
 /// The work a store did, for the counted ratchets (AGENTS-004 R5).

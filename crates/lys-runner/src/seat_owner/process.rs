@@ -99,7 +99,7 @@ impl OwnerState {
     }
 
     fn store(&self) -> Result<std::sync::MutexGuard<'_, OwnerStore>, RunnerError> {
-        self.store.lock().map_err(|_| {
+        self.store.lock().map_err(|_poisoned| {
             RunnerError::refused(
                 "seat_owner_store_unavailable",
                 "the owner store's lock is poisoned",
@@ -182,7 +182,12 @@ pub fn establish(
         credential_references: plan.credential_references.clone(),
         established_at: now_ms(),
     };
-    store.record(&plan.establish, &Intent::Establish { record })?;
+    store.record(
+        &plan.establish,
+        &Intent::Establish {
+            record: Box::new(record),
+        },
+    )?;
     Ok(())
 }
 

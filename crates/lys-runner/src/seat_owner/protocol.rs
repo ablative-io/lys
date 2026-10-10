@@ -410,7 +410,7 @@ pub fn parse_ready_line(line: &str) -> Result<(String, PathBuf, Leader, String),
             Some(("socket", value)) => socket = Some(PathBuf::from(value)),
             Some(("pid", value)) => pid = value.parse::<u32>().ok(),
             Some(("start", value)) => start = Some(value.to_owned()),
-            Some(("build", value)) if !value.is_empty() => build = value.to_owned(),
+            Some(("build", value)) if !value.is_empty() => value.clone_into(&mut build),
             _ => {}
         }
     }

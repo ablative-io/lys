@@ -29,7 +29,7 @@ fn hex_id(n: u64) -> String {
 
 fn establish(session: &str, pid: u32) -> Intent {
     Intent::Establish {
-        record: OwnerRecord {
+        record: Box::new(OwnerRecord {
             seat: format!("seat-{session}"),
             session: session.to_owned(),
             conversation: format!("conversation-{session}"),
@@ -44,7 +44,7 @@ fn establish(session: &str, pid: u32) -> Intent {
             cursors: Cursors::default(),
             credential_references: vec!["seat-token".to_owned()],
             established_at: 1_760_060_000_000,
-        },
+        }),
     }
 }
 

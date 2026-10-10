@@ -76,7 +76,7 @@ fn record(session: &str, pid: u32) -> OwnerRecord {
 
 fn establish(session: &str, pid: u32) -> Intent {
     Intent::Establish {
-        record: record(session, pid),
+        record: Box::new(record(session, pid)),
     }
 }
 
@@ -341,10 +341,10 @@ fn seat_owner_store_refuses_named_errors() -> TestResult {
     // too many are each refused by name, without the bytes, with no partial
     // success.
     let with_references = |references: Vec<String>| Intent::Establish {
-        record: OwnerRecord {
+        record: Box::new(OwnerRecord {
             credential_references: references,
             ..record("u", 5_005)
-        },
+        }),
     };
     let error = match store.record(
         &hex_id(13),

@@ -190,7 +190,7 @@ fn seat_survival_append_refused_is_red_by_name() -> TestResult {
     store.record(
         &hex_id(1),
         &Intent::Establish {
-            record: record("a", start),
+            record: Box::new(record("a", start)),
         },
     )?;
     let before = store.owner("a").cloned();
@@ -225,7 +225,7 @@ fn seat_survival_checkpoint_refused_is_red_by_name() -> TestResult {
     store.record(
         &hex_id(3),
         &Intent::Establish {
-            record: record("b", start),
+            record: Box::new(record("b", start)),
         },
     )?;
     store.checkpoint()?;

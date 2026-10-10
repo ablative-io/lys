@@ -72,9 +72,9 @@ impl Sessions {
     ///
     /// `seat_owner_held` when this runner already is an owner.
     pub fn adopt_owner(&self, state: Arc<OwnerState>) -> Result<(), RunnerError> {
-        self.owner_state
-            .set(state)
-            .map_err(|_| refused("seat_owner_held", "this runner already is a seat owner"))
+        self.owner_state.set(state).map_err(|_already_set| {
+            refused("seat_owner_held", "this runner already is a seat owner")
+        })
     }
 
     /// This runner's owner state, when it is a seat owner.
@@ -134,7 +134,7 @@ impl Sessions {
     fn owned_index(
         &self,
     ) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, OwnedSeat>>, RunnerError> {
-        self.owned.lock().map_err(|_| {
+        self.owned.lock().map_err(|_poisoned| {
             refused(
                 "seat_owner_store_unavailable",
                 "the owned-seat index's lock is poisoned",
@@ -289,7 +289,7 @@ impl Sessions {
     fn unreachable_lock(
         &self,
     ) -> Result<std::sync::MutexGuard<'_, Vec<super::recovery::Found>>, RunnerError> {
-        self.unreachable.lock().map_err(|_| {
+        self.unreachable.lock().map_err(|_poisoned| {
             refused(
                 "seat_owner_store_unavailable",
                 "the unreachable-owner list's lock is poisoned",

@@ -148,7 +148,7 @@ pub(super) fn apply(projection: &mut Projection, intent: &Intent) -> Result<(), 
             }
             projection
                 .owners
-                .insert(record.session.clone(), record.clone());
+                .insert(record.session.clone(), record.as_ref().clone());
         }
         Intent::Lease {
             session,

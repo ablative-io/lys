@@ -39,6 +39,7 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::GrantStream(GrantStreamError::BindingUnsupported { .. })
         | ServerError::Holding(..) => "invalid_request",
         ServerError::Team(..)
+        ServerError::AuthorityUnavailable { .. } => "temporarily_unavailable",
         | ServerError::Budget(..)
         | ServerError::HarnessCatalogueUnreadable { .. }
         | ServerError::Identity(..)

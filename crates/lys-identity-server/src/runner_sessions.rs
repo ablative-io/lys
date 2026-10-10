@@ -296,6 +296,8 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Refused { .. } => "refused",
         Answer::Liveness { .. } => "liveness",
         Answer::AttachLines { .. } => "attach_lines",
+        Answer::Owner { .. } => "owner",
+        Answer::Owned { .. } => "owned",
     }
 }
 

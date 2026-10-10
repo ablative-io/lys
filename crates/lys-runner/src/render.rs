@@ -166,7 +166,7 @@ fn placeholder(inner: &str, inputs: &Inputs, contributed: &mut Vec<Contributed>)
         "time_left" => inputs
             .deadline
             .map(|deadline| time_left(deadline, inputs.now)),
-        "deadline" => inputs.deadline.map(|deadline| stamp(deadline)),
+        "deadline" => inputs.deadline.map(stamp),
         other => inputs.numbers.get(other).cloned(),
     };
     value.or_else(|| fallback.map(str::to_owned))
