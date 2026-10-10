@@ -238,7 +238,12 @@ async fn marking_a_goal_met_cancels_its_pending_reminders() -> TestResult {
     assert!(self::item(&goals, "op-g1")?.fired.is_empty());
     let again = goals.with(|store| store.mark(marked("op-m2", "op-g1", Standing::Dropped, None)));
     assert!(
-        matches!(again, Err(ServerError::Agents(AgentsError::Goal(GoalError::Closed { .. })))),
+        matches!(
+            again,
+            Err(ServerError::Agents(AgentsError::Goal(
+                GoalError::Closed { .. }
+            )))
+        ),
         "{again:?}"
     );
     Ok(())
@@ -254,7 +259,9 @@ fn a_deliverable_without_named_evidence_is_refused() -> TestResult {
     assert!(
         matches!(
             refused,
-            Err(ServerError::Agents(AgentsError::Goal(GoalError::EvidenceMissing { .. })))
+            Err(ServerError::Agents(AgentsError::Goal(
+                GoalError::EvidenceMissing { .. }
+            )))
         ),
         "{refused:?}"
     );
@@ -263,7 +270,9 @@ fn a_deliverable_without_named_evidence_is_refused() -> TestResult {
     assert!(
         matches!(
             claimless,
-            Err(ServerError::Agents(AgentsError::Goal(GoalError::EvidenceMissing { .. })))
+            Err(ServerError::Agents(AgentsError::Goal(
+                GoalError::EvidenceMissing { .. }
+            )))
         ),
         "{claimless:?}"
     );
@@ -445,7 +454,12 @@ async fn a_restart_reads_only_the_leaves_after_the_snapshot() -> TestResult {
         })
     });
     assert!(
-        matches!(reused, Err(ServerError::Agents(AgentsError::Goal(GoalError::Reused { .. })))),
+        matches!(
+            reused,
+            Err(ServerError::Agents(AgentsError::Goal(
+                GoalError::Reused { .. }
+            )))
+        ),
         "{reused:?}"
     );
     Ok(())

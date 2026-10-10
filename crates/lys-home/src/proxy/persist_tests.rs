@@ -95,7 +95,14 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
     if checkpoint == 3 {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o500))?;
-        let result = ingest(&home, &journal, "unlinked-2000-01-01", &mut job);
+        let mut sessions = OpenSessions::default();
+        let result = ingest(
+            &home,
+            &journal,
+            &mut sessions,
+            "unlinked-2000-01-01",
+            &mut job,
+        );
         std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o700))?;
         let (status, report) = result?;
         assert_eq!(status, CallStatus::Complete);

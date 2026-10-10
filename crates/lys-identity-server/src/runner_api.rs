@@ -431,8 +431,9 @@ async fn wake(
         // now (AGENTS-001 R1, R3); the plain message with the profile's
         // prefix when no layer sets the slot, or when the words cannot be
         // rendered, which is said.
-        let delivered = crate::runner_words::wake_words(&state, &agent, &driven.session, &given.message)
-            .unwrap_or_else(|| plain.clone());
+        let delivered =
+            crate::runner_words::wake_words(&state, &agent, &driven.session, &given.message)
+                .unwrap_or_else(|| plain.clone());
         let carried = Carried {
             text: Some(Digested::of(&delivered)),
             keys: Vec::new(),

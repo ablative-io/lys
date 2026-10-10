@@ -196,6 +196,11 @@ pub fn establish(
 /// started before the lease is recorded, and the ready line is not written
 /// before the harness is recorded.
 pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
+    // The owner's first act: a session and process group of its own, so no
+    // client's exit, hangup or group signal reaches it or its harness.
+    rustix::process::setsid().map_err(|error| {
+        RunnerError::refused("seat_owner_start_failed", format!("setsid: {error}"))
+    })?;
     let plan = OwnerPlan::read(&serve.dir)?;
     let pid = std::process::id();
     let own = Leader {

@@ -305,11 +305,15 @@ mod tests {
         );
         assert!(matches!(
             store.keep(added("op-a", "other")),
-            Err(ServerError::Agents(AgentsError::Seat(SeatError::OperationReused { .. })))
+            Err(ServerError::Agents(AgentsError::Seat(
+                SeatError::OperationReused { .. }
+            )))
         ));
         assert!(matches!(
             store.keep(added("op-b", "waffles")),
-            Err(ServerError::Agents(AgentsError::Seat(SeatError::NameTaken { .. })))
+            Err(ServerError::Agents(AgentsError::Seat(
+                SeatError::NameTaken { .. }
+            )))
         ));
         store.keep(Line::Started(Started {
             operation: "op-c".to_owned(),
@@ -327,7 +331,9 @@ mod tests {
         assert_eq!(reopened.len(), 1);
         assert!(matches!(
             reopened.named("absent"),
-            Err(ServerError::Agents(AgentsError::Seat(SeatError::Unknown { .. })))
+            Err(ServerError::Agents(AgentsError::Seat(
+                SeatError::Unknown { .. }
+            )))
         ));
         Ok(())
     }

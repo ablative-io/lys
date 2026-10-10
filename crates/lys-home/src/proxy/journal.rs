@@ -140,7 +140,7 @@ impl Journal {
             file.seek(SeekFrom::End(-1)).map_err(unwritable)?;
             let mut last = [0_u8; 1];
             file.read_exact(&mut last).map_err(unwritable)?;
-            if last != [b'\n'] {
+            if last != *b"\n" {
                 line.push(b'\n');
             }
         }
@@ -268,7 +268,7 @@ fn last_record(bytes: &[u8], path: PathBuf) -> Result<OpenCall, ProxyError> {
         Ok(call) => Ok(call),
         Err(source) => match lines.next_back() {
             Some(whole) if !bytes.ends_with(b"\n") => serde_json::from_slice(whole)
-                .map_err(|_| ProxyError::JournalRecord { path, source }),
+                .map_err(|_torn_tail| ProxyError::JournalRecord { path, source }),
             _ => Err(ProxyError::JournalRecord { path, source }),
         },
     }

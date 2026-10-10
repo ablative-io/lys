@@ -389,7 +389,7 @@ pub fn ready_line(runner: &str, socket: &Path, owner: &Leader, build: &str) -> S
 /// # Errors
 ///
 /// `seat_owner_start_failed` when the line is not a ready line.
-pub fn parse_ready_line(line: &str) -> Result<(String, PathBuf, Leader), RunnerError> {
+pub fn parse_ready_line(line: &str) -> Result<(String, PathBuf, Leader, String), RunnerError> {
     let rest = line
         .trim_end()
         .strip_prefix("owner ready ")

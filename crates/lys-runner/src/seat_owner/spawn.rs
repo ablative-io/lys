@@ -193,16 +193,11 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
         .arg(spawn.scrollback.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(log)
-        .process_group(0);
-    // SAFETY: setsid is async-signal-safe and touches no memory the parent
-    // shares; the child joins a session of its own before exec.
-    unsafe {
-        command.pre_exec(|| {
-            rustix::process::setsid().map_err(std::io::Error::from)?;
-            Ok(())
-        });
-    }
+        .stderr(log);
+    // The owner moves itself into a session and process group of its own
+    // (`setsid`) as its first act in `process::serve`: the workspace denies
+    // unsafe code, so no `pre_exec` hook runs here, and the child is not made
+    // a group leader first, which would make its `setsid` fail.
     let mut child = command.spawn().map_err(|error| {
         start_failed(format!("{} could not start: {error}", spawn.lys.display()))
     })?;

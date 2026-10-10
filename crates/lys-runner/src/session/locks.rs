@@ -31,7 +31,10 @@ impl Sessions {
         }
     }
 
-    fn wait<'a>(&self, table: MutexGuard<'a, Table>) -> Result<MutexGuard<'a, Table>, RunnerError> {
+    pub(super) fn wait<'a>(
+        &self,
+        table: MutexGuard<'a, Table>,
+    ) -> Result<MutexGuard<'a, Table>, RunnerError> {
         self.changed.wait(table).map_err(table_poisoned)
     }
 

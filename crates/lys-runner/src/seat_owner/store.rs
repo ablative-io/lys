@@ -28,7 +28,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
+use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 
 use crate::error::RunnerError;
@@ -42,6 +42,7 @@ pub use super::record::{
 use super::rules::{apply, is_hex_id, refused, validate_record};
 
 /// The store.
+#[derive(Debug)]
 pub struct OwnerStore {
     projection_path: PathBuf,
     journal_path: PathBuf,
