@@ -38,6 +38,7 @@ pub struct PatchBody {
     /// The revision read; 0 for a scope never patched.
     pub revision: u64,
     /// The values, by name; null removes a key.
+    #[schema(schema_with = crate::variables_state::any_json_values)]
     pub values: BTreeMap<String, serde_json::Value>,
     /// When the keys set expire, in seconds since the Unix epoch.
     #[serde(default)]

@@ -105,6 +105,7 @@ impl Scope {
 #[serde(deny_unknown_fields)]
 pub struct Variable {
     /// The value.
+    #[schema(schema_with = any_json_value)]
     pub value: serde_json::Value,
     /// The scope revision of the patch that set it.
     pub revision: u64,
@@ -115,6 +116,36 @@ pub struct Variable {
     pub expires_at: Option<u64>,
     /// When it was set, in seconds since the Unix epoch.
     pub at: u64,
+}
+
+/// The schema of any JSON value. utoipa renders a bare `serde_json::Value`
+/// as an empty schema, which its own document reader refuses as no schema
+/// at all, so the value's possible types are named instead.
+pub(crate) fn any_json_value() -> utoipa::openapi::schema::Object {
+    use utoipa::openapi::schema::{ObjectBuilder, SchemaType, Type};
+    ObjectBuilder::new()
+        .schema_type(SchemaType::Array(vec![
+            Type::String,
+            Type::Number,
+            Type::Integer,
+            Type::Boolean,
+            Type::Object,
+            Type::Array,
+            Type::Null,
+        ]))
+        .description(Some("Any JSON value"))
+        .build()
+}
+
+/// The schema of a map from variable names to any JSON value.
+pub(crate) fn any_json_values() -> utoipa::openapi::schema::Object {
+    use utoipa::openapi::RefOr;
+    use utoipa::openapi::schema::{ObjectBuilder, Schema, Type};
+    ObjectBuilder::new()
+        .schema_type(Type::Object)
+        .additional_properties(Some(RefOr::T(Schema::Object(any_json_value()))))
+        .description(Some("Variable names to any JSON value"))
+        .build()
 }
 
 /// One scope's variables as held.

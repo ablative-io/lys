@@ -96,7 +96,14 @@ impl Run {
 
     /// The run at the Lys MCP address `url`, whose API is beside it.
     fn at(url: &str, pass: String, seat: Option<String>) -> CliResult<Self> {
-        let authority = Authority::from_http_url(url)
+        // The MCP url carries a path (`/api/mcp`); the authority is the part
+        // before it.
+        let origin = url
+            .strip_prefix("http://")
+            .map(|rest| rest.split('/').next().unwrap_or(rest))
+            .map(|host_port| format!("http://{host_port}"))
+            .unwrap_or_else(|| url.to_owned());
+        let authority = Authority::from_http_url(&origin)
             .map_err(|detail| refused("server_base_invalid", format!("{url}: {detail}")))?;
         let path = url
             .splitn(4, '/')

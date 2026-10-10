@@ -140,6 +140,19 @@ pub(crate) fn build(name: &str, path: &Path, config: &Config) -> Result<(), Box<
         "goals" => {
             snapshot_result(GoalStore::open(path, key)?.snapshot_failure())?;
         }
+        "words" => {
+            snapshot_result(lys_identity_server::words_store::open(path, key)?.snapshot_failure())?;
+        }
+        "variables" => {
+            snapshot_result(
+                lys_identity_server::variables_store::open(path, key)?.snapshot_failure(),
+            )?;
+        }
+        "schedules" => {
+            snapshot_result(
+                lys_identity_server::schedules_store::open(path, key)?.snapshot_failure(),
+            )?;
+        }
         "mcp-requests" => {
             drop(McpRequestStore::open(path, key)?);
         }

@@ -44,7 +44,8 @@ fn time_left_renders_two_hours_before_the_deadline() {
         "Reminder: 2 hours 0 minutes left (1970-01-01T04:46:40Z)."
     );
     assert!(rendered.missing.is_empty());
-    assert_eq!(time_left(100, 160), "60 seconds past the deadline");
+    assert_eq!(time_left(100, 159), "59 seconds past the deadline");
+    assert_eq!(time_left(100, 160), "1 minutes past the deadline");
     assert_eq!(span(90), "1 minutes");
 }
 

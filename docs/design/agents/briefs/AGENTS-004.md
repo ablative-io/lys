@@ -119,6 +119,12 @@ Amendment 1 (10 October 2026, Waffles 16:1x on Tom's word; the descriptor transf
 - modify: surface/identity/src/features/sessions/Owned.tsx
 - modify: docs/ops/SEAT-SUPERVISION.md
 
+**Checklist:**
+- C713 — An upgrade hands an active turn, control descriptors and proxy stream over with one writer; refusal keeps the old live owner and never falls back to stop/start (AGENTS-004 R3).
+
+**Stories:**
+- S407 (An operator, a person running the estate) — As an operator, I want to upgrade Lys while an active seat streams and receives control replies, so that the same seat continues under one proven owner.
+
 ### R4: Version ownership records and migrate actual installed state
 
 THE SYSTEM SHALL persist versioned supervised-owner, lease, custody and receipt-cursor records with one durable authority per session. Existing lys-runner-sessions/v3 bytes are an installed shape: any change to them ships a migration from an old install and preserves ended sessions, manual-session meaning, operation ids and uncertainty. New AGENTS-002 seat records that have never been installed are identified as new records, not described as an invented legacy format. Persisted records contain public identity and credential references only. A migration or handover intent fences all participating writers; an uncertain append is resolved by reading its stable intent/operation id, never by accepting a different id. A failed or interrupted migration leaves the previous committed readable state and running owner authoritative until the new checkpoint is durable. Reopening validates every shape, bounded field and process identity, with named errors; a malformed record is not skipped and an unknown old version is not silently treated as empty. Keep a compact indexed current projection plus bounded recovery tail; retirement and id-dedup retention use DIRECTORY-084 without forgetting ids whose retry window remains open. No recovery loop over all permanent session or delivery history is permitted.
