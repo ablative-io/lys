@@ -6034,6 +6034,31 @@
       "path": "crates/lys-runner/tests/restart_group.rs",
       "note": "a runner restart ends only its own recorded process groups and names why it ends or keeps each member",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys/tests/identity_install/estate.rs",
+      "note": "the install tests' estate: every detached service it stops on close and Drop, the model proxy among them, and the prefixed folder recording its owner and compose project",
+      "brief": "DIRECTORY-092"
+    },
+    {
+      "path": "crates/lys/tests/identity_install/cleanup_tests.rs",
+      "note": "the estate's cleanup tests: a dropped or closed estate leaves none of its four services running, and a refused stop fails close by name",
+      "brief": "DIRECTORY-092"
+    },
+    {
+      "path": "crates/lys/tests/identity_install/estate_sweep_tests.rs",
+      "note": "the sweep a new estate makes of the folders killed tests left: stopped through exit locks only, removed and named",
+      "brief": "DIRECTORY-092"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-092.json",
+      "note": "the brief",
+      "brief": "DIRECTORY-092"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-092.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-092"
     }
   ],
   "inventory": [

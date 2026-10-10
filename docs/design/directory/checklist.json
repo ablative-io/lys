@@ -2125,6 +2125,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "An install test's model proxy ends with its estate (DIRECTORY-092)",
+      "items": [
+        {
+          "id": "C729",
+          "text": "Estate's cleanup stops the model proxy (run/proxy.pid) with the runner, directory service and secrets broker on close and on Drop, and a proxy it cannot stop fails close naming proxy.pid (DIRECTORY-092 R1).",
+          "done": false
+        },
+        {
+          "id": "C730",
+          "text": "Each install-test estate lives under the lys-estate- prefix with its owner and compose project recorded; making an estate sweeps and names every prefixed folder whose owner is gone, stopping its services through their exit locks only (DIRECTORY-092 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

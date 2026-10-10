@@ -1306,6 +1306,11 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/context_stop.rs` | context limits stop or compact live sessions, and the usage report answers what it kept | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/budget_feed.rs` | native budget figures and refusals through the runner feed | DIRECTORY-064 |
 | `crates/lys-runner/tests/restart_group.rs` | a runner restart ends only its own recorded process groups and names why it ends or keeps each member | DIRECTORY-064 |
+| `crates/lys/tests/identity_install/estate.rs` | the install tests' estate: every detached service it stops on close and Drop, the model proxy among them, and the prefixed folder recording its owner and compose project | DIRECTORY-092 |
+| `crates/lys/tests/identity_install/cleanup_tests.rs` | the estate's cleanup tests: a dropped or closed estate leaves none of its four services running, and a refused stop fails close by name | DIRECTORY-092 |
+| `crates/lys/tests/identity_install/estate_sweep_tests.rs` | the sweep a new estate makes of the folders killed tests left: stopped through exit locks only, removed and named | DIRECTORY-092 |
+| `docs/design/directory/briefs/DIRECTORY-092.json` | the brief | DIRECTORY-092 |
+| `docs/design/directory/briefs/DIRECTORY-092.md` | rendered markdown | DIRECTORY-092 |
 
 ## Inventory
 
