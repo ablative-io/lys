@@ -557,3 +557,8 @@
 - [ ] **C520** — The agent request signature names Lys's own origin, and another audience is refused (DIRECTORY-086 R1).
 - [ ] **C521** — v1 is retired in one cutover, and stored v1 draft evidence still verifies (DIRECTORY-086 R2).
 - [ ] **C522** — A signature made before the process started is refused (DIRECTORY-086 R3).
+
+## A silent program that holds the hang-up is ended (DIRECTORY-091)
+
+- [ ] **C727** — A tripped generation whose program cannot receive the hang-up and prints nothing is killed with its process group REPEAT_GRACE after the first hang-up, stamped rotation_signal_escalated (DIRECTORY-091 R1).
+- [ ] **C728** — The escalation kills only the leader the hang-up was sent to, judged by pid and start time; an exited or reused leader is left alone (DIRECTORY-091 R2).

@@ -304,6 +304,8 @@
 
 **S257.** As the person running a team of agents, I want to start an agent from Lys and never sign it in or paste anything, so that it can act at once and only within its grants.
 
+**S415.** As a person running a team of agents on rotating accounts, I want a session the runner hung up at its usage limit to end even when its program cannot receive the hang-up and prints nothing, so that a silent program never holds my agent, its next account or the runner forever.
+
 ## Installer and operator — Provision and upgrade the internal audit connection
 
 **S163.** As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
