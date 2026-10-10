@@ -732,6 +732,13 @@ pub enum ServerError {
         /// The machine.
         machine: String,
     },
+    /// The authority an act needs is not there to admit it (AGENTS-004):
+    /// the act is held, never admitted on a guess.
+    #[error("authority_unavailable: {reason}")]
+    AuthorityUnavailable {
+        /// What was missing.
+        reason: String,
+    },
     /// A runner refused the act, or could not be reached, by its own name.
     #[error("{refusal}: {words}")]
     Runner {

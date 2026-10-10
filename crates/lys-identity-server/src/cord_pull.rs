@@ -243,7 +243,9 @@ async fn ask_runner(state: &Arc<AppState>, machine: &str, pull: &Pull, asking: A
         settling: asking == Asking::Settling,
     };
     match crate::runner_client::ask(state, machine, runner, act).await {
-        Ok(Answer::StoppedEverything { sessions, running }) => Ok((sessions, running)),
+        Ok(Answer::StoppedEverything {
+            sessions, running, ..
+        }) => Ok((sessions, running)),
         Ok(other) => Err((
             "runner_reply_malformed".to_owned(),
             format!(

@@ -218,6 +218,7 @@ impl ServerError {
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }
             | Self::RunnerAbsent { .. }
+            | Self::AuthorityUnavailable { .. }
             | Self::SetupClosed
             | Self::ReviewReused { .. }
             | Self::BootstrapInterrupted { .. } => StatusCode::CONFLICT,

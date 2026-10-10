@@ -27,6 +27,10 @@ pub struct StoppedEverything {
     pub sessions: Vec<String>,
     /// Every session asked to end that had not when it answered.
     pub running: Vec<String>,
+    /// Every owned seat this runner holds, left with its owner: a seat is
+    /// ended at its owner by a signed stop (AGENTS-004), never by the runner
+    /// that started it stopping its own sessions.
+    pub owned: Vec<String>,
 }
 
 /// How a stop of everything asks.
@@ -99,7 +103,16 @@ impl Sessions {
             Err(error) if error.name() == "caller_left" => {}
             Err(error) => return Err(error),
         }
-        Ok(StoppedEverything { sessions, running })
+        let owned = self
+            .owned_seats()?
+            .into_iter()
+            .map(|seat| seat.binding.session)
+            .collect();
+        Ok(StoppedEverything {
+            sessions,
+            running,
+            owned,
+        })
     }
 
     /// Ask every running session to end as `stopped` says, answering their

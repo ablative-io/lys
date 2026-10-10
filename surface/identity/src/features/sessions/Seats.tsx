@@ -10,6 +10,7 @@ import type { SeatList, SeatState, SeatView, UnregisteredSession } from '../../a
 import { refreshLive } from '../../live';
 import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
+import { OwnedList } from './Owned';
 import { clockMs } from '../file/time';
 
 const STATE_WORDS: Record<SeatState, string> = {
@@ -43,6 +44,8 @@ export function Seats() {
   return <section className="card seats" aria-label="Seats">
     <h2>Seats</h2>
     <Gate load={list} title="the seats" renderError={(refused) => <Unread refused={refused} what="The seats" />} ok={(answer) => <SeatTable answer={answer} />} />
+    <h3>Owners</h3>
+    <OwnedList />
     <h3>Seen but unregistered</h3>
     <Gate load={unregistered} title="the sessions held for no seat" renderError={(refused) => <Unread refused={refused} what="The sessions held for no seat" />} ok={(sessions) => <Unregistered sessions={sessions} />} />
   </section>;

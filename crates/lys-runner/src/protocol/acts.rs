@@ -355,6 +355,10 @@ pub enum Answer {
         sessions: Vec<String>,
         /// Every session asked to end that had not when the act answered.
         running: Vec<String>,
+        /// Every owned seat left with its owner (AGENTS-004): stopped at
+        /// the owner by a signed stop, never here.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        owned: Vec<String>,
     },
     /// The act was refused, by name.
     Refused {

@@ -54,6 +54,7 @@ mod injection_tests;
 mod peer_view;
 
 mod lifecycle;
+mod locks;
 pub(crate) mod output;
 mod owned;
 mod restart;
@@ -388,49 +389,6 @@ impl Sessions {
     /// The runner's own id, which every request it answers names.
     pub fn runner(&self) -> &str {
         self.state.runner()
-    }
-
-    pub(crate) fn read_lock(&self) -> Result<MutexGuard<'_, Table>, RunnerError> {
-        #[cfg(test)]
-        lifecycle::output_tests::table_locked();
-        self.table.lock().map_err(table_poisoned)
-    }
-
-    pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Table>, RunnerError> {
-        let mut table = self.read_lock()?;
-        table.operations.prune(now_ms());
-        Ok(table)
-    }
-
-    pub(crate) fn lock_logged(&self) -> Option<MutexGuard<'_, Table>> {
-        match self.lock() {
-            Ok(table) => Some(table),
-            Err(error) => {
-                crate::error::said(&error.to_string());
-                self.wake();
-                None
-            }
-        }
-    }
-
-    fn wait<'a>(&self, table: MutexGuard<'a, Table>) -> Result<MutexGuard<'a, Table>, RunnerError> {
-        self.changed.wait(table).map_err(table_poisoned)
-    }
-
-    /// Wake everything waiting on the table: a caller left, or a thing changed.
-    pub fn wake(&self) {
-        #[cfg(test)]
-        lifecycle::output_tests::table_woken();
-        self.changed.notify_all();
-    }
-
-    /// Wake a cancelled output request and the shared control waiters.
-    pub fn wake_session(&self, id: &str) -> Result<(), RunnerError> {
-        let table = self.lock()?;
-        let output = Arc::clone(&table.sessions.get(id).ok_or_else(|| unknown(id))?.output);
-        self.changed.notify_all();
-        drop(table);
-        output.wake()
     }
 
     fn persist(&self, table: &Table) -> Result<(), RunnerError> {

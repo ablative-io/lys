@@ -193,10 +193,23 @@ fn stop_runner_sessions(
         settling: false,
     };
     match client.ask(&act) {
-        Ok(Answer::StoppedEverything { sessions, running }) if running.is_empty() => Ok(format!(
-            "this computer's runner stopped {} sessions{}",
+        Ok(Answer::StoppedEverything {
+            sessions,
+            running,
+            owned,
+        }) if running.is_empty() => Ok(format!(
+            "this computer's runner stopped {} sessions{}{}",
             sessions.len(),
-            listed(&sessions)
+            listed(&sessions),
+            if owned.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "; {} owned seats stay with their owners: {}",
+                    owned.len(),
+                    owned.join(", ")
+                )
+            }
         )),
         Ok(Answer::StoppedEverything { running, .. }) => Err(format!(
             "these sessions had not ended when the runner answered: {}",

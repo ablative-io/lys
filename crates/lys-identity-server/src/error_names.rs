@@ -143,6 +143,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::NotPermitted { .. } => "not_permitted",
         ServerError::NoLiveSession { .. } => "no_live_session",
         ServerError::RunnerAbsent { .. } => "runner_absent",
+        ServerError::AuthorityUnavailable { .. } => "authority_unavailable",
         ServerError::Seat(error) => error.name(),
     }
 }

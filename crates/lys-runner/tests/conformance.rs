@@ -515,6 +515,7 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         Answer::StoppedEverything {
             sessions: Vec::new(),
             running: Vec::new(),
+            owned: Vec::new(),
         },
         Answer::Refused {
             refusal: "r".to_owned(),

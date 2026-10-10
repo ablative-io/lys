@@ -302,6 +302,7 @@ pub mod who_can_grant;
 /// The seats (AGENTS-002): their record, acts, routes and refusals.
 pub mod error_seat;
 pub mod seats_acts;
+pub mod seat_supervision;
 pub mod seats_api;
 mod seats_argus;
 mod seats_run;

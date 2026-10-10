@@ -54,7 +54,9 @@ fn stop_everything(by: &str, settling: bool) -> Act {
 /// What a stop of everything answered: the sessions ended and those running.
 fn stopped(answer: Answer) -> Result<(Vec<String>, Vec<String>), Box<dyn Error>> {
     match answer {
-        Answer::StoppedEverything { sessions, running } => Ok((sessions, running)),
+        Answer::StoppedEverything {
+            sessions, running, ..
+        } => Ok((sessions, running)),
         other => Err(format!("stopping everything answered {other:?}").into()),
     }
 }

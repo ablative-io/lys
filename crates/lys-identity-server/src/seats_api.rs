@@ -53,6 +53,7 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/seats", get(list).post(add))
         .route("/seats/unregistered", get(unregistered))
+        .route("/seats/owned", get(crate::seat_supervision::owned))
         .route("/seats/{name}", get(one))
         .route("/seats/{name}/start", post(crate::seats_run::start))
         .route("/seats/{name}/stop", post(crate::seats_run::stop))
@@ -74,12 +75,23 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<Entry> {
     let sent = api.schema::<SeatSent>();
     vec![
         (GET, "/seats", None, Some(api.schema::<SeatList>())),
-        (POST, "/seats", Some(api.schema::<SeatAddBody>()), Some(seat.clone())),
+        (
+            POST,
+            "/seats",
+            Some(api.schema::<SeatAddBody>()),
+            Some(seat.clone()),
+        ),
         (
             GET,
             "/seats/unregistered",
             None,
             Some(api.schema::<SeatUnregistered>()),
+        ),
+        (
+            GET,
+            "/seats/owned",
+            None,
+            Some(api.schema::<crate::seat_supervision::OwnedSeats>()),
         ),
         (GET, "/seats/{name}", None, Some(seat)),
         (
@@ -100,7 +112,12 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<Entry> {
             Some(stop),
             Some(api.schema::<SeatRestarted>()),
         ),
-        (POST, "/seats/{name}/send", Some(send.clone()), Some(sent.clone())),
+        (
+            POST,
+            "/seats/{name}/send",
+            Some(send.clone()),
+            Some(sent.clone()),
+        ),
         (POST, "/seats/{name}/type", Some(send), Some(sent)),
         (
             POST,

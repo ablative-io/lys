@@ -45,6 +45,7 @@ pub(super) fn select_transport(act: Act) -> Act {
             transport,
             conversation,
             requires_controls,
+            owner: None,
         }),
         lys_mcp,
         proxy,

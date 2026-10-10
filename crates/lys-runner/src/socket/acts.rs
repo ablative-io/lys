@@ -233,6 +233,7 @@ pub(super) fn perform(
             .map(|stopped| Answer::StoppedEverything {
                 sessions: stopped.sessions,
                 running: stopped.running,
+                owned: stopped.owned,
             }),
         Act::Liveness { session } => Ok(Answer::Liveness {
             sessions: sessions.liveness(session.as_deref())?,

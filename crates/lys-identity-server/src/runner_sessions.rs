@@ -349,6 +349,7 @@ pub async fn run_on_runner(
         )?
     };
     let act = select_transport(act);
+    let act = crate::seat_supervision::bind_owner(state, agent, machine, act)?;
     let missing_config = matches!(
         &act,
         Act::Start { lys_mcp: None, .. } | Act::StartManaged { lys_mcp: None, .. }
