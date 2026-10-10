@@ -155,9 +155,13 @@ fn proved(
                 )));
             }
         }
-        return crate::grants::with_grants(state, |judged| {
-            let signed =
-                crate::agent_signature::signed_agent(state, judged.directory, headers, request)?;
+        return crate::routes::with_directory(state, |directory| {
+            let signed = crate::agent_signature::signed_agent(
+                state,
+                directory.projection()?,
+                headers,
+                request,
+            )?;
             if signed != Some(agent) {
                 return Err(ServerError::AgentSignatureRefused {
                     reason: "the signed agent is not the requested agent",
