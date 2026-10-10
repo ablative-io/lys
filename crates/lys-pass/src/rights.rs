@@ -72,6 +72,10 @@ pub struct Claims {
     pub nbf: Option<u64>,
     /// The holder and responsibility assertion.
     pub holder: Holder,
+    /// Base64url SHA-256 digests of the agent's non-withdrawn Ed25519 certificate keys.
+    /// An older pass or a non-agent holder carries no key assertion.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agent_key_thumbprints: Vec<String>,
     /// Effective rights, already expanded by Lys.
     pub rights: Vec<Right>,
     /// The audience whose rights could not fit; no partial offline decision.

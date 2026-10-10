@@ -69,6 +69,13 @@ pub(super) fn pass(
     (at, ends_at): (u64, u64),
     bind: bool,
 ) -> Result<Pass, ServerError> {
+    let agent_key_thumbprints = match holder {
+        IdentityId::Agent(agent) => super::agent_issue::key_thumbprints(state, agent, at)?,
+        IdentityId::Person(_)
+        | IdentityId::Machine(_)
+        | IdentityId::Connector(_)
+        | IdentityId::ServiceAccount(_) => Vec::new(),
+    };
     let expires_at = ends_at.min(at.saturating_add(provider.pass_seconds));
     if expires_at <= at {
         return Err(ServerError::Provider(ProviderError::SessionEnded));
@@ -115,6 +122,7 @@ pub(super) fn pass(
         exp: expires_at,
         nbf: None,
         holder: asserted,
+        agent_key_thumbprints,
         rights,
         rights_truncated,
     };

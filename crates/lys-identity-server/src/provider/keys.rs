@@ -348,6 +348,7 @@ mod tests {
                 kind: "person".to_owned(),
                 responsible: None,
             },
+            agent_key_thumbprints: Vec::new(),
             rights: Vec::new(),
             rights_truncated: None,
         })

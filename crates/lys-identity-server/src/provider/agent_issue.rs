@@ -20,8 +20,10 @@
 //! The apps lock is taken and released before the grants are read; no
 //! provider lock is held under either.
 
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use lys_identity::{AgentId, IdentityId};
 use serde::Serialize;
+use sha2::{Digest as _, Sha256};
 
 use super::endpoints::{apps, provider};
 use super::rights_claim::pass;
@@ -76,4 +78,31 @@ pub(crate) fn agent_app_pass(
         expires_at: issued.expires_at,
         audience,
     })
+}
+
+/// Snapshot only the agent's current signing certificates, releasing their store before decoding.
+pub(super) fn key_thumbprints(
+    state: &AppState,
+    agent: AgentId,
+    at: u64,
+) -> Result<Vec<String>, ServerError> {
+    let Some(store) = state.certificates.as_ref() else {
+        // Without a certificate log there are no certificate keys this issuer can attest.
+        return Ok(Vec::new());
+    };
+    let certificates = store
+        .lock()
+        .map_err(|error| ServerError::CertificatesUnavailable {
+            reason: format!("the certificate store for {agent} is unavailable: {error}"),
+        })?
+        .signing_certificates(&agent.to_string())?;
+    let mut keys = Vec::with_capacity(certificates.len());
+    for certificate in certificates {
+        if let Some(key) = certificate.key_at(at)? {
+            keys.push(URL_SAFE_NO_PAD.encode(Sha256::digest(key)));
+        }
+    }
+    keys.sort_unstable();
+    keys.dedup();
+    Ok(keys)
 }
