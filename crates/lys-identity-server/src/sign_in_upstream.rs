@@ -33,8 +33,6 @@ use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_identity::Actor;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -61,59 +59,9 @@ pub(super) struct Upstream {
     continuation: Option<Continuation>,
 }
 
-/// Where a sign-in continues once the person is signed in: a bounded
-/// authorize request on Lys's own origin, the only target Lys accepts. It is
-/// made only by [`Continuation::accepted`], so nothing else can be carried.
-#[derive(Clone)]
-pub(super) struct Continuation(String);
-
-impl Continuation {
-    /// `target` as a continuation, refused by name unless it is a bounded
-    /// authorize request on this origin.
-    fn accepted(target: String) -> Result<Self, ServerError> {
-        if target.len() > 8192
-            || !["/oauth/authorize?", "/oauth/mcp/authorize?"]
-                .iter()
-                .any(|path| target.starts_with(path))
-            || !target.is_ascii()
-            || target
-                .bytes()
-                .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
-            || target.contains(['#', '\\'])
-        {
-            return Err(failed(
-                "the provider continuation is not a bounded authorize request on this origin",
-            ));
-        }
-        Ok(Self(target))
-    }
-}
-
-/// A provider sign-in refused once its flight was found: the refusal, and
-/// the continuation the flight carried when it may be kept for the browser
-/// that answered.
-pub(super) struct Refused {
-    error: ServerError,
-    continuation: Option<Continuation>,
-}
-
-impl Refused {
-    fn dropping(error: ServerError) -> Self {
-        Self {
-            error,
-            continuation: None,
-        }
-    }
-}
-
-/// A PKCE verifier: 32 bytes from the secure random source, base64url.
-fn verifier() -> Result<String, ServerError> {
-    let mut bytes = [0u8; 32];
-    OsRng
-        .try_fill_bytes(&mut bytes)
-        .map_err(|error| failed(format!("the secure random source failed: {error}")))?;
-    Ok(URL_SAFE_NO_PAD.encode(bytes))
-}
+#[path = "sign_in_continuation.rs"]
+mod continuation;
+use continuation::{Continuation, Refused, verifier};
 
 impl IssuerSignIn {
     /// Begin a sign-in through the issuer's provider `provider` for the
@@ -502,7 +450,7 @@ async fn begin(
     extensions: &Extensions,
     id: &str,
     headers: &HeaderMap,
-    continuation: Option<String>,
+    continuation: Option<Continuation>,
 ) -> Result<(String, String), ServerError> {
     if id.is_empty()
         || !id
@@ -652,10 +600,10 @@ mod tests {
         };
         let response = to_sign_in(&ServerError::SignInStateUnknown, Some(&kept));
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        let location = location(&response)?;
-        let carried = location
+        let sent = location(&response)?;
+        let carried = sent
             .strip_prefix("/#/sign-in?refused=SignInStateUnknown&continue=")
-            .ok_or_else(|| format!("the refusal keeps no continuation: {location}"))?;
+            .ok_or_else(|| format!("the refusal keeps no continuation: {sent}"))?;
         assert!(
             !carried.contains(['&', '#', '?', '/']),
             "the continuation is one encoded value: {carried}"
@@ -687,9 +635,8 @@ mod tests {
             "/oauth/authorize?client_id=n\u{f6}tes",
             long.as_str(),
         ] {
-            let error = match continuation_target(Some(target.to_owned())) {
-                Ok(_) => return Err(format!("{target:?} was accepted").into()),
-                Err(error) => error,
+            let Err(error) = continuation_target(Some(target.to_owned())) else {
+                return Err(format!("{target:?} was accepted").into());
             };
             assert_eq!(error.name(), "SignInFailed", "{target:?}");
             let response = to_sign_in(&error, None);
