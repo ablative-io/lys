@@ -17,7 +17,9 @@
 //! back to Lys's own callback address, so a provider is never registered
 //! with an address that is not Lys's; a provider sign-in in flight is used
 //! once; and every refusal lands the person on Lys's sign-in screen with its
-//! name, never on a page of the issuer.
+//! name, never on a page of the issuer, keeping the continuation the sign-in
+//! was started with so signing in there still returns to it. A continuation
+//! is carried only once it is one Lys accepts ([`Continuation::accepted`]).
 
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -56,7 +58,52 @@ pub(super) struct Upstream {
     verifier: String,
     state: String,
     browser: [u8; 32],
-    continuation: Option<String>,
+    continuation: Option<Continuation>,
+}
+
+/// Where a sign-in continues once the person is signed in: a bounded
+/// authorize request on Lys's own origin, the only target Lys accepts. It is
+/// made only by [`Continuation::accepted`], so nothing else can be carried.
+#[derive(Clone)]
+pub(super) struct Continuation(String);
+
+impl Continuation {
+    /// `target` as a continuation, refused by name unless it is a bounded
+    /// authorize request on this origin.
+    fn accepted(target: String) -> Result<Self, ServerError> {
+        if target.len() > 8192
+            || !["/oauth/authorize?", "/oauth/mcp/authorize?"]
+                .iter()
+                .any(|path| target.starts_with(path))
+            || !target.is_ascii()
+            || target
+                .bytes()
+                .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+            || target.contains(['#', '\\'])
+        {
+            return Err(failed(
+                "the provider continuation is not a bounded authorize request on this origin",
+            ));
+        }
+        Ok(Self(target))
+    }
+}
+
+/// A provider sign-in refused once its flight was found: the refusal, and
+/// the continuation the flight carried when it may be kept for the browser
+/// that answered.
+pub(super) struct Refused {
+    error: ServerError,
+    continuation: Option<Continuation>,
+}
+
+impl Refused {
+    fn dropping(error: ServerError) -> Self {
+        Self {
+            error,
+            continuation: None,
+        }
+    }
 }
 
 /// A PKCE verifier: 32 bytes from the secure random source, base64url.
@@ -89,7 +136,7 @@ impl IssuerSignIn {
         provider: &str,
         address: IpAddr,
         browser: [u8; 32],
-        continuation: Option<String>,
+        continuation: Option<Continuation>,
     ) -> Result<String, ServerError> {
         let begun = reqwest::Url::parse(&oidc.begin_provider(address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
@@ -121,7 +168,7 @@ impl IssuerSignIn {
         address: IpAddr,
         state: String,
         browser: [u8; 32],
-        continuation: Option<String>,
+        continuation: Option<Continuation>,
     ) -> Result<String, ServerError> {
         let client_address = address;
         let started_at = Instant::now();
@@ -205,9 +252,13 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<Actor, ServerError> {
-        self.finish_provider_to(oidc, code, upstream, address, browser)
+        match self
+            .finish_provider_to(oidc, code, upstream, address, browser)
             .await
-            .map(|(actor, _)| actor)
+        {
+            Ok((actor, _)) => Ok(actor),
+            Err(refused) => Err(refused.error),
+        }
     }
 
     async fn finish_provider_to(
@@ -217,16 +268,39 @@ impl IssuerSignIn {
         upstream: &str,
         address: IpAddr,
         browser: [u8; 32],
-    ) -> Result<(Actor, Option<String>), ServerError> {
+    ) -> Result<(Actor, Option<Continuation>), Refused> {
         let held = self
             .upstream
             .lock()
-            .map_err(|error| failed(format!("provider sign-in flights unavailable: {error}")))?
-            .take(upstream, Instant::now())?;
+            .map_err(|error| failed(format!("provider sign-in flights unavailable: {error}")))
+            .and_then(|mut flights| flights.take(upstream, Instant::now()))
+            .map_err(Refused::dropping)?;
         if !crate::provider_browser::matches(&held.browser, &browser) {
-            oidc.abandon(&held.state)?;
-            return Err(ServerError::SignInStateUnknown);
+            // Another browser answered: the continuation was asked for by
+            // the browser that began, so it is not handed to this one.
+            oidc.abandon(&held.state).map_err(Refused::dropping)?;
+            return Err(Refused::dropping(ServerError::SignInStateUnknown));
         }
+        let continuation = held.continuation.clone();
+        match self.settle(oidc, code, upstream, address, held).await {
+            Ok(actor) => Ok((actor, continuation)),
+            Err(error) => Err(Refused {
+                error,
+                continuation,
+            }),
+        }
+    }
+
+    /// Finish the provider sign-in `held` at the issuer, from the browser
+    /// that began it, answering the actor it signs in.
+    async fn settle(
+        &self,
+        oidc: &Oidc,
+        code: &str,
+        upstream: &str,
+        address: IpAddr,
+        held: Upstream,
+    ) -> Result<Actor, ServerError> {
         let body = json!({
             "state": upstream,
             "code": code,
@@ -252,10 +326,7 @@ impl IssuerSignIn {
             Err(error) => Err(error),
         };
         match outcome {
-            Ok((code, answered)) if answered == held.state => {
-                let actor = oidc.finish(code, &held.state).await?;
-                Ok((actor, held.continuation))
-            }
+            Ok((code, answered)) if answered == held.state => oidc.finish(code, &held.state).await,
             Ok(_) => {
                 oidc.abandon(&held.state)?;
                 Err(ServerError::SignInStateUnknown)
@@ -374,12 +445,17 @@ async fn callback_refusal(mut answer: reqwest::Response) -> ServerError {
     ))
 }
 
-/// Send the browser to Lys's sign-in screen naming the refusal.
-fn to_sign_in(error: &ServerError) -> Response {
+/// Send the browser to Lys's sign-in screen naming the refusal, keeping
+/// `continuation`, encoded, so signing in there continues where it was going.
+fn to_sign_in(error: &ServerError, continuation: Option<&Continuation>) -> Response {
     // The browser is told only the refusal's name; the reason is written to
     // the service's log, so whoever reads it can see why.
     eprintln!("lys-identity-server provider sign-in refused: {error}");
-    let location = format!("{SIGN_IN_SCREEN}?refused={}", error.name());
+    let mut location = format!("{SIGN_IN_SCREEN}?refused={}", error.name());
+    if let Some(Continuation(target)) = continuation {
+        location.push_str("&continue=");
+        location.push_str(&crate::provider::encoded(target));
+    }
     (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response()
 }
 
@@ -460,17 +536,19 @@ async fn start(
             ))
         })
         .and_then(|Query(asked)| continuation_target(asked.continuation));
+    // A continuation Lys does not accept is refused by name and never
+    // carried back to the sign-in screen.
     let target = match target {
         Ok(target) => target,
-        Err(error) => return to_sign_in(&error),
+        Err(error) => return to_sign_in(&error, None),
     };
-    match begin(&state, &extensions, &id, &headers, target).await {
+    match begin(&state, &extensions, &id, &headers, target.clone()).await {
         Ok((location, cookie)) => (
             StatusCode::SEE_OTHER,
             [(header::LOCATION, location), (header::SET_COOKIE, cookie)],
         )
             .into_response(),
-        Err(error) => to_sign_in(&error),
+        Err(error) => to_sign_in(&error, target.as_ref()),
     }
 }
 
@@ -482,25 +560,8 @@ struct Continue {
 
 /// A continuation is a bounded request on the same origin, held in the
 /// one-use flight rather than trusted from a callback's query or referrer.
-fn continuation_target(target: Option<String>) -> Result<Option<String>, ServerError> {
-    let Some(target) = target else {
-        return Ok(None);
-    };
-    if target.len() > 8192
-        || !["/oauth/authorize?", "/oauth/mcp/authorize?"]
-            .iter()
-            .any(|path| target.starts_with(path))
-        || !target.is_ascii()
-        || target
-            .bytes()
-            .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
-        || target.contains(['#', '\\'])
-    {
-        return Err(failed(
-            "the provider continuation is not a bounded authorize request on this origin",
-        ));
-    }
-    Ok(Some(target))
+fn continuation_target(target: Option<String>) -> Result<Option<Continuation>, ServerError> {
+    target.map(Continuation::accepted).transpose()
 }
 
 /// What a provider sends the person back with.
@@ -515,23 +576,28 @@ async fn finish(
     extensions: &Extensions,
     back: Back,
     headers: &HeaderMap,
-) -> Result<(String, Option<String>), ServerError> {
+) -> Result<(String, Option<Continuation>), Refused> {
     let (Some(code), Some(upstream)) = (back.code, back.state) else {
-        return Err(failed("the provider did not sign the person in"));
+        return Err(Refused::dropping(failed(
+            "the provider did not sign the person in",
+        )));
     };
-    let address = state.sign_in.address(extensions, headers)?;
+    let address = state
+        .sign_in
+        .address(extensions, headers)
+        .map_err(Refused::dropping)?;
+    let browser = crate::provider_browser::digest(headers).map_err(Refused::dropping)?;
     let (actor, continuation) = state
         .sign_in
-        .finish_provider_to(
-            &state.oidc,
-            &code,
-            &upstream,
-            address,
-            crate::provider_browser::digest(headers)?,
-        )
+        .finish_provider_to(&state.oidc, &code, &upstream, address, browser)
         .await?;
-    let cookie = crate::session_admission::begin(state, actor).await?;
-    Ok((cookie, continuation))
+    match crate::session_admission::begin(state, actor).await {
+        Ok(cookie) => Ok((cookie, continuation)),
+        Err(error) => Err(Refused {
+            error,
+            continuation,
+        }),
+    }
 }
 
 async fn callback(
@@ -548,14 +614,14 @@ async fn callback(
                 (
                     header::LOCATION,
                     match continuation {
-                        Some(target) => target,
+                        Some(Continuation(target)) => target,
                         None => SIGNED_IN.to_owned(),
                     },
                 ),
             ],
         )
             .into_response(),
-        Err(error) => to_sign_in(&error),
+        Err(refused) => to_sign_in(&refused.error, refused.continuation.as_ref()),
     }
 }
 
@@ -563,7 +629,79 @@ async fn callback(
 mod tests {
     use std::error::Error;
 
-    use super::callback_refusal;
+    use axum::http::{StatusCode, header};
+
+    use super::{Continuation, callback_refusal, continuation_target, to_sign_in};
+    use crate::error::ServerError;
+
+    /// Where `response` sends the browser.
+    fn location(response: &axum::response::Response) -> Result<String, Box<dyn Error>> {
+        Ok(response
+            .headers()
+            .get(header::LOCATION)
+            .ok_or("the refusal names no location")?
+            .to_str()?
+            .to_owned())
+    }
+
+    #[test]
+    fn a_refused_provider_sign_in_keeps_its_continuation() -> Result<(), Box<dyn Error>> {
+        let target = "/oauth/authorize?client_id=notes&redirect_uri=https%3A%2F%2Fapp.example.test%2Fcallback&state=s1";
+        let Some(kept) = continuation_target(Some(target.to_owned()))? else {
+            return Err("an authorize request on this origin is a continuation".into());
+        };
+        let response = to_sign_in(&ServerError::SignInStateUnknown, Some(&kept));
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let location = location(&response)?;
+        let carried = location
+            .strip_prefix("/#/sign-in?refused=SignInStateUnknown&continue=")
+            .ok_or_else(|| format!("the refusal keeps no continuation: {location}"))?;
+        assert!(
+            !carried.contains(['&', '#', '?', '/']),
+            "the continuation is one encoded value: {carried}"
+        );
+        let read_back = reqwest::Url::parse(&format!("http://lys.test/?continue={carried}"))?;
+        let decoded = read_back
+            .query_pairs()
+            .find(|(name, _)| name == "continue")
+            .map(|(_, value)| value.into_owned());
+        assert_eq!(decoded.as_deref(), Some(target));
+        let without = to_sign_in(&ServerError::SignInStateUnknown, None);
+        assert_eq!(location(&without)?, "/#/sign-in?refused=SignInStateUnknown");
+        Ok(())
+    }
+
+    #[test]
+    fn an_unacceptable_continuation_is_refused_by_name_and_never_carried()
+    -> Result<(), Box<dyn Error>> {
+        let long = format!("/oauth/authorize?{}", "a".repeat(8192));
+        for target in [
+            "https://elsewhere.example/oauth/authorize?client_id=notes",
+            "//elsewhere.example/oauth/authorize?client_id=notes",
+            "/oauth/authorize",
+            "/#/me",
+            "/oauth/authorize?client_id=notes#elsewhere",
+            "/oauth/authorize?client_id=notes\\elsewhere",
+            "/oauth/authorize?client_id=no tes",
+            "/oauth/authorize?client_id=notes\r\nLocation:%20https://elsewhere.example",
+            "/oauth/authorize?client_id=n\u{f6}tes",
+            long.as_str(),
+        ] {
+            let error = match continuation_target(Some(target.to_owned())) {
+                Ok(_) => return Err(format!("{target:?} was accepted").into()),
+                Err(error) => error,
+            };
+            assert_eq!(error.name(), "SignInFailed", "{target:?}");
+            let response = to_sign_in(&error, None);
+            let location = location(&response)?;
+            assert_eq!(location, "/#/sign-in?refused=SignInFailed", "{target:?}");
+        }
+        assert!(continuation_target(None)?.is_none());
+        let Continuation(kept) =
+            Continuation::accepted("/oauth/mcp/authorize?client_id=a".to_owned())?;
+        assert_eq!(kept, "/oauth/mcp/authorize?client_id=a");
+        Ok(())
+    }
 
     fn answer(status: u16, body: String) -> Result<reqwest::Response, axum::http::Error> {
         Ok(reqwest::Response::from(

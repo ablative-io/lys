@@ -13,7 +13,8 @@ use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use identity_contract::apps::{
-    BEA, FILES, NOTES, TestResult, login, ok, op, refused, register, registered, root,
+    Auth, BEA, FILES, NOTES, TestResult, get, login, ok, op, put, refused, register, registered,
+    root,
 };
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
@@ -73,6 +74,7 @@ async fn opened() -> Result<World, Box<dyn Error>> {
     let (service, seeded) = world().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     registered(&service, &admin, NOTES).await?;
+    agents_may_edit_docs(&service, &admin).await?;
     let ada = &seeded.people[0];
     let [scribe, courier, ..] = ada.agents.as_slice() else {
         return Err("the seed gives the administrator three agents".into());
@@ -84,6 +86,31 @@ async fn opened() -> Result<World, Box<dyn Error>> {
         scribe: scribe.id.to_string(),
         courier: courier.id.to_string(),
     })
+}
+
+/// Change `NOTES`'s schema, as the administrator, so an agent may hold
+/// reading and writing a document: the shared fixture schema lets an agent
+/// hold nothing on an app's kind, and these tests pass an `editor` grant on
+/// a document to an agent. The change replaces the current version and is
+/// otherwise the schema as it stands.
+async fn agents_may_edit_docs(service: &Service, admin: &str) -> TestResult {
+    let path = format!("/apps/{NOTES}/schema");
+    let current = ok(get(service, &path, Auth::Cookie(admin)).await?)?;
+    let version = current["version"]
+        .as_u64()
+        .ok_or_else(|| format!("no current schema version: {current}"))?;
+    let mut schema = current["schema"].clone();
+    let doc = schema["kinds"]
+        .get_mut(format!("{NOTES}.doc"))
+        .ok_or_else(|| format!("no document kind: {current}"))?;
+    doc["agents"] = json!(["read", "write"]);
+    let change = json!({"operation": op()?, "replaces": version, "schema": schema});
+    let changed = ok(put(service, &path, Auth::Cookie(admin), &change).await?)?;
+    assert_eq!(changed["applied"], true, "{changed}");
+    let now_held = ok(get(service, &path, Auth::Cookie(admin)).await?)?;
+    assert_eq!(now_held["version"], version + 1, "{now_held}");
+    assert_eq!(now_held["schema"], schema, "{now_held}");
+    Ok(())
 }
 
 /// A grant of `NOTES`'s document `doc` passed to `agent` under a root the
@@ -176,10 +203,7 @@ async fn an_agent_is_issued_a_pass_carrying_exactly_its_own_grants() -> TestResu
     let (status, answer) = ask(&world, &scribe, &with, &body).await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["audience"], NOTES);
-    assert!(
-        answer.get("refresh_token").is_none(),
-        "an agent asks again"
-    );
+    assert!(answer.get("refresh_token").is_none(), "an agent asks again");
     assert!(
         !answer.to_string().contains(&token),
         "the credential is never answered"

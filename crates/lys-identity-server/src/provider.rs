@@ -218,7 +218,7 @@ fn same(a: &str, b: &str) -> bool {
 }
 
 /// `text` percent-encoded for a query value.
-fn encoded(text: &str) -> String {
+pub(crate) fn encoded(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for byte in text.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
