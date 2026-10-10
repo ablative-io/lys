@@ -103,7 +103,7 @@ fn custody(session: &str, custody: Custody) -> Intent {
 
 fn refusal<T: std::fmt::Debug>(result: Result<T, RunnerError>) -> String {
     match result {
-        Ok(value) => panic!("expected a refusal, got {value:?}"),
+        Ok(value) => format!("accepted: {value:?}"),
         Err(error) => error.name(),
     }
 }
@@ -205,7 +205,7 @@ fn seat_owner_migrates_installed_v3() -> TestResult {
 
     // An installed record of another version is refused by name, never read
     // as empty, and nothing is written.
-    let mut other = installed.clone();
+    let mut other = installed;
     other.format = "lys-runner-sessions/v2".to_owned();
     let fresh = tempfile::tempdir()?;
     assert_eq!(

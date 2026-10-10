@@ -160,9 +160,14 @@ impl Run {
                 )
             });
         }
-        let (name, reason) = parsed
-            .ok()
-            .map(|body| {
+        let (name, reason) = parsed.ok().map_or_else(
+            || {
+                (
+                    "identity_server_refused".to_owned(),
+                    "a body that is not JSON".to_owned(),
+                )
+            },
+            |body| {
                 (
                     body.get("refusal")
                         .and_then(Value::as_str)
@@ -173,13 +178,8 @@ impl Run {
                         .unwrap_or("the server gave no reason")
                         .to_owned(),
                 )
-            })
-            .unwrap_or_else(|| {
-                (
-                    "identity_server_refused".to_owned(),
-                    "a body that is not JSON".to_owned(),
-                )
-            });
+            },
+        );
         Err(refused(
             &name,
             format!("{reason} ({method} {route}, HTTP {})", answer.status),
@@ -265,16 +265,16 @@ pub fn run(args: VariablesArgs, json: bool) -> CliResult<()> {
 
 /// The read, as lines: the scope and revision, then each variable.
 fn lines(answer: &Value) {
-    let scope = answer
-        .get("scope")
-        .map(|scope| {
+    let scope = answer.get("scope").map_or_else(
+        || "?".to_owned(),
+        |scope| {
             format!(
                 "{} {}",
                 scope.get("kind").and_then(Value::as_str).unwrap_or("?"),
                 scope.get("id").and_then(Value::as_str).unwrap_or("?")
             )
-        })
-        .unwrap_or_else(|| "?".to_owned());
+        },
+    );
     let revision = answer.get("revision").and_then(Value::as_u64).unwrap_or(0);
     println!("{scope} at revision {revision}");
     if let Some(values) = answer.get("values").and_then(Value::as_object) {

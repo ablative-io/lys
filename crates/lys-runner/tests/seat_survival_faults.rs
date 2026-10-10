@@ -30,6 +30,10 @@ struct Matrix {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "the field is the fixture file's own name"
+)]
 struct Barrier {
     barrier: String,
     #[serde(rename = "where")]
@@ -60,7 +64,7 @@ fn names(row: &Barrier, name: &str) -> bool {
 fn refusal<T: std::fmt::Debug>(result: Result<T, RunnerError>) -> String {
     match result {
         Ok(value) => format!("accepted: {value:?}"),
-        Err(error) => error.name().to_owned(),
+        Err(error) => error.name(),
     }
 }
 

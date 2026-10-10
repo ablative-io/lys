@@ -48,7 +48,12 @@ struct Begun {
     notes: Vec<String>,
 }
 
-/// A seat's session stopped, as the stop answers it.
+/// A seat's session stopped, as the stop answers it; `ended` is the wire
+/// field's name.
+#[allow(
+    clippy::struct_field_names,
+    reason = "the field is the answer's own name on the wire"
+)]
 struct Ended {
     session: String,
     ended: bool,

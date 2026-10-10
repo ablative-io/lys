@@ -131,10 +131,14 @@ fn claude_folder(root: &Path) -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn sha256(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     Sha256::digest(bytes)
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+        .fold(String::with_capacity(64), |mut hex, byte| {
+            hex.push(char::from(HEX[usize::from(byte >> 4)]));
+            hex.push(char::from(HEX[usize::from(byte & 0x0f)]));
+            hex
+        })
 }
 
 /// Whether `member` is excluded with a reason starting `reason`.

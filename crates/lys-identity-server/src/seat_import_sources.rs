@@ -115,11 +115,7 @@ impl Kind {
 /// declare and writes nothing.
 pub fn read_files(manifest: &Manifest, declared: Option<&DeclaredHarness>) -> Fragment {
     let mut fragment = empty_fragment();
-    if manifest
-        .replaced_env_prefixes
-        .iter()
-        .any(|prefix| prefix.is_empty())
-    {
+    if manifest.replaced_env_prefixes.iter().any(String::is_empty) {
         fragment.refusals.push(refusal(
             MEMBER_UNSUPPORTED,
             "manifest.replaced_env_prefixes",
@@ -559,7 +555,7 @@ pub fn codex_profile(source_id: &str, document: &Value) -> Sorted {
                     });
                 }
                 Some(_) | None => {
-                    sorted.unsupported(key, "the sandbox mode is not one the Codex launch takes")
+                    sorted.unsupported(key, "the sandbox mode is not one the Codex launch takes");
                 }
             },
             "approval_policy" => sorted.exclude(key, CODEX_MACHINE_OWNED),

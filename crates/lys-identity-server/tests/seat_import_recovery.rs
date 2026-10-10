@@ -26,6 +26,10 @@ use stores::{AGENT, Exit, PERSON, SEAT, Stores, exits, fragment, now, reserved};
 type TestResult = Result<(), Box<dyn Error>>;
 
 /// Every write an import makes is held behind a fence that is open here.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "the fence's signature is the importer's, which may fail to read it"
+)]
 fn open() -> std::io::Result<bool> {
     Ok(false)
 }

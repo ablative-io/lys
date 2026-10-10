@@ -6,7 +6,7 @@
 //!
 //! The owner under test is the `fake_seat_owner` example (the real owner
 //! steps with no harness). The harness send count and the identity
-//! server's AuthorityUnavailable hold are the battery's and the identity
+//! server's `AuthorityUnavailable` hold are the battery's and the identity
 //! server's own tests; what is proved here is the runner side.
 
 use std::error::Error;
@@ -210,7 +210,7 @@ fn seat_survives_identity_restart() -> TestResult {
     let first = view_of(hello(&seat, ClientKind::IdentityServer, &key)?)?;
     let intent = "000000000000000000000000000000b1".to_owned();
     let hook = OwnerCommand::Cursors {
-        intent: intent.clone(),
+        intent,
         cursors: Cursors {
             receipt: 0,
             feed: 0,
@@ -248,7 +248,7 @@ fn seat_reconnect_keeps_uncertainty() -> TestResult {
     // received is refused rather than invented.
     let intent = "000000000000000000000000000000c1".to_owned();
     let possibly_sent = OwnerCommand::Cursors {
-        intent: intent.clone(),
+        intent,
         cursors: Cursors {
             receipt: 3,
             feed: 0,
@@ -340,7 +340,7 @@ fn seat_reconnect_refuses_foreign_generation() -> TestResult {
 
     // A stale lease generation and a wrong public identity each name the
     // mismatch; the live owner answers afterwards, untouched.
-    let stale = OwnedSeat {
+    let dead = OwnedSeat {
         binding: lys_runner::seat_owner::protocol::OwnerBinding {
             generation: 9,
             ..seat.binding.clone()
@@ -348,7 +348,7 @@ fn seat_reconnect_refuses_foreign_generation() -> TestResult {
         ..seat.clone()
     };
     assert_eq!(
-        refusal_of(hello(&stale, ClientKind::Runner, &key)?)?,
+        refusal_of(hello(&dead, ClientKind::Runner, &key)?)?,
         "seat_owner_generation_stale"
     );
     let wrong = OwnedSeat {

@@ -138,8 +138,8 @@ impl Table {
         let bytes = body.to_string().into_bytes();
         let signed_at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
         let nonce = hex(&[nonce; 16]);
-        let signed = payload("POST", &path, &bytes, signed_at, &nonce);
-        let cose = sign_attestation(&signed, key).to_cose_bytes();
+        let signed_again = payload("POST", &path, &bytes, signed_at, &nonce);
+        let cose = sign_attestation(&signed_again, key).to_cose_bytes();
         let header = format!("{signer} {signed_at} {nonce} {}", hex(&cose));
         self.service
             .post_signed(&path, (HEADER, &header), bytes)

@@ -2,8 +2,8 @@
 //! serves, against the checked-in ratchet. Counts gate; durations are kept
 //! beside them as evidence and never widen a limit.
 
-use std::sync::Arc;
 use std::error::Error;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use lys_runner::peer::{Leader, StartIdentity};
@@ -381,7 +381,7 @@ fn seat_owner_idle_is_event_driven() -> TestResult {
     let meter = Arc::new(Meter::default());
     let (done, waited) = std::sync::mpsc::channel();
     let counted = Arc::clone(&meter);
-    let waiter = std::thread::spawn(move || {
+    let ready = std::thread::spawn(move || {
         let result = wait_ready(&mut BufReader::new(reader), &counted);
         done.send(()).expect("the test is waiting");
         result
@@ -393,7 +393,7 @@ fn seat_owner_idle_is_event_driven() -> TestResult {
     );
     assert!(
         waited.try_recv().is_err(),
-        "the waiter has not returned without its signal"
+        "the ready has not returned without its signal"
     );
     let own = Leader {
         pid: std::process::id(),
@@ -407,7 +407,9 @@ fn seat_owner_idle_is_event_driven() -> TestResult {
     );
     writeln!(writer, "{line}")?;
     waited.recv()?;
-    let (runner, socket, announced, build) = waiter.join().map_err(|_| "the waiter panicked")??;
+    let (runner, socket, announced, build) = ready
+        .join()
+        .map_err(|panic| format!("{}: {panic:?}", "the ready panicked"))??;
     assert_eq!(build, "0.0.0-test");
     assert_eq!(runner, "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f");
     assert_eq!(socket, std::path::PathBuf::from("/tmp/owner.sock"));

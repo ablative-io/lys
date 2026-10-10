@@ -72,7 +72,7 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<Entry> {
     let seat = api.schema::<SeatView>();
     let stop = api.schema::<SeatStopBody>();
     let send = api.schema::<SeatSendBody>();
-    let sent = api.schema::<SeatSent>();
+    let sent_schema = api.schema::<SeatSent>();
     vec![
         (GET, "/seats", None, Some(api.schema::<SeatList>())),
         (
@@ -116,9 +116,9 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<Entry> {
             POST,
             "/seats/{name}/send",
             Some(send.clone()),
-            Some(sent.clone()),
+            Some(sent_schema.clone()),
         ),
-        (POST, "/seats/{name}/type", Some(send), Some(sent)),
+        (POST, "/seats/{name}/type", Some(send), Some(sent_schema)),
         (
             POST,
             "/seats/{name}/attach",

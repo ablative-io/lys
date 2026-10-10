@@ -282,8 +282,8 @@ impl Held {
                 seat.revision += 1;
             }
             Line::Sent(sent) => {
-                let seat = self.changed(&name)?;
-                if seat.session.as_deref() != Some(sent.session.as_str()) {
+                let holder = self.changed(&name)?;
+                if holder.session.as_deref() != Some(sent.session.as_str()) {
                     return Err(format!(
                         "seat `{name}` does not hold session `{}`",
                         sent.session

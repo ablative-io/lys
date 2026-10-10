@@ -264,8 +264,7 @@ pub async fn pass(
             &schedule,
             &sent.operation,
             deliver.operate(operation).await,
-        )
-        .await?;
+        )?;
     }
     // Then every occurrence due.
     let due = schedules.with(|log| Ok(log.held().due(at)))?;
@@ -302,7 +301,7 @@ pub async fn pass(
             .collect();
         schedules.append(Line::Fired(fired))?;
         for (operation, ask) in asks {
-            answer(schedules, &id, &operation, deliver.operate(ask).await).await?;
+            answer(schedules, &id, &operation, deliver.operate(ask).await)?;
         }
         let after = item(schedules, &id)?;
         if after.stopped.is_none() && after.next_due.is_none() && after.settled() {
@@ -382,7 +381,7 @@ fn recipient_name(recipient: &Recipient) -> String {
 
 /// Keep what the runner answered for `operation` of `schedule`, and stop
 /// the schedule on an uncertain delivery or a terminal refusal.
-async fn answer(
+fn answer(
     schedules: &SchedulesKept,
     schedule: &str,
     operation: &str,

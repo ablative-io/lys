@@ -349,12 +349,12 @@ async fn survives(
     let sending = operation()?;
     let send = json!({ "operation": sending, "text": "still here" });
     let send_path = format!("/seats/{SEAT}/send");
-    let sent = scene
+    let delivery = scene
         .table
         .service
         .post(&send_path, Some(&scene.table.ada), &send)
         .await?;
-    assert_eq!(sent.0, 200, "{}", sent.1);
+    assert_eq!(delivery.0, 200, "{}", delivery.1);
 
     scene.attach_and_exit().await?;
     assert_eq!(
@@ -387,7 +387,10 @@ async fn survives(
         .service
         .post(&send_path, Some(&scene.table.ada), &send)
         .await?;
-    assert_eq!(again, sent, "the in-flight send was not resolved as itself");
+    assert_eq!(
+        again, delivery,
+        "the in-flight send was not resolved as itself"
+    );
     assert_eq!(scene.get(&format!("/seats/{SEAT}")).await?, seat);
     assert_eq!(&scene.status().await?, completed);
     // A confirmation while the seat runs is refused by name (the seat runs,

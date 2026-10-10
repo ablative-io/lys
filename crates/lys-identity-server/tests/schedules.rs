@@ -338,7 +338,7 @@ impl Table {
         })
     }
 
-    fn body(&self, agent: &str, at: u64) -> Result<Value, Box<dyn Error>> {
+    fn body(agent: &str, at: u64) -> Result<Value, Box<dyn Error>> {
         Ok(json!({
             "operation": OperationId::generate()?.to_string(),
             "at": at,
@@ -354,7 +354,7 @@ impl Table {
 async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult {
     let table = Table::set().await?;
     let at = now()? + 86_400;
-    let body = table.body(&table.beas_agent, at)?;
+    let body = Table::body(&table.beas_agent, at)?;
     let (status, set) = table
         .service
         .post("/schedules", Some(&table.bea), &body)
@@ -438,7 +438,7 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
         .post(
             "/schedules",
             Some(&table.ada),
-            &table.body(&table.beas_agent, 1)?,
+            &Table::body(&table.beas_agent, 1)?,
         )
         .await?;
     assert_eq!(status, 400, "{refused}");
@@ -448,12 +448,12 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
         .post(
             "/schedules",
             Some(&table.bea),
-            &table.body(&table.adas_agent, at)?,
+            &Table::body(&table.adas_agent, at)?,
         )
         .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "AgentNotVisible");
-    let mut session = table.body(&table.beas_agent, at)?;
+    let mut session = Table::body(&table.beas_agent, at)?;
     session["recipients"] = json!([{ "kind": "session", "id": "session-nobody" }]);
     let (status, refused) = table
         .service
@@ -471,7 +471,7 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
         .post(
             "/schedules",
             Some(&table.ada),
-            &table.body(&table.adas_agent, at)?,
+            &Table::body(&table.adas_agent, at)?,
         )
         .await?;
     assert_eq!(status, 200, "{adas}");

@@ -212,7 +212,7 @@ fn typed(server: Server, seat: &str, json: bool) -> CliResult<()> {
                     source,
                 });
             }
-            Event::Followed(followed) => return followed,
+            Event::Followed(answer) => return answer,
         }
     }
     Err(refused(

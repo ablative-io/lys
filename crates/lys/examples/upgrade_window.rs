@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 //! Disposable upgrade proof driver. The production CLI's own upgrade function
 //! runs unchanged; its existing ready callback exits before recording Started.
 //! This example is never installed and refuses roots without the proof marker.

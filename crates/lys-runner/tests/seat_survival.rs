@@ -46,7 +46,7 @@ fn own_leader() -> Result<Leader, Box<dyn Error>> {
     })
 }
 
-fn supervised(session: &str) -> ManagedLaunch {
+fn supervised(session: &str) -> Result<ManagedLaunch, serde_json::Error> {
     serde_json::from_value(serde_json::json!({
         "launch": {
             "session": session,
@@ -67,7 +67,6 @@ fn supervised(session: &str) -> ManagedLaunch {
             "generation": 1
         }
     }))
-    .expect("the fixture launch reads")
 }
 
 fn alive(pid: u32) -> bool {
@@ -154,9 +153,12 @@ fn seat_survives_terminal_crash() -> TestResult {
 
     // The owner is in a session of its own, not the runner's or the test's.
     let owner_pid = rustix::process::Pid::from_raw(i32::try_from(owner)?).ok_or("pid 0")?;
-    let owner_sid = rustix::process::getsid(Some(owner_pid))?;
-    let own_sid = rustix::process::getsid(None)?;
-    assert_ne!(owner_sid, own_sid, "the owner joined a session of its own");
+    let owner_session = rustix::process::getsid(Some(owner_pid))?;
+    let test_session = rustix::process::getsid(None)?;
+    assert_ne!(
+        owner_session, test_session,
+        "the owner joined a session of its own"
+    );
 
     // The attaching client binds and is told the owner it reached.
     let view = bound(hello(&seat, own_leader()?, &key)?)?;
@@ -208,7 +210,7 @@ fn seat_owner_is_unique() -> TestResult {
 
     // Two starts for the same seat binding at once: one owner, the other
     // refused by name, never a second session.
-    let managed = supervised("unique");
+    let managed = supervised("unique")?;
     let binding = managed.owner.clone().ok_or("supervised")?;
     let barrier = Arc::new(std::sync::Barrier::new(2));
     let starts: Vec<_> = (0..2)
@@ -225,7 +227,11 @@ fn seat_owner_is_unique() -> TestResult {
         .collect();
     let mut outcomes = Vec::new();
     for start in starts {
-        outcomes.push(start.join().map_err(|_| "a start panicked")?);
+        outcomes.push(
+            start
+                .join()
+                .map_err(|panic| format!("a start panicked: {panic:?}"))?,
+        );
     }
     let started: Vec<_> = outcomes.iter().filter(|outcome| outcome.is_ok()).collect();
     let refused: Vec<String> = outcomes
@@ -318,7 +324,7 @@ fn seat_owner_preserves_manual_lifecycle() -> TestResult {
     // nothing, by name.
     let dir = tempfile::tempdir()?;
     let sessions = Sessions::open(&dir.path().join("state"), 1 << 16)?;
-    let supervised = supervised("unserved");
+    let supervised = supervised("unserved")?;
     let binding = supervised.owner.clone().ok_or("supervised")?;
     let refused = sessions
         .start_owned(supervised, binding, None)
@@ -350,7 +356,7 @@ fn seat_owner_preserves_manual_lifecycle() -> TestResult {
     }))?;
     sessions.start(launch)?;
     // `supervised` is already the launch bound above; the helper is named by its path.
-    let supervised = self::supervised("manual");
+    let supervised = self::supervised("manual")?;
     let binding = supervised.owner.clone().ok_or("supervised")?;
     let refused = sessions
         .start_owned(supervised, binding, None)

@@ -243,7 +243,8 @@ fn refused(answer: &(u16, Value), name: &str) {
 /// no destination.
 async fn refused_and_unwritten(scene: &Scene, plan: &Value) -> TestResult {
     let before = scene.destinations().await?;
-    let answer = scene.confirm(plan, &operation()?).await?;
+    let operation = operation()?;
+    let answer = scene.confirm(plan, &operation).await?;
     refused(&answer, "import_plan_refused");
     assert_eq!(
         scene.destinations().await?,

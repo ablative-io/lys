@@ -75,7 +75,7 @@ fn seat_started_before_an_upgrade_keeps_its_owner() -> TestResult {
     fs::write(state.join("owner-build"), "0.9.0-before\n")?;
     let (before, mut old_runner) = runner_with_owner(&state, "before", &key)?;
     assert_eq!(before.endpoint.build, "0.9.0-before");
-    let owner_before = before.endpoint.owner.clone();
+    let owner_before = before.endpoint.owner;
     assert!(alive(owner_before.pid));
 
     // The upgrade: the runner is replaced; the owner binary on disk is the

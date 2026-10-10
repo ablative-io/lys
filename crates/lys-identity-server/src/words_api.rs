@@ -377,7 +377,7 @@ pub(crate) fn rendered(
         if let Some(session) = session {
             inputs.session = Some(scope(
                 variables,
-                Scope::Session {
+                &Scope::Session {
                     id: session.to_owned(),
                 },
             )?);
@@ -385,7 +385,7 @@ pub(crate) fn rendered(
         if let Some(agent) = agent {
             inputs.agent = Some(scope(
                 variables,
-                Scope::Agent {
+                &Scope::Agent {
                     id: agent.to_owned(),
                 },
             )?);
@@ -425,9 +425,9 @@ pub(crate) fn rendered(
 
 fn scope(
     variables: &crate::variables_store::VariablesKept,
-    scope: Scope,
+    scope: &Scope,
 ) -> Result<lys_runner::render::Scope, ServerError> {
-    let read = crate::variables_store::read(variables, &scope)?;
+    let read = crate::variables_store::read(variables, scope)?;
     Ok(lys_runner::render::Scope {
         name: scope.name(),
         revision: read.revision,

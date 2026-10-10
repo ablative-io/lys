@@ -160,9 +160,8 @@ async fn read_all(
     }
     let mut visible = Vec::new();
     for item in items {
-        let agents = match agents_of(&state, item.recipients()) {
-            Ok(agents) => agents,
-            Err(_) => continue,
+        let Ok(agents) = agents_of(&state, item.recipients()) else {
+            continue;
         };
         if over(&state, &headers, &agents).is_ok() {
             visible.push(item);

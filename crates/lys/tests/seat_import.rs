@@ -145,14 +145,14 @@ fn seat_import_help_names_every_subcommand_and_flag() -> TestResult {
     let root = tempfile::tempdir()?;
     let output = lys(root.path(), &["seat", "import", "--help"])?;
     assert!(output.status.success(), "{}", printed(&output));
-    let help = String::from_utf8(output.stdout.clone())?;
+    let help = String::from_utf8(output.stdout)?;
     for word in ["dry-run", "confirm", "status"] {
         assert!(help.contains(word), "{word} is missing from:\n{help}");
     }
     let output = lys(root.path(), &["seat", "import", "dry-run", "--help"])?;
-    assert!(String::from_utf8(output.stdout.clone())?.contains("--manifest"));
+    assert!(String::from_utf8(output.stdout)?.contains("--manifest"));
     let output = lys(root.path(), &["seat", "import", "confirm", "--help"])?;
-    let help = String::from_utf8(output.stdout.clone())?;
+    let help = String::from_utf8(output.stdout)?;
     assert!(
         help.contains("--plan") && help.contains("--revision"),
         "{help}"

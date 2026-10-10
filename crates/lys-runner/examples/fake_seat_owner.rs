@@ -73,9 +73,12 @@ fn owner(args: &[String]) -> Result<(), RunnerError> {
             format!("reading {key_path}: {error}"),
         )
     })?)?;
-    let scrollback: usize = option(args, "--scrollback")?
-        .parse()
-        .map_err(|_| RunnerError::refused("fixture_args_invalid", "scrollback is a number"))?;
+    let scrollback: usize = option(args, "--scrollback")?.parse().map_err(|error| {
+        RunnerError::refused(
+            "fixture_args_invalid",
+            format!("scrollback is a number: {error}"),
+        )
+    })?;
     let plan = OwnerPlan::read(&dir)?;
     let pid = std::process::id();
     let own = Leader {

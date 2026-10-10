@@ -176,7 +176,7 @@ pub mod start;
 /// Open the directory, discover the issuer and answer the service's routes,
 /// as `config` says. The log is created when its directory does not exist.
 pub async fn service(config: &Config) -> Result<Router, ServerError> {
-    service_saying(config, Arc::new(|_| {})).await
+    Box::pin(service_saying(config, Arc::new(|_| {}))).await
 }
 
 /// As `service`, saying through `say` how each thing kept was started: the
@@ -184,7 +184,7 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
-    crate::routes_startup::service_saying(config, say).await
+    Box::pin(crate::routes_startup::service_saying(config, say)).await
 }
 
 /// Open the directory `config` names, creating its log when the log's

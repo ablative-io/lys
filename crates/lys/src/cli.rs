@@ -86,8 +86,8 @@ pub enum Command {
     /// A Lys-started run's own variables: read and patch its agent's map
     /// and its session's map, as the run itself, by the run pass Lys
     /// rendered into the seat's own configuration. The pass is read from
-    /// the launch's mcp.json (a Claude Code seat) or from LYS_AGENT_PASS
-    /// and LYS_MCP_URL (a Codex seat), and is never printed.
+    /// the launch's mcp.json (a Claude Code seat) or from `LYS_AGENT_PASS`
+    /// and `LYS_MCP_URL` (a Codex seat), and is never printed.
     Variables(VariablesArgs),
 
     /// Sign an attestation over a payload file and write the `COSE_Sign1`

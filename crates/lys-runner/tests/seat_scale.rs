@@ -61,7 +61,7 @@ fn seat_scale_fixture_reads() -> TestResult {
     assert_eq!(fixture.brief, "AGENTS-004 R7");
     assert!(fixture.rule.contains("48 owners"));
     assert_eq!(fixture.sessions.len(), 48);
-    let mut unique = fixture.sessions.clone();
+    let mut unique = fixture.sessions;
     unique.sort();
     unique.dedup();
     assert_eq!(unique.len(), 48, "every session is its own owner");
