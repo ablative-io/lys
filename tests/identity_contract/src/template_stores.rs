@@ -20,6 +20,8 @@ use lys_identity_server::{
     routes::open_directory,
     runner_acts::ActStore,
     runtime_store::RuntimeStore,
+    seat_import_store::SeatImports,
+    seats_store::SeatStore,
     service_accounts_store::ServiceAccountStore,
     stops_store::StopStore,
     teams_state::{Checked, Line},
@@ -38,6 +40,11 @@ pub(crate) fn paths(config: &Config) -> Vec<(&'static str, PathBuf)> {
         (
             "launch-records",
             config.log_dir.with_file_name("launch-records"),
+        ),
+        ("seats", config.log_dir.with_file_name("seats")),
+        (
+            "seat-imports",
+            config.log_dir.with_file_name("seat-imports"),
         ),
         ("apps", config.apps_dir()),
     ];
@@ -155,6 +162,15 @@ pub(crate) fn build(name: &str, path: &Path, config: &Config) -> Result<(), Box<
         }
         "mcp-requests" => {
             drop(McpRequestStore::open(path, key)?);
+        }
+        // The two seat stores the server opens beside its log at startup
+        // (routes_startup.rs): built here once, so a prepared service
+        // creates nothing and flushes nothing when it opens them.
+        "seats" => {
+            snapshot_result(SeatStore::open(path, key)?.snapshot_failure())?;
+        }
+        "seat-imports" => {
+            drop(SeatImports::open(path, key)?);
         }
         _ => return Err(format!("unknown service template store {name}").into()),
     }

@@ -285,7 +285,7 @@ async fn a_configured_context_notice_appears_in_the_live_session() -> TestResult
         .budget(json!({"limits": [{"unit": "context_percent", "amount": 50, "period": null, "act": "notice"}], "warn_at": null, "version": 0}))
         .await?;
     table.used(context("e1", &session, 64)).await?;
-    table.waited(&session, "context is at 64%").await?;
+    table.waited(&session, "Context is at 64 percent").await?;
     table.end(&session).await?;
     table.stop_runner()
 }
