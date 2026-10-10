@@ -180,6 +180,9 @@ pub(super) fn append(
         .append(true)
         .create(true)
         .open(dir.join(format!("{}.jsonl", line.run)))?;
+    // The directory is synced only when this append created the file: an
+    // established file's entry is durable already (AGENTS-005 P05).
+    let created = file.metadata()?.len() == 0;
     let mut text = String::new();
     if unfinished(&mut file)? {
         // What a dying proxy left of a line is closed, so this one is whole.
@@ -191,7 +194,10 @@ pub(super) fn append(
     // The line is durable before the journal lets the call go: a budget
     // must not read low after a power loss.
     file.sync_all()?;
-    std::fs::File::open(dir)?.sync_all()
+    if created {
+        std::fs::File::open(dir)?.sync_all()?;
+    }
+    Ok(())
 }
 
 /// Whether the file ends part way through a line.

@@ -448,3 +448,52 @@ fn a_stopped_capture_worker_closes_its_reports_before_shutdown_returns() -> Res 
     ));
     Ok(())
 }
+
+#[test]
+fn a_put_appends_in_place_and_a_torn_tail_yields_the_last_whole_record() -> Res {
+    use std::io::Write;
+    let dir = tempfile::tempdir()?;
+    let journal = Journal::open(dir.path().join("journal"))?;
+    let mut call = open_call("c9", Some(KEY));
+    journal.put(&call)?;
+    call.run = Some("run-z".to_owned());
+    journal.put(&call)?;
+    journal.settle("c9")?;
+    let path = journal.dir().join("c9.json");
+    let text = std::fs::read_to_string(&path)?;
+    assert_eq!(
+        text.lines().count(),
+        2,
+        "one line per put, in place: {text}"
+    );
+    assert!(text.ends_with('\n'));
+    let calls = journal.open_calls()?;
+    assert_eq!(calls.len(), 1);
+    assert_eq!(
+        calls[0].run.as_deref(),
+        Some("run-z"),
+        "the last whole line is the record"
+    );
+    assert!(Journal::holds_run(journal.dir(), "run-z")?);
+    // A line a dying proxy left unfinished is not the record.
+    let mut file = std::fs::OpenOptions::new().append(true).open(&path)?;
+    file.write_all(b"{\"call_id\":\"c9\",\"provider\":\"anth")?;
+    drop(file);
+    let calls = journal.open_calls()?;
+    assert_eq!(calls[0].run.as_deref(), Some("run-z"));
+    // The next put closes the torn line first, so its record is whole.
+    call.run = Some("run-y".to_owned());
+    journal.put(&call)?;
+    assert_eq!(journal.open_calls()?[0].run.as_deref(), Some("run-y"));
+    assert!(!Journal::holds_run(journal.dir(), "run-z")?);
+    let no_tmp = std::fs::read_dir(journal.dir())?
+        .filter_map(Result::ok)
+        .all(|entry| !entry.file_name().to_string_lossy().ends_with(".tmp"));
+    assert!(
+        no_tmp,
+        "no temporary file and no rename on an established record"
+    );
+    journal.retire("c9")?;
+    assert!(journal.open_calls()?.is_empty());
+    Ok(())
+}

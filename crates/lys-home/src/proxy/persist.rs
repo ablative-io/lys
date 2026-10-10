@@ -12,17 +12,52 @@ use crate::record::{
 };
 use std::path::Path;
 
+/// The sessions the capture worker holds open across completions, by
+/// session id, bounded; a session whose append failed is dropped so the
+/// next completion opens it afresh from the record.
+#[derive(Default)]
+pub(super) struct OpenSessions {
+    held: std::collections::HashMap<String, crate::record::Session>,
+}
+
+/// The most sessions held open at once: beyond it the oldest are released.
+const MAX_OPEN_SESSIONS: usize = 8;
+
+impl OpenSessions {
+    fn open<'a>(
+        &'a mut self,
+        home: &Home,
+        session_id: &str,
+    ) -> Result<&'a mut crate::record::Session, ProxyError> {
+        if !self.held.contains_key(session_id) {
+            if self.held.len() >= MAX_OPEN_SESSIONS {
+                self.held.clear();
+            }
+            let session = if home.session_path(session_id)?.is_file() {
+                home.open_session(session_id)?
+            } else {
+                home.create_session(session_id, "", None)?
+            };
+            self.held.insert(session_id.to_owned(), session);
+        }
+        self.held.get_mut(session_id).ok_or_else(|| {
+            ProxyError::io(
+                "holding a session open",
+                Path::new(session_id),
+                std::io::Error::other("the session just opened is not held"),
+            )
+        })
+    }
+}
+
 pub(super) fn ingest(
     home: &Home,
     journal: &Journal,
+    sessions: &mut OpenSessions,
     session_id: &str,
     job: &mut Job,
 ) -> Result<(CallStatus, IngestReport), ProxyError> {
-    let mut session = if home.session_path(session_id)?.is_file() {
-        home.open_session(session_id)?
-    } else {
-        home.create_session(session_id, "", None)?
-    };
+    let session = sessions.open(home, session_id)?;
     let blocks = home.blocks()?;
     if job.call.completed.is_none() {
         let request = raw_hash(&blocks, job.request.as_deref(), job.request_hash.as_ref())?;
@@ -36,8 +71,10 @@ pub(super) fn ingest(
             duration_ms: (job.status != CallStatus::Lost).then_some(job.duration_ms),
             stream: job.stream,
         };
-        // The manifest must never name a spool whose directory entry can still disappear.
-        sync_sources(job)?;
+        // The spools' directory entries are made durable by the store when
+        // it admits each body (rename, then the spool parent synced), on the
+        // same durable boundary: no sync of the spool directories here
+        // (AGENTS-005 P03).
         job.call.completed = Some(PreparedCall::prepare(
             &blocks,
             Captured {
@@ -68,7 +105,15 @@ pub(super) fn ingest(
             std::io::Error::other("capture manifest absent"),
         )
     })?;
-    Ok((ready.record.status, ready.append(&mut session)?))
+    let status = ready.record.status;
+    match ready.append(session) {
+        Ok(report) => Ok((status, report)),
+        Err(error) => {
+            // The next completion opens the session afresh from the record.
+            sessions.held.remove(session_id);
+            Err(error.into())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -144,18 +189,6 @@ pub(super) fn install(
             // A body never captured (no spool was ever made) is not in the store either.
             DurableTime::NotPlaced
         };
-    }
-    Ok(())
-}
-
-fn sync_sources(job: &Job) -> Result<(), ProxyError> {
-    let request = job.request.as_deref().and_then(Path::parent);
-    let response = job.response.as_deref().and_then(Path::parent);
-    if let Some(dir) = request {
-        crate::record::blocks::sync_dir(dir)?;
-    }
-    if let Some(dir) = response.filter(|dir| Some(*dir) != request) {
-        crate::record::blocks::sync_dir(dir)?;
     }
     Ok(())
 }

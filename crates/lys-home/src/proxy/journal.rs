@@ -112,22 +112,45 @@ impl Journal {
     /// record is there for the proxy's next start, so a call in flight when
     /// the proxy ends is still found and recorded lost. It holds through a
     /// loss of power once [`Journal::settle`] has returned for it.
+    /// Append the call's record as one line of its journal file (AGENTS-005
+    /// P01/P04b): an established record takes one append and no rename, so
+    /// its durability is the one file sync `settle` makes; a line a dying
+    /// proxy left unfinished is closed first, and the last whole line is the
+    /// record. Only the cold creation of the file syncs the directory.
     pub fn put(&self, call: &OpenCall) -> Result<(), ProxyError> {
-        use std::io::Write;
-        let bytes = serde_json::to_vec(call).map_err(|source| ProxyError::JournalEncode {
+        use std::io::{Read, Seek, SeekFrom, Write};
+        let mut bytes = serde_json::to_vec(call).map_err(|source| ProxyError::JournalEncode {
             call_id: call.call_id.clone(),
             source,
         })?;
         let path = self.path_of(&call.call_id);
-        let tmp = self.dir.join(format!(".{}.json.tmp", call.call_id));
         let unwritable = |source| ProxyError::JournalUnwritable {
             path: path.clone(),
             source,
         };
-        let mut file = std::fs::File::create(&tmp).map_err(unwritable)?;
-        file.write_all(&bytes).map_err(unwritable)?;
-        drop(file);
-        std::fs::rename(&tmp, &path).map_err(unwritable)
+        let created = !path.is_file();
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .append(true)
+            .create(true)
+            .open(&path)
+            .map_err(unwritable)?;
+        let mut line = Vec::with_capacity(bytes.len() + 2);
+        if file.metadata().map_err(unwritable)?.len() > 0 {
+            file.seek(SeekFrom::End(-1)).map_err(unwritable)?;
+            let mut last = [0_u8; 1];
+            file.read_exact(&mut last).map_err(unwritable)?;
+            if last != [b'\n'] {
+                line.push(b'\n');
+            }
+        }
+        line.append(&mut bytes);
+        line.push(b'\n');
+        file.write_all(&line).map_err(unwritable)?;
+        if created {
+            sync_dir(&self.dir).map_err(unwritable)?;
+        }
+        Ok(())
     }
 
     /// Make a put record hold through a loss of power: its file synced,
@@ -139,12 +162,13 @@ impl Journal {
             path: path.clone(),
             source,
         };
+        // One sync: the record is appended in place, so its directory entry
+        // was made durable when the file was created, never again here.
         match std::fs::File::open(&path) {
-            Ok(file) => file.sync_all().map_err(unwritable)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-            Err(error) => return Err(unwritable(error)),
+            Ok(file) => file.sync_all().map_err(unwritable),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(unwritable(error)),
         }
-        sync_dir(&self.dir).map_err(unwritable)
     }
 
     /// Settle a put record beside the call that put it, so the call does
@@ -195,8 +219,7 @@ impl Journal {
         for path in paths {
             let bytes = std::fs::read(&path)
                 .map_err(|e| ProxyError::io("reading a journal record", &path, e))?;
-            let call = serde_json::from_slice(&bytes)
-                .map_err(|source| ProxyError::JournalRecord { path, source })?;
+            let call = last_record(&bytes, path)?;
             calls.push(call);
         }
         Ok(calls)
@@ -224,13 +247,30 @@ impl Journal {
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
                 Err(e) => return Err(ProxyError::io("reading a journal record", &path, e)),
             };
-            let call: OpenCall = serde_json::from_slice(&bytes)
-                .map_err(|source| ProxyError::JournalRecord { path, source })?;
+            let call = last_record(&bytes, path)?;
             if call.run.as_deref() == Some(run) {
                 return Ok(true);
             }
         }
         Ok(false)
+    }
+}
+
+/// The last whole line of a journal file as its record: a line a dying
+/// proxy left unfinished at the tail is not the record, the whole line
+/// before it is; a file with no whole record is refused by name.
+fn last_record(bytes: &[u8], path: PathBuf) -> Result<OpenCall, ProxyError> {
+    let mut lines = bytes
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty());
+    let last = lines.next_back().unwrap_or_default();
+    match serde_json::from_slice(last) {
+        Ok(call) => Ok(call),
+        Err(source) => match lines.next_back() {
+            Some(whole) if !bytes.ends_with(b"\n") => serde_json::from_slice(whole)
+                .map_err(|_| ProxyError::JournalRecord { path, source }),
+            _ => Err(ProxyError::JournalRecord { path, source }),
+        },
     }
 }
 
@@ -399,6 +439,10 @@ fn run(
 ) {
     let mut held: Vec<Job> = Vec::new();
     let mut unretired: Vec<String> = Vec::new();
+    // AGENTS-005 P04a: a session stays open across the completions it takes,
+    // so a healthy completion reads no index file and rebuilds no call map;
+    // its freshness against another process is checked at every write.
+    let mut sessions = super::persist::OpenSessions::default();
     for message in rx {
         #[cfg(test)]
         if let Message::Pause(ready, resume) = message {
@@ -422,7 +466,7 @@ fn run(
         }
         unretired.retain(|call_id| journal.retire(call_id).is_err());
         for mut job in std::mem::take(&mut held) {
-            let report = record(home, journal, &mut job);
+            let report = record(home, journal, &mut sessions, &mut job);
             if report.held.is_some() {
                 held.push(job);
             } else {
@@ -446,7 +490,12 @@ fn run(
 
 /// Record one call: rewrite its journal record naming its session, ingest
 /// it, remove its spool files and retire its record.
-fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
+fn record(
+    home: &Home,
+    journal: &Journal,
+    sessions: &mut super::persist::OpenSessions,
+    job: &mut Job,
+) -> CallReport {
     let link = Link::from_record(job.call.session.as_deref());
     let session_id = link.session_id(day_of(&job.call.started_at));
     let mut report = CallReport {
@@ -474,7 +523,7 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
     }
     #[cfg(test)]
     let started = std::time::Instant::now();
-    let ingested = super::persist::ingest(home, journal, &session_id, job);
+    let ingested = super::persist::ingest(home, journal, sessions, &session_id, job);
     #[cfg(test)]
     {
         super::timing::add(&super::timing::INGEST, started);

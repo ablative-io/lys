@@ -33,7 +33,7 @@ The 41-path source census at 71e44c78360d2b2228657dc5213026f920526fb9, report SH
 
 ## Task
 
-Write the 41 path contract below with three actual-code benchmark drivers, per-case workloads/ratchets/correlation artifacts and narrowly owned thirty-minute write/qualification slices. Strictly reduce growing or redundant work while preserving the exact successful/refused/durable behaviours. Keep existing efficient paths as explicit non-regression guards, qualify counts against real native-time/completion/backlog improvement, and retain all slow-test/old-install/survival evidence as prerequisites.
+Write the 41 path contract below with three actual-code benchmark drivers, per-case workloads/ratchets/correlation artifacts and narrowly owned thirty-minute write/qualification slices. Strictly reduce growing or redundant work while preserving the exact successful/refused/durable behaviours. Keep existing efficient paths as explicit non-regression guards, qualify counts against real native-time/completion/backlog improvement, and retain all slow-test/old-install/survival evidence as prerequisites. Amendment 1 (10 October 2026, Tom's word relayed by Waffles 16:1x: "Don't worry about doing these bloody measurements. Just get stuck into it."): the measurement apparatus this brief asked for (benchmark drivers, count fixtures, ratchet files, correlation proofs, BEFORE formulas and thirty-minute boxes) is dropped; the named fix slices are written as plain code into the one Lys build, with the same visible outputs and acknowledgement boundary, and the existing tests prove behaviour.
 
 ## Requirements
 
