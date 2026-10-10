@@ -7,3 +7,9 @@ command = { command-line = "cargo run --offline --locked -p lys-core --example g
 [[profile.default.scripts]]
 filter = '((package(lys-core) & binary(/^(bundle_conformance|receipt_conformance|cose_conformance|consistency_conformance|consistency_receipt_conformance|delegation_conformance|go_conformance)$/)) | (package(lys-anchor) & binary(/^(anchor_receipt_conformance|checkpoint_note_conformance)$/))) & (test(/(^|::)go_/) | binary(/^consistency_conformance$/))'
 setup = "go-fixture"
+
+# Waffles 10 Oct 11:59: a test that hangs is a named red at 300 s, as the door's
+# runs have it, never a battery that waits forever (battery 1 at d05b8b18 waited
+# 634 s on lys-runner's a_program_that_drops_one_hang_up_is_told_again_when_it_prints).
+[profile.default]
+slow-timeout = { period = "60s", terminate-after = 5 }
