@@ -155,6 +155,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Agents' passes to apps",
+      "items": [
+        {
+          "id": "C735",
+          "text": "An agent asks POST /agents/{id}/pass with its run pass or a grant credential for a live grant it holds, and is answered the rights_claim pass for an approved app carrying only its own grants, with no refresh token; every other ask is refused by name and each issue is logged (AGENTS-006 R1, R2, R4).",
+          "done": false
+        },
+        {
+          "id": "C736",
+          "text": "`lys agent pass` reads the grant credential from an owner-only file, asks over loopback with no operator token, and writes the pass to an owner-only file, printing neither (AGENTS-006 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

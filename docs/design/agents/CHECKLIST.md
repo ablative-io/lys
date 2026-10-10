@@ -38,3 +38,8 @@
 - [ ] **C725** — Terminal/pattern/transport paths count complete work, preserve every byte and match, and remove prefix re-search and shared network-wait holds (AGENTS-005 R7).
 - [ ] **C726** — Approval, connector, MCP refusal and nonce paths remove per-request global scans/copies/thread growth without stale grants or weakened replay/audit (AGENTS-005 R8).
 - [ ] **C734** — A message sent to a seat from the Sessions screen or `lys seat send` arrives in its Claude Code transcript as a user turn, never as typed keys (AGENTS-002 R6).
+
+## Agents' passes to apps
+
+- [ ] **C735** — An agent asks POST /agents/{id}/pass with its run pass or a grant credential for a live grant it holds, and is answered the rights_claim pass for an approved app carrying only its own grants, with no refresh token; every other ask is refused by name and each issue is logged (AGENTS-006 R1, R2, R4).
+- [ ] **C736** — `lys agent pass` reads the grant credential from an owner-only file, asks over loopback with no operator token, and writes the pass to an owner-only file, printing neither (AGENTS-006 R3).

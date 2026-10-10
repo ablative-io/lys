@@ -1,18 +1,20 @@
 //! Schemas for the agents cluster's records (AGENTS-001): the words, the
-//! variables and the schedules.
+//! variables and the schedules; and an agent's pass to an app (AGENTS-006).
 
 use lys_openapi::Api;
 
+use crate::agent_app_pass::AppPassAsked;
 use crate::openapi_table::{GET, POST};
 use crate::openapi_types::Entry;
+use crate::provider::AgentAppPass;
 use crate::schedules_api::{ChangeBody, SetBody as ScheduleBody, StopBody, View as SchedulesView};
 use crate::schedules_state::Item as ScheduleItem;
 use crate::variables_api::PatchBody;
 use crate::variables_state::Read as VariablesRead;
 use crate::words_api::{Delivered, ForAgent, PreviewBody, SaveBody, Saved, TemplateBody};
 
-/// The words, variables and schedules routes, each with the types it takes
-/// and answers.
+/// The words, variables, schedules and agent pass routes, each with the
+/// types it takes and answers.
 pub(crate) fn agents(api: &mut Api) -> Vec<Entry> {
     let (save, saved) = (api.schema::<SaveBody>(), api.schema::<Saved>());
     let (template, preview) = (api.schema::<TemplateBody>(), api.schema::<PreviewBody>());
@@ -86,5 +88,11 @@ pub(crate) fn agents(api: &mut Api) -> Vec<Entry> {
             Some(item.clone()),
         ),
         (POST, "/schedules/{id}/stop", Some(stop), Some(item)),
+        (
+            POST,
+            "/agents/{id}/pass",
+            Some(api.schema::<AppPassAsked>()),
+            Some(api.schema::<AgentAppPass>()),
+        ),
     ]
 }

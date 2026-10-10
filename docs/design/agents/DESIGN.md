@@ -86,6 +86,24 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-identity-server/Cargo.toml` | owned non-default benchmark target/instrumentation declaration; no unapproved dependency | AGENTS-005 |
 | `crates/lys-identity-server/tests/seat_send.rs` | a message to a seat lands as a user turn; refusals by name | AGENTS-002 |
 | `crates/lys-identity-server/src/network_store.rs` | the network store; one kind-lys runner per install | AGENTS-002 |
+| `crates/lys-identity-server/src/agent_app_pass.rs` | an agent's pass to an app: the route, its two proofs and the issue log line | AGENTS-006 |
+| `crates/lys-identity-server/src/error_app_pass.rs` | the agent pass refusals by name | AGENTS-006 |
+| `crates/lys-identity-server/src/provider/agent_issue.rs` | the provider issues an agent the rights_claim pass for an approved audience | AGENTS-006 |
+| `crates/lys-identity-server/tests/agent_app_pass.rs` | an agent's pass over HTTP: its own grants, refusals by name, a revoked credential | AGENTS-006 |
+| `crates/lys/src/commands/agent_pass.rs` | lys agent pass: credential from an owner-only file, pass to an owner-only file | AGENTS-006 |
+| `crates/lys/tests/agent_pass.rs` | lys agent pass against a loopback fixture | AGENTS-006 |
+| `crates/lys-identity-server/src/lib.rs` | the crate's modules | AGENTS-006 |
+| `crates/lys-identity-server/src/provider.rs` | the provider's modules | AGENTS-006 |
+| `crates/lys-identity-server/src/routes_table.rs` | the route table | AGENTS-006 |
+| `crates/lys-identity-server/src/route_actions.rs` | a run pass reaches the agent pass route untouched | AGENTS-006 |
+| `crates/lys-identity-server/src/openapi_table.rs` | the route's OpenAPI row | AGENTS-006 |
+| `crates/lys-identity-server/src/openapi_agents_types.rs` | the route's typed request and answer | AGENTS-006 |
+| `crates/lys-identity-server/src/error_agents.rs` | the agents cluster's refusal families | AGENTS-006 |
+| `crates/lys-identity-server/src/error_names.rs` | refusal names | AGENTS-006 |
+| `crates/lys/src/cli.rs` | the lys agent command | AGENTS-006 |
+| `crates/lys/src/main.rs` | the lys agent dispatch | AGENTS-006 |
+| `crates/lys/src/commands/mod.rs` | the CLI's command modules | AGENTS-006 |
+| `crates/lys/src/commands/seat_client.rs` | the loopback client, reachable without the operator token | AGENTS-006 |
 
 ## Inventory
 

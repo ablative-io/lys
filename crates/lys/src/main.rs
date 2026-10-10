@@ -250,6 +250,7 @@ fn main() -> ExitCode {
         ),
         Command::Seat(seat_args) => commands::seat::run(seat_args, json),
         Command::Attach(attach_args) => commands::attach::run(&attach_args, json),
+        Command::Agent(agent_args) => commands::agent_pass::run(agent_args, json),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

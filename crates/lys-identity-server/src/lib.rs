@@ -331,3 +331,7 @@ pub mod seat_import_schedules;
 pub mod seat_import_sources;
 pub mod seat_import_state;
 pub mod seat_import_store;
+
+/// An agent's pass to an approved app (AGENTS-006): its route and refusals.
+mod agent_app_pass;
+pub mod error_app_pass;

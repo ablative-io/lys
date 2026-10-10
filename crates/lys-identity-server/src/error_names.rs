@@ -325,5 +325,6 @@ fn agents(error: &AgentsError) -> &str {
         AgentsError::Schedules(error) => error.name(),
         AgentsError::Seat(error) => error.name(),
         AgentsError::SeatImport(error) => error.name(),
+        AgentsError::AppPass(error) => error.name(),
     }
 }

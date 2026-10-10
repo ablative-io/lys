@@ -40,6 +40,12 @@ pub(crate) fn admit(
         })
         .map_err(|error| Box::new(error.into_response()));
     }
+    // An agent's ask for its own pass to an app (AGENTS-006 R1) exercises no
+    // grant: the route takes the run pass as its proof of who asks, refuses
+    // another agent's, and issues only the asker's own rights.
+    if method == "POST" && crate::agent_app_pass::asks_for_pass(path) {
+        return Ok(());
+    }
     let (resource, action) = crate::openapi_table::token_scope(method, path)
         .map_err(|error| Box::new(error.into_response()))?;
     let refusal = crate::grants::with_grants(state, |mut judged| {

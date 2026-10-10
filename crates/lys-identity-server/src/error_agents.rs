@@ -1,12 +1,14 @@
 //! The agents cluster's refusals: budgets, goals, words, variables, schedules,
-//! seats and seat imports. Each owner keeps its own status and name; this enum
-//! is one variant of `ServerError` so `error.rs` stays under the length gate
-//! (ADR-111) as the cluster grows, and a `?` on any owner's error still lands
-//! in `ServerError` through the `From` impls below.
+//! seats, seat imports and agents' passes to apps. Each owner keeps its own
+//! status and name; this enum is one variant of `ServerError` so `error.rs`
+//! stays under the length gate (ADR-111) as the cluster grows, and a `?` on
+//! any owner's error still lands in `ServerError` through the `From` impls
+//! below.
 
 use axum::http::StatusCode;
 
 use crate::error::ServerError;
+use crate::error_app_pass::AppPassError;
 use crate::error_budget::BudgetError;
 use crate::error_seat::SeatError;
 use crate::error_seat_import::SeatImportError;
@@ -39,6 +41,9 @@ pub enum AgentsError {
     /// A seat import's refusal (AGENTS-003).
     #[error(transparent)]
     SeatImport(#[from] SeatImportError),
+    /// An agent's pass to an app refused (AGENTS-006).
+    #[error(transparent)]
+    AppPass(#[from] AppPassError),
 }
 
 impl AgentsError {
@@ -52,6 +57,7 @@ impl AgentsError {
             Self::Schedules(error) => error.status(),
             Self::Seat(error) => error.status(),
             Self::SeatImport(error) => error.status(),
+            Self::AppPass(error) => error.status(),
         }
     }
 }
@@ -74,4 +80,5 @@ lands! {
     SchedulesError => Schedules,
     SeatError => Seat,
     SeatImportError => SeatImport,
+    AppPassError => AppPass,
 }

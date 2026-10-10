@@ -169,6 +169,96 @@
       "path": "crates/lys-identity-server/src/network_store.rs",
       "note": "the network store; one kind-lys runner per install",
       "brief": "AGENTS-002"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_app_pass.rs",
+      "note": "an agent's pass to an app: the route, its two proofs and the issue log line",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_app_pass.rs",
+      "note": "the agent pass refusals by name",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider/agent_issue.rs",
+      "note": "the provider issues an agent the rights_claim pass for an approved audience",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_app_pass.rs",
+      "note": "an agent's pass over HTTP: its own grants, refusals by name, a revoked credential",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys/src/commands/agent_pass.rs",
+      "note": "lys agent pass: credential from an owner-only file, pass to an owner-only file",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys/tests/agent_pass.rs",
+      "note": "lys agent pass against a loopback fixture",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "the crate's modules",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider.rs",
+      "note": "the provider's modules",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes_table.rs",
+      "note": "the route table",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/route_actions.rs",
+      "note": "a run pass reaches the agent pass route untouched",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_table.rs",
+      "note": "the route's OpenAPI row",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_agents_types.rs",
+      "note": "the route's typed request and answer",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_agents.rs",
+      "note": "the agents cluster's refusal families",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_names.rs",
+      "note": "refusal names",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys/src/cli.rs",
+      "note": "the lys agent command",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys/src/main.rs",
+      "note": "the lys agent dispatch",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys/src/commands/mod.rs",
+      "note": "the CLI's command modules",
+      "brief": "AGENTS-006"
+    },
+    {
+      "path": "crates/lys/src/commands/seat_client.rs",
+      "note": "the loopback client, reachable without the operator token",
+      "brief": "AGENTS-006"
     }
   ],
   "principles": [

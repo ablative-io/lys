@@ -10,6 +10,8 @@
 
 **S418.** As Tom, I want to send a message to any seat from the Sessions screen or the lys CLI and see it arrive in that seat as a real turn, so that I can talk to my agents from Lys.
 
+**S419.** As the owner, I want an agent to use an app's store with its own grants, so that I can hand it work without lending it my sign-in.
+
 ## Archie — an agent
 
 **S403.** As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind.

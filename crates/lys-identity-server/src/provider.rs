@@ -56,6 +56,7 @@ use crate::session::now;
 mod token_store;
 use token_store::Tokens;
 
+mod agent_issue;
 mod bearer;
 mod client_auth;
 mod endpoints;
@@ -66,6 +67,7 @@ mod keys;
 mod machine_issue;
 mod refusal;
 mod rights_claim;
+pub(crate) use agent_issue::{AgentAppPass, agent_app_pass};
 pub(crate) use bearer::{pass_holder, presented_pass};
 pub use endpoints::routes;
 pub(crate) use grant_binding::signed_binding;

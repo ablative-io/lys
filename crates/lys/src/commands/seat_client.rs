@@ -10,6 +10,10 @@
 //! loopback address, and never printed: no message here carries it, only
 //! the file that holds it. There is no new sign-in.
 //!
+//! An agent's own ask (`lys agent pass`, AGENTS-006 R3) reaches the same
+//! server with no operator token at all: the install's token is never read,
+//! and the request carries only the credential the agent brings.
+//!
 //! A refusal from the server is shown by its own name and words; every
 //! refusal made here is named as well.
 
@@ -47,7 +51,7 @@ fn install_failure(kind: ErrorKind, path: &Path, detail: impl Into<String>) -> C
 pub struct Server {
     authority: Authority,
     prefix: String,
-    token: Zeroizing<String>,
+    token: Option<Zeroizing<String>>,
 }
 
 impl Server {
@@ -60,6 +64,25 @@ impl Server {
     /// configuration refusals; `server_base_invalid`, `server_not_loopback`,
     /// `operator_token_absent` and `operator_token_invalid` by name.
     pub fn reach(base: Option<&str>) -> CliResult<Self> {
+        Self::open(base, true)
+    }
+
+    /// The installed server, or the one `base` names over it, reached with
+    /// no operator token: the install's token is not read, and each request
+    /// carries only the credential its caller brings.
+    ///
+    /// # Errors
+    ///
+    /// `not_installed` when no install is found; the install's
+    /// configuration refusals; `server_base_invalid` and
+    /// `server_not_loopback` by name.
+    pub fn reach_without_operator(base: Option<&str>) -> CliResult<Self> {
+        Self::open(base, false)
+    }
+
+    /// The server `base` names or the install's own, with the install's
+    /// operator token when `operator` asks for it.
+    fn open(base: Option<&str>, operator: bool) -> CliResult<Self> {
         let layout = Layout::discover()?;
         let path = layout.service_config();
         let bytes = match fs::read(&path) {
@@ -92,7 +115,11 @@ impl Server {
             None => installed_base(&config, &path)?,
         };
         loopback(&authority)?;
-        let token = token(&config, &path)?;
+        let token = if operator {
+            Some(token(&config, &path)?)
+        } else {
+            None
+        };
         Ok(Self {
             authority,
             prefix,
@@ -107,7 +134,7 @@ impl Server {
     /// The server's refusal by its name and words, or a named failure to
     /// reach it or to read its answer.
     pub fn get(&self, path: &str) -> CliResult<Value> {
-        self.send("GET", path, None)
+        self.send("GET", path, None, None)
     }
 
     /// `POST path` with `body` under the base, answering the body of a
@@ -118,10 +145,33 @@ impl Server {
     /// The server's refusal by its name and words, or a named failure to
     /// reach it or to read its answer.
     pub fn post(&self, path: &str, body: &Value) -> CliResult<Value> {
-        self.send("POST", path, Some(body))
+        self.send("POST", path, Some(body), None)
     }
 
-    fn send(&self, method: &str, path: &str, body: Option<&Value>) -> CliResult<Value> {
+    /// `POST path` with `body` under the base, carrying the caller's own
+    /// `credential` header beside it, answering the body of a success. The
+    /// credential is never printed. An uncertain outcome is never retried.
+    ///
+    /// # Errors
+    ///
+    /// The server's refusal by its name and words, or a named failure to
+    /// reach it or to read its answer.
+    pub fn post_carrying(
+        &self,
+        path: &str,
+        body: &Value,
+        credential: (&str, &[u8]),
+    ) -> CliResult<Value> {
+        self.send("POST", path, Some(body), Some(credential))
+    }
+
+    fn send(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+        credential: Option<(&str, &[u8])>,
+    ) -> CliResult<Value> {
         let route = format!("{}{path}", self.prefix);
         let bytes = match body {
             Some(body) => serde_json::to_vec(body).map_err(|source| CliError::JsonSerialize {
@@ -130,10 +180,12 @@ impl Server {
             })?,
             None => Vec::new(),
         };
-        let headers = [
-            (OPERATOR_HEADER, self.token.as_bytes()),
-            ("Content-Type", b"application/json".as_slice()),
-        ];
+        let mut headers: Vec<(&str, &[u8])> = Vec::with_capacity(3);
+        if let Some(token) = &self.token {
+            headers.push((OPERATOR_HEADER, token.as_bytes()));
+        }
+        headers.extend(credential);
+        headers.push(("Content-Type", b"application/json".as_slice()));
         let request = Request {
             method,
             path: &route,

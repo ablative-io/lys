@@ -29,3 +29,6 @@ pub mod seat;
 pub mod seat_client;
 // `lys seat import` (AGENTS-003).
 pub mod seat_import;
+
+// `lys agent pass` (AGENTS-006).
+pub mod agent_pass;

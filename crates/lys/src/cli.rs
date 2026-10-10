@@ -238,6 +238,10 @@ pub enum Command {
     /// record naming who. With --session, a session that was not started
     /// managed is shown read-only as its pseudo-terminal's exact bytes.
     Attach(AttachArgs),
+
+    /// An agent's own acts against the installed identity server, made
+    /// with the agent's own credential and never the operator token.
+    Agent(AgentArgs),
 }
 
 /// `lys variables`: which map, and what to do with it.
@@ -713,6 +717,52 @@ pub enum SeatImportCommand {
     Status {
         /// The seat.
         name: String,
+    },
+}
+
+/// `lys agent`: what to do, and the server it is asked of.
+#[derive(Debug, clap::Args)]
+pub struct AgentArgs {
+    /// The identity server's base address, `http://<loopback>:<port>` with
+    /// `/api` after it when the server serves its screens, over the
+    /// installed service's own. The request is sent only to a numeric
+    /// loopback address, and carries no operator token.
+    #[arg(long, global = true, value_name = "BASE")]
+    pub server: Option<String>,
+
+    /// What to do.
+    #[command(subcommand)]
+    pub command: AgentCommand,
+}
+
+/// `lys agent` subcommands.
+#[derive(Debug, Subcommand)]
+pub enum AgentCommand {
+    /// Ask for the agent's pass to an approved app, carrying the agent's
+    /// own grants on that app's kinds, and write it to a file only its
+    /// owner may read, for a tool to present to the app.
+    ///
+    /// The agent proves itself with a grant credential its responsible
+    /// person issued for one of its grants (`POST /grants/{id}/tokens`),
+    /// read from a file only its owner may read. Neither the credential nor
+    /// the pass is ever printed. The pass lives the provider's pass
+    /// lifetime; ask again for a new one.
+    Pass {
+        /// The agent identity the pass is for.
+        #[arg(long, value_name = "ID")]
+        agent: String,
+
+        /// The app the pass is for: an app approved on the Apps screen.
+        #[arg(long, value_name = "APP")]
+        audience: String,
+
+        /// The file holding the grant credential, owner-only.
+        #[arg(long, value_name = "PATH")]
+        credential_file: PathBuf,
+
+        /// The file to write the pass to, created owner-only (mode 0600).
+        #[arg(long, value_name = "PATH")]
+        out: PathBuf,
     },
 }
 
