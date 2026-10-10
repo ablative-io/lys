@@ -3,12 +3,19 @@
 
 use std::io::Read;
 use std::sync::Arc;
+use std::time::Duration;
 
 use portable_pty::Child;
 
 use super::super::{Sessions, now_ms};
 use super::plan;
 use crate::protocol::{Ended, EndedHow};
+
+/// How long a program has, after the repeated hang-up, before its process
+/// group is killed: the rotation tests' own cadence, so a program that cannot
+/// receive the hang-up (its SIGHUP blocked) never holds the runner (Waffles,
+/// 10 Oct 2026, 12:09).
+const REPEAT_GRACE: Duration = Duration::from_secs(2);
 
 impl Sessions {
     /// Keep the output of generation `generation` of session `id` until its
@@ -25,6 +32,8 @@ impl Sessions {
         let mut told = false;
         // Whether the repeat has been said; it is said once, however often it is sent.
         let mut said_again = false;
+        // Whether the kill after the repeat's grace is armed; it is armed once.
+        let mut escalating = false;
         loop {
             let read = match reader.read(&mut buffer) {
                 Ok(0) => break,
@@ -42,13 +51,15 @@ impl Sessions {
                     // reading. Output from a generation already told to hang up
                     // means its program is still running, so it is told again,
                     // and the runner says so, once. Nothing is sent to a generation
-                    // that has gone quiet; nothing here waits on a clock. A program
+                    // that has gone quiet; this reader never waits on a clock. A program
                     // that took the first hang-up and prints while it shuts down
                     // is hung up again as it prints: one whose handler stands
                     // loses nothing; one whose handler was for a single signal is
                     // ended there. Its output to that point is kept; shutdown work
                     // that is not output, such as writing its own session file, is
-                    // lost with it.
+                    // lost with it. A program that cannot receive the repeat (its
+                    // SIGHUP blocked) is killed with its group after
+                    // REPEAT_GRACE, by a thread of its own (`escalate`).
                     if !tripped && !told {
                         continue;
                     }
@@ -80,7 +91,12 @@ impl Sessions {
                                 "session {id}: rotation_signal_repeated: output came after the hang-up"
                             ));
                         }
-                        if let Err(error) = crate::pty::end(&leader) {
+                        let sent = crate::pty::end(&leader);
+                        if again && sent.is_ok() && !escalating {
+                            escalating = true;
+                            escalate(id, leader.clone());
+                        }
+                        if let Err(error) = sent {
                             // On macOS a hang-up to a group whose leader has
                             // exited and is not yet reaped is refused, so a
                             // repeat that races the exit fails for a session
@@ -305,5 +321,34 @@ mod cleanup_tests {
             .is_some_and(|words| words.starts_with("group_cleanup_failed:")
                 && words.contains("process_group_unreadable"))
         );
+    }
+}
+
+/// After the repeated hang-up of session `id`, give its program
+/// [`REPEAT_GRACE`]; if the same leader is still running then, kill its
+/// process group and say so. A program can hold a hang-up blocked forever (a
+/// shell's `exec` from inside its SIGHUP trap passes the block on), and a
+/// runner that only repeats the hang-up would wait on it forever.
+fn escalate(id: &str, leader: crate::peer::Leader) {
+    let id = id.to_owned();
+    let spawned = std::thread::Builder::new()
+        .name(format!("lys-runner-escalate-{id}"))
+        .spawn(move || {
+            std::thread::sleep(REPEAT_GRACE);
+            match crate::pty::kill_if_still(&leader) {
+                Ok(true) => crate::error::said(&format!(
+                    "session {id}: rotation_signal_escalated: still running {} s after the repeated hang-up; its process group was killed",
+                    REPEAT_GRACE.as_secs()
+                )),
+                Ok(false) => {}
+                Err(error) => crate::error::said(&format!(
+                    "session {id}: rotation_escalation_failed: {error}"
+                )),
+            }
+        });
+    if let Err(error) = spawned {
+        crate::error::said(&format!(
+            "session {id}: rotation_escalation_failed: the escalation could not be started: {error}"
+        ));
     }
 }

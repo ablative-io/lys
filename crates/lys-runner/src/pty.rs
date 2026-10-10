@@ -308,3 +308,25 @@ pub fn end(leader: &crate::peer::Leader) -> Result<(), RunnerError> {
         Err(error) => Err(RunnerError::refused("end_failed", error.to_string())),
     }
 }
+
+/// End the recorded leader's process group with the signal no process can
+/// block, when the leader is still the process it was: what follows a hang-up
+/// a program could not receive (a shell that runs `exec` from inside its
+/// SIGHUP trap hands the new program a blocked SIGHUP). Answers whether a
+/// group was ended; a leader that has exited, or whose pid now names another
+/// process, is left alone.
+///
+/// # Errors
+/// Refuses a failure to read or signal the leader.
+pub fn kill_if_still(leader: &crate::peer::Leader) -> Result<bool, RunnerError> {
+    let pid = group(leader.pid)?;
+    match crate::peer::present_start(leader.pid)? {
+        Some(start) if start == leader.start => {}
+        None | Some(_) => return Ok(false),
+    }
+    match kill_process_group(pid, Signal::KILL) {
+        Ok(()) => Ok(true),
+        Err(rustix::io::Errno::SRCH) => Ok(false),
+        Err(error) => Err(RunnerError::refused("end_failed", error.to_string())),
+    }
+}
