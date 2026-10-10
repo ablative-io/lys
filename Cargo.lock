@@ -1397,7 +1397,7 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity-contract"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -1670,7 +1670,7 @@ checksum = "4050469837a6ff301cd14c1f8f24f88549e6d548f24f64e2148eb0f72cebc51f"
 
 [[package]]
 name = "lys"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -1697,7 +1697,7 @@ dependencies = [
 
 [[package]]
 name = "lys-anchor"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -1712,7 +1712,7 @@ dependencies = [
 
 [[package]]
 name = "lys-anchor-cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap",
  "lys-anchor",
@@ -1726,7 +1726,7 @@ dependencies = [
 
 [[package]]
 name = "lys-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -1755,7 +1755,7 @@ dependencies = [
 
 [[package]]
 name = "lys-home"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "brotli",
  "brotli-decompressor",
@@ -1784,7 +1784,7 @@ dependencies = [
 
 [[package]]
 name = "lys-identity"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "chrono",
  "ciborium",
@@ -1804,7 +1804,7 @@ dependencies = [
 
 [[package]]
 name = "lys-identity-server"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "allocation-counter",
  "axum",
@@ -1838,7 +1838,7 @@ dependencies = [
 
 [[package]]
 name = "lys-log-store"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "lys-core",
@@ -1851,7 +1851,7 @@ dependencies = [
 
 [[package]]
 name = "lys-openapi"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1860,7 +1860,7 @@ dependencies = [
 
 [[package]]
 name = "lys-pass"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "lys-runner"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -1910,7 +1910,7 @@ dependencies = [
 
 [[package]]
 name = "lys-secrets"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "axum",
  "clap",
