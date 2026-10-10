@@ -51,7 +51,7 @@ rustix.workspace = true
 tempfile.workspace = true
 
 [target.'cfg(unix)'.dev-dependencies]
-nix = { version = "0.28", features = ["fs", "user"] }
+nix = { version = "0.28", features = ["event", "fs", "time", "user"] }
 
 # The container-backed identity targets run only on the identity leg of
 # .land/gates.sh, never under `cargo test --workspace --all-features`.

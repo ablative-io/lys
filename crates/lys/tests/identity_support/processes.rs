@@ -14,8 +14,6 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::process::{Child, Command, ExitStatus, Output, Stdio};
-use std::sync::mpsc;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use super::fixtures::{TestResult, succeeded};
@@ -258,6 +256,112 @@ fn still_running() -> TestResult<Vec<Listed>> {
 /// refused by name.
 pub const STOP_BUDGET: Duration = Duration::from_secs(10);
 
+/// Waits, on the kernel's exit of each, for every process whose parent is
+/// this test process, until none is listed or `budget` from now is spent.
+/// The table is read again after each round, so a child that appears, or is
+/// still being made, while the first ones exit is waited for too; one already
+/// seen to exit is not waited for twice. Each exit is the kernel's own
+/// `NOTE_EXIT` on a kqueue, whether or not this process can reap the child
+/// (a child auto-reaped, or exiting, is not `waitpid`'s to answer); one that
+/// is this process's to reap is reaped as it exits. Nothing polls or sleeps.
+///
+/// # Errors
+///
+/// `process_stop_exceeded` naming every child that has not exited within
+/// `budget`; `process_wait_failed` when the kqueue itself fails.
+#[cfg(target_os = "macos")]
+fn reap_children(budget: Duration) -> TestResult {
+    use nix::errno::Errno;
+    use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, Kqueue};
+
+    let me = std::process::id();
+    let deadline = Instant::now() + budget;
+    let mut exited: Vec<u32> = Vec::new();
+    loop {
+        let children: Vec<Listed> = still_running()?
+            .into_iter()
+            .filter(|row| row.parent == me && !exited.contains(&row.pid))
+            .collect();
+        if children.is_empty() {
+            return Ok(());
+        }
+        let queue =
+            Kqueue::new().map_err(|error| format!("process_wait_failed: a kqueue: {error}"))?;
+        let mut watching: Vec<&Listed> = Vec::new();
+        for row in &children {
+            let watch = KEvent::new(
+                usize::try_from(row.pid)?,
+                EventFilter::EVFILT_PROC,
+                EventFlag::EV_ADD | EventFlag::EV_ONESHOT,
+                FilterFlag::NOTE_EXIT,
+                0,
+                0,
+            );
+            match queue.kevent(&[watch], &mut [], None) {
+                Ok(_) => watching.push(row),
+                // Gone, or a zombie, before it could be watched: it has exited.
+                Err(Errno::ESRCH) => {
+                    reap(row.pid)?;
+                    exited.push(row.pid);
+                }
+                Err(error) => {
+                    return Err(format!("process_wait_failed: {}: {error}", row.pid).into());
+                }
+            }
+        }
+        let mut heard = [KEvent::new(
+            0,
+            EventFilter::EVFILT_PROC,
+            EventFlag::empty(),
+            FilterFlag::empty(),
+            0,
+            0,
+        )];
+        while !watching.is_empty() {
+            let left = deadline.saturating_duration_since(Instant::now());
+            let count = if left.is_zero() {
+                0
+            } else {
+                let timeout = nix::sys::time::TimeSpec::from(left);
+                queue
+                    .kevent(&[], &mut heard, Some(*timeout.as_ref()))
+                    .map_err(|error| format!("process_wait_failed: a kqueue wait: {error}"))?
+            };
+            if count == 0 {
+                let named = watching
+                    .iter()
+                    .map(|row| format!("{} {}", row.pid, row.command))
+                    .collect::<Vec<String>>()
+                    .join("; ");
+                return Err(format!(
+                    "process_stop_exceeded: {} process(es) this test started had not exited {} ms after it ended: {named}",
+                    watching.len(),
+                    budget.as_millis()
+                )
+                .into());
+            }
+            let pid = u32::try_from(heard[0].ident())?;
+            reap(pid)?;
+            exited.push(pid);
+            watching.retain(|row| row.pid != pid);
+        }
+    }
+}
+
+/// Reaps `pid` when it is this process's exited child; a child this process
+/// cannot wait for (already reaped, or auto-reaped) has nothing to reap.
+#[cfg(target_os = "macos")]
+fn reap(pid: u32) -> TestResult {
+    let child = i32::try_from(pid)
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+        .ok_or_else(|| format!("process_wait_failed: {pid} is not a process id"))?;
+    match rustix::process::waitpid(Some(child), rustix::process::WaitOptions::NOHANG) {
+        Ok(_) | Err(rustix::io::Errno::CHILD) => Ok(()),
+        Err(error) => Err(format!("process_wait_failed: {pid}: {error}").into()),
+    }
+}
+
 /// Waits for each of this process's own children still listed, reaping it,
 /// within `budget` from now. Each wait is the kernel's own exit event, taken
 /// on a thread of its own, so nothing here polls or sleeps.
@@ -266,7 +370,11 @@ pub const STOP_BUDGET: Duration = Duration::from_secs(10);
 ///
 /// `process_stop_exceeded` naming every child that has not exited within
 /// `budget`; `process_wait_failed` when a wait itself fails.
+#[cfg(not(target_os = "macos"))]
 fn reap_children(budget: Duration) -> TestResult {
+    use std::sync::mpsc;
+    use std::thread;
+
     let me = std::process::id();
     let children: Vec<Listed> = still_running()?
         .into_iter()
@@ -341,14 +449,18 @@ pub fn leaves_no_process(test: impl FnOnce() -> TestResult) -> TestResult {
 /// finish exiting before the proof reads the process table.
 pub fn leaves_no_process_within(budget: Duration, test: impl FnOnce() -> TestResult) -> TestResult {
     let outcome = catch_unwind(AssertUnwindSafe(test));
-    let left = match reap_children(budget).and_then(|()| left_behind()) {
-        Ok(left) if left.is_empty() => None,
-        Ok(left) => Some(format!(
-            "process_left_running: the test ended with {} process(es) it started still running: {}",
-            left.len(),
-            left.join("; ")
-        )),
-        Err(error) => Some(format!("process_census_failed: {error}")),
+    let left = match reap_children(budget) {
+        // The stop's own refusal is the caller's to read, by its own name.
+        Err(stopped) => Some(stopped.to_string()),
+        Ok(()) => match left_behind() {
+            Ok(left) if left.is_empty() => None,
+            Ok(left) => Some(format!(
+                "process_left_running: the test ended with {} process(es) it started still running: {}",
+                left.len(),
+                left.join("; ")
+            )),
+            Err(error) => Some(format!("process_census_failed: {error}")),
+        },
     };
     match (outcome, left) {
         (Ok(result), None) => result,
