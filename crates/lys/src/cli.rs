@@ -211,6 +211,26 @@ pub enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+
+    /// Seats: an agent identity's standing place on a machine, held by the
+    /// installed identity server, which starts it managed through its
+    /// machine's runner.
+    ///
+    /// Asked of the installed server over loopback as its operator, with
+    /// the `lys-operator` header read from the install's operator-token
+    /// file, which is never printed. A development install keeps one; a
+    /// service install keeps none, and is refused `operator_token_absent`.
+    Seat(SeatArgs),
+
+    /// Show a seat's live session in this terminal, following it as it
+    /// runs: user turns, assistant text, tool calls and results, and status.
+    ///
+    /// Read-only unless --type is given. Ctrl-C detaches, and so does the
+    /// end of standard input under --type; detaching never ends the
+    /// session. The server keeps the attach and each typed line as a
+    /// record naming who. With --session, a session that was not started
+    /// managed is shown read-only as its pseudo-terminal's exact bytes.
+    Attach(AttachArgs),
 }
 
 /// `lys ca` subcommands.
@@ -474,6 +494,122 @@ pub enum KeyCommand {
         #[arg(long, value_name = "PRINCIPAL")]
         allowed_signers: Option<String>,
     },
+}
+
+/// `lys seat`: what to do, and the server it is asked of.
+#[derive(Debug, clap::Args)]
+pub struct SeatArgs {
+    /// The identity server's base address, `http://<loopback>:<port>` with
+    /// `/api` after it when the server serves its screens, over the
+    /// installed service's own. The operator token is still the install's,
+    /// and is sent only to a numeric loopback address.
+    #[arg(long, global = true, value_name = "BASE")]
+    pub server: Option<String>,
+
+    /// What to do.
+    #[command(subcommand)]
+    pub command: SeatCommand,
+}
+
+/// `lys seat` subcommands. Each prints human lines, or one JSON object
+/// with --json; a refusal is shown by the server's name and words.
+#[derive(Debug, Subcommand)]
+pub enum SeatCommand {
+    /// Add a seat: a name, the agent it runs as, a reviewed profile
+    /// version, and the machine whose runner holds it.
+    Add {
+        /// The seat's name: lowercase letters, digits and '-', 1 to 64,
+        /// unique in the install.
+        name: String,
+
+        /// The agent identity the seat runs as.
+        #[arg(long)]
+        agent: String,
+
+        /// The reviewed version of the agent's profile the seat starts
+        /// with.
+        #[arg(long)]
+        profile_version: u64,
+
+        /// The machine whose runner holds the seat.
+        #[arg(long)]
+        machine: String,
+
+        /// The folder the seat works in, on that machine.
+        #[arg(long)]
+        working_folder: Option<String>,
+    },
+
+    /// List every seat with its state and last signal, and whether the
+    /// runner could be read; a runner that could not is named with its
+    /// reason.
+    List,
+
+    /// Start a seat's session through the server's own start path, managed.
+    Start {
+        /// The seat.
+        name: String,
+    },
+
+    /// Stop a seat's session: the harness is asked to end when idle, and
+    /// a turn in progress is refused `seat_turn_in_progress` unless
+    /// --force.
+    Stop {
+        /// The seat.
+        name: String,
+
+        /// End the session even while a turn is in progress.
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Stop a seat's session, then start it again.
+    Restart {
+        /// The seat.
+        name: String,
+
+        /// End the session even while a turn is in progress.
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Send a message to a running seat as a user turn, never as typed
+    /// keys. Text that is empty or carries control characters is refused
+    /// by name.
+    Send {
+        /// The seat.
+        name: String,
+
+        /// The message; its words are joined with single spaces.
+        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        text: Vec<String>,
+    },
+}
+
+/// `lys attach`: the seat or session to show, and how.
+#[derive(Debug, clap::Args)]
+pub struct AttachArgs {
+    /// The seat whose session to show.
+    #[arg(required_unless_present = "session", conflicts_with = "session")]
+    pub seat: Option<String>,
+
+    /// Send each line typed on standard input to the seat as a user turn,
+    /// through the same path as `lys seat send`, never as keys. An empty
+    /// line sends nothing.
+    #[arg(long = "type", conflicts_with = "session")]
+    pub typing: bool,
+
+    /// Show this session, one not started managed, read-only as the exact
+    /// bytes of its pseudo-terminal.
+    #[arg(long, value_name = "ID")]
+    pub session: Option<String>,
+
+    /// The identity server's base address, `http://<loopback>:<port>` with
+    /// `/api` after it when the server serves its screens, over the
+    /// installed service's own. The operator token is still the install's,
+    /// and is sent only to a numeric loopback address.
+    #[arg(long, value_name = "BASE")]
+    pub server: Option<String>,
 }
 
 #[cfg(test)]

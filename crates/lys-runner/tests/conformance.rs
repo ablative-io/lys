@@ -437,6 +437,12 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             kill: false,
             settling: false,
         },
+        Act::Liveness { session: None },
+        Act::AttachRead {
+            session: id.clone(),
+            cursor: None,
+            follow: false,
+        },
     ];
     let mut named = 0;
     for act in &every_act {
@@ -514,6 +520,14 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             refusal: "r".to_owned(),
             words: String::new(),
             oldest: None,
+        },
+        Answer::Liveness {
+            sessions: Vec::new(),
+        },
+        Answer::AttachLines {
+            lines: Vec::new(),
+            cursor: 0,
+            ended: false,
         },
     ];
     let mut kinds = 0;

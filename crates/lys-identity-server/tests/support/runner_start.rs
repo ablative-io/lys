@@ -83,6 +83,22 @@ impl Table {
         commands_only: bool,
         other_subject: Option<&str>,
     ) -> Result<Self, Box<dyn Error>> {
+        Self::unprofiled_judging(GRANT_MODEL, commands_only, other_subject).await
+    }
+
+    /// Start with a reviewed profile, judging grants by `model`.
+    pub async fn set_judging(model: &'static str) -> Result<Self, Box<dyn Error>> {
+        let table = Self::unprofiled_judging(model, false, None).await?;
+        table.profile().await?;
+        Ok(table)
+    }
+
+    /// As [`Table::unprofiled_with`], judging grants by `model`.
+    pub async fn unprofiled_judging(
+        model: &'static str,
+        commands_only: bool,
+        other_subject: Option<&str>,
+    ) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
@@ -98,7 +114,7 @@ impl Table {
         let state = dir.path().join("runner-state");
         let adjusted = socket.clone();
         let (service, (seeded, serving, server_key)) = Service::start_adjusted(
-            GRANT_MODEL,
+            model,
             None,
             Some(settings),
             None,
@@ -154,6 +170,11 @@ impl Table {
     /// The seeded agent that the administrator answers for.
     pub fn agent(&self) -> String {
         self.seeded.people[0].agents[0].id.to_string()
+    }
+
+    /// The seeded person at `index`: the administrator first, then bea.
+    pub fn person(&self, index: usize) -> String {
+        self.seeded.people[index].id.to_string()
     }
 
     /// Send a setup request and propagate any refusal.

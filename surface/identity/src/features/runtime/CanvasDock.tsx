@@ -13,6 +13,7 @@ import { entries } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { clock } from '../file/time';
 import { RunningList } from './Sessions';
+import { Seats } from '../sessions/Seats';
 import type { SessionGraph } from './session-graph';
 import { said } from './canvas-kept';
 import { KINDS } from './canvas-widgets';
@@ -72,6 +73,7 @@ function Agents({ graph, show, open }: { graph: SessionGraph; show: (node: strin
       {refused ? <p className="why-not" role="alert">The agents that are not running could not be read. <small className="refusal-name">{refused}</small></p> : null}
       {agents && !idle.length && wanted && ![...graph.nodes].some((node) => node.session && node.title.toLowerCase().includes(wanted)) ? <p className="dim">No agent by that name.</p> : null}
     </div>
+    <Seats />
   </div>;
 }
 

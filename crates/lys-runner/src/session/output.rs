@@ -21,6 +21,7 @@ pub(crate) struct OutputState {
     words: Vec<String>,
     longest_word: usize,
     tripped: bool,
+    last_at: Option<u64>,
 }
 
 impl OutputState {
@@ -30,6 +31,12 @@ impl OutputState {
 
     pub(crate) fn ended(&self) -> Option<Ended> {
         self.ended.clone()
+    }
+
+    /// When the session last gave output, in milliseconds since the Unix
+    /// epoch; none before its first byte.
+    pub(crate) fn last_at(&self) -> Option<u64> {
+        self.last_at
     }
 }
 
@@ -48,6 +55,7 @@ impl OutputHandle {
                 words: Vec::new(),
                 longest_word: 0,
                 tripped: false,
+                last_at: None,
             }),
             changed: Condvar::new(),
         }
@@ -87,6 +95,7 @@ impl OutputHandle {
             return Ok(false);
         }
         state.scrollback.push(bytes);
+        state.last_at = Some(super::now_ms());
         let trip = if state.tripped || state.words.is_empty() {
             false
         } else {

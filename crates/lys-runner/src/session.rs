@@ -130,7 +130,7 @@ pub use guard::Guard;
 /// One session.
 pub(crate) struct Session {
     pub(crate) started_at: u64,
-    pid: Option<u32>,
+    pub(crate) pid: Option<u32>,
     pub(crate) leader_start: Option<Leader>,
     columns: u16,
     rows: u16,
@@ -146,6 +146,10 @@ pub(crate) struct Session {
     pub(crate) follower: Option<mpsc::Sender<Wake>>,
     pub(crate) pending_status: Option<crate::collector::status::PendingStatus>,
     pub(crate) stopped: Option<Stopped>,
+    /// Its managed frames rendered as lines, bounded like its output.
+    pub(crate) attach: crate::attach::Ring,
+    /// When its harness last signalled through a frame, hook or status line.
+    pub(crate) last_signal: Option<u64>,
 }
 
 impl Session {
@@ -326,6 +330,8 @@ impl Sessions {
                     follower: None,
                     pending_status: None,
                     stopped: None,
+                    attach: crate::attach::Ring::new(scrollback),
+                    last_signal: None,
                 },
             );
         }
@@ -542,6 +548,8 @@ impl Sessions {
             follower: None,
             pending_status: None,
             stopped: None,
+            attach: crate::attach::Ring::new(self.scrollback),
+            last_signal: None,
         };
         let prepared = self.run(&lifecycle::plan(&session, false)?)?;
         let pending = Self::install(&mut session, prepared)?;

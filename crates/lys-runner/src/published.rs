@@ -12,7 +12,7 @@ use crate::dial::{
 use crate::protocol::{PROTOCOL_VERSION, REQUEST_DOMAIN};
 
 /// Every act the protocol defines, by its tag.
-pub const ACTS: [&str; 16] = [
+pub const ACTS: [&str; 18] = [
     "read_bytes",
     "input_bytes",
     "start",
@@ -29,10 +29,12 @@ pub const ACTS: [&str; 16] = [
     "folders",
     "grant_channel",
     "stop_everything",
+    "liveness",
+    "attach_read",
 ];
 
 /// Every answer the protocol defines, by its kind.
-pub const ANSWERS: [&str; 13] = [
+pub const ANSWERS: [&str; 15] = [
     "bytes",
     "feed",
     "folders",
@@ -46,6 +48,8 @@ pub const ANSWERS: [&str; 13] = [
     "operation",
     "stopped_everything",
     "refused",
+    "liveness",
+    "attach_lines",
 ];
 
 /// Every refusal a runner names for a request before it acts.
@@ -104,13 +108,15 @@ pub fn section() -> Value {
                 "folders": {"under": "optional string: an absolute folder on this computer, the runner's own home folder when absent; answered as folders {under, folders}, the name of each folder directly inside it"},
                 "grant_channel": {"description": "the connection becomes the grant channel: each question is written as one line, and its answer is read as one line"},
                 "stop_everything": {"by": "string: who pulled the cord", "reason": "string: why", "kill": "bool: end each proved process group at once; an ask while sessions an earlier one stopped still run does so too", "settling": "bool: the server's own ask again under a pull in force, for a start that crossed it; a session an earlier ask already stopped is left as it is, with no signal and no wait on its exit, and is answered ended or running as it stands", "answered": "stopped_everything {sessions, running}: every session this act ended, each recorded ended stopped with {by, reason, at}, and those not ended when it answered: only when the caller left before every exit was seen, or a settling ask left a session as an earlier ask had it"},
+                "liveness": {"session": "optional string", "answered": "liveness {sessions: [{session, pid: optional u32, alive: bool, managed: bool, harness_session: optional string, turn_active: bool, last_signal_at: optional u64 ms, started_at: u64 ms, ended: bool}]}, from the runner's own knowledge: alive is a held process not seen to exit that still answers a null signal; last_signal_at is its last output, managed frame, hook or status line"},
+                "attach_read": {"session": "string", "cursor": "optional u64, the oldest line kept when absent", "follow": "bool: answer once a line follows the cursor or the session ends", "answered": "attach_lines {lines: [{at: u64 ms, kind: user|assistant|tool_call|tool_result|status|system, text}], cursor: u64, ended: bool}: a managed session's frames rendered as lines, kept bounded by the scrollback size; a session in a pseudo-terminal is refused attach_pty_use_read_bytes"},
             },
             "act_tag": "act",
             "reply": {"version": PROTOCOL_VERSION, "answer": "tagged by kind"},
             "answers": ANSWERS,
             "bytes": {"output": {"session": "string", "from": "u64", "cursor": "u64", "oldest": "u64", "data": "array of u8, exact PTY bytes", "ended": "observed end or null"}},
             "request_refusals": REQUEST_REFUSALS,
-            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "launch_without_directory", "trust_file_invalid", "trust_file_unreadable", "trust_file_unwritable", "trust_home_unknown", "trust_watch_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "stop_words_missing", "caller_left", "operation_reused", "operation_unknown", "policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous", "policy_target_uninspectable", "policy_digest_mismatch", "cursor_invalid", "grant_channel_unheld", "home_unknown", "folder_invalid", "folder_unreadable"],
+            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "launch_without_directory", "trust_file_invalid", "trust_file_unreadable", "trust_file_unwritable", "trust_home_unknown", "trust_watch_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "stop_words_missing", "caller_left", "operation_reused", "operation_unknown", "policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous", "policy_target_uninspectable", "policy_digest_mismatch", "cursor_invalid", "grant_channel_unheld", "home_unknown", "folder_invalid", "folder_unreadable", "attach_pty_use_read_bytes", "liveness_unreadable"],
             "judged_under": "a status's session names the policy its launch carried as policy {version, digest}; absent when none was carried",
             "ended": {"how": ["exited", "ended_by_runner_restart", "accounts_exhausted", "stopped"], "at": "milliseconds since the Unix epoch", "status": "the exit status seen, or null: never invented", "signal": "string or null", "reason": "optional string: why a restart ended it", "stopped": "optional {by, reason, at}: who stopped it and why"},
             "dial": {

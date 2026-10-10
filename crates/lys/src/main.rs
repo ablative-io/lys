@@ -244,6 +244,8 @@ fn main() -> ExitCode {
             &out,
             json,
         ),
+        Command::Seat(seat_args) => commands::seat::run(seat_args, json),
+        Command::Attach(attach_args) => commands::attach::run(&attach_args, json),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

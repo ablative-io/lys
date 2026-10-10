@@ -407,10 +407,14 @@ impl Table {
             runners: crate::runner_client::Runners::new(Arc::clone(&key), None),
             acts: Mutex::new(crate::runner_acts::ActStore::open(
                 &path.join("runner-acts"),
-                key,
+                Arc::clone(&key),
             )?),
             say,
             membership: crate::channel_membership_counts::Membership::new(None),
+            seats: Mutex::new(crate::seats_store::SeatStore::open(
+                &path.join("seats"),
+                key,
+            )?),
         };
         Ok(ReadyTable {
             state,

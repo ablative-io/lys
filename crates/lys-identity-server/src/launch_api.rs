@@ -182,6 +182,38 @@ pub(crate) async fn start_profile(
     operation: &str,
     chosen: Chosen,
 ) -> Result<Json<Value>, ServerError> {
+    Box::pin(start_as(
+        state,
+        headers,
+        Who::Caller(actor),
+        agent,
+        (machine, operation),
+        chosen,
+    ))
+    .await
+}
+
+/// Who a start is for: a caller the start command admits only as the
+/// administrator or the person responsible for the agent, or one a seat's
+/// own act already admitted under its rights (AGENTS-002 R3), named as the
+/// start's records name it.
+pub(crate) enum Who<'a> {
+    /// A caller still to be admitted to the start command.
+    Caller(&'a Actor),
+    /// A caller already admitted, by its identity.
+    Admitted(String),
+}
+
+/// The one start path every start takes: the same checks, kept report and
+/// runner call, for `who`.
+pub(crate) async fn start_as(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    who: Who<'_>,
+    agent: AgentId,
+    (machine, operation): (&str, &str),
+    chosen: Chosen,
+) -> Result<Json<Value>, ServerError> {
     let Chosen { profile, directory } = chosen;
     // The body's shape is refused before any record is consulted, as a start
     // naming no machine already is: a folder that is not an absolute, plain
@@ -191,7 +223,10 @@ pub(crate) async fn start_profile(
         .transpose()?;
     let session = OperationId::from_str(operation)?.to_string();
     let agent = agent.to_string();
-    let admitted_by = start_caller(state, headers, actor, &agent)?;
+    let admitted_by = match who {
+        Who::Caller(actor) => start_caller(state, headers, actor, &agent)?,
+        Who::Admitted(by) => by,
+    };
     let admission = with_directory(state, |directory| {
         let directory = directory.projection()?;
         let parsed = AgentId::from_str(&agent)?;

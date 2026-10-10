@@ -5,6 +5,7 @@ import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { useLive, useLoad } from '../../api';
 import { RunningList } from './Sessions';
+import { Seats } from '../sessions/Seats';
 import type { Load } from '../../api';
 import { Gate } from '../signin/Gate';
 import { Terminal } from './Terminal';
@@ -549,7 +550,7 @@ export function SessionCanvas() {
     <nav className="operations-swap" aria-label="Operations views"><a href="#/canvas" aria-current={proxy ? undefined : 'page'}>Canvas</a><a href={proxyHref({})} aria-current={proxy ? 'page' : undefined}>Proxy</a></nav>
     {proxy ? <ProxyView board={board} /> : <div className="canvas-side">
         {/* With agents running, who is running is behind the bar's Agents button. With none, or while the canvas cannot be read, it is said here; a person who is not signed in is asked to sign in once, by the canvas. */}
-        {(load.status === 'ok' && load.data.nodes.some((node) => node.session)) || (load.status === 'refused' && load.refused.status === 401) ? null : <RunningList />}
+        {(load.status === 'ok' && load.data.nodes.some((node) => node.session)) || (load.status === 'refused' && load.refused.status === 401) ? null : <><RunningList /><Seats /></>}
         <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? (keeping.status === 'ok' ? <Whole graph={graph} messages={messages} keeping={keeping.data} board={board} /> : <p role="status">Reading your canvas…</p>) : <>
           {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
           {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}

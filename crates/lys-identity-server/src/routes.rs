@@ -150,6 +150,8 @@ pub struct AppState {
     /// The channel membership capability's page settings, kept cursors and
     /// work counts (ACCESS-006).
     pub membership: crate::channel_membership_counts::Membership,
+    /// The seats (AGENTS-002), kept beside the directory log: always open.
+    pub seats: Mutex<crate::seats_store::SeatStore>,
 }
 
 /// Where the service says how a thing it keeps was started.

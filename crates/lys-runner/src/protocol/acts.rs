@@ -220,6 +220,28 @@ pub enum Act {
         #[serde(default)]
         settling: bool,
     },
+    /// Say, from the runner's own knowledge, whether each session's process
+    /// is alive, its harness session, whether a turn is in progress and
+    /// when it last signalled.
+    Liveness {
+        /// One session only, when named.
+        #[serde(default)]
+        session: Option<String>,
+    },
+    /// Read a managed session's frames rendered as lines, from `cursor`, the
+    /// oldest kept when absent. With `follow`, the answer waits until a line
+    /// follows the cursor or the session ends. A session in a
+    /// pseudo-terminal is refused `attach_pty_use_read_bytes`.
+    AttachRead {
+        /// The session.
+        session: String,
+        /// Where to read on from.
+        #[serde(default)]
+        cursor: Option<u64>,
+        /// Whether to wait for a line after the cursor.
+        #[serde(default)]
+        follow: bool,
+    },
 }
 
 /// An answer to one act.
@@ -334,6 +356,20 @@ pub enum Answer {
         /// For `cursor_expired`, the oldest cursor held.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         oldest: Option<u64>,
+    },
+    /// Each session's liveness, from the runner's own knowledge.
+    Liveness {
+        /// Every session held, or the one named.
+        sessions: Vec<crate::liveness::LivenessView>,
+    },
+    /// A managed session's rendered lines.
+    AttachLines {
+        /// The lines from the cursor asked for.
+        lines: Vec<crate::attach::AttachLine>,
+        /// The cursor to read on from.
+        cursor: u64,
+        /// Whether the session has ended.
+        ended: bool,
     },
 }
 

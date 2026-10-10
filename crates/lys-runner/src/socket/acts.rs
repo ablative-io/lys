@@ -226,6 +226,14 @@ pub(super) fn perform(
                 sessions: stopped.sessions,
                 running: stopped.running,
             }),
+        Act::Liveness { session } => Ok(Answer::Liveness {
+            sessions: sessions.liveness(session.as_deref())?,
+        }),
+        Act::AttachRead {
+            session,
+            cursor,
+            follow,
+        } => sessions.attach_read(&session, cursor, follow, left),
     }
 }
 

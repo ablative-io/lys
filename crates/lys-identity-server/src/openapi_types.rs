@@ -113,6 +113,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     ));
     entries.extend(crate::openapi_runner_types::runner(api));
     entries.extend(crate::openapi_goals_types::goals(api));
+    entries.extend(crate::seats_api::types(api));
     entries
         .into_iter()
         .map(|(method, path, request, response)| ((method, path), (request, response)))

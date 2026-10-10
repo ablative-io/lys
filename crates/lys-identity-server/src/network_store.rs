@@ -430,7 +430,9 @@ impl NetworkStore {
     }
 
     /// Name `runner` as the machine `id`'s runner, or none. A retired
-    /// machine takes no runner.
+    /// machine takes no runner, and this install's own runner is named by
+    /// one live machine only (AGENTS-002 D3): naming it for a second is
+    /// refused `runner_lys_taken`, naming the machine that holds it.
     pub fn name_runner(
         &mut self,
         id: &str,
@@ -440,6 +442,16 @@ impl NetworkStore {
         let machine = self.machine(id).ok_or(ServerError::MachineUnknown)?;
         if machine.retired.is_some() {
             return Err(ServerError::MachineRetired);
+        }
+        if runner == Some(RunnerRecord::Lys)
+            && let Some(holder) = self.kept.runners.iter().find_map(|(holder, record)| {
+                (holder != id
+                    && *record == RunnerRecord::Lys
+                    && self.machine(holder).is_some_and(|held| held.retired.is_none()))
+                .then(|| holder.clone())
+            })
+        {
+            return Err(crate::error_seat::SeatError::RunnerLysTaken { machine: holder }.into());
         }
         self.write(Change::Runner {
             machine: id.to_owned(),

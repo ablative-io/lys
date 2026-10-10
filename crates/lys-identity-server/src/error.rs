@@ -731,4 +731,7 @@ pub enum ServerError {
         /// Why, in words.
         words: String,
     },
+    /// A seat's refusal (AGENTS-002), preserving its name and status.
+    #[error(transparent)]
+    Seat(#[from] crate::error_seat::SeatError),
 }

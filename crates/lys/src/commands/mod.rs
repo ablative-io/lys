@@ -21,3 +21,8 @@ pub mod runner;
 pub mod runner_join;
 pub mod seal;
 pub mod verify;
+
+// `lys seat` and `lys attach` (AGENTS-002), and the client they share.
+pub mod attach;
+pub mod seat;
+pub mod seat_client;

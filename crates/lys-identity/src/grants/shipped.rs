@@ -8,7 +8,7 @@
 //! only adds.
 
 /// The shipped model's version. Raise it whenever [`ACTIONS`] gains one.
-pub const SHIPPED_VERSION: u64 = 3;
+pub const SHIPPED_VERSION: u64 = 4;
 
 /// The acts the first model named, kept so every grant made under it
 /// still resolves.
@@ -78,6 +78,10 @@ pub const ACTIONS: &[&str] = &[
     "runtime-session.keys",
     "runtime-session.resize",
     "runtime.stop-everything",
+    "seat.restart",
+    "seat.send",
+    "seat.start",
+    "seat.stop",
     "secret.add",
     "secret.drop",
     "secret.recipients",
@@ -179,6 +183,10 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "runtime-session.input-bytes",
     "runtime-session.keys",
     "runtime-session.resize",
+    "seat.restart",
+    "seat.send",
+    "seat.start",
+    "seat.stop",
     "session.end",
     "skill.keep",
     "team.create",
@@ -310,6 +318,10 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
         "runtime.stop-everything",
         "Stop every running agent on every computer, and let agents start again",
     ),
+    ("seat.restart", "Restart this seat with a new session"),
+    ("seat.send", "Send a message to this seat"),
+    ("seat.start", "Start this seat"),
+    ("seat.stop", "Stop this seat"),
     ("secret.add", "Add a secret"),
     ("secret.drop", "Remove this secret"),
     ("secret.recipients", "Choose who receives this secret"),

@@ -325,3 +325,53 @@ export const controls = {
     return answer;
   },
 };
+
+/** crates/lys-identity-server/src/seats_api.rs (AGENTS-002): a seat's state as its runner knows it; unknown when the runner could not be read. */
+export type SeatState = 'online-working' | 'online-idle' | 'offline' | 'not-seen' | 'unknown';
+const SEAT_STATES: readonly SeatState[] = ['online-working', 'online-idle', 'offline', 'not-seen', 'unknown'];
+/** One seat: its record and its liveness. `last_signal_at` is milliseconds since the epoch, as the runner keeps it. */
+export interface SeatView {
+  name: string; agent: string; harness: string; profile_version: number; machine: string; working_folder: string; account?: string | null;
+  responsible: string; session?: string | null; harness_session?: string | null; state: SeatState; last_signal_at?: number | null;
+  created_by: string; created_at: number; revision: number;
+}
+/** GET /seats: every seat, and whether the runner was read; when it was not, `reason` says why and every state is unknown. */
+export interface SeatList { seats: SeatView[]; runner: 'read' | 'unknown'; reason?: string }
+/** A session a runner holds for no seat: seen but unregistered. `started_at` is milliseconds since the epoch. */
+export interface UnregisteredSession { session: string; machine: string; agent?: string | null; pid: number; started_at: number }
+
+function seatsUnreadable(reason: string): never { throw new Refused(0, { refusal: 'SeatsUnreadable', reason }); }
+const seatPath = (name: string, act: string) => '/seats/' + encodeURIComponent(name) + '/' + act;
+function seatAnswer<T extends { seat: SeatView; session: string }>(answer: T, name: string): T {
+  if (typeof answer !== 'object' || answer === null || answer.seat?.name !== name || typeof answer.session !== 'string' || !answer.session) seatsUnreadable('The answer did not name this seat and its session; its outcome is not assumed.');
+  return answer;
+}
+
+/** The seat calls: the list, the sessions held for no seat, and the four acts, each carrying its operation id. */
+export const seats = {
+  list: async (): Promise<SeatList> => {
+    const answer = await request<SeatList>('/seats');
+    if (!Array.isArray(answer.seats) || (answer.runner !== 'read' && answer.runner !== 'unknown')) seatsUnreadable('The service did not answer a seat list with whether its runner was read.');
+    if (answer.seats.some((seat) => typeof seat.name !== 'string' || !seat.name || !SEAT_STATES.includes(seat.state))) seatsUnreadable('A seat has no name or an unknown state; its state is not assumed.');
+    return answer;
+  },
+  unregistered: async (): Promise<UnregisteredSession[]> => {
+    const answer = await request<{ sessions: UnregisteredSession[] }>('/seats/unregistered');
+    if (!Array.isArray(answer.sessions)) seatsUnreadable('The service did not answer the sessions held for no seat.');
+    return answer.sessions;
+  },
+  start: async (name: string, operation: string) =>
+    seatAnswer(await request<{ seat: SeatView; session: string; harness_session?: string | null }>(seatPath(name, 'start'), { operation }), name),
+  stop: async (name: string, operation: string, force: boolean) => {
+    const answer = seatAnswer(await request<{ seat: SeatView; session: string; ended: boolean }>(seatPath(name, 'stop'), { operation, force }), name);
+    if (typeof answer.ended !== 'boolean') seatsUnreadable('The stop answer did not say whether the session ended.');
+    return answer;
+  },
+  restart: async (name: string, operation: string, force: boolean) =>
+    seatAnswer(await request<{ seat: SeatView; session: string }>(seatPath(name, 'restart'), { operation, force }), name),
+  send: async (name: string, operation: string, text: string) => {
+    const answer = seatAnswer(await request<{ seat: SeatView; session: string; delivered: true }>(seatPath(name, 'send'), { operation, text }), name);
+    if (answer.delivered !== true) seatsUnreadable('The send answer did not confirm delivery; the message is not assumed delivered.');
+    return answer;
+  },
+};

@@ -160,7 +160,8 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::RunnerAbsent { .. }
         | ServerError::IssuerChallengeExpired
         | ServerError::IssuerRefused { .. }
-        | ServerError::Runner { .. } => "server_error",
+        | ServerError::Runner { .. }
+        | ServerError::Seat(..) => "server_error",
     }
 }
 

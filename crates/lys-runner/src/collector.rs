@@ -68,6 +68,7 @@ impl Sessions {
         id: &str,
         collected: &Collected,
     ) -> Result<String, RunnerError> {
+        self.signalled(id)?;
         let result = match collected {
             Collected::Hook { event, input } => self.hook(id, event, input),
             Collected::StatusLine { input } => return self.status_line(id, input),

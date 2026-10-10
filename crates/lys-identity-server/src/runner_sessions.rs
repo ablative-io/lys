@@ -294,6 +294,8 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::GrantChannel => "grant_channel",
         Answer::StoppedEverything { .. } => "stopped_everything",
         Answer::Refused { .. } => "refused",
+        Answer::Liveness { .. } => "liveness",
+        Answer::AttachLines { .. } => "attach_lines",
     }
 }
 

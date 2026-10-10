@@ -286,3 +286,14 @@ mod agent_pass_tests;
 pub mod warn_lines;
 /// Eligible authorities named by an agent grant refusal.
 pub mod who_can_grant;
+
+/// The seats (AGENTS-002): their record, acts, routes and refusals.
+pub mod error_seat;
+pub mod seats_acts;
+pub mod seats_api;
+mod seats_argus;
+mod seats_run;
+mod seats_send;
+pub mod seats_state;
+pub mod seats_store;
+pub mod seats_views;

@@ -27,6 +27,7 @@ impl Sessions {
         };
         loop {
             let observed = super::process::frame(&mut reader).and_then(|value| {
+                self.attach_frame(id, generation, transport, &value)?;
                 let passive = match transport {
                     Transport::Claude => super::claude::passive_frame(&value),
                     Transport::Codex => super::codex::passive_frame(&value),

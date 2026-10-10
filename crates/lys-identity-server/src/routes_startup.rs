@@ -85,6 +85,15 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         acts.start(),
         acts.len()
     ));
+    let seats = crate::seats_store::SeatStore::open(
+        &config.log_dir.with_file_name("seats"),
+        Arc::clone(&key),
+    )?;
+    say(&format!(
+        "seats log {}, holding {} seats",
+        seats.start(),
+        seats.len()
+    ));
     let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model = apps.model()?;
     let spicedb = config
@@ -202,6 +211,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         acts: Mutex::new(acts),
         say,
         membership: crate::channel_membership_counts::Membership::new(config.membership),
+        seats: Mutex::new(seats),
     });
     crate::teams_migration::at_start(&state)?;
     crate::budgets_migration::advance(&state)?;

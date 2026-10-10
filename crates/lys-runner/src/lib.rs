@@ -89,6 +89,9 @@ pub mod trust;
 #[cfg(test)]
 mod trust_tests;
 
+pub mod attach;
+pub mod liveness;
+
 pub use client::{Client, Closer, Connection, GrantChannel, connect};
 pub use error::RunnerError;
 pub use protocol::{Act, Answer, Ended, EndedHow, Key, Launch, PROTOCOL_VERSION, Stopped};
