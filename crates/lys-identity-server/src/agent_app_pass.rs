@@ -6,7 +6,7 @@
 //!   whose audience is the approved app `audience`. The answer is
 //!   `{"pass", "expires_at", "audience"}` (`provider::agent_issue`).
 //!
-//! The agent proves the request is its own in one of two ways, and with no
+//! The agent proves the request is its own in one of three ways, and with no
 //! other credential beside it:
 //!
 //! - a run Lys started presents its run pass (`lys-agent-pass`), judged as
@@ -14,6 +14,8 @@
 //!   that signed it); a pass that does not admit is refused
 //!   `AgentPassRefused` before this route is reached, and a pass of another
 //!   agent `agent_pass_unproven`;
+//! - a certified agent signs the exact request (`lys-agent-signature`), verified
+//!   against its active, non-withdrawn certificate keys;
 //! - any other agent presents a grant credential (`lys-grant-token`) that
 //!   the person responsible for one of its grants issued through
 //!   `POST /grants/{id}/tokens`. The credential must be known, unrevoked and
@@ -26,7 +28,7 @@
 //! next one.
 //!
 //! Each pass issued is one line in the service's log naming the agent, the
-//! audience and the proof used: the run pass, or the grant credential by
+//! audience and the proof used: the signed request, the run pass, or the grant credential by
 //! the grant it was issued for. Never the credential, the run pass or the
 //! pass itself.
 //!
@@ -37,7 +39,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use axum::extract::{Path, State};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::{HeaderMap, header};
 use axum::routing::post;
 use axum::{Json, Router};
@@ -68,6 +70,8 @@ pub(crate) struct AppPassAsked {
 enum Proof {
     /// The run pass of a run Lys started.
     RunPass,
+    /// The request signed by the agent's certified key.
+    Signature,
     /// A grant credential, issued for this grant.
     GrantCredential(GrantId),
 }
@@ -89,11 +93,12 @@ pub(crate) fn asks_for_pass(path: &str) -> bool {
 async fn pass(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
+    OriginalUri(uri): OriginalUri,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<AgentAppPass>, ServerError> {
     let agent = AgentId::from_str(&id)?;
-    let proof = proved(&state, &headers, agent)?;
+    let proof = proved(&state, &headers, agent, ("POST", uri.path(), &body))?;
     let asked: AppPassAsked =
         serde_json::from_slice(&body).map_err(|error| ServerError::RequestMalformed {
             reason: format!("the pass request does not read: {error}"),
@@ -104,7 +109,7 @@ async fn pass(
 }
 
 /// What a request with no proof is told to bring.
-const PROOFS: &str = "bring the run pass (lys-agent-pass) or a grant credential (lys-grant-token)";
+const PROOFS: &str = "bring a signed request (lys-agent-signature), the run pass (lys-agent-pass) or a grant credential (lys-grant-token)";
 
 fn unproven(reason: impl Into<String>) -> ServerError {
     AppPassError::Unproven {
@@ -126,17 +131,40 @@ fn credential_refused(error: &TokenError) -> ServerError {
 }
 
 /// The proof `headers` carry that the request is `agent`'s, judged now.
-fn proved(state: &AppState, headers: &HeaderMap, agent: AgentId) -> Result<Proof, ServerError> {
+fn proved(
+    state: &AppState,
+    headers: &HeaderMap,
+    agent: AgentId,
+    request: (&str, &str, &[u8]),
+) -> Result<Proof, ServerError> {
     for other in [
         header::AUTHORIZATION.as_str(),
         header::COOKIE.as_str(),
-        crate::agent_signature::HEADER,
         crate::operator::HEADER,
     ] {
         if headers.contains_key(other) {
             let reason = format!("a second credential, {other}, came with the proof");
             return Err(unproven(reason));
         }
+    }
+    if headers.contains_key(crate::agent_signature::HEADER) {
+        for other in [crate::agent_pass::HEADER, crate::grant_tokens::HEADER] {
+            if headers.contains_key(other) {
+                return Err(unproven(format!(
+                    "a second credential, {other}, came with the proof"
+                )));
+            }
+        }
+        return crate::grants::with_grants(state, |judged| {
+            let signed =
+                crate::agent_signature::signed_agent(state, judged.directory, headers, request)?;
+            if signed != Some(agent) {
+                return Err(ServerError::AgentSignatureRefused {
+                    reason: "the signed agent is not the requested agent",
+                });
+            }
+            Ok(Proof::Signature)
+        });
     }
     if headers.contains_key(crate::agent_pass::HEADER) {
         return run_pass(state, headers, agent);
@@ -225,6 +253,7 @@ fn standing(directory: &Projection, agent: AgentId) -> Result<(), ServerError> {
 fn issued_line(agent: AgentId, audience: &str, proof: Proof) -> String {
     let proof = match proof {
         Proof::RunPass => "run_pass".to_owned(),
+        Proof::Signature => "agent_signature".to_owned(),
         Proof::GrantCredential(grant) => format!("grant_credential for grant {grant}"),
     };
     format!(

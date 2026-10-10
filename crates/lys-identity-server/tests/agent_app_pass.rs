@@ -456,7 +456,10 @@ async fn a_certified_key_proves_an_app_pass_and_each_rejected_signature_keeps_it
         [URL_SAFE_NO_PAD.encode(Sha256::digest(key.public_key_bytes()))]
     );
     assert_eq!(pass.claims().rights.len(), 1);
-    assert_eq!(pass.claims().rights[0].grant, grant);
+    let [right] = pass.claims().rights.as_slice() else {
+        return Err("the signed pass must carry one right".into());
+    };
+    assert_eq!(right.grant, grant);
 
     let replayed = ask(&world, &agent, &headers, &body).await?;
     refused(&replayed, 401, "AgentSignatureRefused")?;
