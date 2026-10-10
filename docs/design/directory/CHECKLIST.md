@@ -560,5 +560,5 @@
 
 ## A silent program that holds the hang-up is ended (DIRECTORY-091)
 
-- [ ] **C727** — A tripped generation whose program cannot receive the hang-up and prints nothing is killed with its process group REPEAT_GRACE after the first hang-up, stamped rotation_signal_escalated (DIRECTORY-091 R1).
+- [ ] **C727** — A tripped generation whose program cannot receive the hang-up and prints nothing is killed with its process group FIRST_HANGUP_GRACE (10 s) after the first hang-up, or REPEAT_GRACE (2 s) after a repeat, stamped once with rotation_signal_escalated naming the grace that expired and its seconds (DIRECTORY-091 R1).
 - [ ] **C728** — The escalation kills only the leader the hang-up was sent to, judged by pid and start time; an exited or reused leader is left alone (DIRECTORY-091 R2).

@@ -2116,7 +2116,7 @@
       "items": [
         {
           "id": "C727",
-          "text": "A tripped generation whose program cannot receive the hang-up and prints nothing is killed with its process group REPEAT_GRACE after the first hang-up, stamped rotation_signal_escalated (DIRECTORY-091 R1).",
+          "text": "A tripped generation whose program cannot receive the hang-up and prints nothing is killed with its process group FIRST_HANGUP_GRACE (10 s) after the first hang-up, or REPEAT_GRACE (2 s) after a repeat, stamped once with rotation_signal_escalated naming the grace that expired and its seconds (DIRECTORY-091 R1).",
           "done": false
         },
         {
