@@ -282,5 +282,7 @@ mod sign_in_address;
 #[cfg(test)]
 mod agent_pass_tests;
 
+/// The one tracing subscriber: warn and above said into identity.log.
+pub mod warn_lines;
 /// Eligible authorities named by an agent grant refusal.
 pub mod who_can_grant;

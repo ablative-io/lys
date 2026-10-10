@@ -140,6 +140,10 @@
         {
           "id": "S416",
           "text": "As an operator, I want a refused token step logged with the client id and the reason, so that when a product's sign-in is refused I can read why from Lys without asking the product."
+        },
+        {
+          "id": "S417",
+          "text": "As an operator, I want every warning the identity server raises written in its log with where it came from, so that a failure the service noticed is never silent."
         }
       ]
     },

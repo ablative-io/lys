@@ -68,6 +68,8 @@
 
 **S416.** As an operator, I want a refused token step logged with the client id and the reason, so that when a product's sign-in is refused I can read why from Lys without asking the product.
 
+**S417.** As an operator, I want every warning the identity server raises written in its log with where it came from, so that a failure the service noticed is never silent.
+
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.

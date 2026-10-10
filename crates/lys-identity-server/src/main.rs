@@ -19,7 +19,14 @@ const VERSION: &str = concat!(
 
 async fn serve(config_path: PathBuf) -> Result<(), ServerError> {
     let config = Config::load(&config_path)?;
-    let say = Arc::new(|line: &str| println!("lys-identity-server {line}"));
+    let say: lys_identity_server::routes::Say =
+        Arc::new(|line: &str| println!("lys-identity-server {line}"));
+    // Warn and above reach identity.log through the same sink (DIRECTORY-095).
+    lys_identity_server::warn_lines::install(Arc::clone(&say)).map_err(|refused| {
+        ServerError::ConfigInvalid {
+            reason: refused.to_string(),
+        }
+    })?;
     let app = service_saying(&config, say).await?;
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await

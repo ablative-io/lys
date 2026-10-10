@@ -575,3 +575,7 @@
 ## A refused token step is readable from Lys's log (DIRECTORY-094)
 
 - [x] **C732** — Every refused /oauth/token request writes one warn line naming the client_id presented, the OAuth code, Lys's refusal name and its reason, and never a secret, code, verifier or token (DIRECTORY-094 R1).
+
+## The identity server's warnings reach its log (DIRECTORY-095)
+
+- [x] **C733** — lys-identity-server installs one tracing subscriber at start that says every WARN and ERROR event, with its target and fields, through the say sink into identity.log; info and below are off (DIRECTORY-095 R1).

@@ -6099,6 +6099,26 @@
       "path": "crates/lys-identity-server/tests/shared/provider_client_credentials.rs",
       "note": "an app's virtual client credentials at the token exchange, and the refused step's log line",
       "brief": "DIRECTORY-094"
+    },
+    {
+      "path": "crates/lys-identity-server/src/warn_lines.rs",
+      "note": "the identity server's one tracing subscriber: warn and above said through the say sink with target and fields",
+      "brief": "DIRECTORY-095"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/warn_lines.rs",
+      "note": "the subscriber installed as main installs it, a warn from another thread said, a second install refused by name",
+      "brief": "DIRECTORY-095"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-095.json",
+      "note": "the brief",
+      "brief": "DIRECTORY-095"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-095.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-095"
     }
   ],
   "inventory": [
