@@ -25,16 +25,12 @@ struct Matrix {
     format: String,
     brief: String,
     rule: String,
-    barriers: Vec<Barrier>,
+    barriers: Vec<Crossing>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "the field is the fixture file's own name"
-)]
-struct Barrier {
+struct Crossing {
     barrier: String,
     #[serde(rename = "where")]
     site: String,
@@ -49,7 +45,7 @@ fn matrix() -> Result<Matrix, Box<dyn Error>> {
     Ok(serde_json::from_slice(&fs::read(path)?)?)
 }
 
-fn expected<'a>(matrix: &'a Matrix, barrier: &str) -> Result<&'a Barrier, Box<dyn Error>> {
+fn expected<'a>(matrix: &'a Matrix, barrier: &str) -> Result<&'a Crossing, Box<dyn Error>> {
     matrix
         .barriers
         .iter()
@@ -57,7 +53,7 @@ fn expected<'a>(matrix: &'a Matrix, barrier: &str) -> Result<&'a Barrier, Box<dy
         .ok_or_else(|| format!("the matrix has no barrier {barrier}").into())
 }
 
-fn names(row: &Barrier, name: &str) -> bool {
+fn names(row: &Crossing, name: &str) -> bool {
     row.refusal.split('|').any(|allowed| allowed == name)
 }
 

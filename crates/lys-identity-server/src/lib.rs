@@ -318,6 +318,7 @@ pub mod seats_views;
 pub mod error_seat_import;
 pub mod seat_import_api;
 pub mod seat_import_apply;
+pub mod seat_import_canonical;
 pub mod seat_import_changes;
 pub mod seat_import_monitor;
 mod seat_import_monitor_maps;

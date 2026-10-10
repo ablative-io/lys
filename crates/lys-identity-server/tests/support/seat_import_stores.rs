@@ -1,8 +1,4 @@
 #![cfg(test)]
-#![allow(
-    dead_code,
-    reason = "shared support: each test binary that includes this file uses a part of it"
-)]
 //! The destination owners and the import journal of one install, opened in
 //! a folder and opened again as a restart would, with a plan built from
 //! fragments the test writes itself (AGENTS-003 R5). Readers are never

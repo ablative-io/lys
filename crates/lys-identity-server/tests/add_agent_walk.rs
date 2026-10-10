@@ -2,7 +2,7 @@
 //! The add-agent requests must reach a live runner before a start is confirmed.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 use std::sync::Arc;

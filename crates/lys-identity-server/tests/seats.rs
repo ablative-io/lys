@@ -5,7 +5,7 @@
 //! machine naming its own runner.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 

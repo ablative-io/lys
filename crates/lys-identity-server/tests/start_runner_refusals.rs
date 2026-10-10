@@ -1,7 +1,7 @@
 //! A runner's named start refusal survives the HTTP contract unchanged.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};

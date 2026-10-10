@@ -44,6 +44,7 @@ use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use lys_core::Ed25519Identity;
+use lys_identity::AgentId;
 use lys_identity::start::active::Lifecycles;
 use lys_identity::start::authority::Admission;
 use lys_identity::start::credentials::HandleRecords;
@@ -51,22 +52,25 @@ use lys_identity::start::egress::{EgressLists, ProfileNeeds};
 use lys_identity::start::machine_role::RoleMachines;
 use lys_identity::start::profile_command::ProfileVersionRecords;
 use lys_identity::start::profile_review::ProfileReviews;
-use lys_identity::start::request::{AgentRecord, AgentRecords};
+use lys_identity::start::request::AgentRecords;
 use lys_identity::start::state::SessionReports;
 use lys_identity::start::{
     Given, Grammars, LaunchRecords, Owners, StartError, give, give_again, state_of, withdraw,
 };
-use lys_identity::{AgentId, IdentityId, LifecycleState, LoginBinding};
 use serde_json::Value;
 
 use crate::error::ServerError;
-use crate::routes::{AppState, signed_in, with_directory};
+use crate::routes::AppState;
 
 #[path = "start_pass_state.rs"]
 mod pass_state;
 
+#[path = "start_directory.rs"]
+mod directory;
 #[path = "start_records.rs"]
 mod records;
+
+use directory::Directory;
 
 /// Who is asking, as the records a start keeps name them.
 pub trait Callers: Send + Sync {
@@ -517,84 +521,6 @@ async fn state(
         state_of(launches, &launch_record, service.owners().sessions).map(|state| state.to_json())
     })
     .await
-}
-
-/// The directory's own records, read for a start: the caller, the
-/// administrator's admission, each agent's record and its lifecycle state.
-struct Directory(Arc<AppState>);
-
-impl Directory {
-    /// The person bound to `binding`, or the login itself when none is.
-    fn caller_of(&self, binding: &LoginBinding) -> String {
-        let login = || format!("login {} {}", binding.issuer(), binding.subject());
-        match with_directory(&self.0, |directory| {
-            Ok(directory.projection()?.person_for(binding))
-        }) {
-            Ok(Some(person)) => person.to_string(),
-            Ok(None) => login(),
-            Err(error) => {
-                tracing::error!("the directory could not be read for the caller: {error}");
-                login()
-            }
-        }
-    }
-
-    fn record(&self, agent: &str) -> Option<lys_identity::projection::Record> {
-        let id = AgentId::from_str(agent).ok()?;
-        match with_directory(&self.0, |directory| {
-            Ok(directory.record(IdentityId::Agent(id))?)
-        }) {
-            Ok(record) => record,
-            Err(error) => {
-                tracing::error!(agent, "the directory could not be read: {error}");
-                None
-            }
-        }
-    }
-}
-
-impl Callers for Directory {
-    fn check_admission(&self) -> Result<(), ServerError> {
-        self.0.admission.administrator_available()
-    }
-
-    fn caller(&self, headers: &HeaderMap) -> Option<String> {
-        let actor = signed_in(&self.0, headers).ok()?;
-        Some(self.caller_of(actor.binding()))
-    }
-}
-
-impl Admission for Directory {
-    fn is_administrator(&self, caller: &str) -> bool {
-        match self.0.admission.administrator_login() {
-            Ok(login) => login.is_some_and(|login| caller == self.caller_of(&login)),
-            Err(error) => {
-                tracing::error!("start administrator admission refused: {error}");
-                false
-            }
-        }
-    }
-
-    /// Step 1 admits the configured administrator alone.
-    fn admits(&self, caller: &str) -> bool {
-        self.is_administrator(caller)
-    }
-}
-
-impl AgentRecords for Directory {
-    fn agent(&self, agent: &str) -> Option<AgentRecord> {
-        let record = self.record(agent)?;
-        Some(AgentRecord {
-            id: agent.to_owned(),
-            responsible: record.responsible().map(|person| person.to_string()),
-        })
-    }
-}
-
-impl Lifecycles for Directory {
-    fn state(&self, agent: &str) -> Option<LifecycleState> {
-        self.record(agent).map(|record| record.state())
-    }
 }
 
 fn agent_id(text: &str) -> bool {

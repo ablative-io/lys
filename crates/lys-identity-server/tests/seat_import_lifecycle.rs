@@ -19,7 +19,7 @@
 //! closes, an intent file the test writes and removes). Nothing sleeps.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};

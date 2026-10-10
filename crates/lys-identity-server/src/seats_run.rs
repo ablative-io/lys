@@ -48,13 +48,8 @@ struct Begun {
     notes: Vec<String>,
 }
 
-/// A seat's session stopped, as the stop answers it; `ended` is the wire
-/// field's name.
-#[allow(
-    clippy::struct_field_names,
-    reason = "the field is the answer's own name on the wire"
-)]
-struct Ended {
+/// A seat's session stopped, as the stop answers it.
+struct StopAnswer {
     session: String,
     ended: bool,
     notes: Vec<String>,
@@ -285,13 +280,13 @@ async fn end(
     caller: &str,
     operation: &str,
     force: bool,
-) -> Result<Ended, ServerError> {
+) -> Result<StopAnswer, ServerError> {
     let name = held.added.name.clone();
     let recorded = with_seats(state, |store| Ok(store.recorded(operation).cloned()))?;
     if let Some(Line::Stopped(kept)) = recorded
         && kept.name == name
     {
-        return Ok(Ended {
+        return Ok(StopAnswer {
             session: kept.session,
             ended: true,
             notes: vec![format!("stopped already under operation {operation}")],
@@ -367,7 +362,7 @@ async fn end(
             at: now(),
         }))
     })?;
-    Ok(Ended {
+    Ok(StopAnswer {
         session,
         ended,
         notes,

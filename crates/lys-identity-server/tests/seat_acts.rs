@@ -5,7 +5,7 @@
 //! is for the seat's responsible person or an administrator alone (R4).
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 

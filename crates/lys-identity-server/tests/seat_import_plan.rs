@@ -9,7 +9,7 @@
 //! the plan's public entry points.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 

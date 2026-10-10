@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! Run credentials ride the signed start act, never its answer or public receipt.
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 use lys_runner::protocol::{Greeting, reply_line, verify_request};
 use lys_runner::{Act, Answer};
 use serde_json::{Value, json};

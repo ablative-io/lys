@@ -16,7 +16,7 @@
 //! service is ready.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;

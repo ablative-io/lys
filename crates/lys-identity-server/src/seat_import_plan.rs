@@ -36,10 +36,11 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
-use crate::routes::{AppState, hex};
+use crate::routes::AppState;
+pub use crate::seat_import_canonical::canonical;
+use crate::seat_import_canonical::sha256;
 
 /// The plan's format, named in every plan.
 pub const PLAN_VERSION: &str = "lys-seat-import-plan/v1";
@@ -603,40 +604,6 @@ pub fn vector_key(plan: &Plan) -> String {
     let mut text = String::new();
     canonical(&bound, &mut text);
     sha256(&text)
-}
-
-/// `value` as JSON with every object's members in byte order.
-pub fn canonical(value: &Value, out: &mut String) {
-    match value {
-        Value::Object(members) => {
-            let sorted: BTreeMap<&String, &Value> = members.iter().collect();
-            out.push('{');
-            for (index, (key, member)) in sorted.into_iter().enumerate() {
-                if index > 0 {
-                    out.push(',');
-                }
-                canonical(&Value::String(key.clone()), out);
-                out.push(':');
-                canonical(member, out);
-            }
-            out.push('}');
-        }
-        Value::Array(items) => {
-            out.push('[');
-            for (index, item) in items.iter().enumerate() {
-                if index > 0 {
-                    out.push(',');
-                }
-                canonical(item, out);
-            }
-            out.push(']');
-        }
-        other => out.push_str(&other.to_string()),
-    }
-}
-
-fn sha256(text: &str) -> String {
-    hex(&Sha256::digest(text.as_bytes()))
 }
 
 /// Read every source the manifest declares for its seat at one instant and

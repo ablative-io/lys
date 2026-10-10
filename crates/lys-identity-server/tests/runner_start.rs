@@ -11,7 +11,7 @@
 //! answer, never a clock.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 use support::{Table, operation};
 
 use std::collections::BTreeMap;

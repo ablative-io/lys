@@ -7,7 +7,7 @@
 //! with no legacy format.
 
 #[path = "support/seat_import_stores.rs"]
-mod stores;
+pub mod stores;
 
 use std::error::Error;
 use std::sync::Arc;

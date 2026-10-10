@@ -3,7 +3,7 @@
 //! service that keeps no policies.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use std::error::Error;
 use std::sync::Arc;
