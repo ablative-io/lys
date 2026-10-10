@@ -1,0 +1,65 @@
+{
+  "format": "lys-runner-seat-cost-ratchet/v1",
+  "taken_at": "c771f686 (AGENTS-004 R4 on main) plus the R5 counting code",
+  "provenance": "ceilings derived by reading the counting code before any battery ran, on Tom's word of 10 October 2026 that every repository is written whole before one build; the one Lys battery records the measured figures beside these and lowers any ceiling the measurement comes under. A ceiling only ever moves down.",
+  "inputs": {
+    "owners_live": 48,
+    "tail_lines_max": 256,
+    "transition_intents": 4,
+    "duplicate_readbacks": 1,
+    "frame_bytes": 4096,
+    "hook_line_bytes": 1024,
+    "roster_seats": 16,
+    "roster_multiplier": 3
+  },
+  "ceilings": {
+    "proxy_forward": {
+      "calls": 2,
+      "record_visits": 1,
+      "bytes_copied": 8192,
+      "journal_appends": 0,
+      "syncs": 0,
+      "wakes": 0
+    },
+    "hook_ingest": {
+      "calls": 2,
+      "record_visits": 1,
+      "bytes_copied": 2048,
+      "journal_appends": 1,
+      "syncs": 1,
+      "wakes": 0
+    },
+    "control_delivery": {
+      "calls": 3,
+      "record_visits": 1,
+      "bytes_copied": 8192,
+      "journal_appends": 1,
+      "syncs": 1,
+      "wakes": 0
+    },
+    "registry_read": {
+      "calls": 1,
+      "record_visits": 1,
+      "bytes_copied": 0,
+      "journal_appends": 0,
+      "syncs": 0,
+      "wakes": 0
+    },
+    "reconnect": {
+      "calls": 1,
+      "record_visits": 305,
+      "bytes_copied": 1048576,
+      "journal_appends": 0,
+      "syncs": 0,
+      "wakes": 0
+    },
+    "custody_transfer": {
+      "calls": 5,
+      "record_visits": 0,
+      "bytes_copied": 4096,
+      "journal_appends": 4,
+      "syncs": 4,
+      "wakes": 0
+    }
+  }
+}

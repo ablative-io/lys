@@ -22,6 +22,7 @@
 //! - [`handoff`]: custody transfer to an upgrade's successor (R3).
 //! - [`counts`]: the counted work of every hot path and its ratchet (R5).
 
+pub mod counts;
 pub mod record;
 pub mod rules;
 pub mod store;
