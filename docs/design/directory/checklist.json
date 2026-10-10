@@ -2140,6 +2140,26 @@
           "done": true
         }
       ]
+    },
+    {
+      "name": "The Rauthy pin test leaves nothing running (DIRECTORY-093)",
+      "items": [
+        {
+          "id": "C731",
+          "text": "The id001 pin test's fetch runs with --no-auto-maintenance, so it starts no detached git maintenance that outlives the test (DIRECTORY-093 R1).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "A refused token step is readable from Lys's log (DIRECTORY-094)",
+      "items": [
+        {
+          "id": "C732",
+          "text": "Every refused /oauth/token request writes one warn line naming the client_id presented, the OAuth code, Lys's refusal name and its reason, and never a secret, code, verifier or token (DIRECTORY-094 R1).",
+          "done": false
+        }
+      ]
     }
   ]
 }

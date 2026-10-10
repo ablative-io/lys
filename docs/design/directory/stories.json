@@ -136,6 +136,10 @@
         {
           "id": "S165",
           "text": "As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together."
+        },
+        {
+          "id": "S416",
+          "text": "As an operator, I want a refused token step logged with the client id and the reason, so that when a product's sign-in is refused I can read why from Lys without asking the product."
         }
       ]
     },

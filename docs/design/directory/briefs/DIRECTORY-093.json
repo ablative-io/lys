@@ -1,0 +1,52 @@
+{
+  "id": "DIRECTORY-093",
+  "cluster": "directory",
+  "title": "The Rauthy pin test starts no process that outlives it: its fetch runs no detached maintenance",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C731"
+  ],
+  "stories": [
+    "S260"
+  ],
+  "design_anchor": [
+    "ADR-114",
+    "ADR-054"
+  ],
+  "purpose": "The Lys battery at 91e34d4f (10 Oct 2026, Mac) printed one LEAK in its identity leg: lys::identity_deploy id001_pin_clone_vendor_rauthy_is_the_pinned_ablative_commit (1.249 s). A LEAK means the test's output stayed open 100 ms after the test process exited. Waffles ruled at 15:16 and 15:23: a fixture row, the test waits on its child, briefed today. The test's `git` helper (crates/lys/tests/identity_deploy.rs:209) runs every git command through Command::output, which waits on that command. But `git -C vendor/rauthy fetch --quiet origin ablative` ends by starting `git maintenance run --auto --quiet --detach`. Measured on the Mac with GIT_TRACE=1 and git 2.47.1: `trace: run_command: git maintenance run --auto --quiet --detach`. The test never waits on that detached process. Five warm runs of the test alone showed no LEAK, so the holder is seen only under load. Either way it is a process the test started and did not wait on, and the right fix is that the test starts none.",
+  "task": "Run the test's fetch with `--no-auto-maintenance`, so the fetch itself starts no detached maintenance. Prove with a trace that the test's git commands start no `git maintenance` and no process outlives them.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The pin test's fetch starts no detached maintenance",
+      "spec": "Behavioural. WHEN id001_pin_clone_vendor_rauthy_is_the_pinned_ablative_commit fetches origin's ablative branch into vendor/rauthy, THE SYSTEM SHALL run the fetch with `--no-auto-maintenance`, so that no `git maintenance` process is started. Every other git command the test runs SHALL still run through the waiting `git` helper.",
+      "acceptance": [
+        "The fetch call in identity_deploy.rs carries `--no-auto-maintenance` beside `--quiet`.",
+        "A test in identity_deploy.rs runs the same fetch arguments through the helper with GIT_TRACE=1 on the command, and asserts that the trace names no `git maintenance` run_command line.",
+        "`cargo nextest run -p lys --all-features --test identity_deploy -E 'test(id001_pin_clone)'` run 20 times on the Mac under the full Lys battery's load prints no LEAK line."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys/tests/identity_deploy.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C731"
+      ],
+      "stories": [
+        "S260"
+      ]
+    }
+  ],
+  "boundaries": [
+    "Test code only: no change to vendor/rauthy, .gitmodules, versions.json or any git configuration on the machine.",
+    "SHALL NOT mark the test serial, add a sleep or retry, or change nextest's leak timeout to hide the line.",
+    "The test still fetches from origin and still proves the pinned commit is an ancestor of origin's ablative branch."
+  ],
+  "verification": [
+    "cargo clippy -p lys --all-features --test identity_deploy -- -D warnings; the identity leg of the next Lys battery prints no LEAK line for id001."
+  ]
+}

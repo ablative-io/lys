@@ -66,6 +66,8 @@
 
 **S165.** As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together.
 
+**S416.** As an operator, I want a refused token step logged with the client id and the reason, so that when a product's sign-in is refused I can read why from Lys without asking the product.
+
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.

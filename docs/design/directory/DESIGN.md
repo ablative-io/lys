@@ -1311,6 +1311,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/tests/identity_install/estate_sweep_tests.rs` | the sweep a new estate makes of the folders killed tests left: stopped through exit locks only, removed and named | DIRECTORY-092 |
 | `docs/design/directory/briefs/DIRECTORY-092.json` | the brief | DIRECTORY-092 |
 | `docs/design/directory/briefs/DIRECTORY-092.md` | rendered markdown | DIRECTORY-092 |
+| `crates/lys-identity-server/src/provider/client_auth.rs` | a token request's client authentication: the app's live credentials asked of the broker, each refusal in Lys's words | DIRECTORY-094 |
+| `crates/lys-identity-server/src/provider/refusal.rs` | a token refusal in OAuth's words, and the fields of its one log line | DIRECTORY-094 |
+| `docs/design/directory/briefs/DIRECTORY-093.json` | the brief | DIRECTORY-093 |
+| `docs/design/directory/briefs/DIRECTORY-093.md` | rendered markdown | DIRECTORY-093 |
+| `docs/design/directory/briefs/DIRECTORY-094.json` | the brief | DIRECTORY-094 |
+| `docs/design/directory/briefs/DIRECTORY-094.md` | rendered markdown | DIRECTORY-094 |
 
 ## Inventory
 

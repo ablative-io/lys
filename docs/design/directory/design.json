@@ -6059,6 +6059,36 @@
       "path": "docs/design/directory/briefs/DIRECTORY-092.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-092"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider/client_auth.rs",
+      "note": "a token request's client authentication: the app's live credentials asked of the broker, each refusal in Lys's words",
+      "brief": "DIRECTORY-094"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider/refusal.rs",
+      "note": "a token refusal in OAuth's words, and the fields of its one log line",
+      "brief": "DIRECTORY-094"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-093.json",
+      "note": "the brief",
+      "brief": "DIRECTORY-093"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-093.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-093"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-094.json",
+      "note": "the brief",
+      "brief": "DIRECTORY-094"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-094.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-094"
     }
   ],
   "inventory": [

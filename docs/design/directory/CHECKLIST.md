@@ -567,3 +567,11 @@
 
 - [x] **C729** — Estate's cleanup stops the model proxy (run/proxy.pid) with the runner, directory service and secrets broker on close and on Drop, and a proxy it cannot stop fails close naming proxy.pid (DIRECTORY-092 R1).
 - [x] **C730** — Each install-test estate lives under the lys-estate- prefix with its owner and compose project recorded; making an estate sweeps and names every prefixed folder whose owner is gone, stopping its services through their exit locks only (DIRECTORY-092 R2).
+
+## The Rauthy pin test leaves nothing running (DIRECTORY-093)
+
+- [ ] **C731** — The id001 pin test's fetch runs with --no-auto-maintenance, so it starts no detached git maintenance that outlives the test (DIRECTORY-093 R1).
+
+## A refused token step is readable from Lys's log (DIRECTORY-094)
+
+- [ ] **C732** — Every refused /oauth/token request writes one warn line naming the client_id presented, the OAuth code, Lys's refusal name and its reason, and never a secret, code, verifier or token (DIRECTORY-094 R1).
