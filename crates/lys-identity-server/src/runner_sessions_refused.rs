@@ -63,7 +63,10 @@ pub(super) fn record_refused(
 /// The runner's refusal a start of `session` was already answered with:
 /// a start sent again is answered the same, and its runner is not asked
 /// again under a session already kept stopped.
-pub(super) fn refused_before(state: &AppState, session: &str) -> Result<Option<ServerError>, ServerError> {
+pub(super) fn refused_before(
+    state: &AppState,
+    session: &str,
+) -> Result<Option<ServerError>, ServerError> {
     if state.runtime.is_none() {
         return Ok(None);
     }
