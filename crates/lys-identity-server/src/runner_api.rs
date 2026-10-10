@@ -425,8 +425,14 @@ async fn wake(
     let prefix = session_settings(&state, &agent)?
         .map(|settings| settings.message_prefix)
         .unwrap_or_default();
-    let delivered = format!("{prefix}{}", given.message);
+    let plain = format!("{prefix}{}", given.message);
     for driven in open_sessions(&state, &agent)? {
+        // The wake-up slot's words, resolved for this session and rendered
+        // now (AGENTS-001 R1, R3); the plain message with the profile's
+        // prefix when no layer sets the slot, or when the words cannot be
+        // rendered, which is said.
+        let delivered = wake_words(&state, &agent, &driven.session, &given.message)
+            .unwrap_or_else(|| plain.clone());
         let carried = Carried {
             text: Some(Digested::of(&delivered)),
             keys: Vec::new(),
@@ -443,6 +449,36 @@ async fn wake(
         }
     }
     Err(ServerError::NoLiveSession { agent })
+}
+
+/// The wake-up slot's words for `session` of `agent`, carrying `message`;
+/// none when no layer sets the slot or the words cannot be rendered.
+fn wake_words(state: &Arc<AppState>, agent: &str, session: &str, message: &str) -> Option<String> {
+    use crate::words_state::Slot;
+    let words = state.words.as_ref()?;
+    let resolved =
+        crate::words_store::resolve(words, Slot::WakeUp, Some(agent), Some(session)).ok()?;
+    if resolved.source == "built_in" {
+        return None;
+    }
+    let mut numbers = std::collections::BTreeMap::new();
+    numbers.insert("message".to_owned(), message.to_owned());
+    match crate::words_api::deliverable(
+        state,
+        Slot::WakeUp,
+        Some(agent),
+        Some(session),
+        numbers,
+        None,
+    ) {
+        Ok(delivered) => Some(delivered.text),
+        Err(error) => {
+            (state.say)(&format!(
+                "wake of {agent}: the wake_up words could not be rendered, the plain message stands: {error}"
+            ));
+            None
+        }
+    }
 }
 
 /// The sessions the caller may see that are not confirmed stopped, each

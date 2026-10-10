@@ -72,6 +72,7 @@ mod pty_command_tests;
 pub mod published;
 pub mod refusal_log;
 pub mod refusals;
+pub mod render;
 pub mod rotation;
 pub mod scrollback;
 pub mod seat_owner;

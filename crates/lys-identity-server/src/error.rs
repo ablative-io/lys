@@ -38,6 +38,15 @@ pub enum ServerError {
     /// A goals refusal: an item, its judgement or its reminders.
     #[error(transparent)]
     Goal(#[from] crate::goals_state::GoalError),
+    /// A words refusal (AGENTS-001 R1): a slot, a layer, a template or a stale save.
+    #[error(transparent)]
+    Words(#[from] crate::words_state::WordsError),
+    /// A variables refusal (AGENTS-001 R2): a scope, a name or a stale patch.
+    #[error(transparent)]
+    Variables(#[from] crate::variables_state::VariablesError),
+    /// A schedules refusal (AGENTS-001 R4): a schedule, its change or its stop.
+    #[error(transparent)]
+    Schedules(#[from] crate::schedules_state::SchedulesError),
     /// The caller's directory identity is not Active for the requested act.
     #[error("inactive: {identity} is {state} and may not act")]
     Inactive {

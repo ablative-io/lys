@@ -181,6 +181,20 @@ pub struct Config {
     /// `goals_unavailable`.
     #[serde(default)]
     pub goals_dir: Option<PathBuf>,
+    /// The directory the words a seat is sent are kept in, created when it
+    /// does not exist. Without it the words routes answer `words_unavailable`
+    /// and every delivery uses the built-in wording.
+    #[serde(default)]
+    pub words_dir: Option<PathBuf>,
+    /// The directory the agents' and sessions' variables are kept in,
+    /// created when it does not exist. Without it the variables routes
+    /// answer `variables_unavailable`.
+    #[serde(default)]
+    pub variables_dir: Option<PathBuf>,
+    /// The directory the schedules are kept in, created when it does not
+    /// exist. Without it the schedule routes answer `schedules_unavailable`.
+    #[serde(default)]
+    pub schedules_dir: Option<PathBuf>,
     /// The directory the review decisions are kept in, created when it does
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]

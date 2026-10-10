@@ -71,6 +71,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         }
     }
     let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
+    let words = crate::words_store::configured(config, Arc::clone(&key), &say)?;
+    let variables = crate::variables_store::configured(config, Arc::clone(&key), &say)?;
+    let schedules = crate::schedules_store::configured(config, Arc::clone(&key), &say)?;
     let cord = crate::cord_store::CordStore::open(
         &config.log_dir.with_file_name("cord"),
         Arc::clone(&key),
@@ -178,6 +181,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         configuration: Mutex::new(configuration),
         policies: policies.map(Mutex::new),
         goals: goals.map(crate::goals_store::Goals::new),
+        words,
+        variables,
+        schedules,
         agent_passes: Arc::new(Mutex::new(crate::agent_pass_store::Passes::open(
             config.log_dir.with_file_name("agent-passes.json"),
         )?)),
@@ -227,6 +233,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         other => other?,
     }
     crate::goals_api::remind_from(&state);
+    crate::schedules_api::fire_from(&state);
     crate::budgets_act::settle_at_start(&state);
     crate::refusals_follow::follow_at_start(&state);
     crate::grants_refusals::hold_at_start(&state);

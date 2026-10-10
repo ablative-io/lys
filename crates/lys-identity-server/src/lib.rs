@@ -116,6 +116,18 @@ pub mod goals_state;
 pub mod goals_store;
 pub mod goals_types;
 pub mod goals_views;
+/// The agents cluster's records (AGENTS-001): one fold-and-snapshot engine, then the words, variables and schedules on it.
+pub mod agents_log;
+mod openapi_agents_types;
+pub mod schedules_api;
+pub mod schedules_state;
+pub mod schedules_store;
+pub mod variables_api;
+pub mod variables_state;
+pub mod variables_store;
+pub mod words_api;
+pub mod words_state;
+pub mod words_store;
 pub mod grant_bindings_api;
 pub mod grant_changes;
 pub mod grant_checkpoint_reset;

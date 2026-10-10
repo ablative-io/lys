@@ -121,6 +121,12 @@ pub struct AppState {
     pub canvas: crate::canvas_store::CanvasStore,
     /// The goals and their reminders, when the configuration names their directory.
     pub goals: Option<crate::goals_store::Goals>,
+    /// The words a seat is sent (AGENTS-001 R1), when the configuration names their directory.
+    pub words: Option<crate::words_store::WordsKept>,
+    /// The agents' and sessions' variables (AGENTS-001 R2), when the configuration names their directory.
+    pub variables: Option<crate::variables_store::VariablesKept>,
+    /// The schedules (AGENTS-001 R4), when the configuration names their directory.
+    pub schedules: Option<crate::schedules_store::SchedulesKept>,
     /// The apps, kept beside the grant log: always open, holding at least
     /// the app `lys`.
     pub apps: Mutex<crate::apps_store::AppStore>,

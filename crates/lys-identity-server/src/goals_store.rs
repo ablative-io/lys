@@ -242,6 +242,12 @@ impl<S: LeafStore> GoalStore<S> {
         self.held.next_due()
     }
 
+    /// The goals log's revision: its leaf count, named in a rendering's
+    /// receipt as the revision the goals were read at (AGENTS-001 R3).
+    pub fn revision(&self) -> u64 {
+        self.log.len()
+    }
+
     /// Keep `goal` as set. Sent again in the same words it answers the item
     /// as it stands; the same operation in other words is refused.
     pub fn set(&mut self, goal: crate::goals_state::Goal) -> Result<Item, ServerError> {

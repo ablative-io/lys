@@ -378,6 +378,9 @@ impl Table {
             policies: None,
             stops: None,
             goals: None,
+            words: None,
+            variables: None,
+            schedules: None,
             configuration: Mutex::new(Box::new(
                 crate::configuration_store::ConfigurationStore::open(
                     &path.join("organisation"),

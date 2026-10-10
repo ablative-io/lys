@@ -482,6 +482,9 @@ impl Service {
             budgets_dir: Some(dir.path().join("budgets")),
             policies_dir: Some(dir.path().join("policies")),
             goals_dir: Some(dir.path().join("goals")),
+            words_dir: Some(dir.path().join("words")),
+            variables_dir: Some(dir.path().join("variables")),
+            schedules_dir: Some(dir.path().join("schedules")),
             reviews_dir: Some(dir.path().join("reviews")),
             sign_in_providers,
             provider_origins: Some(ProviderOrigins {

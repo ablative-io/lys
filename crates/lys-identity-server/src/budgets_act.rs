@@ -230,6 +230,57 @@ fn at_ms() -> i64 {
     jiff::Timestamp::now().as_millisecond()
 }
 
+/// The words of the slot `crossing`'s act delivers, resolved for its
+/// session and rendered now (AGENTS-001 R3): the context warning for a
+/// notice on a context budget, the compaction command for a compaction. None
+/// when no layer sets the slot (the crossing's own words, or the profile's
+/// command, stand), or when the words cannot be rendered, which is said.
+fn slot_words(state: &Arc<AppState>, crossing: &Crossing) -> Option<String> {
+    use crate::words_state::Slot;
+    let slot = match crossing.act {
+        Act::Notice if crossing.measure == crate::budgets_state::Measure::ContextPercent => {
+            Slot::ContextWarning
+        }
+        Act::Compact => Slot::Compaction,
+        _ => return None,
+    };
+    let words = state.words.as_ref()?;
+    let resolved = crate::words_store::resolve(
+        words,
+        slot,
+        Some(&crossing.agent),
+        crossing.session.as_deref(),
+    )
+    .ok()?;
+    if resolved.source == "profile" || (slot == Slot::Compaction && resolved.source == "built_in")
+    {
+        return None;
+    }
+    let mut numbers = std::collections::BTreeMap::new();
+    if let Some(figure) = &crossing.figure {
+        numbers.insert("context_percent".to_owned(), figure.to_string());
+    }
+    numbers.insert("limit".to_owned(), crossing.limit.to_string());
+    match crate::words_api::deliverable(
+        state,
+        slot,
+        Some(&crossing.agent),
+        crossing.session.as_deref(),
+        numbers,
+        None,
+    ) {
+        Ok(delivered) => Some(delivered.text),
+        Err(error) => {
+            (state.say)(&format!(
+                "budget crossing {}: the {} words could not be rendered, the crossing's own stand: {error}",
+                crossing.operation,
+                slot.name()
+            ));
+            None
+        }
+    }
+}
+
 /// What came of asking `crossing`'s act; none when the answer was lost.
 async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
     let kept = |stands: Stands, words: String| Acted {
@@ -281,7 +332,12 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
     } else {
         false
     };
-    let request = match (crossing.act, crossing.text.clone()) {
+    // The words the act types come from the words a seat is sent (AGENTS-001
+    // R1, R3): the context warning and the compaction command resolve for
+    // this session, rendered now; a slot nobody set keeps the crossing's own
+    // words, and a compaction command nobody set stays the profile's.
+    let worded = slot_words(state, crossing);
+    let request = match (crossing.act, worded.or_else(|| crossing.text.clone())) {
         (Act::Tell, _) => {
             return Some(kept(
                 Stands::Told,

@@ -197,6 +197,9 @@ pub fn render(
         "policies_dir": dir("policies"),
         "stops_dir": dir("stops"),
         "goals_dir": dir("goals"),
+        "words_dir": dir("words"),
+        "variables_dir": dir("variables"),
+        "schedules_dir": dir("schedules"),
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),
     });

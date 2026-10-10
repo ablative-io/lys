@@ -20,6 +20,7 @@ pub mod proxy;
 pub mod runner;
 pub mod runner_join;
 pub mod seal;
+pub mod variables;
 pub mod verify;
 
 // `lys seat` and `lys attach` (AGENTS-002), and the client they share.

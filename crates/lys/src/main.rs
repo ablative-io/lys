@@ -195,6 +195,7 @@ fn main() -> ExitCode {
         },
         Command::Runner(runner_command) => commands::runner::run(runner_command),
         Command::Proxy(proxy_command) => commands::proxy::run(proxy_command),
+        Command::Variables(variables_args) => commands::variables::run(variables_args, json),
         Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out, json),
         Command::Verify {
             attestation,

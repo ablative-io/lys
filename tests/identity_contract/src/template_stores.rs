@@ -52,6 +52,9 @@ pub(crate) fn paths(config: &Config) -> Vec<(&'static str, PathBuf)> {
         ("budgets", &config.budgets_dir),
         ("policies", &config.policies_dir),
         ("goals", &config.goals_dir),
+        ("words", &config.words_dir),
+        ("variables", &config.variables_dir),
+        ("schedules", &config.schedules_dir),
     ] {
         if let Some(path) = path {
             paths.push((name, path.clone()));

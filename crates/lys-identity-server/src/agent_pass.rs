@@ -52,6 +52,24 @@ pub(crate) fn verified(
     Ok(Some(run))
 }
 
+/// The agent and the session a run pass is for, once its seat signed it;
+/// none when the request carries no pass (AGENTS-001 R2: a run reads and
+/// patches its own variables by its pass alone).
+pub(crate) fn run_session(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<(AgentId, String)>, ServerError> {
+    let Some(pass) = value(headers)? else {
+        return Ok(None);
+    };
+    let (agent, session) = {
+        let passes = store(state)?;
+        (passes.lookup(pass)?, passes.session_of(pass)?)
+    };
+    crate::agent_seat::check(state, headers, agent, &session, pass)?;
+    Ok(Some((agent, session)))
+}
+
 fn value(headers: &HeaderMap) -> Result<Option<&str>, ServerError> {
     if !headers.contains_key(HEADER) {
         return Ok(None);
