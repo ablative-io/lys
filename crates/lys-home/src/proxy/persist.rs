@@ -24,6 +24,13 @@ pub(super) struct OpenSessions {
 const MAX_OPEN_SESSIONS: usize = 8;
 
 impl OpenSessions {
+    /// Release every session held open: the next completion of each opens
+    /// it afresh from the record. The sink does this on a settle, so that a
+    /// reader or a recovery in this process is not refused by its own lock.
+    pub(super) fn release(&mut self) {
+        self.held.clear();
+    }
+
     fn open<'a>(
         &'a mut self,
         home: &Home,

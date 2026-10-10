@@ -176,7 +176,10 @@ impl Harness {
 
     /// The `lys.call` records of a session, in file order.
     pub(super) fn calls(&self, session: &str) -> Res<Vec<CallRecord>> {
-        let session = self.home()?.open_session(session)?;
+        // A reader never takes the writer's lock: the capture worker keeps a
+        // session open across completions (AGENTS-005 P04a), and a reading
+        // that claimed the lock would be refused as held by this process.
+        let session = self.home()?.read_session(session)?;
         let mut records = Vec::new();
         for entry in session.customs_everywhere(CUSTOM_CALL)? {
             if let EntryBody::Custom {

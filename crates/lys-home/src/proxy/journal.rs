@@ -338,6 +338,8 @@ enum Message {
     Capture(Work),
     Settle,
     #[cfg(test)]
+    Release(mpsc::Sender<()>),
+    #[cfg(test)]
     Stop,
     #[cfg(test)]
     Pause(mpsc::Sender<()>, mpsc::Receiver<()>),
@@ -400,6 +402,19 @@ impl Sink {
         Ok(release)
     }
 
+    /// Have the sink release every session it keeps open, and wait until
+    /// it has: a test that recovers or reads with the writer's lock in this
+    /// process runs after this, never racing the sink's own hold.
+    #[cfg(test)]
+    pub(super) fn released(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let (done, released) = mpsc::channel();
+        self.tx
+            .send(Message::Release(done))
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        released.recv()?;
+        Ok(())
+    }
+
     pub(super) fn capture(&self, work: Work) -> Result<(), ProxyError> {
         self.tx
             .send(Message::Capture(work))
@@ -423,6 +438,8 @@ impl Message {
         match self {
             Self::Capture(..) => String::from("a capture event"),
             Self::Settle => String::from("a settle request"),
+            #[cfg(test)]
+            Self::Release(..) => String::from("a release request"),
             #[cfg(test)]
             Self::Stop => String::from("a worker shutdown"),
             #[cfg(test)]
@@ -458,7 +475,17 @@ fn run(
                 Some(job) => held.push(job),
                 None => continue,
             },
-            Message::Settle => {}
+            // A settle quiesces the sink: the sessions it kept open are
+            // released, so a reader or a recovery in this process is not
+            // refused by the sink's own lock; the next completion reopens.
+            Message::Settle => sessions.release(),
+            #[cfg(test)]
+            Message::Release(done) => {
+                sessions.release();
+                // The asker gone is no fault of the sink.
+                let _asked = done.send(());
+                continue;
+            }
             #[cfg(test)]
             Message::Stop => return,
             #[cfg(test)]

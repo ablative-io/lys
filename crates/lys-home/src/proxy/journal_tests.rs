@@ -240,12 +240,15 @@ async fn a_journal_lost_after_admission_forwards_and_records_unrecorded_once_wri
         .recv()
         .await
         .ok_or("the upstream saw no request")?;
+    // The record was created at admission and is appended in place at
+    // completion (AGENTS-005 P01), so the directory alone read-only no longer
+    // refuses the write: the record files are made read-only with it.
     let journal = harness.state("journal");
-    std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o500))?;
+    permit(&journal, 0o500, 0o400)?;
     go_tx.send(()).await?;
     let received = call.await??;
     let held = harness.report()?;
-    std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o700))?;
+    permit(&journal, 0o700, 0o600)?;
     assert_eq!(
         received,
         hyper::body::Bytes::from(message_response().to_string())
@@ -341,6 +344,7 @@ async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all(
             .iter()
             .any(|reason| reason.contains("Permission denied"))
     );
+    harness.proxy.sink().released()?;
     let recovered = recover(
         &harness.home()?,
         &Journal::open(harness.state("journal"))?,
@@ -365,6 +369,9 @@ async fn a_whole_large_response_stays_complete_after_journal_recovery() -> Res {
     let home = harness.home()?;
     let journal = Journal::open(harness.state("journal"))?;
     journal.write(&open_call(&calls[0].call_id, Some(KEY)))?;
+    // The live sink keeps the session open across completions; a recovery
+    // in this process runs once the sink has released it.
+    harness.proxy.sink().released()?;
     let reports = recover(&home, &journal, &harness.state("capture"))?;
     assert_eq!(reports.len(), 1);
     assert!(reports[0].already_recorded);
@@ -495,5 +502,18 @@ fn a_put_appends_in_place_and_a_torn_tail_yields_the_last_whole_record() -> Res 
     );
     journal.retire("c9")?;
     assert!(journal.open_calls()?.is_empty());
+    Ok(())
+}
+
+/// Set the mode of `dir` and of every file in it: the journal's directory
+/// and its records together, read-only or writable.
+fn permit(dir: &std::path::Path, dir_mode: u32, file_mode: u32) -> Res {
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_file() {
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(file_mode))?;
+        }
+    }
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(dir_mode))?;
     Ok(())
 }
