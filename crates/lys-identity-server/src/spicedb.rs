@@ -265,6 +265,7 @@ impl SpiceDb {
             "operation": "OPERATION_TOUCH",
             "relationship": relationship_json(&placement(child, parent)),
         });
+        PassReads::forget();
         let (status, body) = self.call("/v1/relationships/write", &json!({"updates": [update]}))?;
         if status == 200 {
             return Ok(());
@@ -337,6 +338,24 @@ impl SpiceDb {
     }
 
     fn read_of(&self, filter: &Value) -> Result<Vec<Relationship>, GrantError> {
+        let key = filter.to_string();
+        if let Some(held) = PASS_READS.with(|memo| {
+            memo.borrow()
+                .as_ref()
+                .and_then(|reads| reads.get(&key).cloned())
+        }) {
+            return Ok(held);
+        }
+        let held = self.read_of_engine(filter)?;
+        PASS_READS.with(|memo| {
+            if let Some(reads) = memo.borrow_mut().as_mut() {
+                reads.insert(key, held.clone());
+            }
+        });
+        Ok(held)
+    }
+
+    fn read_of_engine(&self, filter: &Value) -> Result<Vec<Relationship>, GrantError> {
         let request =
             json!({"consistency": {"fullyConsistent": true}, "relationshipFilter": filter});
         let (status, body) = self.call("/v1/relationships/read", &request)?;
@@ -499,6 +518,7 @@ impl RelationshipStore for SpiceDb {
         };
         updates.push(update("OPERATION_TOUCH", self.marker(revision)));
         let request = json!({"updates": updates, "optionalPreconditions": [precondition]});
+        PassReads::forget();
         let (status, body) = self.call("/v1/relationships/write", &request)?;
         if status == 200 {
             return Ok(());
@@ -665,3 +685,37 @@ mod key_tests;
 #[cfg(test)]
 #[path = "spicedb_poison_tests.rs"]
 mod poison_tests;
+
+thread_local! {
+    /// Relationship reads answered once while a [`PassReads`] is held on this thread.
+    static PASS_READS: std::cell::RefCell<Option<std::collections::HashMap<String, Vec<Relationship>>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// While held, each distinct relationship read on this thread is asked of the engine once
+/// and repeated from memory. One pass decides every (resource, action) pair of an app
+/// against one snapshot, and each decision's frame re-read the whole relationship set: on
+/// 11 Oct 2026 one Cambium agent pass took over 60 s. A write on this thread forgets them.
+pub(crate) struct PassReads;
+
+impl PassReads {
+    /// Start answering repeated reads from memory until the guard drops.
+    pub(crate) fn hold() -> Self {
+        PASS_READS.with(|memo| *memo.borrow_mut() = Some(std::collections::HashMap::new()));
+        Self
+    }
+
+    fn forget() {
+        PASS_READS.with(|memo| {
+            if let Some(reads) = memo.borrow_mut().as_mut() {
+                reads.clear();
+            }
+        });
+    }
+}
+
+impl Drop for PassReads {
+    fn drop(&mut self) {
+        PASS_READS.with(|memo| *memo.borrow_mut() = None);
+    }
+}

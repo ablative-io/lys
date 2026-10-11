@@ -242,6 +242,8 @@ fn rights(
     at: u64,
     required: Option<u64>,
 ) -> Result<Read, ServerError> {
+    // Every decision below reads the same snapshot: ask the engine once per distinct read.
+    let _reads = crate::spicedb::PassReads::hold();
     let mut paths: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let Some(schema) = judged.apps.schema(app) else {
         return Ok(Read {
