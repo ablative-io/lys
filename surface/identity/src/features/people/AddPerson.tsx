@@ -3,6 +3,8 @@ import { api, operationId, Refused, request, useLoad } from '../../api';
 import type { GrantModel } from '../../generated/grants';
 import { sendKept } from '../../kept';
 import { DirectoryGate, ErrorWords } from './Words';
+import { identity } from '../access/Resources';
+import type { ResourcesView } from '../access/Resources';
 import './add-agent.css';
 import { Act } from '../../shell/Act';
 
@@ -87,7 +89,18 @@ function Failure({ failure, operation }: { failure: unknown; operation: string |
   return stopped ? <RefusedReceipt stopped={stopped} /> : <ErrorWords problem={failure} />;
 }
 
-function PersonForm({ person, model }: { person: string; model: GrantModel }) {
+/** The kinds a first grant may name and, for each, the resources of it the caller sees; a person or an agent is never a first grant's resource. */
+function grantable(view: ResourcesView): Map<string, string[]> {
+  const kinds = new Map<string, string[]>();
+  for (const resource of view.resources) {
+    if (identity(resource.id)) continue;
+    kinds.set(resource.kind, [...(kinds.get(resource.kind) ?? []), resource.id]);
+  }
+  return new Map([...kinds].sort(([a], [b]) => a.localeCompare(b)).map(([kind, ids]) => [kind, ids.sort()]));
+}
+
+function PersonForm({ person, model, resources }: { person: string; model: GrantModel; resources: ResourcesView }) {
+  const choices = grantable(resources);
   const key = 'lys.add-person.' + person;
   const [saved] = useState(() => {
     try {
@@ -125,8 +138,15 @@ function PersonForm({ person, model }: { person: string; model: GrantModel }) {
     <label className="field">Name<input name="display_name" autoFocus autoComplete="name" value={asking.name} disabled={locked} onChange={set('name')} /></label>
     <label className="field">Email<input name="email" type="email" autoComplete="email" value={asking.email} disabled={locked} onChange={set('email')} /></label>
     <p className="note">Their first grant: what they may use from the start. More can be given from Access later.</p>
-    <label className="field">Kind of thing<input name="kind" autoComplete="off" value={asking.kind} disabled={locked} onChange={set('kind')} /></label>
-    <label className="field">Which one<input name="resource" autoComplete="off" value={asking.id} disabled={locked} onChange={set('id')} /></label>
+    <label className="field">Kind of thing<select name="kind" value={asking.kind} disabled={locked} onChange={(event) => setAsking({ ...asking, kind: event.target.value, id: '' })}>
+      <option value="" disabled>Choose a kind</option>
+      {[...choices.keys()].map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+    </select></label>
+    <label className="field">Which one<select name="resource" value={asking.id} disabled={locked || !asking.kind} onChange={set('id')}>
+      <option value="" disabled>{asking.kind ? 'Choose one' : 'Choose a kind first'}</option>
+      {(choices.get(asking.kind) ?? []).map((id) => <option key={id} value={id}>{id}</option>)}
+    </select></label>
+    {choices.size ? null : <p className="note">No resource is visible to you yet: <a href="#/resources">Resources</a> lists what can be granted.</p>}
     <label className="field">Relation<select name="relation" value={asking.relation} disabled={locked} onChange={set('relation')}>
       <option value="" disabled>Choose a relation</option>
       {Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}
@@ -139,11 +159,11 @@ function PersonForm({ person, model }: { person: string; model: GrantModel }) {
 
 export function AddPerson() {
   const load = useLoad(async () => {
-    const [me, people, model] = await Promise.all([api.me(), api.people(), api.model()]);
-    return { me, people, model };
+    const [me, people, model, resources] = await Promise.all([api.me(), api.people(), api.model(), request<ResourcesView>('/resources')]);
+    return { me, people, model, resources };
   }, 'add-person');
   return <div className="page"><a href="#/people">People and agents</a><h1>Add a person</h1>
     <DirectoryGate load={load} title="Add a person" ok={(data) => data.people.scope === 'directory'
-      ? <PersonForm person={data.me.person.id} model={data.model} /> : <p>Only the Lys administrator can add people.</p>} />
+      ? <PersonForm person={data.me.person.id} model={data.model} resources={data.resources} /> : <p>Only the Lys administrator can add people.</p>} />
   </div>;
 }

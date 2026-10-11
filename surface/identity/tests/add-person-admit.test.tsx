@@ -27,8 +27,8 @@ async function form(routes: Record<string, Route>) {
 async function fill(entry: HTMLFormElement) {
   await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
   await type(entry.querySelector('input[name="email"]'), 'helper@example.test');
-  await type(entry.querySelector('input[name="kind"]'), 'workspace');
-  await type(entry.querySelector('input[name="resource"]'), 'ward-7');
+  await choose(entry.querySelector('select[name="kind"]'), 'workspace');
+  await choose(entry.querySelector('select[name="resource"]'), 'ward-7');
   await choose(entry.querySelector('select[name="relation"]'), 'editor');
 }
 
@@ -130,5 +130,17 @@ describe('Add a person in one act', () => {
     await submit(entry);
     expect(document.querySelector('[aria-label="Refused receipt"]')).toBeNull();
     expect(entry.textContent).toContain('IdentityNotActive');
+  });
+  it('offers as a first grant only the kinds and resources Lys lists, never a person or an agent', async () => {
+    const { entry } = await form({});
+    const kinds = [...entry.querySelectorAll('select[name="kind"] option')].map((option) => option.getAttribute('value'));
+    expect(kinds).toEqual(['', 'place', 'workspace']);
+    expect(entry.querySelector('select[name="resource"]')?.hasAttribute('disabled')).toBe(true);
+    await choose(entry.querySelector('select[name="kind"]'), 'workspace');
+    const ids = [...entry.querySelectorAll('select[name="resource"] option')].map((option) => option.getAttribute('value'));
+    expect(ids).toEqual(['', 'ward-3', 'ward-7']);
+    await choose(entry.querySelector('select[name="resource"]'), 'ward-3');
+    await choose(entry.querySelector('select[name="kind"]'), 'place');
+    expect((entry.querySelector('select[name="resource"]') as HTMLSelectElement).value).toBe('');
   });
 });

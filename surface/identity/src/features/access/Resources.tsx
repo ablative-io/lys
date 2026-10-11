@@ -8,11 +8,11 @@ import { DirectoryGate as Gate } from '../people/Words';
 import { clock } from '../file/time';
 import { counted } from '../../shell/count';
 
-interface ResourceSummary { kind: string; id: string; standing: number; ended: number; holders: number }
-interface ResourcesView { kinds: string[]; resources: ResourceSummary[]; revision: number; judged_at: number }
+export interface ResourceSummary { kind: string; id: string; standing: number; ended: number; holders: number }
+export interface ResourcesView { kinds: string[]; resources: ResourceSummary[]; revision: number; judged_at: number }
 const keyOf = (resource: ResourceSummary) => resource.kind + ':' + resource.id;
 /** A resource that is itself a person or an agent is read by its name, never its raw id. */
-const identity = (id: string) => /^(?:person|agent)-[0-9a-f]{32}$/.test(id);
+export const identity = (id: string) => /^(?:person|agent)-[0-9a-f]{32}$/.test(id);
 /** The resources, and the names of the people and agents among them; the directory is read only when one of them is an identity. */
 async function readResources(): Promise<{ list: ResourcesView; label: (resource: ResourceSummary) => string }> {
   const list = await request<ResourcesView>('/resources');

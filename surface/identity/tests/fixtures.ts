@@ -232,6 +232,12 @@ export const SERVICE: Record<string, Route> = {
   '/drafts?state=decided': ok({ drafts: [] }),
   '/product-drafts': ok({ drafts: [], next: null, total: 0 }),
   '/requests': ok({ requests: [] }),
+  '/resources': ok({ kinds: ['place', 'workspace'], revision: 1, judged_at: 1790000000, resources: [
+    { kind: 'workspace', id: 'ward-7', standing: 2, ended: 0, holders: 2 },
+    { kind: 'workspace', id: 'ward-3', standing: 1, ended: 0, holders: 1 },
+    { kind: 'place', id: 'handover', standing: 1, ended: 0, holders: 1 },
+    { kind: 'workspace', id: 'person-0123456789abcdef0123456789abcdef', standing: 1, ended: 0, holders: 1 },
+  ] }),
   '/reviews': ok({ scope: 'personal', due: [], unanswered: [], revision: 0, judged_at: 1790000000 }),
   '/runtime/found': ok({ sessions: [] }),
   '/runtime/sessions': ok({ sessions: [] }),

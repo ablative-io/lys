@@ -28,8 +28,8 @@ async function submit(entry: HTMLFormElement) {
 async function fill(entry: HTMLFormElement) {
   await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
   await type(entry.querySelector('input[name="email"]'), 'helper@example.test');
-  await type(entry.querySelector('input[name="kind"]'), 'workspace');
-  await type(entry.querySelector('input[name="resource"]'), 'ward-7');
+  await choose(entry.querySelector('select[name="kind"]'), 'workspace');
+  await choose(entry.querySelector('select[name="resource"]'), 'ward-7');
   await choose(entry.querySelector('select[name="relation"]'), 'editor');
 }
 function admitted(body: unknown) {
@@ -44,7 +44,8 @@ function admitted(body: unknown) {
 describe('Add a person', () => {
   it('has the name, the email and the first grant, and one Add button', async () => {
     const { entry } = await form({});
-    for (const name of ['display_name', 'email', 'kind', 'resource']) expect(entry.querySelector(`input[name="${name}"]`)).not.toBeNull();
+    for (const name of ['display_name', 'email']) expect(entry.querySelector(`input[name="${name}"]`)).not.toBeNull();
+    for (const name of ['kind', 'resource']) expect(entry.querySelector(`select[name="${name}"]`)).not.toBeNull();
     expect(entry.querySelector('select[name="relation"]')).not.toBeNull();
     const add = entry.querySelector('button[type="submit"]');
     expect([add?.getAttribute('aria-label'), add?.textContent]).toEqual(['Add person', 'Add']);
