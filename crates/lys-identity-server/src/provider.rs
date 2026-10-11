@@ -69,7 +69,7 @@ mod refusal;
 mod rights_claim;
 pub(crate) use agent_issue::{AgentAppPass, agent_app_pass};
 pub(crate) use bearer::{pass_holder, presented_pass};
-pub use endpoints::routes;
+pub use endpoints::{api_keys, routes};
 pub(crate) use grant_binding::signed_binding;
 pub use keys::{RotateAnswer, RotateBody};
 pub(crate) use machine_issue::{MachinePass, machine_pass};

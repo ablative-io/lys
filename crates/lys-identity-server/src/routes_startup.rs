@@ -300,7 +300,10 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         apps.metadata_address(),
     ));
     let served = match &config.surface_dir {
-        Some(dir) => crate::surface::serving(dir, api)?,
+        Some(dir) => crate::surface::serving(
+            dir,
+            api.merge(crate::provider::api_keys(Arc::clone(&state))),
+        )?,
         None => api,
     };
     Ok(served

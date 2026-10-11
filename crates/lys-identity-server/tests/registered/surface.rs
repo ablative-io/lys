@@ -128,3 +128,32 @@ async fn public_screens_do_not_exempt_unknown_or_wildcard_shaped_api_requests() 
     );
     Ok(())
 }
+
+/// With the screens mounted, the API answers the key set at `/api/oauth/jwks` exactly as the
+/// origin answers `/oauth/jwks`: lys-pass joins `oauth/jwks` onto the API address a product
+/// holds, and Cambium's key fetch met the API's 404 until it did (11 Oct 2026).
+#[tokio::test]
+async fn the_api_answers_the_key_set_the_origin_publishes() -> TestResult {
+    let (service, _cookie) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.surface_dir = Some(config.log_dir.with_file_name("surface")),
+        |config| {
+            let surface = config.surface_dir.as_ref().ok_or("surface")?;
+            std::fs::create_dir_all(surface)?;
+            std::fs::write(surface.join("index.html"), "public fixture screen")?;
+            Ok(String::new())
+        },
+    )
+    .await?;
+    let origin = reqwest::get(format!("{}/oauth/jwks", service.base)).await?;
+    let (origin_status, origin_body) = (origin.status(), origin.text().await?);
+    let api = reqwest::get(format!("{}/api/oauth/jwks", service.base)).await?;
+    let (api_status, api_body) = (api.status(), api.text().await?);
+    assert_eq!(api_status, origin_status, "{api_body}");
+    assert_eq!(api_body, origin_body);
+    assert!(!api_body.contains("not an API route"), "{api_body}");
+    Ok(())
+}
