@@ -32,3 +32,6 @@ pub mod seat_import;
 
 // `lys agent pass` (AGENTS-006).
 pub mod agent_pass;
+
+// `lys mcp`: an agent's own signed MCP connection to Lys.
+pub mod mcp_bridge;

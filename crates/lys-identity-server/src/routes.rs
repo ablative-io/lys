@@ -244,6 +244,17 @@ pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, 
     if let Some(actor) = crate::operator::actor(state, headers)? {
         return Ok(actor);
     }
+    // An agent whose signed MCP message relayed this call, its route grant judged
+    // before the handler (`route_actions::admit`): the agent itself, never a person.
+    if let Some(agent) = crate::agent_signature::relayed_agent() {
+        return Ok(Actor::new(
+            lys_identity::LoginBinding::new(state.oidc.issuer(), &agent.to_string())?,
+            lys_identity::Provenance::new(
+                lys_identity::AuthMethod::AgentSignature(agent),
+                crate::session::now(),
+            ),
+        ));
+    }
     state.sessions.actor(cookie_header(headers))
 }
 
@@ -259,16 +270,25 @@ pub(crate) fn administrator(state: &AppState, actor: &Actor) -> Result<(), Serve
     })
 }
 
-/// Admit a pass actor whose route grant was exercised by the guarded router.
-/// A signed agent cannot borrow this exception to personal admission.
+/// Admit a pass actor, or the agent a signed MCP message relayed this call for, whose
+/// route grant was exercised by the guarded router. A request merely signed, not relayed
+/// and judged, cannot borrow this exception to personal admission.
 pub(crate) fn admitted_agent(
     directory: &lys_identity::projection::Projection,
     actor: &Actor,
 ) -> Result<bool, ServerError> {
-    if matches!(
-        actor.provenance().method(),
-        lys_identity::AuthMethod::AgentPass(_)
-    ) {
+    let relayed = match actor.provenance().method() {
+        lys_identity::AuthMethod::AgentSignature(agent) => {
+            crate::agent_signature::relayed_agent() == Some(agent)
+        }
+        _ => false,
+    };
+    if relayed
+        || matches!(
+            actor.provenance().method(),
+            lys_identity::AuthMethod::AgentPass(_)
+        )
+    {
         crate::caller_admission::active_caller(directory, actor)?;
         return Ok(true);
     }

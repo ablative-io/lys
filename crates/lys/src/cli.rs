@@ -90,6 +90,26 @@ pub enum Command {
     /// and `LYS_MCP_URL` (a Codex seat), and is never printed.
     Variables(VariablesArgs),
 
+    /// An agent's own MCP connection to Lys, over stdio: each JSON-RPC message read
+    /// on stdin is signed with the agent's key (`lys-agent-signature`) and posted to
+    /// Lys's MCP route, and the answer written on stdout. Calls carry the agent's own
+    /// grants and meet Lys's own refusals; the bridge grants nothing. The key is never
+    /// printed.
+    Mcp {
+        /// Lys's MCP route on loopback, e.g. `http://127.0.0.1:8490/api/mcp`.
+        #[arg(long)]
+        url: String,
+
+        /// The agent the messages are signed as (`agent-…`).
+        #[arg(long)]
+        agent: String,
+
+        /// The agent's key: a PKCS#8 PEM file, or a seat file whose `privateKeyPem`
+        /// holds it.
+        #[arg(long)]
+        key_file: PathBuf,
+    },
+
     /// Sign an attestation over a payload file and write the `COSE_Sign1`
     /// artifact.
     Attest {

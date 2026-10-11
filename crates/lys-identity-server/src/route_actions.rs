@@ -7,16 +7,18 @@ use lys_identity::grants::{ExerciseRequest, GrantError, Route};
 
 use crate::routes::AppState;
 
-/// A pass is judged before its handler and never acquires a person's authority.
+/// A pass is judged before its handler and never acquires a person's authority. So is
+/// an agent whose signed MCP message relayed this call: the route's action is exercised
+/// through the agent's own grants, as a run pass's is.
 pub(crate) fn admit(
     state: &AppState,
     method: &str,
     path: &str,
     headers: &HeaderMap,
 ) -> Result<(), Box<Response>> {
-    let Some(agent) = crate::agent_pass::holder(state, headers)
-        .map_err(|error| Box::new(error.into_response()))?
-    else {
+    let pass = crate::agent_pass::holder(state, headers)
+        .map_err(|error| Box::new(error.into_response()))?;
+    let Some(agent) = pass.or_else(crate::agent_signature::relayed_agent) else {
         return Ok(());
     };
     // The MCP envelope carries no resource act; its dispatched tool route is judged.

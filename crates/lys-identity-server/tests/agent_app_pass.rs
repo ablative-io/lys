@@ -10,6 +10,7 @@
 //! refused by name.
 
 use std::error::Error;
+use std::fmt::Write as _;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use identity_contract::apps::{
@@ -411,7 +412,6 @@ fn signed_pass_header(
         lys_identity_server::agent_signature::payload("POST", path, &bytes, signed_at, &nonce);
     let signature = lys_core::attestation::sign_attestation(&payload, key).to_cose_bytes();
     let mut encoded = String::new();
-    use std::fmt::Write as _;
     for byte in signature {
         write!(encoded, "{byte:02x}")?;
     }

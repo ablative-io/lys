@@ -21,49 +21,50 @@ async fn certified_agent() -> Result<
         Actor, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, Profile, Provenance,
         Transition,
     };
-    let (service, (agent, key)) = Service::start_with(|config| {
-        lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
-        let path = config.log_dir.clone();
-        let key = lys_core::Ed25519Identity::load(&config.event_key_file)?;
-        lys_identity::directory_migration::migrate(
-            lys_log_store::FileLeafStore::open(&path)?,
-            &key,
-        )?;
-        let mut directory = Directory::open(
-            Box::new(move || lys_log_store::FileLeafStore::open(&path)),
-            key,
-        )?;
-        let actor = Actor::new(
-            LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-            Provenance::new(AuthMethod::Oidc, 1),
-        );
-        let (person, _) = directory.setup_person(
-            actor.clone(),
-            OperationId::generate()?,
-            Profile::new("Owner")?,
-            1,
-        )?;
-        let (agent, _) = directory.register_agent(
-            actor.clone(),
-            OperationId::generate()?,
-            person,
-            Profile::new("Caller")?,
-            2,
-        )?;
-        directory.transition(
-            actor,
-            OperationId::generate()?,
-            IdentityId::Agent(agent),
-            Transition::Activate,
-            "",
-            3,
-        )?;
-        Ok((
-            agent.to_string(),
-            std::sync::Arc::new(lys_core::Ed25519Identity::load(&config.event_key_file)?),
-        ))
-    })
-    .await?;
+    let (service, (agent, key)) =
+        Service::start_judging(&lys_identity::grants::shipped_model(), None, |config| {
+            lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+            let path = config.log_dir.clone();
+            let key = lys_core::Ed25519Identity::load(&config.event_key_file)?;
+            lys_identity::directory_migration::migrate(
+                lys_log_store::FileLeafStore::open(&path)?,
+                &key,
+            )?;
+            let mut directory = Directory::open(
+                Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+                key,
+            )?;
+            let actor = Actor::new(
+                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                Provenance::new(AuthMethod::Oidc, 1),
+            );
+            let (person, _) = directory.setup_person(
+                actor.clone(),
+                OperationId::generate()?,
+                Profile::new("Owner")?,
+                1,
+            )?;
+            let (agent, _) = directory.register_agent(
+                actor.clone(),
+                OperationId::generate()?,
+                person,
+                Profile::new("Caller")?,
+                2,
+            )?;
+            directory.transition(
+                actor,
+                OperationId::generate()?,
+                IdentityId::Agent(agent),
+                Transition::Activate,
+                "",
+                3,
+            )?;
+            Ok((
+                agent.to_string(),
+                std::sync::Arc::new(lys_core::Ed25519Identity::load(&config.event_key_file)?),
+            ))
+        })
+        .await?;
     let cookie = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
         .await?;
@@ -126,12 +127,12 @@ async fn a_refused_ask_is_kept_once_and_answered_as_asked_not_as_a_receipt()
         let answer: Value = response.json().await?;
         assert_eq!(answer["result"]["isError"], true, "{answer}");
         assert_eq!(
-            answer["result"]["structuredContent"]["status"], 401,
-            "an agent is no signed-in person, so the route refuses after the ask is kept: {answer}"
+            answer["result"]["structuredContent"]["status"], 403,
+            "an agent holding no grant to register people is refused after the ask is kept: {answer}"
         );
         assert_eq!(
             answer["result"]["structuredContent"]["body"]["refusal"],
-            "NotSignedIn"
+            "NotHeld"
         );
         assert!(
             answer["result"].get("receipt").is_none(),
@@ -670,5 +671,75 @@ async fn a_signed_message_cannot_also_carry_a_grant_token() -> Result<(), Box<dy
             .ok_or("no refusal reason")?
             .contains("a grant token cannot carry another credential")
     );
+    Ok(())
+}
+
+/// An agent's MCP call to a route whose door knew only a person's session answered
+/// `NotSignedIn` (12 Oct 2026). Relayed, it is judged through the agent's own grants: with
+/// no grant for the route's action it is refused by name, and with one it registers a
+/// person exactly as the HTTP route would for a run pass holding that grant.
+#[tokio::test]
+async fn an_agent_registers_a_person_through_mcp_only_with_a_grant_for_it()
+-> Result<(), Box<dyn Error>> {
+    let (service, cookie, agent, key) = certified_agent().await?;
+    let register = |id: u64| -> Result<(Vec<u8>, String), Box<dyn Error>> {
+        let bytes = change_call(id, "/people", &nobody()?)?;
+        let signature = signed(&agent, &key, &bytes)?;
+        Ok((bytes, signature))
+    };
+
+    let (bytes, signature) = register(20)?;
+    let refused: Value = post_signed(&service.base, bytes, &signature)
+        .await?
+        .json()
+        .await?;
+    let answer = &refused["result"]["structuredContent"];
+    assert_eq!(refused["result"]["isError"], true, "{refused}");
+    let name = answer["body"]["refusal"]
+        .as_str()
+        .ok_or("no refusal name")?;
+    assert_ne!(name, "NotSignedIn", "{refused}");
+
+    let (status, tree) = service.get("/tree", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{tree}");
+    let person = tree["root"]["id"].as_str().ok_or("no person")?.to_owned();
+    let resource = json!({"kind": "person", "id": "all"});
+    let (status, root) = service
+        .post(
+            "/grants/roots",
+            Some(&cookie),
+            &json!({
+                "operation": lys_identity::OperationId::generate()?.to_string(),
+                "route": "api", "holder": person, "resource": resource,
+                "relation": "only.person.create",
+                "pass_on": {"kind": "to", "actions": ["person.create"], "recipients": ["agent"]},
+                "window": {"starts_at": 0, "ends_at": null},
+            }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{root}");
+    let (status, granted) = service
+        .post(
+            "/grants",
+            Some(&cookie),
+            &json!({
+                "operation": lys_identity::OperationId::generate()?.to_string(),
+                "route": "api", "source": root["grant"], "recipient": agent,
+                "responsible": person, "resource": resource,
+                "relation": "only.person.create", "pass_on": {"kind": "use_only"},
+                "window": {"starts_at": 0, "ends_at": null},
+            }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{granted}");
+
+    let (bytes, signature) = register(21)?;
+    let admitted: Value = post_signed(&service.base, bytes, &signature)
+        .await?
+        .json()
+        .await?;
+    let answer = &admitted["result"]["structuredContent"];
+    assert_eq!(answer["status"], 200, "{admitted}");
+    assert!(answer["body"]["person"].is_string(), "{admitted}");
     Ok(())
 }

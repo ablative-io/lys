@@ -97,13 +97,33 @@ async fn check(
         return next.run(request).await;
     }
     // A call relayed from an MCP message: its body is the message's, read
-    // already under the guard its own caller was given.
+    // already under the guard its own caller was given. A route whose door
+    // takes no agent signature knew only a person's session, and an agent's
+    // call to it answered NotSignedIn (12 Oct 2026): it is judged here as a
+    // run pass's call is, through the agent's own grants for the route's action.
     if request
         .extensions()
         .get::<crate::agent_signature::TokenPrincipal>()
         .is_some()
-        || crate::agent_signature::relayed_agent().is_some()
     {
+        return next.run(request).await;
+    }
+    if crate::agent_signature::relayed_agent().is_some() {
+        let signed_door = door(&doors, matched.as_ref(), request.method())
+            .is_some_and(|auth| auth.iter().any(|door| matches!(door, Auth::AgentSignature)));
+        if !signed_door {
+            let method = pass_method(request.method());
+            let path = request
+                .uri()
+                .path()
+                .strip_prefix(NESTED)
+                .unwrap_or(request.uri().path());
+            if let Err(refusal) =
+                crate::route_actions::admit(&doors.state, method, path, request.headers())
+            {
+                return refuse(request, *refusal).await;
+            }
+        }
         return next.run(request).await;
     }
     if request.method() == HttpMethod::POST
@@ -112,21 +132,7 @@ async fn check(
     {
         return unverified(request, next).await;
     }
-    let named = matched.and_then(|matched| {
-        let path = matched.as_str();
-        let method = match request.method() {
-            &HttpMethod::HEAD => HttpMethod::GET,
-            method => method.clone(),
-        };
-        doors
-            .doors
-            .get(&(method.clone(), path))
-            .or_else(|| {
-                let inner = path.strip_prefix(NESTED)?;
-                doors.doors.get(&(method, inner))
-            })
-            .copied()
-    });
+    let named = door(&doors, matched.as_ref(), request.method());
     let whole = match named {
         Some(auth) => match admitted(&doors.state, auth, request.headers()) {
             Ok(whole) => whole,
@@ -138,6 +144,27 @@ async fn check(
         return next.run(request).await;
     }
     unverified(request, next).await
+}
+
+/// The doors the matched route declares, nested under `/api` or not.
+fn door(
+    doors: &Doors,
+    matched: Option<&MatchedPath>,
+    method: &HttpMethod,
+) -> Option<&'static [Auth]> {
+    let path = matched?.as_str();
+    let method = match method {
+        &HttpMethod::HEAD => HttpMethod::GET,
+        method => method.clone(),
+    };
+    doors
+        .doors
+        .get(&(method.clone(), path))
+        .or_else(|| {
+            let inner = path.strip_prefix(NESTED)?;
+            doors.doors.get(&(method, inner))
+        })
+        .copied()
 }
 
 /// Whether the request may reach its route: a public route, or a caller
