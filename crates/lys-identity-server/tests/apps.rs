@@ -1063,5 +1063,38 @@ async fn an_identity_of_no_known_kind_is_refused_by_name() -> TestResult {
     Ok(())
 }
 
+/// A service app that registered no return address (liminal: it admits passes
+/// and signs nobody in) is approved with none; an app that registered one is
+/// still refused an approval that would leave it without (11 Oct 2026).
+#[tokio::test]
+async fn a_service_app_with_no_return_address_is_approved_with_none() -> TestResult {
+    let (service, _) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let mut body = registration(FILES, &workspace_schema(FILES))?;
+    body["redirects"] = json!([]);
+    ok(post(&service, "/apps", Auth::Cookie(&admin), &body).await?)?;
+    let empty = json!({"operation": op()?, "redirects": [], "profile": false});
+    ok(post(
+        &service,
+        &format!("/apps/{FILES}/approve"),
+        Auth::Cookie(&admin),
+        &empty,
+    )
+    .await?)?;
+    let app = ok(get(&service, &format!("/apps/{FILES}"), Auth::Cookie(&admin)).await?)?;
+    assert_eq!(app["state"], "approved", "{app}");
+    assert_eq!(app["redirects"], json!([]), "{app}");
+    register(&service, &admin, NOTES).await?;
+    let refused_answer = post(
+        &service,
+        &format!("/apps/{NOTES}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation": op()?, "redirects": [], "profile": false}),
+    )
+    .await?;
+    refused(&refused_answer, 400, "redirect_invalid")?;
+    Ok(())
+}
+
 #[path = "shared/app_registration.rs"]
 mod app_registration;

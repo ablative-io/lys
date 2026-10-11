@@ -506,7 +506,19 @@ async fn approve(
     let operation = OperationId::from_str(&body.operation)?.to_string();
     // The sign-in settings are judged before any broker work: an approval
     // that would leave the app unable to sign anyone in is refused whole.
-    let redirects = crate::apps_sign_in::redirects(&id, &body.redirects)?;
+    // A service app that registered no return address (liminal: it admits passes and
+    // signs nobody in) is approved with none, and its schema still decides its passes.
+    let service = body.redirects.is_empty()
+        && with_apps(&state, |apps, _| {
+            Ok(apps
+                .app(&id)
+                .is_some_and(|app| app.registered.redirects.is_empty()))
+        })?;
+    let redirects = if service {
+        Vec::new()
+    } else {
+        crate::apps_sign_in::redirects(&id, &body.redirects)?
+    };
     // Authenticate and check pending state before doing any broker work. Never
     // hold directory/apps locks across a network wait; recheck after custody.
     let pending = crate::apps_credentials::pending(&state, &headers, &id, &operation)?;
