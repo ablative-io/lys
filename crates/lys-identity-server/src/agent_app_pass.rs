@@ -103,7 +103,16 @@ async fn pass(
         serde_json::from_slice(&body).map_err(|error| ServerError::RequestMalformed {
             reason: format!("the pass request does not read: {error}"),
         })?;
-    let issued = agent_app_pass(&state, agent, &asked.audience)?;
+    // The rights claim asks SpiceDB once per placed resource over blocking sockets: on a
+    // runtime worker, a few concurrent passes held every worker and Lys answered no one
+    // (11 Oct 2026, a Cambium seat's first pass). It runs on the blocking pool instead.
+    let issued = {
+        let state = Arc::clone(&state);
+        let audience = asked.audience.clone();
+        tokio::task::spawn_blocking(move || agent_app_pass(&state, agent, &audience))
+            .await
+            .map_err(|error| unavailable(format!("the pass computation stopped: {error}")))??
+    };
     eprintln!("{}", issued_line(agent, &issued.audience, proof));
     Ok(Json(issued))
 }
