@@ -72,6 +72,7 @@ fn started(client: &Client, id: &str, script: &str) -> TestResult {
     };
     assert!(matches!(
         client.ask(&Act::Start {
+            tracking: None,
             lys_mcp: None,
             proxy: None,
             launch: Box::new(launch)
