@@ -116,6 +116,7 @@ pub(crate) async fn restart(
     let held = seat(&state, &name)?;
     let (admission, standing) = admitted(&state, &headers, &held, RESTART, &uri.to_string())?;
     state.seat_imports.require_selectable(&held.added.name)?;
+    crate::seats_monitor::check(&name)?;
     let mut notes = Vec::new();
     let stopped = if held.running {
         let ended = Box::pin(end(
@@ -299,7 +300,7 @@ async fn end(
         let live = live_session(state, &driven.machine, &session).await?;
         match &live {
             Some(live) if live.alive && !live.ended => {
-                if live.turn_active && !force {
+                if live.turn_active {
                     return Err(SeatError::TurnInProgress { name, session }.into());
                 }
                 if live.managed {
