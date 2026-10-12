@@ -267,7 +267,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
     GET "/oauth/authorize" "Begin an authorization" P [&["RequestMalformed", "RedirectUnregistered", "ScopeUnknown", "ScopeNotGranted", "NoPerson", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["credential_refused", "app_not_approved", "app_retired", "redirect_invalid", "apps_unavailable"]];
     POST "/oauth/token" "Exchange a code or a refresh token for a pass" P [&["RequestMalformed", "ClientUnknown", "CodeExpired", "CodeUnknown", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "RefreshUnknown", "SessionEnded", "HolderRetired", "NotAdmitted", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], UNANSWERED, &["credential_refused", "app_not_approved", "app_retired", "redirect_invalid", "apps_unavailable", "SecretsUnavailable"], &["grant_log_identity_unavailable", "grant_binding_unsupported", "grant_binding_revision_moved", "grant_binding_degraded"]];
-    GET "/oauth/jwks" "The issuer's signing keys" P [];
+    GET "/oauth/jwks" "The issuer's signing keys" P [&["ProviderUnavailable"]];
     GET "/.well-known/oauth-protected-resource" "Where the MCP door's authorization is found" P [];
     GET "/.well-known/oauth-protected-resource/mcp" "Where the MCP door's authorization is found, by its address" P [];
     GET "/.well-known/oauth-protected-resource/api/mcp" "Where the MCP door's authorization is found, by its screens address" P [];
