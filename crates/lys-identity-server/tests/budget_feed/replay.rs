@@ -186,4 +186,3 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
     assert_eq!(restored["used"], answer["used"]);
     Ok(())
 }
-

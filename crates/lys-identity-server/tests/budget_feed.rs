@@ -383,10 +383,9 @@ fn named(config: &lys_identity_server::Config) -> TestResult<Named> {
     })
 }
 
-
-#[path = "budget_feed/replay.rs"]
-mod replay;
 #[path = "budget_feed/late.rs"]
 mod late;
 #[path = "budget_feed/peers.rs"]
 mod peers;
+#[path = "budget_feed/replay.rs"]
+mod replay;
