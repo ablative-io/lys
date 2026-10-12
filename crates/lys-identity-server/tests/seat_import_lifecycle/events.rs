@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use super::{
-    Scene, TestResult, Value, operation, qualified_is_empty, scene, start_refused, support,
+    SEAT, Scene, TestResult, Value, operation, qualified_is_empty, scene, start_refused, support,
     surviving,
 };
 
