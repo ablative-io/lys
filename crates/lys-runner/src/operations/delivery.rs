@@ -9,7 +9,6 @@ use crate::error::RunnerError;
 use crate::protocol::{Ended, Key};
 use crate::session::{Table, now_ms};
 use crate::tracking_store::{Body, Commit};
-use std::collections::VecDeque;
 use std::sync::Weak;
 
 /// Say `outcome` in the feed, naming in the log a feed that cannot take it:
@@ -67,6 +66,32 @@ pub(crate) fn accept(
             format!("no session {} is held", operation.session),
         )
     })?;
+    if let OperationRequest::WakeUp { compaction, .. } = &operation.request {
+        if operation.operation != format!("wake-up-{compaction}")
+            || compaction == &operation.operation
+        {
+            return Err(RunnerError::refused(
+                "wake_up_identity_invalid",
+                "wake occurrence must name its compaction exactly",
+            ));
+        }
+        if session.managed.is_some() {
+            return Err(RunnerError::refused(
+                "control_transport_unsupported",
+                "this wake occurrence is for a terminal session",
+            ));
+        }
+        if table
+            .operations
+            .get(compaction)
+            .is_some_and(|held| held.session != operation.session || held.request != "compact")
+        {
+            return Err(RunnerError::refused(
+                "wake_up_compaction_invalid",
+                "wake occurrence names another session or request",
+            ));
+        }
+    }
     if session.ended.is_none() {
         crate::harness_control::events::accepts(table, &operation.session, &operation.request)?;
     }
@@ -80,7 +105,22 @@ pub(crate) fn accept(
             "session_ended: the session has ended and does nothing more".to_owned(),
         )
     } else {
-        (OperationState::Accepted, "accepted".to_owned())
+        let words = match &operation.request {
+            OperationRequest::WakeUp { compaction, .. } => {
+                format!("wake_up compaction={compaction}; accepted")
+            }
+            _ if session.guard.tracking.is_some()
+                && !session.guard.idle
+                && operation.request != OperationRequest::Stop =>
+            {
+                format!(
+                    "boundary_wait={}s; accepted awaiting turn boundary",
+                    super::BOUNDARY_WAIT.as_secs()
+                )
+            }
+            _ => "accepted".to_owned(),
+        };
+        (OperationState::Accepted, words)
     };
     let outcome = OperationOutcome {
         operation: operation.operation.clone(),
@@ -135,18 +175,21 @@ pub(crate) fn accept(
     if operation.request == OperationRequest::Stop {
         return Ok(outcome);
     }
-    let waits = table
-        .sessions
-        .get(&id)
-        .is_some_and(|session| session.guard.tracking.is_some() && !session.guard.idle);
-    if !waits {
-        deliver(table, &id);
+    if let Err(error) = super::boundary::arm(table, &operation.operation) {
+        let refused = table.operations.set(
+            &operation.operation,
+            OperationState::Refused,
+            error.to_string(),
+        )?;
+        feed(table, &refused);
+        return Ok(refused);
     }
-    Ok(table
+    deliver(table, &id);
+    table
         .operations
         .get(&operation.operation)
         .cloned()
-        .unwrap_or(outcome))
+        .ok_or_else(|| unavailable("accepted operation record disappeared"))
 }
 
 pub(super) fn stop(
@@ -176,19 +219,52 @@ pub(super) fn stop(
 /// Type the first accepted operation of session `id` that waits for a
 /// boundary: `delivering` made durable first, `delivered` after.
 pub(crate) fn deliver(table: &mut Table, id: &str) {
-    let next = table
-        .operations
-        .accepted
-        .get_mut(id)
-        .and_then(VecDeque::pop_front);
+    deliver_at(table, id, now_ms());
+}
+
+pub(super) fn deliver_at(table: &mut Table, id: &str, now: u64) {
+    let Some(queue) = table.operations.accepted.get(id) else {
+        return;
+    };
+    let eligible = |operation: &&String| {
+        table
+            .operations
+            .get(operation)
+            .is_some_and(|held| held.state == OperationState::Accepted)
+            && super::wake::ready(table, operation)
+    };
+    let next = queue
+        .iter()
+        .filter(eligible)
+        .find(|operation| {
+            table
+                .operations
+                .get(operation)
+                .is_some_and(|held| held.request == "wake_up")
+        })
+        .or_else(|| queue.iter().find(eligible))
+        .cloned();
     let Some(operation) = next else {
         return;
     };
-    let marked = table.operations.set(
-        &operation,
-        OperationState::Delivering,
-        "being typed".to_owned(),
-    );
+    let Some(mut words) = super::boundary::note_at(table, id, &operation, now) else {
+        return;
+    };
+    if let Some(held) = table.operations.get(&operation)
+        && let Some((note, _)) = held.words.split_once("; ")
+        && held.request == "wake_up"
+    {
+        words = match words.split_once("; ") {
+            Some((boundary, message)) => format!("{note} {boundary}; {message}"),
+            None => format!("{note}; {words}"),
+        };
+    }
+    if let Some(queue) = table.operations.accepted.get_mut(id) {
+        queue.retain(|queued| queued != &operation);
+    }
+    let marked = table
+        .operations
+        .set(&operation, OperationState::Delivering, words);
     if let Err(error) = marked {
         crate::error::said(&format!(
             "operation {operation} was not typed: its delivery could not be recorded first: {error}"
@@ -271,7 +347,16 @@ pub(super) fn finish(table: &mut Table, operation: &str, result: Result<(), Runn
         Err(error) => (OperationState::Refused, error.to_string()),
     };
     match table.operations.set(operation, state, words) {
-        Ok(outcome) => feed(table, &outcome),
+        Ok(outcome) => {
+            feed(table, &outcome);
+            if state == OperationState::Confirmed {
+                super::wake::confirmed(table, operation);
+            }
+            if state == OperationState::Refused {
+                super::wake::failed(table, operation);
+            }
+            super::boundary::resume(table, &outcome.session);
+        }
         Err(error) => crate::error::said(&format!(
             "operation {operation}: its delivery was not recorded, and it stays uncertain: {error}"
         )),
@@ -307,7 +392,10 @@ pub(crate) fn compacting(table: &mut Table, id: &str) {
             OperationState::Confirmed,
             "the harness said it is compacting".to_owned(),
         ) {
-            Ok(outcome) => feed(table, &outcome),
+            Ok(outcome) => {
+                feed(table, &outcome);
+                super::wake::confirmed(table, &operation);
+            }
             Err(error) => crate::error::said(&format!("operation {operation}: {error}")),
         }
     }

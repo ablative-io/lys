@@ -8,9 +8,10 @@
 //! same id asked for something else is refused `operation_reused`. A fresh
 //! connection's challenge is never its identity.
 //!
-//! Text is typed only at a turn boundary the harness signalled: after a
-//! turn ends, or at once when the session is already between turns or
-//! reports no turns. Before typing, `delivering` is made durable; after, it
+//! Text waits for the harness's turn boundary, or types at once between
+//! turns or in a session that reports no turns. A tracked busy session
+//! that never signals its boundary is released at the named wait budget;
+//! its receipt keeps the unsignalled wait rather than hiding that exception. Before typing, `delivering` is made durable; after, it
 //! is `delivered`. A runner that stops between the two cannot know whether
 //! the text reached the terminal, so the next one reports the operation
 //! `uncertain` and never types it again. A compaction is `confirmed` when
@@ -20,25 +21,29 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::error::RunnerError;
-use crate::protocol::Ended;
-use crate::session::{Sessions, now_ms};
+use crate::session::now_ms;
 
 mod control;
+mod migration;
 mod store;
 use control::Control;
 pub(crate) use control::Prepared;
 pub use control::{Certainty, ControlPage, ControlReceipt, Reconciled, Reconciliation};
 
+mod boundary;
+mod wake;
+pub(crate) use wake::confirm_on_turn_end;
 mod delivery;
 pub(crate) use delivery::{accept, compacting, deliver, ended};
 use delivery::{feed, stop};
 
+#[cfg(test)]
+#[path = "../tests/operations_boundary.rs"]
+mod boundary_tests;
 #[cfg(test)]
 #[path = "../tests/operations_index/cases.rs"]
 mod index_tests;
@@ -48,147 +53,12 @@ pub(crate) use restart::{begin_restart, finish_restart};
 
 /// The legacy record format accepted by the forward migration.
 pub const FORMAT: &str = "lys-runner-operations/v1";
+/// Maximum wait for a tracked terminal to signal a turn boundary.
+pub const BOUNDARY_WAIT: std::time::Duration = std::time::Duration::from_secs(20 * 60);
 const RETAIN_MS: u64 = 24 * 60 * 60 * 1000;
 
-/// What an operation asks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "request", rename_all = "snake_case", deny_unknown_fields)]
-pub enum OperationRequest {
-    /// Type the harness's compaction command at the next turn boundary.
-    Compact {
-        /// The command.
-        text: String,
-    },
-    /// Compact one context crossing while keeping normal input held.
-    ContextCompact {
-        /// The configured compaction command.
-        text: String,
-        /// The existing crossing identity.
-        crossing: String,
-    },
-    /// Queue a stable goal occurrence for current boundary authority.
-    GoalReminder {
-        /// The initial reminder words.
-        text: String,
-        /// The saved goal revision and occurrence.
-        reference: crate::harness_control::ReminderReference,
-    },
-    /// Apply the service's current decision to one owned boundary.
-    BoundaryReply {
-        /// The exact generation and boundary decision.
-        reply: crate::harness_control::BoundaryReply,
-    },
-    /// Type a notice to the session at the next turn boundary.
-    Notice {
-        /// The notice.
-        text: String,
-    },
-    /// Type a reminder at the next turn boundary.
-    Reminder {
-        /// The reminder.
-        text: String,
-    },
-    /// End the session's process.
-    Stop,
-}
-
-impl OperationRequest {
-    /// Its name.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Compact { .. } => "compact",
-            Self::ContextCompact { .. } => "context_compact",
-            Self::GoalReminder { .. } => "goal_reminder",
-            Self::BoundaryReply { .. } => "boundary_reply",
-            Self::Notice { .. } => "notice",
-            Self::Reminder { .. } => "reminder",
-            Self::Stop => "stop",
-        }
-    }
-
-    fn text(&self) -> Option<&str> {
-        match self {
-            Self::Compact { text }
-            | Self::ContextCompact { text, .. }
-            | Self::GoalReminder { text, .. }
-            | Self::Notice { text }
-            | Self::Reminder { text } => Some(text),
-            Self::Stop | Self::BoundaryReply { .. } => None,
-        }
-    }
-}
-
-/// An operation as it is asked.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Operation {
-    /// Its stable id, chosen and kept by the server.
-    pub operation: String,
-    /// The session.
-    pub session: String,
-    /// What it asks.
-    pub request: OperationRequest,
-}
-
-/// Where an operation stands.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum OperationState {
-    /// Accepted, waiting for its boundary.
-    Accepted,
-    /// Being typed; a runner stopped here leaves it uncertain.
-    Delivering,
-    /// Typed, or for a stop, the end sent.
-    Delivered,
-    /// Seen done: a compaction begun, a stop's exit seen.
-    Confirmed,
-    /// Its delivery cannot be known; it is never typed again.
-    Uncertain,
-    /// Not done, by name.
-    Refused,
-}
-
-/// Text as the record keeps it: its length and digest.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct TextDigest {
-    /// Its length in bytes.
-    pub length: usize,
-    /// The lowercase hex SHA-256 of its bytes.
-    pub sha256: String,
-}
-
-impl TextDigest {
-    /// `text`'s length and digest.
-    pub fn of(text: &str) -> Self {
-        Self {
-            length: text.len(),
-            sha256: crate::protocol::hex(&Sha256::digest(text.as_bytes())),
-        }
-    }
-}
-
-/// An operation's outcome.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct OperationOutcome {
-    /// The operation.
-    pub operation: String,
-    /// The session.
-    pub session: String,
-    /// What it asked, by name.
-    pub request: String,
-    /// Where it stands.
-    pub state: OperationState,
-    /// When it came to stand there, in milliseconds since the Unix epoch.
-    pub at: u64,
-    /// Why, in words.
-    pub words: String,
-    /// The text it types, as length and digest.
-    pub text: Option<TextDigest>,
-    /// The session's end, for a confirmed stop.
-    pub ended: Option<Ended>,
-}
+mod requests;
+pub use requests::{Operation, OperationOutcome, OperationRequest, OperationState, TextDigest};
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -215,6 +85,8 @@ pub(crate) struct Operations {
     active: BTreeMap<String, BTreeSet<String>>,
     texts: BTreeMap<String, String>,
     compacting: BTreeSet<String>,
+    boundary_waiters: HashMap<String, std::sync::mpsc::Sender<()>>,
+    boundary_expired: HashMap<String, u64>,
     writer: Option<crate::durable::Writer>,
 }
 
@@ -285,6 +157,16 @@ impl Operations {
                 .or_default()
                 .insert(id.clone());
         }
+        if outcome.state != OperationState::Accepted {
+            self.boundary_waiters.remove(&id);
+            self.boundary_expired.remove(&id);
+            if let Some(queue) = self.accepted.get_mut(&outcome.session) {
+                queue.retain(|operation| operation != &id);
+                if queue.is_empty() {
+                    self.accepted.remove(&outcome.session);
+                }
+            }
+        }
         self.held.insert(id, outcome);
         self.prune(now);
     }
@@ -317,6 +199,8 @@ impl Operations {
             self.original_requests.remove(&id);
             self.texts.remove(&id);
             self.compacting.remove(&id);
+            self.boundary_waiters.remove(&id);
+            self.boundary_expired.remove(&id);
         }
     }
 
@@ -364,80 +248,13 @@ impl Operations {
             .ok_or_else(|| unavailable(format!("no operation {operation} is held")))?;
         outcome.state = state;
         outcome.at = now_ms();
-        outcome.words = words;
+        outcome.words = receipt_words(&outcome.words, words);
         self.record(outcome.clone())?;
         Ok(outcome)
     }
 }
 
-impl Sessions {
-    /// Accept `operation` under its stable id, answering how it stands.
-    pub fn operate(&self, operation: Operation) -> Result<OperationOutcome, RunnerError> {
-        if matches!(operation.request, OperationRequest::BoundaryReply { .. }) {
-            return Err(RunnerError::refused(
-                "control_boundary_service_required",
-                "only a verified service request may decide a boundary",
-            ));
-        }
-        if matches!(
-            operation.request,
-            OperationRequest::Compact { .. } | OperationRequest::ContextCompact { .. }
-        ) && self.lock()?.responsible.contains_key(&operation.session)
-        {
-            return Err(RunnerError::refused(
-                "SessionInputContextMissing",
-                "owned compaction requires a verified caller and live grant judge",
-            ));
-        }
-        self.operate_admitted(operation)
-    }
-
-    pub(crate) fn operate_admitted(
-        &self,
-        operation: Operation,
-    ) -> Result<OperationOutcome, RunnerError> {
-        let mut table = self.lock()?;
-        let mut outcome = accept(&mut table, operation)?;
-        drop(table);
-        self.writer.barrier()?;
-        if outcome.request == "stop" && outcome.state == OperationState::Accepted {
-            let mut table = self.lock()?;
-            outcome = stop(&mut table, &outcome.session, &outcome.operation)?;
-            drop(table);
-            self.writer.barrier()?;
-        }
-        self.wake();
-        if outcome.state != OperationState::Delivering {
-            return Ok(outcome);
-        }
-        let outcome = self.until_any(&AtomicBool::new(false), |table| {
-            table
-                .operations
-                .get(&outcome.operation)
-                .filter(|held| held.state != OperationState::Delivering)
-                .cloned()
-        })?;
-        self.writer.barrier()?;
-        Ok(outcome)
-    }
-
-    /// How operation `operation` stands, as the record keeps it.
-    pub fn outcome(&self, operation: &str) -> Result<OperationOutcome, RunnerError> {
-        let outcome = self
-            .lock()?
-            .operations
-            .get(operation)
-            .cloned()
-            .ok_or_else(|| {
-                RunnerError::refused(
-                    "operation_unknown",
-                    format!("no operation {operation} is held"),
-                )
-            })?;
-        self.writer.barrier()?;
-        Ok(outcome)
-    }
-}
+mod session;
 
 pub(crate) fn managed_take(
     table: &mut crate::session::Table,
@@ -490,5 +307,19 @@ impl Operations {
     }
     pub(crate) fn cancel_journal_batch(&mut self) {
         drop(self.batch.take());
+    }
+}
+
+fn receipt_words(previous: &str, words: String) -> String {
+    match previous.split_once("; ") {
+        Some((note, _))
+            if (note.starts_with("wake_up ")
+                || note.starts_with("boundary_wait=")
+                || note.contains("boundary_unsignalled"))
+                && !words.contains(note) =>
+        {
+            format!("{note}; {words}")
+        }
+        _ => words,
     }
 }

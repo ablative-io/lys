@@ -13,8 +13,13 @@
 use std::sync::Arc;
 
 mod control;
+mod profile;
+pub(crate) use profile::{compact_command, prepare_compact};
+mod words;
 pub(crate) use control::resend_allowed;
 pub(crate) use control::{feed_end, review, start};
+pub(crate) use words::queue_wake;
+use words::slot_words;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -191,8 +196,12 @@ pub(crate) async fn settle_for(state: &Arc<AppState>, agent: &str) -> Result<(),
 
 pub(crate) async fn settle_crossings(
     state: &Arc<AppState>,
-    unsettled: Vec<Crossing>,
+    mut unsettled: Vec<Crossing>,
 ) -> Result<(), ServerError> {
+    unsettled.sort_by_key(|crossing| {
+        crossing.act == Act::Compact
+            && crossing.measure == crate::budgets_state::Measure::ContextPercent
+    });
     for crossing in unsettled {
         if let Some(acted) = act(state, &crossing).await {
             with_budgets_mut(state, |store| store.acted(acted))?;
@@ -230,56 +239,6 @@ fn at_ms() -> i64 {
     jiff::Timestamp::now().as_millisecond()
 }
 
-/// The words of the slot `crossing`'s act delivers, resolved for its
-/// session and rendered now (AGENTS-001 R3): the context warning for a
-/// notice on a context budget, the compaction command for a compaction. None
-/// when no layer sets the slot (the crossing's own words, or the profile's
-/// command, stand), or when the words cannot be rendered, which is said.
-fn slot_words(state: &Arc<AppState>, crossing: &Crossing) -> Option<String> {
-    use crate::words_state::Slot;
-    let slot = match crossing.act {
-        Act::Notice if crossing.measure == crate::budgets_state::Measure::ContextPercent => {
-            Slot::ContextWarning
-        }
-        Act::Compact => Slot::Compaction,
-        _ => return None,
-    };
-    let words = state.words.as_ref()?;
-    let resolved = crate::words_store::resolve(
-        words,
-        slot,
-        Some(&crossing.agent),
-        crossing.session.as_deref(),
-    )
-    .ok()?;
-    if resolved.source == "profile" || (slot == Slot::Compaction && resolved.source == "built_in") {
-        return None;
-    }
-    let mut numbers = std::collections::BTreeMap::new();
-    if let Some(figure) = &crossing.figure {
-        numbers.insert("context_percent".to_owned(), figure.to_string());
-    }
-    numbers.insert("limit".to_owned(), crossing.limit.to_string());
-    match crate::words_api::deliverable(
-        state,
-        slot,
-        Some(&crossing.agent),
-        crossing.session.as_deref(),
-        numbers,
-        None,
-    ) {
-        Ok(delivered) => Some(delivered.text),
-        Err(error) => {
-            (state.say)(&format!(
-                "budget crossing {}: the {} words could not be rendered, the crossing's own stand: {error}",
-                crossing.operation,
-                slot.name()
-            ));
-            None
-        }
-    }
-}
-
 /// What came of asking `crossing`'s act; none when the answer was lost.
 async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
     let kept = |stands: Stands, words: String| Acted {
@@ -315,28 +274,32 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
     {
         return Some(kept(Stands::Refused, error.to_string()));
     }
-    let requires_controls = if crossing.act == Act::Compact
-        && crossing.measure == crate::budgets_state::Measure::ContextPercent
-    {
-        match crate::runner_api::session_settings(state, &crossing.agent) {
-            Ok(settings) => settings.is_some_and(|settings| settings.requires_controls),
-            Err(error) => {
-                (state.say)(&format!(
-                    "budget crossing {} awaits its control profile: {error}",
-                    crossing.operation
-                ));
-                return None;
-            }
+    let compact_profile = if crossing.act == Act::Compact {
+        match crossing
+            .session
+            .as_deref()
+            .map(|session| compact_command(state, &crossing.agent, session))
+            .transpose()
+        {
+            Ok(settings) => settings,
+            Err(error) => return Some(kept(Stands::Refused, error.to_string())),
         }
     } else {
-        false
+        None
     };
-    // The words the act types come from the words a seat is sent (AGENTS-001
-    // R1, R3): the context warning and the compaction command resolve for
-    // this session, rendered now; a slot nobody set keeps the crossing's own
-    // words, and a compaction command nobody set stays the profile's.
-    let worded = slot_words(state, crossing);
-    let request = match (crossing.act, worded.or_else(|| crossing.text.clone())) {
+    let requires_controls = compact_profile
+        .as_ref()
+        .is_some_and(|(_, _, required)| *required);
+    let worded = match slot_words(state, crossing) {
+        Ok(words) => words,
+        Err(error) => return Some(kept(Stands::Refused, error.to_string())),
+    };
+    let request = match (
+        crossing.act,
+        worded
+            .or_else(|| crossing.text.clone())
+            .or_else(|| compact_profile.as_ref().map(|(text, _, _)| text.clone())),
+    ) {
         (Act::Tell, _) => {
             return Some(kept(
                 Stands::Told,
@@ -353,15 +316,9 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
         },
         (Act::Compact, Some(text)) => OperationRequest::Compact { text },
         (Act::Notice, Some(text)) => OperationRequest::Notice { text },
-        (Act::Compact, None) => {
-            return Some(kept(
-                Stands::Refused,
-                format!(
-                    "compact_unnamed: the profile of {} names no compaction command",
-                    crossing.agent
-                ),
-            ));
-        }
+        (Act::Compact, None) => OperationRequest::Compact {
+            text: "/compact".to_owned(),
+        },
         (Act::Notice, None) => {
             return Some(kept(Stands::Refused, "a notice with no words".to_owned()));
         }
@@ -375,6 +332,18 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
             ),
         ));
     };
+    if crossing.act == Act::Compact && !requires_controls {
+        if let Err(error) = queue_wake(state, &crossing.agent, &session, &crossing.operation).await
+        {
+            (state.say)(&format!("budget crossing {}: {error}", crossing.operation));
+            return if matches!(&error, ServerError::Runner { refusal, .. } if refusal == "wake_up_unavailable")
+            {
+                None
+            } else {
+                Some(kept(Stands::Refused, error.to_string()))
+            };
+        }
+    }
     let operation = Operation {
         operation: crossing.operation.clone(),
         session,
@@ -382,7 +351,15 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
     };
     match operate(state, operation).await {
         Ok(outcome) => match i64::try_from(outcome.at) {
-            Ok(observed) => Some(Acted::from_runner(&outcome, observed)),
+            Ok(observed) => {
+                let mut acted = Acted::from_runner(&outcome, observed);
+                if let Some((_, version, _)) = compact_profile {
+                    acted
+                        .words
+                        .push_str(&format!("; profile_version={version}"));
+                }
+                Some(acted)
+            }
             Err(error) => Some(kept(
                 Stands::Refused,
                 format!("runner outcome instant: {error}"),

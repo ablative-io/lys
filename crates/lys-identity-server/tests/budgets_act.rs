@@ -139,12 +139,16 @@ impl Table {
     }
 
     async fn profile(&self, session: &Value) -> TestResult {
+        self.profile_at(session, 0).await
+    }
+
+    async fn profile_at(&self, session: &Value, from: u32) -> TestResult {
         let path = format!("/agents/{}/provisioning", self.agent());
         let program = stub_program::write(self.dir.path(), stub_program::SHELL)?;
         let mut harness = harness_description::declared();
         harness["program"] = json!(program);
         let body = json!({
-            "operation": operation()?, "from_version": 0, "working_folder": "/tmp",
+            "operation": operation()?, "from_version": from, "working_folder": "/tmp",
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": [],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
             "permissions": {"default_mode": "plan"}, "harness": harness,
@@ -152,7 +156,8 @@ impl Table {
         });
         self.ok(&path, &body).await?;
         let review = json!({ "operation": operation()? });
-        self.ok(&format!("{path}/1/review"), &review).await?;
+        self.ok(&format!("{path}/{}/review", from + 1), &review)
+            .await?;
         Ok(())
     }
 
@@ -202,7 +207,7 @@ impl Table {
                 .ok(&format!("/runtime/sessions/{session}/read"), &body)
                 .await?;
             let output = &read["answer"]["output"];
-            text.push_str(output["text"].as_str().unwrap_or_default());
+            text.push_str(output["text"].as_str().ok_or("runner output has no text")?);
             if !output["ended"].is_null() {
                 return Ok(text);
             }
@@ -359,3 +364,6 @@ async fn an_act_whose_answer_cannot_be_had_stays_unconfirmed_and_is_asked_again_
 
 #[path = "shared/budget_session_security.rs"]
 mod budget_session_security;
+
+#[path = "../../lys-runner/tests/operations_budget_cases.rs"]
+mod compaction_cases;

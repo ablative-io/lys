@@ -1,13 +1,13 @@
 //! A projection checkpoint pins a flushed journal prefix and preserves every spent identity.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use super::control::Control;
-use super::{Certainty, FORMAT, Kept, OperationOutcome, OperationState, Operations, unavailable};
+use super::{Certainty, OperationOutcome, OperationState, Operations, unavailable};
 use crate::error::RunnerError;
 use crate::session::now_ms;
 
@@ -34,10 +34,10 @@ enum Row {
 }
 
 #[derive(Serialize)]
-struct Writing<'a> {
-    outcome: &'a OperationOutcome,
-    control: Option<&'a Control>,
-    original_request: Option<&'a [u8; 32]>,
+pub(super) struct Writing<'a> {
+    pub(super) outcome: &'a OperationOutcome,
+    pub(super) control: Option<&'a Control>,
+    pub(super) original_request: Option<&'a [u8; 32]>,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +84,8 @@ impl Operations {
             active: BTreeMap::new(),
             texts: BTreeMap::new(),
             compacting: BTreeSet::new(),
+            boundary_waiters: HashMap::new(),
+            boundary_expired: HashMap::new(),
             writer: None,
         };
         if !operations.path.exists() {
@@ -134,7 +136,7 @@ impl Operations {
             };
             outcome.state = state;
             outcome.at = now;
-            reason.clone_into(&mut outcome.words);
+            outcome.words = super::receipt_words(&outcome.words, reason.to_owned());
             operations.record_at(outcome, now)?;
         }
         if !resumed {
@@ -288,107 +290,6 @@ impl Operations {
             crate::error::said(
                 "operations_tail_incomplete: the uncommitted last record was removed",
             );
-        }
-        Ok(())
-    }
-
-    fn migrate(&mut self, dir: &Path) -> Result<(), RunnerError> {
-        let beside = self.path.with_extension("migrating");
-        let mut output = BufWriter::new(std::fs::File::create(&beside).map_err(unavailable)?);
-        let old_log = dir.join("operations.jsonl");
-        if old_log.exists() {
-            let mut input = BufReader::new(std::fs::File::open(old_log).map_err(unavailable)?);
-            loop {
-                let mut line = Vec::new();
-                let read = input.read_until(b'\n', &mut line).map_err(unavailable)?;
-                if read == 0 || line.last() != Some(&b'\n') {
-                    break;
-                }
-                let outcome = serde_json::from_slice(&line).map_err(unavailable)?;
-                Self::migrate_outcome(&mut output, &outcome)?;
-            }
-        } else {
-            match std::fs::read(dir.join("operations.json")) {
-                Ok(bytes) => {
-                    let kept: Kept = serde_json::from_slice(&bytes).map_err(unavailable)?;
-                    if kept.format != FORMAT {
-                        return Err(unavailable(format!(
-                            "legacy record is in format {}",
-                            kept.format
-                        )));
-                    }
-                    for outcome in kept.operations {
-                        Self::migrate_outcome(&mut output, &outcome)?;
-                    }
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(unavailable(error)),
-            }
-        }
-        output
-            .flush()
-            .and_then(|()| output.get_ref().sync_all())
-            .map_err(unavailable)?;
-        drop(output);
-        std::fs::rename(beside, &self.path).map_err(unavailable)?;
-        std::fs::File::open(dir)
-            .and_then(|file| file.sync_all())
-            .map_err(unavailable)?;
-        Ok(())
-    }
-
-    fn migrate_outcome(
-        output: &mut impl Write,
-        outcome: &OperationOutcome,
-    ) -> Result<(), RunnerError> {
-        if super::control::managed_request(&outcome.request) {
-            return Err(RunnerError::refused(
-                "operation_legacy_request_invalid",
-                "the installed legacy record cannot contain a managed request",
-            ));
-        }
-        let legacy = matches!(
-            outcome.state,
-            OperationState::Accepted | OperationState::Delivering | OperationState::Uncertain
-        )
-        .then_some(Control {
-            prepared: None,
-            original_text: outcome.text.clone(),
-            certainty: Certainty::PossiblySent,
-            admitted: None,
-            decision: None,
-        });
-        serde_json::to_writer(
-            &mut *output,
-            &Writing {
-                outcome,
-                control: legacy.as_ref(),
-                original_request: None,
-            },
-        )
-        .map_err(unavailable)?;
-        output.write_all(b"\n").map_err(unavailable)?;
-        Ok(())
-    }
-
-    fn archive_legacy(dir: &Path) -> Result<(), RunnerError> {
-        for (source, kept) in [
-            ("operations.jsonl", "operations.v1.jsonl"),
-            ("operations.json", "operations.v1.json"),
-        ] {
-            let source = dir.join(source);
-            if source.exists() {
-                let kept = dir.join(kept);
-                if kept.exists() {
-                    return Err(unavailable(
-                        "legacy archive already exists beside an unmoved source",
-                    ));
-                }
-                std::fs::rename(source, kept).map_err(unavailable)?;
-                std::fs::File::open(dir)
-                    .and_then(|file| file.sync_all())
-                    .map_err(unavailable)?;
-            }
         }
         Ok(())
     }
@@ -571,41 +472,5 @@ mod batch_validation_tests {
 }
 
 #[cfg(test)]
-pub(super) mod measurement {
-    use std::cell::RefCell;
-    use std::time::Duration;
-    #[derive(Default)]
-    pub(crate) struct Costs {
-        pub(crate) encode: Duration,
-        pub(crate) read: Duration,
-        pub(crate) decode: Duration,
-    }
-    thread_local! { static COSTS: RefCell<Option<Costs>> = const { RefCell::new(None) }; }
-    pub(crate) fn begin() {
-        COSTS.with(|costs| *costs.borrow_mut() = Some(Costs::default()));
-    }
-    pub(crate) fn finish() -> Option<Costs> {
-        COSTS.with(|costs| costs.borrow_mut().take())
-    }
-    pub(super) fn encode(elapsed: Duration) {
-        COSTS.with(|costs| {
-            if let Some(costs) = &mut *costs.borrow_mut() {
-                costs.encode += elapsed;
-            }
-        });
-    }
-    pub(super) fn read(elapsed: Duration) {
-        COSTS.with(|costs| {
-            if let Some(costs) = &mut *costs.borrow_mut() {
-                costs.read += elapsed;
-            }
-        });
-    }
-    pub(super) fn decode(elapsed: Duration) {
-        COSTS.with(|costs| {
-            if let Some(costs) = &mut *costs.borrow_mut() {
-                costs.decode += elapsed;
-            }
-        });
-    }
-}
+#[path = "measurement.rs"]
+pub(super) mod measurement;

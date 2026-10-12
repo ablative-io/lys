@@ -135,14 +135,19 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
 fn resolve_commands(state: &AppState, crossed: &mut [Crossing]) -> Result<(), ServerError> {
     let mut commands = BTreeMap::new();
     for crossing in crossed {
-        if crossing.act == Act::Compact {
-            if !commands.contains_key(&crossing.agent) {
-                let command = crate::runner_api::session_settings(state, &crossing.agent)?
-                    .and_then(|settings| settings.compact);
-                commands.insert(crossing.agent.clone(), command);
-            }
-            crossing.text = commands.get(&crossing.agent).cloned().flatten();
+        if crossing.act != Act::Compact {
+            continue;
         }
+        let Some(session) = crossing.session.as_deref() else {
+            continue;
+        };
+        let key = (crossing.agent.clone(), session.to_owned());
+        if !commands.contains_key(&key) {
+            let (command, _, _) =
+                crate::budgets_act::compact_command(state, &crossing.agent, session)?;
+            commands.insert(key.clone(), command);
+        }
+        crossing.text = commands.get(&key).cloned();
     }
     Ok(())
 }

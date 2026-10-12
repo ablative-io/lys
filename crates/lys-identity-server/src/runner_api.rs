@@ -352,25 +352,15 @@ async fn compact(
 ) -> Result<Json<Value>, ServerError> {
     body(given)?;
     let (driven, caller) = admitted(&state, &headers, &id, "compact")?;
-    let command = session_settings(&state, &driven.agent)?
-        .and_then(|settings| settings.compact)
-        .ok_or_else(|| ServerError::Runner {
-            refusal: "compact_unnamed".to_owned(),
-            words: format!(
-                "the profile of {} names no compaction command",
-                driven.agent
-            ),
-        })?;
+    let (act, command, version) =
+        crate::budgets_act::prepare_compact(&state, &driven.agent, &id).await?;
     let carried = Carried {
         text: Some(Digested::of(&command)),
         keys: Vec::new(),
     };
-    let act = Act::Input {
-        session: id,
-        text: command,
-        enter: true,
-    };
-    perform(&state, (&driven, caller, "compact"), carried, act).await
+    let Json(mut answer) = perform(&state, (&driven, caller, "compact"), carried, act).await?;
+    answer["profile_version"] = json!(version);
+    Ok(Json(answer))
 }
 
 async fn end(
