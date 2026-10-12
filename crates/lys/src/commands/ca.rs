@@ -49,12 +49,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use lys_core::clock::ClockSource;
-use lys_core::{Ed25519Identity, TrustError};
 use lys_core::ca::{
     CertificateAuthority, LYS_OID_ARC, create_certificate_request, decode_extension,
     encode_extension, verify_certificate_chain_at,
 };
+use lys_core::clock::ClockSource;
+use lys_core::{Ed25519Identity, TrustError};
 use x509_parser::prelude::{FromDer, X509Certificate};
 
 use crate::commands::ca_log::LogEntry;
@@ -712,7 +712,9 @@ mod clock_tests {
         let directory = tempfile::tempdir().unwrap();
         let key = directory.path().join("issuer.key");
         let identity = lys_core::Ed25519Identity::load_or_generate(&key).unwrap();
-        let original = CertificateAuthority::new(identity).issuer_certificate_der().unwrap();
+        let original = CertificateAuthority::new(identity)
+            .issuer_certificate_der()
+            .unwrap();
         let original = pem::encode_certificate(&original).into_bytes();
         std::fs::write(stored_issuer_certificate_path(&key), &original).unwrap();
         let (authority, clock) = failing_authority(&key);
@@ -720,7 +722,10 @@ mod clock_tests {
         assert_eq!(stored.pem, original);
         assert!(stored.built.is_none());
         assert_eq!(clock.reads.load(Ordering::SeqCst), 0);
-        assert_eq!(std::fs::read(stored_issuer_certificate_path(&key)).unwrap(), original);
+        assert_eq!(
+            std::fs::read(stored_issuer_certificate_path(&key)).unwrap(),
+            original
+        );
     }
 
     #[test]
@@ -732,7 +737,10 @@ mod clock_tests {
         std::fs::write(&path, b"invalid stored issuer").unwrap();
         let (authority, clock) = failing_authority(&key);
         let result = stored_issuer_certificate(&key, &authority);
-        assert!(matches!(result, Err(CliError::StoredIssuerCertificateInvalid { .. })));
+        assert!(matches!(
+            result,
+            Err(CliError::StoredIssuerCertificateInvalid { .. })
+        ));
         assert_eq!(clock.reads.load(Ordering::SeqCst), 0);
         assert_eq!(std::fs::read(path).unwrap(), b"invalid stored issuer");
     }
@@ -746,11 +754,17 @@ mod clock_tests {
         let output = directory.path().join("export.pem");
         let provider = Arc::clone(&clock);
         let result = issuer_cert_with_clock(&key, &output, true, ClockSource::Supplied(provider));
-        assert!(matches!(result, Err(CliError::Trust(TrustError::CertificateGeneration { .. }))));
+        assert!(matches!(
+            result,
+            Err(CliError::Trust(TrustError::CertificateGeneration { .. }))
+        ));
         assert_eq!(clock.reads.load(Ordering::SeqCst), 1);
         assert!(!stored_issuer_certificate_path(&key).exists());
         assert!(!output.exists());
-        assert_eq!(authority.public_key_bytes(), load_identity(&key).unwrap().public_key_bytes());
+        assert_eq!(
+            authority.public_key_bytes(),
+            load_identity(&key).unwrap().public_key_bytes()
+        );
         assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
     }
 }

@@ -30,7 +30,8 @@ fn ordinary_cli_rejects_fixture_time_even_with_fixture_environment() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_lys"))
         .env("LYS_CLOCK_FIXTURE", "unavailable")
         .args(["--fixture-at", "1700000000", "ca", "issuer-cert"])
-        .output().unwrap();
+        .output()
+        .unwrap();
     assert_eq!(output.status.code(), Some(2), "{}", said(&output));
     assert!(String::from_utf8_lossy(&output.stderr).contains("--fixture-at"));
 }

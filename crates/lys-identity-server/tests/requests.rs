@@ -53,31 +53,51 @@ struct RequestWork {
 
 fn request_extent(table: &Table) -> Result<u64, Box<dyn Error>> {
     use lys_log_store::LeafStore;
-    Ok(lys_log_store::FileLeafStore::open_read_only(&table.service.dir.path().join("requests"))?.extent())
+    Ok(
+        lys_log_store::FileLeafStore::open_read_only(&table.service.dir.path().join("requests"))?
+            .extent(),
+    )
 }
 
 impl RequestWork {
     fn begin(table: &Table, clock: &ManualClock) -> Result<Self, Box<dyn Error>> {
         let extent = request_extent(table)?;
-        Ok(Self { started: std::time::Instant::now(), reads: clock.reads(), extent })
+        Ok(Self {
+            started: std::time::Instant::now(),
+            reads: clock.reads(),
+            extent,
+        })
     }
 
     fn completed(
-        self, table: &Table, clock: &ManualClock, outcome: &str,
-        status: u16, expected_reads: u64, expected_appends: u64,
+        self,
+        table: &Table,
+        clock: &ManualClock,
+        outcome: &str,
+        status: u16,
+        expected_reads: u64,
+        expected_appends: u64,
     ) -> TestResult {
         let elapsed = self.started.elapsed();
-        let reads = clock.reads().checked_sub(self.reads).ok_or("clock count decreased")?;
+        let reads = clock
+            .reads()
+            .checked_sub(self.reads)
+            .ok_or("clock count decreased")?;
         let extent = request_extent(table)?;
-        let appended = extent.checked_sub(self.extent).ok_or("request extent decreased")?;
+        let appended = extent
+            .checked_sub(self.extent)
+            .ok_or("request extent decreased")?;
         assert_eq!(reads, expected_reads, "{outcome}");
         assert_eq!(appended, expected_appends, "{outcome}");
-        eprintln!("CLOCK_HTTP {}", json!({
-            "outcome": outcome, "status": status, "provider_reads": reads,
-            "elapsed_nanos": elapsed.as_nanos(),
-            "extent_before": self.extent, "extent_after": extent,
-            "request_appends": appended, "physical_syncs": null, "history_visits": null,
-        }));
+        eprintln!(
+            "CLOCK_HTTP {}",
+            json!({
+                "outcome": outcome, "status": status, "provider_reads": reads,
+                "elapsed_nanos": elapsed.as_nanos(),
+                "extent_before": self.extent, "extent_after": extent,
+                "request_appends": appended, "physical_syncs": null, "history_visits": null,
+            })
+        );
         Ok(())
     }
 }
@@ -101,10 +121,16 @@ impl Table {
         let provider: Arc<dyn lys_core::clock::Clock> = clock.clone();
         let (service, seeded) = Service::start_with_clock(provider, |config| {
             Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
-        }).await?;
+        })
+        .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
-        Ok(Self { service, seeded, ada, bea })
+        Ok(Self {
+            service,
+            seeded,
+            ada,
+            bea,
+        })
     }
 
     fn ask_body(resource: &str, relation: &str) -> Result<Value, Box<dyn Error>> {
@@ -564,7 +590,10 @@ async fn request_clock_boundaries_and_service_isolation() -> TestResult {
         let before = table.listed(&table.bea).await?;
         let mut body = Table::ask_body("4", "beta")?;
         body["ends_at"] = json!(end);
-        let answer = table.service.post("/requests", Some(&table.bea), &body).await?;
+        let answer = table
+            .service
+            .post("/requests", Some(&table.bea), &body)
+            .await?;
         if end > at {
             assert_eq!(answer.0, 200, "{}", answer.1);
             assert_eq!(answer.1["asked_at"], at);
@@ -576,20 +605,36 @@ async fn request_clock_boundaries_and_service_isolation() -> TestResult {
     }
     let (body, first) = kept.ok_or("no future request kept")?;
     clock.set(i64::try_from(at + 3)?);
-    let replay = table.service.post("/requests", Some(&table.bea), &body).await?;
+    let replay = table
+        .service
+        .post("/requests", Some(&table.bea), &body)
+        .await?;
     assert_eq!(replay.0, 200, "{}", replay.1);
     assert_eq!(replay.1["id"], first["id"]);
     assert_eq!(replay.1["asked_at"], first["asked_at"]);
     let mut changed = body.clone();
     changed["why"] = json!("different content");
-    refused(&table.service.post("/requests", Some(&table.bea), &changed).await?, 409, "RequestReused");
+    refused(
+        &table
+            .service
+            .post("/requests", Some(&table.bea), &changed)
+            .await?,
+        409,
+        "RequestReused",
+    );
     let mut other_body = Table::ask_body("4", "beta")?;
     other_body["ends_at"] = json!(at + 1);
-    let admitted = other.service.post("/requests", Some(&other.bea), &other_body).await?;
+    let admitted = other
+        .service
+        .post("/requests", Some(&other.bea), &other_body)
+        .await?;
     assert_eq!(admitted.0, 200, "{}", admitted.1);
     assert_eq!(admitted.1["asked_at"], at);
     table.service.restart().await?;
-    let reopened = table.service.post("/requests", Some(&table.bea), &body).await?;
+    let reopened = table
+        .service
+        .post("/requests", Some(&table.bea), &body)
+        .await?;
     assert_eq!(reopened.0, 200, "{}", reopened.1);
     assert_eq!(reopened.1["id"], first["id"]);
     assert_eq!(reopened.1["asked_at"], first["asked_at"]);
@@ -607,7 +652,14 @@ async fn clock_failure_refuses_http_before_request_or_session_mutation() -> Test
         clock.set(at);
         clock.refuse(at >= 0);
         let body = Table::ask_body("4", "beta")?;
-        refused(&table.service.post("/requests", Some(&table.bea), &body).await?, 503, "ClockUnavailable");
+        refused(
+            &table
+                .service
+                .post("/requests", Some(&table.bea), &body)
+                .await?,
+            503,
+            "ClockUnavailable",
+        );
     }
     clock.refuse(false);
     clock.set(1_700_000_000);
@@ -628,7 +680,10 @@ async fn request_decisions_and_lenders_use_the_same_supplied_clock() -> TestResu
         "pass_on": { "kind": "to", "actions": ["read"], "recipients": ["person"] },
         "window": { "starts_at": 0, "ends_at": at + 5 },
     });
-    let lent = table.service.post("/grants/roots", Some(&table.ada), &root).await?;
+    let lent = table
+        .service
+        .post("/grants/roots", Some(&table.ada), &root)
+        .await?;
     assert_eq!(lent.0, 200, "{}", lent.1);
     clock.set(i64::try_from(at + 1)?);
     let asked = table.ask(&table.ada, "4", "beta").await?;
@@ -636,29 +691,45 @@ async fn request_decisions_and_lenders_use_the_same_supplied_clock() -> TestResu
     assert_eq!(asked["approvers"].as_array().map(Vec::len), Some(2));
     let before = table.service.get("/requests", Some(&table.ada)).await?;
     assert_eq!(before.0, 200, "{}", before.1);
-    assert_eq!(before.1["requests"][0]["approvers"].as_array().map(Vec::len), Some(2));
+    assert_eq!(
+        before.1["requests"][0]["approvers"]
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
     clock.set(i64::try_from(at + 6)?);
-    let settled = table.decide(&table.ada, &asked, "reconcile", &json!({})).await?;
+    let settled = table
+        .decide(&table.ada, &asked, "reconcile", &json!({}))
+        .await?;
     assert_eq!(settled.0, 200, "{}", settled.1);
     assert_eq!(settled.1["state"], "waiting");
     assert_eq!(settled.1["approvers"].as_array().map(Vec::len), Some(1));
     let after = table.service.get("/requests", Some(&table.ada)).await?;
     assert_eq!(after.0, 200, "{}", after.1);
-    assert_eq!(after.1["requests"][0]["approvers"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        after.1["requests"][0]["approvers"].as_array().map(Vec::len),
+        Some(1)
+    );
     clock.set(i64::try_from(at + 7)?);
-    let approved = table.decide(&table.ada, &asked, "approve", &approval(None)?).await?;
+    let approved = table
+        .decide(&table.ada, &asked, "approve", &approval(None)?)
+        .await?;
     assert_eq!(approved.0, 200, "{}", approved.1);
     assert_eq!(approved.1["decision"]["decided_at"], at + 7);
     assert_eq!(approved.1["state"], "approved");
     clock.set(i64::try_from(at + 8)?);
     let next = table.ask(&table.bea, "9", "beta").await?;
     clock.set(i64::try_from(at + 9)?);
-    let declined = table.decide(&table.ada, &next, "decline", &json!({ "note": "refused" })).await?;
+    let declined = table
+        .decide(&table.ada, &next, "decline", &json!({ "note": "refused" }))
+        .await?;
     assert_eq!(declined.0, 200, "{}", declined.1);
     assert_eq!(declined.1["state"], "declined");
     assert_eq!(declined.1["decision"]["decided_at"], at + 9);
     clock.set(i64::try_from(at + 10)?);
-    let replay = table.decide(&table.ada, &asked, "approve", &approval(None)?).await?;
+    let replay = table
+        .decide(&table.ada, &asked, "approve", &approval(None)?)
+        .await?;
     assert_eq!(replay.0, 200, "{}", replay.1);
     assert_eq!(replay.1["decision"], approved.1["decision"]);
     table.service.close()?;

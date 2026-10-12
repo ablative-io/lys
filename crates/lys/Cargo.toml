@@ -21,7 +21,7 @@ clock-fixture = []
 
 [[example]]
 name = "clock-cli"
-path = "tests/clock_cli.rs"
+path = "examples/clock-cli.rs"
 required-features = ["clock-fixture"]
 test = false
 

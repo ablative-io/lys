@@ -143,9 +143,12 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         proxy_dir: config.proxy_dir.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
         sessions: match &config.sessions_file {
-            Some(file) => {
-                Sessions::open_with_clock(file.clone(), config.session_seconds, config.secure_cookie, clock)?
-            }
+            Some(file) => Sessions::open_with_clock(
+                file.clone(),
+                config.session_seconds,
+                config.secure_cookie,
+                clock,
+            )?,
             None => Sessions::new_with_clock(config.session_seconds, config.secure_cookie, clock),
         },
         admission: Admission::new(

@@ -9,8 +9,8 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::support::{
-    Bench, assert_success, corrupt_first_leaf, dir_bytes, leaf_files, openssl, path_str,
-    clock_work, pem_to_der, report, run_lys, run_lys_at, said,
+    Bench, assert_success, clock_work, corrupt_first_leaf, dir_bytes, leaf_files, openssl,
+    path_str, pem_to_der, report, run_lys, run_lys_at, said,
 };
 
 const T0: i64 = 1_700_000_000;
@@ -28,9 +28,18 @@ fn issuer_cert(key: &Path, out: &Path) -> std::process::Output {
 }
 
 fn issuer_cert_at(key: &Path, out: &Path, at: i64) -> std::process::Output {
-    run_lys_at(&[
-        "--json", "ca", "issuer-cert", "--key", path_str(key), "--out", path_str(out),
-    ], &at.to_string())
+    run_lys_at(
+        &[
+            "--json",
+            "ca",
+            "issuer-cert",
+            "--key",
+            path_str(key),
+            "--out",
+            path_str(out),
+        ],
+        &at.to_string(),
+    )
 }
 
 fn generate(key: &Path) {
@@ -82,13 +91,34 @@ fn issue_with_issuer_out(
     ])
 }
 
-fn issue_at(bench: &Bench, key: &Path, subject: &str, issuer_out: &Path, at: i64) -> std::process::Output {
-    run_lys_at(&[
-        "ca", "issue", "--key", path_str(key), "--subject", subject,
-        "--validity", "1h", "--out", path_str(&bench.path(&format!("{subject}.pem"))),
-        "--log", path_str(&bench.log_dir), "--leaf-out", path_str(&bench.path(&format!("{subject}.leaf"))),
-        "--issuer-out", path_str(issuer_out),
-    ], &at.to_string())
+fn issue_at(
+    bench: &Bench,
+    key: &Path,
+    subject: &str,
+    issuer_out: &Path,
+    at: i64,
+) -> std::process::Output {
+    run_lys_at(
+        &[
+            "ca",
+            "issue",
+            "--key",
+            path_str(key),
+            "--subject",
+            subject,
+            "--validity",
+            "1h",
+            "--out",
+            path_str(&bench.path(&format!("{subject}.pem"))),
+            "--log",
+            path_str(&bench.log_dir),
+            "--leaf-out",
+            path_str(&bench.path(&format!("{subject}.leaf"))),
+            "--issuer-out",
+            path_str(issuer_out),
+        ],
+        &at.to_string(),
+    )
 }
 
 #[test]
@@ -144,18 +174,13 @@ fn issuer_cert_writes_the_stored_certificate_and_every_later_call_writes_the_sam
     // `ca issue --issuer-out` writes the same stored bytes, and they anchor
     // the certificate it issued.
     let at_issue = bench.path("issuer-at-issue.pem");
-    let issued = issue_at(
-        &bench,
-        &bench.issuer_key,
-        "agent-x",
-        &at_issue,
-        T0 + 4,
-    );
+    let issued = issue_at(&bench, &bench.issuer_key, "agent-x", &at_issue, T0 + 4);
     assert_success(&issued);
     assert_eq!(clock_work(&issued).provider_reads, 2);
     assert_eq!(leaf_files(&bench.log_dir), 1);
     assert_eq!(bytes(&issuer_pem), bytes(&at_issue));
-    let verified = crate::support::openssl_verify_at(bench.dir(), "issuer.pem", "agent-x.pem", T0 + 4);
+    let verified =
+        crate::support::openssl_verify_at(bench.dir(), "issuer.pem", "agent-x.pem", T0 + 4);
     assert_success(&verified);
     assert_eq!(
         String::from_utf8_lossy(&verified.stdout).trim(),
@@ -172,13 +197,7 @@ fn an_issuer_certificate_first_built_by_issue_is_the_one_issuer_cert_writes_late
     assert!(!stored.exists());
 
     let first = bench.path("first.pem");
-    let issued = issue_at(
-        &bench,
-        &key,
-        "agent-y",
-        &first,
-        T0,
-    );
+    let issued = issue_at(&bench, &key, "agent-y", &first, T0);
     assert_success(&issued);
     assert_eq!(clock_work(&issued).provider_reads, 3);
     assert_eq!(leaf_files(&bench.log_dir), 1);
@@ -208,7 +227,10 @@ fn issuer_regeneration_control() {
     assert_eq!(first_cert.validity().not_before.timestamp(), T0);
     assert_eq!(later_cert.validity().not_before.timestamp(), T0 + 2);
     assert_eq!(first_cert.public_key(), later_cert.public_key());
-    assert_eq!(first_cert.validity().not_after, later_cert.validity().not_after);
+    assert_eq!(
+        first_cert.validity().not_after,
+        later_cert.validity().not_after
+    );
     assert_ne!(first_der, later_der);
 }
 
@@ -218,9 +240,18 @@ fn real_stored_issuer_export_does_not_read_a_failed_clock() {
     let first = bench.path("first.pem");
     assert_success(&issuer_cert_at(&bench.issuer_key, &first, T0));
     let later = bench.path("later.pem");
-    let output = run_lys_at(&[
-        "--json", "ca", "issuer-cert", "--key", path_str(&bench.issuer_key), "--out", path_str(&later),
-    ], "unavailable");
+    let output = run_lys_at(
+        &[
+            "--json",
+            "ca",
+            "issuer-cert",
+            "--key",
+            path_str(&bench.issuer_key),
+            "--out",
+            path_str(&later),
+        ],
+        "unavailable",
+    );
     assert_success(&output);
     assert_eq!(clock_work(&output).provider_reads, 0);
     assert_eq!(bytes(&first), bytes(&later));

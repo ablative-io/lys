@@ -112,7 +112,13 @@ impl Sessions {
     /// No sessions, using the clock supplied by their owner.
     #[must_use]
     pub fn new_with_clock(seconds: u64, secure: bool, clock: ClockSource) -> Self {
-        Self { live: Mutex::new(Live::default()), file: None, seconds, secure, clock }
+        Self {
+            live: Mutex::new(Live::default()),
+            file: None,
+            seconds,
+            secure,
+            clock,
+        }
     }
 
     /// Open the existing sessions with the production clock.
@@ -127,10 +133,25 @@ impl Sessions {
     ///
     /// # Errors
     /// Refuses unavailable time before reading or pruning stored sessions.
-    pub fn open_with_clock(file: PathBuf, seconds: u64, secure: bool, clock: ClockSource) -> Result<Self, ServerError> {
-        let at = clock.unix_seconds().map_err(|error| ServerError::ClockUnavailable { reason: error.to_string() })?;
+    pub fn open_with_clock(
+        file: PathBuf,
+        seconds: u64,
+        secure: bool,
+        clock: ClockSource,
+    ) -> Result<Self, ServerError> {
+        let at = clock
+            .unix_seconds()
+            .map_err(|error| ServerError::ClockUnavailable {
+                reason: error.to_string(),
+            })?;
         let live = crate::session_store::load(&file, at)?;
-        Ok(Self { live: Mutex::new(Live::from_entries(live)), file: Some(file), seconds, secure, clock })
+        Ok(Self {
+            live: Mutex::new(Live::from_entries(live)),
+            file: Some(file),
+            seconds,
+            secure,
+            clock,
+        })
     }
 
     /// Sample the service and session owner's checked whole Unix second.
@@ -138,7 +159,11 @@ impl Sessions {
     /// # Errors
     /// Propagates a named clock read or conversion failure without fallback.
     pub fn now(&self) -> Result<u64, ServerError> {
-        self.clock.unix_seconds().map_err(|error| ServerError::ClockUnavailable { reason: error.to_string() })
+        self.clock
+            .unix_seconds()
+            .map_err(|error| ServerError::ClockUnavailable {
+                reason: error.to_string(),
+            })
     }
 
     /// Write `live` to the sessions file, when there is one.
@@ -161,7 +186,10 @@ impl Sessions {
             .map_err(|error| ServerError::SessionsUnavailable {
                 reason: format!("the sessions lock is poisoned: {error}"),
             })?;
-        let at = match sampled { Some(at) => at, None => self.now()? };
+        let at = match sampled {
+            Some(at) => at,
+            None => self.now()?,
+        };
         live.entries.retain(|_, entry| entry.ends_at > at);
         let Live { entries, ids } = &mut *live;
         ids.retain(|_, key| entries.contains_key(key));
@@ -213,10 +241,16 @@ impl Sessions {
     /// The live session named by a Cookie header.
     fn entry(&self, cookie_header: Option<&str>) -> Result<SessionEntry, ServerError> {
         let secret = cookie_secret(cookie_header)?;
-        let live = self.live.lock().map_err(|error| ServerError::SessionsUnavailable {
-            reason: format!("the sessions lock is poisoned: {error}"),
-        })?;
-        let entry = live.entries.get(&key_of(secret)).ok_or(ServerError::NotSignedIn)?;
+        let live = self
+            .live
+            .lock()
+            .map_err(|error| ServerError::SessionsUnavailable {
+                reason: format!("the sessions lock is poisoned: {error}"),
+            })?;
+        let entry = live
+            .entries
+            .get(&key_of(secret))
+            .ok_or(ServerError::NotSignedIn)?;
         if entry.ends_at <= self.now()? {
             return Err(ServerError::NotSignedIn);
         }
@@ -240,9 +274,12 @@ impl Sessions {
 
     /// Whether the session named by its public id is still live.
     pub fn is_live(&self, id: &str) -> Result<bool, ServerError> {
-        let live = self.live.lock().map_err(|error| ServerError::SessionsUnavailable {
-            reason: format!("the sessions lock is poisoned: {error}"),
-        })?;
+        let live = self
+            .live
+            .lock()
+            .map_err(|error| ServerError::SessionsUnavailable {
+                reason: format!("the sessions lock is poisoned: {error}"),
+            })?;
         match live.ids.get(id).and_then(|key| live.entries.get(key)) {
             Some(entry) => Ok(entry.ends_at > self.now()?),
             None => Ok(false),

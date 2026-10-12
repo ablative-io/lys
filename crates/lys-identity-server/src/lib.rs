@@ -284,7 +284,9 @@ pub mod words_store;
 pub use config::Config;
 mod signed_json;
 pub use error::ServerError;
-pub use routes::{AppState, Say, router, service, service_saying, service_with_clock, service_saying_with_clock};
+pub use routes::{
+    AppState, Say, router, service, service_saying, service_saying_with_clock, service_with_clock,
+};
 
 mod provider_browser;
 
