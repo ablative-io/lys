@@ -253,6 +253,33 @@ pub enum Act {
     Owned,
 }
 
+impl Act {
+    /// The one session this act is about, when it names one: the act a
+    /// server routes to whichever runner holds that session, the machine's
+    /// own or a seat owner's. A start names none: the machine's runner
+    /// starts it, and starts its owner when it is supervised.
+    #[must_use]
+    pub fn session(&self) -> Option<&str> {
+        match self {
+            Self::ReadBytes { session, .. }
+            | Self::InputBytes { session, .. }
+            | Self::Input { session, .. }
+            | Self::Keys { session, .. }
+            | Self::Read { session, .. }
+            | Self::Wait { session, .. }
+            | Self::Resize { session, .. }
+            | Self::End { session }
+            | Self::ControlStatus { session }
+            | Self::ControlReceipts { session, .. }
+            | Self::AttachRead { session, .. } => Some(session),
+            Self::Status { session } | Self::Liveness { session } => session.as_deref(),
+            Self::Operate { operation } => Some(&operation.session),
+            Self::AsCaller { done, .. } => done.session(),
+            _ => None,
+        }
+    }
+}
+
 /// An answer to one act.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -417,3 +444,7 @@ impl Answer {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "acts_session_tests.rs"]
+mod session_tests;
