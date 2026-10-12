@@ -168,3 +168,49 @@ pub(crate) async fn owned(
         reason: (!unread.is_empty()).then(|| unread.join("; ")),
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{bind_selected, chosen_seat, machines};
+    use crate::seats_state::{Added, Seat};
+    use lys_runner::Act;
+    use serde_json::json;
+
+    #[test]
+    fn a_managed_launch_ignores_retired_seats_and_selects_active_names_deterministically()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let seat = |name: &str, machine: &str, retired| Seat {
+            added: Added {
+                operation: name.to_owned(), name: name.to_owned(), agent: "agent".to_owned(),
+                harness: "claude".to_owned(), profile_version: 1, machine: machine.to_owned(),
+                working_folder: None, account: None, by: "person".to_owned(), at: 1,
+            },
+            session: None, harness_session: None, running: false, revision: 1, retired,
+        };
+        let mut seats = vec![
+            seat("fairy-bread", "machine", true),
+            seat("z-active", "machine", false),
+            seat("fairybread", "machine", false),
+            seat("retired-elsewhere", "old-machine", true),
+        ];
+        let selected = chosen_seat(&seats, "agent", "machine");
+        assert_eq!(selected.as_deref(), Some("fairybread"));
+        let managed = serde_json::from_value(json!({
+            "launch": {"session":"session", "program":"claude", "arguments":[],
+                "directory":"/", "environment":{}, "columns":80, "rows":24},
+            "transport":{"mode":"claude"},
+            "conversation":"0f3c9a1e-5b7d-4c2a-8e6f-1b3d5a7c9e2f", "requires_controls":false,
+        }))?;
+        let bound = bind_selected(Act::StartManaged { managed, lys_mcp: None, proxy: None }, selected)?;
+        let Act::StartManaged { managed, .. } = bound else { return Err("managed launch changed kind".into()); };
+        let owner = managed.owner.ok_or("no owner binding")?;
+        assert_eq!(owner.seat, "fairybread");
+        assert_eq!(owner.session, "session");
+        assert_eq!(owner.generation, 1);
+        seats.reverse();
+        assert_eq!(chosen_seat(&seats, "agent", "machine").as_deref(), Some("fairybread"));
+        assert_eq!(machines(&seats), std::collections::BTreeSet::from(["machine".to_owned()]));
+        assert!(chosen_seat(&seats, "agent", "absent").is_none());
+        Ok(())
+    }
+}
