@@ -230,6 +230,7 @@ pub(crate) fn spawn(
     transport: Transport,
     conversation: &str,
     generation: u64,
+    resume: bool,
 ) -> Result<Spawned, RunnerError> {
     let selected = selected(&launch.program, &launch.environment)?;
     let (harness_name, adapter) = match transport {
@@ -286,7 +287,9 @@ pub(crate) fn spawn(
     let harness = executable(&selected)?;
     let adapter = adapter.to_owned();
     let arguments = match transport {
-        Transport::Claude => super::claude::arguments(&launch.arguments, conversation)?,
+        Transport::Claude => if resume {
+            super::claude::resume_arguments(&launch.arguments, conversation)?
+        } else { super::claude::arguments(&launch.arguments, conversation)? },
         Transport::Codex => super::codex::arguments(&launch.arguments)?,
         Transport::Pty => {
             return Err(failed(

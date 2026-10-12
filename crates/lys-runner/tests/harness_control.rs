@@ -167,6 +167,7 @@ fn an_unqualified_selected_binary_is_named_with_its_actual_reported_version() ->
         let error = sessions
             .start_managed(
                 ManagedLaunch {
+                    resume: false,
                     launch: managed,
                     transport: Transport::Claude,
                     conversation: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee".to_owned(),
@@ -209,6 +210,7 @@ fn a_whole_version_report_is_read_before_the_unqualified_refusal() -> Result {
         let error = sessions
             .start_managed(
                 ManagedLaunch {
+                    resume: false,
                     launch: managed,
                     transport: Transport::Claude,
                     conversation: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee".to_owned(),

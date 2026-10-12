@@ -10,6 +10,7 @@ use crate::protocol::Launch;
 pub use crate::tracking_store::managed::{Binding, Executable, ManagedEvent};
 
 mod approval;
+mod conversation;
 mod context;
 mod initialize;
 mod reminders;
@@ -44,6 +45,9 @@ pub struct ManagedLaunch {
     pub transport: Transport,
     /// An explicit conversation to resume, or empty for a new Codex thread.
     pub conversation: String,
+    /// Resume the named conversation instead of creating it.
+    #[serde(default)]
+    pub resume: bool,
     /// Whether a manual transport must refuse the launch.
     pub requires_controls: bool,
     /// The supervised-seat binding, when AGENTS-002 started this as a seat:
@@ -57,6 +61,7 @@ pub struct ManagedLaunch {
 pub(crate) struct Settings {
     pub(crate) transport: Transport,
     pub(crate) conversation: String,
+    pub(crate) resume: bool,
 }
 
 /// Input's protocol purpose.

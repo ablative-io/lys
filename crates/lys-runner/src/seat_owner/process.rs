@@ -9,6 +9,8 @@
 //! before the ready line is written, and a deliberate stop is recorded as
 //! stopping before the harness is ended and as exited once it has.
 
+mod conversation;
+
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -85,6 +87,7 @@ impl OwnerState {
         Ok(OwnerView {
             protocol: OWNER_PROTOCOL,
             binding: OwnerBinding {
+                conversation: record.conversation.clone(),
                 generation: record.lease.generation,
                 ..self.binding.clone()
             },
@@ -285,7 +288,10 @@ pub fn answer(
             client_start,
         } => {
             prove_client(client, &client_start, peer)?;
-            if !binding.same_seat(&state.binding) {
+            let view = state.view()?;
+            let initial = binding.conversation.is_empty() && state.binding.conversation.is_empty();
+            if binding.seat != view.binding.seat || binding.session != view.binding.session
+                || (!initial && binding.conversation != view.binding.conversation) {
                 return Err(RunnerError::refused(
                     "seat_owner_binding_mismatch",
                     format!(
@@ -294,7 +300,6 @@ pub fn answer(
                     ),
                 ));
             }
-            let view = state.view()?;
             if binding.generation != view.lease.generation {
                 return Err(RunnerError::refused(
                     "seat_owner_generation_stale",

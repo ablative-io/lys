@@ -142,6 +142,7 @@ pub fn supervised(session: &str) -> ManagedLaunch {
             policy: None,
         },
         transport: Transport::Claude,
+        resume: false,
         conversation: "0f3c9a1e-5b7d-4c2a-8e6f-1b3d5a7c9e2f".to_owned(),
         requires_controls: false,
         owner: Some(OwnerBinding {

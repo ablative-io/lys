@@ -72,7 +72,6 @@ impl OwnerBinding {
         for (what, name) in [
             ("seat", &self.seat),
             ("session", &self.session),
-            ("conversation", &self.conversation),
         ] {
             if name.is_empty()
                 || name.len() > MAX_SESSION_BYTES
@@ -87,6 +86,14 @@ impl OwnerBinding {
                         "the {what} is empty, padded, oversized, a path or holds a control character"
                     ),
                 ));
+            }
+        }
+        if !self.conversation.is_empty() {
+            let conversation = &self.conversation;
+            if conversation.len() > MAX_SESSION_BYTES || conversation.trim() != conversation
+                || conversation.contains('/') || conversation.starts_with('.')
+                || conversation.chars().any(char::is_control) {
+                return Err(RunnerError::refused("seat_owner_binding_invalid", "the conversation is padded, oversized, a path or holds a control character"));
             }
         }
         if self.generation == 0 {

@@ -44,6 +44,7 @@ impl Sessions {
             managed.transport,
             &managed.conversation,
             plan.generation,
+            managed.resume,
         )?;
         let leader = spawned.binding.leader.clone();
         let live = crate::harness_control::events::live(
@@ -87,6 +88,9 @@ impl Sessions {
         proxy: Option<crate::tracking_proxy::ProxyTracking>,
         responsible: Option<String>,
     ) -> Result<(u32, u64), RunnerError> {
+        if managed.resume {
+            managed.transport.validate_resume(&managed.conversation)?;
+        }
         if let Some(binding) = managed.owner.clone() {
             // A typed supervised-seat binding, and only that, selects an
             // independent owner (AGENTS-004 R1); a manual launch is never
@@ -125,6 +129,7 @@ impl Sessions {
             Some(crate::harness_control::Settings {
                 transport: managed.transport,
                 conversation: managed.conversation,
+                resume: managed.resume,
             })
         };
         self.begin_transport(managed.launch, policy, None, proxy, responsible, settings)

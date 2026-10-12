@@ -69,6 +69,13 @@ impl OwnerPlan {
     /// `seat_owner_binding_invalid`.
     pub fn validate(&self) -> Result<(), RunnerError> {
         self.binding.validate()?;
+        if self.binding.conversation.is_empty()
+            && (self.managed.transport != crate::harness_control::Transport::Codex || self.managed.resume) {
+            return Err(RunnerError::refused("seat_owner_binding_invalid", "only a fresh Codex launch may await a conversation"));
+        }
+        if self.managed.resume {
+            self.managed.transport.validate_resume(&self.managed.conversation)?;
+        }
         if self.managed.launch.session != self.binding.session {
             return Err(RunnerError::refused(
                 "seat_owner_binding_invalid",

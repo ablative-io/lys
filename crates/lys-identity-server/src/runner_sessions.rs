@@ -7,7 +7,6 @@
 //! the runtime report the runner's answer confirms, never inferred.
 
 mod controls;
-use controls::select_transport;
 #[path = "runner_sessions_refused.rs"]
 mod refused;
 use refused::{record_refused, refused_before, started_nothing};
@@ -323,6 +322,15 @@ pub async fn run_on_runner(
     (agent, machine, caller): (&str, &str, &str),
     launch: Launch,
 ) -> Result<Value, ServerError> {
+    run_resuming(state, (agent, machine, caller), launch, None).await
+}
+
+pub(crate) async fn run_resuming(
+    state: &Arc<AppState>,
+    (agent, machine, caller): (&str, &str, &str),
+    launch: Launch,
+    conversation: Option<&str>,
+) -> Result<Value, ServerError> {
     // Every start a runner is asked for comes here: none while everything is
     // stopped. A start already kept as starting is settled, not left open.
     if let Err(stopped) = crate::cord_api::refuse_start(state) {
@@ -356,7 +364,7 @@ pub async fn run_on_runner(
             seat,
         )?
     };
-    let act = select_transport(act);
+    let act = controls::select_resume(act, conversation)?;
     let act = crate::seat_supervision::bind_owner(state, agent, machine, act)?;
     let missing_config = matches!(
         &act,

@@ -172,6 +172,13 @@ pub enum Intent {
         /// The harness process-start identity.
         start: Leader,
     },
+    /// Bind the conversation proved by the managed harness.
+    Conversation {
+        /// The owned session.
+        session: String,
+        /// The proved conversation; it cannot replace another one.
+        conversation: String,
+    },
     /// Change custody.
     Custody {
         /// The session.

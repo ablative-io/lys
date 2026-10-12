@@ -146,6 +146,7 @@ async fn restart(
         Chosen {
             profile: Some(profile),
             directory: kept_directory,
+            conversation: None,
         },
     )
     .await

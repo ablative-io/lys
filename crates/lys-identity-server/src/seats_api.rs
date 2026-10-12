@@ -68,7 +68,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 /// The seat routes' schemas, for the document.
 pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<Entry> {
     use crate::seats_views::{
-        SeatAttachBody, SeatAttached, SeatOperationBody, SeatRestarted, SeatSendBody, SeatSent,
+        SeatAttachBody, SeatAttached, SeatRestarted, SeatSendBody, SeatSent,
         SeatStarted, SeatStopBody, SeatStopped,
     };
     let seat = api.schema::<SeatView>();
@@ -99,7 +99,7 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<Entry> {
         (
             POST,
             "/seats/{name}/start",
-            Some(api.schema::<SeatOperationBody>()),
+            Some(api.schema::<crate::seats_views::SeatStartBody>()),
             Some(api.schema::<SeatStarted>()),
         ),
         (

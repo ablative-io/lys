@@ -44,6 +44,17 @@ pub struct SeatOperationBody {
     pub operation: String,
 }
 
+/// Start a new conversation or resume a named harness conversation.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SeatStartBody {
+    /// The operation admitting the start.
+    pub operation: String,
+    /// The existing Claude session UUID or Codex thread UUID; absent, start fresh.
+    #[serde(default)]
+    pub conversation: Option<String>,
+}
+
 /// Select a reviewed profile version for a stopped seat.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

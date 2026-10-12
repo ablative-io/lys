@@ -43,6 +43,18 @@ pub fn arguments(given: &[String], conversation: &str) -> Result<Vec<String>, Ru
     Ok(arguments)
 }
 
+/// Resume an existing session while keeping the managed protocol arguments.
+///
+/// # Errors
+/// The same launch argument refusals as a fresh managed session.
+pub fn resume_arguments(given: &[String], conversation: &str) -> Result<Vec<String>, RunnerError> {
+    super::Transport::Claude.validate_resume(conversation)?;
+    let mut arguments = arguments(given, conversation)?;
+    let flag = arguments.len().checked_sub(2).ok_or_else(|| RunnerError::refused("control_launch_invalid", "managed arguments have no conversation flag"))?;
+    arguments[flag] = "--resume".to_owned();
+    Ok(arguments)
+}
+
 pub(super) fn request(conversation: &str, pending: &Pending) -> Value {
     let text = if pending.kind == Kind::Compact {
         "/compact".to_owned()

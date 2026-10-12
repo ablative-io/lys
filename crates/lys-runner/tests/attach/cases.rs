@@ -38,6 +38,7 @@ fn managed(sessions: &Arc<Sessions>, id: &str) -> TestResult<u64> {
         .get_mut(id)
         .ok_or("the session is not held")?;
     session.managed = Some(Settings {
+        resume: false,
         transport: Transport::Claude,
         conversation: CONVERSATION.to_owned(),
     });

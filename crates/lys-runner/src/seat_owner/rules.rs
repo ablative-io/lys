@@ -74,7 +74,9 @@ fn validate_custody(custody: &Custody) -> Result<(), RunnerError> {
 pub(super) fn validate_record(record: &OwnerRecord) -> Result<(), RunnerError> {
     validate_name(&record.seat, "a seat")?;
     validate_name(&record.session, "a session")?;
-    validate_name(&record.conversation, "a conversation")?;
+    if !record.conversation.is_empty() {
+        validate_name(&record.conversation, "a conversation")?;
+    }
     if let Some(start) = &record.harness {
         validate_leader(start, "a harness")?;
     }
@@ -118,6 +120,7 @@ impl Projection {
             Intent::Establish { record } => record.session.as_str(),
             Intent::Lease { session, .. }
             | Intent::Harness { session, .. }
+            | Intent::Conversation { session, .. }
             | Intent::Custody { session, .. }
             | Intent::Cursors { session, .. }
             | Intent::Retire { session } => session.as_str(),
@@ -194,6 +197,14 @@ pub(super) fn apply(projection: &mut Projection, intent: &Intent) -> Result<(), 
                 ));
             }
             record.harness = Some(start.clone());
+        }
+        Intent::Conversation { session, conversation } => {
+            validate_name(conversation, "a proved conversation")?;
+            let record = held(projection, session)?;
+            if !record.conversation.is_empty() && record.conversation != *conversation {
+                return Err(refused("seat_owner_binding_mismatch", "the proved conversation cannot replace the owned conversation"));
+            }
+            record.conversation.clone_from(conversation);
         }
         Intent::Custody { session, custody } => {
             validate_custody(custody)?;

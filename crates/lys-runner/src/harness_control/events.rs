@@ -665,6 +665,7 @@ mod tests {
             session.managed = Some(Settings {
                 transport,
                 conversation: "conversation".to_owned(),
+                resume: false,
             });
             let live = session.live.as_mut().ok_or("fixture process missing")?;
             live.control = Some(runtime);

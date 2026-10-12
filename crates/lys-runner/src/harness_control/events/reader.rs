@@ -44,6 +44,7 @@ impl Sessions {
                 let held = runtime(&mut table, id, generation)?;
                 let update = held.controller.ingest(&source, &value)?;
                 let closed = held.controller.closed;
+                let conversation = held.controller.ready().then(|| held.controller.binding.conversation.clone());
                 let changed = !update.events.is_empty()
                     || !update.receipts.is_empty()
                     || !update.dispatches.is_empty();
@@ -51,6 +52,9 @@ impl Sessions {
                 drop(table);
                 if changed {
                     self.writer.barrier()?;
+                }
+                if let (Some(owner), Some(conversation)) = (self.owner_state(), conversation) {
+                    owner.bind_conversation(id, &conversation)?;
                 }
                 if closed {
                     return Err(RunnerError::refused(

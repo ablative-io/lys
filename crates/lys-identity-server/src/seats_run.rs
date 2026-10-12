@@ -36,7 +36,7 @@ use crate::seats_acts::{RESTART, START, STOP, Standing, act, admitted, live_sess
 use crate::seats_api::{body, seat, shown, with_seats};
 use crate::seats_state::{Line, Seat, Started, Stopped};
 use crate::seats_views::{
-    SeatOperationBody, SeatRestarted, SeatStarted, SeatStopBody, SeatStopped,
+    SeatStartBody, SeatRestarted, SeatStarted, SeatStopBody, SeatStopped,
 };
 use crate::session::now;
 
@@ -60,7 +60,7 @@ pub(crate) async fn start(
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path(name): Path<String>,
-    given: Result<Json<SeatOperationBody>, JsonRejection>,
+    given: Result<Json<SeatStartBody>, JsonRejection>,
 ) -> Result<Json<SeatStarted>, ServerError> {
     let given = body(given)?;
     OperationId::from_str(&given.operation)?;
@@ -72,6 +72,7 @@ pub(crate) async fn start(
         (&held, &standing),
         &admission.caller,
         &given.operation,
+        given.conversation,
     ))
     .await?;
     let held = seat(&state, &name)?;
@@ -148,6 +149,7 @@ pub(crate) async fn restart(
         (&held, &standing),
         &admission.caller,
         &part(&given.operation, "start"),
+        None,
     ))
     .await?;
     notes.extend(begun.notes);
@@ -175,6 +177,7 @@ async fn begin(
     (held, standing): (&Seat, &Standing),
     caller: &str,
     operation: &str,
+    conversation: Option<String>,
 ) -> Result<Begun, ServerError> {
     let name = held.added.name.clone();
     if standing.responsible.is_none() {
@@ -215,6 +218,7 @@ async fn begin(
     let chosen = Chosen {
         profile: Some(version),
         directory: held.added.working_folder.clone(),
+        conversation,
     };
     let Json(start) = Box::pin(start_as(
         state,
