@@ -1,8 +1,9 @@
 //! A computer that joined is a machine: the fifth identity, and a grant
 //! holder (ACCESS-005 R1 and R2).
 //!
-//! A machine is made by the join that spends a connection code, from the key
-//! that join recorded, and kept on the spent code (`network_join.rs`). It
+//! A machine is made from the key a join recorded, or the public machine
+//! key recorded by the managed install for its own runner. Both receipts
+//! are kept in the connection store. It
 //! answers to the administrator who asked for the code, is active while
 //! they are, and is retired once a later join of the same computer replaces
 //! it or once the computer itself is retired on the Network page: retiring
@@ -15,6 +16,9 @@
 //!   machine, newest join last: its id, the computer it is, its key, the
 //!   person answering for it, its state, and every grant it holds that is
 //!   not revoked, expired or yet to start, with the resource each is on.
+
+#[path = "network_machines/local.rs"]
+mod local;
 
 use std::collections::BTreeSet;
 use std::str::FromStr;
@@ -105,6 +109,7 @@ pub(crate) fn joined_now(state: &AppState) -> Result<Vec<Joined>, ServerError> {
     if state.joins.is_none() {
         return Ok(Vec::new());
     }
+    local::ensure(state)?;
     let machines = with_joins(state, |joins| joined(joins))?;
     if machines.is_empty() || state.network.is_none() {
         return Ok(machines);

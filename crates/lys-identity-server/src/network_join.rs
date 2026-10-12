@@ -36,8 +36,11 @@
 //! memory never runs ahead of or behind it. A code has no expiry. It is
 //! never logged, never kept whole and never placed in an address.
 
+#[path = "network_join/local.rs"]
+mod local;
 #[path = "network_join/routes.rs"]
 mod routes;
+pub(crate) use local::joined_local;
 
 use std::fs;
 use std::io::Write;
