@@ -138,6 +138,27 @@ pub enum RunnerCommand {
         #[arg(long)]
         socket: PathBuf,
     },
+    /// Hand Claude Code's hook JSON from stdin to the runner. Every outcome
+    /// exits zero with no stdout; failures are named on stderr.
+    Hook {
+        /// The runner's Unix socket.
+        #[arg(long)]
+        socket: PathBuf,
+
+        /// Override hook_event_name for a settings entry that names its event.
+        #[arg(long)]
+        event: Option<String>,
+    },
+    /// Hand Codex's appended notification JSON to the runner. Only
+    /// agent-turn-complete is sent; every outcome exits zero with no stdout.
+    Notify {
+        /// The runner's Unix socket.
+        #[arg(long)]
+        socket: PathBuf,
+
+        /// The notification JSON appended by Codex.
+        notification: String,
+    },
     /// Serve as the independent owner of one supervised seat (AGENTS-004
     /// R1), started by the runner in a session of its own; its plan is in
     /// its directory.

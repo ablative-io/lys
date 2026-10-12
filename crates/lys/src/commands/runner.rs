@@ -65,6 +65,28 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
         } => crate::commands::runner_join::run(&server, &machine, server_ca, scrollback),
         RunnerCommand::Judge { socket, harness } => judge(&socket, harness),
         RunnerCommand::StatusLine { socket } => status_line(&socket),
+        RunnerCommand::Hook { socket, event } => {
+            lys_runner::hook_line::run(lys_runner::hook_line::Args {
+                socket: &socket,
+                event: event.as_deref(),
+                stdin: &mut std::io::stdin().lock(),
+                stdout: &mut std::io::stdout().lock(),
+                stderr: &mut std::io::stderr().lock(),
+            });
+            Ok(())
+        }
+        RunnerCommand::Notify {
+            socket,
+            notification,
+        } => {
+            lys_runner::notify_line::run(lys_runner::notify_line::Args {
+                socket: &socket,
+                notification: &notification,
+                stdout: &mut std::io::stdout().lock(),
+                stderr: &mut std::io::stderr().lock(),
+            });
+            Ok(())
+        }
         RunnerCommand::SeatOwner {
             dir,
             server_key,
