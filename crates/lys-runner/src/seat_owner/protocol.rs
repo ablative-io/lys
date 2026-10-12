@@ -423,15 +423,36 @@ impl OwnerEndpoint {
 /// The line an owner writes on its standard output once it listens: the
 /// runner reads it from the pipe it holds, and nothing else, as the ready
 /// signal. Anything else on that pipe before it is the owner's refusal.
+///
+/// After `owner ready ` the members are one JSON object, so a socket path
+/// with a space in it is carried whole: a real install's path runs through
+/// `Application Support` (12 Oct 2026, the first seat started on a Mac read
+/// its socket as `/Users/tom/Library/Application`).
 #[must_use]
 pub fn ready_line(runner: &str, socket: &Path, owner: &Leader, build: &str) -> String {
-    format!(
-        "owner ready runner={runner} socket={} pid={} start={} build={}",
-        socket.display(),
-        owner.pid,
-        owner.start.0,
-        build.trim()
-    )
+    let ready = Ready {
+        runner: runner.to_owned(),
+        socket: socket.to_path_buf(),
+        pid: owner.pid,
+        start: owner.start.0.clone(),
+        build: build.trim().to_owned(),
+    };
+    // A struct of strings, a path and an integer always serializes.
+    let members = serde_json::to_string(&ready).unwrap_or_default();
+    format!("{READY_PREFIX}{members}")
+}
+
+const READY_PREFIX: &str = "owner ready ";
+
+/// The members of an owner's ready line.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Ready {
+    runner: String,
+    socket: PathBuf,
+    pid: u32,
+    start: String,
+    build: String,
 }
 
 /// Reads a ready line back.
@@ -440,45 +461,36 @@ pub fn ready_line(runner: &str, socket: &Path, owner: &Leader, build: &str) -> S
 ///
 /// `seat_owner_start_failed` when the line is not a ready line.
 pub fn parse_ready_line(line: &str) -> Result<(String, PathBuf, Leader, String), RunnerError> {
-    let rest = line
-        .trim_end()
-        .strip_prefix("owner ready ")
-        .ok_or_else(|| {
-            RunnerError::refused(
-                "seat_owner_start_failed",
-                format!("the owner said {:?} before it was ready", line.trim_end()),
-            )
-        })?;
-    let mut runner = None;
-    let mut socket = None;
-    let mut pid = None;
-    let mut start = None;
-    let mut build = UNVERSIONED.to_owned();
-    for member in rest.split(' ') {
-        match member.split_once('=') {
-            Some(("runner", value)) => runner = Some(value.to_owned()),
-            Some(("socket", value)) => socket = Some(PathBuf::from(value)),
-            Some(("pid", value)) => pid = value.parse::<u32>().ok(),
-            Some(("start", value)) => start = Some(value.to_owned()),
-            Some(("build", value)) if !value.is_empty() => value.clone_into(&mut build),
-            _ => {}
-        }
-    }
-    match (runner, socket, pid, start) {
-        (Some(runner), Some(socket), Some(pid), Some(start)) if pid > 1 && !start.is_empty() => {
-            Ok((
-                runner,
-                socket,
-                Leader {
-                    pid,
-                    start: crate::peer::StartIdentity(start),
-                },
-                build,
-            ))
-        }
-        _ => Err(RunnerError::refused(
+    let members = line.trim_end().strip_prefix(READY_PREFIX).ok_or_else(|| {
+        RunnerError::refused(
+            "seat_owner_start_failed",
+            format!("the owner said {:?} before it was ready", line.trim_end()),
+        )
+    })?;
+    let ready: Ready = serde_json::from_str(members).map_err(|error| {
+        RunnerError::refused(
+            "seat_owner_start_failed",
+            format!("the owner's ready line does not read: {error}"),
+        )
+    })?;
+    if ready.pid <= 1 || ready.start.is_empty() || ready.runner.is_empty() {
+        return Err(RunnerError::refused(
             "seat_owner_start_failed",
             "the owner's ready line names no runner, socket, pid or start",
-        )),
+        ));
     }
+    let build = if ready.build.is_empty() {
+        UNVERSIONED.to_owned()
+    } else {
+        ready.build
+    };
+    Ok((
+        ready.runner,
+        ready.socket,
+        Leader {
+            pid: ready.pid,
+            start: crate::peer::StartIdentity(ready.start),
+        },
+        build,
+    ))
 }

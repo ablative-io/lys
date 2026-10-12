@@ -100,3 +100,31 @@ fn a_claude_resume_keeps_the_session_and_old_managed_plans_decode() -> TestResul
     assert!(resumed.validate().is_err());
     Ok(())
 }
+
+/// A real install's socket path runs through `Application Support`: the
+/// ready line must carry it whole, or the runner refuses its own owner.
+#[test]
+fn a_ready_line_carries_a_socket_path_with_a_space_whole() -> TestResult {
+    use lys_runner::peer::{Leader, StartIdentity};
+    use lys_runner::seat_owner::protocol::{parse_ready_line, ready_line};
+    let socket = std::path::Path::new(
+        "/Users/tom/Library/Application Support/lys/identity/run/owners/8453a70aec43cbe6.sock",
+    );
+    let owner = Leader {
+        pid: 4242,
+        start: StartIdentity("macos:1.000001".to_owned()),
+    };
+    let line = ready_line(
+        "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f",
+        socket,
+        &owner,
+        "0.0.0-test",
+    );
+    let (runner, read, announced, build) = parse_ready_line(&line)?;
+    assert_eq!(runner, "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e2f");
+    assert_eq!(read, socket);
+    assert_eq!(announced.pid, 4242);
+    assert_eq!(build, "0.0.0-test");
+    assert!(parse_ready_line("owner ready runner=x socket=/a pid=2 start=s").is_err());
+    Ok(())
+}
