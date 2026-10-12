@@ -130,7 +130,7 @@ impl Sorted {
                     None => self.unsupported(&at, "the arguments are not a list of text"),
                 },
                 ("env", _) => {
-                    let Some(given) = self.env_literals(&at, item) else { return None; };
+                    let given = self.env_literals(&at, item)?;
                     parts.env = given;
                 },
                 ("type", Harness::Claude) => {
