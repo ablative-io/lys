@@ -208,7 +208,7 @@ fn seat_import_sources_preserves_channels() -> TestResult {
 }
 
 #[test]
-fn seat_import_sources_excludes_a_wake_channel_it_cannot_keep() -> TestResult {
+fn seat_import_sources_refuses_a_wake_channel_it_cannot_keep() -> TestResult {
     let root = tempfile::tempdir()?;
     let text = "[mcp_servers.waker]\ncommand = \"/bin/fixture-wake\"\nchannel = \"wake\"\n";
     let profile = write(root.path(), "fixture-channels.config.toml", text)?;
