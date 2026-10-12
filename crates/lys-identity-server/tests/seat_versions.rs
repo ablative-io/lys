@@ -2,7 +2,7 @@
 //! Seat edits preserve reviewed profile selection, retirement history and refusal names.
 
 #[path = "support/runner_start.rs"]
-mod support;
+pub mod support;
 
 use identity_contract::fake_issuer::Login;
 use serde_json::{Value, json};
@@ -47,19 +47,21 @@ async fn version_controls(table: &Table) -> TestResult {
     let edit = |version| -> Result<Value, Box<dyn Error>> {
         Ok(json!({"operation":operation()?,"profile_version":version}))
     };
+    let unknown = edit(99)?;
     refused(
         &table
             .service
-            .post(path, Some(&table.ada), &edit(99)?)
+            .post(path, Some(&table.ada), &unknown)
             .await?,
         404,
         "ProfileVersionUnknown",
     );
     profile(table, 1, Some(table.harness())).await?;
+    let unreviewed = edit(2)?;
     refused(
         &table
             .service
-            .post(path, Some(&table.ada), &edit(2)?)
+            .post(path, Some(&table.ada), &unreviewed)
             .await?,
         409,
         "ProfileNotReviewed",
@@ -87,11 +89,13 @@ async fn version_controls(table: &Table) -> TestResult {
             email: "bea@example.test".to_owned(),
         })
         .await?;
+    let version_request = edit(2)?;
+    let retirement_request = json!({"operation":operation()?});
     for (route, body) in [
-        (path, edit(2)?),
+        (path, version_request),
         (
             "/seats/fixture-seat/retire",
-            json!({"operation":operation()?}),
+            retirement_request,
         ),
     ] {
         refused(
@@ -112,10 +116,11 @@ async fn version_controls(table: &Table) -> TestResult {
             &json!({"operation":operation()?}),
         )
         .await?;
+    let undeclared = edit(3)?;
     refused(
         &table
             .service
-            .post(path, Some(&table.ada), &edit(3)?)
+            .post(path, Some(&table.ada), &undeclared)
             .await?,
         409,
         "HarnessUndeclared",
