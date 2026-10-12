@@ -21,13 +21,14 @@ use serde::{Deserialize, Serialize};
 
 use super::counts::Meter;
 use super::protocol::{
-    LOG, OwnerBinding, OwnerEndpoint, PLAN, SOCKET, fits_socket, owner_dir, owner_socket,
-    parse_ready_line,
+    LOG, OwnerBinding, OwnerEndpoint, PLAN, fits_socket, owner_dir, owner_socket, parse_ready_line,
 };
 use super::store::{JOURNAL, PROJECTION};
 use crate::error::RunnerError;
 use crate::harness_control::ManagedLaunch;
 use crate::peer::{self, Leader};
+
+mod socket_path;
 
 /// The plan an owner reads at start, written by the runner into the
 /// owner's directory before the owner is spawned. It holds public identity
@@ -49,8 +50,8 @@ pub struct OwnerPlan {
     pub harness: String,
     /// The socket the owner listens on, chosen by the runner at start
     /// ([`super::protocol::owner_socket`]). A plan written before owner
-    /// sockets moved has none, and its owner listens on
-    /// [`SOCKET`] in its directory.
+    /// sockets moved has none; reading it checks the old endpoint before
+    /// selecting the short socket beside the runner.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub socket: Option<PathBuf>,
 }
@@ -68,13 +69,6 @@ impl OwnerPlan {
             harness: fresh_intent(),
             socket: None,
         }
-    }
-
-    /// The socket the owner in `dir` listens on: the plan's own, or
-    /// [`SOCKET`] in `dir` for a plan written before owner sockets moved.
-    #[must_use]
-    pub fn socket_in(&self, dir: &Path) -> PathBuf {
-        self.socket.clone().unwrap_or_else(|| dir.join(SOCKET))
     }
 
     /// Refuses a plan whose launch names another session than its binding.
@@ -143,21 +137,6 @@ impl OwnerPlan {
             .map_err(|error| start_failed(format!("writing {}: {error}", path.display())))?;
         Ok(path)
     }
-
-    /// Reads a plan back from an owner's directory.
-    ///
-    /// # Errors
-    ///
-    /// `seat_owner_start_failed` when it cannot be read or does not validate.
-    pub fn read(dir: &Path) -> Result<Self, RunnerError> {
-        let path = dir.join(PLAN);
-        let bytes = fs::read(&path)
-            .map_err(|error| start_failed(format!("reading {}: {error}", path.display())))?;
-        let plan: Self = serde_json::from_slice(&bytes)
-            .map_err(|error| start_failed(format!("{} does not read: {error}", path.display())))?;
-        plan.validate()?;
-        Ok(plan)
-    }
 }
 
 /// A fresh intent id: 32 lowercase hexadecimal characters.
@@ -218,6 +197,7 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             ));
         }
     }
+    socket_path::prepare(&plan, &dir)?;
     for made in [&dir, spawn.sockets] {
         fs::create_dir_all(made)
             .and_then(|()| fs::set_permissions(made, fs::Permissions::from_mode(0o700)))
