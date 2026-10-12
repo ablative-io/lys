@@ -35,6 +35,26 @@ pub(crate) fn bind_owner(
     machine: &str,
     act: Act,
 ) -> Result<Act, ServerError> {
+    if !matches!(act, Act::StartManaged { .. }) {
+        return Ok(act);
+    }
+    let seat = with_seats(state, |store| Ok(chosen_seat(store.seats(), agent, machine)))?;
+    bind_selected(act, seat)
+}
+
+fn chosen_seat(seats: &[crate::seats_state::Seat], agent: &str, machine: &str) -> Option<String> {
+    seats.iter()
+        .filter(|seat| !seat.retired && seat.added.agent == agent && seat.added.machine == machine)
+        .min_by(|left, right| left.added.name.cmp(&right.added.name))
+        .map(|seat| seat.added.name.clone())
+}
+
+fn machines(seats: &[crate::seats_state::Seat]) -> BTreeSet<String> {
+    seats.iter().filter(|seat| !seat.retired)
+        .map(|seat| seat.added.machine.clone()).collect()
+}
+
+fn bind_selected(act: Act, seat: Option<String>) -> Result<Act, ServerError> {
     let Act::StartManaged {
         mut managed,
         lys_mcp,
@@ -43,13 +63,6 @@ pub(crate) fn bind_owner(
     else {
         return Ok(act);
     };
-    let seat = with_seats(state, |store| {
-        Ok(store
-            .seats()
-            .iter()
-            .find(|seat| seat.added.agent == agent && seat.added.machine == machine)
-            .map(|seat| seat.added.name.clone()))
-    })?;
     if let Some(seat) = seat {
         let binding = OwnerBinding {
             seat,
@@ -127,13 +140,7 @@ pub(crate) async fn owned(
     headers: HeaderMap,
 ) -> Result<Json<OwnedSeats>, ServerError> {
     signed_in(&state, &headers)?;
-    let machines: BTreeSet<String> = with_seats(&state, |store| {
-        Ok(store
-            .seats()
-            .iter()
-            .map(|seat| seat.added.machine.clone())
-            .collect())
-    })?;
+    let machines = with_seats(&state, |store| Ok(machines(store.seats())))?;
     let mut owners = Vec::new();
     let mut unread = Vec::new();
     for machine in machines {
