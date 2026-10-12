@@ -38,7 +38,7 @@ use super::{OpenIdProvider, unavailable};
 use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
-use crate::grants::{Decision, Judged, decide, with_grants};
+use crate::grants::{Judged, decide_in, with_grants};
 use crate::grants_batch::unanswered;
 use crate::routes::AppState;
 
@@ -257,6 +257,10 @@ fn rights(
         .filter(|(kind, _)| owned_by(kind, app))
         .map(|(kind, declared)| (kind.clone(), declared.actions.iter().cloned().collect()))
         .collect();
+    // One settle and one snapshot for the whole reading, as `/grants/which`
+    // decides: every decision is made at the same revision, and the log is
+    // not settled again for each candidate and action.
+    let frame = judged.grants.frame(judged.directory, required)?;
     let mut found: BTreeMap<(String, String, String), (lys_pass::Mode, Vec<String>)> =
         BTreeMap::new();
     for (kind, actions) in kinds {
@@ -269,7 +273,7 @@ fn rights(
                     resource: resource.clone(),
                     action: action.clone(),
                 };
-                let permit = match decide(judged, &request, at, required, Decision::Explain) {
+                let permit = match decide_in(judged, &frame, &request, at) {
                     Ok((permit, _)) => permit,
                     Err(error) if unanswered(&error) => return Err(error.into()),
                     Err(_) => continue,
