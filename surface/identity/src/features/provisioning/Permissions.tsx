@@ -64,7 +64,7 @@ function said(failure: unknown): string {
 
 /** The last row of the rules table: the kind, the one thing that kind needs, what happens, and Add. */
 function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
-  lists: RuleList[]; computers: Computers; computer: string; enforcer: string; add: (list: RuleList, rule: string) => void;
+  lists: RuleList[]; computers: Computers; computer?: string; enforcer: string; add: (list: RuleList, rule: string) => void;
   /** Adds a rule to the agent's policy, when the policy was read; without it the row adds the program's rules only. */
   addPolicy?: (rule: PolicyRule) => void;
 }) {
@@ -138,7 +138,7 @@ function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
 
 interface Props {
   /** The agent whose policy forces rules; none while an agent is being added. */
-  agent?: string; program: Program | undefined; value: Value; change: (next: Value) => void; computers: Computers; computer: string;
+  agent?: string; program: Program | undefined; value: Value; change: (next: Value) => void; computers: Computers; computer?: string;
   /** The tools the settings list; a start puts each on the Without asking list, which Kept to its folder cannot carry (launch_permissions.rs 137-140). */
   tools?: string[];
 }
