@@ -220,10 +220,13 @@ fn qualify(
         version,
         entry,
     })?;
+    // A Lys run uses the login's own Claude Code or Codex setup (Tom, 3 Oct 2026), so the
+    // candidate is qualified under the login's HOME, as every seat runs it; only the working
+    // folder is scratch. An empty HOME proves only "Not logged in".
     let scratch = tempfile::tempdir()?;
-    let home = scratch.path().join("home");
+    let home =
+        std::env::var("HOME").map_err(|error| format!("qualification_home_unset: {error}"))?;
     let working = scratch.path().join("working");
-    std::fs::create_dir(&home)?;
     std::fs::create_dir(&working)?;
     let conversation = if transport == Transport::Claude {
         Pending::new("qualification".to_owned(), Kind::Human, String::new()).uuid
@@ -240,12 +243,7 @@ fn qualify(
             .to_str()
             .ok_or("qualification_working_path_not_text")?
             .to_owned(),
-        environment: BTreeMap::from([(
-            "HOME".to_owned(),
-            home.to_str()
-                .ok_or("qualification_home_path_not_text")?
-                .to_owned(),
-        )]),
+        environment: BTreeMap::from([("HOME".to_owned(), home)]),
         config: None,
         columns: 80,
         rows: 24,

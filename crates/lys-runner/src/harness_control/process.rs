@@ -20,13 +20,8 @@ use crate::peer::Leader;
 #[cfg(test)]
 mod qualification;
 
-struct Qualification {
-    adapter: &'static str,
-    version: &'static str,
-}
-
-// A wire fixture is insufficient to qualify an installed executable.
-const QUALIFIED: &[Qualification] = &[];
+mod qualified;
+use qualified::QUALIFIED;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
