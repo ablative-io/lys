@@ -417,18 +417,21 @@ pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
         Ok(start) if start == owner.start => {
             let group = ended_group(owner.pid);
             // A bare pid can be reused once the owner is reaped, so any answer but
-            // gone is checked against the owner's start identity before it is said.
-            let still = || matches!(peer::start_identity(owner.pid), Ok(start) if start == owner.start);
+            // gone is checked against the owner's start identity before it is said;
+            // an identity that cannot be read is said with its words, never taken
+            // as the owner gone.
+            let not_gone = |seen: &str| match owner_still(owner) {
+                Held::Owner => format!("{seen}{group}"),
+                Held::NotOwner => format!("the owner was ended{group}"),
+                Held::Unknown(words) => format!(
+                    "{seen}, and whether it is still the owner could not be read: {words}{group}"
+                ),
+            };
             match super::exit_wait::exit_within(owner.pid, std::time::Duration::from_secs(5)) {
                 super::exit_wait::Exit::Gone => format!("the owner was ended{group}"),
-                super::exit_wait::Exit::Running if still() => {
-                    format!("the owner did not end within 5 s{group}")
-                }
-                super::exit_wait::Exit::Unwatched(cause) if still() => {
-                    format!("the owner's end could not be watched ({cause}) and it still runs{group}")
-                }
-                super::exit_wait::Exit::Running | super::exit_wait::Exit::Unwatched(_) => {
-                    format!("the owner was ended{group}")
+                super::exit_wait::Exit::Running => not_gone("the owner did not end within 5 s"),
+                super::exit_wait::Exit::Unwatched(cause) => {
+                    not_gone(&format!("the owner's end could not be watched ({cause})"))
                 }
             }
         }
@@ -436,6 +439,37 @@ pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
         Err(error) => format!("the owner's identity could not be read: {error}"),
     };
     RunnerError::refused(&refusal.name(), format!("{refusal}; {ended}"))
+}
+
+/// Whether `owner.pid` still names the owner.
+enum Held {
+    Owner,
+    /// No process has the pid, or another process does.
+    NotOwner,
+    /// The kernel's answer could not be read; its words are kept.
+    Unknown(String),
+}
+
+/// Asks the kernel first whether any process has the pid (a typed "no such
+/// process"), and only then reads its start identity, so a read that fails
+/// for any other reason is [`Held::Unknown`], never the owner gone.
+fn owner_still(owner: &Leader) -> Held {
+    let Some(id) = i32::try_from(owner.pid)
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+    else {
+        return Held::NotOwner;
+    };
+    match rustix::process::test_kill_process(id) {
+        Ok(()) | Err(rustix::io::Errno::PERM) => {}
+        Err(rustix::io::Errno::SRCH) => return Held::NotOwner,
+        Err(error) => return Held::Unknown(format!("signal 0 to {}: {error}", owner.pid)),
+    }
+    match peer::start_identity(owner.pid) {
+        Ok(start) if start == owner.start => Held::Owner,
+        Ok(_) => Held::NotOwner,
+        Err(error) => Held::Unknown(error.to_string()),
+    }
 }
 
 /// Kills the process group `pid` leads, answering words for the refusal.
