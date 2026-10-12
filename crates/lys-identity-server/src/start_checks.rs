@@ -179,7 +179,14 @@ pub fn fields(
         .iter()
         .map(|server| server_fields(server, handles))
         .collect::<Result<Vec<_>, _>>()?;
-    let model_proxy = start.model_proxy.map(str::to_owned);
+    let supports_proxy = matches!(
+        harness.description.rendering_contract.as_str(),
+        "claude-code/template-v1" | "codex/template-v1"
+    );
+    let model_proxy = start
+        .model_proxy
+        .filter(|_| supports_proxy)
+        .map(str::to_owned);
     // Every start is rendered from these fields, so every start that is
     // given the proxy is given it under a key minted here for it alone: no
     // start path can give a run the proxy without one.
