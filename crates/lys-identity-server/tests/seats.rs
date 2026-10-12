@@ -1,8 +1,8 @@
 #![cfg(test)]
 //! A seat is a Lys record (AGENTS-002 R1, R2): added by name for an agent,
 //! a reviewed profile version and a machine with a runner; seen with its
-//! runner's own knowledge; started only managed; and an install holds one
-//! machine naming its own runner.
+//! runner's own knowledge; started through a reviewed profile; and an install
+//! holds one machine naming its own runner.
 
 #[path = "support/runner_start.rs"]
 pub mod support;
@@ -307,8 +307,6 @@ async fn the_document_names_every_seat_refusal() -> TestResult {
                 "seat_unknown",
                 "seat_no_responsible",
                 "seat_running",
-                "seat_not_managed",
-                "seat_online_in_monitor",
                 "import_incomplete",
                 "not_permitted",
             ][..],
@@ -335,6 +333,24 @@ async fn the_document_names_every_seat_refusal() -> TestResult {
             );
         }
     }
+    for path in ["/seats/{name}/start", "/seats/{name}/restart"] {
+        let refusals = named(path);
+        for retired in ["seat_not_managed", "seat_online_in_monitor"] {
+            assert!(
+                !refusals.iter().any(|name| name == retired),
+                "{path}: {retired}"
+            );
+        }
+    }
+    for path in ["/seats/{name}/send", "/seats/{name}/type"] {
+        assert_eq!(
+            document["paths"][path]["post"]["responses"]["200"]["content"]
+                ["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SeatMessage",
+            "{path}"
+        );
+    }
+    assert!(document["components"]["schemas"]["SeatMessage"].is_object());
     table.close()
 }
 

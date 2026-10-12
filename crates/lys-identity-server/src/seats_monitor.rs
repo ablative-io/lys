@@ -4,14 +4,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg(test)]
-use reqwest::header::HeaderName;
-#[cfg(test)]
-use serde_json::Value;
-
 use crate::error::ServerError;
-#[cfg(test)]
-use crate::error_seat::SeatError;
 use crate::routes::AppState;
 use crate::runner_acts::Digested;
 use crate::runner_sessions::{Driven, kind, record_end};
@@ -21,9 +14,6 @@ use lys_runner::{Act, Answer};
 
 /// The bounded grace period after accepting the terminal's exit operation.
 pub(crate) const STOP_WAIT: Duration = Duration::from_secs(30);
-
-#[cfg(test)]
-const ASKED_FOR: Duration = Duration::from_secs(5);
 
 /// Refuse retired setting names without reading or reporting their values.
 pub(crate) fn check(name: &str) -> Result<String, ServerError> {
@@ -132,83 +122,6 @@ async fn exited(state: &Arc<AppState>, driven: &Driven) -> Result<bool, ServerEr
         }
         cursor = Some(output.cursor);
     }
-}
-
-/// Ask the monitor at `base` whether `name` is online, with the collector's
-/// secret in its header when one is given.
-#[cfg(test)]
-pub(crate) async fn check_at(
-    base: &str,
-    secret: Option<(&HeaderName, &str)>,
-    name: &str,
-) -> Result<String, ServerError> {
-    let address = format!("{}/api/seats", base.trim_end_matches('/'));
-    let client = reqwest::Client::builder()
-        .timeout(ASKED_FOR)
-        .build()
-        .map_err(|error| ServerError::ConfigInvalid {
-            reason: format!("the client that asks the monitor could not be built: {error}"),
-        })?;
-    let mut request = client.get(&address);
-    if let Some((header, secret)) = secret {
-        request = request.header(header, secret);
-    }
-    let answered = match request.send().await {
-        Ok(answered) => answered,
-        Err(error) => {
-            return Ok(format!(
-                "the monitor at {base} could not be reached, so it was not known whether seat {name} is online there: {error}"
-            ));
-        }
-    };
-    let status = answered.status();
-    if !status.is_success() {
-        return Ok(format!(
-            "the monitor at {base} answered {status} to its seats listing, so it was not known whether seat {name} is online there"
-        ));
-    }
-    let body = match answered.json::<Value>().await {
-        Ok(body) => body,
-        Err(error) => {
-            return Ok(format!(
-                "the monitor at {base} answered a seats listing that does not read: {error}"
-            ));
-        }
-    };
-    match online_in(&body, name) {
-        Ok(Some(true)) => Err(SeatError::OnlineInMonitor {
-            name: name.to_owned(),
-            monitor: base.to_owned(),
-        }
-        .into()),
-        Ok(Some(false)) => Ok(format!("the monitor at {base} lists seat {name} offline")),
-        Ok(None) => Ok(format!(
-            "the monitor at {base} does not know whether seat {name} is online, or does not list it"
-        )),
-        Err(reason) => Ok(format!(
-            "the monitor at {base} answered a seats listing that does not read: {reason}"
-        )),
-    }
-}
-
-/// Whether the monitor's seats listing `body` names `name` online: none when
-/// it does not list the name or does not know.
-#[cfg(test)]
-pub(crate) fn online_in(body: &Value, name: &str) -> Result<Option<bool>, String> {
-    let seats = body
-        .get("seats")
-        .and_then(Value::as_array)
-        .ok_or("it names no seats list")?;
-    for seat in seats {
-        if seat.get("name").and_then(Value::as_str) == Some(name) {
-            return match seat.get("online") {
-                Some(Value::Bool(online)) => Ok(Some(*online)),
-                Some(Value::Null) | None => Ok(None),
-                Some(other) => Err(format!("seat {name}'s online is {other}, not a boolean")),
-            };
-        }
-    }
-    Ok(None)
 }
 
 #[cfg(test)]

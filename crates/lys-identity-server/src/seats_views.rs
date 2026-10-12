@@ -209,7 +209,7 @@ pub struct SeatSent {
     pub seat: SeatView,
     /// The session it reached.
     pub session: String,
-    /// Always true: a message not delivered is refused by name.
+    /// Whether the runner recorded delivery; false while an operation awaits its boundary.
     pub delivered: bool,
     /// What admitted it.
     pub admission: SeatAdmission,
@@ -322,6 +322,44 @@ mod tests {
     use super::{Reading, view};
     use crate::seats_acts::Live;
     use crate::seats_state::{Added, Seat};
+
+    #[test]
+    fn a_seat_log_before_transport_loads_folds_and_serves_unknown_transport()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use std::sync::Arc;
+
+        use lys_core::Ed25519Identity;
+        use lys_log_store::{FileLeafStore, FrontierLog};
+
+        use crate::seats_store::{ORIGIN, SeatStore};
+
+        let fixture = r#"[
+          {"added":{"operation":"op-a","name":"waffles","agent":"agent",
+            "harness":"claude","profile_version":1,"machine":"op-1",
+            "working_folder":null,"account":null,"by":"person","at":1}},
+          {"started":{"operation":"op-b","name":"waffles","session":"op-b",
+            "harness_session":null,"by":"person","at":2}}
+        ]"#;
+        let leaves: Vec<serde_json::Value> = serde_json::from_str(fixture)?;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("seats");
+        let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+        let (mut log, _) = FrontierLog::open(FileLeafStore::create(&path, ORIGIN)?)?;
+        for leaf in &leaves {
+            log.append(&serde_json::to_vec(leaf)?)?;
+        }
+        drop(log);
+        for _ in 0..2 {
+            let store = SeatStore::open(&path, Arc::clone(&key))?;
+            let seat = store.named("waffles")?;
+            assert!(seat.running);
+            assert_eq!(seat.session.as_deref(), Some("op-b"));
+            assert_eq!(seat.revision, 2);
+            let served = serde_json::to_value(view(&seat, None, &Reading::Read(None)))?;
+            assert_eq!(served.get("transport"), Some(&serde_json::Value::Null));
+        }
+        Ok(())
+    }
 
     fn seat(session: Option<&str>) -> Seat {
         Seat {

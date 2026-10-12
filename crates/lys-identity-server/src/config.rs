@@ -314,6 +314,16 @@ impl Config {
         let text = std::fs::read_to_string(path)
             .map_err(|error| invalid(format!("{} could not be read: {error}", path.display())))?;
         let config: Self = serde_json::from_str(&text).map_err(|error| {
+            if error
+                .to_string()
+                .starts_with("unknown field `LYS_MONITOR_URL`")
+            {
+                return invalid(format!(
+                    "{}: LYS_MONITOR_URL is retired; delete line {} setting LYS_MONITOR_URL",
+                    path.display(),
+                    error.line()
+                ));
+            }
             invalid(format!(
                 "{} is not a configuration: {error}",
                 path.display()

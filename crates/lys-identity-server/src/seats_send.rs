@@ -97,6 +97,7 @@ pub(crate) async fn attach(
     let session = held
         .session
         .clone()
+        .filter(|_| held.running)
         .ok_or_else(|| SeatError::NotRunning { name: name.clone() })?;
     let driven = driven(&state, &session)?;
     let read = Act::AttachRead {

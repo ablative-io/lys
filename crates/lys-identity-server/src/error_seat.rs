@@ -72,17 +72,6 @@ pub enum SeatError {
         /// Its session.
         session: String,
     },
-    /// The monitor's registry still lists the seat's name online.
-    #[error(
-        "seat_online_in_monitor: the monitor at {monitor} lists seat `{name}` online: stop it there and turn its delivery off before starting it from Lys"
-    )]
-    #[cfg(test)]
-    OnlineInMonitor {
-        /// The seat.
-        name: String,
-        /// The monitor base asked.
-        monitor: String,
-    },
     /// Another live machine already names this install's own runner.
     #[error(
         "runner_lys_taken: machine `{machine}` already names this install's own runner; an install holds one such machine"
@@ -129,8 +118,6 @@ impl SeatError {
             Self::Running { .. } => "seat_running",
             Self::NotRunning { .. } => "seat_not_running",
             Self::TurnInProgress { .. } => "seat_turn_in_progress",
-            #[cfg(test)]
-            Self::OnlineInMonitor { .. } => "seat_online_in_monitor",
             Self::RunnerLysTaken { .. } => "runner_lys_taken",
             Self::AttachRefused { .. } => "seat_attach_refused",
             Self::TextEmpty { .. } => "seat_text_empty",
@@ -153,8 +140,6 @@ impl SeatError {
             | Self::NotRunning { .. }
             | Self::TurnInProgress { .. }
             | Self::RunnerLysTaken { .. } => StatusCode::CONFLICT,
-            #[cfg(test)]
-            Self::OnlineInMonitor { .. } => StatusCode::CONFLICT,
         }
     }
 }
@@ -204,13 +189,6 @@ mod tests {
                     session: "op".to_owned(),
                 },
                 "seat_turn_in_progress",
-            ),
-            (
-                SeatError::OnlineInMonitor {
-                    name: name(),
-                    monitor: "http://monitor".to_owned(),
-                },
-                "seat_online_in_monitor",
             ),
             (
                 SeatError::RunnerLysTaken {

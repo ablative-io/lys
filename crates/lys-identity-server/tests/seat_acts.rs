@@ -21,6 +21,16 @@ const MODEL: &str = r#"{"version":1,"relations":{"alpha":["read","write"],"beta"
 const BEA: &str = "bea-subject";
 
 async fn seated(table: &Table) -> Result<(), Box<dyn Error>> {
+    let program = table.dir.path().join("declared-harness");
+    let fixture = std::fs::read_to_string(&program)?;
+    std::fs::write(
+        &program,
+        fixture.replacen(
+            "#!/bin/sh\n",
+            "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 2.1.285; exit 0; fi\n",
+            1,
+        ),
+    )?;
     let machine = operation()?;
     table
         .machine(
@@ -46,6 +56,33 @@ async fn seated(table: &Table) -> Result<(), Box<dyn Error>> {
 fn refused(answer: &(u16, Value), status: u16, name: &str) {
     assert_eq!(answer.0, status, "{}", answer.1);
     assert_eq!(answer.1["refusal"], name, "{}", answer.1);
+}
+
+fn live_pty(table: &Table, answer: &(u16, Value)) -> Result<String, Box<dyn Error>> {
+    assert_eq!(answer.0, 200, "{}", answer.1);
+    assert_eq!(answer.1["seat"]["profile_version"], 1);
+    let session = answer.1["session"].as_str().ok_or("no session")?;
+    let runner = table.serving.as_ref().ok_or("no runner")?.sessions();
+    let live = runner.liveness(Some(session))?;
+    assert_eq!(live.len(), 1, "{live:?}");
+    assert!(live[0].alive, "{live:?}");
+    assert!(!live[0].managed, "{live:?}");
+    assert!(!live[0].ended, "{live:?}");
+    let client = lys_runner::Client::new(
+        table.dir.path().join("runner.sock"),
+        std::sync::Arc::clone(&table.server_key),
+    );
+    let ready = client.ask(&lys_runner::Act::Wait {
+        session: session.to_owned(),
+        cursor: Some(0),
+        pattern: "profile-read".to_owned(),
+        regex: false,
+    })?;
+    assert!(
+        matches!(ready, lys_runner::Answer::Matched { .. }),
+        "{ready:?}"
+    );
+    Ok(session.to_owned())
 }
 
 async fn bea(table: &Table) -> Result<String, Box<dyn Error>> {
@@ -117,7 +154,7 @@ async fn with_the_right_the_act_is_admitted_and_judged_on_the_seat() -> TestResu
         )
         .await?;
     refused(&answer, 409, "seat_not_running");
-    // Admitted by the grant, the start is judged on the profile: it is not managed.
+    // The grant admits the reviewed profile's terminal launch.
     let answer = table
         .service
         .post(
@@ -126,7 +163,7 @@ async fn with_the_right_the_act_is_admitted_and_judged_on_the_seat() -> TestResu
             &json!({ "operation": operation()? }),
         )
         .await?;
-    refused(&answer, 409, "seat_not_managed");
+    live_pty(&table, &answer)?;
     // The grant names one seat; another is still refused.
     let answer = table
         .service
@@ -140,39 +177,53 @@ async fn with_the_right_the_act_is_admitted_and_judged_on_the_seat() -> TestResu
     table.close()
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn the_responsible_person_stands_without_a_grant_and_a_stranger_cannot_attach() -> TestResult
-{
-    let table = Table::set_judging(MODEL).await?;
-    seated(&table).await?;
-    let answer = table
-        .service
-        .post(
-            "/seats/waffles/stop",
-            Some(&table.ada),
-            &json!({ "operation": operation()?, "force": true }),
-        )
-        .await?;
-    refused(&answer, 409, "seat_not_running");
-    let answer = table
-        .service
-        .post(
-            "/seats/waffles/restart",
-            Some(&table.ada),
-            &json!({ "operation": operation()? }),
-        )
-        .await?;
-    refused(&answer, 409, "seat_not_managed");
-    let answer = table
-        .service
-        .post("/seats/waffles/attach", Some(&table.ada), &json!({}))
-        .await?;
-    refused(&answer, 409, "seat_not_running");
-    let bea = bea(&table).await?;
-    let answer = table
-        .service
-        .post("/seats/waffles/attach", Some(&bea), &json!({}))
-        .await?;
-    refused(&answer, 403, "seat_attach_refused");
-    table.close()
+mod seat_attach {
+    use super::{MODEL, Table, TestResult, bea, live_pty, operation, refused, seated};
+    use serde_json::json;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_responsible_person_stands_without_a_grant_and_a_stranger_cannot_attach() -> TestResult
+    {
+        let table = Table::set_judging(MODEL).await?;
+        seated(&table).await?;
+        let answer = table
+            .service
+            .post(
+                "/seats/waffles/stop",
+                Some(&table.ada),
+                &json!({ "operation": operation()?, "force": true }),
+            )
+            .await?;
+        refused(&answer, 409, "seat_not_running");
+        let answer = table
+            .service
+            .post(
+                "/seats/waffles/restart",
+                Some(&table.ada),
+                &json!({ "operation": operation()? }),
+            )
+            .await?;
+        let session = live_pty(&table, &answer)?;
+        let stopped = table
+            .ok(
+                "/seats/waffles/stop",
+                &json!({ "operation": operation()?, "force": true }),
+            )
+            .await?;
+        assert_eq!(stopped["ended"], true, "{stopped}");
+        let runner = table.serving.as_ref().ok_or("no runner")?.sessions();
+        assert!(!runner.liveness(Some(&session))?[0].alive);
+        let answer = table
+            .service
+            .post("/seats/waffles/attach", Some(&table.ada), &json!({}))
+            .await?;
+        refused(&answer, 409, "seat_not_running");
+        let bea = bea(&table).await?;
+        let answer = table
+            .service
+            .post("/seats/waffles/attach", Some(&bea), &json!({}))
+            .await?;
+        refused(&answer, 403, "seat_attach_refused");
+        table.close()
+    }
 }
