@@ -14,8 +14,13 @@ use crate::session::{Sessions, Table, accounts, append, now_ms};
 use crate::tracking::{Harness, Reading};
 use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 
+mod hooks;
 pub(crate) mod status;
 mod stop;
+
+#[cfg(test)]
+#[path = "../tests/collector_tracking.rs"]
+mod tracking_tests;
 
 #[cfg(test)]
 #[path = "../tests/collector_binding/cases.rs"]
@@ -82,92 +87,6 @@ impl Sessions {
             self.advance_hook_cursor(id)?;
         }
         result
-    }
-
-    fn hook(self: &Arc<Self>, id: &str, event: &str, input: &Value) -> Result<String, RunnerError> {
-        match event {
-            "SessionStart" => self.bind_claude(id, input),
-            "UserPromptSubmit" => {
-                let mut table = self.lock()?;
-                if let Some(session) = table.sessions.get_mut(id) {
-                    session.guard.idle = false;
-                }
-                append(&mut table, id, vec![boundary("turn_start", None)], None)?;
-                Ok("a turn began".to_owned())
-            }
-            "Stop" if input.get("stop_hook_active").and_then(Value::as_bool) == Some(true) => Ok(
-                "stop_hook_active: the harness is already continuing from a stop hook, so this is no boundary".to_owned(),
-            ),
-            "Stop" | "SessionEnd" => self.hook_stop(id, event),
-            "PreCompact" => {
-                let mut table = self.lock()?;
-                append(&mut table, id, vec![boundary("compacting", None)], None)?;
-                if table.sessions.get(id).is_none_or(|session| session.managed.is_none()) {
-                    crate::operations::compacting(&mut table, id);
-                }
-                drop(table);
-                self.wake();
-                Ok("compacting kept".to_owned())
-            }
-            "PostToolUse" | "PostToolUseFailure" => Ok(
-                "an outcome observation: it is no usage and no policy refusal, and nothing is kept".to_owned(),
-            ),
-            other => Err(RunnerError::refused(
-                "hook_unknown",
-                format!("the collector keeps no hook {other}"),
-            )),
-        }
-    }
-
-    /// Bind session `id` to the transcript a `SessionStart` names, once it
-    /// is the file its isolated configuration home keeps for that session.
-    fn bind_claude(self: &Arc<Self>, id: &str, input: &Value) -> Result<String, RunnerError> {
-        let unbound = |words: String| RunnerError::refused("transcript_unbound", words);
-        let claude = text(input, "session_id").filter(|claude| plain(claude));
-        let given = text(input, "transcript_path");
-        let (Some(claude), Some(given)) = (claude, given) else {
-            return Err(unbound(
-                "the hook names no session id and transcript".to_owned(),
-            ));
-        };
-        let mut table = self.lock()?;
-        let session = table
-            .sessions
-            .get(id)
-            .ok_or_else(|| crate::session::unknown(id))?;
-        let tracking = session
-            .guard
-            .tracking
-            .as_ref()
-            .filter(|tracking| tracking.harness == Harness::ClaudeCode)
-            .ok_or_else(|| unbound(format!("session {id} is not a tracked Claude Code session")))?;
-        let launched = session
-            .launch
-            .as_ref()
-            .map(|launch| launch.directory.clone());
-        let expected = [Some(session.guard.cwd.clone()), launched]
-            .into_iter()
-            .flatten()
-            .map(|dir| {
-                Path::new(&tracking.config_home)
-                    .join("projects")
-                    .join(slug(&dir))
-                    .join(format!("{claude}.jsonl"))
-            })
-            .any(|path| path == Path::new(given));
-        if !expected {
-            let words = format!(
-                "{given} is not the transcript the session's configuration home keeps for {claude}"
-            );
-            let refused = SourceState {
-                path: given.to_owned(),
-                ..SourceState::default()
-            };
-            let coverage = Coverage::of("source_refused", &refused, None, words.clone());
-            append(&mut table, id, vec![Body::Coverage(coverage)], None)?;
-            return Err(unbound(words));
-        }
-        self.bind(&mut table, id, (given, claude), false)
     }
 
     /// Bind session `id` to the stream at `path` as the harness's `bound`
