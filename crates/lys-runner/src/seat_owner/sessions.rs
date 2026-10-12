@@ -224,6 +224,7 @@ impl Sessions {
             &OwnerSpawn {
                 lys: &lys,
                 state: &self.state_dir,
+                sockets: &self.owner_sockets(),
                 server_key: &key_path,
                 scrollback: self.scrollback,
             },

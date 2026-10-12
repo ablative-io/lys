@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use super::counts::Meter;
 use super::protocol::{
     ClientKind, OWNER_PROTOCOL, OwnerAnswer, OwnerBinding, OwnerCommand, OwnerView, RUNNER_STATE,
-    SOCKET, ready_line,
+    ready_line,
 };
 use super::record::{Cursors, Custody, Holder, Intent, Lease, OwnerRecord};
 use super::spawn::OwnerPlan;
@@ -229,7 +229,8 @@ pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
     };
     let mut store = OwnerStore::open(&serve.dir)?;
     establish(&mut store, &plan, &own)?;
-    let socket = serve.dir.join(SOCKET);
+    let socket = plan.socket_in(&serve.dir);
+    super::protocol::fits_socket(&socket)?;
     let runner = crate::Runner::open(&crate::Options {
         socket: socket.clone(),
         state: serve.dir.join(RUNNER_STATE),

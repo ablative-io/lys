@@ -21,7 +21,8 @@ use serde::{Deserialize, Serialize};
 
 use super::counts::Meter;
 use super::protocol::{
-    LOG, OwnerBinding, OwnerEndpoint, PLAN, SOCKET, owner_dir, parse_ready_line,
+    LOG, OwnerBinding, OwnerEndpoint, PLAN, SOCKET, fits_socket, owner_dir, owner_socket,
+    parse_ready_line,
 };
 use super::store::{JOURNAL, PROJECTION};
 use crate::error::RunnerError;
@@ -46,6 +47,12 @@ pub struct OwnerPlan {
     pub establish: String,
     /// The intent id of the harness record, chosen by the runner.
     pub harness: String,
+    /// The socket the owner listens on, chosen by the runner at start
+    /// ([`super::protocol::owner_socket`]). A plan written before owner
+    /// sockets moved has none, and its owner listens on
+    /// [`SOCKET`] in its directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub socket: Option<PathBuf>,
 }
 
 impl OwnerPlan {
@@ -59,7 +66,15 @@ impl OwnerPlan {
             credential_references: Vec::new(),
             establish: fresh_intent(),
             harness: fresh_intent(),
+            socket: None,
         }
+    }
+
+    /// The socket the owner in `dir` listens on: the plan's own, or
+    /// [`SOCKET`] in `dir` for a plan written before owner sockets moved.
+    #[must_use]
+    pub fn socket_in(&self, dir: &Path) -> PathBuf {
+        self.socket.clone().unwrap_or_else(|| dir.join(SOCKET))
     }
 
     /// Refuses a plan whose launch names another session than its binding.
@@ -162,6 +177,9 @@ pub struct OwnerSpawn<'a> {
     pub lys: &'a Path,
     /// The runner's state directory, under which owners live.
     pub state: &'a Path,
+    /// The directory owner sockets are made in, beside the runner's own
+    /// socket.
+    pub sockets: &'a Path,
     /// The server's public key file, which the owner verifies acts with.
     pub server_key: &'a Path,
     /// Scrollback for the owner's one session.
@@ -179,6 +197,12 @@ pub struct OwnerSpawn<'a> {
 pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, RunnerError> {
     plan.validate()?;
     let dir = owner_dir(spawn.state, &plan.binding.session);
+    let planned = owner_socket(spawn.sockets, &plan.binding.session);
+    fits_socket(&planned).map_err(|error| start_failed(error.to_string()))?;
+    let plan = OwnerPlan {
+        socket: Some(planned.clone()),
+        ..plan.clone()
+    };
     // An owner's record is its journal until its first checkpoint writes the
     // projection: either one present means the session has an owner. A file
     // whose presence the kernel cannot say is a refusal, never an absence.
@@ -194,9 +218,11 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             ));
         }
     }
-    fs::create_dir_all(&dir)
-        .and_then(|()| fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)))
-        .map_err(|error| start_failed(format!("making {}: {error}", dir.display())))?;
+    for made in [&dir, spawn.sockets] {
+        fs::create_dir_all(made)
+            .and_then(|()| fs::set_permissions(made, fs::Permissions::from_mode(0o700)))
+            .map_err(|error| start_failed(format!("making {}: {error}", made.display())))?;
+    }
     plan.write(&dir)?;
     let log = fs::OpenOptions::new()
         .create(true)
@@ -257,10 +283,11 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             "the owner's announced start identity is not the kernel's",
         ));
     }
-    if socket != dir.join(SOCKET) {
+    if socket != planned {
         return Err(start_failed(format!(
-            "the owner listens on {} and not in its directory",
-            socket.display()
+            "the owner listens on {} and not on its planned {}",
+            socket.display(),
+            planned.display()
         )));
     }
     // The owner outlives this runner; reap it if it exits first, without
@@ -273,7 +300,7 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             }
         })
         .map_err(|error| start_failed(format!("the reaper could not start: {error}")))?;
-    let mut endpoint = OwnerEndpoint::new(dir, runner, announced);
+    let mut endpoint = OwnerEndpoint::new(dir, planned, runner, announced);
     endpoint.build = build;
     Ok(endpoint)
 }

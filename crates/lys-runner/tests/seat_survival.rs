@@ -156,11 +156,27 @@ fn runner_with_owner(
     session: &str,
     key: &Arc<Ed25519Identity>,
 ) -> Result<(OwnedSeat, std::process::Child), Box<dyn Error>> {
-    let mut child = Command::new(fixture()?)
+    runner_serving_with_owner(state, None, session, key)
+}
+
+/// [`runner_with_owner`], the runner serving on `socket` when given, so its
+/// owner's socket is made beside it.
+fn runner_serving_with_owner(
+    state: &std::path::Path,
+    socket: Option<&std::path::Path>,
+    session: &str,
+    key: &Arc<Ed25519Identity>,
+) -> Result<(OwnedSeat, std::process::Child), Box<dyn Error>> {
+    let mut command = Command::new(fixture()?);
+    command
         .arg("--as-runner")
         .arg(state)
         .arg(session)
-        .arg(hex(&key.public_key_bytes()))
+        .arg(hex(&key.public_key_bytes()));
+    if let Some(socket) = socket {
+        command.arg(socket);
+    }
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -176,6 +192,80 @@ fn runner_with_owner(
     }
     let seat: OwnedSeat = serde_json::from_str(line.trim_end())?;
     Ok((seat, child))
+}
+
+/// A real install's state root is long: the owner's directory under it
+/// put the old owner socket past the kernel's limit, and every supervised
+/// start failed. Under a root at least that long, the owner's socket is
+/// made beside the runner's own, binds, and is reached.
+#[test]
+fn an_owner_under_a_state_root_as_long_as_a_real_install_binds_and_is_reached() -> TestResult {
+    use lys_runner::seat_owner::protocol::{OWNERS_DIR, SOCKET, SUN_PATH_BYTES, owner_dir};
+    const INSTALL_STATE: &str = "/Users/tom/Library/Application Support/lys/identity/data/runner";
+    let dir = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let mut state = dir
+        .path()
+        .join("Library/Application Support/lys/identity/data/runner");
+    while state.as_os_str().len() < INSTALL_STATE.len() {
+        state.push("longer");
+    }
+    let session = "op-0123456789abcdef0123456789abcdef";
+    let old = owner_dir(&state, session).join(SOCKET);
+    assert!(
+        old.as_os_str().len() >= SUN_PATH_BYTES,
+        "the state root is not long enough to have failed: {}",
+        old.display()
+    );
+    let runner_socket = dir.path().join("run").join("runner.sock");
+    let mut owners = Owners::default();
+    let (seat, runner) = runner_serving_with_owner(&state, Some(&runner_socket), session, &key)?;
+    owners.hold(&seat);
+    let beside = dir.path().join("run").join(OWNERS_DIR);
+    assert_eq!(seat.endpoint.socket.parent(), Some(beside.as_path()));
+    assert!(seat.endpoint.socket.as_os_str().len() < SUN_PATH_BYTES);
+    let plan = lys_runner::seat_owner::spawn::OwnerPlan::read(&seat.endpoint.dir)?;
+    assert_eq!(plan.socket.as_ref(), Some(&seat.endpoint.socket));
+    let view = bound(hello(&seat, own_leader()?, &key)?)?;
+    assert_eq!(view.owner, seat.endpoint.owner);
+    assert_eq!(view.socket, seat.endpoint.socket);
+    drop(runner);
+    drop(owners);
+    Ok(())
+}
+
+/// A plan or endpoint recorded before owner sockets moved still reads, and
+/// names the socket in the owner's directory; a socket path at the kernel's
+/// limit is refused by name before anything binds.
+#[test]
+fn old_owner_records_still_read_and_a_long_socket_is_refused_by_name() -> TestResult {
+    use lys_runner::seat_owner::protocol::{SOCKET, SUN_PATH_BYTES, fits_socket};
+    use lys_runner::seat_owner::spawn::OwnerPlan;
+    let dir = tempfile::tempdir()?;
+    let mut plan = serde_json::to_value(OwnerPlan::new(
+        supervised("old")?.owner.ok_or("the launch is supervised")?,
+        supervised("old")?,
+        None,
+    ))?;
+    let fields = plan.as_object_mut().ok_or("a plan is an object")?;
+    assert!(
+        fields.remove("socket").is_none(),
+        "a new plan says no socket before start"
+    );
+    let plan: OwnerPlan = serde_json::from_value(plan)?;
+    assert_eq!(plan.socket_in(dir.path()), dir.path().join(SOCKET));
+    let long = std::path::PathBuf::from(format!("/{}", "s".repeat(SUN_PATH_BYTES - 1)));
+    match fits_socket(&long) {
+        Err(RunnerError::Refused { refusal, .. }) => {
+            assert_eq!(refusal, "runner_socket_path_too_long");
+        }
+        other => return Err(format!("a {SUN_PATH_BYTES}-byte socket was {other:?}").into()),
+    }
+    fits_socket(&std::path::PathBuf::from(format!(
+        "/{}",
+        "s".repeat(SUN_PATH_BYTES - 2)
+    )))?;
+    Ok(())
 }
 
 #[test]

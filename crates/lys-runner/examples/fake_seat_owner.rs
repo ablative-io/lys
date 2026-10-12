@@ -6,8 +6,9 @@
 //! opens a runner of its own on the owner socket, adopts its owner state and
 //! writes the ready line, exactly as `lys runner seat-owner` does short of
 //! starting the managed session.
-//! As `--as-runner STATE SESSION KEY_HEX` it is the runner: it starts an
-//! owner for a supervised binding through `Sessions::start_owned`, prints
+//! As `--as-runner STATE SESSION KEY_HEX [SOCKET]` it is the runner: it
+//! starts an owner for a supervised binding through `Sessions::start_owned`,
+//! its owner sockets beside SOCKET when given, as a serving runner's are, prints
 //! the owned seat as JSON on standard output and blocks on standard input
 //! until the test kills it, which is how the test proves the owner outlives
 //! the process that started it.
@@ -22,7 +23,7 @@ use lys_runner::harness_control::{ManagedLaunch, Transport};
 use lys_runner::peer::{self, Leader};
 use lys_runner::protocol::{Launch, unhex};
 use lys_runner::seat_owner::process::{OwnerState, detach, establish};
-use lys_runner::seat_owner::protocol::{OwnerBinding, RUNNER_STATE, SOCKET, ready_line};
+use lys_runner::seat_owner::protocol::{OwnerBinding, RUNNER_STATE, ready_line};
 use lys_runner::seat_owner::spawn::OwnerPlan;
 use lys_runner::seat_owner::store::OwnerStore;
 use lys_runner::session::Sessions;
@@ -35,7 +36,7 @@ fn main() -> ExitCode {
         Some("--as-runner") => as_runner(&args),
         _ => Err(RunnerError::refused(
             "fixture_args_invalid",
-            "use: runner seat-owner --dir D --server-key K --scrollback N | --as-runner STATE SESSION KEY_HEX",
+            "use: runner seat-owner --dir D --server-key K --scrollback N | --as-runner STATE SESSION KEY_HEX [SOCKET]",
         )),
     };
     match result {
@@ -91,7 +92,7 @@ fn owner(args: &[String]) -> Result<(), RunnerError> {
     };
     let mut store = OwnerStore::open(&dir)?;
     establish(&mut store, &plan, &own)?;
-    let socket = dir.join(SOCKET);
+    let socket = plan.socket_in(&dir);
     let runner = Runner::open(&Options {
         socket: socket.clone(),
         state: dir.join(RUNNER_STATE),
@@ -110,9 +111,9 @@ fn owner(args: &[String]) -> Result<(), RunnerError> {
     // The build this fake owner announces: `<state>/owner-build` when the
     // test wrote one, so a seat started after an "upgrade" names the new
     // build while an earlier seat keeps its owner and its build.
-    let build = socket
+    let build = dir
         .ancestors()
-        .nth(3)
+        .nth(2)
         .map(|state| state.join("owner-build"))
         .and_then(|path| std::fs::read_to_string(path).ok())
         .map_or_else(|| "fake".to_owned(), |build| build.trim().to_owned());
@@ -159,6 +160,9 @@ fn as_runner(args: &[String]) -> Result<(), RunnerError> {
     let session = args.get(2).cloned().unwrap_or_default();
     let key = key_from_hex(args.get(3).map(String::as_str).unwrap_or_default())?;
     let sessions = Sessions::open(&state, 1 << 16)?;
+    if let Some(socket) = args.get(4) {
+        sessions.serving_on(std::path::Path::new(socket));
+    }
     sessions.set_server_key(key);
     sessions.set_owner_program(
         std::env::current_exe()

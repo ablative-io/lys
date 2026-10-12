@@ -75,6 +75,16 @@ impl Sessions {
         }
     }
 
+    /// Where this runner makes its owners' sockets: beside its own socket,
+    /// or under its state while it serves on none.
+    pub(crate) fn owner_sockets(&self) -> std::path::PathBuf {
+        self.serving
+            .get()
+            .and_then(|socket| socket.parent())
+            .unwrap_or(&self.state_dir)
+            .join(crate::seat_owner::protocol::OWNERS_DIR)
+    }
+
     /// Say the socket this runner serves on. Said once, when it is bound.
     pub fn serving_on(&self, socket: &std::path::Path) {
         if self.serving.set(socket.to_owned()).is_err() {

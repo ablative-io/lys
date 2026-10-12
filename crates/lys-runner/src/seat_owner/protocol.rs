@@ -35,8 +35,49 @@ fn unversioned() -> String {
 
 /// The directory under the runner's state holding one directory per owner.
 pub const OWNERS_DIR: &str = "owners";
-/// The owner's socket, in its directory.
+/// The owner's socket, in its directory: where owners recorded before
+/// owner sockets moved beside the runner's own socket still listen.
 pub const SOCKET: &str = "owner.sock";
+
+/// The longest socket path the kernel binds, terminator included
+/// (`sun_path` in `sockaddr_un`): a path of this many bytes or more is
+/// refused by name before any bind.
+pub const SUN_PATH_BYTES: usize = if cfg!(target_os = "linux") { 108 } else { 104 };
+
+/// Refuses a socket path of [`SUN_PATH_BYTES`] bytes or more, by name,
+/// before anything binds it.
+///
+/// # Errors
+///
+/// `runner_socket_path_too_long`.
+pub fn fits_socket(path: &Path) -> Result<(), RunnerError> {
+    let bytes = path.as_os_str().len();
+    if bytes >= SUN_PATH_BYTES {
+        return Err(RunnerError::refused(
+            "runner_socket_path_too_long",
+            format!(
+                "{} is {bytes} bytes; a socket path must be shorter than {SUN_PATH_BYTES}",
+                path.display()
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// Where the owner of `session` listens: beside the runner's own socket,
+/// in `sockets` (that socket's directory joined with [`OWNERS_DIR`]), as
+/// the first 16 hexadecimal characters of the session's sha256 and
+/// `.sock`. Short whatever the state root, so a real install's owner
+/// binds; the plan and the endpoint record carry it, and nothing derives
+/// it again.
+#[must_use]
+pub fn owner_socket(sockets: &Path, session: &str) -> PathBuf {
+    use sha2::Digest as _;
+    let digest = sha2::Sha256::digest(session.as_bytes());
+    let mut name = crate::protocol::hex(&digest);
+    name.truncate(16);
+    sockets.join(format!("{name}.sock"))
+}
 /// The owner's launch plan, in its directory, written before it starts.
 pub const PLAN: &str = "launch.json";
 /// The owner's own words, in its directory.
@@ -365,11 +406,10 @@ pub struct OwnerEndpoint {
 }
 
 impl OwnerEndpoint {
-    /// The endpoint for an owner in `dir` that announced `runner` from the
-    /// process `owner`.
+    /// The endpoint for an owner in `dir`, listening on `socket`, that
+    /// announced `runner` from the process `owner`.
     #[must_use]
-    pub fn new(dir: PathBuf, runner: String, owner: Leader) -> Self {
-        let socket = dir.join(SOCKET);
+    pub fn new(dir: PathBuf, socket: PathBuf, runner: String, owner: Leader) -> Self {
         Self {
             dir,
             socket,

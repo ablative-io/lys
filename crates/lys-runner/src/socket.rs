@@ -89,6 +89,7 @@ fn refuse_live(path: &Path) -> Result<(), RunnerError> {
 /// that ended without removing it, and is replaced; one a runner answers on
 /// is refused `runner_already_running`.
 fn bind(path: &Path) -> Result<UnixListener, RunnerError> {
+    crate::seat_owner::protocol::fits_socket(path)?;
     if path.exists() {
         refuse_live(path)?;
         std::fs::remove_file(path)
