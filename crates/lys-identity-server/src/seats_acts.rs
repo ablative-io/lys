@@ -220,10 +220,16 @@ pub(crate) async fn live_session(
     machine: &str,
     session: &str,
 ) -> Result<Option<Live>, ServerError> {
-    Ok(liveness(state, machine, Some(session.to_owned()))
-        .await?
-        .into_iter()
-        .find(|live| live.session == session))
+    // A session the runner does not hold is not live: its owner exited, or the
+    // runner restarted without it. Answered as absent, so a seat whose session
+    // died can still be stopped, retired and started again (12 Oct 2026: a seat
+    // whose session was gone refused stop as session_unknown, retire as
+    // seat_running, and start as session_unknown, and could never move again).
+    match liveness(state, machine, Some(session.to_owned())).await {
+        Ok(sessions) => Ok(sessions.into_iter().find(|live| live.session == session)),
+        Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown" => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 /// Ask `act` of `driven`'s runner for `caller`, keep its receipt under
