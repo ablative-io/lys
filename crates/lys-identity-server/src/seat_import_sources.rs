@@ -35,7 +35,7 @@ use crate::seat_import_plan::{Completeness, Excluded, Fragment, Harness, Manifes
 use crate::seat_import_profiles::{
     BOUND_EXCEEDED, MEMBER_UNSUPPORTED, NO_MEMBER, NO_OWNER, PLUGIN_SET, ProfileParts, Replaced,
     SCOPE_AMBIGUOUS, SOURCE_MALFORMED, SOURCE_MISSING, SOURCE_UNREADABLE, Sorted, UI_STATE,
-    WITHHELD, child, dotted, empty_fragment, map_profile, refusal, sha256_hex,
+    WITHHELD, child, empty_fragment, map_profile, refusal, sha256_hex,
 };
 
 /// The largest declared resource file read, in bytes.
@@ -58,7 +58,7 @@ pub const REVISION_NONE: &str = "none";
 
 const CODEX_MACHINE_OWNED: &str = "machine_owned: the approval policy and project trust are the machine's own Codex configuration, never a profile member (the Codex launch takes them from the machine)";
 /// The Claude settings that are the harness's own interface or preferences.
-const CLAUDE_UI: [&str; 7] = [
+const CLAUDE_UI: [&str; 10] = [
     "alwaysThinkingEnabled",
     "tui",
     "voiceEnabled",
@@ -66,16 +66,9 @@ const CLAUDE_UI: [&str; 7] = [
     "teammateMode",
     "autoCompactEnabled",
     "disableAgentView",
-];
-const SECRET_WORDS: [&str; 8] = [
-    "key",
-    "token",
-    "secret",
-    "password",
-    "passwd",
-    "bearer",
-    "authorization",
-    "cookie",
+    "switchModelsOnFlag",
+    "theme",
+    "voice",
 ];
 const SANDBOX_MODES: [&str; 3] = ["read-only", "workspace-write", "danger-full-access"];
 
@@ -114,6 +107,14 @@ impl Kind {
 /// seat's own profile version declares. Reads nothing the manifest does not
 /// declare and writes nothing.
 pub fn read_files(manifest: &Manifest, declared: Option<&DeclaredHarness>) -> Fragment {
+    read_files_with_session(manifest, declared, None)
+}
+
+pub(crate) fn read_files_with_session(
+    manifest: &Manifest,
+    declared: Option<&DeclaredHarness>,
+    session: Option<&crate::provisioning_store::SessionSettings>,
+) -> Fragment {
     let mut fragment = empty_fragment();
     if manifest.replaced_env_prefixes.iter().any(String::is_empty) {
         fragment.refusals.push(refusal(
@@ -183,6 +184,7 @@ pub fn read_files(manifest: &Manifest, declared: Option<&DeclaredHarness>) -> Fr
             manifest.harness,
             declared,
             parts,
+            session,
         ));
     }
     fragment
@@ -370,102 +372,9 @@ fn withheld(value: &Value, secrets: &BTreeSet<String>) -> Result<Vec<u8>, String
     serde_json::to_vec(&copy).map_err(|error| error.to_string())
 }
 
-/// Whether a variable, header, flag or query name names a secret.
-pub fn secret_name(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    SECRET_WORDS.iter().any(|word| lower.contains(word))
-}
-
-/// Whether `text` is shaped as a secret wherever it is written: a private
-/// key, a bearer or basic credential, or an address carrying a user part or
-/// a secret-named query value.
-pub fn secret_value(text: &str) -> bool {
-    let lower = text.to_ascii_lowercase();
-    lower.contains("-----begin")
-        || lower.starts_with("bearer ")
-        || lower.starts_with("basic ")
-        || address_carries_secret(text)
-}
-
-fn address_carries_secret(text: &str) -> bool {
-    let Some((_, rest)) = text.split_once("://") else {
-        return false;
-    };
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-    if authority.contains('@') {
-        return true;
-    }
-    let Some((_, query)) = rest.split_once('?') else {
-        return false;
-    };
-    let query = query.split('#').next().unwrap_or_default();
-    query.split('&').any(|pair| {
-        pair.split_once('=')
-            .is_some_and(|(name, value)| secret_name(name) && !value.is_empty())
-    })
-}
-
-enum Flag {
-    Plain,
-    Inline,
-    Next,
-}
-
-fn secret_flag(arg: &str) -> Flag {
-    let body = arg.trim_start_matches('-');
-    if body.len() == arg.len() {
-        return Flag::Plain;
-    }
-    match body.split_once('=') {
-        Some((name, value)) if secret_name(name) && !value.is_empty() => Flag::Inline,
-        None if secret_name(body) => Flag::Next,
-        Some(_) | None => Flag::Plain,
-    }
-}
-
-/// Every secret-shaped value under `value`, refused into `sorted`.
-fn scan(sorted: &mut Sorted, value: &Value, path: &str, pointer: &str, parent: &str) {
-    match value {
-        Value::String(text) if secret_value(text) => sorted.credential(path, pointer.to_owned()),
-        Value::Array(items) => {
-            let mut next_is_secret = false;
-            for (index, item) in items.iter().enumerate() {
-                let at = format!("{path}[{index}]");
-                let below = format!("{pointer}/{index}");
-                if parent == "args"
-                    && let Value::String(arg) = item
-                {
-                    if std::mem::take(&mut next_is_secret) {
-                        sorted.credential(&at, below);
-                        continue;
-                    }
-                    match secret_flag(arg) {
-                        Flag::Inline => {
-                            sorted.credential(&at, below);
-                            continue;
-                        }
-                        Flag::Next => next_is_secret = true,
-                        Flag::Plain => {}
-                    }
-                }
-                scan(sorted, item, &at, &below, "");
-            }
-        }
-        Value::Object(members) => {
-            for (key, item) in members {
-                let at = dotted(path, key);
-                let below = child(pointer, key);
-                let named = matches!(parent, "env" | "headers" | "http_headers");
-                if named && secret_name(key) && item.as_str().is_some_and(|text| !text.is_empty()) {
-                    sorted.credential(&at, below);
-                    continue;
-                }
-                scan(sorted, item, &at, &below, key);
-            }
-        }
-        Value::String(_) | Value::Null | Value::Bool(_) | Value::Number(_) => {}
-    }
-}
+mod credentials;
+use credentials::scan;
+pub use credentials::{secret_name, secret_value};
 
 /// The Claude `settings.json` document sorted; `replaced` names the
 /// environment entries Lys replaces: the monitor address the manifest names

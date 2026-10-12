@@ -1,0 +1,464 @@
+[
+  {
+    "seat": "waffles",
+    "harness": "claude",
+    "settings": {
+      "model": "claude-fable-5-1[1m]",
+      "switchModelsOnFlag": false
+    },
+    "mcp": {
+      "mcpServers": {
+        "haematite": {
+          "command": "/Users/tom/.local/bin/haematite",
+          "args": [
+            "mcp",
+            "--socket",
+            "/Users/tom/Developer/ablative/stack/haematite/.work/apollo/door-20261010/sock/studio.sock",
+            "--lys-agent",
+            "http://127.0.0.1:8490",
+            "agent-fb8a066298743165730618642c5578c5",
+            "--key-file",
+            "/Users/tom/.claude-waffles/cambium-mcp/waffles.seat.json"
+          ]
+        }
+      }
+    },
+    "reported_refusals": [
+      {
+        "name": "import_credential_inline",
+        "member": "claude.mcp#mcpServers.haematite.args[7]",
+        "detail": "a secret-shaped value is written here; it is not copied, shown or hashed, and the member must name a broker handle instead"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "claude.settings#switchModelsOnFlag",
+        "detail": "the provisioning profile has no member that carries this setting"
+      }
+    ]
+  },
+  {
+    "seat": "buckley",
+    "harness": "claude",
+    "settings": {
+      "model": "claude-fable-5-1[1m]",
+      "switchModelsOnFlag": false
+    },
+    "mcp": {
+      "mcpServers": {
+        "haematite": {
+          "command": "/Users/tom/.local/bin/haematite",
+          "args": [
+            "mcp",
+            "--socket",
+            "/Users/tom/Developer/ablative/stack/haematite/.work/apollo/door-20261010/sock/studio.sock",
+            "--lys-agent",
+            "http://127.0.0.1:8490",
+            "agent-68e37b7ce57f2c63de6109fb32415787",
+            "--key-file",
+            "/Users/tom/.cambium/buckley.seat.json"
+          ]
+        }
+      }
+    },
+    "reported_refusals": [
+      {
+        "name": "import_credential_inline",
+        "member": "claude.mcp#mcpServers.haematite.args[7]",
+        "detail": "a secret-shaped value is written here; it is not copied, shown or hashed, and the member must name a broker handle instead"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "claude.settings#switchModelsOnFlag",
+        "detail": "the provisioning profile has no member that carries this setting"
+      }
+    ]
+  },
+  {
+    "seat": "apollo",
+    "harness": "claude",
+    "settings": {
+      "model": "claude-fable-5-1[1m]",
+      "switchModelsOnFlag": false
+    },
+    "mcp": {
+      "mcpServers": {
+        "haematite": {
+          "command": "/Users/tom/.local/bin/haematite",
+          "args": [
+            "mcp",
+            "--socket",
+            "/Users/tom/Developer/ablative/stack/haematite/.work/apollo/door-20261010/sock/studio.sock",
+            "--lys-agent",
+            "http://127.0.0.1:8490",
+            "agent-7c6ecdb3befcfe0079d822bd92a360f5",
+            "--key-file",
+            "/Users/tom/.claude-apollo/cambium-mcp/apollo-biscuit.seat.json"
+          ]
+        }
+      }
+    },
+    "reported_refusals": [
+      {
+        "name": "import_credential_inline",
+        "member": "claude.mcp#mcpServers.haematite.args[7]",
+        "detail": "a secret-shaped value is written here; it is not copied, shown or hashed, and the member must name a broker handle instead"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "claude.settings#switchModelsOnFlag",
+        "detail": "the provisioning profile has no member that carries this setting"
+      }
+    ]
+  },
+  {
+    "seat": "hermes",
+    "harness": "claude",
+    "settings": {
+      "model": "fable",
+      "voice": {
+        "enabled": true,
+        "mode": "hold"
+      },
+      "theme": "dark",
+      "switchModelsOnFlag": false,
+      "env": {
+        "CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE": "40"
+      }
+    },
+    "mcp": {
+      "mcpServers": {
+        "haematite": {
+          "command": "/Users/tom/.local/bin/haematite",
+          "args": [
+            "mcp",
+            "--socket",
+            "/Users/tom/Developer/ablative/stack/haematite/.work/apollo/door-20261010/sock/studio.sock",
+            "--lys-agent",
+            "http://127.0.0.1:8490",
+            "agent-4efb584921f605a5a6c259ed79046501",
+            "--key-file",
+            "/Users/tom/.cambium/hermes.seat.json"
+          ]
+        }
+      }
+    },
+    "reported_refusals": [
+      {
+        "name": "import_credential_inline",
+        "member": "claude.mcp#mcpServers.haematite.args[7]",
+        "detail": "a secret-shaped value is written here; it is not copied, shown or hashed, and the member must name a broker handle instead"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "claude.settings#env.CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE",
+        "detail": "the profile carries no harness environment; only an MCP server's command carries one"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "claude.settings#switchModelsOnFlag",
+        "detail": "the provisioning profile has no member that carries this setting"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "claude.settings#theme",
+        "detail": "the provisioning profile has no member that carries this setting"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "claude.settings#voice",
+        "detail": "the provisioning profile has no member that carries this setting"
+      }
+    ]
+  },
+  {
+    "seat": "nimbus",
+    "harness": "codex",
+    "profile": {
+      "mcp_servers": {
+        "cambium": {
+          "command": "/Users/tom/cambium-local/bin/cambium-mcp",
+          "enabled": true,
+          "channel": "wake",
+          "env": {
+            "CAMBIUM_MCP_SEAT": "/Users/tom/.cambium/nimbus.seat.json"
+          },
+          "tools": {
+            "send": {
+              "approval_mode": "approve"
+            },
+            "read": {
+              "approval_mode": "approve"
+            },
+            "find": {
+              "approval_mode": "approve"
+            },
+            "inbox": {
+              "approval_mode": "approve"
+            },
+            "item": {
+              "approval_mode": "approve"
+            },
+            "item_create": {
+              "approval_mode": "approve"
+            },
+            "item_update": {
+              "approval_mode": "approve"
+            },
+            "task": {
+              "approval_mode": "approve"
+            },
+            "pin": {
+              "approval_mode": "approve"
+            },
+            "note": {
+              "approval_mode": "approve"
+            },
+            "project": {
+              "approval_mode": "approve"
+            },
+            "run": {
+              "approval_mode": "approve"
+            },
+            "queue": {
+              "approval_mode": "approve"
+            },
+            "read_schema": {
+              "approval_mode": "approve"
+            },
+            "read_record": {
+              "approval_mode": "approve"
+            },
+            "write_record": {
+              "approval_mode": "approve"
+            },
+            "watch": {
+              "approval_mode": "approve"
+            },
+            "topic": {
+              "approval_mode": "approve"
+            },
+            "place": {
+              "approval_mode": "approve"
+            },
+            "calendar": {
+              "approval_mode": "approve"
+            },
+            "canvas": {
+              "approval_mode": "approve"
+            },
+            "huddle": {
+              "approval_mode": "approve"
+            },
+            "me": {
+              "approval_mode": "approve"
+            },
+            "file": {
+              "approval_mode": "approve"
+            }
+          }
+        },
+        "haematite": {
+          "command": "/Users/tom/.local/bin/haem-seat",
+          "args": [
+            "mcp",
+            "--socket",
+            "/Users/tom/Developer/ablative/stack/haematite/.work/apollo/door-20261010/sock/studio.sock",
+            "--lys-agent",
+            "http://127.0.0.1:8490",
+            "agent-67e9a418b3ab620e0b5b49275959c6fb",
+            "--key-file",
+            "/Users/tom/.cambium/nimbus.seat.json"
+          ],
+          "enabled": true
+        }
+      },
+      "model": "gpt-6.1-sol"
+    },
+    "reported_refusals": [
+      {
+        "name": "import_credential_inline",
+        "member": "codex.profile#mcp_servers.haematite.args[7]",
+        "detail": "a secret-shaped value is written here; it is not copied, shown or hashed, and the member must name a broker handle instead"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "codex.profile#mcp_servers.cambium.channel",
+        "detail": "the declared Codex launch contract refuses wake channels"
+      }
+    ]
+  },
+  {
+    "seat": "gypsy",
+    "harness": "codex",
+    "profile": {
+      "mcp_servers": {
+        "meridian": {
+          "command": "/Users/tom/.bun/bin/bun",
+          "args": [
+            "/Users/tom/Developer/ablative/apps/meridian/packages/meridian-remote-mcp/server.ts"
+          ],
+          "channel": "wake",
+          "env": {
+            "MERIDIAN_SERVER_URL": "http://localhost:29876",
+            "MERIDIAN_MEMBER_ID": "f27ad39e-2270-41d2-97e3-e4669b0c3d2a",
+            "CLAUDE_CODE_SESSION_ID": "f27ad39e-2270-41d2-97e3-e4669b0c3d2a"
+          }
+        },
+        "cambium": {
+          "command": "/Users/tom/cambium-local/bin/cambium-mcp",
+          "enabled": true,
+          "channel": "wake",
+          "env": {
+            "CAMBIUM_MCP_SEAT": "/Users/tom/.cambium/gypsy.seat.json"
+          },
+          "tools": {
+            "send": {
+              "approval_mode": "approve"
+            },
+            "read": {
+              "approval_mode": "approve"
+            },
+            "find": {
+              "approval_mode": "approve"
+            },
+            "inbox": {
+              "approval_mode": "approve"
+            },
+            "item": {
+              "approval_mode": "approve"
+            },
+            "item_create": {
+              "approval_mode": "approve"
+            },
+            "item_update": {
+              "approval_mode": "approve"
+            },
+            "task": {
+              "approval_mode": "approve"
+            },
+            "pin": {
+              "approval_mode": "approve"
+            },
+            "note": {
+              "approval_mode": "approve"
+            },
+            "project": {
+              "approval_mode": "approve"
+            },
+            "run": {
+              "approval_mode": "approve"
+            },
+            "queue": {
+              "approval_mode": "approve"
+            },
+            "read_schema": {
+              "approval_mode": "approve"
+            },
+            "read_record": {
+              "approval_mode": "approve"
+            },
+            "write_record": {
+              "approval_mode": "approve"
+            },
+            "watch": {
+              "approval_mode": "approve"
+            },
+            "topic": {
+              "approval_mode": "approve"
+            },
+            "place": {
+              "approval_mode": "approve"
+            },
+            "calendar": {
+              "approval_mode": "approve"
+            },
+            "canvas": {
+              "approval_mode": "approve"
+            },
+            "huddle": {
+              "approval_mode": "approve"
+            },
+            "me": {
+              "approval_mode": "approve"
+            },
+            "file": {
+              "approval_mode": "approve"
+            }
+          }
+        },
+        "dot": {
+          "command": "/Users/tom/Applications/Cuti.app/Contents/MacOS/dot-seat",
+          "args": [
+            "--earhorn-connect",
+            "ws://100.125.55.89:8087/v1/stream",
+            "--gob",
+            "ws://100.125.55.89:8088"
+          ],
+          "enabled": true,
+          "channel": "wake",
+          "env": {
+            "DOT_VOICE": "af_sky",
+            "DOT_NAME": "Gypsy",
+            "DOT_COSTUME": "darkRounds,waistcoat,cigarette"
+          },
+          "tools": {
+            "respond_to_invitation": {
+              "approval_mode": "approve"
+            }
+          }
+        },
+        "argus": {
+          "tools": {
+            "clients_list": {
+              "approval_mode": "approve"
+            },
+            "queue_get": {
+              "approval_mode": "approve"
+            }
+          }
+        },
+        "haematite": {
+          "command": "/Users/tom/.local/bin/haem-seat",
+          "args": [
+            "mcp",
+            "--socket",
+            "/Users/tom/Developer/ablative/stack/haematite/.work/apollo/door-20261010/sock/studio.sock",
+            "--lys-agent",
+            "http://127.0.0.1:8490",
+            "agent-04ce6a785e27445f38ce89e0053552bb",
+            "--key-file",
+            "/Users/tom/.cambium/gypsy.seat.json"
+          ],
+          "enabled": true
+        }
+      }
+    },
+    "reported_refusals": [
+      {
+        "name": "import_credential_inline",
+        "member": "codex.profile#mcp_servers.haematite.args[7]",
+        "detail": "a secret-shaped value is written here; it is not copied, shown or hashed, and the member must name a broker handle instead"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "codex.profile#mcp_servers.argus",
+        "detail": "the server names neither a command nor an address"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "codex.profile#mcp_servers.cambium.channel",
+        "detail": "the declared Codex launch contract refuses wake channels"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "codex.profile#mcp_servers.dot.channel",
+        "detail": "the declared Codex launch contract refuses wake channels"
+      },
+      {
+        "name": "import_member_unsupported",
+        "member": "codex.profile#mcp_servers.meridian.channel",
+        "detail": "the declared Codex launch contract refuses wake channels"
+      }
+    ]
+  }
+]
